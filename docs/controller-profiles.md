@@ -2,8 +2,56 @@
 
 Open **App Settings → Controllers** from the launcher or pause menu. Select a
 device, or choose **Identify by pressing a button** and press one of its buttons.
-The device's current P1/P2 assignment is shown; this does not change its seat.
+The device's current P1/P2 assignment is shown. Select **Use as Player 1** or
+**Use as Player 2** to change it; merely opening settings does not claim a seat.
 A paused game stays paused throughout setup.
+
+## NES button layout
+
+NES Library and Falling translate logical **East (right face button) to NES A**
+and **South (bottom face button) to NES B** for both players. This follows the
+Nintendo layout: on an SN30 Pro, the printed A jumps and B runs in Super Mario
+Bros. The mapping does not depend on the reported device name: a Nintendo-layout
+controller may identify itself as an Xbox controller over USB.
+
+This is a scenario binding, not a global controller remap. The setup/tester's
+`A / South` and `B / East` labels describe the common host controls, not NES
+buttons. Menu confirm/back and other scenarios are unchanged; NES keyboard
+controls remain Z/Space = A and X = B. Custom profiles first map physical inputs
+to logical positions; NES then applies the same East/South binding. On a pad
+with Xbox-style printed labels, the NES binding follows positions, not letters.
+
+## Player assignments
+
+- Moving a seated controller swaps it with the destination slot. For example,
+  choose the USB gamepad and **Use as Player 1**: it now controls single-player
+  NES/Falling, while the cabinet becomes P2. Scenarios keep independent inputs.
+- Choosing an unassigned controller replaces the destination; the displaced
+  controller becomes unassigned. It is not silently moved to another player.
+- Any connected controller—including an unassigned one—can navigate host menus.
+  Unassigned controllers do not send gameplay or Clock event/duck actions.
+- Assignment changes immediately clear both players' held gamepad state and any
+  CLI input lease. Each physical controller must return to neutral before its
+  buttons/directions are forwarded again. No confirming A becomes a NES button
+  or ship laser on resume. Keyboard and Picade utility keys are unchanged.
+- Explicit preferences persist locally as `controls.player_1_device` and
+  `controls.player_2_device`. Without preferences, devices take free slots in
+  connection order.
+  Preferences use the same OS-specific **model** keys as profiles, never backend
+  connection IDs. Assignments apply across scenario launches and app restarts.
+- A disconnected controller reserves its slot. A uniquely distinguishable model
+  can reclaim it even with a new connection ID; a different device cannot steal
+  it. Manual gameplay still pauses on a seated controller's disconnect, and
+  reconnecting does not automatically resume. Replace the slot explicitly or
+  use **Reset player assignments** to forget reservations and saved preferences.
+- Identical models are not individually identifiable. Their live assignments
+  work, but are **session-only** and are not saved. Once duplicate models have
+  been observed in a session, reconnect requires an explicit choice, even if
+  the backend reuses an ID. At startup, an ambiguous saved model is left reserved
+  rather than guessing which physical pad it represents. Menus remain usable.
+- Resetting player assignments chooses the first two available devices and
+  leaves button profiles unchanged. Saving uses the shared background writer;
+  a failed save keeps the live assignment and offers App Settings → Retry Save.
 
 ## Setup and recovery
 
@@ -77,7 +125,7 @@ controller layout for both button edges and continuous held snapshots. Scenario
 code keeps its existing actions. Unclaimed analog sticks retain their normal
 behavior; a stick axis assigned to digital directions no longer sends its old
 analog direction as well. Whole-stick calibration, keyboard remapping,
-scenario-specific Jump/Run bindings, and P1/P2 reassignment are separate work.
+and scenario-specific Jump/Run bindings are separate work.
 
 ## Automation and checks
 
@@ -85,14 +133,21 @@ scenario-specific Jump/Run bindings, and P1/P2 reassignment are separate work.
 spacewars-cli ui activate launcher.sound
 spacewars-cli ui activate settings.controllers
 spacewars-cli ui state --json
+# Use the connection ID listed in the snapshot, not a hard-coded cabinet ID:
+spacewars-cli ui activate controllers.device.0
+spacewars-cli ui activate controllers.assign-p1
+spacewars-cli ui activate controllers.back
 spacewars-cli ui activate controllers.back
 ```
 
 Use `pause.sound` from a paused game. Screen IDs are `launcher.controllers` and
 `pause.controllers`. Enumerated `controllers.device.<id>` IDs are valid only for
-the current connection. `controllers.detail` and `controllers.status` expose the
-visible diagnostic text. Countdown/tester changes affect UI revisions; use a
-screen guard instead of an old revision while observing live input.
+the current connection. `controllers.players`, `controllers.detail`, and
+`controllers.status` expose player names/assignments and diagnostic text.
+`controllers.assign-p1`, `controllers.assign-p2`, and `controllers.reset-players`
+use the same callbacks as touch/controller UI. Countdown/tester changes affect
+UI revisions; use a screen guard instead of an old revision while observing
+live input.
 
 The CLI's simulated controller remains a *logical* controller, so it bypasses
 hardware profiles. Simulated presses are rejected while Controllers is open;
@@ -103,6 +158,7 @@ Logical simulation is not a substitute for testing a real held switch on
 ```sh
 cargo test -p engine-common controller::
 cargo test -p engine-client --bin engine-client controller_
+cargo test -p engine-client --bin engine-client gamepad::
 SPACEWARS_CONTROLLER_ARTIFACTS=/tmp/controller-layouts \
   cargo test -p engine-client --bin engine-client \
   ui_render_tests::controller_setup_renders_on_picade_and_hyperpixel_layouts -- --exact
@@ -116,3 +172,10 @@ axes, duplicate/diagonal input rejection, neutral/release gating, optional skips
 cancel/timeout/disconnect rollback, same-model profiles, save/reload, and default
 restoration. Layouts are rendered at 800×480, 1024×768, and 480×800. Physical
 cabinet/gamepad validation remains necessary before calling the mapping verified.
+
+Assignment tests cover swaps, an unassigned replacement, saved preference reload
+with changed IDs/order, reserved slots, duplicate models, ID reuse, reset, and
+isolated settings recovery. Tests drive the real menu callbacks and shared
+sampling gates into the NES controller inputs, verifying independent ports and
+held-button suppression. Unassigned-pad menu routing is tested separately from
+gameplay. The real-app UI workflow checks both launcher and pause entry/reset.

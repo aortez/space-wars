@@ -1,5 +1,6 @@
 //! Device-level controller setup. Drafts are isolated; a short, reversible
-//! trial precedes persistence. No scenario or player-assignment policy lives here.
+//! trial precedes persistence. Player-slot policy is kept in Assignments, not
+//! in scenarios or the button-profile schema.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -11,8 +12,9 @@ use engine_common::{ControllerControl, ControllerProfile, Settings};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use spacewars_control::{UiAction, UiControl};
 
+use crate::controller_assignments::Assignments;
 use crate::controller_profile::{Capture, RawState};
-use crate::input::GamepadSeatInput;
+use crate::input::{GamepadSeatInput, SharedGamepadInput};
 use crate::settings_writer::SettingsWriter;
 use crate::{ControllerRow, MainWindow};
 
@@ -79,6 +81,8 @@ impl Page {
 pub(crate) struct Controllers {
     devices: BTreeMap<usize, Device>,
     profiles: BTreeMap<String, ControllerProfile>,
+    assignments: Assignments,
+    gamepads: SharedGamepadInput,
     page: Page,
     pub epoch: u64,
     visible: bool,
@@ -97,6 +101,7 @@ pub(crate) fn install(
     window: &MainWindow,
     settings: Arc<RwLock<Settings>>,
     writer: SettingsWriter,
+    gamepads: SharedGamepadInput,
 ) -> SharedControllers {
     let mut profiles = BTreeMap::new();
     let mut invalid = 0;
@@ -110,9 +115,18 @@ pub(crate) fn install(
             invalid += 1;
         }
     }
+    let preferences = {
+        let settings = settings.read().unwrap();
+        [
+            settings.controls.player_1_device.clone(),
+            settings.controls.player_2_device.clone(),
+        ]
+    };
     let state = Rc::new(RefCell::new(Controllers {
         devices: BTreeMap::new(),
         profiles,
+        assignments: Assignments::new(preferences),
+        gamepads,
         page: Page::Devices,
         epoch: 0,
         visible: false,
@@ -178,15 +192,92 @@ pub(crate) fn install(
 
 impl Controllers {
     pub fn connect(&mut self, device: Device) {
+        self.assignments.connect(device.id, device.key.clone());
         self.devices.insert(device.id, device);
+        self.assignments_changed();
+    }
+
+    pub fn connect_many(&mut self, devices: Vec<Device>) {
+        self.assignments
+            .connect_many(devices.iter().map(|device| (device.id, device.key.clone())));
+        for device in devices {
+            self.devices.insert(device.id, device);
+        }
+        self.assignments_changed();
     }
 
     pub fn disconnect(&mut self, id: usize) {
+        self.assignments.disconnect(id);
         self.devices.remove(&id);
+        self.assignments_changed();
         if self.page.device() == Some(id) {
             self.change_page(Page::Devices);
             self.status = "Controller disconnected. Unsaved mapping discarded.".into();
         }
+    }
+
+    pub fn seat(&self, id: usize) -> Option<usize> {
+        self.assignments.seat(id)
+    }
+
+    pub fn connected_id(&self, seat: usize) -> Option<usize> {
+        self.assignments.connected_id(seat)
+    }
+
+    pub fn has_disconnected_seat(&self) -> bool {
+        self.assignments.has_disconnected_seat()
+    }
+
+    pub fn disconnected_player_labels(&self) -> String {
+        (0..2)
+            .filter(|seat| self.assignments.reserved(*seat) && self.connected_id(*seat).is_none())
+            .map(|seat| format!("P{}", seat + 1))
+            .collect::<Vec<_>>()
+            .join(" / ")
+    }
+
+    fn assignments_changed(&mut self) {
+        for device in self.devices.values_mut() {
+            device.seat = self.assignments.seat(device.id);
+        }
+        // Clear synchronously, including touch/CLI activations between polls.
+        // The pump observes the epoch and gates every device until neutral.
+        self.gamepads.borrow_mut().clear_for_reassignment();
+        self.epoch = self.epoch.wrapping_add(1);
+        self.last_publish = None;
+    }
+
+    fn save_preferences(&self, window: &MainWindow, preferences: [Option<String>; 2]) {
+        let snapshot = {
+            let mut settings = self.settings.write().unwrap();
+            [
+                settings.controls.player_1_device,
+                settings.controls.player_2_device,
+            ] = preferences;
+            settings.clone()
+        };
+        self.writer.save(snapshot);
+        window.set_settings_save_pending(true);
+        window.set_settings_save_error("".into());
+    }
+
+    fn player_summary(&self) -> String {
+        (0..2)
+            .map(|seat| {
+                let name = self
+                    .assignments
+                    .connected_id(seat)
+                    .and_then(|id| self.devices.get(&id))
+                    .map(|device| device.name.as_str())
+                    .unwrap_or(if self.assignments.reserved(seat) {
+                        "Reserved — controller disconnected"
+                    } else {
+                        "No controller"
+                    });
+                format!("P{}: {name}", seat + 1)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     pub fn profile(&self, id: usize) -> Option<&ControllerProfile> {
@@ -345,6 +436,11 @@ impl Controllers {
             }
         } else if command == "controllers.identify" {
             self.change_page(Page::Identify(now + Duration::from_secs(20)));
+        } else if command == "controllers.reset-players" {
+            self.assignments.reset();
+            self.assignments_changed();
+            self.save_preferences(window, [None, None]);
+            self.status = "Player preferences cleared. First two available controllers assigned; release controls to continue.".into();
         } else if let Some(id) = command
             .strip_prefix("controllers.device.")
             .and_then(|id| id.parse().ok())
@@ -354,6 +450,24 @@ impl Controllers {
             }
         } else if let Some(id) = self.page.device() {
             match command {
+                "controllers.assign-p1" | "controllers.assign-p2" => {
+                    let seat = usize::from(command == "controllers.assign-p2");
+                    if self.assignments.assign(id, seat) {
+                        self.assignments_changed();
+                        self.save_preferences(window, self.assignments.preferences());
+                        self.status = if self.assignments.model_is_ambiguous(id) {
+                            format!(
+                                "Assigned P{}. Identical model: session only; choose again after reconnect. Release controls to continue.",
+                                seat + 1
+                            )
+                        } else {
+                            format!(
+                                "Assigned P{}. Saving player preferences. Release controls to continue.",
+                                seat + 1
+                            )
+                        };
+                    }
+                }
                 "controllers.remap" => {
                     if self.profiles.len() >= MAX_PROFILES
                         && !self.profiles.contains_key(&self.devices[&id].key)
@@ -448,8 +562,11 @@ impl Controllers {
                 if !self.devices.is_empty() {
                     add("controllers.identify", "Identify by pressing a button");
                 }
+                add("controllers.reset-players", "Reset player assignments");
             }
             Page::Device(_) => {
+                add("controllers.assign-p1", "Use as Player 1");
+                add("controllers.assign-p2", "Use as Player 2");
                 add("controllers.remap", "Set up mapping…");
                 add("controllers.test", "Test buttons and joystick");
                 add("controllers.defaults", "Try default mapping…");
@@ -480,7 +597,7 @@ impl Controllers {
         window.set_controllers_subtitle(
             device
                 .map_or_else(
-                    || "Device mappings · player assignments stay unchanged".into(),
+                    || "Player assignments · button mappings".into(),
                     |device| format!("{} · {}", seat_label(device), device.name),
                 )
                 .into(),
@@ -495,6 +612,7 @@ impl Controllers {
             }
             .into(),
         );
+        window.set_controllers_assignments(self.player_summary().into());
         let remaining = |deadline: Instant| {
             deadline
                 .saturating_duration_since(now)
@@ -503,17 +621,23 @@ impl Controllers {
         };
         let text = match &self.page {
             Page::Devices => {
-                if self.devices.is_empty() {
-                    "No controllers connected. Keyboard and touch still work.".into()
+                let hint = if self.devices.is_empty() {
+                    "Connect a controller. Keyboard and touch still work."
                 } else {
-                    "Choose a controller, or identify it by pressing a button. Profiles are local to this machine, not copied to the other cabinet.".into()
-                }
+                    "Choose or identify a controller. Either controller can navigate menus."
+                };
+                format!("{}\n\n{hint}", self.player_summary())
             }
             Page::Device(id) => {
                 let customized = self.profile(*id).is_some();
                 format!(
-                    "{} mapping. Setup changes logical buttons for ALL games and menus.\nSame-model controllers share a profile here; it does not change P1/P2. Picade Esc/Enter utility keys remain unchanged.",
-                    if customized { "Custom" } else { "Default" }
+                    "{} mapping for all games and menus. Player choices swap occupied slots.\n{}\nPicade Esc/Enter utility keys stay unchanged.",
+                    if customized { "Custom" } else { "Default" },
+                    if self.assignments.model_is_ambiguous(*id) {
+                        "Identical models: assignments are session-only; choose again after reconnect."
+                    } else {
+                        "Distinct device models are remembered. Missing controllers keep their slots."
+                    }
                 )
             }
             Page::Identify(deadline) => format!(
@@ -636,6 +760,10 @@ pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
         .map(|row| UiControl::new(row.id.as_str(), row.label.as_str(), true))
         .collect::<Vec<_>>();
     result.push(
+        UiControl::new("controllers.players", "Player assignments", false)
+            .with_value(window.get_controllers_assignments().to_string()),
+    );
+    result.push(
         UiControl::new("controllers.detail", "Controller status", false)
             .with_value(window.get_controllers_detail().to_string()),
     );
@@ -696,7 +824,12 @@ mod tests {
         let path = directory.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
         let writer = SettingsWriter::new(path.clone()).unwrap();
-        let state = install(&window, Arc::clone(&settings), writer.clone());
+        let state = install(
+            &window,
+            Arc::clone(&settings),
+            writer.clone(),
+            crate::input::new_shared_input().1,
+        );
         state.borrow_mut().connect(device(0));
         state.borrow_mut().connect(device(1)); // Identical models, not seat keys.
         let mut other = device(2);
@@ -784,7 +917,12 @@ mod tests {
             "parent menu close rolls back"
         );
 
-        let reloaded = install(&window, Arc::new(RwLock::new(stored)), writer);
+        let reloaded = install(
+            &window,
+            Arc::new(RwLock::new(stored)),
+            writer,
+            crate::input::new_shared_input().1,
+        );
         reloaded.borrow_mut().connect(device(12));
         assert_eq!(
             reloaded.borrow().profile(12),
@@ -814,6 +952,7 @@ mod tests {
             &window,
             Arc::new(RwLock::new(settings)),
             SettingsWriter::new(directory.path().join("settings.toml")).unwrap(),
+            crate::input::new_shared_input().1,
         );
         state.borrow_mut().connect(device(15));
         assert_eq!(state.borrow().profile(15), Some(&profile(100)));
@@ -831,6 +970,7 @@ mod tests {
             &window,
             Arc::new(RwLock::new(Settings::default())),
             SettingsWriter::new(directory.path().join("settings.toml")).unwrap(),
+            crate::input::new_shared_input().1,
         );
         state.borrow_mut().connect(device(0));
         state.borrow_mut().connect(device(1));

@@ -142,11 +142,22 @@ impl GamepadInput {
         self.seats.get(player)
     }
 
+    #[cfg(test)]
     pub(crate) fn set_seat(&mut self, player: usize, state: GamepadSeatInput) {
         if let Some(seat) = self.seats.get_mut(player) {
             *seat = state;
         }
         self.refresh_simulated();
+    }
+
+    pub(crate) fn replace_seats(&mut self, seats: [GamepadSeatInput; 2]) {
+        self.seats = seats;
+        self.refresh_simulated();
+    }
+
+    pub(crate) fn clear_for_reassignment(&mut self) {
+        self.simulated = None;
+        self.seats = Default::default();
     }
 
     pub(crate) fn simulate(&mut self, player: usize, button: InputButton, until: Instant) {
@@ -634,10 +645,12 @@ impl ClientInput {
         if gamepad.dpad_right {
             buttons |= ControllerButtons::RIGHT;
         }
-        if gamepad.south {
+        // NES uses Nintendo's face-button positions, independent of the device's
+        // reported brand or the host menu's South=confirm / East=back bindings.
+        if gamepad.east {
             buttons |= ControllerButtons::A;
         }
-        if gamepad.east {
+        if gamepad.south {
             buttons |= ControllerButtons::B;
         }
         if gamepad.select {
@@ -2111,6 +2124,97 @@ mod tests {
     }
 
     #[test]
+    fn nes_gamepad_buttons_use_nintendo_positions_on_both_ports() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            for name in [
+                "Microsoft X-Box 360 pad",
+                "8BitDo SN30 Pro",
+                "Space-Wars Picade",
+            ] {
+                for (south, east, expected) in [
+                    (false, false, ControllerButtons::NONE),
+                    (false, true, ControllerButtons::A),
+                    (true, false, ControllerButtons::B),
+                    (true, true, ControllerButtons::A | ControllerButtons::B),
+                ] {
+                    gamepads.borrow_mut().set_seat(
+                        player,
+                        GamepadSeatInput {
+                            connected: true,
+                            name: name.into(),
+                            south,
+                            east,
+                            ..GamepadSeatInput::default()
+                        },
+                    );
+                    assert_eq!(
+                        input.nes_controller_buttons(player),
+                        expected,
+                        "player={player} name={name} south={south} east={east}"
+                    );
+                    assert_eq!(
+                        input.nes_controller_buttons(1 - player),
+                        ControllerButtons::NONE
+                    );
+                }
+            }
+            gamepads.borrow_mut().disconnect_seat(player);
+        }
+    }
+
+    #[test]
+    fn nes_gamepad_can_hold_b_while_tapping_a() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            // Hold Run across frames, tap Jump twice, then release Run.
+            for (south, east, expected) in [
+                (true, false, ControllerButtons::B),
+                (true, false, ControllerButtons::B),
+                (true, true, ControllerButtons::A | ControllerButtons::B),
+                (true, false, ControllerButtons::B),
+                (true, true, ControllerButtons::A | ControllerButtons::B),
+                (true, false, ControllerButtons::B),
+                (false, false, ControllerButtons::NONE),
+            ] {
+                gamepads.borrow_mut().set_seat(
+                    player,
+                    GamepadSeatInput {
+                        connected: true,
+                        south,
+                        east,
+                        ..GamepadSeatInput::default()
+                    },
+                );
+                assert_eq!(input.nes_controller_buttons(player), expected);
+                assert_eq!(
+                    input.nes_controller_buttons(1 - player),
+                    ControllerButtons::NONE
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nes_keyboard_keeps_z_and_space_as_a_and_x_as_b() {
+        let mut input = ClientInput::default();
+        for (key, expected) in [
+            (KeyCode::KeyZ, ControllerButtons::A),
+            (KeyCode::Space, ControllerButtons::A),
+            (KeyCode::KeyX, ControllerButtons::B),
+        ] {
+            let key = game_key_from_key_code(key).unwrap();
+            input.press(key);
+            assert_eq!(input.nes_controller_buttons(0), expected);
+            assert_eq!(input.nes_controller_buttons(1), ControllerButtons::NONE);
+            input.release(key);
+            assert_eq!(input.nes_controller_buttons(0), ControllerButtons::NONE);
+        }
+    }
+
+    #[test]
     fn nes_input_combines_keyboard_and_the_assigned_gamepad() {
         let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
         gamepads.borrow_mut().set_seat(
@@ -2118,7 +2222,7 @@ mod tests {
             GamepadSeatInput {
                 connected: true,
                 dpad_right: true,
-                south: true,
+                east: true,
                 start: true,
                 ..GamepadSeatInput::default()
             },

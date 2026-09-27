@@ -7,6 +7,7 @@
 mod autostart;
 mod client_scenarios;
 mod clock_controls;
+mod controller_assignments;
 mod controller_controls;
 mod controller_profile;
 mod device_info;
@@ -497,8 +498,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         !launch_directly && !args.uses_debug_render() && !args.uses_benchmark() && !args.touch_test,
     );
     apply_video_settings(&window, &args, &settings.read().unwrap());
-    let controllers =
-        controller_controls::install(&window, Arc::clone(&settings), settings_writer.clone());
+    let controllers = controller_controls::install(
+        &window,
+        Arc::clone(&settings),
+        settings_writer.clone(),
+        Rc::clone(&gamepad_input),
+    );
     let _gamepad_timer =
         gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input, controllers);
 

@@ -10,6 +10,12 @@ fn controllers_are_reachable_from_launcher_and_pause_without_resuming() {
         assert_eq!(controllers.screen, UiScreen::LauncherControllers);
         assert!(control_ids(&controllers).contains(&"controllers.back"));
         assert!(control_value(&controllers, "controllers.detail").is_some());
+        assert!(control_value(&controllers, "controllers.players").is_some());
+        assert!(control_ids(&controllers).contains(&"controllers.reset-players"));
+        // Works without attached hardware too; resetting player preferences
+        // must not leave setup, resume gameplay, or reset button profiles.
+        let controllers = h.activate_guarded("controllers.reset-players", &controllers);
+        assert_eq!(controllers.screen, UiScreen::LauncherControllers);
         h.capture_screenshot("launcher-controllers.png");
         let settings = h.activate_guarded("controllers.back", &controllers);
         assert_eq!(settings.screen, UiScreen::LauncherSound);
@@ -41,6 +47,9 @@ fn controllers_are_reachable_from_launcher_and_pause_without_resuming() {
         let controllers = h.activate_guarded("settings.controllers", &settings);
         assert_eq!(controllers.screen, UiScreen::PauseControllers);
         assert!(controllers.paused);
+        let controllers = h.activate_guarded("controllers.reset-players", &controllers);
+        assert!(controllers.paused);
+        assert_eq!(controllers.scenario_revision, game.scenario_revision);
         h.capture_screenshot("pause-controllers.png");
         let settings = h.press_guarded(UiAction::Back, &controllers);
         assert_eq!(settings.screen, UiScreen::PauseSound);

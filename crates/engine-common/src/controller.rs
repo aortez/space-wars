@@ -152,12 +152,25 @@ mod tests {
     fn profile_round_trips_through_settings_and_old_settings_default() {
         let mut settings = crate::Settings::default();
         settings.controls.controller_profiles.push(profile());
+        settings.controls.player_1_device = Some("gilrs-v1:linux:gamepad".into());
+        settings.controls.player_2_device = Some("gilrs-v1:linux:picade".into());
         let encoded = toml::to_string(&settings).unwrap();
         let decoded: crate::Settings = toml::from_str(&encoded).unwrap();
         assert_eq!(
             decoded.controls.controller_profiles,
             settings.controls.controller_profiles
         );
+        assert_eq!(
+            decoded.controls.player_1_device,
+            settings.controls.player_1_device
+        );
+        assert_eq!(
+            decoded.controls.player_2_device,
+            settings.controls.player_2_device
+        );
+        let old = toml::from_str::<crate::Settings>("[controls]").unwrap();
+        assert_eq!(old.controls.player_1_device, None);
+        assert_eq!(old.controls.player_2_device, None);
         assert!(
             toml::from_str::<crate::Settings>("[controls]")
                 .unwrap()

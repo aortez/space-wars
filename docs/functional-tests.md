@@ -86,10 +86,16 @@ telemetry revision; CPU/network sampling must not introduce timing-sensitive
 test failures. Render tests include the Info panel at 800×480 and 480×800.
 
 The Controllers workflow opens the shared setup screen from launcher and pause,
-checks stable control IDs and the new settings-row navigation, and returns
-without resuming or replacing the game. Display-free tests drive the actual
+checks stable control IDs, player diagnostics, reset, and settings-row navigation,
+and returns without resuming or replacing the game. Display-free tests drive the actual
 setup callbacks with synthetic physical input snapshots, including save/reload,
 timed rollback, disconnect, duplicate inputs, and both measured Picade layouts.
+Assignment tests drive menu callbacks and the shared polling gates through NES
+controller inputs, verifying P1/P2 separation, swaps, immediate clearing, and
+release gating. Saved model preferences, changed IDs/order, missing reserved
+slots, unassigned-pad menu access, and identical-pad ambiguity have deterministic
+coverage. These tests do not claim to exercise real physical switches or USB
+enumeration; cabinet-plus-gamepad playtesting remains the hardware check.
 The live tester and calibration screens have 800×480, 1024×768, and 480×800
 render coverage. See [controller profiles](controller-profiles.md).
 
