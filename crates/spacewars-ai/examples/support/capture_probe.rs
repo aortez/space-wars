@@ -126,6 +126,10 @@ impl CaptureProbe {
         }
     }
 
+    pub fn attach_neutral_timing(&mut self, timing: Value) {
+        self.source.as_mut().expect("timing needs a capture source")["neutral_timing"] = timing;
+    }
+
     fn inspect(&mut self, o: &MissionObservationV1, m: &MissionTelemetry) -> Option<&'static str> {
         let a = self.anchor.as_ref().unwrap();
         let p = &o.local.combat.recovery.flight.pilot;

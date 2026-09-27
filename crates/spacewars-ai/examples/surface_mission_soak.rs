@@ -17,6 +17,8 @@ mod live_planning;
 mod mission_evaluation;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
+#[path = "support/native_capture_probe.rs"]
+mod native_capture_probe;
 #[path = "support/physics_profile.rs"]
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
@@ -173,6 +175,13 @@ fn main() {
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
+    let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
+    assert!(
+        !native_capture_probe::timing_enabled()
+            || native_capture_probe.is_some()
+            || arg("--probe-capture-seconds", "none") != "none",
+        "neutral timing needs a capture probe"
+    );
     let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
     let mut transfer_comparison = transfer_comparison::TransferComparisonRun::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
@@ -517,6 +526,14 @@ fn main() {
                         mission_evaluation.as_ref().map(|e| &e.evaluator),
                     );
                 }
+                if let Some(probe) = &mut native_capture_probe {
+                    probe.record(
+                        i,
+                        &pilots[i],
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    );
+                }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
                     let mut original = if reference_site == site {
@@ -700,6 +717,9 @@ fn main() {
         if transfer_probe
             .as_ref()
             .is_some_and(|probe| probe.run_done())
+            || native_capture_probe
+                .as_ref()
+                .is_some_and(|probe| probe.done())
         {
             break;
         }
@@ -891,6 +911,11 @@ fn main() {
     if let Some(probe) = &mut transfer_probe {
         report["termination"] = json!("transfer_probe_finished");
         report["transfer_probe"] = probe.finish(&state, &pilots[probe.seat()]);
+    }
+    if let Some(probe) = &mut native_capture_probe {
+        report["termination"] = json!("native_capture_probe_finished");
+        report["native_capture_probe"] =
+            probe.finish(state.tick(), state.match_outcome().is_some());
     }
     if let Some(sources) = &mut transfer_sources {
         report["transfer_sources"] = sources.report();

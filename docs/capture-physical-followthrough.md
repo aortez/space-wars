@@ -231,3 +231,5 @@ Changed material also requires a fresh attempt and a fresh reference; the six
 interrupted snapshots must not silently survive an impact. Current-state
 validation, explicit enemy-flag admission and mission value remain prerequisites
 for the broader planning goal. Deployment remains paused.
+
+The follow-up plan is [neutral timing with separate combat cover](capture-neutral-timing.md).

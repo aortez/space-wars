@@ -39,6 +39,7 @@ pub struct TransferProbeRun {
     landing_reference: Option<LandingSiteId>,
     landing_choice: Option<Value>,
     capture: Option<super::capture_probe::CaptureProbe>,
+    neutral_timing: Option<Value>,
 }
 
 impl TransferProbeRun {
@@ -152,6 +153,7 @@ impl TransferProbeRun {
             landing_reference,
             landing_choice: None,
             capture,
+            neutral_timing: None,
         })
     }
 
@@ -366,6 +368,9 @@ impl TransferProbeRun {
                 evaluator,
                 self.landing_choice.as_ref().unwrap(),
             );
+            if let Some(timing) = self.neutral_timing.take() {
+                capture.attach_neutral_timing(timing);
+            }
         }
         if capture.started() && !capture.done() {
             capture.observe(o, bot.telemetry());
@@ -387,17 +392,14 @@ impl TransferProbeRun {
         }
         // The caller passes the exact immutable observation used for this
         // tick's intent and dense trace. No world queries or controller updates.
-        let started = Instant::now();
-        let result = bot.landing_choice_comparison(o, reference);
-        let assessment_ms = started.elapsed().as_secs_f64() * 1000.0;
-        let (report, unknown) = match result {
-            Ok(report) => (Some(report), None),
-            Err(reason) => (None, Some(reason)),
-        };
-        self.landing_choice = Some(json!({
-            "reference":reference,"observation_tick":p.tick,"actor":p.owner,
-            "report":report,"unknown":unknown,"assessment_ms":assessment_ms,"physics_queries":0,
-        }));
+        let (choice, timing) = super::native_capture_probe::compare(
+            bot,
+            o,
+            reference,
+            super::native_capture_probe::timing_enabled(),
+        );
+        self.landing_choice = Some(choice);
+        self.neutral_timing = timing;
     }
 
     fn stop(&mut self, tick: u64, reason: &'static str) {
