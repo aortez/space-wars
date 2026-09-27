@@ -194,3 +194,7 @@ mission value, interruption risk and current-state revalidation before proposing
 any live destination change.
 This comparison establishes concurrent scheduling and provenance, not a stronger
 playing bot, a calibrated capture-cost model or a hardware budget recommendation.
+
+The follow-up [source-local composition study](capture-local-composition.md)
+implements that contract and explicitly retains the unmeasured interval between
+flight handoff and landing-site choice.
