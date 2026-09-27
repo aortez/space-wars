@@ -9,6 +9,140 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
+    use crate::controller_controls::{self, Device};
+    use crate::controller_profile::RawState;
+    use crate::input::GamepadSeatInput;
+    use crate::settings_writer::SettingsWriter;
+    use engine_common::{ControllerControl, Settings};
+    use std::sync::{Arc, RwLock};
+    use std::time::Instant;
+
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let state = controller_controls::install(
+        &ui,
+        Arc::new(RwLock::new(Settings::default())),
+        SettingsWriter::new(directory.path().join("settings.toml")).unwrap(),
+    );
+    for (id, name) in [(0, "Space-Wars Picade"), (1, "Xbox 360 USB Controller")] {
+        state.borrow_mut().connect(Device {
+            id,
+            name: name.into(),
+            key: format!("gilrs-v1:linux:{id}"),
+            seat: Some(id),
+        });
+    }
+    ui.set_launcher_visible(true);
+    ui.set_sound_visible(true);
+    let output = std::env::var_os("SPACEWARS_CONTROLLER_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        ui.invoke_controllers_open();
+        for stage in [
+            "devices", "device", "capture", "review", "trial", "tester", "settings",
+        ] {
+            match stage {
+                "device" => ui.invoke_controllers_command("controllers.device.0".into()),
+                "capture" => ui.invoke_controllers_command("controllers.remap".into()),
+                "review" => {
+                    for (code, _) in ControllerControl::ALL.iter().enumerate() {
+                        let mut state = state.borrow_mut();
+                        state.observe(
+                            0,
+                            &RawState::default(),
+                            &GamepadSeatInput::default(),
+                            None,
+                            Instant::now(),
+                        );
+                        state.observe(
+                            0,
+                            &RawState {
+                                buttons: vec![(code as u32, 1.0)],
+                                ..Default::default()
+                            },
+                            &GamepadSeatInput::default(),
+                            Some(true),
+                            Instant::now(),
+                        );
+                        state.observe(
+                            0,
+                            &RawState::default(),
+                            &GamepadSeatInput::default(),
+                            Some(false),
+                            Instant::now(),
+                        );
+                    }
+                    state.borrow_mut().tick(&ui, Instant::now());
+                }
+                "trial" => ui.invoke_controllers_command("controllers.try".into()),
+                "tester" => {
+                    ui.invoke_controllers_command("controllers.back".into());
+                    ui.invoke_controllers_command("controllers.test".into());
+                    state.borrow_mut().observe(
+                        0,
+                        &RawState::default(),
+                        &GamepadSeatInput::default(),
+                        None,
+                        Instant::now(),
+                    );
+                    state.borrow_mut().observe(
+                        0,
+                        &RawState {
+                            buttons: vec![(304, 1.0), (308, 1.0)],
+                            axes: vec![(0, -1.0)],
+                            ..Default::default()
+                        },
+                        &GamepadSeatInput {
+                            south: true,
+                            west: true,
+                            left_stick_x: -1.0,
+                            ..Default::default()
+                        },
+                        Some(true),
+                        Instant::now(),
+                    );
+                    state
+                        .borrow_mut()
+                        .tick(&ui, Instant::now() + std::time::Duration::from_millis(101));
+                }
+                "settings" => {
+                    ui.set_controllers_visible(false);
+                    ui.set_sound_focus_index(7);
+                }
+                _ => {}
+            }
+            let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows.borrow()[0].request_redraw();
+            windows.borrow()[0].draw_if_needed(|renderer| {
+                renderer.render(pixels.make_mut_slice(), width as usize);
+            });
+            assert!(
+                pixels
+                    .as_slice()
+                    .iter()
+                    .filter(|pixel| pixel.r > 150 && pixel.g > 150 && pixel.b > 150)
+                    .count()
+                    > 300,
+                "missing menu text for {stage}"
+            );
+            if let Some(output) = &output {
+                crate::thruster_visual_tests::write_png(
+                    &output.join(format!("controllers-{width}x{height}-{stage}.png")),
+                    &pixels,
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_layouts() {
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat, Scenario};
@@ -467,6 +601,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_settings_save_pending(false);
     ui.set_sound_focus_index(0);
     ui.set_device_info_visible(false);
+    ui.set_controllers_visible(false);
     ui.set_performance_overlay_enabled(false);
     ui.set_performance_overlay_text("".into());
     ui.set_launcher_busy(false);

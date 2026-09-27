@@ -32,6 +32,9 @@ mod sound;
 #[path = "ui_control_functional/device_info.rs"]
 mod device_info;
 
+#[path = "ui_control_functional/controllers.rs"]
+mod controllers;
+
 #[path = "ui_control_functional/performance.rs"]
 mod performance;
 

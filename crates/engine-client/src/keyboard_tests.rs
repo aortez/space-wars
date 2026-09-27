@@ -75,6 +75,17 @@ fn simulated_controller_uses_shared_clock_routing_and_bounded_single_edges() {
         assert!(input.borrow_mut().take_clock_next_event_requested());
         driver.cancel();
     }
+    window.set_controllers_visible(true);
+    let error = driver
+        .press(
+            &window,
+            &state,
+            InputPressRequest::new(&state, InputButton::South),
+            Instant::now(),
+        )
+        .unwrap_err();
+    assert!(error.contains("physical input"));
+    assert!(!gamepads.borrow().has_simulated());
 }
 
 #[cfg(unix)]

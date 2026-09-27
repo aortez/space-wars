@@ -12,7 +12,9 @@ use serde::{
 
 mod activity_settings;
 mod clock_message;
+mod controller;
 pub use activity_settings::{AutostartSettings, MatchSettings};
+pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
 pub mod render;
 
 pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
@@ -286,7 +288,9 @@ impl AudioSettings {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ControlBindings {
-    // Keymap lands here once the input schema is defined.
+    /// Local to this installation. Matching controller models share a profile;
+    /// connection order and player assignments are deliberately not identities.
+    pub controller_profiles: Vec<ControllerProfile>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -28,6 +28,14 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if window.get_controllers_visible()
+        && crate::controller_controls::inventory(window)
+            .iter()
+            .any(|control| control.id == control_id && control.enabled)
+    {
+        window.invoke_controllers_command(control_id.into());
+        return true;
+    }
     let Some(target) = activation_target(
         control_id,
         window.get_scenario_benchmark_available(),
@@ -102,6 +110,7 @@ fn activation_target(
         "settings.fps-counter" => sound(2, UiAction::Confirm),
         "settings.device-info" => sound(3, UiAction::Confirm),
         "settings.autostart" => sound(4, UiAction::Confirm),
+        "settings.controllers" => sound(7, UiAction::Confirm),
         "sound.back" => sound(5, UiAction::Confirm),
         "sound.retry" => sound(6, UiAction::Confirm),
         "autostart.activity.previous" => ActivationTarget {
