@@ -44,6 +44,10 @@ pub struct TacticalCapturePilot {
     previous_intent: CombatIntent,
 }
 impl TacticalCapturePilot {
+    pub(crate) fn selected_approach(&self) -> Option<(f32, bool)> {
+        self.base.selected_approach()
+    }
+
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self::with_planning(context, breaks, ObjectivePlanning::Legacy)
     }

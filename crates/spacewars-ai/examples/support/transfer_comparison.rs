@@ -39,6 +39,7 @@ pub struct TransferComparisonRun {
     queue: TransferComparisonQueue,
     sources: [Option<Source>; 2],
     allowance: u32,
+    neutral_timing: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
@@ -47,7 +48,11 @@ pub struct TransferComparisonRun {
 impl TransferComparisonRun {
     pub fn from_args(out: &Path) -> Option<Self> {
         let specification = super::arg("--compare-transfer-sources", "none");
+        let neutral_timing = super::arg("--compare-neutral-timing", "false")
+            .parse::<bool>()
+            .unwrap();
         if specification == "none" {
+            assert!(!neutral_timing, "neutral comparison needs fixed sources");
             assert_eq!(
                 super::arg("--transfer-comparison-allowance", "none"),
                 "none"
@@ -61,11 +66,11 @@ impl TransferComparisonRun {
             ("--objective-graph-budget", "16384", "4"),
             ("--evaluate-missions", "false", "true"),
             ("--continue-successor", "none", "none"),
-            ("--probe-transfer-destination", "none", "none"),
             ("--require-finish", "false", "false"),
         ] {
             assert_eq!(super::arg(flag, default), expected, "incompatible {flag}");
         }
+        validate_probe_options(super::arg, neutral_timing);
         let allowance = super::arg("--transfer-comparison-allowance", "32")
             .parse()
             .unwrap();
@@ -88,6 +93,7 @@ impl TransferComparisonRun {
             queue: TransferComparisonQueue::new(2),
             sources,
             allowance,
+            neutral_timing,
             work: BufWriter::new(File::create(out.join("transfer-comparison-work.jsonl")).unwrap()),
             observation_ms: Vec::new(),
             dispatch_ms: Vec::new(),
@@ -141,8 +147,14 @@ impl TransferComparisonRun {
             source.attempted = true;
             source.environment = environment.as_ref().ok().map(|e| json!(e));
             match environment.and_then(|e| {
-                self.queue
-                    .submit_comparison(before, actual, o, evaluator, e, contact)
+                if self.neutral_timing {
+                    self.queue.submit_comparison_with_neutral_timing(
+                        before, actual, o, evaluator, e, contact,
+                    )
+                } else {
+                    self.queue
+                        .submit_comparison(before, actual, o, evaluator, e, contact)
+                }
             }) {
                 Ok(token) => {
                     source.token = Some(token);
@@ -235,5 +247,71 @@ impl TransferComparisonRun {
             "cancelled":self.queue.cancelled_total,"charged_graph":self.queue.charged_total,"physics_queries":0,
             "observation":super::timing(self.observation_ms.clone()),"dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."})
+    }
+}
+
+fn validate_probe_options(arg: impl Fn(&str, &str) -> String, neutral_timing: bool) {
+    if arg("--probe-transfer-destination", "none") != "none" {
+        assert!(
+            neutral_timing && arg("--probe-capture-seconds", "none") != "none",
+            "nominated replay requires observational neutral capture comparison"
+        );
+        for (flag, default) in [
+            ("--transfer-forecast-allowance", "none"),
+            ("--schedule-transfer-forecast", "false"),
+            ("--forecast-transfer", "false"),
+        ] {
+            assert_eq!(
+                arg(flag, default),
+                default,
+                "combined replay forbids {flag}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn combined_capture_comparison_forbids_unbudgeted_or_competing_forecasts() {
+        for changed in [
+            "--forecast-transfer",
+            "--schedule-transfer-forecast",
+            "--transfer-forecast-allowance",
+            "--probe-capture-seconds",
+            "disabled",
+        ] {
+            assert!(
+                std::panic::catch_unwind(|| validate_probe_options(
+                    |flag, default| {
+                        if flag == changed {
+                            return if flag == "--probe-capture-seconds" {
+                                "none"
+                            } else {
+                                "true"
+                            }
+                            .into();
+                        }
+                        match flag {
+                            "--probe-transfer-destination" => "1".into(),
+                            "--probe-capture-seconds" => "120".into(),
+                            _ => default.into(),
+                        }
+                    },
+                    changed != "disabled"
+                ))
+                .is_err()
+            );
+        }
+        validate_probe_options(
+            |flag, default| match flag {
+                "--probe-transfer-destination" => "1".into(),
+                "--probe-capture-seconds" => "120".into(),
+                _ => default.into(),
+            },
+            true,
+        );
     }
 }

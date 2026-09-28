@@ -70,7 +70,7 @@ def audit_report(report):
     assert report['preferred_handoffs'] == (fastest if complete else [])
 
 
-def audit_schedule(schedule, rows, upstream, elapsed):
+def audit_schedule(schedule, rows, upstream, elapsed, *, terminal_observed=False):
     assert schedule['observational'] and schedule['physics_queries'] == 0
     assert schedule['playing_graph_allowance'] == 4 and schedule['max_source_age_ticks'] == 120
     allowance = schedule['total_graph_allowance']
@@ -178,8 +178,11 @@ def audit_schedule(schedule, rows, upstream, elapsed):
         if states[seat]['phase'] == 'stale':
             assert state == states[seat]
         else:
+            reason = state['reason'] if terminal_observed else 'comparison run ended'
+            assert reason
+            if reason == 'source expired': assert elapsed == state['source_tick']+121
             assert state == dict(states[seat], phase='stale', cancelled_tick=elapsed,
-                reason='comparison run ended', validated_tick=None)
+                reason=reason, validated_tick=None)
         summaries.append(dict(seat=seat, source_tick=source['source_tick'], completed=seat in ready,
             completion_age=ready[seat]['completed_tick']-source['source_tick'] if seat in ready else None,
             cancelled=state['reason'], cancellation_age=state['cancelled_tick']-source['source_tick'],

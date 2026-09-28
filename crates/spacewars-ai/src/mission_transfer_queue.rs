@@ -11,6 +11,10 @@ use scenario_spacewars::surface_sortie::{
 };
 use std::collections::BTreeMap;
 
+#[cfg(test)]
+#[path = "mission_neutral_comparison_tests.rs"]
+mod neutral_tests;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferQueuePhase {
@@ -32,6 +36,8 @@ pub struct TransferForecastState {
     pub phase: TransferQueuePhase,
     pub reason: Option<&'static str>,
     pub charged_graph: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutral_validation: Option<crate::mission_evaluation::NeutralTimingValidation>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -43,6 +49,7 @@ enum SourceKind {
 #[derive(Clone)]
 struct Source {
     local_reference: Option<crate::mission_evaluation::LocalReferenceContext>,
+    neutral_reference: Option<crate::mission_evaluation::NeutralTimingContext>,
     kind: SourceKind,
     actor: PlayerId,
     vehicle: VehicleId,
@@ -80,6 +87,7 @@ impl Source {
         let p = &o.local.combat.recovery.flight.pilot;
         Self {
             local_reference: None,
+            neutral_reference: None,
             kind,
             actor: p.owner,
             vehicle: p.vehicle,
@@ -106,7 +114,7 @@ impl Source {
 
     fn validate(
         &mut self,
-        state: &TransferForecastState,
+        state: &mut TransferForecastState,
         bot: &MaterialMissionPilot,
         o: &MissionObservationV1,
         environment: &TransferEnvironment,
@@ -260,6 +268,13 @@ impl Source {
         if !self.environment.matches_advanced_environment(environment) {
             return Err("environment dynamics changed");
         }
+        if let Some(reference) = &self.neutral_reference {
+            state.neutral_validation = Some(reference.validate_current(
+                o,
+                bot.telemetry(),
+                bot.capture.as_ref().and_then(|c| c.selected_approach()),
+            )?);
+        }
         Ok(())
     }
 }
@@ -302,6 +317,27 @@ impl TransferForecastQueue {
 }
 
 impl TransferForecastQueue<TransferComparisonJob> {
+    /// Opt-in observational join. Numeric timing is created internally from
+    /// the actual fresh choice and adds current-state guards to the queue.
+    pub fn submit_comparison_with_neutral_timing(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+    ) -> Result<RequestToken, &'static str> {
+        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_neutral_timing(actual, o);
+        let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
+        source.local_reference = Some(job.local_context(o));
+        source.neutral_reference = job
+            .neutral_context()
+            .map(|r| crate::mission_evaluation::NeutralTimingContext::new(r, o));
+        self.submit_job(actual, o, environment, contact, job, source)
+    }
+
     pub fn submit_comparison(
         &mut self,
         before: &MaterialMissionPilot,
@@ -379,7 +415,7 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
         {
             return Err("source already submitted");
         }
-        let placeholder = TransferForecastState {
+        let mut placeholder = TransferForecastState {
             token: RequestToken {
                 actor,
                 generation: 0,
@@ -393,8 +429,9 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
             phase: TransferQueuePhase::Pending,
             reason: None,
             charged_graph: 0,
+            neutral_validation: None,
         };
-        source.validate(&placeholder, bot, o, &environment, contact)?;
+        source.validate(&mut placeholder, bot, o, &environment, contact)?;
         if let Some(old) = self.state(p.owner) {
             self.cancel(old.token, p.tick, "replaced");
         }
@@ -423,6 +460,7 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
             slot.state.reason = Some(reason);
             slot.state.cancelled_tick = Some(tick);
             slot.state.validated_tick = None;
+            slot.state.neutral_validation = None;
             slot.source = None;
             self.cancelled_total += 1;
         }
@@ -447,7 +485,7 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
         let Some(source) = &mut slot.source else {
             return;
         };
-        match source.validate(&slot.state, bot, o, environment, contact) {
+        match source.validate(&mut slot.state, bot, o, environment, contact) {
             Ok(()) => slot.state.validated_tick = Some(p.tick),
             Err(reason) => {
                 let token = slot.state.token;
@@ -526,7 +564,7 @@ mod tests {
 
     // Synthetic observations isolate lifetime/accounting from controller/physics
     // behavior; native world agreement is tested in transfer_environment.
-    fn next(
+    pub(super) fn next(
         bot: &mut MaterialMissionPilot,
         o: &mut MissionObservationV1,
         e: &mut TransferEnvironment,

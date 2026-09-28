@@ -1,7 +1,9 @@
 //! Historical travel and source-local reference components. Missing acquisition
 //! time stays unknown; the playing controller never consumes this comparison.
 use super::*;
-use crate::mission_evaluation::{LocalCostReference, LocalReferenceContext, MissionEvaluator};
+use crate::mission_evaluation::{
+    LocalCostReference, LocalReferenceContext, MissionEvaluator, NeutralCaptureTiming,
+};
 use engine_common::Action;
 use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::surface_sortie::transfer_environment::TransferEnvironment;
@@ -20,6 +22,26 @@ pub struct TransferCandidateForecast {
     /// Explicitly entered by the captured controller, not inferred from a
     /// rejected free-flight constructor or mere proximity to a planet.
     pub source_capture: Option<SourceCaptureEntry>,
+    /// Opt-in record from the actual controller only. Hypothetical arrivals
+    /// cannot supply future first-choice evidence to this source tick.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutral_timing: Option<NeutralTimingContribution>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct NeutralTimingContribution {
+    pub record: Option<NeutralCaptureTiming>,
+    pub unknown: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct NeutralTimingComposition {
+    pub destination: usize,
+    pub source_tick: u64,
+    pub travel_seconds: Option<f32>,
+    /// Conditional total from the witnessed choice, never current time remaining.
+    pub source_tick_total_seconds: Option<f32>,
+    pub unknown: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -63,6 +85,8 @@ pub struct TransferComparisonReport {
     /// Published in the same charged final step. No capture-value ranking or
     /// live selection consumes these historical conditional components.
     pub capture_costs: Vec<CaptureCostComposition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutral_timing_costs: Option<Vec<NeutralTimingComposition>>,
 }
 
 #[derive(Clone)]
@@ -133,6 +157,7 @@ impl TransferComparisonJob {
                 fastest_known_handoffs: Vec::new(),
                 preferred_handoffs: Vec::new(),
                 capture_costs: Vec::new(),
+                neutral_timing_costs: None,
             },
             jobs: Vec::with_capacity(MAX_CANDIDATES),
             cursor: 0,
@@ -169,6 +194,49 @@ impl TransferComparisonJob {
             );
         }
         Ok(job)
+    }
+
+    pub(super) fn with_neutral_timing(
+        mut self,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+    ) -> Self {
+        for candidate in &mut self.report.candidates {
+            let result = if candidate.source_capture == Some(SourceCaptureEntry::CurrentApproach) {
+                actual
+                    .telemetry
+                    .capture
+                    .as_ref()
+                    .and_then(|c| c.site)
+                    .ok_or("no actual selected site at source")
+                    .and_then(|site| actual.landing_choice_with_neutral_timing(o, site))
+                    .map(|(_, timing)| timing)
+            } else {
+                Err("no actual first-choice timing at source")
+            };
+            candidate.neutral_timing = Some(match result {
+                Ok(record) => NeutralTimingContribution {
+                    unknown: record.unknown,
+                    record: Some(record),
+                },
+                Err(reason) => NeutralTimingContribution {
+                    unknown: Some(reason),
+                    record: None,
+                },
+            });
+        }
+        self.report.neutral_timing_costs = Some(Vec::new());
+        self
+    }
+
+    pub(super) fn neutral_context(&self) -> Option<NeutralCaptureTiming> {
+        self.report
+            .candidates
+            .iter()
+            .filter_map(|c| c.neutral_timing.as_ref())
+            .filter_map(|n| n.record.as_ref())
+            .find(|r| r.total_seconds.is_some())
+            .cloned()
     }
 
     fn add(
@@ -234,6 +302,27 @@ impl TransferComparisonJob {
             .iter()
             .map(TransferCandidateForecast::compose)
             .collect();
+        if self.report.neutral_timing_costs.is_some() {
+            self.report.neutral_timing_costs = Some(
+                self.report
+                    .candidates
+                    .iter()
+                    .map(|c| {
+                        let n = c.neutral_timing.as_ref().unwrap();
+                        let total = n.record.as_ref().and_then(|r| r.total_seconds);
+                        NeutralTimingComposition {
+                            destination: c.destination,
+                            source_tick: self.report.source_tick,
+                            travel_seconds: (c.source_capture
+                                == Some(SourceCaptureEntry::CurrentApproach))
+                            .then_some(0.0),
+                            source_tick_total_seconds: total,
+                            unknown: n.unknown,
+                        }
+                    })
+                    .collect(),
+            );
+        }
     }
 }
 
@@ -279,6 +368,7 @@ impl TransferCandidateForecast {
             unknown: None,
             forecast: None,
             source_capture,
+            neutral_timing: None,
             local_reference: evaluator.source_local_reference(
                 o,
                 bot.telemetry(),

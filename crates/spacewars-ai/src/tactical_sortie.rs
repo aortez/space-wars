@@ -114,6 +114,16 @@ pub struct TacticalSortiePilot {
     bounded_acquisition: bool,
 }
 impl TacticalSortiePilot {
+    /// Read-only phase context for a separately validated timing reference.
+    pub(crate) fn selected_approach(&self) -> Option<(f32, bool)> {
+        self.site?;
+        match self.telemetry.goal {
+            TacticalGoal::SeekCover => Some((self.side, true)),
+            TacticalGoal::Approach => Some((self.side, false)),
+            _ => None,
+        }
+    }
+
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
         let landing = RulePilotV1::new(context);
         Self {

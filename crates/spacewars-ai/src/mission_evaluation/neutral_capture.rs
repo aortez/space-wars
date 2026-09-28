@@ -13,6 +13,45 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+/// Current same-site eligibility, separate from the immutable source timing.
+/// Solar assessment is conditional on the observed approach phase, not a
+/// collision certificate or a replacement forecast for the phase costs.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct NeutralTimingValidation {
+    pub tick: u64,
+    pub circling: bool,
+    pub solar: Option<crate::landing_safety::SolarLandingPlan>,
+}
+
+#[derive(Clone)]
+pub(crate) struct NeutralTimingContext {
+    record: NeutralCaptureTiming,
+    sun: Option<scenario_spacewars::surface_sortie::SolarHazard>,
+    orbit_omega: Option<f32>,
+}
+
+impl NeutralTimingContext {
+    pub(crate) fn new(record: NeutralCaptureTiming, o: &MissionObservationV1) -> Self {
+        Self {
+            record,
+            sun: o.local.sun,
+            orbit_omega: o.local.planet_orbit_omega,
+        }
+    }
+
+    pub(crate) fn validate_current(
+        &self,
+        o: &MissionObservationV1,
+        m: &MissionTelemetry,
+        direction: Option<(f32, bool)>,
+    ) -> Result<NeutralTimingValidation, &'static str> {
+        if o.local.sun != self.sun || o.local.planet_orbit_omega != self.orbit_omega {
+            return Err("neutral solar environment changed");
+        }
+        self.record.validate_current(o, m, direction)
+    }
+}
+
 /// Existing successful-trip medians, conditional on execution. This is neither
 /// a success probability nor remaining time, and never enters evaluator caches.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -41,6 +80,125 @@ pub struct NeutralCaptureTiming {
     pub unknown: Option<&'static str>,
 }
 
+impl NeutralCaptureTiming {
+    pub(crate) fn validate_current(
+        &self,
+        o: &MissionObservationV1,
+        m: &MissionTelemetry,
+        direction: Option<(f32, bool)>,
+    ) -> Result<NeutralTimingValidation, &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let c = m
+            .capture
+            .as_ref()
+            .ok_or("neutral capture attempt changed")?;
+        if self.unknown.is_some()
+            || m.policy != self.policy
+            || c.policy != "tactical_sortie_v11"
+            || m.goal != MissionGoal::Capture
+            || m.target != Some(self.planet.index)
+            || m.recovery.is_some()
+            || selection_tick(m) != self.visit_tick
+            || c.started_tick != self.started_tick
+            || m.completed_sorties != self.completed_sorties
+            || Some(attempt_counters(c)) != self.attempt_counters
+            || c.failed_tick.is_some()
+            || c.failure.is_some()
+            || c.completed_tick.is_some()
+            || c.landing.landed_tick.is_some()
+            || c.landing.claimed_tick.is_some()
+            || c.landing.boarded_tick.is_some()
+            || c.site != Some(self.selected.site)
+        {
+            return Err("neutral capture attempt changed");
+        }
+        if p.planet.index != self.planet.index
+            || p.planet.revision != self.planet.revision
+            || p.planet.radius != self.planet.radius
+            || p.planet.claim != self.planet.claim
+            || !motion(p.planet.motion)
+            || o.planets
+                .iter()
+                .filter(|q| q.index == p.planet.index)
+                .count()
+                != 1
+            || o.planets.iter().find(|q| q.index == p.planet.index) != Some(&p.planet)
+        {
+            return Err("neutral material or claim changed");
+        }
+        use scenario_spacewars::surface_sortie::pilot::LandingSiteQuery;
+        if !p.queries_ready
+            || !matches!(
+                p.site_query,
+                LandingSiteQuery::Survey | LandingSiteQuery::Selected(_)
+            )
+            || matches!(p.site_query, LandingSiteQuery::Selected(id) if id != self.selected.site)
+            || p.sites.len() > 64
+            || p.sites
+                .iter()
+                .filter(|s| s.id == self.selected.site)
+                .count()
+                != 1
+        {
+            return Err("neutral selected site unmeasured");
+        }
+        let site = p
+            .sites
+            .iter()
+            .find(|s| s.id == self.selected.site)
+            .copied()
+            .unwrap();
+        if !usable_site(site, &p.planet)
+            || self
+                .site
+                .is_none_or(|source| source.local_position.distance_to(site.local_position) > 0.002)
+        {
+            return Err("neutral selected material or hatch changed");
+        }
+        if o.local.combat.target.is_some_and(|t| {
+            !motion(t.motion) || !t.motion.position.distance_to(p.ship.position).is_finite()
+        }) {
+            return Err("neutral opponent geometry unavailable");
+        }
+        if o.local.combat.target.is_some_and(|t| {
+            !t.ground_occluded && t.motion.position.distance_to(p.ship.position) < 300.0
+        }) {
+            return Err("neutral capture exposed to opponent");
+        }
+        let (side, circling) = direction.ok_or("neutral approach phase unavailable")?;
+        if Some(side) != self.selected.side || c.solar != self.selected.solar {
+            return Err("neutral selected direction or source solar plan changed");
+        }
+        if !solar_geometry(o) {
+            return Err("neutral solar geometry unavailable");
+        }
+        let solar = crate::landing_safety::assess(&o.local, site, side, circling);
+        match (self.selected.solar, solar) {
+            (None, None) => (),
+            (Some(_), Some(s)) if valid_solar(s) => (),
+            _ => return Err("neutral current solar assessment unavailable or unsafe"),
+        }
+        Ok(NeutralTimingValidation {
+            tick: p.tick,
+            circling,
+            solar,
+        })
+    }
+}
+
+fn attempt_counters(c: &crate::tactical_sortie::TacticalTelemetry) -> [u32; 8] {
+    [
+        c.replans,
+        c.invalidations,
+        c.cover_replans,
+        c.solar_replans,
+        c.circling_replans,
+        c.objective_replans,
+        c.landing.invalidations,
+        c.landing.landing_retries,
+    ]
+}
+
 pub(crate) fn neutral_capture_timing(
     o: &MissionObservationV1,
     m: &MissionTelemetry,
@@ -64,18 +222,7 @@ pub(crate) fn neutral_capture_timing(
         visit_tick: selection_tick(m),
         started_tick: m.capture.as_ref().and_then(|c| c.started_tick),
         completed_sorties: m.completed_sorties,
-        attempt_counters: m.capture.as_ref().map(|c| {
-            [
-                c.replans,
-                c.invalidations,
-                c.cover_replans,
-                c.solar_replans,
-                c.circling_replans,
-                c.objective_replans,
-                c.landing.invalidations,
-                c.landing.landing_retries,
-            ]
-        }),
+        attempt_counters: m.capture.as_ref().map(|c| attempt_counters(c)),
         planet: p.planet.clone(),
         ship: p.ship,
         gravity: p.gravity,
@@ -105,6 +252,52 @@ fn vector(v: Vec2) -> bool {
 }
 fn motion(m: PilotMotion) -> bool {
     vector(m.position) && vector(m.velocity) && m.angle.is_finite() && m.spin.is_finite()
+}
+
+fn usable_site(site: PilotLandingSite, planet: &PilotPlanetObservation) -> bool {
+    site.id.planet == planet.index
+        && site.revision == planet.revision
+        && [
+            site.local_position,
+            site.position,
+            site.normal,
+            site.velocity,
+            site.vehicle_position,
+            site.hatch_position,
+        ]
+        .into_iter()
+        .all(vector)
+        && site.normal.length_squared() >= 0.0001
+        && site.boarding_hatches.into_iter().flatten().all(vector)
+        && site.boarding_hatches.iter().any(Option::is_some)
+}
+
+fn solar_geometry(o: &MissionObservationV1) -> bool {
+    o.local.planet_orbit_omega.is_none_or(f32::is_finite)
+        && o.local.sun.is_none_or(|s| {
+            vector(s.position)
+                && s.radius.is_finite()
+                && s.radius > 0.0
+                && s.heat_radius.is_finite()
+                && s.heat_radius >= 0.0
+        })
+}
+
+fn valid_solar(s: crate::landing_safety::SolarLandingPlan) -> bool {
+    s.safe()
+        && s.arrival_seconds >= 0.0
+        && s.surface_seconds > 0.0
+        && [
+            s.arrival_seconds,
+            s.surface_seconds,
+            s.side,
+            s.approach_clearance,
+            s.parked_clearance,
+            s.departure_clearance,
+            s.departure_side,
+        ]
+        .into_iter()
+        .all(f32::is_finite)
 }
 
 fn domain(
@@ -201,33 +394,10 @@ fn domain(
         return Err("source exposed to opponent");
     }
     let site = site.ok_or("selected material site unavailable")?;
-    if site.id.planet != p.planet.index
-        || site.revision != p.planet.revision
-        || ![
-            site.local_position,
-            site.position,
-            site.normal,
-            site.velocity,
-            site.vehicle_position,
-            site.hatch_position,
-        ]
-        .into_iter()
-        .all(vector)
-        || site.normal.length_squared() < 0.0001
-        || !site.boarding_hatches.into_iter().flatten().all(vector)
-        || !site.boarding_hatches.iter().any(Option::is_some)
-    {
+    if !usable_site(site, &p.planet) {
         return Err("selected material or hatch unavailable");
     }
-    if o.local.planet_orbit_omega.is_some_and(|v| !v.is_finite())
-        || o.local.sun.is_some_and(|s| {
-            !vector(s.position)
-                || !s.radius.is_finite()
-                || s.radius <= 0.0
-                || !s.heat_radius.is_finite()
-                || s.heat_radius < 0.0
-        })
-    {
+    if !solar_geometry(o) {
         return Err("solar geometry unavailable");
     }
     match (o.local.sun, choice.selected.solar) {
@@ -235,20 +405,7 @@ fn domain(
         (Some(_), Some(s))
             if s.forecast_tick == p.tick
                 && Some(s.side) == choice.selected.side
-                && s.safe()
-                && s.arrival_seconds >= 0.0
-                && s.surface_seconds > 0.0
-                && [
-                    s.arrival_seconds,
-                    s.surface_seconds,
-                    s.side,
-                    s.approach_clearance,
-                    s.parked_clearance,
-                    s.departure_clearance,
-                    s.departure_side,
-                ]
-                .into_iter()
-                .all(f32::is_finite) => {}
+                && valid_solar(s) => {}
         _ => return Err("selected solar plan unavailable"),
     }
     Ok(())
