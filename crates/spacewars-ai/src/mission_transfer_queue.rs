@@ -50,6 +50,7 @@ enum SourceKind {
 struct Source {
     local_reference: Option<crate::mission_evaluation::LocalReferenceContext>,
     neutral_reference: Option<crate::mission_evaluation::NeutralTimingContext>,
+    arrival_reference: Option<remote_arrival::ArrivalScreenContext>,
     kind: SourceKind,
     actor: PlayerId,
     vehicle: VehicleId,
@@ -88,6 +89,7 @@ impl Source {
         Self {
             local_reference: None,
             neutral_reference: None,
+            arrival_reference: None,
             kind,
             actor: p.owner,
             vehicle: p.vehicle,
@@ -275,6 +277,13 @@ impl Source {
                 bot.capture.as_ref().and_then(|c| c.selected_approach()),
             )?);
         }
+        if self
+            .arrival_reference
+            .as_ref()
+            .is_some_and(|r| !r.matches(o))
+        {
+            return Err("remote arrival solar context changed or source samples expired");
+        }
         Ok(())
     }
 }
@@ -317,6 +326,29 @@ impl TransferForecastQueue {
 }
 
 impl TransferForecastQueue<TransferComparisonJob> {
+    /// Historical geometry/solar screen only; no acquisition-time or threat
+    /// estimate and no live candidate ranking uses this record.
+    #[allow(clippy::too_many_arguments)] // Keep diagnostics separate from controller input.
+    pub fn submit_comparison_with_remote_arrival(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+        cover: Option<
+            &scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation,
+        >,
+    ) -> Result<RequestToken, &'static str> {
+        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_remote_arrival(o, cover, &environment);
+        let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
+        source.local_reference = Some(job.local_context(o));
+        source.arrival_reference = job.arrival_context(o);
+        self.submit_job(actual, o, environment, contact, job, source)
+    }
+
     /// Opt-in observational join. Numeric timing is created internally from
     /// the actual fresh choice and adds current-state guards to the queue.
     pub fn submit_comparison_with_neutral_timing(

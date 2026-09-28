@@ -5,6 +5,7 @@ use crate::flight_prediction::advance_motor;
 use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::surface_sortie::{
     LandingPhase,
+    combat::TacticalSortieObservationV1,
     pilot::PilotMotion,
     transfer_environment::{MAX_TRANSFER_PLANETS, TransferEnvironment},
 };
@@ -221,6 +222,17 @@ impl MaterialMissionPilot {
 }
 
 impl TransferForecastJob {
+    /// Conditional endpoint only. Queries, sites and opponents remain absent;
+    /// callers must not treat this as a native arrival observation.
+    pub(super) fn arrival_frame(&self) -> Option<TacticalSortieObservationV1> {
+        if self.report.end != Some(TransferForecastEnd::KinematicHandoff) {
+            return None;
+        }
+        let mut local = self.predicted.local.clone();
+        local.planet_orbit_omega = self.environment.planet_orbit_omega(self.report.destination);
+        Some(local)
+    }
+
     pub fn report(&self) -> &TransferForecastReport {
         &self.report
     }
@@ -714,12 +726,27 @@ pub(super) mod tests {
         p.ship.velocity = target.motion.velocity;
         p.ship.spin = 0.0;
         job.intent = CombatIntent::default();
+        // The original frame's local rate must not leak into the destination
+        // solar screen, even though it is irrelevant to free-flight guidance.
+        job.predicted.local.planet_orbit_omega = Some(f32::NAN);
         let mut expiring = job.clone();
         expiring.match_ticks = Some(1);
         job.step();
         assert_eq!(job.report.end, Some(TransferForecastEnd::KinematicHandoff));
         assert_eq!(job.report.handoff_seconds, Some(DT));
         assert_eq!(job.report.charged_graph, 1);
+        let arrival = job.arrival_frame().unwrap();
+        assert_eq!(
+            arrival.planet_orbit_omega,
+            job.environment.planet_orbit_omega(job.report.destination)
+        );
+        assert_eq!(
+            arrival.combat.recovery.flight.pilot.planet.index,
+            job.report.destination
+        );
+        assert!(!arrival.combat.recovery.flight.pilot.queries_ready);
+        assert!(arrival.combat.recovery.flight.pilot.sites.is_empty());
+        assert!(arrival.combat.target.is_none());
         assert!(
             !job.predicted
                 .local
