@@ -49,7 +49,7 @@ def directed(short, side):
     return short if abs(short) < f32(.2) or math.copysign(1, short) == side else f32(short + f32(side*f32(math.tau)))
 
 
-def solar_plan(local, site, side):
+def solar_plan(local, site, side, *, circling=True):
     """Rebuild sampled arc, parking and both departure corridors from raw geometry."""
     sun = local['sun']
     if sun is None: return None
@@ -61,7 +61,8 @@ def solar_plan(local, site, side):
     offset, normal = sub(vec(site['vehicle_position']), center), vec(site['normal'])
     angle = directed(short_angle(p, site), side)
     radius = f32(f32(p['planet']['radius'])+60)
-    travel = f32(f32(abs(angle)*radius)/30)
+    travel = (f32(f32(abs(angle)*radius)/30) if circling else
+              f32(length(sub(vec(p['ship']['position']), vec(site['vehicle_position'])))/12))
 
     def forecast(offset, seconds):
         position = (add(sun_pos, rotate(sub(center, sun_pos), f32(f32(omega)*seconds)))
@@ -73,15 +74,18 @@ def solar_plan(local, site, side):
         t = max(0, min(1, f32(dot(sub(sun_pos, a), delta)/max(dot(delta, delta), f32(.0001)))))
         return f32(length(sub(sun_pos, add(a, mul(delta, t))))-safe)
 
-    previous = forecast(mul(up, radius), 0)
-    approach = clearance(vec(p['ship']['position']), previous)
-    steps = max(math.ceil(f32(abs(angle)/f32(.08))), 1)
-    for step in range(1, steps+1):
-        fraction = f32(step/steps)
-        point = forecast(mul(rotate(up, f32(angle*fraction)), radius), f32(travel*fraction))
-        approach = min(approach, clearance(previous, point))
-        previous = point
-    approach = min(approach, clearance(previous, forecast(offset, travel)))
+    if circling:
+        previous = forecast(mul(up, radius), 0)
+        approach = clearance(vec(p['ship']['position']), previous)
+        steps = max(math.ceil(f32(abs(angle)/f32(.08))), 1)
+        for step in range(1, steps+1):
+            fraction = f32(step/steps)
+            point = forecast(mul(rotate(up, f32(angle*fraction)), radius), f32(travel*fraction))
+            approach = min(approach, clearance(previous, point))
+            previous = point
+        approach = min(approach, clearance(previous, forecast(offset, travel)))
+    else:
+        approach = clearance(vec(p['ship']['position']), forecast(offset, travel))
     parked, departures = math.inf, [math.inf, math.inf]
     for step in range(13):
         seconds = f32(travel+f32(f32(25*step)/12))
