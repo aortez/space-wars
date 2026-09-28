@@ -223,6 +223,10 @@ endpoint command is unexecuted. The audit retains both counts.
 
 ## Next boundary
 
+The follow-up [source-bound neutral join](capture-neutral-join.md) is now
+implemented and checked in 62 fixed replays. It preserves this slice's domains
+and adds current-state validation without changing playing decisions.
+
 This slice supports separating successful neutral-trip timing from combat cover
 as observational evidence. It does not authorize remote landing sites, estimate
 survival or change playing destination choice. Keep exposed sources, foreign
