@@ -203,3 +203,8 @@ site, not a continuously updated time-to-capture prediction. The next decision
 gap is remote acquisition and threat uncertainty: price hypothetical arrivals
 without borrowing a future actual site choice, before allowing these records
 to influence live destination selection. Deployment remains paused.
+
+The next [conditional remote arrival screen](capture-remote-arrival.md) now
+projects source-measured sites into known handoffs while keeping acquisition
+and threat unknown. It also identifies a raw-evidence retention gap for distant
+alternatives.
