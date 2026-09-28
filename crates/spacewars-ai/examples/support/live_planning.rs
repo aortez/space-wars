@@ -113,6 +113,18 @@ impl LivePlanningRun {
         self.planner.observe_with_planning(state, seat, o, planning);
     }
     #[allow(dead_code)] // Only the mission runner requests remote evidence.
+    pub fn remote_snapshot(
+        &self,
+        seat: usize,
+        tick: u64,
+    ) -> Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>
+    {
+        self.planner
+            .destination_cover_observations(tick)
+            .into_iter()
+            .find_map(|(actor, evidence)| (actor == seat).then_some(evidence))
+    }
+    #[allow(dead_code)] // Only the mission runner requests remote evidence.
     pub fn observe_destination_cover(
         &mut self,
         state: &SurfaceSortieState,

@@ -478,9 +478,9 @@ fn main() {
                 if let Some(sources) = &mut transfer_sources {
                     sources.observe(i, &pilots[i], &o);
                 }
-                let comparison_before = transfer_comparison
-                    .as_ref()
-                    .and_then(|c| c.before_intent(&pilots[i], i, state.tick()));
+                let comparison_before = transfer_comparison.as_mut().and_then(|c| {
+                    c.before_intent(&pilots[i], i, state.tick(), live_planning.as_ref())
+                });
                 let clock = Instant::now();
                 let nominated = transfer_probe.as_mut().and_then(|probe| {
                     probe.intent(

@@ -34,6 +34,11 @@ pub use transfer_queue::{TransferForecastQueue, TransferForecastState, TransferQ
 #[path = "mission_transfer_comparison.rs"]
 mod transfer_comparison;
 pub use transfer_comparison::{TransferComparisonJob, TransferComparisonReport};
+#[path = "mission_remote_arrival.rs"]
+mod remote_arrival;
+pub use remote_arrival::{
+    RemoteArrivalDirection, RemoteArrivalFrame, RemoteArrivalScreen, RemoteArrivalSite,
+};
 pub type TransferComparisonQueue = TransferForecastQueue<TransferComparisonJob>;
 
 #[path = "mission_disengagement.rs"]

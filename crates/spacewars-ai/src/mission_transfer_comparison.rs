@@ -26,6 +26,8 @@ pub struct TransferCandidateForecast {
     /// cannot supply future first-choice evidence to this source tick.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neutral_timing: Option<NeutralTimingContribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote_arrival: Option<RemoteArrivalScreen>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -94,6 +96,7 @@ pub struct TransferComparisonJob {
     report: TransferComparisonReport,
     jobs: Vec<Option<TransferForecastJob>>,
     cursor: usize,
+    arrivals: Option<Vec<remote_arrival::ArrivalScreenJob>>,
 }
 
 impl TransferComparisonJob {
@@ -161,6 +164,7 @@ impl TransferComparisonJob {
             },
             jobs: Vec::with_capacity(MAX_CANDIDATES),
             cursor: 0,
+            arrivals: None,
         };
         job.add(
             TransferCandidateForecast::source(actual, o, evaluator, current, true, None),
@@ -239,6 +243,49 @@ impl TransferComparisonJob {
             .cloned()
     }
 
+    pub(super) fn with_remote_arrival(
+        mut self,
+        o: &MissionObservationV1,
+        cover: Option<
+            &scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation,
+        >,
+        environment: &TransferEnvironment,
+    ) -> Self {
+        // This diagnostic evidence is separate from the controller's observation.
+        let mut source = o.clone();
+        source.destination_cover = cover.cloned();
+        self.arrivals = Some(
+            self.report
+                .candidates
+                .iter()
+                .zip(&self.jobs)
+                .map(|(candidate, forecast)| {
+                    let mut screen =
+                        remote_arrival::ArrivalScreenJob::new(&source, candidate.destination);
+                    if candidate.source_capture.is_some() {
+                        let mut local = o.local.clone();
+                        local.planet_orbit_omega =
+                            environment.planet_orbit_omega(candidate.destination);
+                        screen.begin(Some(local));
+                    } else if forecast.is_none() {
+                        screen.begin(None);
+                    }
+                    screen
+                })
+                .collect(),
+        );
+        self
+    }
+
+    pub(super) fn arrival_context(
+        &self,
+        o: &MissionObservationV1,
+    ) -> Option<remote_arrival::ArrivalScreenContext> {
+        self.arrivals
+            .as_ref()
+            .map(|jobs| remote_arrival::ArrivalScreenContext::new(o, jobs))
+    }
+
     fn add(
         &mut self,
         mut candidate: TransferCandidateForecast,
@@ -263,6 +310,11 @@ impl TransferComparisonJob {
         for (candidate, job) in report.candidates.iter_mut().zip(&self.jobs) {
             if let Some(job) = job {
                 candidate.forecast = Some(job.report().clone());
+            }
+        }
+        if let Some(arrivals) = &self.arrivals {
+            for (candidate, arrival) in report.candidates.iter_mut().zip(arrivals) {
+                candidate.remote_arrival = Some(arrival.report.clone());
             }
         }
         report
@@ -369,6 +421,7 @@ impl TransferCandidateForecast {
             forecast: None,
             source_capture,
             neutral_timing: None,
+            remote_arrival: None,
             local_reference: evaluator.source_local_reference(
                 o,
                 bot.telemetry(),
@@ -447,10 +500,26 @@ impl PlanningJob for TransferComparisonJob {
                 job.step();
                 if let Some(output) = job.output() {
                     self.report.candidates[index].forecast = Some(output.clone());
+                    if let Some(arrivals) = &mut self.arrivals {
+                        arrivals[index].begin(job.arrival_frame());
+                    }
                     self.jobs[index] = None;
                 }
                 self.cursor = (index + 1) % self.jobs.len();
                 return;
+            }
+        }
+        if let Some(arrivals) = &mut self.arrivals {
+            for offset in 0..arrivals.len() {
+                let index = (self.cursor + offset) % arrivals.len();
+                if arrivals[index].has_work() {
+                    arrivals[index].step();
+                    self.cursor = (index + 1) % arrivals.len();
+                    return;
+                }
+            }
+            for (candidate, arrival) in self.report.candidates.iter_mut().zip(arrivals) {
+                candidate.remote_arrival = Some(arrival.report.clone());
             }
         }
         // A separate charged operation, even when every candidate was unknown.

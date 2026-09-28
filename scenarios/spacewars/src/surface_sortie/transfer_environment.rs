@@ -122,6 +122,11 @@ impl SurfaceSortieState {
 }
 
 impl TransferEnvironment {
+    /// Source-known orbit of this planet, independent of the ship's current frame.
+    pub fn planet_orbit_omega(&self, planet: usize) -> Option<f32> {
+        self.planets.get(planet)?.orbit.map(|orbit| orbit.rate)
+    }
+
     /// Compare an independently advanced source snapshot to a current capture.
     /// Never rebase the prediction onto later observations. Fixed parameters and
     /// scripted phases are exact; completed-body readings allow only the small

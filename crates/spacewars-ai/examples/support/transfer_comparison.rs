@@ -33,6 +33,8 @@ struct Source {
     last_snapshot_tick: Option<u64>,
     published: Option<TransferComparisonReport>,
     published_state: Option<TransferForecastState>,
+    remote:
+        Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>,
 }
 
 pub struct TransferComparisonRun {
@@ -40,6 +42,7 @@ pub struct TransferComparisonRun {
     sources: [Option<Source>; 2],
     allowance: u32,
     neutral_timing: bool,
+    remote_arrival: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
@@ -51,8 +54,19 @@ impl TransferComparisonRun {
         let neutral_timing = super::arg("--compare-neutral-timing", "false")
             .parse::<bool>()
             .unwrap();
+        let remote_arrival = super::arg("--compare-remote-arrival", "false")
+            .parse::<bool>()
+            .unwrap();
+        assert!(
+            !(neutral_timing && remote_arrival),
+            "select one observational extension"
+        );
         if specification == "none" {
             assert!(!neutral_timing, "neutral comparison needs fixed sources");
+            assert!(
+                !remote_arrival,
+                "remote arrival comparison needs fixed sources"
+            );
             assert_eq!(
                 super::arg("--transfer-comparison-allowance", "none"),
                 "none"
@@ -94,6 +108,7 @@ impl TransferComparisonRun {
             sources,
             allowance,
             neutral_timing,
+            remote_arrival,
             work: BufWriter::new(File::create(out.join("transfer-comparison-work.jsonl")).unwrap()),
             observation_ms: Vec::new(),
             dispatch_ms: Vec::new(),
@@ -101,15 +116,21 @@ impl TransferComparisonRun {
     }
 
     pub fn before_intent(
-        &self,
+        &mut self,
         bot: &MaterialMissionPilot,
         seat: usize,
         tick: u64,
+        live: Option<&super::live_planning::LivePlanningRun>,
     ) -> Option<MaterialMissionPilot> {
         self.sources[seat]
-            .as_ref()
+            .as_mut()
             .filter(|s| s.tick == tick && !s.attempted)
-            .map(|_| bot.clone())
+            .map(|source| {
+                if self.remote_arrival {
+                    source.remote = live.and_then(|l| l.remote_snapshot(seat, tick));
+                }
+                bot.clone()
+            })
     }
 
     pub fn observe(
@@ -147,7 +168,17 @@ impl TransferComparisonRun {
             source.attempted = true;
             source.environment = environment.as_ref().ok().map(|e| json!(e));
             match environment.and_then(|e| {
-                if self.neutral_timing {
+                if self.remote_arrival {
+                    self.queue.submit_comparison_with_remote_arrival(
+                        before,
+                        actual,
+                        o,
+                        evaluator,
+                        e,
+                        contact,
+                        source.remote.as_ref(),
+                    )
+                } else if self.neutral_timing {
                     self.queue.submit_comparison_with_neutral_timing(
                         before, actual, o, evaluator, e, contact,
                     )
@@ -235,12 +266,16 @@ impl TransferComparisonRun {
             }
         }
         self.work.flush().unwrap();
-        let sources: Vec<_> = self.sources.iter().enumerate().filter_map(|(seat, s)| s.as_ref().map(|s| json!({
+        let sources: Vec<_> = self.sources.iter().enumerate().filter_map(|(seat, s)| s.as_ref().map(|s| {
+            let mut value = json!({
             "seat":seat,"source_tick":s.tick,"attempted":s.attempted,"environment":s.environment,
             "rejected":s.rejected,"initial":s.initial,"last_snapshot":s.last_snapshot,
             "last_snapshot_tick":s.last_snapshot_tick,"published":s.published,"published_state":s.published_state,
             "final_state":self.queue.state(PlayerId::from_index(seat).unwrap()),
-        }))).collect();
+            });
+            if self.remote_arrival { value["remote_source"] = json!(s.remote); }
+            value
+        })).collect();
         json!({"schema":1,"observational":true,"sources":sources,"total_graph_allowance":self.allowance,
             "playing_graph_allowance":PLAYING_GRAPH,"max_source_age_ticks":MAX_RESULT_AGE,
             "submitted":self.queue.submitted_total,"completed":self.queue.completed_total,
