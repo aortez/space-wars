@@ -50,11 +50,13 @@ pub struct TransferComparisonRun {
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
+    arrival_survey: Option<super::arrival_survey::ArrivalSurveyRun>,
 }
 
 impl TransferComparisonRun {
     pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
         let specification = super::arg("--compare-transfer-sources", "none");
+        let arrival_survey = super::arrival_survey::ArrivalSurveyRun::from_args(out);
         let neutral_timing = super::arg("--compare-neutral-timing", "false")
             .parse::<bool>()
             .unwrap();
@@ -73,6 +75,10 @@ impl TransferComparisonRun {
             "select one observational extension"
         );
         if specification == "none" {
+            assert!(
+                arrival_survey.is_none(),
+                "arrival survey needs fixed comparison sources"
+            );
             assert!(!neutral_timing, "neutral comparison needs fixed sources");
             assert!(
                 !remote_arrival,
@@ -130,6 +136,7 @@ impl TransferComparisonRun {
             work: BufWriter::new(File::create(out.join("transfer-comparison-work.jsonl")).unwrap()),
             observation_ms: Vec::new(),
             dispatch_ms: Vec::new(),
+            arrival_survey,
         })
     }
 
@@ -239,6 +246,23 @@ impl TransferComparisonRun {
         }
         self.observation_ms
             .push(start.elapsed().as_secs_f64() * 1000.0);
+        if let Some(survey) = &mut self.arrival_survey {
+            let plan = source
+                .token
+                .and_then(|t| self.queue.arrival_survey(t, p.tick));
+            survey.observe(seat, o, plan);
+        }
+    }
+
+    pub fn survey_arrival(
+        &mut self,
+        state: &SurfaceSortieState,
+        remaining: Work,
+        busy: &[usize],
+    ) -> f64 {
+        self.arrival_survey
+            .as_mut()
+            .map_or(0.0, |s| s.advance(state, remaining, busy))
     }
 
     pub fn advance(&mut self, tick: u64, playing_remaining: Work) -> f64 {
@@ -313,12 +337,16 @@ impl TransferComparisonRun {
             if self.retain_remote { value["retained_source"] = json!(s.retained); }
             value
         })).collect();
-        json!({"schema":1,"observational":true,"sources":sources,"total_graph_allowance":self.allowance,
+        let mut report = json!({"schema":1,"observational":true,"sources":sources,"total_graph_allowance":self.allowance,
             "playing_graph_allowance":PLAYING_GRAPH,"max_source_age_ticks":MAX_RESULT_AGE,
             "submitted":self.queue.submitted_total,"completed":self.queue.completed_total,
             "cancelled":self.queue.cancelled_total,"charged_graph":self.queue.charged_total,"physics_queries":0,
             "observation":super::timing(self.observation_ms.clone()),"dispatch":super::timing(self.dispatch_ms.clone()),
-            "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."})
+            "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."});
+        if let Some(survey) = &mut self.arrival_survey {
+            report["arrival_survey"] = survey.report();
+        }
+        report
     }
 }
 

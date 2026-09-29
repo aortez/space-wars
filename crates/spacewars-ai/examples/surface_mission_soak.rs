@@ -1,6 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/acquisition_probe.rs"]
 mod acquisition_probe;
+#[path = "support/arrival_survey.rs"]
+mod arrival_survey;
 #[path = "support/capture_probe.rs"]
 mod capture_probe;
 #[path = "support/flag_survey.rs"]
@@ -761,6 +763,11 @@ fn main() {
             }
             if let Some(comparison) = &mut transfer_comparison {
                 planning_ms += comparison.advance(state.tick(), remaining);
+                let mut busy = live_planning.as_ref().unwrap().physical_actors().to_vec();
+                if let Some(flags) = &flag_survey {
+                    busy.extend(&flags.physical_actors);
+                }
+                planning_ms += comparison.survey_arrival(&state, remaining, &busy);
             }
         }
         let clock = Instant::now();

@@ -15,6 +15,10 @@ use std::collections::BTreeMap;
 #[path = "mission_neutral_comparison_tests.rs"]
 mod neutral_tests;
 
+#[path = "mission_arrival_survey.rs"]
+mod arrival_survey;
+pub use arrival_survey::ArrivalSurveyPlan;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferQueuePhase {
@@ -48,6 +52,7 @@ enum SourceKind {
 
 #[derive(Clone)]
 struct Source {
+    survey_blocked: Option<&'static str>,
     local_reference: Option<crate::mission_evaluation::LocalReferenceContext>,
     neutral_reference: Option<crate::mission_evaluation::NeutralTimingContext>,
     arrival_reference: Option<remote_arrival::ArrivalScreenContext>,
@@ -87,6 +92,7 @@ impl Source {
     ) -> Self {
         let p = &o.local.combat.recovery.flight.pilot;
         Self {
+            survey_blocked: arrival_survey::blocked(o),
             local_reference: None,
             neutral_reference: None,
             arrival_reference: None,
@@ -284,6 +290,7 @@ impl Source {
         {
             return Err("remote arrival solar context changed or source samples expired");
         }
+        self.survey_blocked = arrival_survey::blocked(o);
         Ok(())
     }
 }
@@ -292,6 +299,8 @@ impl Source {
 struct Slot {
     state: TransferForecastState,
     source: Option<Source>,
+    survey_request:
+        Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest>,
 }
 
 /// One immutable forecast per actor. The host supplies a current observation
@@ -503,6 +512,7 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
                     ..placeholder
                 },
                 source: Some(source),
+                survey_request: None,
             },
         );
         self.submitted_total += 1;
