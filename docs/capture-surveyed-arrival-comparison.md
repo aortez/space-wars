@@ -85,9 +85,10 @@ Implementation, tests, plan and command builder froze at
 All **16 runs** pass, spanning **88,118 physical ticks**. Complete control and
 observation traces, normalized sensors, existing work/evidence, original surveys
 and comparisons, native choices and full capture outcomes match the historical
-survey-on runs and paired arms. There are no interrupted runs, failed runtime
-audits or dropped cases. Review corrected analysis clock, partial-output and
-provenance checks before the freeze; no runtime or audit changed after outcomes.
+survey-on runs and paired arms. No runs were interrupted or dropped, and all
+frozen experiment-runner audits passed. Review corrected analysis clock,
+partial-output and provenance checks before the freeze; runtime and experiment
+runner remained unchanged after outcomes.
 
 The four ordinary conditions remain untriggered in both arms because local
 landing work prevents a charged arrival sample. Each controlled condition freezes
@@ -145,6 +146,21 @@ hashes, all trigger/refusal states, budgets, screens and separate retrospective
 joins. Raw summary:
 `target/capture-flag-survey/surveyed-arrival-v1/summary.json`, SHA-256
 `fdcffd7a04cda2218f3ea4bc1c334f3117edd2b91346a3b98dc6f89093647ce3`.
+
+The [independent audit](data/capture-surveyed-arrival-audit-v1.json) verifies all
+232 raw files, 16 logs and 108 baseline files, 176,252 control/observation rows
+and the same number of sensor rows, 1,562,311,426 decompressed trace bytes,
+24,172 fresh-ledger rows and 968 active source validations. It checks historical
+and paired parity, causal admission, identity, immutable evidence, budgets,
+retirement, projection, solar reconstruction, native joins and these notes
+without importing the new experiment runner. No substantive findings remain.
+The checker is retained at
+`target/capture-flag-survey/surveyed-arrival-post-audit.py`, SHA-256
+`c4ff05e7ab73a063f97e728d5032c534eb7c3184ab3d72b0d0a32b93b89964d0`.
+Its two initial checker failures remain archived: an empty geometry screen can
+still retain a numerical arrival frame, and explicit zero Counter entries need
+to compare equal to absent zero entries. These corrections changed neither the
+runtime, frozen experiment runner, corpus nor recorded outcomes.
 
 Local validation passes **398 Rust tests** across all spacewars-ai targets with
 sensor profiling, **487 Python analysis tests**, formatting and diff checks.
