@@ -75,3 +75,109 @@ python3 tools/compare-transfer-body-motion.py \
 
 Use a clean checkout and a new output directory. The retained ordinary raw
 archive is required and verified against its committed projection.
+
+## Results
+
+The experiment froze at `8e4e1d184d32419c58f57b316cb90c7a4fd7896e` and used
+profiled binary SHA-256
+`45df0d5ee41b427c908e2f4306dd8daf9511150dc5f58890fd984a55c24130bf`.
+All eight full replays pass their historical trajectory, sensor, upstream,
+budget, native-choice and capture audits. The four point-model forecasts are
+exactly equal to the previously frozen distant forecasts. Between paired arms,
+the source actions/environment and all shared-time target motions are identical.
+All actual matches again select bearing 33 and complete capture and departure;
+these are preserved old outcomes, not an improvement in playing behavior.
+
+There are **105 common nonzero sample times** across the four pairs (28, 26, 26
+and 25), plus four identical source samples excluded from error aggregates.
+Only samples at or before physical transfer handoff are scored. These are
+correlated samples from four nominations in one quiet world, not 105 independent
+trials. The old and new models use precisely the same sample times below.
+
+| Metric at common times | Point model | Body-origin model |
+| --- | ---: | ---: |
+| RMS position error, world units | 7.619 | 0.390 |
+| RMS velocity error, units/s | 2.287 | 0.226 |
+| Mean absolute wrapped heading error | 18.240 degrees | 0.984 degrees |
+| Maximum absolute wrapped heading error | <111.777 degrees | <9.002 degrees |
+
+Timing improves overall, though the source-3876 point model's exact time becomes
+a one-tick early estimate. The table preserves the signed timing error
+**predicted minus actual**. Endpoint heading compares each model's own endpoint
+with the physical endpoint; it is not a common-time error when those ticks differ.
+
+| Source | Actual handoff | Point time error | Body time error | Point / body absolute endpoint heading error |
+| ---: | ---: | ---: | ---: | ---: |
+| 3816 | 5508 | +26 ticks | -3 ticks | 50.470 / 0.743 degrees |
+| 3876 | 5492 | 0 ticks | -1 tick | 60.779 / 0.271 degrees |
+| 3934 | 5508 | +14 ticks | 0 ticks | 107.251 / 0.240 degrees |
+| 3997 | 5534 | +13 ticks | 0 ticks | 145.995 / 0.353 degrees |
+
+Mean absolute time error falls from **0.221 to 0.0167 seconds**; maximum from
+**0.4334 to 0.050 seconds**. The motor error was a substantial cause of the
+heading discrepancy. This is still a conditional free-flight model. Native
+rotation/sweep arithmetic differs slightly, feedback can amplify small errors,
+and contacts, changing terrain, opponents and later landing controls remain
+outside this comparison. It does not establish exact long-horizon motion or
+general accuracy under asteroid pressure.
+
+The radial **position** at each predicted endpoint rounds to bearing 33 for
+**both models**, as does each actual handoff position. The COM correction did
+not discover a new bearing; the original position forecast already identified
+this part of the planet despite its heading error. The historical survey sampled
+63/31 instead. This supports testing an arrival-directed request, while leaving
+the actual best-site selection and new geometry to real measurements. A coarse
+bearing agreement is not a guarantee of landing clearance or capture cost.
+
+The two models perform **6,472 / 6,415** charged motor ticks, respectively, and
+zero physics queries. Maximum observed full-forecast wall time is **0.486 / 0.602
+ms** on this desktop. These are single-run diagnostic timings, not a controlled
+performance benchmark, a shared-queue admission result, or evidence of Pi
+headroom. The body model performs fewer ticks because its endpoint occurs earlier,
+while its geometric transport adds work per tick. Existing playing maxima remain
+four graph operations and 126 queries within the unchanged four/384 allowance.
+
+The corpus covers **55,718 physical ticks**, **111,452 controller rows and the
+same number of sensor rows**, **1,052,460,654 decompressed trace bytes**, 88 raw
+files and eight logs. There were no failures in the eight-run experiment and no
+dropped cases.
+The [tracked projection](data/capture-transfer-body-motion-v1.json) preserves
+commands, forecasts, shared-time differences, endpoint clocks, historical audits
+and hashes. Raw summary:
+`target/capture-flag-survey/transfer-body-motion-v1/summary.json`, SHA-256
+`19bc11c14a5515f5fedf765ddc19852e2394cffdc28b766dfe5d52e6b5397703`.
+
+The independent evidence audit is recorded separately in
+[the audit report](data/capture-transfer-body-motion-audit-v1.json). Its script
+is `target/capture-flag-survey/transfer-body-motion-post-audit.py`; it does not
+import the new paired-comparison runner. The report pins its own code and any
+older helpers, verifies raw evidence and the tracked projection, and reconstructs
+the accuracy metrics and bearing claims. Same-tick planet angle/spin residuals
+are kept separate from ship errors.
+
+The audit passes all eight runs and checks **226 predicted planet samples** at
+89 distinct tick numbers against the planet observed at each matching tick.
+This includes three samples after physical transfer handoff; only planetary
+motion is checked there. Maximum residuals are zero position at recorded
+precision, less than **0.006737 units/s** in velocity,
+**0.000000008 radians** in wrapped angle and **0.000000448 radians/s** in spin.
+Both models share the same ephemeris calculation; the large accuracy improvement
+follows the change to ship-origin transport. The audit independently confirms all
+eight endpoint bearing bins and the 105 shared-time comparisons, in addition to
+raw-file and historical parity.
+
+Validation passes **979 Rust tests** across engine-rapier, scenario-spacewars and
+spacewars-ai with all targets and sensor profiling, plus **473 Python analysis
+tests** and formatting. Independent pre-run review prompted chunked-work coverage,
+explicit retention of non-finite terminal samples, pinned expanded commands/logs,
+and shared target-motion checks. Clippy completes with 16 existing warnings in
+unchanged files; strict `-D warnings` stops at the existing nested conditional in
+`crates/engine-rapier/src/spaceling.rs`. No warning is on a changed line.
+
+The next bounded slice should replace the current-position bearing in an
+observational shortlist with an available predicted-arrival position, keeping
+the existing candidate/query limits and stable generations. Measurements must
+occur after the request, and any subsequent source comparison must preserve
+their actual epochs. Test coverage against fresh native choices while retaining
+negative/missing geometry and old age/identity guards. This mode remains opt-in
+and diagnostic; no default forecast, playing ranker or device behavior changes.
