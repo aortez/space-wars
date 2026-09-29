@@ -35,6 +35,9 @@ mod device_info;
 #[path = "ui_control_functional/controllers.rs"]
 mod controllers;
 
+#[path = "ui_control_functional/network.rs"]
+mod network;
+
 #[path = "ui_control_functional/performance.rs"]
 mod performance;
 
@@ -606,6 +609,15 @@ impl FunctionalHarness {
             .env("RUST_LOG", "info")
             .env("SLINT_BACKEND", backend)
             .env("SPACEWARS_CONTROL_SOCKET", &socket_path)
+            // These UI workflows must not reach the host's NetworkManager or
+            // BlueZ. Wire-protocol tests supply their own private D-Bus daemon.
+            .env(
+                "DBUS_SYSTEM_BUS_ADDRESS",
+                format!(
+                    "unix:path={}",
+                    run_directory.path().join("absent-system-bus").display()
+                ),
+            )
             .env_remove("WAYLAND_DISPLAY")
             .stdin(Stdio::null())
             .stdout(Stdio::from(log))

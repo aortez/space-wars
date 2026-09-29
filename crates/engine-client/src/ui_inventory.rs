@@ -9,6 +9,7 @@ pub(crate) struct ScreenVisibility {
     pub(crate) sound: bool,
     pub(crate) device_info: bool,
     pub(crate) controllers: bool,
+    pub(crate) network: bool,
     pub(crate) launcher: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
@@ -25,7 +26,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound && visibility.controllers {
+        if visibility.sound && visibility.network {
+            UiScreen::LauncherNetwork
+        } else if visibility.sound && visibility.controllers {
             UiScreen::LauncherControllers
         } else if visibility.sound && visibility.autostart {
             UiScreen::LauncherAutostart
@@ -42,6 +45,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound && visibility.network {
+        UiScreen::PauseNetwork
     } else if visibility.ingame_menu && visibility.sound && visibility.controllers {
         UiScreen::PauseControllers
     } else if visibility.ingame_menu && visibility.sound && visibility.autostart {
@@ -69,6 +74,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) device_info_controls: Vec<UiControl>,
     pub(crate) controller_controls: Vec<UiControl>,
     pub(crate) controller_focus: i32,
+    pub(crate) network_controls: Vec<UiControl>,
+    pub(crate) network_focus: i32,
     pub(crate) launcher_busy_stage: String,
     pub(crate) launcher_busy_elapsed: String,
     pub(crate) sound_focus_index: i32,
@@ -149,6 +156,33 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::LauncherMain => launcher_main_inventory(context),
         UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
+        UiScreen::LauncherNetwork | UiScreen::PauseNetwork => UiInventory {
+            selected_control: context
+                .network_controls
+                .get(context.network_focus as usize)
+                .filter(|control| control.enabled)
+                .map(|control| control.id.clone()),
+            controls: context.network_controls.clone(),
+            actions: {
+                let mut actions = vec![
+                    UiAction::Up,
+                    UiAction::Down,
+                    UiAction::Left,
+                    UiAction::Right,
+                    UiAction::Confirm,
+                    UiAction::Back,
+                ];
+                if context
+                    .network_controls
+                    .iter()
+                    .any(|c| c.id == "network.connect-password")
+                {
+                    actions.extend([UiAction::Start, UiAction::Controls]);
+                }
+                actions
+            },
+            error: None,
+        },
         UiScreen::LauncherControllers | UiScreen::PauseControllers => UiInventory {
             selected_control: context
                 .controller_controls
@@ -808,6 +842,7 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     controls.push(UiControl::new("settings.device-info", "Device Info", true));
     controls.push(UiControl::new("settings.autostart", "Auto-start", true));
     controls.push(UiControl::new("settings.controllers", "Controllers", true));
+    controls.push(UiControl::new("settings.network", "Network", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
@@ -835,6 +870,8 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     UiInventory {
         selected_control: if context.sound_focus_index == 7 {
             Some("settings.controllers".into())
+        } else if context.sound_focus_index == 8 {
+            Some("settings.network".into())
         } else {
             selected_from_index(&ids, context.sound_focus_index)
         },
@@ -1162,6 +1199,7 @@ mod tests {
                 sound: false,
                 device_info: false,
                 controllers: false,
+                network: false,
                 autostart: false,
                 launcher: true,
                 launcher_controls: true,
