@@ -55,9 +55,9 @@ def phases(trace):
                 goals=dict(Counter(r['goal'] for r in trace[:-1])), segments=segments)
 
 
-def audit_controls(case, root, trace):
+def audit_controls(case, root, trace, *, end_tick=None):
     """Reconcile diagnostic flags to the actual controller trace, not themselves."""
-    control = [r for r in read_trace(root, case['source_tick']) if r['seat'] == case['seat']]
+    control = [r for r in read_trace(root, case['source_tick'], end_tick) if r['seat'] == case['seat']]
     report = json.loads((root / 'report.json').read_text())
     if len(control) + 1 == len(trace):
         assert trace[-1]['match_finished'] and report['round']['outcome'] is not None
