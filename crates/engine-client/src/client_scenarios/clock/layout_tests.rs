@@ -3,7 +3,7 @@ use crate::thruster_visual_tests::{raster, svg, write_png};
 use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat};
 
 #[test]
-fn centered_clock_and_symmetric_framing_render_across_formats_and_layouts() {
+fn centered_clock_and_wooden_floor_render_across_formats_and_layouts() {
     let output = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS").map(std::path::PathBuf::from);
     if let Some(output) = &output {
         std::fs::create_dir_all(output).unwrap();
@@ -43,16 +43,17 @@ fn centered_clock_and_symmetric_framing_render_across_formats_and_layouts() {
             let width = normal_pixels.width() as usize;
             let height = normal_pixels.height() as usize;
             let at = |x, y| normal_pixels.as_slice()[y * width + x];
-            // Both bands occupy 8%, with open background immediately inside.
-            let band = at(width / 2, height * 4 / 100);
-            assert_eq!(band, at(width / 2, height * 96 / 100));
-            assert_ne!(band, at(width / 2, height * 9 / 100));
-            assert_ne!(band, at(width / 2, height * 91 / 100));
-            // Opposite polygon edges can round to adjacent raster rows.
-            let edge_differences = (0..height * 8 / 100)
-                .filter(|&y| at(width / 2, y) != at(width / 2, height - 1 - y))
-                .count();
-            assert!(edge_differences <= 2, "{name}: asymmetric framing");
+            // Both bands occupy 8%, with a shaded header and wooden floor.
+            // Their warmer material stays distinct from the open interior.
+            let header = at(width / 2, height * 4 / 100);
+            let base = at(width / 2, height * 96 / 100);
+            for wood in [header, base] {
+                assert!(wood.r > wood.g && wood.g > wood.b);
+            }
+            let background = at(width / 2, height * 9 / 100);
+            assert_eq!(background, at(width / 2, height * 91 / 100));
+            assert_ne!(header, background);
+            assert_ne!(base, background);
             // Bright cyan excludes dim guides, the frame and the AM/PM label.
             let lit: Vec<_> = normal_pixels
                 .as_slice()
@@ -86,6 +87,21 @@ fn centered_clock_and_symmetric_framing_render_across_formats_and_layouts() {
             ] {
                 if let Some(event) = event {
                     scenario.preview_clock_event(event);
+                    if event == ClockEventKind::Falling {
+                        let opened =
+                            raster(&ClockScenario::render_frame(&scenario.state), viewport);
+                        let bottom = (height - 3) * width;
+                        assert_eq!(
+                            opened.as_slice()[bottom + width / 2],
+                            background,
+                            "{name}: drain must cut through the wooden base"
+                        );
+                        assert_eq!(
+                            opened.as_slice()[bottom + width / 4],
+                            normal_pixels.as_slice()[bottom + width / 4],
+                            "{name}: wood remains beneath the solid banks"
+                        );
+                    }
                     for _ in 0..120 {
                         scenario.step(&[], Duration::from_nanos(16_666_667));
                     }

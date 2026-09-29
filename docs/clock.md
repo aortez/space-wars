@@ -22,8 +22,8 @@ hour slots keep their position in 12-hour mode, so a reading change does not
 recenter the clock. AM/PM remains just below the face's right edge. Digit cell
 sizes and horizontal spacing retain the previous responsive size budget.
 
-Matching dark bands occupy the top and bottom **8%** of the display. The floor
-was previously 16% high; its actual surface, colliders, course anchors and water
+A shaded header and wooden base occupy the top and bottom **8%** of the display.
+The floor was previously 16% high; its actual surface, colliders, course anchors and water
 beds now move down together. The upper band is a decorative **rain canopy**, not
 a solid ceiling or another water pool. Finite rain parcels start beneath its
 underside, with room for their initial streak/drop extent; amount, cadence and
@@ -39,12 +39,12 @@ Rain, Falling, Meltdown and Marquee:
 ```sh
 SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-layout \
   cargo test --locked -p engine-client --bin engine-client --profile ci \
-  centered_clock_and_symmetric_framing
+  centered_clock_and_wooden_floor
 ```
 
-Tests check centered face pixels, matching band bounds, AM/PM clearance,
-unchanged cell sizes, rain emission below the canopy, and event framing in both
-render adapters. This changes the arena geometry, so identical seeds can have
+Tests check centered face pixels, equal band heights, wooden floor openings,
+AM/PM clearance, unchanged cell sizes, rain emission below the canopy, and event
+framing in both render adapters. The earlier floor-height change altered the arena geometry, so identical seeds can have
 different duck/hazard encounters; see the centered-arena checkpoint below.
 
 Real-device captures from **sw-picade-2** (1024×768, release build):
@@ -59,13 +59,19 @@ These two are headless layout captures, not deployments to additional devices.
 
 ### Wooden frame and soft lighting
 
-A thin wooden frame surrounds all four edges, with a beveled inner edge and
-subtle grain. Two small amber lights illuminate the upper corners. Lit digit
-cells, the colon and AM/PM cast a dim halo in their current color. The frame
-scales with the shorter display dimension; it leaves the centered face and the
-existing floor, rain canopy, drains and duck courses in place. Duck doorways are
-sections of the side rails: the wood, bevel and grain lift together on a top
-hinge, then return flush with the wall. The two sides swing inward and upward.
+Thin wooden rails surround the sides and top, joining a wooden base at the
+existing walking surface. Flat floors, duck platforms and moving drain panels
+share the frame's warm color, bevel and grain. The physical floor supplies the
+base, so drain gaps remain open all the way through; no second decorative rail
+covers them. Floor heights, colliders and duck courses retain their geometry.
+
+Two small amber lights illuminate the upper corners. Lit digit cells, the colon
+and AM/PM cast a dim halo in their current color, while inactive cells stay
+subdued. The header uses a dark warm finish, and narrow shadows inside the side
+and top rails give the room depth. The frame scales with the shorter display
+dimension. Duck doorways are sections of the side rails: the wood, bevel and
+grain lift together on a top hinge, then return flush with the wall. Both sides
+swing inward and upward, revealing a darker opening and a faint moving shadow.
 
 Cell halos follow falling bars, exploding blocks, melting/reforming cells and
 marquee transformations. They fade with their source cells, and moving content
@@ -89,6 +95,14 @@ overlay, not device screenshots:
 The [portrait fixture](screenshots/clock/portrait-framed-clock-fixture.png) covers
 480×800. Regenerate date-visible captures with `SPACEWARS_CALENDAR_ARTIFACTS` and
 the `clock_calendar_date_renders_in_band_through_native_text_overlay` test below.
+
+The shared wooden material also follows the moving floor during Rain:
+
+![Wooden drain panels during Rain, rendered fixture](screenshots/clock/hyperpixel-wooden-panels-fixture.png)
+
+The refinement passed 275 scenario tests (four ignored) and all 63 client clock
+tests, including both render adapters, portrait layouts, door motion, shared
+water and floor recovery.
 
 **Device validation (2026-09-28):** Release `fc9da2e` was built with Yocto and
 fast-deployed to `spacewars.local` (800×480, raster 2×). The installed client,

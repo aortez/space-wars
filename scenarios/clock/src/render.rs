@@ -29,9 +29,9 @@ pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
 const LABEL_LAYER: i32 = 5;
 
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
-const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.075, 0.105, 0.145);
-const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.19, 0.40, 0.52);
-const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.045, 0.105, 0.135);
+const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.22, 0.14, 0.078);
+const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
+const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.032, 0.068, 0.083);
 const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 
 const COLON_X_UNITS: f32 = 14.5;
@@ -239,32 +239,8 @@ fn render_floor(
     if opacity <= 0.0 {
         return;
     }
-    let edge_height = (pitch * 0.10).clamp(1.5, 3.0);
     for (min, max) in floor.slabs() {
-        frame.push_primitive(
-            ARENA_LAYER,
-            rectangle(
-                RenderPoint::new(min.x, min.y),
-                RenderPoint::new(max.x, max.y),
-                RenderColor {
-                    a: opacity,
-                    ..FLOOR_COLOR
-                },
-                None,
-            ),
-        );
-        frame.push_primitive(
-            ARENA_LAYER,
-            rectangle(
-                RenderPoint::new(min.x, max.y - edge_height),
-                RenderPoint::new(max.x, max.y),
-                RenderColor {
-                    a: opacity,
-                    ..FLOOR_EDGE_COLOR
-                },
-                None,
-            ),
-        );
+        floor::slab(frame, min, max, pitch, opacity);
     }
 }
 
@@ -276,7 +252,7 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
         rectangle(
             RenderPoint::new(layout.bounds_min.x, layout.canopy_y),
             layout.bounds_max,
-            FLOOR_COLOR,
+            RenderColor::rgb(0.063, 0.053, 0.041),
             None,
         ),
     );
@@ -288,7 +264,7 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
                 layout.bounds_max.x,
                 layout.canopy_y + (layout.pitch * 0.10).clamp(1.5, 3.0),
             ),
-            FLOOR_EDGE_COLOR,
+            RenderColor::rgb(0.17, 0.13, 0.085),
             None,
         ),
     );

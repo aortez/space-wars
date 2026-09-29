@@ -1,5 +1,5 @@
 //! A decorative wooden surround, with two dim lamps in its upper corners.
-//! It sits over the scene's edges without changing the floor or rain canopy.
+//! Its side and top rails join the physical floor, which supplies the wooden base.
 
 use super::*;
 use crate::events::duck::DuckEvent;
@@ -12,6 +12,7 @@ mod tests;
 const FRAME_LAYER: i32 = 10;
 const LAMP_LAYER: i32 = 11;
 const DOOR_LAYER: i32 = 12;
+const SHADOW_LAYER: i32 = 9;
 
 #[derive(Clone, Copy)]
 struct DoorPanel {
@@ -29,16 +30,13 @@ impl DoorPanel {
 }
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
-    let width = (layout.bounds_max.x - layout.bounds_min.x).min(CAMERA_HEIGHT) * 0.022;
+    let width = layout.frame_width;
     let doors = door_panels(state.duck_scene());
-    ring(
-        frame,
-        layout,
-        doors,
-        0.0,
-        width,
-        RenderColor::rgb(0.22, 0.14, 0.078),
-    );
+    inner_shadow(frame, layout, width, doors);
+    for door in doors.into_iter().flatten() {
+        door_shadow(frame, door, width);
+    }
+    ring(frame, layout, doors, 0.0, width, FLOOR_COLOR);
     ring(
         frame,
         layout,
@@ -61,11 +59,11 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
         doors,
         width * 0.72,
         width * 0.82,
-        RenderColor::rgb(0.32, 0.21, 0.12),
+        FLOOR_EDGE_COLOR,
     );
 
     // Short, deterministic grain marks keep the thin rails from reading as a
-    // flat brown UI border. Top and bottom grain mirror each other.
+    // flat brown UI border. The physical floor supplies the bottom rail.
     for i in 0..16 {
         let t = i as f32 / 16.0;
         let offset = width * (0.28 + (i % 3) as f32 * 0.13);
@@ -74,20 +72,16 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
             + t * (layout.bounds_max.x - layout.bounds_min.x - width * 4.0);
         let length = (layout.bounds_max.x - layout.bounds_min.x - width * 4.0) / 16.0
             * (0.4 + (i % 4) as f32 * 0.12);
-        for y in [
-            layout.bounds_min.y + offset,
-            layout.bounds_max.y - offset - width * 0.06,
-        ] {
-            frame.push_primitive(
-                FRAME_LAYER,
-                rectangle(
-                    RenderPoint::new(x, y),
-                    RenderPoint::new(x + length, y + width * 0.06),
-                    RenderColor::rgb(0.29, 0.18, 0.095),
-                    None,
-                ),
-            );
-        }
+        let y = layout.bounds_max.y - offset - width * 0.06;
+        frame.push_primitive(
+            FRAME_LAYER,
+            rectangle(
+                RenderPoint::new(x, y),
+                RenderPoint::new(x + length, y + width * 0.06),
+                RenderColor::rgb(0.29, 0.18, 0.095),
+                None,
+            ),
+        );
         let y = layout.bounds_min.y + width * 2.0 + t * (CAMERA_HEIGHT - width * 4.0);
         let length = (CAMERA_HEIGHT - width * 4.0) / 16.0 * (0.4 + (i % 4) as f32 * 0.12);
         for (side, x) in [
@@ -156,6 +150,92 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                 RenderPoint::new(door.hinge.x, door.hinge.y),
                 width * 0.16,
                 RenderColor::rgba(0.58, 0.39, 0.17, (door.angle.abs() * 3.0).min(1.0)),
+            )),
+        );
+    }
+}
+
+fn inner_shadow(
+    frame: &mut RenderFrame,
+    layout: Layout,
+    width: f32,
+    doors: [Option<DoorPanel>; 2],
+) {
+    let left = layout.bounds_min.x + width;
+    let right = layout.bounds_max.x - width;
+    let bottom = layout.floor_y;
+    let top = layout.bounds_max.y - width;
+    let step = width * 0.18;
+    for band in 0..4 {
+        let near = band as f32 * step;
+        let far = near + step;
+        let color = RenderColor::rgba(0.0, 0.0, 0.0, 0.18 * (1.0 - band as f32 / 4.0));
+        frame.push_primitive(
+            SHADOW_LAYER,
+            rectangle(
+                RenderPoint::new(left, top - far),
+                RenderPoint::new(right, top - near),
+                color,
+                None,
+            ),
+        );
+        for (side, (low, high)) in [(left + near, left + far), (right - far, right - near)]
+            .into_iter()
+            .enumerate()
+        {
+            // The opening interrupts the inner wall's shadow as well as its wood.
+            let ranges = doors[side].map_or([(bottom, top), (top, top)], |door| {
+                [(bottom, door.bottom.max(bottom)), (door.top.min(top), top)]
+            });
+            for (low_y, high_y) in ranges {
+                if low_y < high_y {
+                    frame.push_primitive(
+                        SHADOW_LAYER,
+                        rectangle(
+                            RenderPoint::new(low, low_y),
+                            RenderPoint::new(high, high_y),
+                            color,
+                            None,
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn door_shadow(frame: &mut RenderFrame, door: DoorPanel, width: f32) {
+    let inward = door.angle.signum();
+    let lift = door.angle.sin().abs();
+    let inner_x = door.hinge.x + inward * width;
+    frame.push_primitive(
+        SHADOW_LAYER,
+        rectangle(
+            RenderPoint::new(door.hinge.x.min(inner_x), door.bottom),
+            RenderPoint::new(door.hinge.x.max(inner_x), door.top),
+            RenderColor::rgba(0.0, 0.0, 0.0, lift * 0.6),
+            None,
+        ),
+    );
+    // A short soft shadow tracks the actual flap, below its fixed top hinge.
+    let panel = [
+        Vec2::new(door.hinge.x, door.bottom),
+        Vec2::new(inner_x, door.bottom),
+        Vec2::new(inner_x, door.top),
+        Vec2::new(door.hinge.x, door.top),
+    ];
+    for band in (1..=3).rev() {
+        let offset = Vec2::new(inward * width * 0.12, -width * (0.25 + band as f32 * 0.16)) * lift;
+        frame.push_primitive(
+            SHADOW_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon::filled(
+                panel
+                    .map(|point| {
+                        let p = door.transform(point);
+                        RenderPoint::new(p.x + offset.x, p.y + offset.y)
+                    })
+                    .to_vec(),
+                RenderColor::rgba(0.0, 0.0, 0.0, lift * 0.03),
             )),
         );
     }
@@ -263,7 +343,9 @@ fn ring(
     };
     let outside = corners(outer);
     let inside = corners(inner);
-    for i in 0..4 {
+    // The floor itself forms the bottom edge, including its actual drain gaps
+    // and moving panels. A second rail here would hide those openings.
+    for i in 1..4 {
         let next = (i + 1) % 4;
         rail(
             frame,

@@ -31,8 +31,6 @@ pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: 
         return;
     }
     let layout = event.layout;
-    let radius = event.radius;
-    let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if let Some(course) = &event.course {
         let spans = course.surfaces.iter().map(|surface| {
             let a = event
@@ -43,49 +41,24 @@ pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: 
                 .x;
             (a.min(b), a.max(b), surface.height)
         });
-        course_slabs(frame, layout, radius, opacity, spans);
+        course_slabs(frame, layout, opacity, spans);
     } else {
         let pit = event.obstacles[1];
         for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
-            rect(
+            slab(
                 frame,
                 event,
                 Vec2::new(start, layout.bounds_min.y),
                 Vec2::new(end, layout.floor_y),
-                FLOOR_COLOR,
-                ARENA_LAYER,
-                opacity,
-            );
-            rect(
-                frame,
-                event,
-                Vec2::new(start, layout.floor_y - 2.0),
-                Vec2::new(end, layout.floor_y),
-                FLOOR_EDGE_COLOR,
-                ARENA_LAYER,
                 opacity,
             );
         }
         for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
-            rect(
+            slab(
                 frame,
                 event,
                 Vec2::new(obstacle.start, layout.floor_y),
                 Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                orange,
-                ACTIVE_CELL_LAYER,
-                opacity,
-            );
-            rect(
-                frame,
-                event,
-                Vec2::new(
-                    obstacle.start,
-                    layout.floor_y + obstacle.height - radius * 0.3,
-                ),
-                Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                RenderColor::rgb(1.0, 0.85, 0.45),
-                ACTIVE_CELL_LAYER,
                 opacity,
             );
         }
@@ -206,59 +179,36 @@ pub(super) fn shared_course(
             .x;
         (a.min(b), a.max(b), surface.height)
     });
-    course_slabs(frame, geometry.layout, geometry.radius, opacity, spans);
+    course_slabs(frame, geometry.layout, opacity, spans);
 }
 
 fn course_slabs(
     frame: &mut RenderFrame,
     layout: Layout,
-    radius: f32,
     opacity: f32,
     spans: impl Iterator<Item = (f32, f32, f32)>,
 ) {
     for (left, right, height) in spans {
-        let top = layout.floor_y + height;
-        for (bottom, top, color, layer) in [
-            (
-                layout.bounds_min.y,
-                layout.floor_y,
-                FLOOR_COLOR,
-                ARENA_LAYER,
-            ),
-            (
-                layout.floor_y,
-                top,
-                RenderColor::rgb(1.0, 0.48, 0.08),
-                ARENA_LAYER,
-            ),
-            (
-                top - radius * 0.25,
-                top,
-                if height > 0.0 {
-                    RenderColor::rgb(1.0, 0.85, 0.45)
-                } else {
-                    FLOOR_EDGE_COLOR
-                },
-                ACTIVE_CELL_LAYER,
-            ),
-        ] {
-            if top <= bottom {
-                continue;
-            }
-            frame.push_primitive(
-                layer,
-                rectangle(
-                    RenderPoint::new(left, bottom),
-                    RenderPoint::new(right, top),
-                    RenderColor {
-                        a: opacity,
-                        ..color
-                    },
-                    None,
-                ),
-            );
-        }
+        floor::slab(
+            frame,
+            Vec2::new(left, layout.bounds_min.y),
+            Vec2::new(right, layout.floor_y + height),
+            layout.pitch,
+            opacity,
+        );
     }
+}
+
+fn slab(frame: &mut RenderFrame, event: &DuckEvent, min: Vec2, max: Vec2, opacity: f32) {
+    let a = event.render_position(min);
+    let b = event.render_position(max);
+    floor::slab(
+        frame,
+        Vec2::new(a.x.min(b.x), a.y),
+        Vec2::new(a.x.max(b.x), b.y),
+        event.layout.pitch,
+        opacity,
+    );
 }
 
 fn rect(
