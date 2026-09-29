@@ -374,4 +374,4 @@ fn project(
 
 #[cfg(test)]
 #[path = "mission_remote_arrival_tests.rs"]
-mod tests;
+pub(super) mod tests;

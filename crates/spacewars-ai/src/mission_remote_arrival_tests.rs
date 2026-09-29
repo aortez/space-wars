@@ -10,7 +10,10 @@ use scenario_spacewars::surface_sortie::{
 };
 use std::time::Duration;
 
-fn sample(planet: &PilotPlanetObservation, tick: u64) -> CoverCandidate {
+pub(in crate::mission_pilot) fn sample(
+    planet: &PilotPlanetObservation,
+    tick: u64,
+) -> CoverCandidate {
     let local_position = Vec2::Y * planet.radius;
     let normal = Vec2::Y.rotate_radians(planet.motion.angle);
     let position = planet.motion.position + local_position.rotate_radians(planet.motion.angle);
@@ -50,7 +53,7 @@ fn sample(planet: &PilotPlanetObservation, tick: u64) -> CoverCandidate {
     }
 }
 
-fn fixture() -> MissionObservationV1 {
+pub(in crate::mission_pilot) fn fixture() -> MissionObservationV1 {
     let mut state = SurfaceSortieScenario::init_material_combat(42);
     SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
     let mut o = state.mission_observation(0, None);
