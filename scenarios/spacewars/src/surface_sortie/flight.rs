@@ -8,6 +8,18 @@ pub const WING_TRANSITION_SECONDS: f32 = 0.45;
 pub const OPEN_CRUISE_SPEED: f32 = 70.0;
 pub const SWEPT_CRUISE_SPEED: f32 = 140.0;
 
+/// Local center of mass relative to the full ship's body/render origin.
+/// Uses the actual uniform-density hull; the landing feet have zero mass.
+/// This is known vehicle geometry, with no world query or future observation.
+pub fn ship_local_center_of_mass(sweep: f32) -> Vec2 {
+    assert!(sweep.is_finite() && (0.0..=1.0).contains(&sweep));
+    engine_rapier::world::ColliderShape::ConvexPolygon {
+        vertices: physics::ship_collision_hull_for(ShipForm::Ship, MAX_WING_THETA * sweep),
+    }
+    .local_center_of_mass()
+    .expect("full ship has a valid massive hull")
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SurfaceWingAction {
     /// Held while aboard: swept wings provide cruise thrust. Braking suppresses

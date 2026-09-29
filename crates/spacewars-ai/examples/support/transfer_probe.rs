@@ -33,6 +33,7 @@ pub struct TransferProbeRun {
     defer_pursuit: bool,
     control_comparison: Option<Value>,
     forecast_enabled: bool,
+    forecast_body_motion: bool,
     forecast: Option<Value>,
     schedule: Option<super::transfer_schedule::TransferScheduleRun>,
     acquisition: Option<super::acquisition_probe::AcquisitionProbe>,
@@ -91,6 +92,16 @@ impl TransferProbeRun {
             "false" => false,
             _ => panic!("--forecast-transfer must be true or false"),
         };
+        let forecast_body_motion =
+            match super::arg("--forecast-transfer-body-motion", "false").as_str() {
+                "true" => true,
+                "false" => false,
+                _ => panic!("--forecast-transfer-body-motion must be true or false"),
+            };
+        assert!(
+            !forecast_body_motion || forecast_enabled,
+            "body motion needs --forecast-transfer true"
+        );
         if destination == "none" {
             assert!(
                 !forecast_enabled && schedule.is_none() && acquisition.is_none(),
@@ -147,6 +158,7 @@ impl TransferProbeRun {
             defer_pursuit,
             control_comparison: None,
             forecast_enabled,
+            forecast_body_motion,
             forecast: None,
             schedule,
             acquisition,
@@ -247,7 +259,14 @@ impl TransferProbeRun {
             };
             let source_environment = environment.as_ref().ok().cloned();
             let result = environment
-                .and_then(|environment| bot.forecast_nominated_transfer(o, environment, 3600));
+                .and_then(|environment| bot.forecast_nominated_transfer(o, environment, 3600))
+                .map(|job| {
+                    if self.forecast_body_motion {
+                        job.with_body_origin_motion()
+                    } else {
+                        job
+                    }
+                });
             let construction_ms = started.elapsed().as_secs_f64() * 1000.0;
             let started = Instant::now();
             self.forecast = Some(match result {

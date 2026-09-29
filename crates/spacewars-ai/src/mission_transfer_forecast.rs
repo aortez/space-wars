@@ -1,7 +1,7 @@
 //! Conditional free-flight prediction after an accepted experimental nomination.
 //! No result is consumed by the playing evaluator or controller.
 use super::*;
-use crate::flight_prediction::advance_motor;
+use crate::flight_prediction::{BodyOriginMotor, advance_motor};
 use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::surface_sortie::{
     LandingPhase,
@@ -91,6 +91,7 @@ pub struct TransferForecastJob {
     environment: TransferEnvironment,
     intent: CombatIntent,
     match_ticks: Option<u64>,
+    body_motor: Option<BodyOriginMotor>,
     report: TransferForecastReport,
 }
 
@@ -188,6 +189,7 @@ impl MaterialMissionPilot {
             predicted,
             environment,
             intent: self.previous_intent,
+            body_motor: None,
             match_ticks: o
                 .match_context
                 .as_ref()
@@ -222,6 +224,18 @@ impl MaterialMissionPilot {
 }
 
 impl TransferForecastJob {
+    /// Opt-in body-origin transport for a newly captured transfer job. Keep the
+    /// original model available for paired diagnostics and historical callers.
+    pub fn with_body_origin_motion(mut self) -> Self {
+        assert_eq!(
+            self.report.ticks, 0,
+            "select motion model before forecasting"
+        );
+        self.body_motor = Some(BodyOriginMotor::default());
+        self.report.model = "guided_transfer_forecast_body_v2";
+        self
+    }
+
     /// Conditional endpoint only. Queries, sites and opponents remain absent;
     /// callers must not treat this as a native arrival observation.
     pub(super) fn arrival_frame(&self) -> Option<TacticalSortieObservationV1> {
@@ -366,13 +380,23 @@ impl PlanningJob for TransferForecastJob {
         // Real gravity changes velocity before the motor computes braking and
         // governor strength. Guidance already used the previous-step reading.
         p.ship.velocity += gravity * DT;
-        f.flight.limits = advance_motor(
-            &mut p.ship,
-            &mut f.flight.sweep,
-            self.intent.flight,
-            frame_velocity,
-            Vec2::ZERO,
-        );
+        f.flight.limits = if let Some(motor) = &mut self.body_motor {
+            motor.advance(
+                &mut p.ship,
+                &mut f.flight.sweep,
+                self.intent.flight,
+                frame_velocity,
+                Vec2::ZERO,
+            )
+        } else {
+            advance_motor(
+                &mut p.ship,
+                &mut f.flight.sweep,
+                self.intent.flight,
+                frame_velocity,
+                Vec2::ZERO,
+            )
+        };
         p.gravity = gravity;
         p.tick += 1;
         self.environment.advance(&mut self.predicted.planets);
@@ -587,53 +611,197 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn body_origin_motor_matches_native_turns_and_wing_transitions() {
+        for (turn, closed) in [
+            (-1.0, false),
+            (1.0, false),
+            (0.0, false),
+            (-0.5, true),
+            (0.5, true),
+        ] {
+            let (mut state, bot, _) = source();
+            let mut motor = BodyOriginMotor::default();
+            for tick in 0..90 {
+                let o = state.mission_observation(0, None);
+                let p = &o.local.combat.recovery.flight.pilot;
+                assert_eq!(p.landing.assist_strength, 0.0);
+                assert_eq!(state.transfer_solver_contact(0), Some(false));
+                let mut intent = bot.previous_intent;
+                intent.flight.controls.primary_held = false;
+                intent.flight.controls.brake_held = false;
+                intent.flight.controls.horizontal = turn;
+                intent.flight.wings.closed = closed && tick < 45;
+                let gravity = state
+                    .transfer_environment()
+                    .unwrap()
+                    .ship_gravity(p.ship.position);
+                let mut predicted = p.ship;
+                predicted.velocity += gravity * DT;
+                let mut sweep = o.local.combat.recovery.flight.flight.sweep;
+                motor.advance(
+                    &mut predicted,
+                    &mut sweep,
+                    intent.flight,
+                    p.planet.velocity_at(p.ship.position),
+                    Vec2::ZERO,
+                );
+                SurfaceSortieScenario::step(
+                    &mut state,
+                    &intent.encode(p.owner),
+                    Duration::from_nanos(16_666_667),
+                );
+                let actual = state.mission_observation(0, None);
+                let a = &actual.local.combat.recovery.flight.pilot;
+                assert!(
+                    predicted.position.distance_to(a.ship.position) < 0.002,
+                    "tick={tick}, turn={turn}, swept={closed}: {predicted:?} != {:?}",
+                    a.ship
+                );
+                assert!(
+                    predicted.velocity.distance_to(a.ship.velocity) < 0.003,
+                    "tick={tick}, turn={turn}, swept={closed}: {predicted:?} != {:?}",
+                    a.ship
+                );
+                assert!((predicted.spin - a.ship.spin).abs() < 0.00002);
+                let error = predicted.angle - a.ship.angle;
+                assert!(error.sin().atan2(error.cos()).abs() < 0.00002);
+                assert!(
+                    (sweep - actual.local.combat.recovery.flight.flight.sweep).abs() < 0.000002
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn body_origin_fixed_control_tape_reduces_accumulated_motor_error() {
+        let (mut state, bot, source) = source();
+        let mut body = source.local.combat.recovery.flight.pilot.ship;
+        let mut point = body;
+        let mut body_sweep = source.local.combat.recovery.flight.flight.sweep;
+        let mut point_sweep = body_sweep;
+        let mut motor = BodyOriginMotor::default();
+        let mut worst_body = 0.0_f32;
+        let mut worst_point = 0.0_f32;
+        for tick in 0..90 {
+            let o = state.mission_observation(0, None);
+            let p = &o.local.combat.recovery.flight.pilot;
+            assert_eq!(p.landing.assist_strength, 0.0);
+            assert_eq!(state.transfer_solver_contact(0), Some(false));
+            let mut intent = bot.previous_intent;
+            intent.flight.controls.horizontal = if tick < 45 { 0.7 } else { -0.6 };
+            intent.flight.controls.primary_held = false;
+            intent.flight.controls.brake_held = tick >= 60;
+            intent.flight.wings.closed = (15..60).contains(&tick);
+            // Both motors receive the same actual external forcing. Their own
+            // motion evolves without resets; guidance feedback is excluded.
+            let gravity = state
+                .transfer_environment()
+                .unwrap()
+                .ship_gravity(p.ship.position);
+            let frame = p.planet.velocity_at(p.ship.position);
+            body.velocity += gravity * DT;
+            point.velocity += gravity * DT;
+            motor.advance(&mut body, &mut body_sweep, intent.flight, frame, Vec2::ZERO);
+            advance_motor(
+                &mut point,
+                &mut point_sweep,
+                intent.flight,
+                frame,
+                Vec2::ZERO,
+            );
+            SurfaceSortieScenario::step(
+                &mut state,
+                &intent.encode(p.owner),
+                Duration::from_nanos(16_666_667),
+            );
+            let actual = state
+                .mission_observation(0, None)
+                .local
+                .combat
+                .recovery
+                .flight
+                .pilot
+                .ship;
+            worst_body = worst_body.max(body.position.distance_to(actual.position));
+            worst_point = worst_point.max(point.position.distance_to(actual.position));
+            assert!(body.velocity.distance_to(actual.velocity) < 0.01);
+        }
+        assert!(worst_body < 0.02, "corrected position error {worst_body}");
+        assert!(
+            worst_point > 0.1 && worst_body < worst_point * 0.1,
+            "body={worst_body}, point={worst_point}"
+        );
+    }
+
+    #[test]
+    fn body_origin_forecast_is_explicit_and_preserves_the_legacy_source() {
+        let (state, bot, o) = source();
+        let legacy = bot
+            .forecast_nominated_transfer(&o, state.transfer_environment().unwrap(), 3600)
+            .unwrap();
+        let mut body = legacy.clone().with_body_origin_motion();
+        assert_eq!(legacy.report.model, "guided_transfer_forecast_v1");
+        assert_eq!(body.report.model, "guided_transfer_forecast_body_v2");
+        assert_eq!(legacy.report.samples, body.report.samples);
+        assert_eq!(legacy.intent, body.intent);
+        assert!(legacy.body_motor.is_none());
+        body.step();
+        assert_eq!(legacy.report.ticks, 0);
+        assert_eq!(body.report.charged_graph, 1);
+    }
+
+    #[test]
     fn zero_single_and_chunked_work_produce_identical_bounded_results() {
         let (state, bot, o) = source();
         let environment = state.transfer_environment().unwrap();
-        let mut direct = bot
-            .forecast_nominated_transfer(&o, environment.clone(), 3600)
-            .unwrap();
-        while direct.next_work().is_some() {
-            direct.step();
-        }
-        for allowance in [1, 7, 100] {
-            let mut queue = PlanningQueue::new(1);
-            let token = queue
-                .submit(
-                    0,
-                    (),
-                    JobLimits::default(),
-                    bot.forecast_nominated_transfer(&o, environment.clone(), 3600)
-                        .unwrap(),
-                )
-                .unwrap();
-            assert_eq!(queue.advance(Work::default()).charged, Work::default());
-            assert_eq!(queue.job(token).unwrap().report.ticks, 0);
-            let mut charged = 0;
-            loop {
-                let allocation = queue.advance(Work {
-                    graph: allowance,
-                    physics_queries: 0,
-                });
-                charged += allocation.charged.graph as u64;
-                assert!(allocation.charged.graph <= allowance);
-                if let JobPoll::Ready(report) = queue.poll(token, &()) {
-                    assert_eq!(report, direct.output().unwrap());
-                    assert_eq!(report.ticks, charged);
-                    assert!(report.samples.len() <= 62 && report.phases.len() <= MAX_SEGMENTS);
-                    assert_eq!(
-                        report.launch_ticks + report.transfer_ticks + report.solar_escape_ticks,
-                        report.ticks
-                    );
-                    break;
+        for body_origin in [false, true] {
+            let job = |horizon| {
+                let job = bot
+                    .forecast_nominated_transfer(&o, environment.clone(), horizon)
+                    .unwrap();
+                if body_origin {
+                    job.with_body_origin_motion()
+                } else {
+                    job
+                }
+            };
+            let mut direct = job(3600);
+            while direct.next_work().is_some() {
+                direct.step();
+            }
+            for allowance in [1, 7, 100] {
+                let mut queue = PlanningQueue::new(1);
+                let token = queue
+                    .submit(0, (), JobLimits::default(), job(3600))
+                    .unwrap();
+                assert_eq!(queue.advance(Work::default()).charged, Work::default());
+                assert_eq!(queue.job(token).unwrap().report.ticks, 0);
+                let mut charged = 0;
+                loop {
+                    let allocation = queue.advance(Work {
+                        graph: allowance,
+                        physics_queries: 0,
+                    });
+                    charged += allocation.charged.graph as u64;
+                    assert!(allocation.charged.graph <= allowance);
+                    if let JobPoll::Ready(report) = queue.poll(token, &()) {
+                        assert_eq!(report, direct.output().unwrap());
+                        assert_eq!(report.ticks, charged);
+                        assert!(report.samples.len() <= 62 && report.phases.len() <= MAX_SEGMENTS);
+                        assert_eq!(
+                            report.launch_ticks + report.transfer_ticks + report.solar_escape_ticks,
+                            report.ticks
+                        );
+                        break;
+                    }
                 }
             }
+            let mut short = job(1);
+            short.step();
+            assert_eq!(short.report.end, Some(TransferForecastEnd::Horizon));
+            assert_eq!(short.report.handoff_seconds, None);
+            assert_eq!(short.next_work(), None);
         }
-        let mut short = bot.forecast_nominated_transfer(&o, environment, 1).unwrap();
-        short.step();
-        assert_eq!(short.report.end, Some(TransferForecastEnd::Horizon));
-        assert_eq!(short.report.handoff_seconds, None);
-        assert_eq!(short.next_work(), None);
     }
 
     #[test]
