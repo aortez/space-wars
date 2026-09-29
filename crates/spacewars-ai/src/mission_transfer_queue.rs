@@ -326,6 +326,30 @@ impl TransferForecastQueue {
 }
 
 impl TransferForecastQueue<TransferComparisonJob> {
+    /// Retained evidence must come from this actor's current observation and
+    /// episode. It stays separate from both real and hypothetical controls.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_comparison_with_retained_remote_arrival(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+        retained: &RemoteSurveySnapshot,
+    ) -> Result<RequestToken, &'static str> {
+        if !retained.matches(actual.context, o) {
+            return Err("retained survey snapshot identity or observation mismatch");
+        }
+        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_retained_remote_arrival(o, retained, &environment);
+        let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
+        source.local_reference = Some(job.local_context(o));
+        source.arrival_reference = job.arrival_context(o);
+        self.submit_job(actual, o, environment, contact, job, source)
+    }
+
     /// Historical geometry/solar screen only; no acquisition-time or threat
     /// estimate and no live candidate ranking uses this record.
     #[allow(clippy::too_many_arguments)] // Keep diagnostics separate from controller input.

@@ -244,22 +244,44 @@ impl TransferComparisonJob {
     }
 
     pub(super) fn with_remote_arrival(
-        mut self,
+        self,
         o: &MissionObservationV1,
         cover: Option<
             &scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation,
         >,
         environment: &TransferEnvironment,
     ) -> Self {
+        self.with_remote_sources(o, |_| cover, environment)
+    }
+
+    pub(super) fn with_retained_remote_arrival(
+        self,
+        o: &MissionObservationV1,
+        retained: &RemoteSurveySnapshot,
+        environment: &TransferEnvironment,
+    ) -> Self {
+        self.with_remote_sources(o, |destination| retained.cover(destination), environment)
+    }
+
+    fn with_remote_sources<'a>(
+        mut self,
+        o: &MissionObservationV1,
+        cover: impl Fn(
+            usize,
+        ) -> Option<
+            &'a scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation,
+        >,
+        environment: &TransferEnvironment,
+    ) -> Self {
         // This diagnostic evidence is separate from the controller's observation.
         let mut source = o.clone();
-        source.destination_cover = cover.cloned();
         self.arrivals = Some(
             self.report
                 .candidates
                 .iter()
                 .zip(&self.jobs)
                 .map(|(candidate, forecast)| {
+                    source.destination_cover = cover(candidate.destination).cloned();
                     let mut screen =
                         remote_arrival::ArrivalScreenJob::new(&source, candidate.destination);
                     if candidate.source_capture.is_some() {

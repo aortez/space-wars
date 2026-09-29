@@ -6,10 +6,11 @@ use scenario_spacewars::{
 };
 use serde_json::{Value, json};
 use spacewars_ai::{
+    BrainReset,
     mission_evaluation::{MAX_RESULT_AGE, MissionEvaluator},
     mission_pilot::{
-        MaterialMissionPilot, TransferComparisonQueue, TransferComparisonReport,
-        TransferForecastState, TransferQueuePhase,
+        MaterialMissionPilot, RemoteSurveyMemory, RemoteSurveySnapshot, TransferComparisonQueue,
+        TransferComparisonReport, TransferForecastState, TransferQueuePhase,
     },
 };
 use std::{
@@ -35,6 +36,8 @@ struct Source {
     published_state: Option<TransferForecastState>,
     remote:
         Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>,
+    memory: Option<RemoteSurveyMemory>,
+    retained: Option<RemoteSurveySnapshot>,
 }
 
 pub struct TransferComparisonRun {
@@ -43,13 +46,14 @@ pub struct TransferComparisonRun {
     allowance: u32,
     neutral_timing: bool,
     remote_arrival: bool,
+    retain_remote: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
 }
 
 impl TransferComparisonRun {
-    pub fn from_args(out: &Path) -> Option<Self> {
+    pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
         let specification = super::arg("--compare-transfer-sources", "none");
         let neutral_timing = super::arg("--compare-neutral-timing", "false")
             .parse::<bool>()
@@ -57,6 +61,13 @@ impl TransferComparisonRun {
         let remote_arrival = super::arg("--compare-remote-arrival", "false")
             .parse::<bool>()
             .unwrap();
+        let retain_remote = super::arg("--retain-remote-surveys", "false")
+            .parse::<bool>()
+            .unwrap();
+        assert!(
+            !retain_remote || remote_arrival,
+            "retention needs remote arrival comparison"
+        );
         assert!(
             !(neutral_timing && remote_arrival),
             "select one observational extension"
@@ -100,6 +111,12 @@ impl TransferComparisonRun {
             );
             sources[seat] = Some(Source {
                 tick,
+                memory: retain_remote.then(|| {
+                    RemoteSurveyMemory::new(BrainReset {
+                        actor: PlayerId::from_index(seat).unwrap(),
+                        episode_seed: seed,
+                    })
+                }),
                 ..Default::default()
             });
         }
@@ -109,6 +126,7 @@ impl TransferComparisonRun {
             allowance,
             neutral_timing,
             remote_arrival,
+            retain_remote,
             work: BufWriter::new(File::create(out.join("transfer-comparison-work.jsonl")).unwrap()),
             observation_ms: Vec::new(),
             dispatch_ms: Vec::new(),
@@ -119,18 +137,23 @@ impl TransferComparisonRun {
         &mut self,
         bot: &MaterialMissionPilot,
         seat: usize,
-        tick: u64,
+        o: &MissionObservationV1,
         live: Option<&super::live_planning::LivePlanningRun>,
     ) -> Option<MaterialMissionPilot> {
-        self.sources[seat]
-            .as_mut()
-            .filter(|s| s.tick == tick && !s.attempted)
-            .map(|source| {
-                if self.remote_arrival {
-                    source.remote = live.and_then(|l| l.remote_snapshot(seat, tick));
-                }
-                bot.clone()
-            })
+        let source = self.sources[seat].as_mut().filter(|s| !s.attempted)?;
+        let tick = o.local.combat.recovery.flight.pilot.tick;
+        let remote = (self.remote_arrival && (source.memory.is_some() || source.tick == tick))
+            .then(|| live.and_then(|l| l.remote_snapshot(seat, tick)))
+            .flatten();
+        if let Some(memory) = &mut source.memory {
+            memory.observe(o, remote.as_ref());
+        }
+        if source.tick != tick {
+            return None;
+        }
+        source.remote = remote;
+        source.retained = source.memory.as_ref().and_then(|m| m.snapshot(o));
+        Some(bot.clone())
     }
 
     pub fn observe(
@@ -168,7 +191,20 @@ impl TransferComparisonRun {
             source.attempted = true;
             source.environment = environment.as_ref().ok().map(|e| json!(e));
             match environment.and_then(|e| {
-                if self.remote_arrival {
+                if self.retain_remote {
+                    self.queue.submit_comparison_with_retained_remote_arrival(
+                        before,
+                        actual,
+                        o,
+                        evaluator,
+                        e,
+                        contact,
+                        source
+                            .retained
+                            .as_ref()
+                            .ok_or("retained survey source unavailable")?,
+                    )
+                } else if self.remote_arrival {
                     self.queue.submit_comparison_with_remote_arrival(
                         before,
                         actual,
@@ -274,6 +310,7 @@ impl TransferComparisonRun {
             "final_state":self.queue.state(PlayerId::from_index(seat).unwrap()),
             });
             if self.remote_arrival { value["remote_source"] = json!(s.remote); }
+            if self.retain_remote { value["retained_source"] = json!(s.retained); }
             value
         })).collect();
         json!({"schema":1,"observational":true,"sources":sources,"total_graph_allowance":self.allowance,

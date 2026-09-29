@@ -39,6 +39,9 @@ mod remote_arrival;
 pub use remote_arrival::{
     RemoteArrivalDirection, RemoteArrivalFrame, RemoteArrivalScreen, RemoteArrivalSite,
 };
+#[path = "mission_remote_surveys.rs"]
+mod remote_surveys;
+pub use remote_surveys::{RemoteSurveyMemory, RemoteSurveySnapshot};
 pub type TransferComparisonQueue = TransferForecastQueue<TransferComparisonJob>;
 
 #[path = "mission_disengagement.rs"]
