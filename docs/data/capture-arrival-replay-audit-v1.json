@@ -5,7 +5,7 @@
   "runtime_commit": "1c4a9acae2cd006ffff90ed3009cf1b3db868e15",
   "binary_sha256": "406f5f682e97f52dd2ba7b834e1812059107042dd4b560ac548c5415835dbfb0",
   "summary_sha256": "7db45e0f6e25aee19754eda02cccec4f1ce433c9f7ceb81f4cb334a2713e9209",
-  "script_sha256": "251c5074d4685bf38ebc6717909544d59205d3909c525c98aefd06d6add9e826",
+  "script_sha256": "25a20e4b9c3f002a2cf4f69213cd6ff7d8f98324d1a53b5ad95bcb36a88be037",
   "helper_sha256": {
     "target/capture-flag-survey/remote-arrival-post-audit.py": "a18023881366aa25e2638de94e7c5699ef51106f9c5c3445540bb0017f2ea6c1",
     "target/capture-flag-survey/remote-retention-post-audit.py": "eedf0a1aa5aaf24671f43f47ef6937b5210174ef99ba2ba589676666e5807dcb",
@@ -1896,8 +1896,76 @@
     "frozen_solar_directions": 16,
     "continuous_source_to_choice_rows": 6427
   },
+  "notes_metrics": {
+    "oldest_choice_sample": 1766,
+    "age_limit_margin": 34,
+    "native_minus_retrospective_clearance_max": 0.0001220703125,
+    "native_minus_frozen_clearance_max": 3.7789306640625,
+    "native_minimum_clearance": 315.27593994140625,
+    "native_solar_reconstruction_error": 6.103515625e-05,
+    "native_unresolved_clearance_signs": 0,
+    "native_unresolved_departure_order": 51,
+    "body_relative_position": {
+      "minimum": 3.1966928522369242,
+      "maximum": 4.234602855608602
+    },
+    "body_relative_velocity": {
+      "minimum": 1.1952900782399045,
+      "maximum": 1.3526015188138283
+    },
+    "endpoint_heading_degrees": {
+      "minimum": 50.47037938682249,
+      "maximum": 145.99487794862793
+    },
+    "same_tick_endpoint_heading_degrees": 60.77948016057799,
+    "same_time_planet_position_max": 0.0,
+    "same_time_planet_velocity_max": 0.0005949790934651796,
+    "same_time_planet_angle_max": 7.450580596923828e-09,
+    "same_time_planet_spin_max": 4.470348358154297e-07,
+    "retained_native_score_gap": {
+      "minimum": 13.875159978866577,
+      "maximum": 17.007598400115967
+    },
+    "maximum_graph": 4,
+    "maximum_queries": 126
+  },
+  "initial_auditor_only_failure": {
+    "summary_sha256": "b657c6330aefd55f6e922a4361af76bb8ec86f3c5e26151373331c2123eec44b",
+    "source_commit": "02fc2b8061bbb947bd4bfc85554ef8df40600548",
+    "same_full_trace": true,
+    "same_normalized_sensors": true,
+    "same_transfer_capture_report_without_wall_times": true,
+    "same_upstream_and_budget": true,
+    "full_capture_differs_from_compact": true,
+    "independent_compaction_matches": true,
+    "not_counted_as_additional_case": true,
+    "raw_hashes": {
+      "destination-cover.jsonl": "18f2ff9e9eb5526e65f739029ffe6ce3b6c0b10d7f70b8a4f56a7f63f01b00ad",
+      "flag-survey-work.jsonl": "056e1bfdcb8a01159a19c2468e7d54587b7bd1339a9fa09148b0128cd324473e",
+      "flag-survey.jsonl": "1cc14df2d9ab3fc0687afd17809014a74a00054905bf0bfec9a9ec048217d69a",
+      "flag-value-shadow-work.jsonl": "db9bcce00a4d7d755c4e95761c5f3dd8c938d53ba74eb63f978ae8f5724cf66e",
+      "flag-value-shadow.jsonl": "b3798810fb4c97a2a26ac36baf1200de3a38808592f00bf0b2be687824bfd4b5",
+      "live-planning.csv": "740617932df64e626ad16c819ebe0dd043264292003018e947f9515d0e2282a8",
+      "mission-evaluations.jsonl": "77da90a2e808118cb90f9af23c50dc3bd01e68e93d689f98306a4071ffa8d974",
+      "report.json": "838ea92e997ef785033f46ef1db15b6ae3803ac892b3cffb990b3f25520f00b5",
+      "sensors.jsonl": "806e52c59c653a3ef951eb7be8fdf42c738b5b1a4e129c04461809467261b1cf",
+      "trace.jsonl": "5531e72a9bd4c71441a65dd8f480f47713bada579a24d546e431e7a3e0db0ec7",
+      "transfer-probe.jsonl": "6729683318a56a4709c6217bc8d7504b7bfab627e75550d196e55d0074415529"
+    },
+    "log_sha256": "ea20b7e211502cd2f079ec66888cc12b4292beada537718232ee2393a83b46e4"
+  },
   "docs_checked": true,
   "projection_sha256": "b34113059f88ca3aeef019655558538d431452e55c8e69bbbf08f689e4fe56f3",
-  "notes_sha256": "da05b4afc8aae4bb81168a6182543ff00d2aceca857812b3c45a570777246464",
+  "notes_sha256": "0867a39b01e688d672b6969a1caa7492c2b9415cdada61567b974514a0e2f99f",
+  "resolved_findings": [
+    {
+      "scope": "results prose only",
+      "finding": "Spin residual upper bound rounded below the measured value.",
+      "measured": 4.470348358154297e-07,
+      "previous_bound": 4.47e-07,
+      "corrected_bound": 4.48e-07,
+      "changes_runtime_or_outcomes": false
+    }
+  ],
   "passed": true
 }

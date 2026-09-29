@@ -138,7 +138,7 @@ ship discrepancy.
 Separately, the planet at the exact predicted tick has zero position residual
 at recorded precision in all four cases, velocity residual at most 0.000595
 units/s, angle residual at most 0.000000008 radians and spin residual at most
-0.000000447 radians/s. Orbital drift does not explain the ship heading difference
+0.000000448 radians/s. Orbital drift does not explain the ship heading difference
 here. Post-handoff ship motion was not treated as a transfer-controller forecast.
 
 The bot selects **bearing 33 in all four cases**, outside retained bearings 63
@@ -184,13 +184,16 @@ cases, 44 new raw files, 48 retained-source files and four logs. It reconstructs
 the original survey snapshots, all 6427 source-to-choice observations, both
 retrospective frames, 16 frozen and 32 retrospective direction checks, and all
 458 fresh native directions. It verifies the tracked projection and the results
-above without importing the new replay runner. No findings remain. Existing
-independent and physical/native-choice helpers are hash-pinned in the record.
+above without importing the new replay runner. It separately verifies the initial
+attempt's 11 files and log, without adding it to the four-case denominator. The
+quantitative prose check corrected one rounded-down displayed upper bound; no
+unresolved findings remain. Existing independent and physical/native-choice
+helpers are hash-pinned in the record.
 The audit SHA-256 is
-`affbf98cb15ace3988b470db84f5b9b07d203893cacb35002778fad751c34aff`;
-its notes digest precedes this paragraph. The script remains at
+`4e6aa0edb0dbd8275bf7f54ad38a0356df690f61ee7cf7722435367c379624a9`;
+its notes digest precedes this audit-metadata update. The script remains at
 `target/capture-flag-survey/arrival-replay-post-audit.py`, SHA-256
-`251c5074d4685bf38ebc6717909544d59205d3909c525c98aefd06d6add9e826`.
+`25a20e4b9c3f002a2cf4f69213cd6ff7d8f98324d1a53b5ad95bcb36a88be037`.
 
 ## Reproduction
 
