@@ -647,16 +647,22 @@ impl ClientInput {
         let Some(gamepad) = gamepads.seat(player).filter(|gamepad| gamepad.connected) else {
             return buttons;
         };
-        if gamepad.dpad_up {
+        // Some controllers report their physical D-pad as a left stick. NES
+        // accepts either, with explicit D-pad input taking priority per axis.
+        let (left, right) =
+            nes_axis_directions(gamepad.dpad_left, gamepad.dpad_right, gamepad.left_stick_x);
+        let (down, up) =
+            nes_axis_directions(gamepad.dpad_down, gamepad.dpad_up, gamepad.left_stick_y);
+        if up {
             buttons |= ControllerButtons::UP;
         }
-        if gamepad.dpad_down {
+        if down {
             buttons |= ControllerButtons::DOWN;
         }
-        if gamepad.dpad_left {
+        if left {
             buttons |= ControllerButtons::LEFT;
         }
-        if gamepad.dpad_right {
+        if right {
             buttons |= ControllerButtons::RIGHT;
         }
         // NES uses Nintendo's face-button positions, independent of the device's
@@ -1891,6 +1897,19 @@ impl ControlSource for GamepadSource {
 
 const STICK_DEADZONE: f32 = 0.15;
 const TRIGGER_DEADZONE: f32 = 0.05;
+const NES_STICK_DIRECTION_THRESHOLD: f32 = 0.5;
+
+fn nes_axis_directions(negative: bool, positive: bool, stick: f32) -> (bool, bool) {
+    if negative || positive || !stick.is_finite() {
+        return (negative, positive);
+    }
+    // Use normalized travel directly: analog movement's response curve is
+    // inappropriate for a digital NES button. A centered/drifting stick is idle.
+    (
+        stick <= -NES_STICK_DIRECTION_THRESHOLD,
+        stick >= NES_STICK_DIRECTION_THRESHOLD,
+    )
+}
 
 pub(crate) fn shape_stick(value: f32) -> f32 {
     shape_axis(value, STICK_DEADZONE, true)
@@ -2137,6 +2156,185 @@ mod tests {
             game_key_from_key_code(KeyCode::Numpad2),
             Some(GameKey::P2Reverse)
         );
+    }
+
+    #[test]
+    fn nes_left_stick_directions_work_on_both_ports() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            for (x, y, expected) in [
+                (1.0, 0.0, ControllerButtons::RIGHT),
+                (-1.0, 0.0, ControllerButtons::LEFT),
+                (0.0, 1.0, ControllerButtons::UP),
+                (0.0, -1.0, ControllerButtons::DOWN),
+                (1.0, 1.0, ControllerButtons::RIGHT | ControllerButtons::UP),
+                (-1.0, 1.0, ControllerButtons::LEFT | ControllerButtons::UP),
+                (
+                    1.0,
+                    -1.0,
+                    ControllerButtons::RIGHT | ControllerButtons::DOWN,
+                ),
+                (
+                    -1.0,
+                    -1.0,
+                    ControllerButtons::LEFT | ControllerButtons::DOWN,
+                ),
+                (0.0, 0.0, ControllerButtons::NONE),
+            ] {
+                gamepads.borrow_mut().set_seat(
+                    player,
+                    GamepadSeatInput {
+                        connected: true,
+                        // The Micro can report its physical D-pad as a stick.
+                        name: "8BitDo Micro".into(),
+                        left_stick_x: x,
+                        left_stick_y: y,
+                        ..GamepadSeatInput::default()
+                    },
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(player),
+                    expected,
+                    "player={player} x={x} y={y}"
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(1 - player),
+                    ControllerButtons::NONE
+                );
+                gamepads.borrow_mut().set_seat(
+                    player,
+                    GamepadSeatInput {
+                        connected: true,
+                        ..GamepadSeatInput::default()
+                    },
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(player),
+                    ControllerButtons::NONE
+                );
+            }
+            gamepads.borrow_mut().disconnect_seat(player);
+        }
+    }
+
+    #[test]
+    fn nes_stick_directions_ignore_drift_and_nonfinite_axes() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            for (x, y, expected) in [
+                (0.49, -0.49, ControllerButtons::NONE),
+                (-0.49, 0.49, ControllerButtons::NONE),
+                (0.5, 0.0, ControllerButtons::RIGHT),
+                (-0.5, 0.0, ControllerButtons::LEFT),
+                (0.0, 0.5, ControllerButtons::UP),
+                (0.0, -0.5, ControllerButtons::DOWN),
+                (f32::NAN, f32::NAN, ControllerButtons::NONE),
+                (f32::INFINITY, f32::NEG_INFINITY, ControllerButtons::NONE),
+                (f32::NEG_INFINITY, f32::INFINITY, ControllerButtons::NONE),
+                (f32::NAN, 1.0, ControllerButtons::UP),
+                (1.0, f32::NAN, ControllerButtons::RIGHT),
+            ] {
+                gamepads.borrow_mut().set_seat(
+                    player,
+                    GamepadSeatInput {
+                        connected: true,
+                        left_stick_x: x,
+                        left_stick_y: y,
+                        // The right stick is not a NES direction source.
+                        right_stick_x: 1.0,
+                        right_stick_y: -1.0,
+                        ..GamepadSeatInput::default()
+                    },
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(player),
+                    expected,
+                    "player={player} x={x} y={y}"
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(1 - player),
+                    ControllerButtons::NONE
+                );
+            }
+            gamepads.borrow_mut().disconnect_seat(player);
+        }
+    }
+
+    #[test]
+    fn nes_dpad_takes_priority_over_stick_per_axis() {
+        use ControllerButtons as B;
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            for (dpad, x, y, expected) in [
+                (B::LEFT, 1.0, 0.0, B::LEFT),
+                (B::RIGHT, -1.0, 0.0, B::RIGHT),
+                (B::UP, 0.0, -1.0, B::UP),
+                (B::DOWN, 0.0, 1.0, B::DOWN),
+                (B::LEFT | B::UP, 1.0, -1.0, B::LEFT | B::UP),
+                // The neutral D-pad axis can still use the stick.
+                (B::LEFT, 1.0, 1.0, B::LEFT | B::UP),
+                (B::UP, 1.0, -1.0, B::RIGHT | B::UP),
+                // Preserve the existing digital input even if it is opposing.
+                (B::LEFT | B::RIGHT, 1.0, 0.0, B::LEFT | B::RIGHT),
+                (B::UP | B::DOWN, 0.0, -1.0, B::UP | B::DOWN),
+                (B::LEFT | B::UP, f32::NAN, f32::INFINITY, B::LEFT | B::UP),
+            ] {
+                gamepads.borrow_mut().set_seat(
+                    player,
+                    GamepadSeatInput {
+                        connected: true,
+                        dpad_left: dpad.contains(B::LEFT),
+                        dpad_right: dpad.contains(B::RIGHT),
+                        dpad_up: dpad.contains(B::UP),
+                        dpad_down: dpad.contains(B::DOWN),
+                        left_stick_x: x,
+                        left_stick_y: y,
+                        ..GamepadSeatInput::default()
+                    },
+                );
+                assert_eq!(
+                    input.nes_controller_buttons(player),
+                    expected,
+                    "player={player} dpad={dpad:?} x={x} y={y}"
+                );
+                assert_eq!(input.nes_controller_buttons(1 - player), B::NONE);
+            }
+            gamepads.borrow_mut().disconnect_seat(player);
+        }
+    }
+
+    #[test]
+    fn nes_stick_combines_with_buttons_and_disconnect_clears_input() {
+        use ControllerButtons as B;
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        let input = ClientInput::new(gamepads.clone());
+        for player in 0..2 {
+            let mut pad = GamepadSeatInput {
+                connected: true,
+                left_stick_x: 1.0,
+                east: true,
+                south: true,
+                start: true,
+                select: true,
+                ..GamepadSeatInput::default()
+            };
+            gamepads.borrow_mut().set_seat(player, pad.clone());
+            assert_eq!(
+                input.nes_controller_buttons(player),
+                B::RIGHT | B::A | B::B | B::START | B::SELECT
+            );
+            assert_eq!(input.nes_controller_buttons(1 - player), B::NONE);
+
+            gamepads.borrow_mut().disconnect_seat(player);
+            assert_eq!(input.nes_controller_buttons(player), B::NONE);
+            // Stale values on a disconnected snapshot must also be ignored.
+            pad.connected = false;
+            gamepads.borrow_mut().set_seat(player, pad);
+            assert_eq!(input.nes_controller_buttons(player), B::NONE);
+        }
     }
 
     #[test]
