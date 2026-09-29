@@ -36,8 +36,11 @@ pub use transfer_queue::{
 #[path = "mission_transfer_comparison.rs"]
 mod transfer_comparison;
 pub use transfer_comparison::{TransferComparisonJob, TransferComparisonReport};
+#[path = "mission_arrival_local.rs"]
+mod arrival_local;
 #[path = "mission_remote_arrival.rs"]
 mod remote_arrival;
+pub use arrival_local::{ArrivalLocalReference, ArrivalLocalReport};
 pub use remote_arrival::{
     RemoteArrivalDirection, RemoteArrivalFrame, RemoteArrivalScreen, RemoteArrivalSite,
 };

@@ -308,6 +308,19 @@ impl TransferComparisonJob {
             .map(|jobs| remote_arrival::ArrivalScreenContext::new(o, jobs))
     }
 
+    pub(super) fn with_arrival_local_reference(
+        mut self,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+    ) -> Self {
+        self.arrivals = self.arrivals.map(|jobs| {
+            jobs.into_iter()
+                .map(|job| job.with_local_reference(actual.policy.id(), o))
+                .collect()
+        });
+        self
+    }
+
     fn add(
         &mut self,
         mut candidate: TransferCandidateForecast,

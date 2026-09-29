@@ -286,6 +286,13 @@ impl Source {
         if self
             .arrival_reference
             .as_ref()
+            .is_some_and(|r| !r.local_claims_match(o))
+        {
+            return Err("arrival-local claim domain changed");
+        }
+        if self
+            .arrival_reference
+            .as_ref()
             .is_some_and(|r| !r.matches(o))
         {
             return Err("remote arrival solar context changed or source samples expired");
@@ -348,11 +355,65 @@ impl TransferForecastQueue<TransferComparisonJob> {
         contact: Option<bool>,
         retained: &RemoteSurveySnapshot,
     ) -> Result<RequestToken, &'static str> {
+        self.submit_retained_arrival(
+            before,
+            actual,
+            o,
+            evaluator,
+            environment,
+            contact,
+            retained,
+            false,
+        )
+    }
+
+    /// Adds conditional successful-trip medians for those same projected sites.
+    /// Acquisition, native choice and future exposure remain unknown.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_comparison_with_arrival_local_reference(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+        retained: &RemoteSurveySnapshot,
+    ) -> Result<RequestToken, &'static str> {
+        self.submit_retained_arrival(
+            before,
+            actual,
+            o,
+            evaluator,
+            environment,
+            contact,
+            retained,
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn submit_retained_arrival(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+        retained: &RemoteSurveySnapshot,
+        local_reference: bool,
+    ) -> Result<RequestToken, &'static str> {
         if !retained.matches(actual.context, o) {
             return Err("retained survey snapshot identity or observation mismatch");
         }
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
             .with_retained_remote_arrival(o, retained, &environment);
+        let job = if local_reference {
+            job.with_arrival_local_reference(actual, o)
+        } else {
+            job
+        };
         let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
         source.local_reference = Some(job.local_context(o));
         source.arrival_reference = job.arrival_context(o);

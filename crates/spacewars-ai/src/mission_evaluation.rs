@@ -27,6 +27,7 @@ mod survey;
 mod transfer;
 mod value;
 pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
+pub(crate) use model::no_flag_costs as neutral_phase_costs;
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use neutral_capture::NeutralTimingContext;
 pub(crate) use neutral_capture::neutral_capture_timing;
@@ -69,7 +70,7 @@ pub struct PhaseCosts {
     pub departure: f32,
 }
 impl PhaseCosts {
-    fn total(&self) -> f32 {
+    pub(crate) fn total(&self) -> f32 {
         self.landing + self.exit + self.outbound + self.claim + self.return_board + self.departure
     }
 }
