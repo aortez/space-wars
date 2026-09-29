@@ -2,8 +2,10 @@
 //! query quota. No observation or geometry is returned to a playing consumer.
 use engine_core::planning::Work;
 use scenario_spacewars::surface_sortie::{
-    SurfaceSortieState, live_planning::LiveObjectivePlanner, mission::MissionObservationV1,
+    SurfaceSortieState, destination_cover::DestinationCoverObservation,
+    live_planning::LiveObjectivePlanner, mission::MissionObservationV1,
 };
+use serde::Serialize;
 use serde_json::{Value, json};
 use spacewars_ai::mission_pilot::ArrivalSurveyPlan;
 use std::{
@@ -15,6 +17,15 @@ use std::{
 
 const REFRESH_TICKS: u64 = 30;
 const QUERY_RESERVATION: u32 = 192;
+
+/// Delivered after dispatch, including charged negative/incomplete attempts.
+/// A consumer may first observe it on the following real tick.
+#[derive(Clone, Serialize)]
+pub struct ArrivalSurveyAttempt {
+    pub tick: u64,
+    pub plan: ArrivalSurveyPlan,
+    pub evidence: Option<DestinationCoverObservation>,
+}
 
 pub struct ArrivalSurveyRun {
     pending: [Option<(MissionObservationV1, ArrivalSurveyPlan)>; 2],
@@ -60,10 +71,16 @@ impl ArrivalSurveyRun {
         self.pending[seat] = plan.map(|p| (o.clone(), p));
     }
 
-    pub fn advance(&mut self, state: &SurfaceSortieState, remaining: Work, busy: &[usize]) -> f64 {
+    pub fn advance(
+        &mut self,
+        state: &SurfaceSortieState,
+        remaining: Work,
+        busy: &[usize],
+    ) -> (f64, [Option<ArrivalSurveyAttempt>; 2]) {
         let tick = state.tick();
+        let mut attempts = [None, None];
         if self.last_advance.is_some_and(|last| tick <= last) {
-            return 0.0;
+            return (0.0, attempts);
         }
         self.last_advance = Some(tick);
         let mut remaining = Work {
@@ -71,7 +88,7 @@ impl ArrivalSurveyRun {
             ..remaining
         };
         let mut ms = 0.0;
-        for seat in 0..2 {
+        for (seat, attempt) in attempts.iter_mut().enumerate() {
             let Some((mut o, plan)) = self.pending[seat].take() else {
                 continue;
             };
@@ -106,6 +123,16 @@ impl ArrivalSurveyRun {
                     self.attempts += 1;
                 }
                 let evidence = planner.destination_cover_observations(tick);
+                if report.charged.physics_queries > 0 {
+                    *attempt = Some(ArrivalSurveyAttempt {
+                        tick,
+                        plan: plan.clone(),
+                        evidence: evidence
+                            .iter()
+                            .find(|(s, _)| *s == seat)
+                            .map(|(_, e)| e.clone()),
+                    });
+                }
                 ms += start.elapsed().as_secs_f64() * 1000.0;
                 (Some(report), evidence)
             } else {
@@ -120,7 +147,7 @@ impl ArrivalSurveyRun {
             .unwrap();
             writeln!(self.work).unwrap();
         }
-        ms
+        (ms, attempts)
     }
 
     pub fn report(&mut self) -> Value {

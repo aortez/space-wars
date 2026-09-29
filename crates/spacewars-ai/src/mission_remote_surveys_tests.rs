@@ -61,6 +61,43 @@ fn previous_tick_samples_keep_the_actual_measurement_frame_after_retirement() {
 }
 
 #[test]
+fn historical_status_does_not_rebase_measurement_age_or_change_arrival_screen() {
+    use crate::mission_pilot::remote_arrival::ArrivalScreenJob;
+    let mut expected = None;
+    for status in [CoverStatus::Measured, CoverStatus::Stale] {
+        let mut o = fixture();
+        let mut source = o.destination_cover.take().unwrap();
+        source.candidates[0].status = status;
+        let original = source.candidates[0].measurement.clone();
+        let mut memory = RemoteSurveyMemory::new(context(&o));
+        memory.observe(&o, None);
+        tick(&mut o, 2);
+        memory.observe(&o, Some(&source));
+        let retained = memory.snapshot(&o).unwrap();
+        assert_eq!(retained.groups[0].survey, source);
+        o.destination_cover = retained.cover(source.candidates[0].id.planet).cloned();
+        let mut screen = ArrivalScreenJob::new(&o, source.candidates[0].id.planet);
+        let mut arrival = o.local.clone();
+        arrival.combat.recovery.flight.pilot.tick = 3;
+        screen.begin(Some(arrival));
+        while screen.has_work() {
+            screen.step();
+        }
+        assert_eq!(screen.report.charged_graph, 2);
+        assert_eq!(screen.report.sites[0].arrival_age_ticks, Some(2));
+        assert_eq!(screen.report.sites[0].source.measurement, original);
+        assert_eq!(screen.report.sites[0].source.status, status);
+        // Only the preserved raw status differs; admission and screening do not.
+        screen.report.sites[0].source.status = CoverStatus::Stale;
+        if let Some(previous) = &expected {
+            assert_eq!(previous, &screen.report);
+        } else {
+            expected = Some(screen.report);
+        }
+    }
+}
+
+#[test]
 fn fresh_failures_replace_successes_and_generations_never_splice_old_slots() {
     let mut o = fixture();
     let mut source = o.destination_cover.take().unwrap();
