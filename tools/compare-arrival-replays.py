@@ -248,6 +248,21 @@ def audit_sensors(root, expected):
     return actual
 
 
+def capture_projection(raw):
+    """Recreate the historical compact record without weakening dense-trace checks."""
+    result = copy.deepcopy(raw)
+    source = result['source']
+    if source is None: return result
+    pilot,mission = source['pilot'],source['mission']
+    source['selected_site'] = next(s for s in pilot['sites'] if s['id'] == source['selected']['site'])
+    source['pilot'] = {k:pilot[k] for k in ['tick','owner','vehicle','spaceling','location','ship',
+        'ship_form','ship_health','transfers','planet']}
+    source['mission'] = {k:mission[k] for k in ['policy','goal','target','replans','completed_sorties','capture']}
+    source['mission']['visit_tick'] = max(e['tick'] for e in mission['events']
+        if e['kind'] == 'selected' and e['planet'] == mission['target'])
+    return result
+
+
 def audit_replay(spec, root, ordinary, physical, acquisition, retained_pair):
     case,screen = spec['case'],spec['screen']
     name = case['name']
@@ -278,7 +293,7 @@ def audit_replay(spec, root, ordinary, physical, acquisition, retained_pair):
     assert source_audit == archived['source']
     capture_audit = H.audit_capture(case,report,control)
     assert T.f32_identity(capture_audit) == T.f32_identity(archived['audit'])
-    assert T.f32_identity(Q.without_wall_times(report['transfer_probe']['capture_followthrough'])) == T.f32_identity(Q.without_wall_times(archived['capture']))
+    assert T.f32_identity(Q.without_wall_times(capture_projection(report['transfer_probe']['capture_followthrough']))) == T.f32_identity(Q.without_wall_times(archived['capture']))
     old_probe = acquisition['runs'][name]['off']['probe']
     augmented = dict(case,expected_reason=old_probe['diagnostic']['reason'],expected_diagnostic=old_probe['diagnostic'])
     transfer_audit = T.audit_probe(augmented,report['transfer_probe'],T.rows(root/'transfer-probe.jsonl'))
