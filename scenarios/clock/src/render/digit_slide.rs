@@ -57,10 +57,25 @@ fn clipped_cell(frame: &mut RenderFrame, center: Vec2, layout: Layout, palette: 
     let upper = lower + 9.0 * layout.pitch;
     let half = layout.pitch * 0.4;
     let stroke_half = (layout.pitch * 0.045).max(0.8) * 0.5;
-    if center.y - half - stroke_half >= lower && center.y + half + stroke_half <= upper {
-        super::render_square(frame, center, layout.pitch, 0.0, 1.0, palette);
+    let min = RenderPoint::new(center.x - half, (center.y - half).max(lower));
+    let max = RenderPoint::new(center.x + half, (center.y + half).min(upper));
+    if max.y <= min.y {
         return;
     }
+    super::glow::quad(
+        frame,
+        [
+            min,
+            RenderPoint::new(max.x, min.y),
+            max,
+            RenderPoint::new(min.x, max.y),
+        ],
+        palette.fill,
+        Some(crate::presentation::Bounds {
+            min: Vec2::new(layout.bounds_min.x, lower),
+            max: Vec2::new(layout.bounds_max.x, upper),
+        }),
+    );
     // Clip the edge and fill separately, so the clip boundary does not acquire
     // a false stroke or let half a stroke bleed into the rest of the arena.
     for (radius, color) in [

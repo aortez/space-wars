@@ -130,7 +130,7 @@ fn custom_message_is_latched_and_shared_by_every_text_recipe() {
         let cells: Vec<_> = frame
             .layers
             .iter()
-            .filter(|layer| layer.z == 3)
+            .filter(|layer| layer.z == crate::render::ACTIVE_CELL_LAYER)
             .flat_map(|layer| &layer.primitives)
             .collect();
         assert!(!cells.is_empty() && cells.len() <= MAX_CONTENT_CELLS);
@@ -345,7 +345,7 @@ fn all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face() {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        < 400
+                        < 1800
                 );
                 let layout = crate::layout::Layout::new(aspect);
                 let bounds = Bounds {
@@ -354,12 +354,21 @@ fn all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face() {
                 };
                 for layer in &frame.layers {
                     for primitive in &layer.primitives {
-                        let RenderPrimitive::Polygon(polygon) = primitive else {
-                            panic!("expected code-native geometry")
+                        let polygon = match primitive {
+                            RenderPrimitive::Polygon(polygon) => polygon,
+                            RenderPrimitive::Circle(circle) => {
+                                assert!(circle.center.x.is_finite() && circle.center.y.is_finite());
+                                assert!(circle.radius.is_finite() && circle.radius > 0.0);
+                                continue;
+                            }
+                            _ => panic!("expected code-native geometry"),
                         };
                         for p in &polygon.points {
                             assert!(p.x.is_finite() && p.y.is_finite());
-                            if layer.z == 3 && (45..=675).contains(&tick) {
+                            if [crate::render::GLOW_LAYER, crate::render::ACTIVE_CELL_LAYER]
+                                .contains(&layer.z)
+                                && (45..=675).contains(&tick)
+                            {
                                 assert!(
                                     p.x >= bounds.min.x - 0.0001 && p.x <= bounds.max.x + 0.0001
                                 );

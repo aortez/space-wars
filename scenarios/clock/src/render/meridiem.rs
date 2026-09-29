@@ -21,12 +21,20 @@ pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32
     .map(|p| {
         let p = center + p.rotate_radians(angle);
         RenderPoint::new(p.x, p.y)
-    })
-    .to_vec();
+    });
+    glow::quad(
+        frame,
+        points,
+        RenderColor {
+            a: opacity,
+            ..LABEL_COLOR
+        },
+        None,
+    );
     frame.push_primitive(
         LABEL_LAYER,
         RenderPrimitive::Polygon(RenderPolygon::filled(
-            points,
+            points.to_vec(),
             RenderColor {
                 a: opacity,
                 ..LABEL_COLOR
@@ -128,11 +136,26 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
                 pixel(frame, center, side, 0.0, 1.0);
             } else {
                 let min = RenderPoint::new(center.x - side * 0.5, center.y - side * 0.5);
+                let max = RenderPoint::new(min.x + side, min.y + side * progress);
+                glow::quad(
+                    frame,
+                    [
+                        min,
+                        RenderPoint::new(max.x, min.y),
+                        max,
+                        RenderPoint::new(min.x, max.y),
+                    ],
+                    RenderColor {
+                        a: progress,
+                        ..LABEL_COLOR
+                    },
+                    None,
+                );
                 frame.push_primitive(
                     LABEL_LAYER,
                     rectangle(
                         min,
-                        RenderPoint::new(min.x + side, min.y + side * progress),
+                        max,
                         RenderColor {
                             a: progress,
                             ..LABEL_COLOR

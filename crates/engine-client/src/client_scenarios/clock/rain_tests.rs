@@ -67,7 +67,7 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
         missing_digit
             .layers
             .iter_mut()
-            .find(|l| l.z == 3)
+            .find(|l| l.z == 4)
             .unwrap()
             .primitives
             .remove(0);
@@ -125,7 +125,8 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
                     .sum::<usize>()
                     // 320 columns × fill/edge, 512 parcels × at most four
                     // ribbon primitives, plus the face, duck and arena.
-                    <= 3000,
+                    // Plus the wooden surround and bounded cell halos.
+                    <= 3600,
                 "unbounded Rain scene: {viewport:?}, tick={tick}"
             );
             assert!(

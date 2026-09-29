@@ -357,14 +357,13 @@ fn color_cycle_changes_only_appearance_and_keeps_live_time_without_physics() {
                 .flat_map(|l| &l.primitives)
                 .zip(normal.layers.iter().flat_map(|l| &l.primitives))
             {
-                let (
-                    engine_common::RenderPrimitive::Polygon(a),
-                    engine_common::RenderPrimitive::Polygon(b),
-                ) = (a, b)
-                else {
-                    panic!("Clock uses polygon cells")
-                };
-                assert_eq!(a.points, b.points);
+                match (a, b) {
+                    (
+                        engine_common::RenderPrimitive::Polygon(a),
+                        engine_common::RenderPrimitive::Polygon(b),
+                    ) => assert_eq!(a.points, b.points),
+                    _ => assert_eq!(a, b, "corner lights stay unchanged during color cycling"),
+                }
             }
             let reading = ClockAction::set_reading(ClockReading::new(0, 0, 0).unwrap());
             ClockScenario::step(&mut state, &[reading], Duration::ZERO);

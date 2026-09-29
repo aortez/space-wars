@@ -14,6 +14,8 @@ mod digit_slide;
 mod duck;
 mod explosion;
 mod floor;
+mod frame;
+mod glow;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -21,9 +23,10 @@ mod rain;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
-const INACTIVE_CELL_LAYER: i32 = 2;
-const ACTIVE_CELL_LAYER: i32 = 3;
-const LABEL_LAYER: i32 = 4;
+pub(crate) const GLOW_LAYER: i32 = 2;
+const INACTIVE_CELL_LAYER: i32 = 3;
+pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
+const LABEL_LAYER: i32 = 5;
 
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
 const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.075, 0.105, 0.145);
@@ -83,6 +86,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
+    frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
     if let Some(event) = shared_mechanics_arena(state) {
         let opacity = if state.duck_visit.is_some() {
@@ -158,7 +162,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             // Fade only newly generated face primitives, never physical state
             // or arena/background. No offscreen image or extra frame allocation.
             for layer in &mut frame.layers {
-                if layer.z < INACTIVE_CELL_LAYER {
+                if !(GLOW_LAYER..=LABEL_LAYER).contains(&layer.z) {
                     continue;
                 }
                 for primitive in &mut layer.primitives {
@@ -422,12 +426,14 @@ fn render_square(
     .map(|offset| {
         let point = center + offset.rotate_radians(angle);
         RenderPoint::new(point.x, point.y)
-    })
-    .to_vec();
+    });
+    if brightness > 0.0 {
+        glow::quad(frame, points, color, None);
+    }
     frame.push_primitive(
         layer,
         RenderPrimitive::Polygon(RenderPolygon {
-            points,
+            points: points.to_vec(),
             fill: Some(Fill::new(color)),
             stroke,
         }),
@@ -505,8 +511,8 @@ mod tests {
             .iter()
             .map(|layer| layer.primitives.len())
             .sum::<usize>();
-        // One background, floor/canopy slabs and edges, 96 cells, two dots.
-        assert_eq!(primitive_count, 103);
+        // The face, wooden surround and lighting remain a bounded draw list.
+        assert!(primitive_count < 600, "{primitive_count} primitives");
     }
 
     #[test]

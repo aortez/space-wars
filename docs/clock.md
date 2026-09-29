@@ -10,7 +10,7 @@ the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
 Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slide.
 The Duck upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
 Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
-flashlight/glow polish and multiple concurrent timed animations remain future work.
+flashlight effects and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
 Explosion (#76) scatters individual lit cells as bouncing rigid-body debris.
@@ -56,6 +56,39 @@ Real-device captures from **sw-picade-2** (1024×768, release build):
 Additional fixed-reading production-renderer fixtures: [HyperPixel, 800×480](screenshots/clock/hyperpixel-centered-clock-fixture.png)
 and [portrait, 480×800](screenshots/clock/portrait-centered-clock-fixture.png).
 These two are headless layout captures, not deployments to additional devices.
+
+### Wooden frame and soft lighting
+
+A thin wooden frame surrounds all four edges, with a beveled inner edge and
+subtle grain. Two small amber lights illuminate the upper corners. Lit digit
+cells, the colon and AM/PM cast a dim halo in their current color. The frame
+scales with the shorter display dimension; it leaves the centered face and the
+existing floor, rain canopy, drains and duck courses in place. Duck doorways are
+sections of the side rails: the wood, bevel and grain lift together on a top
+hinge, then return flush with the wall. The two sides swing inward and upward.
+
+Cell halos follow falling bars, exploding blocks, melting/reforming cells and
+marquee transformations. They fade with their source cells, and moving content
+keeps its existing digit-slide and marquee clipping. The wooden frame and corner
+lights remain visible throughout events, including when the normal face fades
+away for a marquee.
+
+Both render adapters use the same bounded geometry: four translucent shells per
+emitting cell, plus a fixed surround and two corner lights. There is no blur
+buffer, lighting simulation, new collider or settings migration. Font selection
+and sampled font glyphs remain a separate follow-up; this pass keeps the existing
+seven-segment geometry.
+
+These are display-free captures through the production renderer and native text
+overlay, not device screenshots:
+
+| HyperPixel layout, 800×480 | Picade layout, 1024×768 |
+| --- | --- |
+| ![Wooden frame and lighting on HyperPixel layout](screenshots/clock/hyperpixel-framed-clock-fixture.png) | ![Wooden frame and lighting on Picade layout](screenshots/clock/picade-framed-clock-fixture.png) |
+
+The [portrait fixture](screenshots/clock/portrait-framed-clock-fixture.png) covers
+480×800. Regenerate date-visible captures with `SPACEWARS_CALENDAR_ARTIFACTS` and
+the `clock_calendar_date_renders_in_band_through_native_text_overlay` test below.
 
 ## Optional weekday and date
 
@@ -566,8 +599,9 @@ colliders and 128 columns in total. These are still environment-only Meltdown
 previews, not new scenarios; normal Clock startup is unchanged. See
 [spilling displacement and verification](design/water.md#displacement-driven-spills).
 
-Duck opens a side door and spawns a yellow pixel duck. The entrance door closes
-behind it, then disappears for the rest of the visit. The duck makes two vertical
+Duck lifts a hinged section of the wooden wall and spawns a yellow pixel duck.
+The entrance flap closes flush behind it and stays closed for the rest of the
+visit. The duck makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently
 selects a seeded course pattern and movement personality. The patterns are:
@@ -695,8 +729,28 @@ switch the personality to `careful` to watch the adjacent route on the same cour
 These overrides are independent and do not change event scheduling.
 The seeded physics comparison below
 exercises both profiles.
-The upright pixel sprite and sliding doors are presentation, not articulated
+The upright pixel sprite and hinged wooden doors are presentation, not articulated
 physics. Doors are logical backstage entry/exit markers, not trapping colliders.
+Both flaps use the existing entry/exit timing, ease at each end of the swing and
+close into a continuous frame. A small pin at the top and the exposed cut edge
+make the hinge visible while the flap moves.
+
+This close-up uses the production renderer at half speed, with the camera moved
+to the entrance of the 800×480 layout:
+
+![Hinged wooden wall flap opening and closing](screenshots/clock/hinged-wall-entry.gif)
+
+Regenerate full frames and entrance close-ups for all four fixture layouts:
+
+```sh
+SPACEWARS_CLOCK_DOOR_ARTIFACTS=/tmp/clock-doors \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  duck_course_reaches_both_render_paths -- --quiet
+ffmpeg -y -framerate 15 -pattern_type glob \
+  -i '/tmp/clock-doors/hinge-800x480-*-detail.png' \
+  -filter_complex '[0:v]split[a][b];[a]palettegen[p];[b][p]paletteuse' \
+  -loop 0 /tmp/clock-doors/hinged-wall-entry.gif
+```
 
 Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
 still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.

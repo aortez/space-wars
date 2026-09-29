@@ -153,7 +153,8 @@ fn seeded_bursts_replay_and_finish_with_bounded_physics_at_every_aspect() {
                                 .iter()
                                 .map(|l| l.primitives.len())
                                 .sum::<usize>()
-                                < 400
+                                // Includes the surround and cell glow shells.
+                                < 1000
                         );
                         assert_eq!(frame, ClockScenario::render_frame(&b));
                     }
