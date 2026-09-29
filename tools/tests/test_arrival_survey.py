@@ -29,6 +29,23 @@ def fixture():
 
 
 class ArrivalSurveyAudit(unittest.TestCase):
+    def test_first_request_after_initial_deferral_cannot_be_backdated(self):
+        row = fixture()[0]
+        known = {}
+        deferred = copy.deepcopy(row)
+        deferred['plan']['request'] = None
+        S.audit_request_generation(deferred,known)
+        later = copy.deepcopy(row)
+        later['tick'] = 10
+        with self.assertRaises(AssertionError): S.audit_request_generation(later,known)
+        later['plan']['request']['generation'] = 10
+        S.audit_request_generation(later,known)
+        S.audit_request_generation(deferred,known)
+        later['tick'] = 11
+        S.audit_request_generation(later,known)
+        later['plan']['request'] = dict(later['plan']['request'],generation=11)
+        with self.assertRaises(AssertionError): S.audit_request_generation(later,known)
+
     def test_current_sample_has_later_epoch_and_consumes_actual_query_charge(self):
         last = {}
         measurement,used = S.audit_row(*fixture(),384,[],last)

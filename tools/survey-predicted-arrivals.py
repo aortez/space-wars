@@ -85,6 +85,18 @@ def sensor_digest(root):
     return digest.hexdigest()
 
 
+def audit_request_generation(row, requests):
+    plan, tick = row['plan'],row['tick']
+    request = plan['request']
+    if request is None:
+        return
+    token = (plan['token']['actor'],plan['token']['generation'])
+    if token not in requests:
+        assert request['generation'] == tick, 'first eligible request was backdated'
+        requests[token] = request
+    assert requests[token] == request, 'request changed within one source lifetime'
+
+
 def audit_survey(root, report, case, controlled):
     schedule = report['transfer_comparison']
     # Existing consumers remain separately audited, including their graph work.
@@ -122,9 +134,7 @@ def audit_survey(root, report, case, controlled):
         candidate = min(eligible,key=lambda c:(not c['current'],c['destination']))
         leftover = 384-live_queries.get(tick,0)-flags[tick]['allocation']['charged']['physics_queries']-spent[tick]
         measurement, used = audit_row(row,state,candidate['forecast'],A.P.pilot(current),leftover,busy[tick],last)
-        request = row['plan']['request']
-        if request:
-            assert requests.setdefault(seat, request) == request, 'generation changed within an uninterrupted eligible window'
+        audit_request_generation(row, requests)
         spent[tick] += used
         reasons[row['deferred'] or 'attempt'] += 1
         if measurement:
