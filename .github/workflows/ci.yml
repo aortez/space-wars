@@ -47,7 +47,7 @@ jobs:
       - run: npm --prefix yocto test
         env:
           SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
-      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh
+      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
       - name: Report sandbox configuration and kernel denials
         if: failure()
         run: |
@@ -101,7 +101,7 @@ jobs:
             . -> target
             vendor/i-slint-backend-linuxkms -> target
       - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports, build identity, and input diagnostic safety
         run: |
           python3 -m unittest discover -s .github/ci -p 'test_*.py'

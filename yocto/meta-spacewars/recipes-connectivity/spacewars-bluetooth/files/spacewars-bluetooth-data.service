@@ -1,0 +1,12 @@
+[Unit]
+Description=Preserve Bluetooth controller pairings across OS updates
+Requires=data.mount
+After=data.mount
+Before=bluetooth.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/sbin/spacewars-bluetooth-data-init
+ExecStart=/bin/mount --bind /data/bluetooth /var/lib/bluetooth
+ExecStop=/bin/umount /var/lib/bluetooth

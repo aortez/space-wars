@@ -1472,6 +1472,8 @@ dependencies = [
 name = "engine-client"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
+ "async-io",
  "bytemuck",
  "chrono",
  "clap",
@@ -1481,6 +1483,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-nes",
+ "futures-lite",
  "gilrs",
  "i-slint-backend-linuxkms",
  "i-slint-core",
@@ -1508,6 +1511,7 @@ dependencies = [
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "zbus",
 ]
 
 [[package]]

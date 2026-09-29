@@ -109,5 +109,6 @@ IMAGE_INSTALL:append = " \
 IMAGE_INSTALL:append = " \
     spacewars \
     spacewars-hardware \
+    spacewars-bluetooth \
     spacewars-ssh-host-keys \
 "

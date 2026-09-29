@@ -71,6 +71,29 @@ physical-key adapter for the desktop keyboard fallback; Pi validation must
 separately confirm whether keyboard events are available on the selected
 display backend.
 
+### Bluetooth pairing storage
+
+The `spacewars-bluetooth` image package starts
+`spacewars-bluetooth-data.service` before BlueZ. It requires mounted `/data`,
+initializes root-owned mode-0700 `/data/bluetooth`, and bind-mounts it onto
+`/var/lib/bluetooth`. Pairing keys never live in the app-owned settings/ROM tree,
+are not exposed to the CLI, and are not copied between cabinets by fast updates.
+Existing persistent state always wins over an OS slot's old keys, including
+deleted/forgotten bonds. Initial migration uses a temporary directory and atomic
+rename; an incomplete copy is not published as authoritative state.
+
+**First upgrade from an older image:** the new boot helper can only migrate keys
+present in that running root filesystem. An A/B rootfs replacement does not carry
+the old slot's `/var/lib/bluetooth` into the new slot. Preserve those keys into
+root-only `/data/bluetooth` with root maintenance access *before* that first OS
+update, or expect to pair controllers again. Do not make the keys app-readable
+or grant unrestricted sudo just to migrate them. Later images with this service
+keep using the same persistent directory across reboots/updates. Rolling back to
+an image predating this service will use its old rootfs-local Bluetooth storage.
+
+This is an image-level change: `--fast` copies binaries only. See the
+[Bluetooth setup flow and hardware checklist](controller-profiles.md#bluetooth-controllers-linux).
+
 ## Launch Command
 
 The current Pi launch command is:
