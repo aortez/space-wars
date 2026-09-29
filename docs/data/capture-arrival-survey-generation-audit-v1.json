@@ -1,0 +1,56 @@
+{
+  "source_commit": "d382ab391a14b8e451ae76d9741a63cc7a5adcd5",
+  "raw_summary_sha256": "513abcf46b1690695c3ef175ac65e8717362ddd0c6fb44c3e0ca46842d065b5a",
+  "auditor_sha256": "7c73220cf844801da740c734f7176b34b9fe4524e36ff8090c4b0901df878e3c",
+  "note": "Post-freeze audit-only strengthening: first request generation equals first eligible observed request tick, retained across deferrals. Runtime and fixed experiments unchanged.",
+  "pairs": {
+    "world1-asteroids0-on-s0t3816-p2-ordinary": {
+      "exact_existing_audit": true,
+      "queries": 0,
+      "rows": 85,
+      "attempts": 0
+    },
+    "world1-asteroids0-on-s0t3816-p2-controlled": {
+      "exact_existing_audit": true,
+      "queries": 180,
+      "rows": 84,
+      "attempts": 3
+    },
+    "world1-asteroids0-on-s0t3876-p2-ordinary": {
+      "exact_existing_audit": true,
+      "queries": 0,
+      "rows": 88,
+      "attempts": 0
+    },
+    "world1-asteroids0-on-s0t3876-p2-controlled": {
+      "exact_existing_audit": true,
+      "queries": 180,
+      "rows": 87,
+      "attempts": 3
+    },
+    "world1-asteroids0-on-s0t3934-p2-ordinary": {
+      "exact_existing_audit": true,
+      "queries": 0,
+      "rows": 78,
+      "attempts": 0
+    },
+    "world1-asteroids0-on-s0t3934-p2-controlled": {
+      "exact_existing_audit": true,
+      "queries": 180,
+      "rows": 88,
+      "attempts": 3
+    },
+    "world1-asteroids0-on-s0t3997-p2-ordinary": {
+      "exact_existing_audit": true,
+      "queries": 0,
+      "rows": 16,
+      "attempts": 0
+    },
+    "world1-asteroids0-on-s0t3997-p2-controlled": {
+      "exact_existing_audit": true,
+      "queries": 180,
+      "rows": 90,
+      "attempts": 3
+    }
+  }
+}
