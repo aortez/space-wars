@@ -1,0 +1,1903 @@
+{
+  "schema": 1,
+  "reviewer": "independent_read_only_subagent",
+  "source_commit": "0094c729e859f5256c6341f28d23ca58e1e0b83d",
+  "runtime_commit": "1c4a9acae2cd006ffff90ed3009cf1b3db868e15",
+  "binary_sha256": "406f5f682e97f52dd2ba7b834e1812059107042dd4b560ac548c5415835dbfb0",
+  "summary_sha256": "7db45e0f6e25aee19754eda02cccec4f1ce433c9f7ceb81f4cb334a2713e9209",
+  "script_sha256": "251c5074d4685bf38ebc6717909544d59205d3909c525c98aefd06d6add9e826",
+  "helper_sha256": {
+    "target/capture-flag-survey/remote-arrival-post-audit.py": "a18023881366aa25e2638de94e7c5699ef51106f9c5c3445540bb0017f2ea6c1",
+    "target/capture-flag-survey/remote-retention-post-audit.py": "eedf0a1aa5aaf24671f43f47ef6937b5210174ef99ba2ba589676666e5807dcb",
+    "tools/calibrate-transfer-references.py": "1fecacf165ff5b7d459c8fa4db6f327dab32bd4f2391c489efd7bc9c46dca41a",
+    "tools/compare-capture-destinations.py": "56f2c47c5535af523d63e7a434366ce2b778b1ebdfdaa8f257db99b3de96f0fe",
+    "tools/compare-flag-surveys.py": "6b8772514a07defd1b3e6e3d5f15636e404452ae8f70b234e0df5997d2877fee",
+    "tools/compare-landing-choices.py": "b27a962a6236064f6948cdc6ae6dbf757fb5a8ca693e2a3a2f4c84d74465e7d9",
+    "tools/compare-transfer-destinations.py": "b08d7ccbbd444b11099ac137fc661f71e7aa3e84401078bd7ea86e81a815ad4a",
+    "tools/compose-capture-references.py": "2b67ed818beb36545d2c9fe9fb900a184c15b6fb2cf0656357a6b92173b02e6e",
+    "tools/forecast-transfer-references.py": "52fc25cc4b992c642830f5a640dbc9e0b7fa12e010e27fc4e74ae49486871767",
+    "tools/probe-capture-followthrough.py": "e77544a8ac601a8c72e65018f20cb948e2f30f44e73c1a0b98965ef8fab12fe3",
+    "tools/probe-site-acquisition.py": "d442204bb69a09639b2b1659386d9732b86ef2d45dd39215f41d46722451a7fa",
+    "tools/probe-transfer-references.py": "57768cfa0a104458962fd67f0373c037e47a9345afe6ddbdf5f5d034605b97e7",
+    "tools/schedule-transfer-references.py": "b5f4f515cb1a6765ff9284487fa571febb0b1998ba19998d686d55f9242be0b6"
+  },
+  "input_sha256": {
+    "docs/data/capture-remote-retention-v1.json": "5deeb6ebb08bb6cb925723ebc9f600f8395070bb4c26ec470d7f1fc3a6c4aee6",
+    "docs/data/capture-followthrough-v1.json": "bd792b960556f681d7aa974548000e279ef6f340b1e79da2f394c0f4069c221c",
+    "docs/data/capture-site-acquisition-v1.json": "3078ee2246eee9ba0b4901243876b6596602de0494193e24322e92b5c415d420"
+  },
+  "cases": {
+    "world1-asteroids0-on-s0t3816-p2": {
+      "trace": {
+        "controller_rows": 14006,
+        "decompressed_bytes": 132341012,
+        "trace_sha256": "5531e72a9bd4c71441a65dd8f480f47713bada579a24d546e431e7a3e0db0ec7",
+        "sensor_rows": 14006
+      },
+      "sensors": {
+        "sensor_rows": 14006,
+        "sensor_work_sha256": "e9028254b99812a29fb2d803fe1d99f6825e2cde1363128968256fbc4053fbb3",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157358,
+          "ground_edge_capsule_samples": 1414833,
+          "ground_edge_floor_samples": 470898,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156966,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14006,
+          "combat_observation": 14006,
+          "flight_pilot_observation": 14006,
+          "ground_posture_observation": 14006,
+          "jetpack_navigation_with_ground": 14006,
+          "landing_objective_survey": 14006,
+          "mission_observation": 14006,
+          "pilot_observation": 14006,
+          "rebuild_relocation_survey": 14006,
+          "recovery_task_observation": 14006,
+          "tactical_sortie_observation": 14006,
+          "landing_hatch_clearance": 7883,
+          "landing_hull_placement": 4197,
+          "landing_preview_shapes": 7883,
+          "vehicle_landing_site": 7889,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "budget": {
+        "executed_ticks": 7002,
+        "live_graph": 0,
+        "live_queries": 17988,
+        "evaluator_graph": 12763,
+        "flag_graph": 827,
+        "flag_queries": 1593,
+        "shadow_graph": 120,
+        "max_combined_graph": 4,
+        "max_combined_queries": 126,
+        "evaluator_charge_sha256": "c2f86ce156f29f8ece6a5f4402f94d2fcd43b20bf6d0d1b8f5d2bbff18f7c144"
+      },
+      "source_prefix": {
+        "prefix_rows": 7632,
+        "prefix_sha256": "d837617efcb7a76509c9f4641ceb60b4f0a099a3b58e675a45c6a03e26f1557d",
+        "source_and_nomination_exact": true
+      },
+      "retention_reconstruction": {
+        "counts": {
+          "fresh_admitted_slots": 134,
+          "new_groups": 2,
+          "refreshed_slots": 130,
+          "expired_slots": 2,
+          "expired_groups": 1
+        },
+        "maximum_groups": 1,
+        "maximum_slots": 2,
+        "reconstructed_observations": 3817,
+        "final_groups": 1,
+        "final_measurements": 2
+      },
+      "frozen_screen_counts": {
+        "screened_candidates": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_with_screen": 1,
+        "directions": 4,
+        "solar_clear": 4,
+        "sites": 2
+      },
+      "frozen_screen_max_solar_error": 0.0,
+      "native_choice": {
+        "classification": "higher_reference_score",
+        "reference": {
+          "bearing": 31,
+          "planet": 2
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "selected_score": 2.3278915882110596,
+        "reference_score": 17.173751831054688,
+        "reference_directions": [
+          {
+            "side": -1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.5724583864212036,
+              "departure_clearance": 364.861572265625,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 382.205810546875,
+              "side": -1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 17.173751831054688,
+            "cover_penalty": 0.0,
+            "total_score": 17.173751831054688
+          },
+          {
+            "side": 1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.5724583864212036,
+              "departure_clearance": 364.861572265625,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 382.205810546875,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 17.173751831054688,
+            "cover_penalty": 0.0,
+            "total_score": 17.173751831054688
+          }
+        ],
+        "assessments": 114,
+        "eligible": 114,
+        "independent_solar_max_error": 0.0,
+        "independently_unresolved_clearance_signs": [],
+        "independently_unresolved_departure_sides": [
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.75506591796875,
+              460.75506591796875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              463.58917236328125,
+              463.58917236328125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.55267333984375,
+              462.55267333984375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              462.92840576171875,
+              462.92840576171875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              463.7244873046875,
+              463.7244873046875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              461.487060546875,
+              461.487060546875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.2850341796875,
+              462.2850341796875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              459.72900390625,
+              459.72900390625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.41162109375,
+              460.41162109375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              457.66314697265625,
+              457.66314697265625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              458.12957763671875,
+              458.12957763671875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              455.31201171875,
+              455.31201171875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 58,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              455.45489501953125,
+              455.45489501953125
+            ]
+          }
+        ]
+      },
+      "capture": {
+        "outcome": "departed",
+        "elapsed_seconds": 24.883333333333333,
+        "prediction": {
+          "claim": 3.0166666507720947,
+          "departure": 3.766666889190674,
+          "exit": 0.01666666753590107,
+          "landing": 17.866666793823242,
+          "outbound": 0.06666667014360428,
+          "return_board": 0.03333333507180214
+        },
+        "unknown": null,
+        "milestones": {
+          "choice": 5509,
+          "landed": 6584,
+          "exited": 6585,
+          "claim_started": 6593,
+          "claimed": 6772,
+          "boarded": 6774,
+          "departed": 7002
+        },
+        "phases": {
+          "landing": {
+            "status": "completed",
+            "predicted_seconds": 17.866666793823242,
+            "observed_seconds": 17.916666666666668,
+            "error_seconds": 0.04999987284342566,
+            "incomplete_elapsed_seconds": null
+          },
+          "exit": {
+            "status": "completed",
+            "predicted_seconds": 0.01666666753590107,
+            "observed_seconds": 0.016666666666666666,
+            "error_seconds": -8.692344032057431e-10,
+            "incomplete_elapsed_seconds": null
+          },
+          "outbound": {
+            "status": "completed",
+            "predicted_seconds": 0.06666667014360428,
+            "observed_seconds": 0.13333333333333333,
+            "error_seconds": 0.06666666318972905,
+            "incomplete_elapsed_seconds": null
+          },
+          "claim": {
+            "status": "completed",
+            "predicted_seconds": 3.0166666507720947,
+            "observed_seconds": 2.9833333333333334,
+            "error_seconds": -0.033333317438761334,
+            "incomplete_elapsed_seconds": null
+          },
+          "return_board": {
+            "status": "completed",
+            "predicted_seconds": 0.03333333507180214,
+            "observed_seconds": 0.03333333333333333,
+            "error_seconds": -1.7384688064114862e-09,
+            "incomplete_elapsed_seconds": null
+          },
+          "departure": {
+            "status": "completed",
+            "predicted_seconds": 3.766666889190674,
+            "observed_seconds": 3.8,
+            "error_seconds": 0.033333110809325994,
+            "incomplete_elapsed_seconds": null
+          }
+        },
+        "touchdown_offset": 0.31385308504104614,
+        "controller_rows": 1494
+      },
+      "comparison": {
+        "source_tick": 3816,
+        "predicted_tick": 5534,
+        "arrival_tick": 5508,
+        "choice_tick": 5509,
+        "delta_ticks": -26,
+        "identity": {
+          "first_planet_change": null,
+          "first_actor_change": null
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "retained_sites": [
+          {
+            "bearing": 63,
+            "planet": 2
+          },
+          {
+            "bearing": 31,
+            "planet": 2
+          }
+        ],
+        "maximum_geometry_residual": 0.0002729575167846423,
+        "score_gap": 14.845860242843628,
+        "endpoint_differences": {
+          "predicted_tick": 5534,
+          "actual_tick": 5508,
+          "ship_world": {
+            "position": 5.039338630680813,
+            "velocity": 1.309164704246397,
+            "heading_actual_minus_predicted": 0.8808742950307293,
+            "spin_actual_minus_predicted": 1.2066520601511002
+          },
+          "planet": {
+            "position": 5.8641130554983905,
+            "velocity": 0.11513141837106242,
+            "heading_actual_minus_predicted": -0.0005363970994949341,
+            "spin_actual_minus_predicted": -8.940696716308594e-07
+          },
+          "ship_body_relative": {
+            "position": 4.016350478517665,
+            "velocity": 1.235961796289626,
+            "heading_actual_minus_predicted": 0.8814106921302243,
+            "spin_actual_minus_predicted": 1.2066529542207718
+          }
+        },
+        "same_time_planet_drift": {
+          "position": 0.0,
+          "velocity": 0.0005948437955450432,
+          "heading_actual_minus_predicted": 0.0,
+          "spin_actual_minus_predicted": 0.0
+        },
+        "solar_reconstruction_max_error": 0.0,
+        "solar_unresolved_signs": 0,
+        "solar_unresolved_departures": 0,
+        "ages": [
+          {
+            "measured": 3769,
+            "source": 47,
+            "predicted": 1765,
+            "handoff": 1739,
+            "choice": 1740
+          },
+          {
+            "measured": 3770,
+            "source": 46,
+            "predicted": 1764,
+            "handoff": 1738,
+            "choice": 1739
+          }
+        ]
+      },
+      "elapsed_ticks": 7002
+    },
+    "world1-asteroids0-on-s0t3876-p2": {
+      "trace": {
+        "controller_rows": 14010,
+        "decompressed_bytes": 132620575,
+        "trace_sha256": "0ab5fa33ffcfbb3c97567629617ad9c73064809a2b1c3cfffa8300877bf6dd68",
+        "sensor_rows": 14010
+      },
+      "sensors": {
+        "sensor_rows": 14010,
+        "sensor_work_sha256": "5d6e50c8fed6370308a57b5bd272b934fb1a5383f65d5dc166f68ac685f14238",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157372,
+          "ground_edge_capsule_samples": 1414959,
+          "ground_edge_floor_samples": 470940,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156980,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14010,
+          "combat_observation": 14010,
+          "flight_pilot_observation": 14010,
+          "ground_posture_observation": 14010,
+          "jetpack_navigation_with_ground": 14010,
+          "landing_objective_survey": 14010,
+          "mission_observation": 14010,
+          "pilot_observation": 14010,
+          "rebuild_relocation_survey": 14010,
+          "recovery_task_observation": 14010,
+          "tactical_sortie_observation": 14010,
+          "landing_hatch_clearance": 7964,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7964,
+          "vehicle_landing_site": 7969,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "budget": {
+        "executed_ticks": 7004,
+        "live_graph": 0,
+        "live_queries": 17628,
+        "evaluator_graph": 12651,
+        "flag_graph": 827,
+        "flag_queries": 1593,
+        "shadow_graph": 124,
+        "max_combined_graph": 4,
+        "max_combined_queries": 126,
+        "evaluator_charge_sha256": "919370a642196eb5d2337f8c2a41695783184994667ef9d32c7206ef4e16ab47"
+      },
+      "source_prefix": {
+        "prefix_rows": 7752,
+        "prefix_sha256": "d5c0e3c633fcb71abee1cb8018c1af9ccead8c5f9c7977222ce1282f596a15e2",
+        "source_and_nomination_exact": true
+      },
+      "retention_reconstruction": {
+        "counts": {
+          "fresh_admitted_slots": 134,
+          "new_groups": 2,
+          "refreshed_slots": 130,
+          "expired_slots": 2,
+          "expired_groups": 1
+        },
+        "maximum_groups": 1,
+        "maximum_slots": 2,
+        "reconstructed_observations": 3877,
+        "final_groups": 1,
+        "final_measurements": 2
+      },
+      "frozen_screen_counts": {
+        "screened_candidates": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_with_screen": 1,
+        "directions": 4,
+        "solar_clear": 4,
+        "sites": 2
+      },
+      "frozen_screen_max_solar_error": 0.0,
+      "native_choice": {
+        "classification": "higher_reference_score",
+        "reference": {
+          "bearing": 31,
+          "planet": 2
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "selected_score": 1.2468819618225098,
+        "reference_score": 18.254480361938477,
+        "reference_directions": [
+          {
+            "side": -1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.6084826588630676,
+              "departure_clearance": 364.6986083984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 382.0965576171875,
+              "side": -1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 18.254480361938477,
+            "cover_penalty": 0.0,
+            "total_score": 18.254480361938477
+          },
+          {
+            "side": 1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.6084826588630676,
+              "departure_clearance": 364.6986083984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 382.0965576171875,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 18.254480361938477,
+            "cover_penalty": 0.0,
+            "total_score": 18.254480361938477
+          }
+        ],
+        "assessments": 116,
+        "eligible": 116,
+        "independent_solar_max_error": 0.0,
+        "independently_unresolved_clearance_signs": [],
+        "independently_unresolved_departure_sides": [
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.62750244140625,
+              460.62750244140625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              463.5277099609375,
+              463.5277099609375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.45184326171875,
+              462.45184326171875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              462.998779296875,
+              462.998779296875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              463.80035400390625,
+              463.80035400390625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              461.575439453125,
+              461.575439453125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.388427734375,
+              462.388427734375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              459.8345947265625,
+              459.8345947265625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.54156494140625,
+              460.54156494140625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              457.785400390625,
+              457.785400390625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              458.2847900390625,
+              458.2847900390625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              455.44970703125,
+              455.44970703125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 58,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              455.634521484375,
+              455.634521484375
+            ]
+          }
+        ]
+      },
+      "capture": {
+        "outcome": "departed",
+        "elapsed_seconds": 25.183333333333334,
+        "prediction": {
+          "claim": 3.0166666507720947,
+          "departure": 3.766666889190674,
+          "exit": 0.01666666753590107,
+          "landing": 17.866666793823242,
+          "outbound": 0.06666667014360428,
+          "return_board": 0.03333333507180214
+        },
+        "unknown": null,
+        "milestones": {
+          "choice": 5493,
+          "landed": 6587,
+          "exited": 6588,
+          "claim_started": 6595,
+          "claimed": 6774,
+          "boarded": 6776,
+          "departed": 7004
+        },
+        "phases": {
+          "landing": {
+            "status": "completed",
+            "predicted_seconds": 17.866666793823242,
+            "observed_seconds": 18.233333333333334,
+            "error_seconds": 0.3666665395100921,
+            "incomplete_elapsed_seconds": null
+          },
+          "exit": {
+            "status": "completed",
+            "predicted_seconds": 0.01666666753590107,
+            "observed_seconds": 0.016666666666666666,
+            "error_seconds": -8.692344032057431e-10,
+            "incomplete_elapsed_seconds": null
+          },
+          "outbound": {
+            "status": "completed",
+            "predicted_seconds": 0.06666667014360428,
+            "observed_seconds": 0.11666666666666667,
+            "error_seconds": 0.04999999652306239,
+            "incomplete_elapsed_seconds": null
+          },
+          "claim": {
+            "status": "completed",
+            "predicted_seconds": 3.0166666507720947,
+            "observed_seconds": 2.9833333333333334,
+            "error_seconds": -0.033333317438761334,
+            "incomplete_elapsed_seconds": null
+          },
+          "return_board": {
+            "status": "completed",
+            "predicted_seconds": 0.03333333507180214,
+            "observed_seconds": 0.03333333333333333,
+            "error_seconds": -1.7384688064114862e-09,
+            "incomplete_elapsed_seconds": null
+          },
+          "departure": {
+            "status": "completed",
+            "predicted_seconds": 3.766666889190674,
+            "observed_seconds": 3.8,
+            "error_seconds": 0.033333110809325994,
+            "incomplete_elapsed_seconds": null
+          }
+        },
+        "touchdown_offset": 0.613736629486084,
+        "controller_rows": 1512
+      },
+      "comparison": {
+        "source_tick": 3876,
+        "predicted_tick": 5492,
+        "arrival_tick": 5492,
+        "choice_tick": 5493,
+        "delta_ticks": 0,
+        "identity": {
+          "first_planet_change": null,
+          "first_actor_change": null
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "retained_sites": [
+          {
+            "bearing": 63,
+            "planet": 2
+          },
+          {
+            "bearing": 31,
+            "planet": 2
+          }
+        ],
+        "maximum_geometry_residual": 0.00017263349150062197,
+        "score_gap": 17.007598400115967,
+        "endpoint_differences": {
+          "predicted_tick": 5492,
+          "actual_tick": 5492,
+          "ship_world": {
+            "position": 3.2154185382673126,
+            "velocity": 1.3565053838883592,
+            "heading_actual_minus_predicted": 1.0608020464526577,
+            "spin_actual_minus_predicted": 0.978955440223217
+          },
+          "planet": {
+            "position": 0.0,
+            "velocity": 0.0005948437955450432,
+            "heading_actual_minus_predicted": 7.450580596923828e-09,
+            "spin_actual_minus_predicted": 0.0
+          },
+          "ship_body_relative": {
+            "position": 3.2154149432294665,
+            "velocity": 1.3526015188138283,
+            "heading_actual_minus_predicted": 1.0608020390020771,
+            "spin_actual_minus_predicted": 0.978955440223217
+          }
+        },
+        "same_time_planet_drift": {
+          "position": 0.0,
+          "velocity": 0.0005948437955450432,
+          "heading_actual_minus_predicted": 7.450580596923828e-09,
+          "spin_actual_minus_predicted": 0.0
+        },
+        "solar_reconstruction_max_error": 0.0,
+        "solar_unresolved_signs": 0,
+        "solar_unresolved_departures": 0,
+        "ages": [
+          {
+            "measured": 3769,
+            "source": 107,
+            "predicted": 1723,
+            "handoff": 1723,
+            "choice": 1724
+          },
+          {
+            "measured": 3770,
+            "source": 106,
+            "predicted": 1722,
+            "handoff": 1722,
+            "choice": 1723
+          }
+        ]
+      },
+      "elapsed_ticks": 7004
+    },
+    "world1-asteroids0-on-s0t3934-p2": {
+      "trace": {
+        "controller_rows": 13778,
+        "decompressed_bytes": 129711394,
+        "trace_sha256": "73c3fb8ae2767c8f604dc3120d963214690002e0a52fcea26827947ff3cf02a9",
+        "sensor_rows": 13778
+      },
+      "sensors": {
+        "sensor_rows": 13778,
+        "sensor_work_sha256": "1f76152501b7d95c466908d5874d7865a8f96af22d166b1e3a16c5d653da8c28",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 154406,
+          "ground_edge_capsule_samples": 1388265,
+          "ground_edge_floor_samples": 462042,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 154014,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13778,
+          "combat_observation": 13778,
+          "flight_pilot_observation": 13778,
+          "ground_posture_observation": 13778,
+          "jetpack_navigation_with_ground": 13778,
+          "landing_objective_survey": 13778,
+          "mission_observation": 13778,
+          "pilot_observation": 13778,
+          "rebuild_relocation_survey": 13778,
+          "recovery_task_observation": 13778,
+          "tactical_sortie_observation": 13778,
+          "landing_hatch_clearance": 7773,
+          "landing_hull_placement": 4087,
+          "landing_preview_shapes": 7773,
+          "vehicle_landing_site": 7779,
+          "crossing_plan": 102,
+          "ground_edges": 186,
+          "ground_nodes": 186,
+          "survey_ground_with_gravity": 186,
+          "terrain_crossings": 102,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "budget": {
+        "executed_ticks": 6888,
+        "live_graph": 0,
+        "live_queries": 17508,
+        "evaluator_graph": 12533,
+        "flag_graph": 827,
+        "flag_queries": 1593,
+        "shadow_graph": 128,
+        "max_combined_graph": 4,
+        "max_combined_queries": 126,
+        "evaluator_charge_sha256": "38d1f8b74f45afb7f8aa5a484f5cc6269ade2f1b726841e76b6f32e6dac77485"
+      },
+      "source_prefix": {
+        "prefix_rows": 7868,
+        "prefix_sha256": "03255d0fe9fefd669de2f5a27a0b46137e28dd088fb88df58a651d2056e7706f",
+        "source_and_nomination_exact": true
+      },
+      "retention_reconstruction": {
+        "counts": {
+          "fresh_admitted_slots": 134,
+          "new_groups": 2,
+          "refreshed_slots": 130,
+          "expired_slots": 2,
+          "expired_groups": 1
+        },
+        "maximum_groups": 1,
+        "maximum_slots": 2,
+        "reconstructed_observations": 3935,
+        "final_groups": 1,
+        "final_measurements": 2
+      },
+      "frozen_screen_counts": {
+        "screened_candidates": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_with_screen": 1,
+        "directions": 4,
+        "solar_clear": 4,
+        "sites": 2
+      },
+      "frozen_screen_max_solar_error": 0.0,
+      "native_choice": {
+        "classification": "higher_reference_score",
+        "reference": {
+          "bearing": 31,
+          "planet": 2
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "selected_score": 2.0592973232269287,
+        "reference_score": 17.44234275817871,
+        "reference_directions": [
+          {
+            "side": -1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.5814114212989807,
+              "departure_clearance": 364.86798095703125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 382.2100830078125,
+              "side": -1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 17.44234275817871,
+            "cover_penalty": 0.0,
+            "total_score": 17.44234275817871
+          },
+          {
+            "side": 1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.5814114212989807,
+              "departure_clearance": 364.86798095703125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 382.2100830078125,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 17.44234275817871,
+            "cover_penalty": 0.0,
+            "total_score": 17.44234275817871
+          }
+        ],
+        "assessments": 114,
+        "eligible": 114,
+        "independent_solar_max_error": 0.0,
+        "independently_unresolved_clearance_signs": [],
+        "independently_unresolved_departure_sides": [
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.7513427734375,
+              460.7513427734375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              463.591552734375,
+              463.591552734375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.5496826171875,
+              462.5496826171875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              462.9256591796875,
+              462.9256591796875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              463.726806640625,
+              463.726806640625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              461.483642578125,
+              461.483642578125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.28802490234375,
+              462.28802490234375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              459.72491455078125,
+              459.72491455078125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.41552734375,
+              460.41552734375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              457.65850830078125,
+              457.65850830078125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              458.13409423828125,
+              458.13409423828125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              455.306640625,
+              455.306640625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 58,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              455.46026611328125,
+              455.46026611328125
+            ]
+          }
+        ]
+      },
+      "capture": {
+        "outcome": "departed",
+        "elapsed_seconds": 22.983333333333334,
+        "prediction": {
+          "claim": 3.0166666507720947,
+          "departure": 3.766666889190674,
+          "exit": 0.01666666753590107,
+          "landing": 17.866666793823242,
+          "outbound": 0.06666667014360428,
+          "return_board": 0.03333333507180214
+        },
+        "unknown": null,
+        "milestones": {
+          "choice": 5509,
+          "landed": 6472,
+          "exited": 6473,
+          "claim_started": 6479,
+          "claimed": 6658,
+          "boarded": 6660,
+          "departed": 6888
+        },
+        "phases": {
+          "landing": {
+            "status": "completed",
+            "predicted_seconds": 17.866666793823242,
+            "observed_seconds": 16.05,
+            "error_seconds": -1.8166667938232415,
+            "incomplete_elapsed_seconds": null
+          },
+          "exit": {
+            "status": "completed",
+            "predicted_seconds": 0.01666666753590107,
+            "observed_seconds": 0.016666666666666666,
+            "error_seconds": -8.692344032057431e-10,
+            "incomplete_elapsed_seconds": null
+          },
+          "outbound": {
+            "status": "completed",
+            "predicted_seconds": 0.06666667014360428,
+            "observed_seconds": 0.1,
+            "error_seconds": 0.03333332985639573,
+            "incomplete_elapsed_seconds": null
+          },
+          "claim": {
+            "status": "completed",
+            "predicted_seconds": 3.0166666507720947,
+            "observed_seconds": 2.9833333333333334,
+            "error_seconds": -0.033333317438761334,
+            "incomplete_elapsed_seconds": null
+          },
+          "return_board": {
+            "status": "completed",
+            "predicted_seconds": 0.03333333507180214,
+            "observed_seconds": 0.03333333333333333,
+            "error_seconds": -1.7384688064114862e-09,
+            "incomplete_elapsed_seconds": null
+          },
+          "departure": {
+            "status": "completed",
+            "predicted_seconds": 3.766666889190674,
+            "observed_seconds": 3.8,
+            "error_seconds": 0.033333110809325994,
+            "incomplete_elapsed_seconds": null
+          }
+        },
+        "touchdown_offset": 0.718488872051239,
+        "controller_rows": 1380
+      },
+      "comparison": {
+        "source_tick": 3934,
+        "predicted_tick": 5522,
+        "arrival_tick": 5508,
+        "choice_tick": 5509,
+        "delta_ticks": -14,
+        "identity": {
+          "first_planet_change": null,
+          "first_actor_change": null
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "retained_sites": [
+          {
+            "bearing": 63,
+            "planet": 2
+          },
+          {
+            "bearing": 31,
+            "planet": 2
+          }
+        ],
+        "maximum_geometry_residual": 0.0002729575167846423,
+        "score_gap": 15.383045434951782,
+        "endpoint_differences": {
+          "predicted_tick": 5522,
+          "actual_tick": 5508,
+          "ship_world": {
+            "position": 4.115577082402091,
+            "velocity": 1.2727302546140982,
+            "heading_actual_minus_predicted": 1.871874738727705,
+            "spin_actual_minus_predicted": 1.834771379828453
+          },
+          "planet": {
+            "position": 3.157554670771951,
+            "velocity": 0.06310028150117644,
+            "heading_actual_minus_predicted": -0.0002888292074203491,
+            "spin_actual_minus_predicted": -4.470348358154297e-07
+          },
+          "ship_body_relative": {
+            "position": 4.234602855608602,
+            "velocity": 1.2201294196446886,
+            "heading_actual_minus_predicted": 1.8721635679351254,
+            "spin_actual_minus_predicted": 1.8347718268632889
+          }
+        },
+        "same_time_planet_drift": {
+          "position": 0.0,
+          "velocity": 0.0005948437955450432,
+          "heading_actual_minus_predicted": 0.0,
+          "spin_actual_minus_predicted": 0.0
+        },
+        "solar_reconstruction_max_error": 0.0,
+        "solar_unresolved_signs": 0,
+        "solar_unresolved_departures": 0,
+        "ages": [
+          {
+            "measured": 3769,
+            "source": 165,
+            "predicted": 1753,
+            "handoff": 1739,
+            "choice": 1740
+          },
+          {
+            "measured": 3770,
+            "source": 164,
+            "predicted": 1752,
+            "handoff": 1738,
+            "choice": 1739
+          }
+        ]
+      },
+      "elapsed_ticks": 6888
+    },
+    "world1-asteroids0-on-s0t3997-p2": {
+      "trace": {
+        "controller_rows": 13932,
+        "decompressed_bytes": 131557346,
+        "trace_sha256": "5b856ca1624d47e3f20e623a654cb3c8abcaaac0d41066933488de1c37c89445",
+        "sensor_rows": 13932
+      },
+      "sensors": {
+        "sensor_rows": 13932,
+        "sensor_work_sha256": "af05a9e0299a2682fe7bcf03bea46c46ffdfdc854d3e1349038ebdeb222f7a5c",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 156374,
+          "ground_edge_capsule_samples": 1405977,
+          "ground_edge_floor_samples": 467946,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 155982,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13932,
+          "combat_observation": 13932,
+          "flight_pilot_observation": 13932,
+          "ground_posture_observation": 13932,
+          "jetpack_navigation_with_ground": 13932,
+          "landing_objective_survey": 13932,
+          "mission_observation": 13932,
+          "pilot_observation": 13932,
+          "rebuild_relocation_survey": 13932,
+          "recovery_task_observation": 13932,
+          "tactical_sortie_observation": 13932,
+          "landing_hatch_clearance": 7949,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7949,
+          "vehicle_landing_site": 7970,
+          "crossing_plan": 104,
+          "ground_edges": 188,
+          "ground_nodes": 188,
+          "survey_ground_with_gravity": 188,
+          "terrain_crossings": 104,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "budget": {
+        "executed_ticks": 6965,
+        "live_graph": 0,
+        "live_queries": 17388,
+        "evaluator_graph": 12648,
+        "flag_graph": 827,
+        "flag_queries": 1593,
+        "shadow_graph": 128,
+        "max_combined_graph": 4,
+        "max_combined_queries": 126,
+        "evaluator_charge_sha256": "2503a4bb5b61e0547959da7cc87c4e3009d42092ceed29d8e7eab872652c1b3d"
+      },
+      "source_prefix": {
+        "prefix_rows": 7994,
+        "prefix_sha256": "8ad7fd76a2af82ab4f6704f592cfd6f30db689e8630891a5a60740f79a4720e7",
+        "source_and_nomination_exact": true
+      },
+      "retention_reconstruction": {
+        "counts": {
+          "fresh_admitted_slots": 134,
+          "new_groups": 2,
+          "refreshed_slots": 130,
+          "expired_slots": 2,
+          "expired_groups": 1
+        },
+        "maximum_groups": 1,
+        "maximum_slots": 2,
+        "reconstructed_observations": 3998,
+        "final_groups": 1,
+        "final_measurements": 2
+      },
+      "frozen_screen_counts": {
+        "screened_candidates": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_with_screen": 1,
+        "directions": 4,
+        "solar_clear": 4,
+        "sites": 2
+      },
+      "frozen_screen_max_solar_error": 0.0,
+      "native_choice": {
+        "classification": "higher_reference_score",
+        "reference": {
+          "bearing": 31,
+          "planet": 2
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "selected_score": 2.813232660293579,
+        "reference_score": 16.688392639160156,
+        "reference_directions": [
+          {
+            "side": -1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.5562797784805298,
+              "departure_clearance": 365.1607666015625,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 382.4058837890625,
+              "side": -1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 16.688392639160156,
+            "cover_penalty": 0.0,
+            "total_score": 16.688392639160156
+          },
+          {
+            "side": 1.0,
+            "rejection": null,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.5562797784805298,
+              "departure_clearance": 365.1607666015625,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 382.4058837890625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "approach_score": 16.688392639160156,
+            "cover_penalty": 0.0,
+            "total_score": 16.688392639160156
+          }
+        ],
+        "assessments": 114,
+        "eligible": 114,
+        "independent_solar_max_error": 6.103515625e-05,
+        "independently_unresolved_clearance_signs": [],
+        "independently_unresolved_departure_sides": [
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.94134521484375,
+              460.94134521484375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 52,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              463.69732666015625,
+              463.69732666015625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.69915771484375,
+              462.69915771484375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 53,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              462.79852294921875,
+              462.79852294921875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              463.608642578125,
+              463.608642578125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 54,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              461.324951171875,
+              461.324951171875
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              462.128173828125,
+              462.128173828125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 55,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              459.53570556640625,
+              459.53570556640625
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              460.2152099609375,
+              460.2152099609375
+            ]
+          },
+          {
+            "site": {
+              "bearing": 56,
+              "planet": 2
+            },
+            "side": -1.0,
+            "corridor_clearances": [
+              457.44024658203125,
+              457.44024658203125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 57,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              457.8956298828125,
+              457.8956298828125
+            ]
+          },
+          {
+            "site": {
+              "bearing": 58,
+              "planet": 2
+            },
+            "side": 1.0,
+            "corridor_clearances": [
+              455.1856689453125,
+              455.1856689453125
+            ]
+          }
+        ]
+      },
+      "capture": {
+        "outcome": "departed",
+        "elapsed_seconds": 23.833333333333332,
+        "prediction": {
+          "claim": 3.0166666507720947,
+          "departure": 3.766666889190674,
+          "exit": 0.01666666753590107,
+          "landing": 17.866666793823242,
+          "outbound": 0.06666667014360428,
+          "return_board": 0.03333333507180214
+        },
+        "unknown": null,
+        "milestones": {
+          "choice": 5535,
+          "landed": 6549,
+          "exited": 6550,
+          "claim_started": 6556,
+          "claimed": 6735,
+          "boarded": 6737,
+          "departed": 6965
+        },
+        "phases": {
+          "landing": {
+            "status": "completed",
+            "predicted_seconds": 17.866666793823242,
+            "observed_seconds": 16.9,
+            "error_seconds": -0.9666667938232436,
+            "incomplete_elapsed_seconds": null
+          },
+          "exit": {
+            "status": "completed",
+            "predicted_seconds": 0.01666666753590107,
+            "observed_seconds": 0.016666666666666666,
+            "error_seconds": -8.692344032057431e-10,
+            "incomplete_elapsed_seconds": null
+          },
+          "outbound": {
+            "status": "completed",
+            "predicted_seconds": 0.06666667014360428,
+            "observed_seconds": 0.1,
+            "error_seconds": 0.03333332985639573,
+            "incomplete_elapsed_seconds": null
+          },
+          "claim": {
+            "status": "completed",
+            "predicted_seconds": 3.0166666507720947,
+            "observed_seconds": 2.9833333333333334,
+            "error_seconds": -0.033333317438761334,
+            "incomplete_elapsed_seconds": null
+          },
+          "return_board": {
+            "status": "completed",
+            "predicted_seconds": 0.03333333507180214,
+            "observed_seconds": 0.03333333333333333,
+            "error_seconds": -1.7384688064114862e-09,
+            "incomplete_elapsed_seconds": null
+          },
+          "departure": {
+            "status": "completed",
+            "predicted_seconds": 3.766666889190674,
+            "observed_seconds": 3.8,
+            "error_seconds": 0.033333110809325994,
+            "incomplete_elapsed_seconds": null
+          }
+        },
+        "touchdown_offset": 0.5144071578979492,
+        "controller_rows": 1431
+      },
+      "comparison": {
+        "source_tick": 3997,
+        "predicted_tick": 5547,
+        "arrival_tick": 5534,
+        "choice_tick": 5535,
+        "delta_ticks": -13,
+        "identity": {
+          "first_planet_change": null,
+          "first_actor_change": null
+        },
+        "selected": {
+          "bearing": 33,
+          "planet": 2
+        },
+        "retained_sites": [
+          {
+            "bearing": 63,
+            "planet": 2
+          },
+          {
+            "bearing": 31,
+            "planet": 2
+          }
+        ],
+        "maximum_geometry_residual": 0.0002729575167846423,
+        "score_gap": 13.875159978866577,
+        "endpoint_differences": {
+          "predicted_tick": 5547,
+          "actual_tick": 5534,
+          "ship_world": {
+            "position": 3.3029186957578336,
+            "velocity": 1.2205998387300785,
+            "heading_actual_minus_predicted": 2.5480913112508223,
+            "spin_actual_minus_predicted": 1.7181687727570534
+          },
+          "planet": {
+            "position": 2.9320014462174706,
+            "velocity": 0.06310072873008514,
+            "heading_actual_minus_predicted": -0.00026819854974746704,
+            "spin_actual_minus_predicted": 0.0
+          },
+          "ship_body_relative": {
+            "position": 3.1966928522369242,
+            "velocity": 1.1952900782399045,
+            "heading_actual_minus_predicted": 2.54835950980057,
+            "spin_actual_minus_predicted": 1.7181687727570534
+          }
+        },
+        "same_time_planet_drift": {
+          "position": 0.0,
+          "velocity": 0.0005949790934651796,
+          "heading_actual_minus_predicted": 0.0,
+          "spin_actual_minus_predicted": -4.470348358154297e-07
+        },
+        "solar_reconstruction_max_error": 0.0,
+        "solar_unresolved_signs": 0,
+        "solar_unresolved_departures": 0,
+        "ages": [
+          {
+            "measured": 3769,
+            "source": 228,
+            "predicted": 1778,
+            "handoff": 1765,
+            "choice": 1766
+          },
+          {
+            "measured": 3770,
+            "source": 227,
+            "predicted": 1777,
+            "handoff": 1764,
+            "choice": 1765
+          }
+        ]
+      },
+      "elapsed_ticks": 6965
+    }
+  },
+  "raw_hashes": {
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/destination-cover.jsonl": "18f2ff9e9eb5526e65f739029ffe6ce3b6c0b10d7f70b8a4f56a7f63f01b00ad",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/flag-survey-work.jsonl": "056e1bfdcb8a01159a19c2468e7d54587b7bd1339a9fa09148b0128cd324473e",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/flag-survey.jsonl": "1cc14df2d9ab3fc0687afd17809014a74a00054905bf0bfec9a9ec048217d69a",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/flag-value-shadow-work.jsonl": "db9bcce00a4d7d755c4e95761c5f3dd8c938d53ba74eb63f978ae8f5724cf66e",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/flag-value-shadow.jsonl": "b3798810fb4c97a2a26ac36baf1200de3a38808592f00bf0b2be687824bfd4b5",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/live-planning.csv": "e83b2808fbc3883d36ab27e556f657a68d2304a80f181c5cc853280445383ccf",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/mission-evaluations.jsonl": "77da90a2e808118cb90f9af23c50dc3bd01e68e93d689f98306a4071ffa8d974",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/report.json": "840a6fa8edd99f64c38f51b7c76ba79248f8b6b9c3a81a5b046f9ef44b640d00",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/sensors.jsonl": "3d6de6787333451906b1f9fa1be127236dbba61b0b2428aee0dd90a6277b2d12",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/trace.jsonl.gz": "d290c5cf8d69acf3f5766009eea0e5a26d330adda8289472b5c09f0685b39f05",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2/transfer-probe.jsonl": "6729683318a56a4709c6217bc8d7504b7bfab627e75550d196e55d0074415529",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/destination-cover.jsonl": "305c35f9e91922cc8f41505ed7868958a110598a928ec59d5f3b758c125be040",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/flag-survey-work.jsonl": "9b4156b2eb68e239ca615b748c8511fea77983894447e3abc79647d8748748ed",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/flag-survey.jsonl": "bf8fc8287d1424894acdb8e5318c9a5c8740808ce05bb4903d5739a7d8d1c43d",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/flag-value-shadow-work.jsonl": "0d0668a5dcd0aa453ed22d30c05d6d1b8b0d9677be1ce19d5a023710f8438361",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/flag-value-shadow.jsonl": "faa5570ccf2b205ceb5a2390df6617574fbefe352ecf33e0be5fc695c52a7d38",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/live-planning.csv": "65d9c0541243a59604c64caec8ec4230099440241ae4f765b4b18b26d1973034",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/mission-evaluations.jsonl": "c38acf2a6e7903de50d572312fa7b0c9955a12fa702bc0655b344775912a8c50",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/report.json": "7db5020922bed8bc4c083965bb93635b300dee89215202fba1b82116d8345fbf",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/sensors.jsonl": "cca7378440e3a02d070ab47cac25476497e6971bd5f29e5086ac83a64ed0569a",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/trace.jsonl.gz": "0c9d418581e0c5ac653658b94095e7547a53a42bf98b65b0e0ee75fb164c281d",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2/transfer-probe.jsonl": "cf62e9171848c5dd206b6e4d74bc2fdcb0b859cc048c0c52b4f99f9b5398e043",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/destination-cover.jsonl": "1e6232a3bd0e289be772315e70c2efadc69f5508a104c2ec9f6a447bcd1a2de5",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/flag-survey-work.jsonl": "cac069d8e13f112e24f888949e1f725048f0927894d314bd9480fcf91cada39f",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/flag-survey.jsonl": "85d175fdf4a6f8790784e38112e64ff7ffe191952ca014bcd1ce134d054f4cf3",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/flag-value-shadow-work.jsonl": "e9aed7fdca144e326f2d4d330e87b6f3c7e1d25e36d3a8646fd48d0a4198b900",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/flag-value-shadow.jsonl": "9431b4a868b13847f48b731d217b5a012ede1dce40a16a2812e9a9672590b708",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/live-planning.csv": "540462494cdf730af5bde510081f2fc3f951fc0eba6d2ff03fe6e7c68dd35559",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/mission-evaluations.jsonl": "0d85f82cb508452351680fc4ff2ee397618b4dbb8d90e99dfc47e4cbd0acd35b",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/report.json": "857de2c02da34dc9ac369936817b43ef87e15eb9fefb0ccfdb5150cf4b3fbb63",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/sensors.jsonl": "724a67f1b5230d3ed7771a9b14e49fb67755dec3725dd2b55d97da759911d7b0",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/trace.jsonl.gz": "8584599694059e2fce962c18929143b5191edbd664d75517a1712e95a98d5a6d",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2/transfer-probe.jsonl": "1400d9dde61b478522bae50d30436fa109c16716f602540303641724c9b0c9b4",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/destination-cover.jsonl": "00753a7276d43ea476486a33cf3994c80325159d336796f5ce3edb627bafe855",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/flag-survey-work.jsonl": "3d88e809bd9f0414f63198e6790bb884e56ad104d2c9394a8c5e783146830dd9",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/flag-survey.jsonl": "7571dd10015cf3fedf60ed5f934b24a04286567b3cdab8731d1bb8da7ee75bd8",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/flag-value-shadow-work.jsonl": "5cd8420d299a81c1d840a13e14c5ee9831d638b0794b562efe0f437a34a1e7bd",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/flag-value-shadow.jsonl": "f0383ff09938c63b59be7751488a30be256a1a9fd1773e608a100b90b6976ea7",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/live-planning.csv": "c2139fc957d3caea18553e59e256aa3decda7789a09ac518bb9084f2e85f7b5d",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/mission-evaluations.jsonl": "435de720a94a83436a01f90eed8a9c2d4b98c1b5a919a319fadbc726a40ab444",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/report.json": "b6a7e37d2e45ef6fd8cf8be725e7ff75c3a19375ce0c16b008e87095c003a809",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/sensors.jsonl": "9bd8cf53059580ebf3e7cbbbd040f58a3ddaf863e92cb58c179a3174b510243c",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/trace.jsonl.gz": "803bff86f61605957f3676131b5104cfa5fbc55cc895f5d2e314d0decfe7b3e1",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2/transfer-probe.jsonl": "317e15cd1e46ef4cfcaaa4bebc69d9a3a6d8bece3df666f50dcb460748645122"
+  },
+  "ordinary_hashes": {
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/live-planning.csv": "da64753d3f7be0bb753bc8571b8196ad645c667d51eda45a750660ab89b9759d",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/report.json": "802a1af7949dc374de51a9230edcf99b6597d5684459ab781f5f87e23c08e842",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/flag-survey-work.jsonl": "d41535ee0ad1db966048120b5c498c5c298baa3a9e1d8d4b53cedc6ae5da20b3",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/trace.jsonl.gz": "74952be017bb0991ba5b98060aa6fedd10eb4c12c29fda6c19f2bc4061965b7d",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/flag-value-shadow-work.jsonl": "e7b7d911082501727066b26b3cc085e5ccdbe652ef68cd2226f80eed4516006b",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/mission-evaluations.jsonl": "c52472cfea12da6ad7974ef06138ab7087e655183b15503eb670a6ff374b141d",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/mission-evaluation-work.jsonl": "0cd565a382f275e8b09e40c6e64ebf12db62b72ecea2f8fe47616e4d009ac3d9",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/flag-value-shadow.jsonl": "3bdb154693581c4684f05ec8e4d6497a6e57695b79eaa5fd49cc071c9e788318",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/transfer-comparison-work.jsonl": "79062b2f638451b84ed79559c7f9809c582332194b441c34dcfe986cc4bfdbb1",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/sensors.jsonl": "7a2ea197a17e8b39519164accdc455b8db5a03539707ccaef27e453cbf55e82f",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3816-budget64-on/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/live-planning.csv": "27640678c110b8584f26f1abe082712c8e6cf34ea928c3e85d5db66bcf58753a",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/report.json": "240b6e72dab88453ac8c191da943512ebbe2b68d5c0ab16537d49fd31b2a0e7f",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/flag-survey-work.jsonl": "c74e003511758aab3bdd3259c1b9b272c7d42eae8a727cb96748cbbb75fa2d19",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/trace.jsonl.gz": "c03ae69fd2203b09a918d4b1f4332197af1c419f1d78b4e1595a97127c2f897b",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/flag-value-shadow-work.jsonl": "4f9ee3f8df2a3805b5724d3c800dc80c449c0bb5955a169aa76ea6c1375816fe",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/mission-evaluations.jsonl": "e5ac46fa7210d1ad7237a1b6633044f400d47f2a5d693932eeab15fbe2c975e7",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/mission-evaluation-work.jsonl": "422364ff98bbd17b97c0d0c99c41a5e3b4e4963e27780bbc3cc046c78bb7573e",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/flag-value-shadow.jsonl": "7d399c72728f3cbbbf0f88056ca2c56ebb0f2b82748fcefe212fae329fe7cd56",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/transfer-comparison-work.jsonl": "22173642866668ed7252f96a87fe5aba0c9f0ef65c2590711b9dea0f682362ae",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/sensors.jsonl": "003a01f0951dfa445a8f930ab9ed5096873c40a0ef869039121a669dfbc84f4b",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3876-budget64-on/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/live-planning.csv": "735bfdd16004fd7f720ca01e7d04d0871a9243bf7f941da760b6059b9f4a2652",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/report.json": "ea0b21709140a055ab46b383e375029328ce3f7e3dd3939d447d45815ea5208c",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/flag-survey-work.jsonl": "3ceadc335e2993790ca567485eaf38f731ef44616b8fb56faade9ecf62fc7196",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/trace.jsonl.gz": "42938eeec92eee0c0e4e6d4ac63d0f343eeadb59574cea60786f6fa7aa04276e",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/flag-value-shadow-work.jsonl": "74717db63040a7429767579c9c12fad86af50b98fdc9e31e5813423bc0f2e95b",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/mission-evaluations.jsonl": "edfb0dc551caa9f46a1a4a86a337386e42009e0cd5151e366a926a159fae15f9",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/mission-evaluation-work.jsonl": "ce88485034de7703808fd6f1369d628e6d387d8002d4d1dea54d882184675211",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/flag-value-shadow.jsonl": "dfd117e458b408611225e4bdd9149eab96c98bb2e7305eb1c4b0a040cf115774",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/transfer-comparison-work.jsonl": "fe7318f03fe93e314a0fdb5cb4667aa5dfe382c8968cdae44647a3b9e8c46801",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/sensors.jsonl": "6098e95509bb31a65bb8776969cc6743e4facd95b6b71b44cae27650e580bc68",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3934-budget64-on/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/live-planning.csv": "96a99d3355f5ffa324e44cb3e5e5ad4ce7adb1178b14449868563865e5e5b0c6",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/report.json": "816cf6bb8e7d4efbc97100373d13d3b8b9005d249df678512fa8e431cf5f9b1c",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/flag-survey-work.jsonl": "7049cae590cfad219b634844f0901ef2d27eb6271249e85c56103bec428ea12a",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/trace.jsonl.gz": "3484dfb15fa93195585c1bed72b5fc04f1710c0e97e0c14e3aa74490a4dd8363",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/flag-value-shadow-work.jsonl": "5c78a35ff96bf508b6e9e57d0dcf941752a361287f5b7b5a298a03e6b7206e5d",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/mission-evaluations.jsonl": "451610d26b68a0868397af52a4fa4d4ae40ff5de4d532afd54ad4c151cd85abb",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/mission-evaluation-work.jsonl": "12bfa8f1bd2854e31c34590dc9cd22e3e5b9ba145931418ea2f949708650a048",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/flag-value-shadow.jsonl": "1e26858119d43fdb1e7186d059f6f69674e8f2eff6808ed54d730ebc9cc53f64",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/transfer-comparison-work.jsonl": "933e4add4c483761c951a4285155dd398fd4e5c86cc0fb514367c8d17cc72e6a",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/sensors.jsonl": "b8420726fdbf177538e93ed9672ff9aabdec28ec5f35db563764b11cd9e77d22",
+    "target/capture-flag-survey/remote-retention-v1/world1-asteroids0-on-s0t3997-budget64-on/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014"
+  },
+  "log_hashes": {
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3816-p2.log": "d0f9df7f32a0d54031e328124cf367e47b4bde957f30e7cd09d1d949cd3096af",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3876-p2.log": "24fa126a6ad7d00ed36f3428fb478931952173f1b0470019edf0978a3a82132e",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3934-p2.log": "33e22f41bc7cc50ad4a47f5d5ba03cb60c0fcbe03486e898adda2c3049d1488e",
+    "target/capture-flag-survey/arrival-replay-v1-complete/world1-asteroids0-on-s0t3997-p2.log": "af51e88181e6d0887ae42b3aefc2fd883c815cfcc2d92bc64dcd23de6f522b8b"
+  },
+  "findings": [],
+  "limitations": [
+    "Four correlated nominations from one world and two original measurements; no independent strength/latency population claim.",
+    "Frozen endpoint ship differences can compare different times; same-time comparison is planetary motion only.",
+    "Retrospective reprojection uses later actual frames and never backfills source prediction or live selection.",
+    "Age/identity validity does not establish current climb, boarding, collision or combat safety.",
+    "Old full physical raw files are absent; exact full trace, normalized sensor evidence and deterministic upstream hashes are checked against committed records.",
+    "Full historical normalized live-planning CSV is unavailable: reconcile all budgets and exact evaluator-charge digest; do not claim full live-ledger byte parity.",
+    "Existing hash-pinned physical/native-choice audit helpers are reused; the new replay runner is never imported."
+  ],
+  "results": {
+    "runs": 4,
+    "compared": 4,
+    "physical_ticks": 27859,
+    "trace_rows": 55726,
+    "trace_bytes": 526230327,
+    "actual_minus_predicted_transfer_ticks": [
+      -26,
+      0,
+      -14,
+      -13
+    ],
+    "actual_acquisition_ticks": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "selected_outside_retained_set": 4,
+    "sites": 8,
+    "native_site_statuses": {
+      "present": 8
+    },
+    "geometry_within_tolerance": 8,
+    "maximum_geometry_residual": 0.0002729575167846423,
+    "direction_signs": {
+      "clear/clear/clear": 16
+    },
+    "directions": 16,
+    "choice_age_and_identity_valid": 8,
+    "capture_outcomes": {
+      "departed": 4
+    }
+  },
+  "coverage": {
+    "runs": 4,
+    "raw_files": 44,
+    "ordinary_files": 48,
+    "logs": 4,
+    "controller_rows": 55726,
+    "sensor_rows": 55726,
+    "original_distinct_measurements": 2,
+    "retrospective_solar_directions": 32,
+    "native_choice_directions": 458,
+    "frozen_solar_directions": 16,
+    "continuous_source_to_choice_rows": 6427
+  },
+  "docs_checked": true,
+  "projection_sha256": "b34113059f88ca3aeef019655558538d431452e55c8e69bbbf08f689e4fe56f3",
+  "notes_sha256": "da05b4afc8aae4bb81168a6182543ff00d2aceca857812b3c45a570777246464",
+  "passed": true
+}
