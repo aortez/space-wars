@@ -931,6 +931,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         ingame_menu: window.get_ingame_menu_visible(),
         ingame_controls: window.get_ingame_controls_visible(),
         ingame_clock: window.get_ingame_clock_visible(),
+        clock_fonts: window.get_clock_fonts_visible(),
         game_over: window.get_game_over_visible(),
     });
     let runtime = runtime_status_for_screen(screen, window.get_runtime_diagnostics().as_str())?;
@@ -938,6 +939,12 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            font_controls: if window.get_clock_fonts_visible() {
+                crate::clock_fonts::inventory(window)
+            } else {
+                Vec::new()
+            },
+            font_focus: window.get_clock_font_focus(),
             automatic: window.get_autostart_running(),
             autostart_controls: crate::autostart::controls(window),
             autostart_focus: window.get_autostart_focus_index(),

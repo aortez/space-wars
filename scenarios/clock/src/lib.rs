@@ -21,6 +21,9 @@ mod floor;
 #[cfg(test)]
 mod floor_tests;
 #[cfg(test)]
+mod font_tests;
+mod fonts;
+#[cfg(test)]
 mod input_tests;
 mod layout;
 #[cfg(test)]
@@ -35,6 +38,7 @@ mod rain;
 mod render;
 pub mod water_fixture;
 
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::time::Duration;
 
 pub use digits::{
@@ -43,9 +47,9 @@ pub use digits::{
 };
 
 use engine_common::{
-    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockMarqueeMessage,
-    ClockMarqueePreset, ClockRainAmount, ClockSettings, ClockTimeFormat, Observation, RenderFrame,
-    Scenario, StepResult, TickModel,
+    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont, ClockFontPool,
+    ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount, ClockSettings,
+    ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
 };
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
@@ -60,7 +64,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 10;
+pub const CLOCK_ACTION_VERSION: u16 = 11;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -74,7 +78,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 9 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 12 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -157,6 +161,11 @@ impl ClockAction {
         payload.push(settings.marquee_preset as u8);
         payload.push(settings.rain_amount as u8);
         payload.push(u8::from(settings.show_date));
+        payload.extend_from_slice(&[
+            settings.fonts.selected as u8,
+            u8::from(settings.fonts.rotate),
+            settings.fonts.pool.bits(),
+        ]);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -222,10 +231,15 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 10..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 1 && payload[8] <= 1 =>
+            (CLOCK_ACTION_CONFIGURE, 13..=MAX_CONFIGURE_BYTES)
+                if payload[5] <= 1 && payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
+                    fonts: ClockFontSettings {
+                        selected: *ClockFont::ALL.get(usize::from(payload[9]))?,
+                        rotate: payload[10] != 0,
+                        pool: ClockFontPool::from_bits(payload[11])?,
+                    },
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
                         24 => ClockTimeFormat::TwentyFourHour,
@@ -251,7 +265,7 @@ impl ClockAction {
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
                     show_date: payload[8] != 0,
-                    marquee_message: std::str::from_utf8(&payload[9..]).ok()?.parse().ok()?,
+                    marquee_message: std::str::from_utf8(&payload[12..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -344,6 +358,7 @@ impl ClockWaterLab {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ClockConfig {
+    pub fonts: ClockFontSettings,
     pub aspect_ratio: f32,
     pub duck_debug_overlay: bool,
     /// Development-only water fixtures using the Meltdown lifecycle.
@@ -364,6 +379,7 @@ pub struct ClockConfig {
 impl Default for ClockConfig {
     fn default() -> Self {
         Self {
+            fonts: ClockFontSettings::default(),
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
             water_lab: ClockWaterLab::Off,
@@ -383,6 +399,7 @@ impl Default for ClockConfig {
 impl ClockConfig {
     fn normalized(self) -> Self {
         Self {
+            fonts: self.fonts,
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             duck_debug_overlay: self.duck_debug_overlay,
             water_lab: self.water_lab,
@@ -416,11 +433,15 @@ pub struct ClockState {
     crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
+    font_rng: StdRng,
+    font_change_pending: bool,
+    font_rotation_pending: bool,
 }
 
 impl ClockState {
     pub fn settings(&self) -> ClockSettings {
         ClockSettings {
+            fonts: self.config.fonts,
             time_format: self.config.time_format,
             show_date: self.config.show_date,
             event_profile: self.config.event_profile,
@@ -432,6 +453,11 @@ impl ClockState {
     }
 
     fn configure(&mut self, settings: ClockSettings) {
+        if self.config.fonts != settings.fonts {
+            self.font_change_pending = true;
+            self.font_rotation_pending = false;
+        }
+        self.config.fonts = settings.fonts;
         self.config.time_format = settings.time_format;
         self.config.show_date = settings.show_date;
         self.config.event_profile = settings.event_profile;
@@ -455,6 +481,40 @@ impl ClockState {
 
     pub fn display(&self) -> DisplaySnapshot {
         self.display
+    }
+
+    pub fn active_font(&self) -> ClockFont {
+        self.display.font
+    }
+
+    /// Change geometry only between timed effects; visitors keep their worlds.
+    fn apply_pending_font(&mut self) {
+        if self.active_event.is_some() || !(self.font_change_pending || self.font_rotation_pending)
+        {
+            return;
+        }
+        let settings = self.config.fonts;
+        let previous = self.display.font;
+        let next = if !settings.rotate
+            || self.font_change_pending && settings.pool.contains(settings.selected)
+        {
+            settings.selected
+        } else {
+            let choices: Vec<_> = settings
+                .pool
+                .fonts()
+                .filter(|font| *font != previous)
+                .collect();
+            if choices.is_empty() {
+                previous
+            } else {
+                choices[self.font_rng.random_range(0..choices.len())]
+            }
+        };
+        self.display.font = next;
+        self.font_change_pending = false;
+        self.font_rotation_pending = false;
+        digits::apply_snapshot(&mut self.segments, self.display);
     }
 
     pub fn segments(&self) -> &[SegmentState] {
@@ -782,6 +842,7 @@ impl ClockState {
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
+        self.apply_pending_font();
         digits::apply_snapshot(&mut self.segments, self.display);
     }
 
@@ -876,8 +937,12 @@ impl ClockState {
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {
         let previous = self.display;
-        let next = digits::snapshot(reading, self.config.time_format);
+        let mut next = digits::snapshot(reading, self.config.time_format);
+        next.font = self.display.font;
         let minute_changed = previous.digits != next.digits;
+        if animate && self.reading.is_some() && minute_changed && self.config.fonts.rotate {
+            self.font_rotation_pending = true;
+        }
         // Only near-contiguous forward readings animate. Initial sync, skipped
         // minutes, backwards corrections and paused control synchronization snap
         // straight to the truth; there is no backlog of stale transitions.
@@ -904,6 +969,7 @@ impl ClockState {
         }
         self.reading = Some(reading);
         self.display = next;
+        self.apply_pending_font();
         // A second changed target supersedes a slide instead of letting old
         // digits finish over a newer reading. Ordinary seconds don't restart it.
         if matches!(self.active_event, Some(ActiveEvent::DigitSlide(_))) && minute_changed {
@@ -932,6 +998,28 @@ impl ClockState {
 
 pub struct ClockScenario;
 
+impl ClockScenario {
+    /// A small real clock scene for the font picker, without a live instance.
+    pub fn font_preview(font: ClockFont) -> RenderFrame {
+        let mut state = Self::init(
+            ClockConfig {
+                aspect_ratio: 3.4,
+                event_profile: ClockEventProfile::Off,
+                fonts: ClockFontSettings {
+                    selected: font,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            0,
+        );
+        state.apply_reading(ClockReading::new(12, 34, 0).unwrap(), false);
+        let mut frame = Self::render_frame(&state);
+        frame.camera = engine_common::Camera2::new(engine_common::RenderPoint::ZERO, 320.0);
+        frame
+    }
+}
+
 impl Scenario for ClockScenario {
     type State = ClockState;
     type Config = ClockConfig;
@@ -952,6 +1040,9 @@ impl Scenario for ClockScenario {
             crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
+            font_rng: StdRng::seed_from_u64(seed ^ 0x464f_4e54),
+            font_change_pending: true,
+            font_rotation_pending: false,
         }
     }
 

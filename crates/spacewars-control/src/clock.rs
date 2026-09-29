@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 19;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 20;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -34,6 +34,7 @@ pub struct ClockState {
     pub scenario_revision: u64,
     pub paused: bool,
     pub settings: engine_common::ClockSettings,
+    pub active_font: engine_common::ClockFont,
     pub profile: String,
     pub lifecycle: String,
     pub event_kind: Option<ClockEventKind>,
@@ -394,6 +395,7 @@ mod tests {
             scenario_revision: 7,
             paused: false,
             settings: engine_common::ClockSettings::default(),
+            active_font: engine_common::ClockFont::Classic,
             profile: "demo".into(),
             lifecycle: "active".into(),
             event_kind: Some(ClockEventKind::ColorCycle),

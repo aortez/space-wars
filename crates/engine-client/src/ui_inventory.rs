@@ -16,6 +16,7 @@ pub(crate) struct ScreenVisibility {
     pub(crate) ingame_menu: bool,
     pub(crate) ingame_controls: bool,
     pub(crate) ingame_clock: bool,
+    pub(crate) clock_fonts: bool,
     pub(crate) game_over: bool,
 }
 
@@ -25,7 +26,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound && visibility.controllers {
+        if visibility.clock_fonts {
+            UiScreen::LauncherClockFonts
+        } else if visibility.sound && visibility.controllers {
             UiScreen::LauncherControllers
         } else if visibility.sound && visibility.autostart {
             UiScreen::LauncherAutostart
@@ -42,6 +45,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.clock_fonts {
+        UiScreen::PauseClockFonts
     } else if visibility.ingame_menu && visibility.sound && visibility.controllers {
         UiScreen::PauseControllers
     } else if visibility.ingame_menu && visibility.sound && visibility.autostart {
@@ -63,6 +68,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) font_controls: Vec<UiControl>,
+    pub(crate) font_focus: i32,
     pub(crate) automatic: bool,
     pub(crate) autostart_controls: Vec<UiControl>,
     pub(crate) autostart_focus: i32,
@@ -212,6 +219,19 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::PauseMain => pause_main_inventory(context),
         UiScreen::PauseClock => pause_clock_inventory(context),
+        UiScreen::LauncherClockFonts | UiScreen::PauseClockFonts => UiInventory {
+            selected_control: context
+                .font_controls
+                .get(context.font_focus as usize)
+                .map(|control| control.id.clone()),
+            controls: context.font_controls.clone(),
+            actions: if context.clock_controls_pending {
+                vec![]
+            } else {
+                UiAction::ALL.to_vec()
+            },
+            error: context.clock_settings_error.clone(),
+        },
         UiScreen::PauseControls => UiInventory {
             selected_control: Some("pause.controls.back".into()),
             controls: vec![
@@ -614,6 +634,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.rain",
                 &context.clock_rain,
             );
+            controls.push(UiControl::new(
+                "launcher.settings.clock.fonts",
+                "Fonts",
+                true,
+            ));
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -630,6 +655,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.show-date",
                 "launcher.settings.clock.crow",
                 "launcher.settings.clock.explosion",
+                "launcher.settings.clock.fonts",
                 "launcher.settings.back",
             ]
         }
@@ -945,6 +971,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         UiControl::new("pause.clock.show-date", "Show Date", true)
             .with_value(if context.clock_show_date { "On" } else { "Off" }),
     );
+    controls.push(UiControl::new("pause.clock.fonts", "Fonts", true));
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
@@ -967,6 +994,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.show-date",
                 "pause.clock.crow",
                 "pause.clock.explosion",
+                "pause.clock.fonts",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -1171,6 +1199,7 @@ mod tests {
                 ingame_controls: true,
                 game_over: true,
                 ingame_clock: true,
+                clock_fonts: false,
             }),
             UiScreen::LauncherTouchTest
         );
@@ -1251,7 +1280,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 32, "launcher.settings.clock.duck"),
+            ("clock", 33, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1495,7 +1524,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 21);
+        assert_eq!(inventory.controls.len(), 22);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

@@ -3,7 +3,7 @@
 //! geometry/material from those cells; it never integrates or edits their poses.
 pub(crate) mod content;
 pub(crate) mod effects;
-mod font;
+pub(crate) mod font;
 #[cfg(test)]
 mod tests;
 

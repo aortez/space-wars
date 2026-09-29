@@ -30,13 +30,17 @@ pub(super) fn render(
         );
     }
     for segment in state.segments() {
-        for cell in digits::cells(segment.id.kind) {
+        for cell in segment.guides() {
             render_square(
                 frame,
-                layout.cell_center(segment.id, *cell),
+                layout.cell_center(segment.id, cell),
                 layout.pitch,
                 0.0,
-                if segment.lit { progress } else { 0.0 },
+                if segment.lit && segment.shape.contains(cell) {
+                    progress
+                } else {
+                    0.0
+                },
                 DigitPalette::default(),
             );
         }

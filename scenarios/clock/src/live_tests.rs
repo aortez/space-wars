@@ -29,6 +29,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             for bits in 0..512 {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
+                        fonts: Default::default(),
                         time_format,
                         show_date: bits % 2 != 0,
                         event_profile,
@@ -124,6 +125,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
     let segments = state.segments().to_vec();
     let counts = (state.body_count(), state.collider_count());
     let settings = ClockSettings {
+        fonts: Default::default(),
         time_format: ClockTimeFormat::TwelveHour,
         show_date: true,
         event_profile: ClockEventProfile::Off,

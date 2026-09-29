@@ -68,12 +68,12 @@ pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
     // followed by preview/Crow/Explosion [4, 14, 15], Marquee/recipe [9, 10], actions [5, 6].
     // Date (13) is beside Rain (12); Up/Down also visit it, since Left/Right
     // on a choice adjusts its value rather than moving focus.
-    let current = current.clamp(0, 15) as usize;
+    let current = current.clamp(0, 16) as usize;
     match action {
-        UiAction::Up => [5, 0, 12, 12, 2, 9, 10, 12, 12, 15, 15, 13, 13, 1, 4, 14][current],
-        UiAction::Down => [1, 13, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 12, 15, 9][current],
-        UiAction::Left => [0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 10, 8, 12, 13, 4, 14][current],
-        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 8, 11, 10, 10, 2, 12, 13, 15, 4][current],
+        UiAction::Up => [5, 0, 12, 12, 2, 9, 10, 12, 12, 15, 15, 13, 13, 16, 4, 14, 1][current],
+        UiAction::Down => [1, 16, 4, 4, 14, 0, 0, 4, 4, 5, 6, 4, 2, 12, 15, 9, 13][current],
+        UiAction::Left => [0, 1, 11, 2, 4, 6, 5, 3, 7, 10, 10, 8, 12, 13, 4, 14, 1][current],
+        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 8, 11, 10, 10, 2, 12, 13, 15, 4, 0][current],
         _ => current as i32,
     }
 }
@@ -106,9 +106,10 @@ mod tests {
         assert_eq!(moved_clock_selection(8, UiAction::Up), 12);
         assert_eq!(moved_clock_selection(7, UiAction::Down), 4);
         assert_eq!(moved_clock_selection(7, UiAction::Up), 12);
-        assert_eq!(moved_clock_selection(1, UiAction::Down), 13);
+        assert_eq!(moved_clock_selection(1, UiAction::Down), 16);
+        assert_eq!(moved_clock_selection(16, UiAction::Down), 13);
         assert_eq!(moved_clock_selection(13, UiAction::Down), 12);
-        assert_eq!(moved_clock_selection(13, UiAction::Up), 1);
+        assert_eq!(moved_clock_selection(13, UiAction::Up), 16);
         assert_eq!(moved_clock_selection(12, UiAction::Down), 2);
         assert_eq!(moved_clock_selection(12, UiAction::Up), 13);
         assert_eq!(moved_clock_selection(4, UiAction::Down), 14);

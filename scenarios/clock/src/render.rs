@@ -290,10 +290,27 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     let progress = t * t * (3.0 - 2.0 * t);
     for segment in state.segments() {
         let anchor = layout.segment_center(segment.id);
-        let (position, angle, brightness) = match segment.representation {
-            SegmentRepresentation::Anchored => (anchor, 0.0, f32::from(segment.lit)),
-            SegmentRepresentation::Disintegrated => (anchor, 0.0, 0.0),
-            SegmentRepresentation::Rigid { position, angle } => (position, angle, 1.0),
+        for cell in segment.guides() {
+            let brightness = if segment.representation == SegmentRepresentation::Anchored
+                && segment.lit
+                && segment.shape.contains(cell)
+            {
+                1.0
+            } else {
+                0.0
+            };
+            render_square(
+                frame,
+                layout.cell_center(segment.id, cell),
+                layout.pitch,
+                0.0,
+                brightness,
+                palette,
+            );
+        }
+        let (position, angle, was_lit, mix) = match segment.representation {
+            SegmentRepresentation::Anchored | SegmentRepresentation::Disintegrated => continue,
+            SegmentRepresentation::Rigid { position, angle } => (position, angle, true, 0.0),
             SegmentRepresentation::Reforming {
                 position,
                 angle,
@@ -301,26 +318,31 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
             } => (
                 position + (anchor - position) * progress,
                 angle * (1.0 - progress),
-                f32::from(was_lit) * (1.0 - progress) + f32::from(segment.lit) * progress,
+                was_lit,
+                progress,
             ),
         };
-        for cell in digits::cells(segment.id.kind) {
-            let center = layout.cell_center(segment.id, *cell);
-            if segment.representation == SegmentRepresentation::Anchored {
-                render_square(frame, center, layout.pitch, 0.0, brightness, palette);
-            } else {
-                // Keep a faint clock outline while the illuminated bars move.
-                render_square(frame, center, layout.pitch, 0.0, 0.0, palette);
-                if brightness > 0.0 {
-                    render_square(
-                        frame,
-                        position + (center - anchor).rotate_radians(angle),
-                        layout.pitch,
-                        angle,
-                        brightness,
-                        palette,
-                    );
-                }
+        let previous = if matches!(
+            segment.representation,
+            SegmentRepresentation::Reforming { .. }
+        ) {
+            segment.previous_shape
+        } else {
+            segment.shape
+        };
+        for cell in crate::fonts::CellMask(previous.0 | segment.shape.0).cells() {
+            let brightness = f32::from(was_lit && previous.contains(cell)) * (1.0 - mix)
+                + f32::from(segment.lit && segment.shape.contains(cell)) * mix;
+            if brightness > 0.0 {
+                let center = layout.cell_center(segment.id, cell);
+                render_square(
+                    frame,
+                    position + (center - anchor).rotate_radians(angle),
+                    layout.pitch,
+                    angle,
+                    brightness,
+                    palette,
+                );
             }
         }
     }

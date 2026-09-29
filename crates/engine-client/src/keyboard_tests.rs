@@ -560,6 +560,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), None);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 16);
+    key(&window, Key::DownArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 13);
     key(&window, Key::Return);
     assert_eq!(adjusted.get(), Some((13, 1)));
@@ -607,8 +609,13 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     adjusted.set(None);
     click(&window, 175.0, 110.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
-    click(&window, 649.0, 110.0);
+    click(&window, 537.0, 110.0);
     assert_eq!(adjusted.get(), Some((1, 1)));
+    let fonts_opened = Rc::new(Cell::new(false));
+    let opened = Rc::clone(&fonts_opened);
+    window.on_clock_fonts_open(move || opened.set(true));
+    click(&window, 649.0, 110.0);
+    assert!(fonts_opened.get());
     click(&window, 649.0, 166.0);
     assert_eq!(adjusted.get(), Some((13, 1)));
     click(&window, 529.0, 166.0);
@@ -622,7 +629,7 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.set_launcher_visible(true);
     window.set_launcher_settings_visible(true);
     assert!(window.get_launcher_clock_digit_slide_enabled());
-    click(&window, 728.0, 168.0);
+    click(&window, 480.0, 168.0);
     assert!(window.get_launcher_clock_show_date());
     assert_eq!(window.get_launcher_settings_focus_index(), 12);
     click(&window, 649.0, 220.0);

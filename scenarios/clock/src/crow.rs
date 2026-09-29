@@ -5,7 +5,7 @@ use engine_common::{ClockCrowState, ClockEventKind};
 use engine_core::Vec2;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{SegmentRepresentation, SegmentState, digits, layout::Layout};
+use crate::{SegmentRepresentation, SegmentState, layout::Layout};
 
 pub const CROW_TICKS: u64 = 22 * 60;
 const FLIGHT_TICKS: u64 = 100;
@@ -41,9 +41,9 @@ fn perches(
         .iter()
         .filter(|s| s.lit && s.representation == SegmentRepresentation::Anchored)
     {
-        for cell in digits::cells(segment.id.kind) {
+        for cell in segment.cells() {
             let index = usize::from(segment.id.digit_slot) * 6 + cell.x as usize;
-            let feet = layout.cell_center(segment.id, *cell) + Vec2::new(0.0, layout.pitch * 0.4);
+            let feet = layout.cell_center(segment.id, cell) + Vec2::new(0.0, layout.pitch * 0.4);
             if result[index].is_none_or(|old| feet.y > old.feet.y) {
                 result[index] = Some(Perch {
                     key: [segment.id.digit_slot, cell.x as u8, cell.y as u8],

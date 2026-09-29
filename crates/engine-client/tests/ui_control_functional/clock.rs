@@ -5,6 +5,75 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn clock_fonts_save_live_choices_and_survive_restart() {
+    use engine_common::ClockFont;
+    run_functional_test("clock-fonts", |harness| {
+        let page = harness.wait_until_ready();
+        let page = harness.activate_until_scenario("clock", page);
+        let page = harness.activate_guarded("launcher.settings", &page);
+        let page =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        let page = harness.activate_guarded("launcher.settings.clock.fonts", &page);
+        assert_eq!(page.screen, UiScreen::LauncherClockFonts);
+        let page = harness.activate_guarded("clock.fonts.select.sans", &page);
+        let page = harness.activate_guarded("clock.fonts.pool.classic", &page);
+        let page = harness.activate_guarded("clock.fonts.pool.matrix", &page);
+        let page = harness.activate_guarded("clock.fonts.rotate", &page);
+        assert_eq!(control_value(&page, "clock.fonts.rotate"), Some("On"));
+        harness.capture_screenshot("clock-font-picker.png");
+        let page = harness.activate_guarded("clock.fonts.back", &page);
+        harness.activate_guarded("launcher.settings.start", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let initial = harness.clock_state();
+        assert_eq!(initial.active_font, ClockFont::Sans);
+        assert_eq!(
+            initial.settings.fonts.pool.fonts().collect::<Vec<_>>(),
+            vec![ClockFont::Sans, ClockFont::Serif]
+        );
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = harness.activate_guarded("pause.clock.fonts", &page);
+        assert_eq!(page.screen, UiScreen::PauseClockFonts);
+        let pending = harness.activate_guarded("clock.fonts.select.serif", &page);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockFonts, pending.revision);
+        let changed = harness.clock_state();
+        assert_eq!(changed.active_font, ClockFont::Serif);
+        assert_eq!(changed.settings.fonts.selected, ClockFont::Serif);
+        assert!(changed.paused);
+        assert_eq!(harness.clock_state(), changed);
+        let pending = harness.activate_guarded("clock.fonts.pool.sans", &page);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockFonts, pending.revision);
+        assert!(
+            !page
+                .controls
+                .iter()
+                .find(|c| c.id == "clock.fonts.pool.serif")
+                .unwrap()
+                .enabled
+        );
+        let pending = harness.activate_guarded("clock.fonts.rotate", &page);
+        let page = harness.wait_clock_screen(UiScreen::PauseClockFonts, pending.revision);
+        let expected = harness.clock_state();
+        assert!(!expected.settings.fonts.rotate);
+        let page = harness.activate_guarded("clock.fonts.back", &page);
+        let page = harness.activate_guarded("pause.clock.back", &page);
+        harness.activate_guarded("pause.restart", &page);
+        harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert_eq!(restarted.settings, expected.settings);
+        assert_eq!(restarted.active_font, ClockFont::Serif);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, expected.settings);
+        harness.capture_screenshot("clock-serif-restarted.png");
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn explosion_controls_pause_recovery_and_restart_preserve_settings() {
     run_functional_test("clock-explosion", |harness| {
         let state = harness.wait_until_ready();
@@ -271,6 +340,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         // D-pad reaches Marquee and its recipe without triggering gameplay.
         for expected in [
             "pause.clock.event-profile",
+            "pause.clock.fonts",
             "pause.clock.show-date",
             "pause.clock.rain",
             "pause.clock.falling",
@@ -603,6 +673,8 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         let page = harness.press_guarded(UiAction::Confirm, &menu);
         assert_eq!(page.screen, UiScreen::PauseClock);
         let page = harness.press_guarded(UiAction::Down, &page);
+        let page = harness.press_guarded(UiAction::Down, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.fonts"));
         let page = harness.press_guarded(UiAction::Down, &page);
         assert_eq!(
             page.selected_control.as_deref(),
@@ -1310,10 +1382,15 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         assert_eq!(harness.clock_state().duck, paused.duck);
-        // Four event switches and the preview are accessible using a D-pad.
-        let mut page = harness.press_guarded(UiAction::Down, &page);
-        page = harness.press_guarded(UiAction::Down, &page);
-        page = harness.press_guarded(UiAction::Down, &page);
+        // The event switches remain reachable past the font and date controls.
+        let mut page = page;
+        for expected in ["event-profile", "fonts", "show-date", "rain", "falling"] {
+            page = harness.press_guarded(UiAction::Down, &page);
+            assert_eq!(
+                page.selected_control,
+                Some(format!("pause.clock.{expected}"))
+            );
+        }
         for _ in 0..3 {
             page = harness.press_guarded(UiAction::Right, &page);
         }

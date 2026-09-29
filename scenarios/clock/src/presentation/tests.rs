@@ -210,6 +210,7 @@ fn clock_geometry_has_stable_routes_and_reuses_its_buffer() {
     // The perimeter is a deliberate clockwise walk, independent of segment
     // storage ordering. All twenty positions occur exactly once on an eight.
     content.update_clock(DisplaySnapshot {
+        font: engine_common::ClockFont::Classic,
         digits: [Some(8), None, None, None],
         colon_lit: false,
         meridiem: None,

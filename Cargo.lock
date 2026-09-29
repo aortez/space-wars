@@ -4615,6 +4615,7 @@ dependencies = [
  "engine-core",
  "engine-rapier",
  "engine-water",
+ "fontdue",
  "rand",
  "serde",
  "serde_json",

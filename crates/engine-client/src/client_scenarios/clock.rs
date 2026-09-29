@@ -76,6 +76,7 @@ fn create(
     }
     let mut state = ClockScenario::init(
         ClockConfig {
+            fonts: settings.clock.fonts,
             aspect_ratio: viewport.aspect_ratio(),
             water_lab: scenario_clock::ClockWaterLab::from_override(
                 std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
@@ -198,6 +199,7 @@ impl ClientScenario for ClockClientScenario {
             scenario_revision: 0, // Stamped by the host, not the scenario.
             paused: false,
             settings: self.state.settings(),
+            active_font: self.state.active_font(),
             profile: match self.state.event_profile() {
                 engine_common::ClockEventProfile::Off => "off",
                 engine_common::ClockEventProfile::Calm => "calm",

@@ -11,9 +11,11 @@ use serde::{
 };
 
 mod activity_settings;
+mod clock_font;
 mod clock_message;
 mod controller;
 pub use activity_settings::{AutostartSettings, MatchSettings};
+pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
 pub mod render;
 
@@ -316,6 +318,7 @@ pub enum ClockTimeFormat {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClockSettings {
+    pub fonts: ClockFontSettings,
     pub time_format: ClockTimeFormat,
     /// Optional local weekday/date in the Clock's upper band; off in old settings.
     pub show_date: bool,

@@ -180,6 +180,8 @@ enum UiScreenArg {
     LauncherControllers,
     #[value(name = "launcher.settings")]
     LauncherSettings,
+    #[value(name = "launcher.clock-fonts")]
+    LauncherClockFonts,
     #[value(name = "launcher.controls")]
     LauncherControls,
     #[value(name = "launcher.touch-test")]
@@ -200,6 +202,8 @@ enum UiScreenArg {
     PauseControls,
     #[value(name = "pause.clock")]
     PauseClock,
+    #[value(name = "pause.clock-fonts")]
+    PauseClockFonts,
     #[value(name = "game-over")]
     GameOver,
 }
@@ -214,6 +218,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::LauncherAutostart => Self::LauncherAutostart,
             UiScreenArg::LauncherControllers => Self::LauncherControllers,
             UiScreenArg::LauncherSettings => Self::LauncherSettings,
+            UiScreenArg::LauncherClockFonts => Self::LauncherClockFonts,
             UiScreenArg::LauncherControls => Self::LauncherControls,
             UiScreenArg::LauncherTouchTest => Self::LauncherTouchTest,
             UiScreenArg::Gameplay => Self::Gameplay,
@@ -224,6 +229,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::PauseControllers => Self::PauseControllers,
             UiScreenArg::PauseControls => Self::PauseControls,
             UiScreenArg::PauseClock => Self::PauseClock,
+            UiScreenArg::PauseClockFonts => Self::PauseClockFonts,
             UiScreenArg::GameOver => Self::GameOver,
         }
     }

@@ -20,7 +20,7 @@ use crate::{
 pub const WARNING_TICKS: u64 = 36;
 pub const BURST_TICKS: u64 = 210;
 pub const EXPLOSION_TICKS: u64 = WARNING_TICKS + BURST_TICKS + REFORMING_TICKS;
-pub const MAX_EXPLOSION_CELLS: usize = 96 + meridiem::MAX_CELLS;
+pub const MAX_EXPLOSION_CELLS: usize = crate::fonts::MAX_DIGIT_CELLS + meridiem::MAX_CELLS;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Cell {
@@ -106,9 +106,9 @@ impl ExplosionEvent {
         for segment in context.segments.iter().filter(|s| s.lit) {
             let origin = layout.digit_origin(segment.id.digit_slot as usize);
             let center = Vec2::new(origin.x + 3.0 * layout.pitch, origin.y + 4.5 * layout.pitch);
-            for cell in digits::cells(segment.id.kind) {
+            for cell in segment.cells() {
                 add(
-                    layout.cell_center(segment.id, *cell),
+                    layout.cell_center(segment.id, cell),
                     center,
                     layout.pitch * 0.8,
                     false,

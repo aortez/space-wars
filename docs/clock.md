@@ -82,9 +82,8 @@ away for a marquee.
 
 Both render adapters use the same bounded geometry: four translucent shells per
 emitting cell, plus a fixed surround and two corner lights. There is no blur
-buffer, lighting simulation, new collider or settings migration. Font selection
-and sampled font glyphs remain a separate follow-up; this pass keeps the existing
-seven-segment geometry.
+buffer, lighting simulation or new collider for the lighting. Classic retains
+the original seven-segment geometry; additional faces are described below.
 
 These are display-free captures through the production renderer and native text
 overlay, not device screenshots:
@@ -140,6 +139,57 @@ and these doorway captures come from the device:
 | Entrance lifted | Entrance closed flush |
 | --- | --- |
 | ![Hinged wall lifted on HyperPixel](screenshots/clock/hyperpixel-hinged-door-open.png) | ![Wall closed flush on HyperPixel](screenshots/clock/hyperpixel-hinged-door-closed.png) |
+
+## Clock fonts
+
+Open **Fonts** from Clock settings or the live Clock controls. The picker has
+rendered previews for **Classic** (the original seven-segment face), **Matrix**
+(pixel digits), **Sans** and **Serif**. The latter two sample bundled DejaVu
+outline fonts into the same 6×9 cell grid at build time. The device renders the
+resulting masks without decoding fonts at runtime. Font sources and license
+are in [scenarios/clock/fonts](../scenarios/clock/fonts/README.md).
+
+Choose a face for a fixed display. **Include** chooses the faces eligible for
+**Rotate each minute**; the last included face cannot be removed. Rotation
+avoids repeating the current face when multiple choices remain. It uses a
+separate seeded random stream, so changing the font pool does not change the
+automatic event sequence. Changes wait until any active timed effect finishes.
+The preview shows each face immediately, even while an effect is paused.
+
+Launcher choices save when starting Clock. Live choices save as they apply and
+survive restart. Existing settings default to Classic with rotation off. The
+saved `[clock.fonts]` table contains `selected`, `rotate` and a nonempty list
+`pool`, using the names `classic`, `matrix`, `sans`, and `serif`. This catalog
+does not yet include importing user-supplied font files.
+
+All digit effects, collision shapes, collecting rain ledges and marquee time
+content consume the same glyph masks. Falling retains seven stable pieces per
+digit; Explosion and Meltdown have room for all 216 grid cells plus AM/PM.
+Denser rain faces reserve space for their maximum lit-cell release and batch
+runoff proportionally, retaining the 512-parcel ceiling. Heavy-rain tests cover
+all faces, three layouts and three seeds through a wet time change, checking
+full delivery, water conservation and bounded source backpressure.
+
+| Font picker, 800×480 | Serif face, 800×480 |
+| --- | --- |
+| ![Clock font picker fixture](screenshots/clock/hyperpixel-font-picker-fixture.png) | ![Sampled Serif clock fixture](screenshots/clock/hyperpixel-serif-clock-fixture.png) |
+
+These are production-renderer fixtures. Regenerate all four faces and the
+picker at 800×480, 1024×768 and 480×800 with:
+
+```sh
+SPACEWARS_FONT_ARTIFACTS=/tmp/clock-fonts \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  clock_fonts_picker_and_faces_render_and_select_across_device_layouts
+```
+
+The display-backed functional test
+`clock_fonts_save_live_choices_and_survive_restart` exercises the picker from
+both entry points, pool editing, rotation, live application and saved restart.
+Public UI screens are `launcher.clock-fonts` and `pause.clock-fonts`, with
+`clock.fonts.select.{name}`, `clock.fonts.pool.{name}`, `clock.fonts.rotate`, and
+`clock.fonts.back` controls. Clock state reports `active_font` separately from
+the configured `settings.fonts`, since a timed effect can delay application.
 
 ## Optional weekday and date
 
@@ -455,7 +505,7 @@ This is one-way coupling: the duck does not displace water yet, and falling
 parcels do not directly push it. Future player/bot forces can be applied at the
 same physical-body boundary without replacing the flotation model.
 
-The event uses **320 columns, at most 512 water parcels, and one dynamic body**:
+With Classic, the event uses **320 columns, at most 512 water parcels, and one dynamic body**:
 128 floor columns plus 192 digit columns; 192 parcel slots are protected for
 atomic digit retirement. With a duck there are four bodies/five colliders: one
 duck, two persistent moving panels and a fixed pair of side walls. The rigid
@@ -860,7 +910,7 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 10; `NextEvent`
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 11; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1725,11 +1775,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **19** and reports scenario-instance revision,
+`clock state` uses schema version **20** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -1807,18 +1857,19 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 18 and
-older requests are rejected. The internal Clock action payload is version 10;
+after completion or cancellation. Use matching client/CLI builds: schema 19 and
+older requests are rejected. The internal Clock action payload is version 11;
 event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
 little-endian u16 switch mask (bits 0–8, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
-and 1–32 message bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–9
+font ID, rotation (0/1) and nonempty four-bit font-pool bytes, and 1–32 message
+bytes. Reading actions contain either three time bytes or those
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–10
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 19, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 20, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1835,7 +1886,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 19, `event`
+tick. A raw `clock trigger` request must include schema version 20, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, or `explosion`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

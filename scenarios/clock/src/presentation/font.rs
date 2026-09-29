@@ -1,5 +1,5 @@
 //! Tiny code-native 5x7 font. No platform font or texture dependency.
-pub(super) fn glyph(byte: u8) -> Option<[u8; 7]> {
+pub(crate) fn glyph(byte: u8) -> Option<[u8; 7]> {
     Some(match byte.to_ascii_uppercase() {
         b' ' => [0; 7],
         b'A' => [14, 17, 17, 31, 17, 17, 17],
