@@ -23,8 +23,8 @@ recenter the clock. AM/PM remains just below the face's right edge. Digit cell
 sizes and horizontal spacing retain the previous responsive size budget.
 
 A shaded header and wooden base occupy the top and bottom **8%** of the display.
-The floor was previously 16% high; its actual surface, colliders, course anchors and water
-beds now move down together. The upper band is a decorative **rain canopy**, not
+The floor was previously 16% high; its actual surface, colliders, course anchors
+and water beds moved down together. The upper band is a decorative **rain canopy**, not
 a solid ceiling or another water pool. Finite rain parcels start beneath its
 underside, with room for their initial streak/drop extent; amount, cadence and
 parcel limits are unchanged. Marquee content clips inside the two bands, while
@@ -44,8 +44,9 @@ SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-layout \
 
 Tests check centered face pixels, equal band heights, wooden floor openings,
 AM/PM clearance, unchanged cell sizes, rain emission below the canopy, and event
-framing in both render adapters. The earlier floor-height change altered the arena geometry, so identical seeds can have
-different duck/hazard encounters; see the centered-arena checkpoint below.
+framing in both render adapters. The earlier floor-height change altered the
+arena geometry, so identical seeds can have different duck/hazard encounters;
+see the centered-arena checkpoint below.
 
 Real-device captures from **sw-picade-2** (1024×768, release build):
 
@@ -104,7 +105,22 @@ The refinement passed 275 scenario tests (four ignored) and all 63 client clock
 tests, including both render adapters, portrait layouts, door motion, shared
 water and floor recovery.
 
-**Device validation (2026-09-28):** Release `fc9da2e` was built with Yocto and
+**Refinement device validation (2026-09-28):** Release `b2e525f` was built with
+Yocto and fast-deployed to `spacewars.local`. The installed client, running
+executable and CLI matched the exported bundle; the client SHA-256 begins
+`dca8d69fdea8b837`. The service remained on PID 22365 with zero unexpected
+restarts and reported 60.1 FPS / 60.1 UPS. All saved preferences were unchanged.
+Live captures verified the unified floor and course material, lifting flap and
+flush closure. Both outer 10-pixel side rails in the
+[closed-entrance capture](screenshots/clock/hyperpixel-refined-door-closed.png)
+match the normal clock capture exactly. Clock was left running in Demo mode
+with the date visible.
+
+| Refined clock on device | Matching course and open flap on device |
+| --- | --- |
+| ![Refined wooden clock on HyperPixel](screenshots/clock/hyperpixel-refined-clock-device.png) | ![Matching wooden course and open wall flap](screenshots/clock/hyperpixel-refined-door-open.png) |
+
+**Initial device validation (2026-09-28):** Release `fc9da2e` was built with Yocto and
 fast-deployed to `spacewars.local` (800×480, raster 2×). The installed client,
 running executable and matching CLI hashes matched the exported bundle. The
 service stayed on PID 21998 with zero unexpected restarts; a later live Duck
