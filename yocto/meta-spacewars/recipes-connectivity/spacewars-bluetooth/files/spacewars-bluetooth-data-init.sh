@@ -6,10 +6,10 @@ umask 077
 mountpoint -q /data || { echo "Bluetooth persistence requires mounted /data" >&2; exit 1; }
 source=/var/lib/bluetooth
 destination=/data/bluetooth
-[ ! -L "$source" ] && [ ! -L "$destination" ] || {
+if [ -L "$source" ] || [ -L "$destination" ]; then
     echo "Refusing symlinked Bluetooth state directories" >&2
     exit 1
-}
+fi
 install -d -m 0700 "$source"
 
 if [ ! -e "$destination" ]; then
