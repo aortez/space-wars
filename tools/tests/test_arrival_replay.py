@@ -162,6 +162,25 @@ class ArrivalReplayTests(unittest.TestCase):
         plan['parked_clearance'] = -.02
         self.assertEqual(A.solar_sign(plan),'unsafe')
 
+    def test_capture_projection_derives_visit_and_selected_site_from_full_source(self):
+        site = dict(id=dict(planet=2,bearing=31),position=dict(x=1.,y=2.))
+        pilot = dict(tick=12,owner='player_1',vehicle=0,spaceling=1,location={'aboard':0},ship={},
+                     ship_form='ship',ship_health=80.,transfers=0,planet={},sites=[site],queries_ready=True)
+        mission = dict(policy='v13',goal='capture',target=2,replans=0,completed_sorties=0,capture={},
+            events=[dict(kind='selected',planet=2,tick=5),dict(kind='selected',planet=1,tick=8),
+                    dict(kind='arrived',planet=2,tick=11)],goal_since=11)
+        raw = dict(source=dict(pilot=pilot,mission=mission,selected=dict(site=site['id'])),milestones=dict(choice=12))
+        original = copy.deepcopy(raw)
+        projected = A.capture_projection(raw)
+        self.assertEqual(raw,original)
+        self.assertEqual(projected['source']['mission']['visit_tick'],5)
+        self.assertEqual(projected['source']['selected_site'],site)
+        self.assertEqual(projected['source']['pilot']['ship_health'],80.)
+        self.assertEqual(projected['milestones'],dict(choice=12))
+        self.assertNotIn('queries_ready',projected['source']['pilot'])
+        raw['source']['selected']['site'] = dict(planet=2,bearing=33)
+        with self.assertRaises(StopIteration): A.capture_projection(raw)
+
     def test_followthrough_controls_are_bounded_at_transfer_without_hiding_boundary_corruption(self):
         with tempfile.TemporaryDirectory() as tmp:
             case,_,root = C.pair_fixture(Path(tmp))
