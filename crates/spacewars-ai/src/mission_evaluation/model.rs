@@ -110,7 +110,7 @@ pub(super) fn route_cadence_gap(o: &MissionObservationV1, sample: &LocalEvidence
         })
 }
 
-pub(super) fn no_flag_costs() -> PhaseCosts {
+pub(crate) fn no_flag_costs() -> PhaseCosts {
     PhaseCosts {
         landing: 17.866_667,
         exit: 1.0 / 60.0,

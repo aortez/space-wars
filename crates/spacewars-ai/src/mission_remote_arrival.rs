@@ -1,5 +1,6 @@
 //! Conditional solar screening of source-measured remote sites. No future
 //! survey, acquisition duration, enemy forecast or landing permission is implied.
+use super::arrival_local::ArrivalLocalReport;
 use crate::{landing_safety, mission_evaluation::MAX_EVIDENCE_AGE};
 use engine_core::Vec2;
 use scenario_spacewars::{
@@ -60,6 +61,10 @@ pub struct RemoteArrivalScreen {
     pub unknown: Option<&'static str>,
     pub acquisition: &'static str,
     pub future_threat: &'static str,
+    /// Separately charged, opt-in conditional medians. Never changes this
+    /// screen's solar completion/charge accounting or old local cost evidence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_reference: Option<ArrivalLocalReport>,
 }
 
 #[derive(Clone)]
@@ -72,6 +77,7 @@ pub(super) struct ArrivalScreenJob {
 pub(super) struct ArrivalScreenContext {
     sun: Option<SolarHazard>,
     earliest: Option<u64>,
+    local_claims: Vec<scenario_spacewars::surface_sortie::PlanetClaimObservation>,
 }
 impl ArrivalScreenContext {
     pub fn new(o: &MissionObservationV1, jobs: &[ArrivalScreenJob]) -> Self {
@@ -84,6 +90,19 @@ impl ArrivalScreenContext {
                 .filter(|s| s.unknown.is_none())
                 .filter_map(|s| s.source.measurement.as_ref().map(|m| m.tick))
                 .min(),
+            local_claims: jobs
+                .iter()
+                .filter(|j| {
+                    j.report.unknown.is_none()
+                        && j.report
+                            .local_reference
+                            .as_ref()
+                            .is_some_and(|r| r.unknown.is_none())
+                })
+                .filter_map(|j| j.report.source_planet.as_ref())
+                .filter(|p| super::arrival_local::neutral_claim(p))
+                .filter_map(|p| p.claim.clone())
+                .collect(),
         }
     }
     pub fn matches(&self, o: &MissionObservationV1) -> bool {
@@ -92,6 +111,21 @@ impl ArrivalScreenContext {
             && self
                 .earliest
                 .is_none_or(|t| tick >= t && tick - t <= MAX_EVIDENCE_AGE)
+    }
+
+    pub fn local_claims_match(&self, o: &MissionObservationV1) -> bool {
+        self.local_claims.iter().all(|source| {
+            o.planets
+                .iter()
+                .find(|p| p.index == source.planet)
+                .is_some_and(|p| {
+                    super::arrival_local::neutral_claim(p)
+                        && p.claim.as_ref().is_some_and(|c| {
+                            c.stage_required_seconds == source.stage_required_seconds
+                                && c.flag_interaction_range == source.flag_interaction_range
+                        })
+                })
+        })
     }
 }
 
@@ -111,6 +145,7 @@ impl ArrivalScreenJob {
             unknown: None,
             acquisition: "requires fresh native survey; choice and duration unknown",
             future_threat: "unmodeled; source cover and opponent are historical only",
+            local_reference: None,
         };
         report.unknown = if o.local.sun.is_some() != o.sun.is_some()
             || o.local
@@ -180,12 +215,27 @@ impl ArrivalScreenJob {
         }
     }
 
+    pub fn with_local_reference(mut self, policy: &'static str, o: &MissionObservationV1) -> Self {
+        self.report.local_reference = Some(ArrivalLocalReport::new(policy, o));
+        self.reject_unavailable_reference();
+        self
+    }
+
+    fn reject_unavailable_reference(&mut self) {
+        if let Some(reference) = &mut self.report.local_reference
+            && let Some(reason) = self.report.unknown
+        {
+            reference.reject(reason);
+        }
+    }
+
     pub fn begin(&mut self, local: Option<TacticalSortieObservationV1>) {
         let Some(local) = local else {
             self.report
                 .unknown
                 .get_or_insert("conditional arrival unavailable");
             self.report.complete = true;
+            self.reject_unavailable_reference();
             return;
         };
         let p = &local.combat.recovery.flight.pilot;
@@ -211,6 +261,7 @@ impl ArrivalScreenJob {
                 .unknown
                 .get_or_insert("conditional arrival frame incompatible");
             self.report.complete = true;
+            self.reject_unavailable_reference();
             return;
         }
         self.report.arrival = Some(RemoteArrivalFrame {
@@ -241,10 +292,21 @@ impl ArrivalScreenJob {
             }
         }
         self.local = Some(local);
-        self.report.complete = !self.has_work();
+        self.report.complete = !self.has_solar_work();
+        self.reject_unavailable_reference();
     }
 
     pub fn has_work(&self) -> bool {
+        self.has_solar_work()
+            || (self.report.complete
+                && self
+                    .report
+                    .local_reference
+                    .as_ref()
+                    .is_some_and(|r| !r.complete))
+    }
+
+    fn has_solar_work(&self) -> bool {
         self.local.is_some()
             && self.report.unknown.is_none()
             && self
@@ -257,6 +319,12 @@ impl ArrivalScreenJob {
     /// One charged graph operation per site/direction. At most four sites and
     /// two directions; solar assessment itself has fixed bounded sampling.
     pub fn step(&mut self) {
+        if !self.has_solar_work() {
+            let mut reference = self.report.local_reference.take().unwrap();
+            reference.step(&self.report);
+            self.report.local_reference = Some(reference);
+            return;
+        }
         let site = self
             .report
             .sites
@@ -284,7 +352,7 @@ impl ArrivalScreenJob {
             solar_clear,
         });
         self.report.charged_graph += 1;
-        self.report.complete = !self.has_work();
+        self.report.complete = !self.has_solar_work();
     }
 }
 
@@ -375,3 +443,7 @@ fn project(
 #[cfg(test)]
 #[path = "mission_remote_arrival_tests.rs"]
 pub(super) mod tests;
+
+#[cfg(test)]
+#[path = "mission_arrival_local_tests.rs"]
+mod local_reference_tests;

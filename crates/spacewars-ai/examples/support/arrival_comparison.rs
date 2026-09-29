@@ -36,6 +36,7 @@ pub(super) struct ArrivalComparisonRun {
     queue: TransferComparisonQueue,
     actors: [Actor; 2],
     measured: bool,
+    local_reference: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
@@ -43,13 +44,26 @@ pub(super) struct ArrivalComparisonRun {
 
 impl ArrivalComparisonRun {
     pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
+        let local_reference = match crate::arg("--arrival-local-reference", "off").as_str() {
+            "off" => false,
+            "on" => true,
+            _ => panic!("--arrival-local-reference must be off or on"),
+        };
         let measured = match crate::arg("--compare-surveyed-arrival", "none").as_str() {
-            "none" => return None,
+            "none" => {
+                assert!(
+                    !local_reference,
+                    "arrival-local reference requires a fresh arrival comparison"
+                );
+                return None;
+            }
             "empty" => false,
             "measured" => true,
             _ => panic!("--compare-surveyed-arrival must be none, empty or measured"),
         };
-        Some(Self::new(out, seed, measured))
+        let mut run = Self::new(out, seed, measured);
+        run.local_reference = local_reference;
+        Some(run)
     }
 
     fn new(out: &Path, seed: u64, measured: bool) -> Self {
@@ -70,6 +84,7 @@ impl ArrivalComparisonRun {
                 }
             }),
             measured,
+            local_reference: false,
             work: BufWriter::new(
                 File::create(out.join("surveyed-arrival-comparison.jsonl")).unwrap(),
             ),
@@ -176,7 +191,13 @@ impl ArrivalComparisonRun {
         if let Some(before) = before {
             source.environment = environment.as_ref().ok().map(|e| json!(e));
             match environment.and_then(|e| {
-                self.queue.submit_comparison_with_retained_remote_arrival(
+                let submit = if self.local_reference {
+                    TransferComparisonQueue::submit_comparison_with_arrival_local_reference
+                } else {
+                    TransferComparisonQueue::submit_comparison_with_retained_remote_arrival
+                };
+                submit(
+                    &mut self.queue,
                     &before,
                     actual,
                     o,
@@ -265,14 +286,18 @@ impl ArrivalComparisonRun {
                 })
             })
             .collect();
-        json!({"schema":1,"queue":"surveyed_arrival_comparison","observational":true,
+        let mut report = json!({"schema":1,"queue":"surveyed_arrival_comparison","observational":true,
             "mode":if self.measured {"measured"} else {"empty"},"actors":actors,
             "submitted":self.queue.submitted_total,"completed":self.queue.completed_total,
             "cancelled":self.queue.cancelled_total,"charged_graph":self.queue.charged_total,
             "physics_queries":0,"max_source_age_ticks":MAX_RESULT_AGE,
             "observation":crate::timing(self.observation_ms.clone()),
             "dispatch":crate::timing(self.dispatch_ms.clone()),
-            "scope":"First charged survey attempt only, including negatives. New source on next real pre-intent tick, with historical measurement age one; invalid or missed sources never retry. Raw candidate status and actual measurement epochs preserved. Separate queue/token namespace, shared graph residual after playing and original comparison, no new physical queries. No playing input, evaluator, ranker, original source or unavailable cost is updated. Published reports remain historical after cancellation."})
+            "scope":"First charged survey attempt only, including negatives. New source on next real pre-intent tick, with historical measurement age one; invalid or missed sources never retry. Raw candidate status and actual measurement epochs preserved. Separate queue/token namespace, shared graph residual after playing and original comparison, no new physical queries. No playing input, evaluator, ranker, original source or unavailable cost is updated. Published reports remain historical after cancellation."});
+        if self.local_reference {
+            report["arrival_local_reference"] = json!(true);
+        }
+        report
     }
 }
 
@@ -569,6 +594,7 @@ mod tests {
         let seed = 13100125988314582075;
         let (_, _, _, path) = fixture("two-jobs", true);
         let mut run = ArrivalComparisonRun::new(&path, seed, true);
+        run.local_reference = true;
         let mut state = SurfaceSortieScenario::init_material_arena(seed);
         state.enable_match_rules();
         let mut bots: [_; 2] = std::array::from_fn(|seat| {
