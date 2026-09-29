@@ -90,7 +90,8 @@ def score(report, trace):
                 sampled_errors=samples, invalid_prediction_samples=invalid_samples)
 
 
-def audit_forecast(case, probe, source_control, trace):
+def audit_forecast(case, probe, source_control, trace, *, model='guided_transfer_forecast_v1'):
+    assert model in {'guided_transfer_forecast_v1', 'guided_transfer_forecast_body_v2'}
     forecast = probe['forecast']
     assert forecast is not None
     observation = source_control['observation']
@@ -120,7 +121,7 @@ def audit_forecast(case, probe, source_control, trace):
         return dict(score(report, trace), unknown=forecast['unknown'], charged_graph=0,
                     construction_ms=forecast['construction_ms'], prediction_ms=forecast['prediction_ms'])
     assert probe['source']['nomination']['accepted'] and environment is not None and forecast['unknown'] is None
-    assert report['model'] == 'guided_transfer_forecast_v1'
+    assert report['model'] == model
     assert report['source_tick'] == case['source_tick'] and report['destination'] == case['destination']
     assert report['horizon_ticks'] == 3600
     ticks = report['ticks']

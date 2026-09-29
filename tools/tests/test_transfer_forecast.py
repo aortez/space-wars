@@ -36,6 +36,16 @@ def fixture():
 
 
 class ForecastAudit(unittest.TestCase):
+    def test_body_model_requires_explicit_selection(self):
+        case, probe, control, trace = fixture()
+        probe['forecast']['report']['model'] = 'guided_transfer_forecast_body_v2'
+        with self.assertRaises(AssertionError):
+            F.audit_forecast(case, probe, control, trace)
+        F.audit_forecast(case, probe, control, trace, model='guided_transfer_forecast_body_v2')
+        for model in ['guided_transfer_forecast_v1', 'typo']:
+            with self.assertRaises(AssertionError):
+                F.audit_forecast(case, probe, control, trace, model=model)
+
     def test_scores_only_two_completed_endpoints(self):
         case, probe, control, trace = fixture()
         result = F.audit_forecast(case, probe, control, trace)

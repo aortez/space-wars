@@ -1566,24 +1566,21 @@ fn debris_collision_groups(owner_id: Option<usize>, armed: bool) -> CollisionGro
     CollisionGroups::new(GROUP_DEBRIS, filter)
 }
 
+#[cfg(test)]
 fn ship_local_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
-    let pivot = ship_pivot(ship.form);
+    ship_local_triangles_for(ship.form, ship.wing_theta)
+}
+
+fn ship_local_triangles_for(form: ShipForm, wing_theta: f32) -> Vec<[Vec2; 3]> {
+    let pivot = ship_pivot(form);
     let centered = |points: [Vec2; 3]| points.map(|point| point - pivot);
-    if ship.form == ShipForm::EscapePod {
+    if form == ShipForm::EscapePod {
         return POD_TRIANGLES.map(centered).to_vec();
     }
 
     vec![
-        centered(rotate_points(
-            SHIP_LEFT_WING,
-            SHIP_WING_PIVOT,
-            ship.wing_theta,
-        )),
-        centered(rotate_points(
-            SHIP_RIGHT_WING,
-            SHIP_WING_PIVOT,
-            -ship.wing_theta,
-        )),
+        centered(rotate_points(SHIP_LEFT_WING, SHIP_WING_PIVOT, wing_theta)),
+        centered(rotate_points(SHIP_RIGHT_WING, SHIP_WING_PIVOT, -wing_theta)),
         centered(SHIP_WING_MOUNT),
         centered(SHIP_THRUSTER),
         centered(SHIP_BODY),
@@ -1671,7 +1668,11 @@ fn surface_ship_colliders(
 /// ship parts. A single collider prevents overlapping decorative triangles from
 /// producing several solver impulses for one impact.
 pub(super) fn ship_collision_hull(ship: &ShipState) -> Vec<Vec2> {
-    let mut points = ship_local_triangles(ship)
+    ship_collision_hull_for(ship.form, ship.wing_theta)
+}
+
+pub(super) fn ship_collision_hull_for(form: ShipForm, wing_theta: f32) -> Vec<Vec2> {
+    let mut points = ship_local_triangles_for(form, wing_theta)
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();

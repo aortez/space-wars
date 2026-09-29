@@ -8,6 +8,45 @@ use scenario_spacewars::surface_sortie::{
 
 const DT: f32 = 1.0 / 60.0;
 
+/// Optional transfer model. Other callers retain the original point-mass motor.
+/// Cache only the hull centroid: controls and motion are never cached here.
+#[derive(Clone, Default)]
+pub(crate) struct BodyOriginMotor {
+    center: Option<(f32, Vec2)>,
+}
+
+impl BodyOriginMotor {
+    pub(crate) fn advance(
+        &mut self,
+        motion: &mut PilotMotion,
+        sweep: &mut f32,
+        intent: FlightIntent,
+        frame_velocity: Vec2,
+        gravity: Vec2,
+    ) -> FlightControlLimits {
+        let before = *motion;
+        let limits = advance_motor(motion, sweep, intent, frame_velocity, gravity);
+        let center = match self.center {
+            Some((previous, center)) if previous == *sweep => center,
+            _ => {
+                let center =
+                    scenario_spacewars::surface_sortie::flight::ship_local_center_of_mass(*sweep);
+                self.center = Some((*sweep, center));
+                center
+            }
+        };
+        // Wing replacement preserves origin velocity before the command. Both
+        // lever arms therefore use the new hull, not the previous wing shape.
+        let old_offset = center.rotate_radians(before.angle);
+        let new_offset = center.rotate_radians(motion.angle);
+        let tangent = |v: Vec2| Vec2::new(-v.y, v.x);
+        let old_rotation = tangent(old_offset) * before.spin;
+        motion.position += old_offset - new_offset + old_rotation * DT;
+        motion.velocity += old_rotation - tangent(new_offset) * motion.spin;
+        limits
+    }
+}
+
 pub(crate) fn advance_motor(
     motion: &mut PilotMotion,
     sweep: &mut f32,
