@@ -191,6 +191,31 @@ Public UI screens are `launcher.clock-fonts` and `pause.clock-fonts`, with
 `clock.fonts.back` controls. Clock state reports `active_font` separately from
 the configured `settings.fonts`, since a timed effect can delay application.
 
+**Font validation (2026-09-28):** The affected common, water, Clock, client,
+control and CLI suites passed 892 tests. Four display-backed workflows also
+passed: font selection/persistence, general live controls, Marquee and Duck.
+The production-renderer fixtures cover all four faces in three layouts.
+
+Release `b25e8a7` was built with Yocto and fast-deployed to `spacewars.local`
+(800×480, raster 2×). The installed client, running executable and CLI matched
+the bundle; the client SHA-256 begins `42f9a3acfa08d901`, and the CLI SHA-256
+begins `a1f792edd6bef229`. The service remained on PID 22697 with zero unexpected
+restarts. The live picker and Serif face were captured, and Matrix ran Heavy
+Rain at approximately 60 FPS / 60 UPS (59.8 during the shower, 60.1 during
+drainage). Selecting Classic while Rain was active preserved Matrix until the
+effect completed, then restored Classic. The final idle sample reported 60.1
+FPS / 60.1 UPS. These are device smoke checks, not a sustained benchmark.
+
+Every pre-existing saved setting matched the backup after verification. Only
+the default `clock.fonts` table was added. Clock was left running with Classic,
+rotation off, Demo events and the date visible.
+
+| Font picker on the device | Sampled Serif on the device |
+| --- | --- |
+| ![Font picker on HyperPixel](screenshots/clock/hyperpixel-font-picker-device.png) | ![Serif clock on HyperPixel](screenshots/clock/hyperpixel-serif-clock-device.png) |
+
+[Matrix with Heavy Rain on the device](screenshots/clock/hyperpixel-matrix-rain-device.png).
+
 ## Optional weekday and date
 
 Enable **Clock → Scenario Settings → Show Date**, or **Pause → Clock Controls →
@@ -301,7 +326,8 @@ not a generalized blast/damage field, water conversion, or chain reaction.
 The canopy stays decorative: upward launch speed is limited for headroom,
 without adding an invisible ceiling collider.
 
-At most **119 cells** exist (96 digit cells plus 23 label pixels). Standalone
+At most **239 cells** exist (216 digit-grid cells plus 23 label pixels); Classic
+uses at most 119. Standalone
 events use four fixed floor/wall bodies and the existing center drain. With a
 duck, the cells instead enter its **existing mechanics world**, which advances
 once per tick. Debris can hit the duck; controller ownership and motion continue.
@@ -571,7 +597,7 @@ Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
 out and back in. They never fabricate a different clock reading. This preview
 works even with the switch/profile Off and is reported as `preview: true`.
 
-Falling releases the illuminated seven-segment bars as compound rigid
+Falling releases the illuminated digit pieces as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
 with the arena floor, side walls, and each other. The floor's center drain opens
 for the event and closes after reforming. Dim anchor cells remain visible behind the action.
@@ -613,8 +639,8 @@ an event take effect at recovery too: 12→24 fades/removes the old label, while
 24→12 introduces the new label as the face reforms. The water-lab previews keep
 their live, anchored face and fixed source volume.
 
-The standalone Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
-AM/PM pixels), **128 columns and 192 spill parcels**, with no Rapier bodies.
+The standalone Meltdown ceiling is **239 cells** (216 digit-grid cells plus at most 23
+AM/PM pixels; Classic uses at most 119), **128 columns and 192 spill parcels**, with no Rapier bodies.
 The additional 64 parcel slots accommodate water released by retracting floor
 edges as well as ordinary overflow. Optional impact spray is reduced once 32
 parcels are live; its volume goes to the bank/gap rather than being deleted.
@@ -1014,7 +1040,7 @@ forces and steps. Coupling is **one-way buoyancy/drag**, not displacement,
 pressure, parcel/duck collision, or a second fluid simulation. Water and rendering
 derive from the same immutable course slabs; geometry is copied only at visit/event
 boundaries. No per-tick geometry allocations or second Rapier world are added.
-At most seven course pools plus 96 digit pools use at most 327 water columns and
+At most seven course pools plus 216 digit pools use at most 567 water columns and
 the existing 512-parcel budget. Starting/replacing/ending Rain preserves a live
 duck; dismissing/falling/exiting preserves Rain and its course. A new visit can
 reuse that wet course. Rain finishing with no player releases the last floor claim.
@@ -1056,8 +1082,9 @@ or invincibility rules are introduced. A knock into a gap can still end the visi
 The shared world steps **once** per fixed tick, including entry, reset and the
 event's first/final ticks. The duck keeps its calibrated gravity and jump; a
 per-body gravity scale preserves Falling's existing 400-unit acceleration across
-display sizes. The batch adds at most **30 bodies / 119 colliders**, for a total
-of at most **39 / 128** with the largest course. IDs occupy separate bounded
+display sizes. The batch adds at most **30 bodies / 239 colliders**, for a total
+of at most **39 / 248** with the largest course. Classic retains its 119-collider
+batch limit. IDs occupy separate bounded
 namespaces; geometry and the body-ID list are allocated at event boundaries,
 not rebuilt each tick. Rendering reads the same body poses used for contacts.
 
@@ -1110,8 +1137,9 @@ conversion. Pooled water supplies the player's existing buoyancy/current drag
 and joystick paddling. The coupling remains one-way, with no fluid displacement
 or liquid/block collision model.
 
-The event adds at most **119 bodies/colliders**, for a shared maximum of
-**128 / 128** on a course, or **123 / 123** on responsive panels. Water uses
+The event adds at most **239 bodies/colliders**, for a shared maximum of
+**248 / 248** on a course, or **243 / 243** on responsive panels. Classic retains
+its 119-cell limit. Water uses
 at most **135 course columns** (128 on panels) and **192 parcels**. Metadata is
 bounded and compacted in place; local contact queries allocate no history or
 world-wide contact list. Each world steps once per fixed tick, including entry,
@@ -1663,7 +1691,7 @@ latest face and drop temporary content.
 
 The Clock-local `presentation/` module separates content generation from effects.
 Cells have immutable positions, glyph pivots, and stable lighting-route positions.
-Seven-segment clock content and the code-native 5×7 font feed the same recipe
+The selected clock-face glyphs and the code-native 5×7 text font feed the same recipe
 sampler. The font accepts up to **32 ASCII bytes / 1,120 cells**, supports letters,
 digits and basic punctuation, folds lowercase, and rejects empty, oversized, or
 unsupported text. The default message is **SPACE WARS**. The shared
