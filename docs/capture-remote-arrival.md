@@ -124,6 +124,10 @@ replacement, with explicit identity and age checks, so distant alternatives can
 be screened too. Acquisition delay and future threat remain separate open
 questions before these observations can influence live destination selection.
 
+The subsequent [bounded retention study](capture-remote-retention.md) recovers
+the four missing raw references and extends screening to distant conditional
+arrivals without changing live controls or old comparison results.
+
 The [tracked results](data/capture-remote-arrival-v1.json) preserve every command,
 source record, projected site, direction, unknown, publication tick, work count
 and the 312 raw file hashes. The complete raw summary is
