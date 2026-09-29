@@ -1,4 +1,7 @@
 //! Opt-in source comparisons, with one shared residual allowance for both seats.
+#[path = "arrival_comparison.rs"]
+mod arrival_comparison;
+
 use engine_core::planning::{JobPoll, RequestToken, Work};
 use scenario_spacewars::{
     PlayerId,
@@ -40,6 +43,47 @@ struct Source {
     retained: Option<RemoteSurveySnapshot>,
 }
 
+impl Source {
+    fn record(&mut self, queue: &mut TransferComparisonQueue, tick: u64) {
+        if let Some(token) = self.token {
+            if let JobPoll::Ready(report) = queue.poll(token, tick)
+                && self.published.is_none()
+            {
+                self.published = Some(report.clone());
+                self.published_state = queue
+                    .state(PlayerId::from_index(token.actor as usize).unwrap())
+                    .cloned();
+            }
+            if let Some(snapshot) = queue.snapshot(token, tick) {
+                self.last_snapshot = Some(snapshot);
+                self.last_snapshot_tick = Some(tick);
+            }
+        }
+    }
+
+    fn progress(&self, queue: &TransferComparisonQueue, seat: usize) -> Value {
+        json!({
+            "seat":seat, "state":queue.state(PlayerId::from_index(seat).unwrap()),
+            "rejected":self.rejected,"snapshot_tick":self.last_snapshot_tick,
+            "ranked":self.last_snapshot.as_ref().map(|r| r.ranked),
+            "candidates":self.last_snapshot.as_ref().map(|r| r.candidates.iter().map(|c| json!({
+                "destination":c.destination,"unknown":c.unknown,
+                "charged_graph":c.forecast.as_ref().map_or(0, |f| f.charged_graph),
+                "end":c.forecast.as_ref().and_then(|f| f.end),
+            })).collect::<Vec<_>>()),
+        })
+    }
+
+    fn report(&self, queue: &TransferComparisonQueue, seat: usize) -> Value {
+        json!({
+            "seat":seat,"source_tick":self.tick,"attempted":self.attempted,"environment":self.environment,
+            "rejected":self.rejected,"initial":self.initial,"last_snapshot":self.last_snapshot,
+            "last_snapshot_tick":self.last_snapshot_tick,"published":self.published,"published_state":self.published_state,
+            "final_state":queue.state(PlayerId::from_index(seat).unwrap()),
+        })
+    }
+}
+
 pub struct TransferComparisonRun {
     queue: TransferComparisonQueue,
     sources: [Option<Source>; 2],
@@ -51,12 +95,18 @@ pub struct TransferComparisonRun {
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
     arrival_survey: Option<super::arrival_survey::ArrivalSurveyRun>,
+    arrival_comparison: Option<arrival_comparison::ArrivalComparisonRun>,
 }
 
 impl TransferComparisonRun {
     pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
         let specification = super::arg("--compare-transfer-sources", "none");
         let arrival_survey = super::arrival_survey::ArrivalSurveyRun::from_args(out);
+        let arrival_comparison = arrival_comparison::ArrivalComparisonRun::from_args(out, seed);
+        assert!(
+            arrival_comparison.is_none() || arrival_survey.is_some(),
+            "surveyed arrival comparison needs predicted-arrival surveys"
+        );
         let neutral_timing = super::arg("--compare-neutral-timing", "false")
             .parse::<bool>()
             .unwrap();
@@ -137,6 +187,7 @@ impl TransferComparisonRun {
             observation_ms: Vec::new(),
             dispatch_ms: Vec::new(),
             arrival_survey,
+            arrival_comparison,
         })
     }
 
@@ -147,6 +198,9 @@ impl TransferComparisonRun {
         o: &MissionObservationV1,
         live: Option<&super::live_planning::LivePlanningRun>,
     ) -> Option<MaterialMissionPilot> {
+        if let Some(comparison) = &mut self.arrival_comparison {
+            comparison.before_intent(bot, seat, o);
+        }
         let source = self.sources[seat].as_mut().filter(|s| !s.attempted)?;
         let tick = o.local.combat.recovery.flight.pilot.tick;
         let remote = (self.remote_arrival && (source.memory.is_some() || source.tick == tick))
@@ -171,6 +225,9 @@ impl TransferComparisonRun {
         o: &MissionObservationV1,
         evaluator: &MissionEvaluator,
     ) {
+        if let Some(comparison) = &mut self.arrival_comparison {
+            comparison.observe(actual, state, o, evaluator);
+        }
         let p = &o.local.combat.recovery.flight.pilot;
         let seat = p.owner.index();
         let Some(source) = &mut self.sources[seat] else {
@@ -260,9 +317,14 @@ impl TransferComparisonRun {
         remaining: Work,
         busy: &[usize],
     ) -> f64 {
-        self.arrival_survey
-            .as_mut()
-            .map_or(0.0, |s| s.advance(state, remaining, busy))
+        let Some(survey) = &mut self.arrival_survey else {
+            return 0.0;
+        };
+        let (ms, attempts) = survey.advance(state, remaining, busy);
+        if let Some(comparison) = &mut self.arrival_comparison {
+            comparison.receive(attempts);
+        }
+        ms
     }
 
     pub fn advance(&mut self, tick: u64, playing_remaining: Work) -> f64 {
@@ -278,36 +340,21 @@ impl TransferComparisonRun {
         let start = Instant::now();
         let allocation = self.queue.advance(tick, remaining).unwrap();
         for source in self.sources.iter_mut().flatten() {
-            if let Some(token) = source.token {
-                if let JobPoll::Ready(report) = self.queue.poll(token, tick)
-                    && source.published.is_none()
-                {
-                    source.published = Some(report.clone());
-                    source.published_state = self
-                        .queue
-                        .state(PlayerId::from_index(token.actor as usize).unwrap())
-                        .cloned();
-                }
-                if let Some(snapshot) = self.queue.snapshot(token, tick) {
-                    source.last_snapshot = Some(snapshot);
-                    source.last_snapshot_tick = Some(tick);
-                }
-            }
+            source.record(&mut self.queue, tick);
         }
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
-        let progress: Vec<_> = self.sources.iter().enumerate().filter_map(|(seat, source)| {
-            source.as_ref().filter(|s| s.attempted).map(|source| json!({
-                "seat":seat, "state":self.queue.state(PlayerId::from_index(seat).unwrap()),
-                "rejected":source.rejected,"snapshot_tick":source.last_snapshot_tick,
-                "ranked":source.last_snapshot.as_ref().map(|r| r.ranked),
-                "candidates":source.last_snapshot.as_ref().map(|r| r.candidates.iter().map(|c| json!({
-                    "destination":c.destination,"unknown":c.unknown,
-                    "charged_graph":c.forecast.as_ref().map_or(0, |f| f.charged_graph),
-                    "end":c.forecast.as_ref().and_then(|f| f.end),
-                })).collect::<Vec<_>>()),
-            }))
-        }).collect();
+        let progress: Vec<_> = self
+            .sources
+            .iter()
+            .enumerate()
+            .filter_map(|(seat, source)| {
+                source
+                    .as_ref()
+                    .filter(|s| s.attempted)
+                    .map(|source| source.progress(&self.queue, seat))
+            })
+            .collect();
         serde_json::to_writer(
             &mut self.work,
             &json!({"event":"dispatch","tick":tick,
@@ -316,7 +363,9 @@ impl TransferComparisonRun {
         )
         .unwrap();
         writeln!(self.work).unwrap();
-        ms
+        ms + self.arrival_comparison.as_mut().map_or(0.0, |comparison| {
+            comparison.advance(tick, prior_graph, allocation.charged, remaining)
+        })
     }
 
     pub fn finish(&mut self, tick: u64) -> Value {
@@ -326,17 +375,23 @@ impl TransferComparisonRun {
             }
         }
         self.work.flush().unwrap();
-        let sources: Vec<_> = self.sources.iter().enumerate().filter_map(|(seat, s)| s.as_ref().map(|s| {
-            let mut value = json!({
-            "seat":seat,"source_tick":s.tick,"attempted":s.attempted,"environment":s.environment,
-            "rejected":s.rejected,"initial":s.initial,"last_snapshot":s.last_snapshot,
-            "last_snapshot_tick":s.last_snapshot_tick,"published":s.published,"published_state":s.published_state,
-            "final_state":self.queue.state(PlayerId::from_index(seat).unwrap()),
-            });
-            if self.remote_arrival { value["remote_source"] = json!(s.remote); }
-            if self.retain_remote { value["retained_source"] = json!(s.retained); }
-            value
-        })).collect();
+        let sources: Vec<_> = self
+            .sources
+            .iter()
+            .enumerate()
+            .filter_map(|(seat, s)| {
+                s.as_ref().map(|s| {
+                    let mut value = s.report(&self.queue, seat);
+                    if self.remote_arrival {
+                        value["remote_source"] = json!(s.remote);
+                    }
+                    if self.retain_remote {
+                        value["retained_source"] = json!(s.retained);
+                    }
+                    value
+                })
+            })
+            .collect();
         let mut report = json!({"schema":1,"observational":true,"sources":sources,"total_graph_allowance":self.allowance,
             "playing_graph_allowance":PLAYING_GRAPH,"max_source_age_ticks":MAX_RESULT_AGE,
             "submitted":self.queue.submitted_total,"completed":self.queue.completed_total,
@@ -345,6 +400,9 @@ impl TransferComparisonRun {
             "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."});
         if let Some(survey) = &mut self.arrival_survey {
             report["arrival_survey"] = survey.report();
+        }
+        if let Some(comparison) = &mut self.arrival_comparison {
+            report["surveyed_arrival_comparison"] = comparison.finish(tick);
         }
         report
     }
