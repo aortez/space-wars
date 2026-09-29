@@ -10,6 +10,7 @@ use std::{
 
 pub struct FlagSurveyRun {
     pub last_charged: Work,
+    pub physical_actors: Vec<usize>,
     pub planner: FlagSurveyPlanner,
     pub shadow: Option<super::flag_value_shadow::ShadowRun>,
     samples: BufWriter<File>,
@@ -42,6 +43,7 @@ impl FlagSurveyRun {
         );
         enabled.then(|| Self {
             last_charged: Work::default(),
+            physical_actors: Vec::new(),
             planner: FlagSurveyPlanner::new(2),
             shadow: super::flag_value_shadow::ShadowRun::from_args(out),
             samples: BufWriter::new(File::create(out.join("flag-survey.jsonl")).unwrap()),
@@ -54,6 +56,12 @@ impl FlagSurveyRun {
         let start = Instant::now();
         let allocation = self.planner.advance(state, remaining, busy).unwrap();
         self.last_charged = allocation.charged;
+        self.physical_actors = allocation
+            .jobs
+            .iter()
+            .filter(|j| j.charged.physics_queries > 0)
+            .map(|j| j.request.actor as usize)
+            .collect();
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
         serde_json::to_writer(

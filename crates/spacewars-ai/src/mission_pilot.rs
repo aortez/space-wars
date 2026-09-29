@@ -29,7 +29,9 @@ pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferFo
 
 #[path = "mission_transfer_queue.rs"]
 mod transfer_queue;
-pub use transfer_queue::{TransferForecastQueue, TransferForecastState, TransferQueuePhase};
+pub use transfer_queue::{
+    ArrivalSurveyPlan, TransferForecastQueue, TransferForecastState, TransferQueuePhase,
+};
 
 #[path = "mission_transfer_comparison.rs"]
 mod transfer_comparison;
