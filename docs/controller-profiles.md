@@ -6,6 +6,56 @@ The device's current P1/P2 assignment is shown. Select **Use as Player 1** or
 **Use as Player 2** to change it; merely opening settings does not claim a seat.
 A paused game stays paused throughout setup.
 
+## Bluetooth controllers (Linux)
+
+Choose **Bluetooth controllers…** in the same screen. Use the cabinet buttons,
+an already connected controller, keyboard, or touch to complete setup:
+
+1. Put the new controller in pairing mode. Choose **Scan for controllers**.
+   Scanning has a 30-second limit and stops when you leave/start an operation.
+2. Select the controller by name and Bluetooth address, then **Pair and connect**.
+   Keep it awake and nearby. Pairing has a 40-second limit; connection operations
+   have a 15-second limit. **Cancel operation** or **Back** remains available.
+3. Go Back to the ordinary Controllers screen to assign P1/P2 and test buttons.
+   Pairing does not replace an occupied/reserved player slot or remap controls.
+
+Remembered controllers offer **Connect**, **Disconnect**, and **Forget
+controller…**. Forget requires a second confirmation; it removes the Bluetooth
+bond, not button profiles or player preferences. Cancelling a pairing that has
+already completed does not delete that bond; use Forget explicitly if needed.
+Reconnect uses BlueZ's trusted-device behavior; the controller must also wake
+and initiate/accept a connection. It never automatically resumes a paused game.
+Pairing always requests profile connection, even if BlueZ already reports a
+Bluetooth link. A link alone does not mean the gamepad's HID input is ready.
+The device detail shows the current Bluetooth connection separately from the
+last operation's result, updating while this screen is open. Use the ordinary
+Controllers screen to verify input and player assignment.
+Setup operations log their start and outcome in the app log
+(`spacewars-cli logs --lines 80`), without polling or button-event logging.
+
+Only devices identified as game controllers by BlueZ's icon, device class, or
+BLE appearance are listed. If none appear, check input mode and pairing mode,
+then rescan. This first pass supports no-PIN gamepad pairing (including the
+8BitDo Micro's previously tested D mode), not PIN-entry keyboards or general Bluetooth
+accessories. Other operating systems use their own Bluetooth settings; their
+connected controllers still use this app's assignment/mapping UI.
+
+The UI never waits on Bluetooth calls. A bounded background worker and private
+application pairing agent exist only while this panel is open. The agent only
+authorizes the selected controller and HID services. Scanning does not change
+adapter power, global discoverability/pairability, or the default agent, and
+leaving releases only this application's discovery request. The kiosk's BLE
+Wi-Fi provisioner can continue using the same adapter. If the adapter is off,
+missing, or inaccessible, the panel reports it without changing system policy.
+
+BlueZ owns bonds separately from app settings. New Yocto images mount its
+root-only `/data/bluetooth` storage at `/var/lib/bluetooth`; a **full OS update**
+is needed for that persistence service. An app-only fast update adds the UI but
+does not make an older image's pairing keys survive an A/B update. See the
+[first-upgrade caveat](pi-kiosk.md#bluetooth-pairing-storage). Desktop Linux uses
+the system's ordinary BlueZ storage. Physical identity for two identical pads
+is still subject to the model-based assignment limits below.
+
 ## NES button layout
 
 NES Library and Falling translate logical **East (right face button) to NES A**
@@ -139,6 +189,13 @@ and scenario-specific Jump/Run bindings are separate work.
 spacewars-cli ui activate launcher.sound
 spacewars-cli ui activate settings.controllers
 spacewars-cli ui state --json
+# Bluetooth uses the same UI actions (no separate privileged CLI API):
+spacewars-cli ui activate controllers.bluetooth
+spacewars-cli ui activate controllers.bluetooth.scan
+spacewars-cli ui state --json
+# Select the exact controllers.bluetooth.device.<path> ID from that snapshot.
+# Back stops this app's scan and returns to controller assignment.
+spacewars-cli ui activate controllers.back
 # Use the connection ID listed in the snapshot, not a hard-coded cabinet ID:
 spacewars-cli ui activate controllers.device.0
 spacewars-cli ui activate controllers.assign-p1
@@ -185,3 +242,37 @@ isolated settings recovery. Tests drive the real menu callbacks and shared
 sampling gates into the NES controller inputs, verifying independent ports and
 held-button suppression. Unassigned-pad menu routing is tested separately from
 gameplay. The real-app UI workflow checks both launcher and pause entry/reset.
+
+Bluetooth checks require `dbus-daemon` on Linux, but **no radio or controller**:
+
+```sh
+cargo test --locked -p engine-client --bin engine-client --profile ci bluetooth::
+SPACEWARS_BLUETOOTH_ARTIFACTS=/tmp/bluetooth-layouts \
+  cargo test --locked -p engine-client --bin engine-client --profile ci bluetooth_callbacks_focus
+npm --prefix yocto test
+npm --prefix yocto run build -- --target spacewars-bluetooth
+```
+
+The transport test starts a private D-Bus with fake BlueZ, verifying discovery,
+pair/trust/connect, link-connected but HID-disconnected pairing, already-connected
+handling, connection errors, cancellation, and removal without accessing the host
+system bus. Panel tests verify live disconnect/reconnect status after pairing.
+Worker tests use explicit events and injected scan
+deadlines, not real-time waits. They cover closing with queued/pending actions,
+failed discovery cleanup, stale devices, duplicate clicks, and Forget confirmation.
+Rendering/callback tests cover all three cabinet display layouts and preserved
+focus when discovery changes the list. Sandbox migration tests exercise first
+copy, failed-copy retry, old-slot precedence, and keeping forgotten keys deleted.
+
+Before calling the hardware flow verified, test fresh pairing using cabinet or
+touch input, cancel and retry, controller power-off/on reconnect, NES D-pad/A/B,
+two-player assignment, and kiosk reboot/reconnect. A subsequent A/B OS update
+should retain the bond without pairing again. These physical checks are separate
+from the simulated transport tests.
+
+Hardware validation (2026-09-28): on `sw-picade-2`, the 8BitDo Micro in D mode
+successfully paired through the app and became usable without a power cycle.
+Controller wake/reconnect and input were also confirmed manually. The app-only
+deployment preserved existing settings and bonds. The full-image persistence
+service has not yet been deployed there; reboot/A/B-update persistence remains
+a separate hardware check.

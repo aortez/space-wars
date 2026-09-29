@@ -236,7 +236,6 @@ impl GamepadPump {
 
         self.observe_mode(window);
         self.sample_gamepads(window);
-        self.controllers.borrow_mut().tick(window, Instant::now());
         self.observe_mode(window);
         if is_ui_mode(window) && !self.controllers.borrow().captures_input() {
             self.update_ui_navigation(window);

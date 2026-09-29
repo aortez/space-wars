@@ -43,11 +43,15 @@ tempfile = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+async-channel = "2"
+async-io = "2"
+futures-lite = "2"
 
 [build-dependencies]
 slint-build = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "=5.13.2", default-features = false, features = ["async-io"] }
 bytemuck = { version = "1.13.1", features = ["derive"] }
 drm = "0.14.1"
 nix = { version = "0.30.1", default-features = false, features = ["fs", "net", "hostname", "time"] }

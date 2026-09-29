@@ -94,6 +94,11 @@ partition. The image exposes `/data/spacewars/config` as
 `/var/lib/spacewars`; place cartridges in `/var/lib/spacewars/roms` and return
 to the launcher to rescan them.
 
+Bluetooth bonds use separate root-only `/data/bluetooth`, bind-mounted onto
+BlueZ's `/var/lib/bluetooth` before its service starts. This requires a full image
+update, not `--fast`; see the [first-upgrade migration caveat](../docs/pi-kiosk.md#bluetooth-pairing-storage)
+before replacing an older rootfs that already has paired controllers.
+
 Manual image writers must also configure `/boot/spacewars-device.txt`, SSH
 access, and the hostname. A raw image defaults to HDMI, not HyperPixel.
 

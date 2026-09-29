@@ -5,6 +5,7 @@
 //! scenario.
 
 mod autostart;
+mod bluetooth;
 mod client_scenarios;
 mod clock_controls;
 mod controller_assignments;

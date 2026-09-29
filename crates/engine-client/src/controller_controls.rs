@@ -36,6 +36,7 @@ pub(crate) struct Device {
 #[derive(Debug)]
 enum Page {
     Devices,
+    Bluetooth(Box<crate::bluetooth::Panel>),
     Device(usize),
     Identify(Instant),
     Capture {
@@ -66,7 +67,7 @@ impl Page {
             | Self::Review { id, .. }
             | Self::Trial { id, .. }
             | Self::Test { id, .. } => Some(*id),
-            Self::Devices | Self::Identify(_) => None,
+            Self::Devices | Self::Bluetooth(_) | Self::Identify(_) => None,
         }
     }
 
@@ -95,6 +96,7 @@ pub(crate) struct Controllers {
     last_publish: Option<Instant>,
     settings: Arc<RwLock<Settings>>,
     writer: SettingsWriter,
+    timer: slint::Timer,
 }
 
 pub(crate) fn install(
@@ -145,6 +147,7 @@ pub(crate) fn install(
         last_publish: None,
         settings,
         writer,
+        timer: slint::Timer::default(),
     }));
     let weak = window.as_weak();
     let open_state = Rc::clone(&state);
@@ -187,6 +190,19 @@ pub(crate) fn install(
             }
         }
     });
+    // Settings must remain responsive on touch-only systems even if the
+    // physical gamepad backend cannot start. No radio work happens here.
+    let polling = Rc::downgrade(&state);
+    let weak = window.as_weak();
+    state.borrow().timer.start(
+        slint::TimerMode::Repeated,
+        Duration::from_millis(100),
+        move || {
+            if let (Some(state), Some(window)) = (polling.upgrade(), weak.upgrade()) {
+                state.borrow_mut().tick(&window, Instant::now());
+            }
+        },
+    );
     state
 }
 
@@ -390,6 +406,9 @@ impl Controllers {
             return;
         }
         self.expire(now);
+        if let Page::Bluetooth(panel) = &mut self.page {
+            panel.poll();
+        }
         if self
             .last_publish
             .is_none_or(|last| now.duration_since(last) >= Duration::from_millis(100))
@@ -424,6 +443,14 @@ impl Controllers {
         }
         self.status.clear();
         if command == "controllers.back" {
+            if let Page::Bluetooth(panel) = &mut self.page {
+                if panel.back() {
+                    self.change_page(Page::Devices);
+                }
+                window.set_controllers_focus_index(0);
+                self.publish(window, now);
+                return;
+            }
             match self.page {
                 Page::Devices => {
                     self.visible = false;
@@ -431,9 +458,15 @@ impl Controllers {
                     window.set_controllers_visible(false);
                     window.set_sound_focus_index(7);
                 }
-                Page::Device(_) | Page::Identify(_) => self.change_page(Page::Devices),
+                Page::Device(_) | Page::Bluetooth(_) | Page::Identify(_) => {
+                    self.change_page(Page::Devices)
+                }
                 _ => self.change_page(Page::Device(self.page.device().unwrap())),
             }
+        } else if command == "controllers.bluetooth" {
+            self.change_page(Page::Bluetooth(Box::new(crate::bluetooth::Panel::new())));
+        } else if let Page::Bluetooth(panel) = &mut self.page {
+            panel.command(command);
         } else if command == "controllers.identify" {
             self.change_page(Page::Identify(now + Duration::from_secs(20)));
         } else if command == "controllers.reset-players" {
@@ -563,6 +596,12 @@ impl Controllers {
                     add("controllers.identify", "Identify by pressing a button");
                 }
                 add("controllers.reset-players", "Reset player assignments");
+                add("controllers.bluetooth", "Bluetooth controllers…");
+            }
+            Page::Bluetooth(panel) => {
+                for (id, label) in panel.rows() {
+                    add(&id, &label);
+                }
             }
             Page::Device(_) => {
                 add("controllers.assign-p1", "Use as Player 1");
@@ -594,14 +633,16 @@ impl Controllers {
     fn publish(&mut self, window: &MainWindow, now: Instant) {
         self.last_publish = Some(now);
         let device = self.page.device().and_then(|id| self.devices.get(&id));
-        window.set_controllers_subtitle(
+        window.set_controllers_subtitle(if matches!(self.page, Page::Bluetooth(_)) {
+            "Bluetooth controllers".into()
+        } else {
             device
                 .map_or_else(
                     || "Player assignments · button mappings".into(),
                     |device| format!("{} · {}", seat_label(device), device.name),
                 )
-                .into(),
-        );
+                .into()
+        });
         window.set_controllers_hint(
             match self.page {
                 Page::Capture { .. } => "Press and release · Esc / touch Cancel",
@@ -620,6 +661,7 @@ impl Controllers {
                 .div_ceil(1000)
         };
         let text = match &self.page {
+            Page::Bluetooth(panel) => panel.detail(),
             Page::Devices => {
                 let hint = if self.devices.is_empty() {
                     "Connect a controller. Keyboard and touch still work."
@@ -686,8 +728,17 @@ impl Controllers {
         let rows = self.rows();
         let old = window.get_controllers_rows();
         if old.row_count() != rows.len() || old.iter().zip(&rows).any(|(a, b)| a != *b) {
+            // Discovery/hotplug must not move a user's highlighted device to
+            // another controller while they are about to confirm.
+            let selected = usize::try_from(window.get_controllers_focus_index())
+                .ok()
+                .and_then(|index| old.row_data(index))
+                .map(|row| row.id);
+            let focus = selected
+                .and_then(|id| rows.iter().position(|row| row.id == id))
+                .unwrap_or(0);
             window.set_controllers_rows(ModelRc::new(VecModel::from(rows)));
-            window.set_controllers_focus_index(0);
+            window.set_controllers_focus_index(focus as i32);
         }
     }
 }
@@ -1019,5 +1070,169 @@ mod tests {
             .borrow_mut()
             .observe(1, &raw, &held, None, now + Duration::from_secs(2));
         assert!(matches!(state.borrow().page, Page::Device(1)));
+    }
+
+    #[test]
+    fn bluetooth_callbacks_focus_and_layouts_work_without_a_radio_or_player_changes() {
+        use crate::bluetooth::{self, Inventory, Panel, View};
+        use slint::{PhysicalSize, Rgb8Pixel, SharedPixelBuffer};
+
+        struct RenderPlatform(Rc<MinimalSoftwareWindow>);
+        impl Platform for RenderPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(self.0.clone())
+            }
+        }
+        let adapter = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
+        slint::platform::set_platform(Box::new(RenderPlatform(adapter.clone()))).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.show().unwrap();
+        window.set_launcher_visible(true);
+        window.set_sound_visible(true);
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        let settings = Arc::new(RwLock::new(Settings::default()));
+        let state = install(
+            &window,
+            settings.clone(),
+            SettingsWriter::new(path.clone()).unwrap(),
+            crate::input::new_shared_input().1,
+        );
+        state.borrow_mut().connect(device(0));
+        window.invoke_controllers_open();
+        assert!(
+            state
+                .borrow()
+                .rows()
+                .iter()
+                .any(|r| r.id == "controllers.bluetooth")
+        );
+        let output =
+            std::env::var_os("SPACEWARS_BLUETOOTH_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(path) = &output {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        let selected = "controllers.bluetooth.device./pad";
+        let remembered = View {
+            inventory: Inventory {
+                adapter: Some("/adapter".into()),
+                devices: vec![bluetooth::Device {
+                    id: "/pad".into(),
+                    adapter: "/adapter".into(),
+                    name: "8BitDo Micro gamepad".into(),
+                    address: "00:11:22:33:44:55".into(),
+                    paired: true,
+                    connected: true,
+                }],
+            },
+            status: "Choose a remembered controller, or scan to add one.".into(),
+            ..View::default()
+        };
+        for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+            adapter.set_size(PhysicalSize::new(width, height));
+            let (panel, latest, commands) = Panel::simulated(remembered.clone());
+            state
+                .borrow_mut()
+                .change_page(Page::Bluetooth(Box::new(panel)));
+            state.borrow_mut().publish(&window, Instant::now());
+            let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            for stage in [
+                "devices",
+                "selected",
+                "disconnected",
+                "reconnected",
+                "forget",
+                "busy",
+            ] {
+                match stage {
+                    "selected" => window.invoke_controllers_command(selected.into()),
+                    "disconnected" | "reconnected" => {
+                        {
+                            let mut view = latest.lock().unwrap();
+                            view.inventory.devices[0].connected = stage == "reconnected";
+                            view.status = "Last action: Pair and connect completed.".into();
+                        }
+                        if let Page::Bluetooth(panel) = &mut state.borrow_mut().page {
+                            panel.poll();
+                        }
+                        state.borrow_mut().publish(&window, Instant::now());
+                    }
+                    "forget" => {
+                        window.invoke_controllers_command("controllers.bluetooth.forget".into())
+                    }
+                    "busy" => window
+                        .invoke_controllers_command("controllers.bluetooth.confirm-forget".into()),
+                    _ => {}
+                }
+                slint::platform::update_timers_and_animations();
+                adapter.request_redraw();
+                adapter.draw_if_needed(|renderer| {
+                    renderer.render(pixels.make_mut_slice(), width as usize);
+                });
+                assert!(
+                    pixels
+                        .as_slice()
+                        .iter()
+                        .filter(|p| p.r > 150 && p.g > 150 && p.b > 150)
+                        .count()
+                        > 300
+                );
+                if let Some(output) = &output {
+                    crate::thruster_visual_tests::write_png(
+                        &output.join(format!("bluetooth-{width}x{height}-{stage}.png")),
+                        &pixels,
+                    );
+                }
+            }
+            assert!(
+                matches!(commands.try_recv(), Ok(bluetooth::Command::Act(bluetooth::Action::Forget, id)) if id == "/pad")
+            );
+            window.invoke_controllers_command("controllers.back".into());
+            assert!(
+                commands.is_closed(),
+                "Back cancels a pending operation without waiting"
+            );
+            assert!(matches!(state.borrow().page, Page::Devices));
+            assert_eq!(state.borrow().seat(0), Some(0));
+            assert!(
+                settings
+                    .read()
+                    .unwrap()
+                    .controls
+                    .controller_profiles
+                    .is_empty()
+            );
+            assert!(
+                !path.exists(),
+                "pairing UI must not persist or change assignments/mappings"
+            );
+
+            // A newly discovered device must not change the highlighted target.
+            let (panel, latest, _commands) = Panel::simulated(remembered.clone());
+            state
+                .borrow_mut()
+                .change_page(Page::Bluetooth(Box::new(panel)));
+            state.borrow_mut().publish(&window, Instant::now());
+            window.set_controllers_focus_index(1);
+            let mut updated = remembered.clone();
+            updated.inventory.devices.insert(
+                0,
+                bluetooth::Device {
+                    id: "/another_pad".into(),
+                    name: "Another controller".into(),
+                    ..updated.inventory.devices[0].clone()
+                },
+            );
+            *latest.lock().unwrap() = updated;
+            if let Page::Bluetooth(panel) = &mut state.borrow_mut().page {
+                panel.poll();
+            }
+            state.borrow_mut().publish(&window, Instant::now());
+            let index = window.get_controllers_focus_index() as usize;
+            assert_eq!(
+                window.get_controllers_rows().row_data(index).unwrap().id,
+                selected
+            );
+        }
     }
 }
