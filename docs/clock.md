@@ -90,6 +90,27 @@ The [portrait fixture](screenshots/clock/portrait-framed-clock-fixture.png) cove
 480×800. Regenerate date-visible captures with `SPACEWARS_CALENDAR_ARTIFACTS` and
 the `clock_calendar_date_renders_in_band_through_native_text_overlay` test below.
 
+**Device validation (2026-09-28):** Release `fc9da2e` was built with Yocto and
+fast-deployed to `spacewars.local` (800×480, raster 2×). The installed client,
+running executable and matching CLI hashes matched the exported bundle. The
+service stayed on PID 21998 with zero unexpected restarts; a later live Duck
+sample reported 60.1 FPS / 60.1 UPS. The client SHA-256 begins
+`47e710a9c3b1cec0`, and the CLI SHA-256 begins `64fcae9a1decd1a0`.
+
+Live captures verified the entrance swing, flush closure and mirrored exit,
+including the exit during overlapping Rain. Both outer 10-pixel side rails in
+the closed-entrance capture match the normal clock capture pixel-for-pixel.
+Every existing saved preference was preserved. The newer settings format added
+default Crow/Explosion switches and the controller-profile field. Clock was
+left running in its original Demo mode with the date visible.
+
+The [normal clock capture](screenshots/clock/hyperpixel-framed-clock-device.png)
+and these doorway captures come from the device:
+
+| Entrance lifted | Entrance closed flush |
+| --- | --- |
+| ![Hinged wall lifted on HyperPixel](screenshots/clock/hyperpixel-hinged-door-open.png) | ![Wall closed flush on HyperPixel](screenshots/clock/hyperpixel-hinged-door-closed.png) |
+
 ## Optional weekday and date
 
 Enable **Clock → Scenario Settings → Show Date**, or **Pause → Clock Controls →
