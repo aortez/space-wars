@@ -6,7 +6,7 @@ use engine_core::planning::{
     JobLimits, JobPhase, JobPoll, PlanningJob, PlanningQueue, PlanningReport, RequestToken, Work,
 };
 use scenario_spacewars::surface_sortie::{
-    LandingPhase, SpacelingId, VehicleId, mission::MissionBoundary,
+    LandingPhase, SpacelingId, VehicleId, mission::LandingSurveyCadence, mission::MissionBoundary,
     transfer_environment::TransferEnvironment,
 };
 use std::collections::BTreeMap;
@@ -52,6 +52,7 @@ enum SourceKind {
 
 #[derive(Clone)]
 struct Source {
+    scan_neutral_domains: Option<Vec<bool>>,
     survey_blocked: Option<&'static str>,
     local_reference: Option<crate::mission_evaluation::LocalReferenceContext>,
     neutral_reference: Option<crate::mission_evaluation::NeutralTimingContext>,
@@ -92,6 +93,7 @@ impl Source {
     ) -> Self {
         let p = &o.local.combat.recovery.flight.pilot;
         Self {
+            scan_neutral_domains: None,
             survey_blocked: arrival_survey::blocked(o),
             local_reference: None,
             neutral_reference: None,
@@ -263,6 +265,14 @@ impl Source {
         if !environment.matches_source(o) {
             return Err("environment observation mismatch");
         }
+        if self.scan_neutral_domains.as_ref().is_some_and(|domains| {
+            domains
+                .iter()
+                .zip(&o.planets)
+                .any(|(neutral, p)| *neutral != arrival_local::neutral_claim(p))
+        }) {
+            return Err("scan clock neutral claim domain changed");
+        }
         if self
             .local_reference
             .as_ref()
@@ -316,6 +326,7 @@ struct Slot {
 /// from charged prediction work. Missing ticks cancel; there is no catch-up.
 #[derive(Clone)]
 pub struct TransferForecastQueue<J: PlanningJob = TransferForecastJob> {
+    scan_cadence: Option<LandingSurveyCadence>,
     queue: PlanningQueue<(), J>,
     actors: BTreeMap<u64, Slot>,
     capacity: usize,
@@ -336,6 +347,10 @@ impl TransferForecastQueue {
     ) -> Result<RequestToken, &'static str> {
         let job =
             bot.forecast_nominated_transfer(o, environment.clone(), transfer_forecast::MAX_TICKS)?;
+        let job = match self.scan_cadence {
+            Some(cadence) => job.with_scan_clock(cadence),
+            None => job,
+        };
         let source = Source::read(bot, o, environment.clone(), SourceKind::Nominated);
         self.submit_job(bot, o, environment, contact, job, source)
     }
@@ -439,6 +454,7 @@ impl TransferForecastQueue<TransferComparisonJob> {
             return Err("retained survey snapshot identity or observation mismatch");
         }
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_scan_clock(self.scan_cadence)
             .with_retained_remote_arrival(o, retained, &environment);
         let job = match mode {
             ArrivalReferenceMode::Off => job,
@@ -469,6 +485,7 @@ impl TransferForecastQueue<TransferComparisonJob> {
         >,
     ) -> Result<RequestToken, &'static str> {
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_scan_clock(self.scan_cadence)
             .with_remote_arrival(o, cover, &environment);
         let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
         source.local_reference = Some(job.local_context(o));
@@ -488,6 +505,7 @@ impl TransferForecastQueue<TransferComparisonJob> {
         contact: Option<bool>,
     ) -> Result<RequestToken, &'static str> {
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_scan_clock(self.scan_cadence)
             .with_neutral_timing(actual, o);
         let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
         source.local_reference = Some(job.local_context(o));
@@ -506,7 +524,8 @@ impl TransferForecastQueue<TransferComparisonJob> {
         environment: TransferEnvironment,
         contact: Option<bool>,
     ) -> Result<RequestToken, &'static str> {
-        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?;
+        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
+            .with_scan_clock(self.scan_cadence);
         let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
         source.local_reference = Some(job.local_context(o));
         self.submit_job(actual, o, environment, contact, job, source)
@@ -523,8 +542,20 @@ impl TransferForecastQueue<TransferComparisonJob> {
 }
 
 impl<J: PlanningJob> TransferForecastQueue<J> {
+    /// Opt-in diagnostics for subsequently submitted jobs. The host must use
+    /// this same cadence for native observations. Reset preserves the setting.
+    pub fn with_scan_clock(mut self, cadence: LandingSurveyCadence) -> Self {
+        assert_eq!(
+            self.submitted_total, 0,
+            "configure scan clock before submission"
+        );
+        self.scan_cadence = Some(cadence);
+        self
+    }
+
     pub fn new(capacity: usize) -> Self {
         Self {
+            scan_cadence: None,
             queue: PlanningQueue::new(capacity),
             actors: BTreeMap::new(),
             capacity,
@@ -561,6 +592,10 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
     ) -> Result<RequestToken, &'static str> {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
+        if self.scan_cadence.is_some() {
+            source.scan_neutral_domains =
+                Some(o.planets.iter().map(arrival_local::neutral_claim).collect());
+        }
         if self.last_advance.is_some_and(|tick| tick >= p.tick) {
             return Err("submission must precede dispatch");
         }

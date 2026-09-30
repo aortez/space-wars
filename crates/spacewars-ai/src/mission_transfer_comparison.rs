@@ -89,6 +89,10 @@ pub struct TransferComparisonReport {
     pub capture_costs: Vec<CaptureCostComposition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neutral_timing_costs: Option<Vec<NeutralTimingComposition>>,
+    /// A separate conditional reference when both optional scan scheduling and
+    /// arrival-local evidence are enabled. It never fills ordinary trip costs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_scan_success: Option<Vec<FirstScanSuccessReport>>,
 }
 
 #[derive(Clone)]
@@ -100,6 +104,22 @@ pub struct TransferComparisonJob {
 }
 
 impl TransferComparisonJob {
+    pub(super) fn with_scan_clock(
+        mut self,
+        cadence: Option<scenario_spacewars::surface_sortie::mission::LandingSurveyCadence>,
+    ) -> Self {
+        if let Some(cadence) = cadence {
+            for (candidate, job) in self.report.candidates.iter_mut().zip(&mut self.jobs) {
+                if let Some(forecast) = job.take() {
+                    let forecast = forecast.with_scan_clock(cadence);
+                    candidate.forecast = Some(forecast.report().clone());
+                    *job = Some(forecast);
+                }
+            }
+        }
+        self
+    }
+
     pub(super) fn new(
         before: &MaterialMissionPilot,
         actual: &MaterialMissionPilot,
@@ -161,6 +181,7 @@ impl TransferComparisonJob {
                 preferred_handoffs: Vec::new(),
                 capture_costs: Vec::new(),
                 neutral_timing_costs: None,
+                first_scan_success: None,
             },
             jobs: Vec::with_capacity(MAX_CANDIDATES),
             cursor: 0,
@@ -399,6 +420,21 @@ impl TransferComparisonJob {
             .iter()
             .map(TransferCandidateForecast::compose)
             .collect();
+        let conditional: Vec<_> = self
+            .report
+            .candidates
+            .iter()
+            .filter_map(|candidate| {
+                let forecast = candidate.forecast.as_ref()?;
+                let clock = forecast.scan_clock.as_ref()?;
+                let screen = candidate.remote_arrival.as_ref()?;
+                screen.local_reference.as_ref()?;
+                Some(FirstScanSuccessReport::compose(forecast, clock, screen))
+            })
+            .collect();
+        if !conditional.is_empty() {
+            self.report.first_scan_success = Some(conditional);
+        }
         if self.report.neutral_timing_costs.is_some() {
             self.report.neutral_timing_costs = Some(
                 self.report
@@ -690,6 +726,127 @@ mod tests {
         );
         assert!(r.charged_graph <= 3 * transfer_forecast::MAX_TICKS + 1);
         assert!(TransferComparisonJob::new(&actual, &actual, &o, &evaluator, e).is_err());
+    }
+
+    #[test]
+    fn scan_clock_preserves_forecasts_rankings_and_charged_work() {
+        use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+        let (state, before, actual, o) = transfer_forecast::tests::source_with_before();
+        let original = TransferComparisonJob::new(
+            &before,
+            &actual,
+            &o,
+            &MissionEvaluator::new(1),
+            state.transfer_environment().unwrap(),
+        )
+        .unwrap();
+        let mut plain = original.clone();
+        let mut clocked = original.with_scan_clock(Some(LandingSurveyCadence::FourHz));
+        let controls = actual.previous_intent;
+        let history = actual.sensor_request().last_survey;
+        while plain.next_work().is_some() {
+            assert_eq!(plain.next_work(), clocked.next_work());
+            plain.step();
+            clocked.step();
+            let mut snapshot = clocked.snapshot();
+            for c in &mut snapshot.candidates {
+                if let Some(f) = &mut c.forecast {
+                    let clock = f.scan_clock.take().unwrap();
+                    assert_eq!(clock.complete, f.end.is_some());
+                    assert_eq!(clock.site_selection_seconds, None);
+                }
+            }
+            assert_eq!(snapshot, plain.snapshot());
+        }
+        assert!(clocked.output().is_some());
+        assert_eq!(actual.previous_intent, controls);
+        assert_eq!(actual.sensor_request().last_survey, history);
+        let value = serde_json::to_value(plain.output().unwrap()).unwrap();
+        assert!(!value.to_string().contains("scan_clock"));
+    }
+
+    #[test]
+    fn scan_clock_queue_respects_zero_budget_and_claim_invalidation() {
+        use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+        let (state, before, actual, o) = transfer_forecast::tests::source_with_before();
+        let e = state.transfer_environment().unwrap();
+        let mut q = TransferComparisonQueue::new(1).with_scan_clock(LandingSurveyCadence::FourHz);
+        let token = q
+            .submit_comparison(
+                &before,
+                &actual,
+                &o,
+                &MissionEvaluator::new(1),
+                e.clone(),
+                Some(false),
+            )
+            .unwrap();
+        assert_eq!(q.advance(e.tick, work(0)).unwrap().charged.graph, 0);
+        let snapshot = q.snapshot(token, e.tick).unwrap();
+        for c in &snapshot.candidates {
+            if let Some(f) = &c.forecast {
+                assert_eq!(f.charged_graph, 0);
+                let clock = f.scan_clock.as_ref().unwrap();
+                assert!(!clock.complete && clock.opportunity_tick.is_none());
+            }
+        }
+        let destination = actual.telemetry.target.unwrap();
+        assert!(arrival_local::neutral_claim(&o.planets[destination]));
+        let mut changed = o.clone();
+        changed.planets[destination]
+            .claim
+            .as_mut()
+            .unwrap()
+            .claimant = Some(actual.context.actor);
+        q.observe(token, &actual, &changed, &e, Some(false));
+        assert_eq!(q.poll(token, e.tick), JobPoll::Stale);
+        assert_eq!(
+            q.state(actual.context.actor).unwrap().reason,
+            Some("scan clock neutral claim domain changed")
+        );
+        assert_eq!(q.charged_total, 0);
+    }
+
+    #[test]
+    fn scan_clock_ready_output_retires_and_reset_keeps_the_cadence() {
+        use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+        let (state, before, actual, o) = transfer_forecast::tests::source_with_before();
+        let e = state.transfer_environment().unwrap();
+        let mut q =
+            TransferComparisonQueue::new(1).with_scan_clock(LandingSurveyCadence::EveryTick);
+        let evaluator = MissionEvaluator::new(1);
+        let token = q
+            .submit_comparison(&before, &actual, &o, &evaluator, e.clone(), Some(false))
+            .unwrap();
+        q.advance(e.tick, work(12000));
+        assert!(matches!(q.poll(token, e.tick), JobPoll::Ready(_)));
+        let charged = q.charged_total;
+        let mut changed = o.clone();
+        changed.planets[actual.telemetry.target.unwrap()]
+            .claim
+            .as_mut()
+            .unwrap()
+            .progress = 0.1;
+        q.observe(token, &actual, &changed, &e, Some(false));
+        assert_eq!(q.poll(token, e.tick), JobPoll::Stale);
+        assert_eq!(q.charged_total, charged);
+        q.reset();
+        let next = q
+            .submit_comparison(&before, &actual, &o, &evaluator, e, Some(false))
+            .unwrap();
+        assert_ne!(next, token);
+        for c in q
+            .snapshot(next, o.local.combat.recovery.flight.pilot.tick)
+            .unwrap()
+            .candidates
+        {
+            if let Some(f) = c.forecast {
+                assert_eq!(
+                    f.scan_clock.unwrap().cadence,
+                    LandingSurveyCadence::EveryTick
+                );
+            }
+        }
     }
 
     #[test]

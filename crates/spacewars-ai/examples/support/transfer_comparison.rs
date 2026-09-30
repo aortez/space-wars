@@ -5,7 +5,10 @@ mod arrival_comparison;
 use engine_core::planning::{JobPoll, RequestToken, Work};
 use scenario_spacewars::{
     PlayerId,
-    surface_sortie::{SurfaceSortieState, mission::MissionObservationV1},
+    surface_sortie::{
+        SurfaceSortieState,
+        mission::{LandingSurveyCadence, MissionObservationV1},
+    },
 };
 use serde_json::{Value, json};
 use spacewars_ai::{
@@ -89,6 +92,7 @@ pub struct TransferComparisonRun {
     sources: [Option<Source>; 2],
     allowance: u32,
     neutral_timing: bool,
+    scan_cadence: Option<LandingSurveyCadence>,
     remote_arrival: bool,
     retain_remote: bool,
     work: BufWriter<File>,
@@ -99,13 +103,18 @@ pub struct TransferComparisonRun {
 }
 
 impl TransferComparisonRun {
-    pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
+    pub fn from_args(out: &Path, seed: u64, cadence: LandingSurveyCadence) -> Option<Self> {
+        let scan_cadence = super::arg("--forecast-scan-clock", "false")
+            .parse::<bool>()
+            .unwrap()
+            .then_some(cadence);
         let specification = super::arg("--compare-transfer-sources", "none");
         let arrival_survey = super::arrival_survey::ArrivalSurveyRun::from_args(out);
         let arrival_comparison = arrival_comparison::ArrivalComparisonRun::from_args(
             out,
             seed,
             arrival_survey.as_ref().is_some_and(|s| s.neighbors),
+            scan_cadence,
         );
         assert!(
             arrival_comparison.is_none() || arrival_survey.is_some(),
@@ -129,6 +138,10 @@ impl TransferComparisonRun {
             "select one observational extension"
         );
         if specification == "none" {
+            assert!(
+                scan_cadence.is_none(),
+                "scan clock needs fixed comparison sources"
+            );
             assert!(
                 arrival_survey.is_none(),
                 "arrival survey needs fixed comparison sources"
@@ -180,11 +193,17 @@ impl TransferComparisonRun {
                 ..Default::default()
             });
         }
+        let queue = TransferComparisonQueue::new(2);
+        let queue = match scan_cadence {
+            Some(cadence) => queue.with_scan_clock(cadence),
+            None => queue,
+        };
         Some(Self {
-            queue: TransferComparisonQueue::new(2),
+            queue,
             sources,
             allowance,
             neutral_timing,
+            scan_cadence,
             remote_arrival,
             retain_remote,
             work: BufWriter::new(File::create(out.join("transfer-comparison-work.jsonl")).unwrap()),
@@ -410,6 +429,9 @@ impl TransferComparisonRun {
             "cancelled":self.queue.cancelled_total,"charged_graph":self.queue.charged_total,"physics_queries":0,
             "observation":super::timing(self.observation_ms.clone()),"dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."});
+        if let Some(cadence) = self.scan_cadence {
+            report["scan_cadence"] = json!(cadence);
+        }
         if let Some(survey) = &mut self.arrival_survey {
             report["arrival_survey"] = survey.report();
         }

@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "scope": "Retained failed audit executions, not additional independent match evidence. The complete unchanged 91-case plan is rerun in v3. Only serialization identity and report observer setup were corrected.",
+  "attempts": [
+    {
+      "directory": "target/capture-value-promotion/v1",
+      "source_commit": "2d448191c417375d8447b5b05a7e1aed89bc6d3c",
+      "binary_sha256": "f2c15b6790ed2c580e1575e61815b4add4ca7f58d1310ff9b5b3b23c0f3e6999",
+      "tools": {
+        "validate-capture-value.py": "9e4acd2a6b7b94507acd8c5bc6942546ddee6b74ea8e84d09b9b2651f4925bf9",
+        "compare-capture-destinations.py": "56f2c47c5535af523d63e7a434366ce2b778b1ebdfdaa8f257db99b3de96f0fe",
+        "compare-capture-evaluation.py": "a1e441b5b999cd7cd9e225dba2c8c0a0f84db537db5ef4d34f18058590a676cc",
+        "compare-capture-value.py": "de6a53cc6f73f8e8dcda3a84345ce89f9d319ba168ceaee52683dc96a0012522"
+      },
+      "summary_sha256": "387192c88557888d40969421cc425ac394dbf866b78b8ce1c49338d59780a9eb",
+      "log_sha256": "eef8ea7c7d58eec5c4e1393dcb50b62f4291ef00eff0e65f55def42bc1cfdb34",
+      "complete": false,
+      "planned_runs": 91,
+      "recorded_runs": 1,
+      "written_physical_reports": 2,
+      "reason": "Direct f32 JSON and widened report JSON compared as Python decimal values; identical native f32 bits were falsely rejected.",
+      "fix_commit": "1761359",
+      "unrecorded_run_hashes": {
+        "regression-v12": {
+          "destination-cover.jsonl": "be77b35f10e64f73f4142b9cf8ec3e3273b38e9dc0c494a750febe46ddfefe6c",
+          "live-planning.csv": "44da6f1bd0e2b33b92638ffd91b7e2b7ab633699902c5fdf0192750439d589aa",
+          "mission-evaluations.jsonl": "8a30c488f54a5f8e7954aeb62aad5a3ab8fc8e65b8cd6b5261b390de60235a88",
+          "report.json": "cd6d69060dfa87dddd8d25470a0b810435aff7cb339ebfb7769301880547a023",
+          "sensors.jsonl": "e138ddddbe79b6ebd5250fd58dfb7a719af875229012240fec49a4b0ebb861b0",
+          "timing.csv": "519c3cd7e1428671b8d08f1928906f75889ac3191b4c9881116f61bf41ff3ad3"
+        }
+      }
+    },
+    {
+      "directory": "target/capture-value-promotion/v2",
+      "source_commit": "17613592dcb9601fe64e3259be2c7b2bd614eb71",
+      "binary_sha256": "f2c15b6790ed2c580e1575e61815b4add4ca7f58d1310ff9b5b3b23c0f3e6999",
+      "tools": {
+        "validate-capture-value.py": "adf8ca04cab9d69c374a5d29b5f6898127a206241e99957403412109a47480aa",
+        "compare-capture-destinations.py": "56f2c47c5535af523d63e7a434366ce2b778b1ebdfdaa8f257db99b3de96f0fe",
+        "compare-capture-evaluation.py": "a1e441b5b999cd7cd9e225dba2c8c0a0f84db537db5ef4d34f18058590a676cc",
+        "compare-capture-value.py": "de6a53cc6f73f8e8dcda3a84345ce89f9d319ba168ceaee52683dc96a0012522"
+      },
+      "summary_sha256": "a1425f326e848ef1c87e6f9d230e2354cb218b9d4664c3e72520afc4a308e4cb",
+      "log_sha256": "ebfcefd2d61403ec3834c02bf6e912168147290a09e83905ed110f9babc87a7b",
+      "complete": false,
+      "planned_runs": 91,
+      "recorded_runs": 91,
+      "written_physical_reports": 91,
+      "reason": "Generated duel observer followed the policy seat; the paired initial-world observations therefore described different players.",
+      "fix_commit": "cdee3e0",
+      "unrecorded_run_hashes": {}
+    }
+  ]
+}

@@ -483,6 +483,56 @@ impl SurfaceSortieScenario {
         );
         Self::step(&mut state, &[], Duration::from_nanos(16_666_667));
         let planet = 1 - player;
+        let enemy = PlayerId::from_index(1 - player).unwrap();
+        Self::place_capture_trial_flag(&mut state, planet, enemy, flag_bearing);
+        state
+    }
+
+    /// Compare enemy-versus-neutral value with an existing physical foothold.
+    /// Flags are initial conditions; subsequent choices, movement, capture and
+    /// boarding use the ordinary mission sensors, controller and physics.
+    pub fn init_capture_destination_match_trial(
+        seed: u64,
+        player: usize,
+        mirror: bool,
+        flag_bearing: f32,
+        owned_foothold: bool,
+        time_limit: Option<Duration>,
+    ) -> SurfaceSortieState {
+        assert!(player < 2 && flag_bearing.is_finite());
+        let mut state = Self::init_material_travel_fixture(
+            seed,
+            mirror,
+            0.0,
+            engine_terrain::TerrainSurface::Interpolated,
+            owned_foothold,
+        );
+        state.enable_match_rules();
+        state.set_match_time_limit(time_limit);
+        Self::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        Self::place_capture_trial_flag(
+            &mut state,
+            1 - player,
+            PlayerId::from_index(1 - player).unwrap(),
+            flag_bearing,
+        );
+        if owned_foothold {
+            Self::place_capture_trial_flag(
+                &mut state,
+                2,
+                PlayerId::from_index(player).unwrap(),
+                0.0,
+            );
+        }
+        state
+    }
+
+    fn place_capture_trial_flag(
+        state: &mut SurfaceSortieState,
+        planet: usize,
+        owner: PlayerId,
+        flag_bearing: f32,
+    ) {
         let frame = motion::SurfaceFrame::read(&state.world.physics, planet);
         let up = Vec2::Y.rotate_radians(flag_bearing);
         let radius = state.world.planets[planet].radius * BODY_BOUNDS_RADIUS_SCALE;
@@ -503,10 +553,9 @@ impl SurfaceSortieScenario {
             .geometry
             .contact_cell(&terrain.field, position, normal)
             .expect("initial flag has material footing");
-        let enemy = PlayerId::from_index(1 - player).unwrap();
-        state.world.planets[planet].owner_id = Some(enemy.index());
+        state.world.planets[planet].owner_id = Some(owner.index());
         state.claims[planet].flag = Some(PlanetFlag {
-            player: enemy,
+            player: owner,
             anchor: FlagAnchor {
                 position,
                 normal,
@@ -514,7 +563,6 @@ impl SurfaceSortieScenario {
                 surface_revision: terrain.field.revision(),
             },
         });
-        state
     }
 
     pub fn init_material_flag_crossing_trial(seed: u64, player: usize) -> SurfaceSortieState {

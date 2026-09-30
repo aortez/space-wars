@@ -218,3 +218,87 @@ fn no_completed_comparison_is_exact_v10_fallback_through_flag_capture() {
         );
     }
 }
+
+#[test]
+fn owned_foothold_fixture_keeps_real_enemy_and_neutral_choices_in_both_seats() {
+    for seat in 0..2 {
+        let mut run = Run::new(MissionPolicy::ValuePlanner, seat, seat == 1);
+        run.state = SurfaceSortieScenario::init_capture_destination_match_trial(
+            42,
+            seat,
+            seat == 1,
+            0.8,
+            true,
+            Some(Duration::from_secs(600)),
+        );
+        let initial = run.state.mission_observation(seat, None);
+        assert_eq!(initial.planets.len(), 3);
+        assert_eq!(
+            initial.match_context.as_ref().unwrap().owned_planets,
+            [1, 1]
+        );
+        assert!(
+            initial.planets[seat]
+                .claim
+                .as_ref()
+                .unwrap()
+                .owner
+                .is_none()
+        );
+        let enemy = initial.planets[1 - seat].claim.as_ref().unwrap();
+        assert_eq!(enemy.owner, PlayerId::from_index(1 - seat));
+        assert!(enemy.flag.is_some());
+        let home = initial.planets[2].claim.as_ref().unwrap();
+        assert_eq!(home.owner, PlayerId::from_index(seat));
+        assert!(home.flag.is_some());
+        for _ in 0..60 {
+            run.step(seat);
+            assert!(run.state.terrain_diagnostics().issues.is_empty());
+        }
+    }
+}
+
+#[test]
+fn near_expiry_value_selection_preserves_v10_controls_and_match_outcome() {
+    for seat in 0..2 {
+        let mut baseline = Run::new(MissionPolicy::Planner, seat, seat == 1);
+        let mut candidate = Run::new(MissionPolicy::ValuePlanner, seat, seat == 1);
+        for run in [&mut baseline, &mut candidate] {
+            run.state = SurfaceSortieScenario::init_capture_destination_match_trial(
+                42,
+                seat,
+                seat == 1,
+                0.8,
+                true,
+                Some(Duration::from_secs(2)),
+            );
+        }
+        for _ in 0..120 {
+            assert_eq!(baseline.step(seat), candidate.step(seat));
+        }
+        assert_eq!(
+            candidate
+                .bot
+                .telemetry()
+                .destination_planning
+                .as_ref()
+                .unwrap()
+                .switches,
+            0
+        );
+        let a = baseline
+            .state
+            .mission_observation(seat, None)
+            .match_context
+            .unwrap();
+        let b = candidate
+            .state
+            .mission_observation(seat, None)
+            .match_context
+            .unwrap();
+        assert!(a.finished && b.finished);
+        assert_eq!(a.owned_planets, b.owned_planets);
+        assert_eq!(a.pilots_alive, b.pilots_alive);
+        assert!(candidate.state.terrain_diagnostics().issues.is_empty());
+    }
+}

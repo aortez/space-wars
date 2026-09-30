@@ -25,7 +25,9 @@ pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, Dest
 
 #[path = "mission_transfer_forecast.rs"]
 mod transfer_forecast;
-pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferForecastReport};
+pub use transfer_forecast::{
+    TransferForecastEnd, TransferForecastJob, TransferForecastReport, TransferScanClock,
+};
 
 #[path = "mission_transfer_queue.rs"]
 mod transfer_queue;
@@ -40,12 +42,15 @@ pub use transfer_comparison::{TransferComparisonJob, TransferComparisonReport};
 mod arrival_local;
 #[path = "mission_arrival_preference.rs"]
 mod arrival_preference;
+#[path = "mission_first_scan_success.rs"]
+mod first_scan_success;
 #[path = "mission_remote_arrival.rs"]
 mod remote_arrival;
 pub use arrival_local::{ArrivalLocalReference, ArrivalLocalReport};
 pub use arrival_preference::{
     ArrivalPreferenceReport, ArrivalSiteAssessment, ArrivalSitePreference,
 };
+pub use first_scan_success::{FirstScanSuccessReference, FirstScanSuccessReport};
 pub use remote_arrival::{
     RemoteArrivalDirection, RemoteArrivalFrame, RemoteArrivalScreen, RemoteArrivalSite,
 };
