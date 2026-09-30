@@ -52,6 +52,7 @@ pub fn model_for_policy(policy: &str) -> &'static str {
     }
 }
 pub const MAX_PLANETS: usize = 8;
+pub const CURRENT_NEUTRAL_MODEL: &str = "capture_value_current_neutral_v1";
 pub const MAX_OPTIONS: usize = 3;
 pub const REFRESH_TICKS: u64 = 60;
 pub const MAX_EVIDENCE_AGE: u64 = 30 * 60;
@@ -288,6 +289,7 @@ pub struct MissionEvaluator {
     pub cancelled_total: u64,
     pub completed_total: u64,
     flag_cost_seats: [bool; 2],
+    current_neutral_seats: [bool; 2],
 }
 impl MissionEvaluator {
     pub fn new(capacity: usize) -> Self {
@@ -300,20 +302,41 @@ impl MissionEvaluator {
             cancelled_total: 0,
             completed_total: 0,
             flag_cost_seats: [false; 2],
+            current_neutral_seats: [false; 2],
         }
     }
     pub fn reset(&mut self) {
-        *self = Self::new(self.capacity).with_flag_costs(self.flag_cost_seats);
+        *self = Self::new(self.capacity)
+            .with_flag_costs(self.flag_cost_seats)
+            .with_current_neutral_surveys(self.current_neutral_seats);
     }
     /// Headless candidate configuration; all ordinary constructors remain off.
     /// Only v13 can consume these conditional historical route references.
     pub fn with_flag_costs(mut self, seats: [bool; 2]) -> Self {
         assert!(self.actors.is_empty(), "configure before observing actors");
+        assert!(
+            (0..2).all(|seat| !self.current_neutral_seats[seat] || seats[seat]),
+            "current-neutral candidate requires published flag costs"
+        );
         self.flag_cost_seats = seats;
         self
     }
     pub fn uses_flag_costs(&self, actor: PlayerId) -> bool {
         self.flag_cost_seats[actor.index()]
+    }
+    /// Headless experiment: measure a neutral current target before arrival,
+    /// alongside one neutral alternative within the existing four-site limit.
+    pub fn with_current_neutral_surveys(mut self, seats: [bool; 2]) -> Self {
+        assert!(self.actors.is_empty(), "configure before observing actors");
+        assert!(
+            (0..2).all(|seat| !seats[seat] || self.flag_cost_seats[seat]),
+            "current-neutral candidate requires published flag costs"
+        );
+        self.current_neutral_seats = seats;
+        self
+    }
+    pub fn surveys_current_neutral(&self, actor: PlayerId) -> bool {
+        self.current_neutral_seats[actor.index()]
     }
     pub fn latest(&self, actor: PlayerId) -> Option<&MissionEvaluation> {
         self.actors.get(&(actor.index() as u64))?.latest.as_ref()
@@ -357,6 +380,7 @@ impl MissionEvaluator {
             &mut self.actors.entry(actor).or_default().survey,
             o,
             mission,
+            self.current_neutral_seats[actor as usize] && value::enabled(mission.policy),
         )
     }
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
@@ -373,6 +397,8 @@ impl MissionEvaluator {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
         let flag_costs = self.uses_flag_costs(p.owner) && value::enabled(mission.policy);
+        let current_neutral =
+            self.surveys_current_neutral(p.owner) && value::enabled(mission.policy);
         if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
             return;
         }
@@ -433,7 +459,7 @@ impl MissionEvaluator {
                     || sample.key.planet != p.planet.index
                     || (sample.gravity - dependencies.gravity).abs() <= 0.01)
         });
-        if let Some(sample) = survey::evidence(&state.survey, o) {
+        for sample in survey::evidence(&state.survey, o) {
             state
                 .evidence
                 .retain(|old| old.key.planet != sample.key.planet);
@@ -541,6 +567,9 @@ impl MissionEvaluator {
             report.model = flag_costs::MODEL;
             report.flag_admissions = Some(admissions);
             report.flag_cost_scope = Some(flag_costs::SCOPE);
+        }
+        if current_neutral {
+            report.model = CURRENT_NEUTRAL_MODEL;
         }
         state.submitted_evidence = state.evidence.clone();
         state.dependencies = Some(dependencies);

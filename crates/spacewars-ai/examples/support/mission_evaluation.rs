@@ -2,7 +2,9 @@ use engine_core::planning::Work;
 use scenario_spacewars::{PlayerId, surface_sortie::mission::MissionObservationV1};
 use serde_json::{Value, json};
 use spacewars_ai::{
-    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy},
+    mission_evaluation::{
+        CURRENT_NEUTRAL_MODEL, DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy,
+    },
     mission_pilot::MissionTelemetry,
 };
 use std::{
@@ -58,8 +60,22 @@ impl EvaluationRun {
                 "flag cost candidate requires v13, evaluation and shared flag surveys"
             );
         }
+        let current_neutral_seats = match super::arg("--survey-current-neutral", "none").as_str() {
+            "none" => [false; 2],
+            "0" => [true, false],
+            "1" => [false, true],
+            "both" => [true; 2],
+            _ => panic!("--survey-current-neutral must be none, 0, 1 or both"),
+        };
+        assert!(
+            (0..2).all(|seat| !current_neutral_seats[seat]
+                || (flag_cost_seats[seat] && alternative_survey)),
+            "current-neutral candidate requires per-seat flag costs and neutral surveys"
+        );
         enabled.then(|| Self {
-            evaluator: MissionEvaluator::new(2).with_flag_costs(flag_cost_seats),
+            evaluator: MissionEvaluator::new(2)
+                .with_flag_costs(flag_cost_seats)
+                .with_current_neutral_surveys(current_neutral_seats),
             alternative_survey,
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
@@ -161,6 +177,26 @@ impl EvaluationRun {
             }
             report["model"] = if seats == [true; 2] {
                 json!("capture_value_published_flags_v1")
+            } else {
+                json!("mixed")
+            };
+        }
+        let current_neutral = [PlayerId::PLAYER_1, PlayerId::PLAYER_2]
+            .map(|actor| self.evaluator.surveys_current_neutral(actor));
+        if current_neutral.iter().any(|enabled| *enabled) {
+            report["current_neutral_survey"] = json!({
+                "enabled_seats":current_neutral,
+                "candidate":CURRENT_NEUTRAL_MODEL,
+                "predecessor":"capture_value_published_flags_v1",
+                "scope":"current neutral plus one neutral alternative, two sites each; historical conditional costs; native arrival, acquisition and exposure remain unmodelled"
+            });
+            for (seat, enabled) in current_neutral.into_iter().enumerate() {
+                if enabled {
+                    report["models_by_seat"][seat] = json!(CURRENT_NEUTRAL_MODEL);
+                }
+            }
+            report["model"] = if report["models_by_seat"][0] == report["models_by_seat"][1] {
+                report["models_by_seat"][0].clone()
             } else {
                 json!("mixed")
             };

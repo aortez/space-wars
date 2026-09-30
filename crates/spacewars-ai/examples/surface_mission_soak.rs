@@ -951,6 +951,13 @@ fn main() {
                 report["policy_configuration"][seat]["flag_cost_model"] =
                     json!("capture_value_published_flags_v1");
             }
+            if evaluator
+                .evaluator
+                .surveys_current_neutral(PlayerId::from_index(seat).unwrap())
+            {
+                report["policy_configuration"][seat]["current_neutral_model"] =
+                    json!(spacewars_ai::mission_evaluation::CURRENT_NEUTRAL_MODEL);
+            }
         }
         report["mission_evaluation"] = evaluator.report();
     }
