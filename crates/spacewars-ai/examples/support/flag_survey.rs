@@ -98,6 +98,7 @@ impl FlagSurveyRun {
     pub fn report(&mut self) -> Value {
         self.samples.flush().unwrap();
         self.work.flush().unwrap();
+        let admitted = super::arg("--admit-flag-costs", "none");
         let consuming_seats: Vec<_> = ["--p1-policy", "--p2-policy"]
             .into_iter()
             .enumerate()
@@ -105,7 +106,8 @@ impl FlagSurveyRun {
                 (matches!(
                     super::arg(flag, "material_mission_v9").as_str(),
                     "material_mission_v14" | "material_mission_v15"
-                ))
+                ) || admitted == "both"
+                    || admitted == seat.to_string())
                 .then_some(seat)
             })
             .collect();
@@ -115,6 +117,12 @@ impl FlagSurveyRun {
             "timing_scope":"dispatch includes snapshot construction and publication geometry validation; those stages are outside operation quotas; trace IO excluded"});
         if !consuming_seats.is_empty() {
             report["consuming_seats"] = json!(consuming_seats);
+        }
+        if super::arg("--admit-flag-costs", "none") != "none" {
+            report["observational"] = json!(false);
+            report["scope"] = json!(
+                "17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; opt-in v13 seats and v14/v15 may use published certificates as conditional destination costs"
+            );
         }
         if let Some(shadow) = &mut self.shadow {
             report["shadow"] = shadow.report();
