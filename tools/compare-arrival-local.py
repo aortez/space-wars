@@ -70,10 +70,10 @@ def audit_reference(screen, row):
     return dict(unknown=None,references=len(r['references']),numeric=numeric)
 
 
-def without_reference(report):
+def without_reference(report, key='local_reference'):
     report = copy.deepcopy(report)
     for candidate in report['candidates']:
-        reference = candidate['remote_arrival'].pop('local_reference',None)
+        reference = candidate['remote_arrival'].pop(key,None)
         if reference: report['charged_graph'] -= reference['charged_graph']
     return report
 
@@ -85,11 +85,11 @@ def audit_snapshot(snapshot, row):
         assert not snapshot['ranked'] or screen['local_reference']['complete'], 'ranked reference was not finished'
 
 
-def audit_pair(off, on):
+def audit_pair(off, on, key='local_reference', marker='arrival_local_reference'):
     left, right = [r['transfer_comparison'][KEY] for r in [off,on]]
-    assert right['arrival_local_reference'] and 'arrival_local_reference' not in left
+    assert right[marker] and marker not in left
     assert {k:v for k,v in Q.without_wall_times(left).items() if k not in ['actors','charged_graph']} == {
-        k:v for k,v in Q.without_wall_times(right).items() if k not in ['actors','charged_graph','arrival_local_reference']}
+        k:v for k,v in Q.without_wall_times(right).items() if k not in ['actors','charged_graph',marker]}
     total_extra, sources = 0, []
     assert len(left['actors']) == len(right['actors'])
     for a,b in zip(left['actors'],right['actors']):
@@ -100,7 +100,7 @@ def audit_pair(off, on):
         assert {k:v for k,v in x.items() if k not in varying} == {k:v for k,v in y.items() if k not in varying}
         for field in ['initial','last_snapshot','published']:
             if x[field] is None: assert y[field] is None; continue
-            assert without_reference(y[field]) == x[field], 'old forecast, solar, cost or ranking changed'
+            assert without_reference(y[field],key) == x[field], 'old forecast, solar, cost or ranking changed'
         extra = (y['last_snapshot']['charged_graph']-x['last_snapshot']['charged_graph']) if x['last_snapshot'] else 0
         for field in ['published_state','final_state']:
             if x[field] is None: assert y[field] is None; continue

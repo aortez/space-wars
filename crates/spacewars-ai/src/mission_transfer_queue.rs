@@ -341,6 +341,12 @@ impl TransferForecastQueue {
     }
 }
 
+enum ArrivalReferenceMode {
+    Off,
+    Local,
+    Preference,
+}
+
 impl TransferForecastQueue<TransferComparisonJob> {
     /// Retained evidence must come from this actor's current observation and
     /// episode. It stays separate from both real and hypothetical controls.
@@ -363,7 +369,7 @@ impl TransferForecastQueue<TransferComparisonJob> {
             environment,
             contact,
             retained,
-            false,
+            ArrivalReferenceMode::Off,
         )
     }
 
@@ -388,7 +394,32 @@ impl TransferForecastQueue<TransferComparisonJob> {
             environment,
             contact,
             retained,
-            true,
+            ArrivalReferenceMode::Local,
+        )
+    }
+
+    /// Adds a conditional native preference within the retained subset. Full
+    /// native choice and acquisition duration still require fresh observations.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_comparison_with_arrival_site_preference(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+        retained: &RemoteSurveySnapshot,
+    ) -> Result<RequestToken, &'static str> {
+        self.submit_retained_arrival(
+            before,
+            actual,
+            o,
+            evaluator,
+            environment,
+            contact,
+            retained,
+            ArrivalReferenceMode::Preference,
         )
     }
 
@@ -402,17 +433,19 @@ impl TransferForecastQueue<TransferComparisonJob> {
         environment: TransferEnvironment,
         contact: Option<bool>,
         retained: &RemoteSurveySnapshot,
-        local_reference: bool,
+        mode: ArrivalReferenceMode,
     ) -> Result<RequestToken, &'static str> {
         if !retained.matches(actual.context, o) {
             return Err("retained survey snapshot identity or observation mismatch");
         }
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?
             .with_retained_remote_arrival(o, retained, &environment);
-        let job = if local_reference {
-            job.with_arrival_local_reference(actual, o)
-        } else {
-            job
+        let job = match mode {
+            ArrivalReferenceMode::Off => job,
+            ArrivalReferenceMode::Local => job.with_arrival_local_reference(actual, o),
+            ArrivalReferenceMode::Preference => job
+                .with_arrival_local_reference(actual, o)
+                .with_arrival_site_preference(),
         };
         let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
         source.local_reference = Some(job.local_context(o));

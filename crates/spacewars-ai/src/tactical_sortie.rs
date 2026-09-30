@@ -26,7 +26,10 @@ mod acquisition_wait;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+#[cfg(test)]
+pub(crate) use selection::select as select_for_test;
 pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};
+pub(crate) use selection::{approach_score, preferred_side};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -845,7 +848,7 @@ impl TacticalSortiePilot {
         }
     }
 }
-fn angle_between(a: Vec2, b: Vec2) -> f32 {
+pub(crate) fn angle_between(a: Vec2, b: Vec2) -> f32 {
     (a.x * b.y - a.y * b.x).atan2(a.dot(b))
 }
 

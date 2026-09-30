@@ -313,7 +313,7 @@ fn arrival_local_comparison_keeps_every_old_component_and_accounts_new_work() {
 #[test]
 fn arrival_local_claim_changes_cancel_pending_and_ready_only_when_opted_in() {
     for ready in [false, true] {
-        for enabled in [false, true] {
+        for mode in 0..3 {
             for change in 0..3 {
                 let (state, before, actual, mut o) = transfer_forecast::tests::source_with_before();
                 let tick = o.local.combat.recovery.flight.pilot.tick;
@@ -326,10 +326,10 @@ fn arrival_local_claim_changes_cancel_pending_and_ready_only_when_opted_in() {
                 let retained = memory.snapshot(&o).unwrap();
                 let env = state.transfer_environment().unwrap();
                 let mut queue = TransferComparisonQueue::new(1);
-                let submit = if enabled {
-                    TransferComparisonQueue::submit_comparison_with_arrival_local_reference
-                } else {
-                    TransferComparisonQueue::submit_comparison_with_retained_remote_arrival
+                let submit = match mode {
+                    0 => TransferComparisonQueue::submit_comparison_with_retained_remote_arrival,
+                    1 => TransferComparisonQueue::submit_comparison_with_arrival_local_reference,
+                    _ => TransferComparisonQueue::submit_comparison_with_arrival_site_preference,
                 };
                 let token = submit(
                     &mut queue,
@@ -365,9 +365,9 @@ fn arrival_local_claim_changes_cancel_pending_and_ready_only_when_opted_in() {
                     _ => claim.phase = PlanetClaimPhase::Raising,
                 }
                 queue.observe(token, &actual, &o, &env, Some(false));
-                assert_eq!(matches!(queue.poll(token, tick), JobPoll::Stale), enabled);
+                assert_eq!(matches!(queue.poll(token, tick), JobPoll::Stale), mode != 0);
                 assert_eq!(queue.charged_total, charged);
-                if enabled {
+                if mode != 0 {
                     assert_eq!(
                         queue.state(actual.context.actor).unwrap().reason,
                         Some("arrival-local claim domain changed")

@@ -321,6 +321,16 @@ impl TransferComparisonJob {
         self
     }
 
+    pub(super) fn with_arrival_site_preference(mut self) -> Self {
+        self.arrivals = self.arrivals.map(|jobs| {
+            jobs.into_iter()
+                .zip(&self.report.candidates)
+                .map(|(job, c)| job.with_site_preference(c.source_capture.is_none()))
+                .collect()
+        });
+        self
+    }
+
     fn add(
         &mut self,
         mut candidate: TransferCandidateForecast,
