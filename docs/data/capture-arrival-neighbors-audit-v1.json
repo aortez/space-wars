@@ -1,0 +1,3468 @@
+{
+  "schema": 1,
+  "passed": true,
+  "raw_checked": true,
+  "raw_summary_sha256": "5fa9867a57a477ef1c945914a4ebe6fccb1d8008ae987d459ca6c8443253aacd",
+  "source_commit": "e5b458e6efa63022d46939a59a1517480074c828",
+  "binary_sha256": "2bbf3ed5822652736b65557eb22e19a36ddc940db412290d61888717e71ffb39",
+  "script_sha256": "939900bd392a9df9d0fb11d8d60225260a37489f6d867192a438ca04363df793",
+  "pinned_prior": {
+    "target/capture-flag-survey/arrival-preference-post-audit.py": "eb2136b3f48e26fecc12b326f90ef8bd8b789aeb5eb3424514a13b6924de0e21",
+    "target/capture-flag-survey/arrival-preference-post-audit.json": "6fc5718f5fe0293c54c65c2de9b885222d69046d33eb26be6657a262dd5e5e77",
+    "target/capture-flag-survey/arrival-preference-v1/summary.json": "b4f99e829f657f68574fedf5a79b085f6666bcdf40c46764fd08c245f5562b34",
+    "docs/data/capture-arrival-preference-v1.json": "840bb7671e7419a8b0198582336a55ee7eab21ea88d43007dcd907f930b61289"
+  },
+  "transitive_pins": {
+    "target/capture-flag-survey/arrival-local-post-audit.py": "2ead1addc3db67c73487e80ad7314e2a84d196b9fb686c7530a6699b9c938ef9",
+    "target/capture-flag-survey/arrival-local-post-audit.json": "1bd4344f3714d2dbb61c0066690238b52a99088ccc49e177defe00213b69bf8c",
+    "target/capture-flag-survey/arrival-local-v1/summary.json": "d9d93793be4fbb6f3ac3ae4870da4daf9d0c9a557103263a41da4c064d1419b2",
+    "docs/data/capture-arrival-local-v1.json": "95421e8880cbccebcc1188728f9d5dfaa3e271c4e0330137648cbf4ada42d2ea",
+    "target/capture-flag-survey/surveyed-arrival-post-audit.py": "c4ff05e7ab73a063f97e728d5032c534eb7c3184ab3d72b0d0a32b93b89964d0",
+    "target/capture-flag-survey/surveyed-arrival-post-audit.json": "4cab8560b2aa2104eb8096c37b10b020ecafb00ca354ca4e07a5999835fc2f15",
+    "tools/compare-neutral-capture-timing.py": "a67f01ca9ab833c86ad824250cf1d3389cb3da09886af02390fcb9bc8504d34e",
+    "tools/calibrate-transfer-references.py": "1fecacf165ff5b7d459c8fa4db6f327dab32bd4f2391c489efd7bc9c46dca41a",
+    "tools/compare-capture-destinations.py": "56f2c47c5535af523d63e7a434366ce2b778b1ebdfdaa8f257db99b3de96f0fe",
+    "tools/compare-flag-surveys.py": "6b8772514a07defd1b3e6e3d5f15636e404452ae8f70b234e0df5997d2877fee",
+    "tools/compare-landing-choices.py": "b27a962a6236064f6948cdc6ae6dbf757fb5a8ca693e2a3a2f4c84d74465e7d9",
+    "tools/compare-transfer-destinations.py": "b08d7ccbbd444b11099ac137fc661f71e7aa3e84401078bd7ea86e81a815ad4a",
+    "tools/compose-capture-references.py": "2b67ed818beb36545d2c9fe9fb900a184c15b6fb2cf0656357a6b92173b02e6e",
+    "tools/forecast-transfer-references.py": "28b6061c31ff6daa376451228b110eddec14da78284a069373b6f2f257c4d388",
+    "tools/probe-capture-followthrough.py": "e77544a8ac601a8c72e65018f20cb948e2f30f44e73c1a0b98965ef8fab12fe3",
+    "tools/probe-site-acquisition.py": "d442204bb69a09639b2b1659386d9732b86ef2d45dd39215f41d46722451a7fa",
+    "tools/probe-transfer-references.py": "57768cfa0a104458962fd67f0373c037e47a9345afe6ddbdf5f5d034605b97e7",
+    "tools/schedule-transfer-references.py": "b5f4f515cb1a6765ff9284487fa571febb0b1998ba19998d686d55f9242be0b6"
+  },
+  "runs": {
+    "world1-asteroids0-on-s0t3816-p2-ordinary-nearest": {
+      "trace": {
+        "controller_rows": 7920,
+        "decompressed_bytes": 62094053,
+        "trace_sha256": "407a1c16154d1560e08bd5c83a25933cad09f08ff59e9515967ea730e2d0fdc8",
+        "sensor_rows": 7920
+      },
+      "sensors": {
+        "sensor_rows": 7920,
+        "sensor_work_sha256": "5f208742423c24953767e701e2ef1ef7be594c45e736fba7d2c41930f063761d",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 7920,
+          "combat_observation": 7920,
+          "flight_pilot_observation": 7920,
+          "ground_posture_observation": 7920,
+          "jetpack_navigation_with_ground": 7920,
+          "landing_objective_survey": 7920,
+          "mission_observation": 7920,
+          "pilot_observation": 7920,
+          "rebuild_relocation_survey": 7920,
+          "recovery_task_observation": 7920,
+          "tactical_sortie_observation": 7920,
+          "landing_hatch_clearance": 3432,
+          "landing_hull_placement": 1728,
+          "landing_preview_shapes": 3432,
+          "vehicle_landing_site": 3432,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 85,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 85
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3": {
+      "trace": {
+        "controller_rows": 7920,
+        "decompressed_bytes": 62094053,
+        "trace_sha256": "407a1c16154d1560e08bd5c83a25933cad09f08ff59e9515967ea730e2d0fdc8",
+        "sensor_rows": 7920
+      },
+      "sensors": {
+        "sensor_rows": 7920,
+        "sensor_work_sha256": "5f208742423c24953767e701e2ef1ef7be594c45e736fba7d2c41930f063761d",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 7920,
+          "combat_observation": 7920,
+          "flight_pilot_observation": 7920,
+          "ground_posture_observation": 7920,
+          "jetpack_navigation_with_ground": 7920,
+          "landing_objective_survey": 7920,
+          "mission_observation": 7920,
+          "pilot_observation": 7920,
+          "rebuild_relocation_survey": 7920,
+          "recovery_task_observation": 7920,
+          "tactical_sortie_observation": 7920,
+          "landing_hatch_clearance": 3432,
+          "landing_hull_placement": 1728,
+          "landing_preview_shapes": 3432,
+          "vehicle_landing_site": 3432,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 85,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 85
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3816-p2-controlled-nearest": {
+      "trace": {
+        "controller_rows": 14006,
+        "decompressed_bytes": 132341012,
+        "trace_sha256": "5531e72a9bd4c71441a65dd8f480f47713bada579a24d546e431e7a3e0db0ec7",
+        "sensor_rows": 14006
+      },
+      "sensors": {
+        "sensor_rows": 14006,
+        "sensor_work_sha256": "e9028254b99812a29fb2d803fe1d99f6825e2cde1363128968256fbc4053fbb3",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157358,
+          "ground_edge_capsule_samples": 1414833,
+          "ground_edge_floor_samples": 470898,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156966,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14006,
+          "combat_observation": 14006,
+          "flight_pilot_observation": 14006,
+          "ground_posture_observation": 14006,
+          "jetpack_navigation_with_ground": 14006,
+          "landing_objective_survey": 14006,
+          "mission_observation": 14006,
+          "pilot_observation": 14006,
+          "rebuild_relocation_survey": 14006,
+          "recovery_task_observation": 14006,
+          "tactical_sortie_observation": 14006,
+          "landing_hatch_clearance": 7883,
+          "landing_hull_placement": 4197,
+          "landing_preview_shapes": 7883,
+          "vehicle_landing_site": 7889,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 84,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "attempt": 3,
+          "earlier physical work": 19,
+          "refresh interval": 62
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 3854,
+          "attempt_tick": 3853,
+          "planned_slots": 1,
+          "measured_slots": 1,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3853
+          ],
+          "sample_ages": [
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 3148,
+        "charged_graph": 1663,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 3881
+        },
+        "validated_after_retirement": {
+          "0": 38
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 3854,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 1.3110942840576172,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 1.3110942840576172,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.3278915882110596,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.023440182209014893,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.07759638875722885,
+              "departure_clearance": 371.87921142578125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9114990234375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.3278915882110596
+          },
+          "native_best_admitted": {
+            "approach_score": 2.3278915882110596,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.023440182209014893,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.07759638875722885,
+              "departure_clearance": 371.87921142578125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9114990234375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.3278915882110596
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 1,
+            "retained_slots": 1,
+            "measured_slots": 1,
+            "admitted_sites": 1,
+            "eligible_sites": 1,
+            "eligible_directions": 2
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3853,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1656,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.00017263349150062197,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 2,
+            "local_reference": 1,
+            "preference": 1
+          },
+          "local_reference_seconds": [
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3816-p2-controlled-neighbors3": {
+      "trace": {
+        "controller_rows": 14006,
+        "decompressed_bytes": 132341012,
+        "trace_sha256": "5531e72a9bd4c71441a65dd8f480f47713bada579a24d546e431e7a3e0db0ec7",
+        "sensor_rows": 14006
+      },
+      "sensors": {
+        "sensor_rows": 14006,
+        "sensor_work_sha256": "e9028254b99812a29fb2d803fe1d99f6825e2cde1363128968256fbc4053fbb3",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157358,
+          "ground_edge_capsule_samples": 1414833,
+          "ground_edge_floor_samples": 470898,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156966,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14006,
+          "combat_observation": 14006,
+          "flight_pilot_observation": 14006,
+          "ground_posture_observation": 14006,
+          "jetpack_navigation_with_ground": 14006,
+          "landing_objective_survey": 14006,
+          "mission_observation": 14006,
+          "pilot_observation": 14006,
+          "rebuild_relocation_survey": 14006,
+          "recovery_task_observation": 14006,
+          "tactical_sortie_observation": 14006,
+          "landing_hatch_clearance": 7883,
+          "landing_hull_placement": 4197,
+          "landing_preview_shapes": 7883,
+          "vehicle_landing_site": 7889,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 84,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "attempt": 3,
+          "earlier physical work": 19,
+          "refresh interval": 39,
+          "collection window closed": 23
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 3914,
+          "attempt_tick": 3853,
+          "planned_slots": 3,
+          "measured_slots": 3,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3853,
+            3883,
+            3913
+          ],
+          "sample_ages": [
+            61,
+            31,
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 3088,
+        "charged_graph": 1616,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 3940
+        },
+        "validated_after_retirement": {
+          "0": 98
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 3914,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 1.6194266080856323,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 1.6194266080856323,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.3278915882110596,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.023440182209014893,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.07759638875722885,
+              "departure_clearance": 371.87921142578125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9114990234375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.3278915882110596
+          },
+          "native_best_admitted": {
+            "approach_score": 2.3278915882110596,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.023440182209014893,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.27593994140625,
+              "arrival_seconds": 0.07759638875722885,
+              "departure_clearance": 371.87921142578125,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9114990234375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.3278915882110596
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 3,
+            "retained_slots": 3,
+            "measured_slots": 3,
+            "admitted_sites": 3,
+            "eligible_sites": 3,
+            "eligible_directions": 6
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3853,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1656,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "measurement_tick": 3883,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1626,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 34,
+                "planet": 2
+              },
+              "measurement_tick": 3913,
+              "geometry_maximum": 0.000244140625,
+              "age_ticks": 1596,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.000244140625,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 6,
+            "local_reference": 3,
+            "preference": 3
+          },
+          "local_reference_seconds": [
+            24.766666412353516,
+            24.766666412353516,
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3876-p2-ordinary-nearest": {
+      "trace": {
+        "controller_rows": 8040,
+        "decompressed_bytes": 63184796,
+        "trace_sha256": "6d2cec33ab069885467c29200d0170f64f7726e7e0ddc6b159ecc723561756f6",
+        "sensor_rows": 8040
+      },
+      "sensors": {
+        "sensor_rows": 8040,
+        "sensor_work_sha256": "0cbf21a7ca5fa30b37c60f7e060b60d0badc36dc629edd79ff9c46479d51c4e6",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8040,
+          "combat_observation": 8040,
+          "flight_pilot_observation": 8040,
+          "ground_posture_observation": 8040,
+          "jetpack_navigation_with_ground": 8040,
+          "landing_objective_survey": 8040,
+          "mission_observation": 8040,
+          "pilot_observation": 8040,
+          "rebuild_relocation_survey": 8040,
+          "recovery_task_observation": 8040,
+          "tactical_sortie_observation": 8040,
+          "landing_hatch_clearance": 3552,
+          "landing_hull_placement": 1788,
+          "landing_preview_shapes": 3552,
+          "vehicle_landing_site": 3552,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 88,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 88
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3": {
+      "trace": {
+        "controller_rows": 8040,
+        "decompressed_bytes": 63184796,
+        "trace_sha256": "6d2cec33ab069885467c29200d0170f64f7726e7e0ddc6b159ecc723561756f6",
+        "sensor_rows": 8040
+      },
+      "sensors": {
+        "sensor_rows": 8040,
+        "sensor_work_sha256": "0cbf21a7ca5fa30b37c60f7e060b60d0badc36dc629edd79ff9c46479d51c4e6",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8040,
+          "combat_observation": 8040,
+          "flight_pilot_observation": 8040,
+          "ground_posture_observation": 8040,
+          "jetpack_navigation_with_ground": 8040,
+          "landing_objective_survey": 8040,
+          "mission_observation": 8040,
+          "pilot_observation": 8040,
+          "rebuild_relocation_survey": 8040,
+          "recovery_task_observation": 8040,
+          "tactical_sortie_observation": 8040,
+          "landing_hatch_clearance": 3552,
+          "landing_hull_placement": 1788,
+          "landing_preview_shapes": 3552,
+          "vehicle_landing_site": 3552,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 88,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 88
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3876-p2-controlled-nearest": {
+      "trace": {
+        "controller_rows": 14010,
+        "decompressed_bytes": 132620575,
+        "trace_sha256": "0ab5fa33ffcfbb3c97567629617ad9c73064809a2b1c3cfffa8300877bf6dd68",
+        "sensor_rows": 14010
+      },
+      "sensors": {
+        "sensor_rows": 14010,
+        "sensor_work_sha256": "5d6e50c8fed6370308a57b5bd272b934fb1a5383f65d5dc166f68ac685f14238",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157372,
+          "ground_edge_capsule_samples": 1414959,
+          "ground_edge_floor_samples": 470940,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156980,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14010,
+          "combat_observation": 14010,
+          "flight_pilot_observation": 14010,
+          "ground_posture_observation": 14010,
+          "jetpack_navigation_with_ground": 14010,
+          "landing_objective_survey": 14010,
+          "mission_observation": 14010,
+          "pilot_observation": 14010,
+          "rebuild_relocation_survey": 14010,
+          "recovery_task_observation": 14010,
+          "tactical_sortie_observation": 14010,
+          "landing_hatch_clearance": 7964,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7964,
+          "vehicle_landing_site": 7969,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 87,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "earlier physical work": 22,
+          "attempt": 3,
+          "refresh interval": 62
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 3914,
+          "attempt_tick": 3913,
+          "planned_slots": 1,
+          "measured_slots": 1,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3913
+          ],
+          "sample_ages": [
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 3090,
+        "charged_graph": 1594,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 3939
+        },
+        "validated_after_retirement": {
+          "0": 38
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 3914,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 0.7967156767845154,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 0.7967156767845154,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 1.2468819618225098,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.012555197812616825,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 33,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.04156273230910301,
+              "departure_clearance": 371.59564208984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 386.720947265625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 1.2468819618225098
+          },
+          "native_best_admitted": {
+            "approach_score": 1.2468819618225098,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.012555197812616825,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 33,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.04156273230910301,
+              "departure_clearance": 371.59564208984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 386.720947265625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 1.2468819618225098
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 1,
+            "retained_slots": 1,
+            "measured_slots": 1,
+            "admitted_sites": 1,
+            "eligible_sites": 1,
+            "eligible_directions": 2
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3913,
+              "geometry_maximum": 0.0001220703125,
+              "age_ticks": 1580,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.0001220703125,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 2,
+            "local_reference": 1,
+            "preference": 1
+          },
+          "local_reference_seconds": [
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3876-p2-controlled-neighbors3": {
+      "trace": {
+        "controller_rows": 14010,
+        "decompressed_bytes": 132620575,
+        "trace_sha256": "0ab5fa33ffcfbb3c97567629617ad9c73064809a2b1c3cfffa8300877bf6dd68",
+        "sensor_rows": 14010
+      },
+      "sensors": {
+        "sensor_rows": 14010,
+        "sensor_work_sha256": "5d6e50c8fed6370308a57b5bd272b934fb1a5383f65d5dc166f68ac685f14238",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 157372,
+          "ground_edge_capsule_samples": 1414959,
+          "ground_edge_floor_samples": 470940,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 156980,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 14010,
+          "combat_observation": 14010,
+          "flight_pilot_observation": 14010,
+          "ground_posture_observation": 14010,
+          "jetpack_navigation_with_ground": 14010,
+          "landing_objective_survey": 14010,
+          "mission_observation": 14010,
+          "pilot_observation": 14010,
+          "rebuild_relocation_survey": 14010,
+          "recovery_task_observation": 14010,
+          "tactical_sortie_observation": 14010,
+          "landing_hatch_clearance": 7964,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7964,
+          "vehicle_landing_site": 7969,
+          "crossing_plan": 105,
+          "ground_edges": 189,
+          "ground_nodes": 189,
+          "survey_ground_with_gravity": 189,
+          "terrain_crossings": 105,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 87,
+        "queries": 122,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "earlier physical work": 22,
+          "attempt": 3,
+          "refresh interval": 39,
+          "collection window closed": 23
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 3974,
+          "attempt_tick": 3913,
+          "planned_slots": 3,
+          "measured_slots": 3,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3913,
+            3943,
+            3973
+          ],
+          "sample_ages": [
+            61,
+            31,
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 3030,
+        "charged_graph": 1542,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 3999
+        },
+        "validated_after_retirement": {
+          "0": 98
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 3974,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 1.106287956237793,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 1.106287956237793,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 1.2468819618225098,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.012555197812616825,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 33,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.04156273230910301,
+              "departure_clearance": 371.59564208984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 386.720947265625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 1.2468819618225098
+          },
+          "native_best_admitted": {
+            "approach_score": 1.2468819618225098,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.012555197812616825,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 33,
+            "solar": {
+              "approach_clearance": 315.8970947265625,
+              "arrival_seconds": 0.04156273230910301,
+              "departure_clearance": 371.59564208984375,
+              "departure_side": 1.0,
+              "forecast_tick": 5493,
+              "parked_clearance": 386.720947265625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 1.2468819618225098
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 3,
+            "retained_slots": 3,
+            "measured_slots": 3,
+            "admitted_sites": 2,
+            "eligible_sites": 2,
+            "eligible_directions": 4
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3913,
+              "geometry_maximum": 0.0001220703125,
+              "age_ticks": 1580,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 34,
+                "planet": 2
+              },
+              "measurement_tick": 3973,
+              "geometry_maximum": 0.0002729575167846423,
+              "age_ticks": 1520,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.0002729575167846423,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 4,
+            "local_reference": 3,
+            "preference": 3
+          },
+          "local_reference_seconds": [
+            24.766666412353516,
+            null,
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": [
+        {
+          "tick": 3943,
+          "site": {
+            "bearing": 32,
+            "planet": 2
+          },
+          "queries": 2,
+          "finding": "no_landing",
+          "later_native_site_available": true,
+          "native_assessments": [
+            {
+              "approach_score": 8.503461837768555,
+              "cover_penalty": 0.0,
+              "direction_order": 0,
+              "ground_score": 0.0,
+              "rejection": null,
+              "revision": 1,
+              "short_angle": -0.08562369644641876,
+              "side": -1.0,
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "site_order": 32,
+              "solar": {
+                "approach_clearance": 315.8970947265625,
+                "arrival_seconds": 0.283448725938797,
+                "departure_clearance": 367.87200927734375,
+                "departure_side": 1.0,
+                "forecast_tick": 5493,
+                "parked_clearance": 384.22149658203125,
+                "side": -1.0,
+                "surface_seconds": 25.0
+              },
+              "total_score": 8.503461837768555
+            },
+            {
+              "approach_score": 8.503461837768555,
+              "cover_penalty": 0.0,
+              "direction_order": 1,
+              "ground_score": 0.0,
+              "rejection": null,
+              "revision": 1,
+              "short_angle": -0.08562369644641876,
+              "side": 1.0,
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "site_order": 32,
+              "solar": {
+                "approach_clearance": 315.8970947265625,
+                "arrival_seconds": 0.283448725938797,
+                "departure_clearance": 367.87200927734375,
+                "departure_side": 1.0,
+                "forecast_tick": 5493,
+                "parked_clearance": 384.22149658203125,
+                "side": 1.0,
+                "surface_seconds": 25.0
+              },
+              "total_score": 8.503461837768555
+            }
+          ]
+        }
+      ]
+    },
+    "world1-asteroids0-on-s0t3934-p2-ordinary-nearest": {
+      "trace": {
+        "controller_rows": 8160,
+        "decompressed_bytes": 64277669,
+        "trace_sha256": "c66015565f9a0aa0426e6b13734bc284dfd38b0f3a2b6eef76c8bdc1c50a7076",
+        "sensor_rows": 8160
+      },
+      "sensors": {
+        "sensor_rows": 8160,
+        "sensor_work_sha256": "85850411ff60839f39f8f0923b1a546c44f491a095d7e3dbec5f576e1143cc61",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8160,
+          "combat_observation": 8160,
+          "flight_pilot_observation": 8160,
+          "ground_posture_observation": 8160,
+          "jetpack_navigation_with_ground": 8160,
+          "landing_objective_survey": 8160,
+          "mission_observation": 8160,
+          "pilot_observation": 8160,
+          "rebuild_relocation_survey": 8160,
+          "recovery_task_observation": 8160,
+          "tactical_sortie_observation": 8160,
+          "landing_hatch_clearance": 3672,
+          "landing_hull_placement": 1848,
+          "landing_preview_shapes": 3672,
+          "vehicle_landing_site": 3672,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 78,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 78
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3": {
+      "trace": {
+        "controller_rows": 8160,
+        "decompressed_bytes": 64277669,
+        "trace_sha256": "c66015565f9a0aa0426e6b13734bc284dfd38b0f3a2b6eef76c8bdc1c50a7076",
+        "sensor_rows": 8160
+      },
+      "sensors": {
+        "sensor_rows": 8160,
+        "sensor_work_sha256": "85850411ff60839f39f8f0923b1a546c44f491a095d7e3dbec5f576e1143cc61",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8160,
+          "combat_observation": 8160,
+          "flight_pilot_observation": 8160,
+          "ground_posture_observation": 8160,
+          "jetpack_navigation_with_ground": 8160,
+          "landing_objective_survey": 8160,
+          "mission_observation": 8160,
+          "pilot_observation": 8160,
+          "rebuild_relocation_survey": 8160,
+          "recovery_task_observation": 8160,
+          "tactical_sortie_observation": 8160,
+          "landing_hatch_clearance": 3672,
+          "landing_hull_placement": 1848,
+          "landing_preview_shapes": 3672,
+          "vehicle_landing_site": 3672,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 78,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 78
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3934-p2-controlled-nearest": {
+      "trace": {
+        "controller_rows": 13778,
+        "decompressed_bytes": 129711394,
+        "trace_sha256": "73c3fb8ae2767c8f604dc3120d963214690002e0a52fcea26827947ff3cf02a9",
+        "sensor_rows": 13778
+      },
+      "sensors": {
+        "sensor_rows": 13778,
+        "sensor_work_sha256": "1f76152501b7d95c466908d5874d7865a8f96af22d166b1e3a16c5d653da8c28",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 154406,
+          "ground_edge_capsule_samples": 1388265,
+          "ground_edge_floor_samples": 462042,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 154014,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13778,
+          "combat_observation": 13778,
+          "flight_pilot_observation": 13778,
+          "ground_posture_observation": 13778,
+          "jetpack_navigation_with_ground": 13778,
+          "landing_objective_survey": 13778,
+          "mission_observation": 13778,
+          "pilot_observation": 13778,
+          "rebuild_relocation_survey": 13778,
+          "recovery_task_observation": 13778,
+          "tactical_sortie_observation": 13778,
+          "landing_hatch_clearance": 7773,
+          "landing_hull_placement": 4087,
+          "landing_preview_shapes": 7773,
+          "vehicle_landing_site": 7779,
+          "crossing_plan": 102,
+          "ground_edges": 186,
+          "ground_nodes": 186,
+          "survey_ground_with_gravity": 186,
+          "terrain_crossings": 102,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 88,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "attempt": 3,
+          "earlier physical work": 23,
+          "refresh interval": 62
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 3968,
+          "attempt_tick": 3967,
+          "planned_slots": 1,
+          "measured_slots": 1,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3967
+          ],
+          "sample_ages": [
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 2920,
+        "charged_graph": 1559,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 3993
+        },
+        "validated_after_retirement": {
+          "0": 34
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 3968,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 1.5158498287200928,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 1.5158498287200928,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.0592973232269287,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02073563262820244,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.0686432421207428,
+              "departure_clearance": 371.87078857421875,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9058837890625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.0592973232269287
+          },
+          "native_best_admitted": {
+            "approach_score": 2.0592973232269287,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02073563262820244,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.0686432421207428,
+              "departure_clearance": 371.87078857421875,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9058837890625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.0592973232269287
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 1,
+            "retained_slots": 1,
+            "measured_slots": 1,
+            "admitted_sites": 1,
+            "eligible_sites": 1,
+            "eligible_directions": 2
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3967,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1542,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.00017263349150062197,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 2,
+            "local_reference": 1,
+            "preference": 1
+          },
+          "local_reference_seconds": [
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3934-p2-controlled-neighbors3": {
+      "trace": {
+        "controller_rows": 13778,
+        "decompressed_bytes": 129711394,
+        "trace_sha256": "73c3fb8ae2767c8f604dc3120d963214690002e0a52fcea26827947ff3cf02a9",
+        "sensor_rows": 13778
+      },
+      "sensors": {
+        "sensor_rows": 13778,
+        "sensor_work_sha256": "1f76152501b7d95c466908d5874d7865a8f96af22d166b1e3a16c5d653da8c28",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 154406,
+          "ground_edge_capsule_samples": 1388265,
+          "ground_edge_floor_samples": 462042,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 154014,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13778,
+          "combat_observation": 13778,
+          "flight_pilot_observation": 13778,
+          "ground_posture_observation": 13778,
+          "jetpack_navigation_with_ground": 13778,
+          "landing_objective_survey": 13778,
+          "mission_observation": 13778,
+          "pilot_observation": 13778,
+          "rebuild_relocation_survey": 13778,
+          "recovery_task_observation": 13778,
+          "tactical_sortie_observation": 13778,
+          "landing_hatch_clearance": 7773,
+          "landing_hull_placement": 4087,
+          "landing_preview_shapes": 7773,
+          "vehicle_landing_site": 7779,
+          "crossing_plan": 102,
+          "ground_edges": 186,
+          "ground_nodes": 186,
+          "survey_ground_with_gravity": 186,
+          "terrain_crossings": 102,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 88,
+        "queries": 122,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "attempt": 3,
+          "earlier physical work": 23,
+          "refresh interval": 35,
+          "collection window closed": 27
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 4028,
+          "attempt_tick": 3967,
+          "planned_slots": 3,
+          "measured_slots": 3,
+          "missing_slots": 0,
+          "sample_ticks": [
+            3967,
+            3997,
+            4027
+          ],
+          "sample_ages": [
+            61,
+            31,
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 2860,
+        "charged_graph": 1505,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 4052
+        },
+        "validated_after_retirement": {
+          "0": 94
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 4028,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 1.4876433610916138,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 1.4876433610916138,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.0592973232269287,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02073563262820244,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.0686432421207428,
+              "departure_clearance": 371.87078857421875,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9058837890625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.0592973232269287
+          },
+          "native_best_admitted": {
+            "approach_score": 2.0592973232269287,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02073563262820244,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.33441162109375,
+              "arrival_seconds": 0.0686432421207428,
+              "departure_clearance": 371.87078857421875,
+              "departure_side": 1.0,
+              "forecast_tick": 5509,
+              "parked_clearance": 386.9058837890625,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.0592973232269287
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 3,
+            "retained_slots": 3,
+            "measured_slots": 3,
+            "admitted_sites": 2,
+            "eligible_sites": 2,
+            "eligible_directions": 4
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 3967,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1542,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 34,
+                "planet": 2
+              },
+              "measurement_tick": 4027,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1482,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.00017263349150062197,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 4,
+            "local_reference": 3,
+            "preference": 3
+          },
+          "local_reference_seconds": [
+            24.766666412353516,
+            null,
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": [
+        {
+          "tick": 3997,
+          "site": {
+            "bearing": 32,
+            "planet": 2
+          },
+          "queries": 2,
+          "finding": "no_landing",
+          "later_native_site_available": true,
+          "native_assessments": [
+            {
+              "approach_score": 7.691653728485107,
+              "cover_penalty": 0.0,
+              "direction_order": 0,
+              "ground_score": 0.0,
+              "rejection": null,
+              "revision": 1,
+              "short_angle": -0.07744938135147095,
+              "side": -1.0,
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "site_order": 31,
+              "solar": {
+                "approach_clearance": 315.33441162109375,
+                "arrival_seconds": 0.25638845562934875,
+                "departure_clearance": 368.06964111328125,
+                "departure_side": 1.0,
+                "forecast_tick": 5509,
+                "parked_clearance": 384.35406494140625,
+                "side": -1.0,
+                "surface_seconds": 25.0
+              },
+              "total_score": 7.691653728485107
+            },
+            {
+              "approach_score": 7.691653728485107,
+              "cover_penalty": 0.0,
+              "direction_order": 1,
+              "ground_score": 0.0,
+              "rejection": null,
+              "revision": 1,
+              "short_angle": -0.07744938135147095,
+              "side": 1.0,
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "site_order": 31,
+              "solar": {
+                "approach_clearance": 315.33441162109375,
+                "arrival_seconds": 0.25638845562934875,
+                "departure_clearance": 368.06964111328125,
+                "departure_side": 1.0,
+                "forecast_tick": 5509,
+                "parked_clearance": 384.35406494140625,
+                "side": 1.0,
+                "surface_seconds": 25.0
+              },
+              "total_score": 7.691653728485107
+            }
+          ]
+        }
+      ]
+    },
+    "world1-asteroids0-on-s0t3997-p2-ordinary-nearest": {
+      "trace": {
+        "controller_rows": 8280,
+        "decompressed_bytes": 65368868,
+        "trace_sha256": "fffa495a2e577fcc692f240f16bb6e9754273535ed047ea12a4cbce8925c3f3f",
+        "sensor_rows": 8280
+      },
+      "sensors": {
+        "sensor_rows": 8280,
+        "sensor_work_sha256": "6fa8dcbe97f09d58980e42236a54bbde3a685f879449e4893c6b92f04b72b149",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8280,
+          "combat_observation": 8280,
+          "flight_pilot_observation": 8280,
+          "ground_posture_observation": 8280,
+          "jetpack_navigation_with_ground": 8280,
+          "landing_objective_survey": 8280,
+          "mission_observation": 8280,
+          "pilot_observation": 8280,
+          "rebuild_relocation_survey": 8280,
+          "recovery_task_observation": 8280,
+          "tactical_sortie_observation": 8280,
+          "landing_hatch_clearance": 3792,
+          "landing_hull_placement": 1908,
+          "landing_preview_shapes": 3792,
+          "vehicle_landing_site": 3792,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 16,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 16
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3": {
+      "trace": {
+        "controller_rows": 8280,
+        "decompressed_bytes": 65368868,
+        "trace_sha256": "fffa495a2e577fcc692f240f16bb6e9754273535ed047ea12a4cbce8925c3f3f",
+        "sensor_rows": 8280
+      },
+      "sensors": {
+        "sensor_rows": 8280,
+        "sensor_work_sha256": "6fa8dcbe97f09d58980e42236a54bbde3a685f879449e4893c6b92f04b72b149",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 70300,
+          "ground_edge_capsule_samples": 632672,
+          "ground_edge_floor_samples": 210852,
+          "ground_edge_jump_paths": 16,
+          "ground_edge_walk_paths": 70284,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 8280,
+          "combat_observation": 8280,
+          "flight_pilot_observation": 8280,
+          "ground_posture_observation": 8280,
+          "jetpack_navigation_with_ground": 8280,
+          "landing_objective_survey": 8280,
+          "mission_observation": 8280,
+          "pilot_observation": 8280,
+          "rebuild_relocation_survey": 8280,
+          "recovery_task_observation": 8280,
+          "tactical_sortie_observation": 8280,
+          "landing_hatch_clearance": 3792,
+          "landing_hull_placement": 1908,
+          "landing_preview_shapes": 3792,
+          "vehicle_landing_site": 3792,
+          "crossing_plan": 6,
+          "ground_edges": 69,
+          "ground_nodes": 69,
+          "survey_ground_with_gravity": 69,
+          "terrain_crossings": 6
+        }
+      },
+      "survey": {
+        "rows": 16,
+        "queries": 0,
+        "attempts": 0,
+        "measurements": 0,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "local landing demand": 16
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": false
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 0,
+        "charged_graph": 0,
+        "maximum_combined_graph": 0,
+        "active_validations": 0,
+        "ready_ticks": {},
+        "validated_after_retirement": {}
+      },
+      "subsets": [],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3997-p2-controlled-nearest": {
+      "trace": {
+        "controller_rows": 13932,
+        "decompressed_bytes": 131557346,
+        "trace_sha256": "5b856ca1624d47e3f20e623a654cb3c8abcaaac0d41066933488de1c37c89445",
+        "sensor_rows": 13932
+      },
+      "sensors": {
+        "sensor_rows": 13932,
+        "sensor_work_sha256": "af05a9e0299a2682fe7bcf03bea46c46ffdfdc854d3e1349038ebdeb222f7a5c",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 156374,
+          "ground_edge_capsule_samples": 1405977,
+          "ground_edge_floor_samples": 467946,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 155982,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13932,
+          "combat_observation": 13932,
+          "flight_pilot_observation": 13932,
+          "ground_posture_observation": 13932,
+          "jetpack_navigation_with_ground": 13932,
+          "landing_objective_survey": 13932,
+          "mission_observation": 13932,
+          "pilot_observation": 13932,
+          "rebuild_relocation_survey": 13932,
+          "recovery_task_observation": 13932,
+          "tactical_sortie_observation": 13932,
+          "landing_hatch_clearance": 7949,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7949,
+          "vehicle_landing_site": 7970,
+          "crossing_plan": 104,
+          "ground_edges": 188,
+          "ground_nodes": 188,
+          "survey_ground_with_gravity": 188,
+          "terrain_crossings": 104,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 90,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "earlier physical work": 24,
+          "attempt": 3,
+          "refresh interval": 63
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 4037,
+          "attempt_tick": 4036,
+          "planned_slots": 1,
+          "measured_slots": 1,
+          "missing_slots": 0,
+          "sample_ticks": [
+            4036
+          ],
+          "sample_ages": [
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 2928,
+        "charged_graph": 1516,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 4061
+        },
+        "validated_after_retirement": {
+          "0": 40
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 4037,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 2.2786624431610107,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 2.2786624431610107,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.813232660293579,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02832721546292305,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.09377442300319672,
+              "departure_clearance": 372.3037109375,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 387.19677734375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.813232660293579
+          },
+          "native_best_admitted": {
+            "approach_score": 2.813232660293579,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02832721546292305,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.09377442300319672,
+              "departure_clearance": 372.3037109375,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 387.19677734375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.813232660293579
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 1,
+            "retained_slots": 1,
+            "measured_slots": 1,
+            "admitted_sites": 1,
+            "eligible_sites": 1,
+            "eligible_directions": 2
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 4036,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1499,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.00017263349150062197,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 2,
+            "local_reference": 1,
+            "preference": 1
+          },
+          "local_reference_seconds": [
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    },
+    "world1-asteroids0-on-s0t3997-p2-controlled-neighbors3": {
+      "trace": {
+        "controller_rows": 13932,
+        "decompressed_bytes": 131557346,
+        "trace_sha256": "5b856ca1624d47e3f20e623a654cb3c8abcaaac0d41066933488de1c37c89445",
+        "sensor_rows": 13932
+      },
+      "sensors": {
+        "sensor_rows": 13932,
+        "sensor_work_sha256": "af05a9e0299a2682fe7bcf03bea46c46ffdfdc854d3e1349038ebdeb222f7a5c",
+        "sensor_counters": {
+          "ground_edge_candidate_pairs": 156374,
+          "ground_edge_capsule_samples": 1405977,
+          "ground_edge_floor_samples": 467946,
+          "ground_edge_jump_paths": 248,
+          "ground_edge_walk_paths": 155982,
+          "objective_clearance_samples": 0,
+          "objective_hull_tests": 0,
+          "ground_route_index_scanned_edges": 50880,
+          "ground_route_scanned_edges": 13240,
+          "ground_route_visited_nodes": 6687
+        },
+        "sensor_stage_calls": {
+          "claim_footing_survey": 13932,
+          "combat_observation": 13932,
+          "flight_pilot_observation": 13932,
+          "ground_posture_observation": 13932,
+          "jetpack_navigation_with_ground": 13932,
+          "landing_objective_survey": 13932,
+          "mission_observation": 13932,
+          "pilot_observation": 13932,
+          "rebuild_relocation_survey": 13932,
+          "recovery_task_observation": 13932,
+          "tactical_sortie_observation": 13932,
+          "landing_hatch_clearance": 7949,
+          "landing_hull_placement": 4278,
+          "landing_preview_shapes": 7949,
+          "vehicle_landing_site": 7970,
+          "crossing_plan": 104,
+          "ground_edges": 188,
+          "ground_nodes": 188,
+          "survey_ground_with_gravity": 188,
+          "terrain_crossings": 104,
+          "find_rebuild_placement": 120,
+          "ground_route": 120,
+          "ground_route_index": 120
+        }
+      },
+      "survey": {
+        "rows": 90,
+        "queries": 180,
+        "attempts": 3,
+        "measurements": 3,
+        "attempts_without_measurements": 0,
+        "reasons": {
+          "earlier physical work": 24,
+          "attempt": 3,
+          "refresh interval": 42,
+          "collection window closed": 21
+        },
+        "maximum_combined_queries": 126
+      },
+      "triggers": [
+        {
+          "triggered": true,
+          "source_tick": 4097,
+          "attempt_tick": 4036,
+          "planned_slots": 3,
+          "measured_slots": 3,
+          "missing_slots": 0,
+          "sample_ticks": [
+            4036,
+            4066,
+            4096
+          ],
+          "sample_ages": [
+            61,
+            31,
+            1
+          ]
+        },
+        {
+          "triggered": false
+        }
+      ],
+      "ledger": {
+        "rows": 2868,
+        "charged_graph": 1545,
+        "maximum_combined_graph": 64,
+        "active_validations": 121,
+        "ready_ticks": {
+          "0": 4122
+        },
+        "validated_after_retirement": {
+          "0": 100
+        }
+      },
+      "subsets": [
+        {
+          "source_tick": 4097,
+          "center": {
+            "bearing": 33,
+            "planet": 2
+          },
+          "center_preferred": {
+            "approach_score": 3.551586151123047,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "subset_preferred": {
+            "approach_score": 3.551586151123047,
+            "direction_order": 0,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            }
+          },
+          "native": {
+            "approach_score": 2.813232660293579,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02832721546292305,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.09377442300319672,
+              "departure_clearance": 372.3037109375,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 387.19677734375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.813232660293579
+          },
+          "native_best_admitted": {
+            "approach_score": 2.813232660293579,
+            "cover_penalty": 0.0,
+            "direction_order": 0,
+            "ground_score": 0.0,
+            "rejection": null,
+            "revision": 1,
+            "short_angle": 0.02832721546292305,
+            "side": 1.0,
+            "site": {
+              "bearing": 33,
+              "planet": 2
+            },
+            "site_order": 32,
+            "solar": {
+              "approach_clearance": 315.84796142578125,
+              "arrival_seconds": 0.09377442300319672,
+              "departure_clearance": 372.3037109375,
+              "departure_side": 1.0,
+              "forecast_tick": 5535,
+              "parked_clearance": 387.19677734375,
+              "side": 1.0,
+              "surface_seconds": 25.0
+            },
+            "total_score": 2.813232660293579
+          },
+          "center_subset_relation": "site_and_direction_match",
+          "native_relation": "site_and_direction_match",
+          "coverage": {
+            "planned_slots": 3,
+            "retained_slots": 3,
+            "measured_slots": 3,
+            "admitted_sites": 3,
+            "eligible_sites": 3,
+            "eligible_directions": 6
+          },
+          "unassessed_bearings": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "native_joins": [
+            {
+              "site": {
+                "bearing": 33,
+                "planet": 2
+              },
+              "measurement_tick": 4036,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1499,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 32,
+                "planet": 2
+              },
+              "measurement_tick": 4066,
+              "geometry_maximum": 0.0001220703125,
+              "age_ticks": 1469,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            },
+            {
+              "site": {
+                "bearing": 34,
+                "planet": 2
+              },
+              "measurement_tick": 4096,
+              "geometry_maximum": 0.00017263349150062197,
+              "age_ticks": 1439,
+              "solar_signs": [
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ],
+                [
+                  "clear",
+                  "clear",
+                  "clear"
+                ]
+              ]
+            }
+          ],
+          "maximum_geometry_residual": 0.00017263349150062197,
+          "maximum_solar_reconstruction_error": 0.0,
+          "maximum_score_reconstruction_error": 0,
+          "charges": {
+            "solar": 6,
+            "local_reference": 3,
+            "preference": 3
+          },
+          "local_reference_seconds": [
+            24.766666412353516,
+            24.766666412353516,
+            24.766666412353516
+          ]
+        }
+      ],
+      "negative_measurements": []
+    }
+  },
+  "raw_hashes": {
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/arrival-survey.jsonl": "5655abdaec67d9797739309ac14d313656e4ddb8449cce22ccc3fa3a0a463b6c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/flag-survey-work.jsonl": "d41535ee0ad1db966048120b5c498c5c298baa3a9e1d8d4b53cedc6ae5da20b3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/flag-value-shadow-work.jsonl": "e7b7d911082501727066b26b3cc085e5ccdbe652ef68cd2226f80eed4516006b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/flag-value-shadow.jsonl": "3bdb154693581c4684f05ec8e4d6497a6e57695b79eaa5fd49cc071c9e788318",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/live-planning.csv": "453853dc279ea730ffd2ae15cc07688297e54ccc70a444735bf4bcf61b66886e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/mission-evaluation-work.jsonl": "0cd565a382f275e8b09e40c6e64ebf12db62b72ecea2f8fe47616e4d009ac3d9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/mission-evaluations.jsonl": "c52472cfea12da6ad7974ef06138ab7087e655183b15503eb670a6ff374b141d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/report.json": "928da4f5fd14923c1b6183e31f120227f831e03d07fb03f2e61ba17494ed8512",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/sensors.jsonl": "e8e72d9423d4f4f20b4158357da77745f6d8de6ac124746bc4eafdd75fb3f027",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/trace.jsonl.gz": "e5cd4839ee03bab73159737291205b85d8787e29c89bbdd69636dc2e1e8fe445",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest/transfer-comparison-work.jsonl": "c62df27e3cdc430b4cff86b57f35ad4f1e09cb754e75db3dfcc6e9d1e7adf1c3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/arrival-survey.jsonl": "9919fb726b97e5587f76fcb91e908c5a395700547a87261bc0721cab935553f3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/flag-survey-work.jsonl": "d41535ee0ad1db966048120b5c498c5c298baa3a9e1d8d4b53cedc6ae5da20b3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/flag-value-shadow-work.jsonl": "e7b7d911082501727066b26b3cc085e5ccdbe652ef68cd2226f80eed4516006b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/flag-value-shadow.jsonl": "3bdb154693581c4684f05ec8e4d6497a6e57695b79eaa5fd49cc071c9e788318",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/live-planning.csv": "e007c4f12b175eee52253c8caf0058890e00aff098ae2215ae09ae78b2ac8cf3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/mission-evaluation-work.jsonl": "0cd565a382f275e8b09e40c6e64ebf12db62b72ecea2f8fe47616e4d009ac3d9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/mission-evaluations.jsonl": "c52472cfea12da6ad7974ef06138ab7087e655183b15503eb670a6ff374b141d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/report.json": "d87cfef2b0dde1348c8b90ed5724ab9043613aa8a77faf19034e1587b4d0238a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/sensors.jsonl": "b04acd5838087169de9dc137f90ba60f7ae528f257b816aa3a3b3ba2ae11fc33",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/trace.jsonl.gz": "d89ea8c0e1e5391148d23fab6281651524f93d57ead606aae321f3ff981f822c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3/transfer-comparison-work.jsonl": "7cdbdd99f295b083faca927ad384d7883ca24ddcdce8c128e54bba04aab2af33",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/arrival-survey.jsonl": "9d7c6e13724c9f960bb141f2db92555e01b441fd010ea6c8b1d15661bd6fa44e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/destination-cover.jsonl": "18f2ff9e9eb5526e65f739029ffe6ce3b6c0b10d7f70b8a4f56a7f63f01b00ad",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/flag-survey-work.jsonl": "056e1bfdcb8a01159a19c2468e7d54587b7bd1339a9fa09148b0128cd324473e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/flag-survey.jsonl": "1cc14df2d9ab3fc0687afd17809014a74a00054905bf0bfec9a9ec048217d69a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/flag-value-shadow-work.jsonl": "db9bcce00a4d7d755c4e95761c5f3dd8c938d53ba74eb63f978ae8f5724cf66e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/flag-value-shadow.jsonl": "b3798810fb4c97a2a26ac36baf1200de3a38808592f00bf0b2be687824bfd4b5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/live-planning.csv": "9e09df51e80e7049f4723d3ad00fb53c5669182ab09fd9da5c861f64a8ba6f3a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/mission-evaluation-work.jsonl": "abd564939a9f283c0318db3851fd56e2971d8f6cd80831d3a9817cb0b2d2ea66",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/mission-evaluations.jsonl": "77da90a2e808118cb90f9af23c50dc3bd01e68e93d689f98306a4071ffa8d974",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/report.json": "8725422082efa0e573de6eb99ed2751ddb932771e29ee4f072479aabb6681681",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/sensors.jsonl": "8acf22ab7a4405f329525d3722391e0e4a41f67c44ff328ed0f0af2a5b805da5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/surveyed-arrival-comparison.jsonl": "49b52c69cb4d195af7eb1ce2a3e2674b61e70538e6dfc8c905d19d052ebcc109",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/trace.jsonl.gz": "014807d6fa1cdacc905e6090272725f3e9109b78f8525caf202995cd74373bdd",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/transfer-comparison-work.jsonl": "2f76fe470c0167aa4485848936689a3b857376205422fa04358bdd9a1e713bfe",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest/transfer-probe.jsonl": "6729683318a56a4709c6217bc8d7504b7bfab627e75550d196e55d0074415529",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/arrival-survey.jsonl": "675b5e07dbb2bb12ea1749e761e3c7f7256e15d9ffc29ae15c5427fa4ef0d7b3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/destination-cover.jsonl": "18f2ff9e9eb5526e65f739029ffe6ce3b6c0b10d7f70b8a4f56a7f63f01b00ad",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/flag-survey-work.jsonl": "056e1bfdcb8a01159a19c2468e7d54587b7bd1339a9fa09148b0128cd324473e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/flag-survey.jsonl": "1cc14df2d9ab3fc0687afd17809014a74a00054905bf0bfec9a9ec048217d69a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/flag-value-shadow-work.jsonl": "db9bcce00a4d7d755c4e95761c5f3dd8c938d53ba74eb63f978ae8f5724cf66e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/flag-value-shadow.jsonl": "b3798810fb4c97a2a26ac36baf1200de3a38808592f00bf0b2be687824bfd4b5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/live-planning.csv": "6cfc1fd8416fe42a6933d1123d4b3b9e220080ca06688b20fb412c062615fa0a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/mission-evaluation-work.jsonl": "abd564939a9f283c0318db3851fd56e2971d8f6cd80831d3a9817cb0b2d2ea66",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/mission-evaluations.jsonl": "77da90a2e808118cb90f9af23c50dc3bd01e68e93d689f98306a4071ffa8d974",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/report.json": "4e1298b4682ddf957db3702658de5d84208e9b659d8b1948f13b2a3aad1e7aa9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/sensors.jsonl": "3f19055ecca780eb2331b62b593a95b6e7151ccbfb4312b508e212d7e5adc183",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/surveyed-arrival-comparison.jsonl": "8d256f77dbeb8052f1797b7777c2cc153f59d5fb43f5a4576fffdb9decc9311e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/trace.jsonl.gz": "b51fcc61b275f9f8a8c39523c7d03b1fcc73ac5b04f14278cb8d53817bb4527e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/transfer-comparison-work.jsonl": "78bb3eeb27305947b3907097f42dff5315f9d3c4e7aa74481916c1647465139a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3/transfer-probe.jsonl": "6729683318a56a4709c6217bc8d7504b7bfab627e75550d196e55d0074415529",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/arrival-survey.jsonl": "57ffdf9fc88cecc01c79fbfecc1e437bcefdc7f2a50b43c8c83d9f5811b48db5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/flag-survey-work.jsonl": "c74e003511758aab3bdd3259c1b9b272c7d42eae8a727cb96748cbbb75fa2d19",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/flag-value-shadow-work.jsonl": "4f9ee3f8df2a3805b5724d3c800dc80c449c0bb5955a169aa76ea6c1375816fe",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/flag-value-shadow.jsonl": "7d399c72728f3cbbbf0f88056ca2c56ebb0f2b82748fcefe212fae329fe7cd56",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/live-planning.csv": "321f28611f2d89c31f362f81950216a5ae7f09a1645cff0be0c3749f2c1505fc",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/mission-evaluation-work.jsonl": "422364ff98bbd17b97c0d0c99c41a5e3b4e4963e27780bbc3cc046c78bb7573e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/mission-evaluations.jsonl": "e5ac46fa7210d1ad7237a1b6633044f400d47f2a5d693932eeab15fbe2c975e7",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/report.json": "958f8328be16c83d424f5d3e3275196db428bce8fa8dc95f6b7802b1d76cf7ef",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/sensors.jsonl": "6bdac1109fe50d90991afcd2d26324692706a7fbed7d4b394c873185c89b8728",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/trace.jsonl.gz": "b523930c42a9e9e08c189d7350f8cf0199fdd64038d07783b24e3ef22f52aa5f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest/transfer-comparison-work.jsonl": "0d2b44649b7f221982862bbf49aeda4faf65a9722594e489b59d83a9ebc65ed1",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/arrival-survey.jsonl": "95efbd82ad09fe2e7b1ca064bd9a84c3cff6db435c00e5b70b28da45a31bcc60",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/flag-survey-work.jsonl": "c74e003511758aab3bdd3259c1b9b272c7d42eae8a727cb96748cbbb75fa2d19",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/flag-value-shadow-work.jsonl": "4f9ee3f8df2a3805b5724d3c800dc80c449c0bb5955a169aa76ea6c1375816fe",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/flag-value-shadow.jsonl": "7d399c72728f3cbbbf0f88056ca2c56ebb0f2b82748fcefe212fae329fe7cd56",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/live-planning.csv": "c5fc67e774878aeb78ac9d30b882fdea5bbfa14c8aa307fd1a5fef60fb4e9843",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/mission-evaluation-work.jsonl": "422364ff98bbd17b97c0d0c99c41a5e3b4e4963e27780bbc3cc046c78bb7573e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/mission-evaluations.jsonl": "e5ac46fa7210d1ad7237a1b6633044f400d47f2a5d693932eeab15fbe2c975e7",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/report.json": "0f100af81d4b1c97c96e9989996171a0ac8a9a2a41d2ab4ce185442b3055c5b1",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/sensors.jsonl": "9f819145949d9c20530ddbc6a04ffb898e840ded12e26daf93181d82f6279e4c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/trace.jsonl.gz": "b0526dfef05efcd15275dcfcef3f334efca49f619e7061f35a62cc02899dc18c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3/transfer-comparison-work.jsonl": "751d85eb547ab92a28e8aa9db57430babfef6222f203ad41626aa211d6c75e6c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/arrival-survey.jsonl": "ce28612930b5a18e6358f885e9ecf2292a6815368f045489fd0694e18c16abd5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/destination-cover.jsonl": "305c35f9e91922cc8f41505ed7868958a110598a928ec59d5f3b758c125be040",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/flag-survey-work.jsonl": "9b4156b2eb68e239ca615b748c8511fea77983894447e3abc79647d8748748ed",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/flag-survey.jsonl": "bf8fc8287d1424894acdb8e5318c9a5c8740808ce05bb4903d5739a7d8d1c43d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/flag-value-shadow-work.jsonl": "0d0668a5dcd0aa453ed22d30c05d6d1b8b0d9677be1ce19d5a023710f8438361",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/flag-value-shadow.jsonl": "faa5570ccf2b205ceb5a2390df6617574fbefe352ecf33e0be5fc695c52a7d38",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/live-planning.csv": "98342ada16465b7b8cd427e59af7d6e739804e6b5f586459976c0d9e6c478967",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/mission-evaluation-work.jsonl": "94a1d4c52ddb4a0546b1c828c69579c3d8a0e9a18b458e1cf7b560e3459e7b62",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/mission-evaluations.jsonl": "c38acf2a6e7903de50d572312fa7b0c9955a12fa702bc0655b344775912a8c50",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/report.json": "1d1a9c655b8d6c998b87eda71bb7162f9300222bc666fe22dd08a5ddc7175b1b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/sensors.jsonl": "c00e2c3659474c89477890cdee01d8fec620f74657e7ea74b20565f7ba46f3e5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/surveyed-arrival-comparison.jsonl": "80a9a7412d417bdfc0bc5351d5d8ec78e5b7d39aaa6d00596619ee65efdd408a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/trace.jsonl.gz": "2508f2984c012f5385b8b285f96a9157cd41840f48f18b3df526eda41fe2f056",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/transfer-comparison-work.jsonl": "341cb4e6f4fa32db69625e179bfcf39a7ac7732141486c46f1a317e5db7e1707",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest/transfer-probe.jsonl": "cf62e9171848c5dd206b6e4d74bc2fdcb0b859cc048c0c52b4f99f9b5398e043",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/arrival-survey.jsonl": "064684f83cb70bd97338fe728a45f9f6f95babb7298db567cfc3f2ec6d14cf5c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/destination-cover.jsonl": "305c35f9e91922cc8f41505ed7868958a110598a928ec59d5f3b758c125be040",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/flag-survey-work.jsonl": "9b4156b2eb68e239ca615b748c8511fea77983894447e3abc79647d8748748ed",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/flag-survey.jsonl": "bf8fc8287d1424894acdb8e5318c9a5c8740808ce05bb4903d5739a7d8d1c43d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/flag-value-shadow-work.jsonl": "0d0668a5dcd0aa453ed22d30c05d6d1b8b0d9677be1ce19d5a023710f8438361",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/flag-value-shadow.jsonl": "faa5570ccf2b205ceb5a2390df6617574fbefe352ecf33e0be5fc695c52a7d38",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/live-planning.csv": "f9533673fb2acd5ffd4ca43f8e1101225467ca46f1fbd9cc372a29465c58df17",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/mission-evaluation-work.jsonl": "94a1d4c52ddb4a0546b1c828c69579c3d8a0e9a18b458e1cf7b560e3459e7b62",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/mission-evaluations.jsonl": "c38acf2a6e7903de50d572312fa7b0c9955a12fa702bc0655b344775912a8c50",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/report.json": "feca5634e9bb24a3cb02c4048d066dea059319b7bbe37583dc30650bb43f3489",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/sensors.jsonl": "68f401214a7a8ed469255aac76460169959c9ad78347de8131c5d8de2725806b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/surveyed-arrival-comparison.jsonl": "bf6dd6e1de9217844313062eb4cec960252b8f96a1f5f0a0b2766b2cc85ca411",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/trace.jsonl.gz": "4afe3751a2264d336b30dceb7eeabae79f9204450bb9da86bc0dbc58045a3a7e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/transfer-comparison-work.jsonl": "20f2c20de9cff18f51a6ac62b3bda136106f34adf8a7c91c57cb53436e7cb38c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3/transfer-probe.jsonl": "cf62e9171848c5dd206b6e4d74bc2fdcb0b859cc048c0c52b4f99f9b5398e043",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/arrival-survey.jsonl": "a284fd69dcd632333a31510124b1108c3f2424073a029973296390adde45c32f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/flag-survey-work.jsonl": "3ceadc335e2993790ca567485eaf38f731ef44616b8fb56faade9ecf62fc7196",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/flag-value-shadow-work.jsonl": "74717db63040a7429767579c9c12fad86af50b98fdc9e31e5813423bc0f2e95b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/flag-value-shadow.jsonl": "dfd117e458b408611225e4bdd9149eab96c98bb2e7305eb1c4b0a040cf115774",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/live-planning.csv": "01ac1e01ceff2e657c286cd0257bf9925562faa65ddb26fa831b4ed56b4c0bbc",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/mission-evaluation-work.jsonl": "ce88485034de7703808fd6f1369d628e6d387d8002d4d1dea54d882184675211",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/mission-evaluations.jsonl": "edfb0dc551caa9f46a1a4a86a337386e42009e0cd5151e366a926a159fae15f9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/report.json": "c5bc4472e3bd922341366ef8d89553dc3244fdc30e15633b08faf0d2ed98df97",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/sensors.jsonl": "40b46ee8b1099b69c4abc3bb26e9e400ca54100f255114a122c58e15e014e12e",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/trace.jsonl.gz": "e432a230e27a0b511ffb527182356442a9c22f23562bfaf0532074a958b55522",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest/transfer-comparison-work.jsonl": "cc117d1ee710fe3ae45b66d0feee0ff91ad2abebe9942c17111cfc45b19f43c0",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/arrival-survey.jsonl": "c16bb3a279bc20e056b8fe99ccedf034996a23ca044811870cc31feb9474e2e8",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/flag-survey-work.jsonl": "3ceadc335e2993790ca567485eaf38f731ef44616b8fb56faade9ecf62fc7196",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/flag-value-shadow-work.jsonl": "74717db63040a7429767579c9c12fad86af50b98fdc9e31e5813423bc0f2e95b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/flag-value-shadow.jsonl": "dfd117e458b408611225e4bdd9149eab96c98bb2e7305eb1c4b0a040cf115774",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/live-planning.csv": "3f168d7bb6eec0d7ca659fad34d95525a2066265b345813435f40c4e226a9ef3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/mission-evaluation-work.jsonl": "ce88485034de7703808fd6f1369d628e6d387d8002d4d1dea54d882184675211",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/mission-evaluations.jsonl": "edfb0dc551caa9f46a1a4a86a337386e42009e0cd5151e366a926a159fae15f9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/report.json": "318cc7e2169a7a73d15d1766e41d7134b23dc0edbce94671b75c6408fa515b7c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/sensors.jsonl": "7587dce8aa54dedef5acbd6765f1aa1e7534e1b4c7fae85fb317934be9936f13",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/trace.jsonl.gz": "3d8273d535a263026d63d9048df1515a9caffe8420e7c6bfaa1361af8c25887d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3/transfer-comparison-work.jsonl": "1cfad2bd35df783a4b93e946f2ef3d23b811f1a41aa0d290c6a146063bd97238",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/arrival-survey.jsonl": "49db0fb686fba47baeff55e3599df694589d5c2a607b02fdd4a4e94ab2a8b061",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/destination-cover.jsonl": "1e6232a3bd0e289be772315e70c2efadc69f5508a104c2ec9f6a447bcd1a2de5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/flag-survey-work.jsonl": "cac069d8e13f112e24f888949e1f725048f0927894d314bd9480fcf91cada39f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/flag-survey.jsonl": "85d175fdf4a6f8790784e38112e64ff7ffe191952ca014bcd1ce134d054f4cf3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/flag-value-shadow-work.jsonl": "e9aed7fdca144e326f2d4d330e87b6f3c7e1d25e36d3a8646fd48d0a4198b900",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/flag-value-shadow.jsonl": "9431b4a868b13847f48b731d217b5a012ede1dce40a16a2812e9a9672590b708",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/live-planning.csv": "d558a899350cfdebc67418b211c45ed606451978d2391f9be368c9f39adeea6f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/mission-evaluation-work.jsonl": "9051568eefc268753593be8d7970dd190d4e07fb9c84fd9bbf6be6f1155c27fc",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/mission-evaluations.jsonl": "0d85f82cb508452351680fc4ff2ee397618b4dbb8d90e99dfc47e4cbd0acd35b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/report.json": "7ec45d4bb980bd170f36b779b75ff09de15d4e8679cf4b3d92cf0eeaa6fb9bb9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/sensors.jsonl": "6b82f9491214da1b433eace653ac2536d834d1c7f1d2b8ad07180983094cd113",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/surveyed-arrival-comparison.jsonl": "fedba82335b751579bf2b3ad1b40b98e1e1cf7367b2d0d09bb152a9a049953ea",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/trace.jsonl.gz": "5c2517e17d605dbad2bcbf70ae55b2800bb3e5fcd55f3afd287e32be01c83689",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/transfer-comparison-work.jsonl": "e1ba98ea7b506d0d7e0861ca2e7e18fb8c4812c9d3ab21ddc2a5e7ffd21020e0",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest/transfer-probe.jsonl": "1400d9dde61b478522bae50d30436fa109c16716f602540303641724c9b0c9b4",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/arrival-survey.jsonl": "aa8650d9799a7b9b0ac46384b29e99a046e17c98a9fa345e6ea6d7ed4ab38bad",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/destination-cover.jsonl": "1e6232a3bd0e289be772315e70c2efadc69f5508a104c2ec9f6a447bcd1a2de5",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/flag-survey-work.jsonl": "cac069d8e13f112e24f888949e1f725048f0927894d314bd9480fcf91cada39f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/flag-survey.jsonl": "85d175fdf4a6f8790784e38112e64ff7ffe191952ca014bcd1ce134d054f4cf3",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/flag-value-shadow-work.jsonl": "e9aed7fdca144e326f2d4d330e87b6f3c7e1d25e36d3a8646fd48d0a4198b900",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/flag-value-shadow.jsonl": "9431b4a868b13847f48b731d217b5a012ede1dce40a16a2812e9a9672590b708",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/live-planning.csv": "f560194cf55e338731e95be238d45b70c20b26de12f8ab367b17827e0a1987ab",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/mission-evaluation-work.jsonl": "9051568eefc268753593be8d7970dd190d4e07fb9c84fd9bbf6be6f1155c27fc",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/mission-evaluations.jsonl": "0d85f82cb508452351680fc4ff2ee397618b4dbb8d90e99dfc47e4cbd0acd35b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/report.json": "fcf4d5115b6e0252ea2e212bfca77de885ab6bebffeeda8654d30393769903bb",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/sensors.jsonl": "43362f8cf9d8b65fe044af450dfbf7624a948fc4dec679c08249b191eed2270b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/surveyed-arrival-comparison.jsonl": "01ff8747a684494d81418edf4d9c7482bc1566e30c0588e61b51db2e1f883c78",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/trace.jsonl.gz": "fd2a2bb9c26d463a596d98322fc0eed210aa61c1e62f49d46c7d44aed80942e0",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/transfer-comparison-work.jsonl": "d3553dd18bb1ed3dfa9fef2eafa4f81f61d2d6d829b146c1e5b66fb5497b767a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3/transfer-probe.jsonl": "1400d9dde61b478522bae50d30436fa109c16716f602540303641724c9b0c9b4",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/arrival-survey.jsonl": "c512976b1942f94a4459c6c53286e02be72f9549e9de2b28ad058df313a5b244",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/flag-survey-work.jsonl": "7049cae590cfad219b634844f0901ef2d27eb6271249e85c56103bec428ea12a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/flag-value-shadow-work.jsonl": "5c78a35ff96bf508b6e9e57d0dcf941752a361287f5b7b5a298a03e6b7206e5d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/flag-value-shadow.jsonl": "1e26858119d43fdb1e7186d059f6f69674e8f2eff6808ed54d730ebc9cc53f64",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/live-planning.csv": "38b8747cf78a82febf2f08b2cbd7210a7ccbb33d1e47963d1ae3903552b47860",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/mission-evaluation-work.jsonl": "12bfa8f1bd2854e31c34590dc9cd22e3e5b9ba145931418ea2f949708650a048",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/mission-evaluations.jsonl": "451610d26b68a0868397af52a4fa4d4ae40ff5de4d532afd54ad4c151cd85abb",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/report.json": "42cba684c53eb792578bf1e865506dbab393b51e1a0d7022f945429ba7102606",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/sensors.jsonl": "885b9990f432e818245ab586f2af541ba781ca408db6c9bbd14f2303915a865a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/trace.jsonl.gz": "df7558b05a7ff9b6b5e5d65b48fbe85bdd2c99c2312f6c8dc9d734032bb51a2b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest/transfer-comparison-work.jsonl": "5430d444f77fc3c9fddd634bd1f593e0e32393b60394d3159528817bf91ae93a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/arrival-survey.jsonl": "0d0ac9c051cb4464dd485c4429abaf40d520c913b960ef10416afa8e20e29abc",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/destination-cover.jsonl": "47aef2ee82b812a43681a46fd1eaac4de2f21b9815caefc264936f352c56a795",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/flag-survey-work.jsonl": "7049cae590cfad219b634844f0901ef2d27eb6271249e85c56103bec428ea12a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/flag-survey.jsonl": "831a3e5f42055565db30c9592671326e98b27704c869b7464e442c30d5d8f014",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/flag-value-shadow-work.jsonl": "5c78a35ff96bf508b6e9e57d0dcf941752a361287f5b7b5a298a03e6b7206e5d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/flag-value-shadow.jsonl": "1e26858119d43fdb1e7186d059f6f69674e8f2eff6808ed54d730ebc9cc53f64",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/live-planning.csv": "1dfcad2b5a5bf377c6f21992f50693a286c684e2b117897fa88a48e979688256",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/mission-evaluation-work.jsonl": "12bfa8f1bd2854e31c34590dc9cd22e3e5b9ba145931418ea2f949708650a048",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/mission-evaluations.jsonl": "451610d26b68a0868397af52a4fa4d4ae40ff5de4d532afd54ad4c151cd85abb",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/report.json": "093f9990d5763b121a54bbcd059d0b9c113bf276d56fac32fefec10479574dbf",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/sensors.jsonl": "0eb1a408f907a9053aa2a33a1da78adb10cd86eed284c5a12062a871568ec703",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/surveyed-arrival-comparison.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/trace.jsonl.gz": "9119012b252438c42360364ee6b1825191b08fe68932b53b4f8bec32ea106894",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3/transfer-comparison-work.jsonl": "f1da191b9ece036b6523a5c468156d0c6cf90972af7396ee36bc571bc06366c2",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/arrival-survey.jsonl": "82c013c98a8dbd98ed8c1e5e56d140cbc854200e48484c7c7a58f09d6a1be283",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/destination-cover.jsonl": "00753a7276d43ea476486a33cf3994c80325159d336796f5ce3edb627bafe855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/flag-survey-work.jsonl": "3d88e809bd9f0414f63198e6790bb884e56ad104d2c9394a8c5e783146830dd9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/flag-survey.jsonl": "7571dd10015cf3fedf60ed5f934b24a04286567b3cdab8731d1bb8da7ee75bd8",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/flag-value-shadow-work.jsonl": "5cd8420d299a81c1d840a13e14c5ee9831d638b0794b562efe0f437a34a1e7bd",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/flag-value-shadow.jsonl": "f0383ff09938c63b59be7751488a30be256a1a9fd1773e608a100b90b6976ea7",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/live-planning.csv": "281b1becaa0f897db699504e9337a602dfb003eafddc545031decd8df921053f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/mission-evaluation-work.jsonl": "38d117732985d729a06bbe0bb5f7ec03a6dec9b9e49f5bdb107850c471565cec",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/mission-evaluations.jsonl": "435de720a94a83436a01f90eed8a9c2d4b98c1b5a919a319fadbc726a40ab444",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/report.json": "adc50f938cdeb0ae054a0492c342d4615cd4196686c7cc458b0e95359ced4160",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/sensors.jsonl": "491f7c9a95de23d7ea0ecfcc097c96b68eae1ce95cf78f2759721fe8f9d979f4",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/surveyed-arrival-comparison.jsonl": "0f4be07192f5a735f1bfb9534c42b4f1dfd69687aa06053c1604713e7c64355a",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/trace.jsonl.gz": "ad694495e02920cb2f17cad67450703a3bd0ef7ae10ea366eea38d655b543e03",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/transfer-comparison-work.jsonl": "34907ab789e3f1117649a3351c436cb7fccc4813c27e69777050edd766db0abb",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest/transfer-probe.jsonl": "317e15cd1e46ef4cfcaaa4bebc69d9a3a6d8bece3df666f50dcb460748645122",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/arrival-survey.jsonl": "f0327c19989e5a1eac9b91ad073ad5c8bf6f6cfa13386bd25f01a15571e8cd96",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/destination-cover.jsonl": "00753a7276d43ea476486a33cf3994c80325159d336796f5ce3edb627bafe855",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/flag-survey-work.jsonl": "3d88e809bd9f0414f63198e6790bb884e56ad104d2c9394a8c5e783146830dd9",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/flag-survey.jsonl": "7571dd10015cf3fedf60ed5f934b24a04286567b3cdab8731d1bb8da7ee75bd8",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/flag-value-shadow-work.jsonl": "5cd8420d299a81c1d840a13e14c5ee9831d638b0794b562efe0f437a34a1e7bd",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/flag-value-shadow.jsonl": "f0383ff09938c63b59be7751488a30be256a1a9fd1773e608a100b90b6976ea7",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/live-planning.csv": "95c5bf8ee3cdc40392d7c767581092b2c29b17356d24c080a9a02809d202286c",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/mission-evaluation-work.jsonl": "38d117732985d729a06bbe0bb5f7ec03a6dec9b9e49f5bdb107850c471565cec",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/mission-evaluations.jsonl": "435de720a94a83436a01f90eed8a9c2d4b98c1b5a919a319fadbc726a40ab444",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/report.json": "3852baa336a4455135d4041d74fd13239a5eea93d5045390f4d4b25195851fac",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/sensors.jsonl": "415589f096e4b21e217dc10980da7297b05c4b7bbbcb50b50d7094b7f477e20b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/surveyed-arrival-comparison.jsonl": "bafc9316496c8628133e3ab158c60b2d503afd1999be4cbfca1736ea08c76607",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/trace.jsonl.gz": "2aa61a7d5da5c281dd40af48b9dc81736a5a62f83930606cfa993455178da4af",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/transfer-comparison-work.jsonl": "72df78813042917f1678708f7683fdf651bf030aa4863a1cbf496f16044daf20",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3/transfer-probe.jsonl": "317e15cd1e46ef4cfcaaa4bebc69d9a3a6d8bece3df666f50dcb460748645122"
+  },
+  "log_hashes": {
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-nearest.log": "012d7d3a6b196bcecb747a813a78a5e5cf6046a9c873e158940d72aee5e60078",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-ordinary-neighbors3.log": "916362b807fc929e1e596c913b9f17d4945a652224a39c21b28846eb04d28294",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-nearest.log": "28ed300fa3015b34049ce564b5af3e15bbc04a73ee584217cbb8df752ffc6653",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3816-p2-controlled-neighbors3.log": "39d28652e7d3173b0430301e1ae33fcae5827104a2ca8064126fc497aee7227f",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-nearest.log": "686a0723dcf2eb968ff9422dd64c87cac6d210cf77d019ea72346fe0dc81424b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-ordinary-neighbors3.log": "b13dcd69ddae35f842bb134f3db252db0f32a933a84d44d47b596ddd0325ede6",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-nearest.log": "e6b451f0a27c599d8caaead4e52576349f0d998c99f5404f3466a05373bc5e2b",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3876-p2-controlled-neighbors3.log": "e6427ff03bd220fe51b9df4a80f7717ad3d420c143b3a604d8151c96a6eb7737",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-nearest.log": "cd464b311822848991941ee13b10b6d9a6ebe8567616a7c99f517c1a0e4f02df",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-ordinary-neighbors3.log": "1ee112c692fda1e118bb50cdf5c5a0047ea5563ce02f74b0c3f7f7f8fe60bc82",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-nearest.log": "75633395283d94229ae1c5bec85ccf1c652b98a1ec9c94be327de5046ddd5f42",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3934-p2-controlled-neighbors3.log": "0b8ef26c0d8a4f04502e1467319560efa0896b5462d4b9a8a4f99457de77ac0d",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-nearest.log": "edeaf6f6202d0a30d05b8f3cdf72dc2ac424ce27057a5fa6dfed709aa8d74017",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-ordinary-neighbors3.log": "219bb02e83c3e5c89de460c9edf8d9e7346a10a42ac9d0bd0b67ce84a8308b08",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-nearest.log": "b6dea679e502e11751418e2665cce29adb715d22db3b5b3978dcb36d39a7a988",
+    "target/capture-flag-survey/arrival-neighbors-v1/world1-asteroids0-on-s0t3997-p2-controlled-neighbors3.log": "44f814ae997df798d6a5816330df34bd11fa5574c83cb2f894e0fe0df4a7081a"
+  },
+  "coverage": {
+    "runs": 16,
+    "physical_ticks": 88118,
+    "controller_rows": 176252,
+    "sensor_rows": 176252,
+    "decompressed_trace_bytes": 1562311426,
+    "ledger_rows": 23932,
+    "active_validations": 968,
+    "pairs": 8,
+    "worlds": 1,
+    "correlated_sources": 4,
+    "raw_files": 232,
+    "logs": 16,
+    "joined_sites": 14
+  },
+  "findings": [],
+  "notes_checked": true,
+  "projection_checked": true,
+  "checker_incidents": [
+    {
+      "script_sha256": "8aedeae2e83f93300b7853689e6b46e835f2c7ddf9fdf5419586a681386af6fd",
+      "stage": "compact projection after all16 raw checks passed",
+      "error": "AssertionError: native_joins",
+      "reason": "Independent checker assumed recursive projection subset; compact output renames retrospective records and derives flattened measurements and source records.",
+      "correction": "Check the explicit mapping from raw summary and hash-verified report, including later native assessments for negative samples. No runtime, frozen runner, replay or result changed."
+    }
+  ],
+  "aggregate": {
+    "nearest_graph": 6332,
+    "nearest_queries": 720,
+    "nearest_measurements": 12,
+    "neighbors3_graph": 6208,
+    "neighbors3_queries": 604,
+    "neighbors3_measurements": 12,
+    "maximum_geometry_residual": 0.0002729575167846423,
+    "maximum_solar_reconstruction_error": 0.0,
+    "maximum_score_reconstruction_error": 0,
+    "native_relations": {
+      "site_and_direction_match": 8
+    },
+    "center_subset_relations": {
+      "site_and_direction_match": 8
+    }
+  },
+  "scope": [
+    "All16 complete dense controls/observations and normalized native sensors independently scanned and matched the pinned previously certified physical corpus; all new raw/log/binary/command hashes checked.",
+    "Nearest reports and ledgers exactly preserve baseline; original controls, sensor work, upstream evidence and physical outcomes unchanged in both modes.",
+    "Sample epochs, fixed slots, partial-memory merge, first+61 freeze, full residual physical and graph ledgers, all new f32 scores, native ties, original material joins and same-frame center-only comparisons independently reconstructed.",
+    "Prior independent scalar geometry/solar helpers reused with hash pins. Native best retained recomputed in actual native order across source-admitted sites. No current replay runner imported.",
+    "Four correlated quiet source conditions in one world, including ordinary untriggered cases. This checks recorded evidence and conditional subset results, not global prediction, playing strength, universal acquisition time, or runtime performance. Lifecycle refusal/absent cases not observed in this fixed physical corpus remain test coverage."
+  ],
+  "raw_checker_sha256": "939900bd392a9df9d0fb11d8d60225260a37489f6d867192a438ca04363df793",
+  "projection_sha256": "b1c18e5bbeaaba94720692a26bd4727b53ff3b55bf7a942a572bf10c14be0d3d",
+  "notes_review": {
+    "path": "docs/capture-arrival-neighbors.md",
+    "sha256": "745ac6d8235ed32fbba707a64bcd9f0287c70d17897d6499d46702c324c6a189",
+    "frozen_plan_sha256": "e632cad1ca9e6f4dae95122dec2359a86778cefcd6289a0cc515dc34127bd2b2",
+    "quantitative_results_review": "all tables, counts, budgets, clocks, geometry bound, native ties, negative samples and scope statements checked",
+    "saved_log_hashes": {
+      "target/capture-flag-survey/arrival-neighbors-rust.log": "acb1fb953eba21cef6819091d81df8794996da9160aa8d86bc0690c224147b6c",
+      "target/capture-flag-survey/arrival-neighbors-python.log": "7b25769db22f0d060c8f598285e9b7fd728bfc9af555c67cc85e53ad37779efd",
+      "target/capture-flag-survey/arrival-neighbors-clippy.log": "4b7483490fa4453f49a81aa2e8f41938d91077615616954a431632e60e331d54"
+    },
+    "rust_tests": 417,
+    "python_tests": 520,
+    "clippy_dependency_warnings": 8,
+    "clippy_ai_harness_warnings": 0,
+    "negative_query_inference": "Two charged queries and NoLanding identify the pre-hull footing-ray/normal/slope stage from frozen pilot.rs; exact failure is unobserved, not inferred."
+  }
+}

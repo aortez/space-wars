@@ -169,3 +169,7 @@ That would test actual preference among alternatives. Acquisition waits and
 landing-duration variation remain separate missing parts of a complete mission
 estimate; these one-site successes do not justify promoting cost ranking into
 live play.
+
+The subsequent [three-site arrival experiment](capture-arrival-neighbors.md)
+now tests that retained-subset comparison with actual neighboring measurements,
+including negative findings, under the existing physical query limits.
