@@ -134,10 +134,16 @@ the mission goal, ground task and planet-local endpoint; changing that identity
 sets a baseline without resetting the no-progress interval. Replanning to the
 same endpoint within the same task retains its best distance.
 
-Freeze this correction and its regression tests before replaying the identical
-64-case plan in `target/published-flag-costs/v3`. Preserve v2 and its binary.
-Compare all 64 recorded physical outcomes and evaluator streams against v2,
-then refresh progress statistics and archive the replay hashes. This corrects
+The correction, regression tests and replay plan were frozen at `55462b6`
+before replaying the identical 64-case plan in `target/published-flag-costs/v3`.
+All 64 recorded physical outcomes, missions, predictions, decisions and work
+allocations matched v2. Evaluator results, evaluator work, flag publications,
+flag work and destination-cover streams were byte-identical in every case.
+The archive now contains corrected progress, replay timings and hashes, plus
+the previous progress counts and replay parity records. V2 and its binary remain
+intact. Across both seats, 35 false progress ticks were removed in 23 cases;
+distance coverage and the reported longest intervals and time beyond 20 seconds
+did not change. This corrects
 measurement of the existing study; it introduces no new held-out seeds,
 candidate behavior, thresholds or promotion claim.
 
@@ -145,9 +151,11 @@ candidate behavior, thresholds or promotion claim.
 
 The [machine-readable evidence](data/published-flag-costs-v1.json) records the
 plan, commands, per-seat configuration, original predictions, actual milestones,
-failures, progress, timing and raw-file hashes. Implementation was frozen at
-`26dd4c5`; the corrected runner at `bc4d483`. The binary SHA-256 is
-`03ba87d92594b6459f3be6b0989c8abbdc60971fdc0f260592a228f858f29d59`.
+failures, progress, timing and raw-file hashes. Candidate behavior was frozen at
+`26dd4c5`; the corrected runner at `bc4d483`; the corrected progress observer at
+`55462b6`. The replay binary SHA-256 is
+`f2170dea202e825af07ef04728706a8cf1c8996ae6ccce7ce318f64080a38ef0`.
+Original source, binary and summary hashes are retained in `observer_correction`.
 
 All 64 cases passed their physical and work audits: 1,029,840 simulated ticks.
 The combined dispatcher maximum was 4 graph operations and 194 physics queries
@@ -229,21 +237,28 @@ as the predecessor's. Arrival/acquisition and exposure remain unmodelled.
 
 ### Timing, checks and decision
 
-On this host, the largest per-run held-out candidate p99 times were 3.685 ms for
-sensors, 0.030 ms for policy, 1.546 ms for physics steps, 0.0014 ms for evaluator
-construction, 0.0013 ms for evaluator dispatch and 0.0053 ms for flag dispatch.
+On this host during the observer correction replay, the largest per-run held-out
+candidate p99 times were 3.680 ms for sensors, 0.030 ms for policy, 1.544 ms for
+physics steps, 0.0013 ms for evaluator construction, 0.0011 ms for evaluator
+dispatch and 0.0053 ms for flag dispatch.
 Flag dispatch includes snapshot/publication validation, whose work is outside
 operation quotas. These component percentiles cannot be added into a frame
 percentile. Drawing was disabled; total measured-frame timing is absent. Trace
 IO and the progress observer are outside these component measurements. This
 does not establish target-device performance.
 
-Checks passed: 276 AI unit tests, 35 harness tests, four physical destination
-tests, and 564 Python tests. Existing shared tests cover near-expiry refusal,
+Original validation passed 276 AI unit tests, 35 harness tests, four physical
+destination tests, and 564 Python tests. The observer correction passed all 37
+harness tests and the three flag-cost audit tests, plus formatting and strict
+Clippy for the harness with `--no-deps`. Its two new regressions exercise the
+public observer: a stationary endpoint change preserves the stall interval;
+same-endpoint replanning retains the best distance, while a new ground task
+establishes a fresh baseline. Actual movement still counts afterward.
+Existing shared tests cover near-expiry refusal,
 recovery priority, descent/return commitment and unknown/stale evidence; new
 candidate tests cover opt-in demand, source pinning, strict flag identity,
-negative replacement, withdrawal, missing publication and expiry. Strict Clippy
-passed for the AI library and harness with `--no-deps`. Dependency-inclusive
+negative replacement, withdrawal, missing publication and expiry. Original strict
+Clippy passed for the AI library and harness with `--no-deps`. Dependency-inclusive
 Clippy stops at the existing `engine-rapier/src/spaceling.rs:395`
 `collapsible_else_if` warning; that file is unchanged.
 
