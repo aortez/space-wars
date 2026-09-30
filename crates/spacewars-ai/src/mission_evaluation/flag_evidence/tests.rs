@@ -57,11 +57,12 @@ fn publish(
 }
 
 #[test]
-fn only_v14_consumes_published_costs_and_retains_the_original_source() {
+fn survey_value_successors_consume_published_costs_and_retain_the_original_source() {
     for policy in [
         MissionPolicy::ValuePlanner,
         MissionPolicy::SurveyValuePlanner,
         MissionPolicy::LandingPlanPlanner,
+        MissionPolicy::ApproachSurveyPlanner,
     ] {
         let (mut o, mut mission, mut evaluator, request, sample) = fixture();
         mission.policy = policy.id();
@@ -182,7 +183,7 @@ fn current_flag_is_a_reference_too_but_existing_local_failures_are_not_overridde
 }
 
 #[test]
-fn v14_requests_current_destinations_without_changing_v13_requests() {
+fn survey_value_successors_request_current_destinations_without_changing_v13_requests() {
     let (mut o, mut mission, _, _, _) = fixture();
     o.local.combat.recovery.flight.pilot.site_query =
         scenario_spacewars::surface_sortie::pilot::LandingSiteQuery::NotRequested;
@@ -191,6 +192,7 @@ fn v14_requests_current_destinations_without_changing_v13_requests() {
         MissionPolicy::ValuePlanner,
         MissionPolicy::SurveyValuePlanner,
         MissionPolicy::LandingPlanPlanner,
+        MissionPolicy::ApproachSurveyPlanner,
     ] {
         mission.policy = policy.id();
         let mut host = MissionEvaluator::new(1);

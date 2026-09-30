@@ -366,7 +366,7 @@ impl MissionEvaluator {
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
         self.observe_with_flag_surveys(o, mission, None, &[]);
     }
-    /// V14/V15 and explicitly configured v13 seats may consume published
+    /// V14 and its successors, plus explicitly configured v13 seats, may consume
     /// remote walking costs through their separate destination models.
     /// Call after controls and flag demand registration. The historical source
     /// remains a timing reference; native arrival must acquire its own route.
@@ -635,7 +635,7 @@ fn selection_tick(mission: &MissionTelemetry) -> Option<u64> {
 fn handoff_invalidation(
     mission: &MissionTelemetry,
 ) -> Option<(&crate::mission_pilot::LandingHandoff, u64)> {
-    if mission.policy != crate::mission_policy::MissionPolicy::LandingPlanPlanner.id() {
+    if !crate::mission_policy::MissionPolicy::carries_landing_plan(mission.policy) {
         return None;
     }
     let h = mission

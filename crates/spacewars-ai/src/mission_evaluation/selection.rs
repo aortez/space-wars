@@ -229,22 +229,21 @@ impl MissionEvaluator {
             current_seconds,
             destination_seconds,
             value,
-            landing: (mission.policy
-                == crate::mission_policy::MissionPolicy::LandingPlanPlanner.id())
-            .then(|| {
-                let candidate = report.candidates.iter().find(|c| c.planet == destination)?;
-                let sample = state.latest_evidence.iter().find(|s| {
-                    Some(s.site) == candidate.site
-                        && Some(s.tick) == candidate.evidence_tick
-                        && s.key.planet == destination
-                })?;
-                Some(CostedLandingReference {
-                    site: sample.site,
-                    evidence_tick: sample.tick,
-                    key: sample.key,
+            landing: crate::mission_policy::MissionPolicy::carries_landing_plan(mission.policy)
+                .then(|| {
+                    let candidate = report.candidates.iter().find(|c| c.planet == destination)?;
+                    let sample = state.latest_evidence.iter().find(|s| {
+                        Some(s.site) == candidate.site
+                            && Some(s.tick) == candidate.evidence_tick
+                            && s.key.planet == destination
+                    })?;
+                    Some(CostedLandingReference {
+                        site: sample.site,
+                        evidence_tick: sample.tick,
+                        key: sample.key,
+                    })
                 })
-            })
-            .flatten(),
+                .flatten(),
         })
     }
 }
@@ -450,9 +449,14 @@ mod tests {
     }
     #[test]
     fn refused_handoff_revokes_ready_and_pending_costs_without_waiting_for_refresh() {
-        for ready in [false, true] {
+        for (policy, ready) in [
+            (MissionPolicy::LandingPlanPlanner, false),
+            (MissionPolicy::LandingPlanPlanner, true),
+            (MissionPolicy::ApproachSurveyPlanner, false),
+            (MissionPolicy::ApproachSurveyPlanner, true),
+        ] {
             let (mut e, mut o, mut m) = fixture();
-            m.policy = MissionPolicy::LandingPlanPlanner.id();
+            m.policy = policy.id();
             for tick in 3..=4 {
                 o.local.combat.recovery.flight.pilot.tick = tick;
                 e.observe(&o, &m);
@@ -510,9 +514,9 @@ mod tests {
             native.tick = 5;
             native.choice = Some((1, 5));
             let mut capture = crate::tactical_capture::TacticalCapturePilot::with_planning(
-                crate::BrainReset { actor: PlayerId::PLAYER_1, episode_seed: 42 }, Default::default(),
-                scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JointRoundTrip
-            ).telemetry().clone();
+            crate::BrainReset { actor: PlayerId::PLAYER_1, episode_seed: 42 }, Default::default(),
+            scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JointRoundTrip
+        ).telemetry().clone();
             capture.sortie.site = Some(native.site);
             m.capture = Some(capture);
             assert!(supports_handoff(&m, &native));

@@ -18,6 +18,7 @@ pub struct EvaluationRun {
     pub last_charged: Work,
     file: BufWriter<File>,
     work: Option<BufWriter<File>>,
+    neutral_approaches: Option<BufWriter<File>>,
     written: [Option<u64>; 2],
     budget: u32,
     construction_ms: Vec<f64>,
@@ -40,6 +41,15 @@ impl EvaluationRun {
             !alternative_survey
                 || (enabled && super::arg("--live-objective-planning", "false") == "true"),
             "alternative survey requires mission evaluation and shared live planning"
+        );
+        let trace_approaches = match super::arg("--trace-neutral-approaches", "false").as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!("--trace-neutral-approaches must be true or false"),
+        };
+        assert!(
+            !trace_approaches || alternative_survey,
+            "approach trace requires alternative survey"
         );
         let flag_cost_seats = match super::arg("--admit-flag-costs", "none").as_str() {
             "none" => [false; 2],
@@ -69,6 +79,9 @@ impl EvaluationRun {
                 .then(|| {
                     BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
                 }),
+            neutral_approaches: trace_approaches.then(|| {
+                BufWriter::new(File::create(out.join("neutral-approach-inputs.jsonl")).unwrap())
+            }),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
                 .parse()
@@ -92,6 +105,26 @@ impl EvaluationRun {
             .observe_with_flag_surveys(o, telemetry, request, samples);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.construction_ms.push(ms);
+        if telemetry.policy == "material_mission_v16"
+            && let Some(file) = &mut self.neutral_approaches
+        {
+            // This is the evaluator's immutable input, before shared dispatch.
+            // Recording adds no queries; its I/O is outside evaluator timing.
+            let p = &o.local.combat.recovery.flight.pilot;
+            serde_json::to_writer(
+                &mut *file,
+                &json!({
+                    "tick":p.tick,"actor":p.owner,"policy":telemetry.policy,
+                    "queries_ready":p.queries_ready,"ship_position":p.ship.position,
+                    "planets":o.planets,"evidence":o.destination_cover,
+                    "target":telemetry.target,
+                    "selected_tick":telemetry.events.iter().rev()
+                        .find(|e| e.kind == "selected" && e.planet == telemetry.target).map(|e| e.tick),
+                }),
+            )
+            .unwrap();
+            writeln!(file).unwrap();
+        }
         ms
     }
     pub fn advance(&mut self, tick: u64, remaining: Work) -> f64 {
@@ -130,10 +163,13 @@ impl EvaluationRun {
         if let Some(file) = &mut self.work {
             file.flush().unwrap();
         }
+        if let Some(file) = &mut self.neutral_approaches {
+            file.flush().unwrap();
+        }
         let models = ["--p1-policy", "--p2-policy"]
             .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
         let mut report = json!({
-            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14" | "material_mission_v15")), "requested_shared_budget":self.budget,
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14" | "material_mission_v15" | "material_mission_v16")), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
