@@ -86,6 +86,15 @@ emitting cell, plus a fixed surround and two corner lights. There is no blur
 buffer, lighting simulation or new collider for the lighting. Classic retains
 the original seven-segment geometry; additional faces are described below.
 
+**Corner placement (2026-09-29):** The lamp centers now sit 1.3 rail widths from
+the top and side edges, down from 1.8—about five pixels closer to each corner
+at 800×480. Render checks passed at 800×480, 1024×768 and 480×800; pixels outside
+the two corner light areas matched the previous fixtures exactly. Release
+`acd5c08` was fast-deployed to `spacewars.local`, where the running client matched
+the bundle and reported 60.1 FPS / UPS with zero unexpected service restarts.
+Saved settings, including the selected Serif face, were preserved.
+[Updated corner lights on the device](screenshots/clock/hyperpixel-corner-lights-device.png).
+
 These are display-free captures through the production renderer and native text
 overlay, not device screenshots:
 
