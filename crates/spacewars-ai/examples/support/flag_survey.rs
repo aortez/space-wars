@@ -98,10 +98,20 @@ impl FlagSurveyRun {
     pub fn report(&mut self) -> Value {
         self.samples.flush().unwrap();
         self.work.flush().unwrap();
-        let mut report = json!({"model":"remote_flag_walk_patch_v1", "observational":true,
+        let consuming_seats: Vec<_> = ["--p1-policy", "--p2-policy"]
+            .into_iter()
+            .enumerate()
+            .filter_map(|(seat, flag)| {
+                (super::arg(flag, "material_mission_v9") == "material_mission_v14").then_some(seat)
+            })
+            .collect();
+        let mut report = json!({"model":"remote_flag_walk_patch_v1", "observational":consuming_seats.is_empty(),
             "telemetry":self.planner.telemetry(), "dispatch":super::timing(self.dispatch_ms.clone()),
-            "scope":"17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; results never enter controls",
+            "scope":"17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; v14 alone may consume historical costs for destination selection",
             "timing_scope":"dispatch includes snapshot construction and publication geometry validation; those stages are outside operation quotas; trace IO excluded"});
+        if !consuming_seats.is_empty() {
+            report["consuming_seats"] = json!(consuming_seats);
+        }
         if let Some(shadow) = &mut self.shadow {
             report["shadow"] = shadow.report();
         }

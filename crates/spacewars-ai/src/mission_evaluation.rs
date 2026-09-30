@@ -17,6 +17,7 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_evidence;
 mod flag_survey;
 mod flag_value_shadow;
 mod model;
@@ -44,7 +45,9 @@ mod tests;
 
 pub const MODEL: &str = "capture_mission_reference_v1";
 pub fn model_for_policy(policy: &str) -> &'static str {
-    if value::enabled(policy) {
+    if flag_evidence::enabled(policy) {
+        flag_evidence::MODEL
+    } else if value::enabled(policy) {
         value::MODEL
     } else {
         MODEL
@@ -306,8 +309,8 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
-    /// Separate observational experiment. Its results are deliberately not
-    /// admitted to evaluation/selection until coverage and timing are tested.
+    /// Remote walking demand. V13 observes it; V14 can consume published costs
+    /// through observe_with_flag_surveys. Neither path replaces native sensing.
     pub fn flag_request(
         &mut self,
         o: &MissionObservationV1,
@@ -342,6 +345,18 @@ impl MissionEvaluator {
         )
     }
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
+        self.observe_with_flag_surveys(o, mission, None, &[]);
+    }
+    /// V14 alone may use published remote walking costs to choose a destination.
+    /// Call after controls and flag demand registration. The historical source
+    /// remains a timing reference; native arrival must acquire its own route.
+    pub fn observe_with_flag_surveys(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+        request: Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest>,
+        samples: &[&scenario_spacewars::surface_sortie::live_planning::FlagSurveySample],
+    ) {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
         if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
@@ -392,7 +407,8 @@ impl MissionEvaluator {
             evidence: Vec::new(),
         };
         state.evidence.retain(|sample| {
-            sample.tick <= p.tick
+            !flag_evidence::is_flag(sample)
+                && sample.tick <= p.tick
                 && p.tick - sample.tick <= MAX_EVIDENCE_AGE
                 && dependencies
                     .planets
@@ -434,6 +450,18 @@ impl MissionEvaluator {
                 state.evidence.remove(0);
             }
             state.evidence.push(sample);
+        }
+        if flag_evidence::enabled(mission.policy) {
+            let base = snapshot(o, mission, &state.evidence);
+            if let Some(sample) = flag_evidence::read(o, &base, request, samples) {
+                state
+                    .evidence
+                    .retain(|old| old.key.planet != sample.key.planet);
+                if state.evidence.len() == MAX_PLANETS {
+                    state.evidence.remove(0);
+                }
+                state.evidence.push(sample);
+            }
         }
         dependencies.evidence = state
             .evidence
@@ -710,7 +738,9 @@ fn snapshot(
                 evidence_age_ticks: sample.map(|s| p.tick - s.tick),
                 route_source_tick: sample.and_then(|s| s.route_source_tick),
                 route_validated_tick: sample.and_then(|s| s.route_validated_tick),
-                evidence_kind: if sample.is_some_and(|s| s.remote) {
+                evidence_kind: if sample.is_some_and(flag_evidence::is_flag) {
+                    "historical published flag walk; cover and live feasibility unknown"
+                } else if sample.is_some_and(|s| s.remote) {
                     "remote landing, hatch and climb samples; live feasibility unknown"
                 } else if sample.is_some_and(|s| s.tick == p.tick) {
                     "current local measurement"

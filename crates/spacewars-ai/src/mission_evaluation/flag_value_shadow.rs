@@ -194,7 +194,7 @@ impl FlagValueShadow {
                 .planets
                 .iter()
                 .find(|k| k.planet == sample.site.planet);
-            let costs = admit(o, base, request, sample, key);
+            let costs = admit(o, base, request, sample, key, false);
             awaiting_source |= costs == Err("flag evidence unavailable at comparison source")
                 && sample.reason.is_none()
                 && sample.validated_tick == Some(sample.completed_tick)
@@ -342,12 +342,13 @@ fn preferred(report: &MissionEvaluation) -> Option<usize> {
     report.value_comparison.as_ref().and_then(|v| v.preferred)
 }
 
-fn admit(
+pub(super) fn admit(
     o: &MissionObservationV1,
     base: &MissionEvaluation,
     request: Option<FlagSurveyRequest>,
     s: &FlagSurveySample,
     baseline_key: Option<&PlanetKey>,
+    allow_current: bool,
 ) -> Result<PhaseCosts, &'static str> {
     let p = &o.local.combat.recovery.flight.pilot;
     let request = request.ok_or("flag demand absent")?;
@@ -423,7 +424,7 @@ fn admit(
         .iter()
         .find(|c| c.planet == planet.index)
         .ok_or("flag outside comparison shortlist")?;
-    if candidate.current
+    if (candidate.current && !allow_current)
         || candidate.revision != planet.revision
         || candidate.observed_owner != claim.owner
         || !candidate.ownership_known
@@ -477,4 +478,4 @@ fn admit(
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

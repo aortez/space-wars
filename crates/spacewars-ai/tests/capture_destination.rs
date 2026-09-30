@@ -4,7 +4,8 @@ use engine_core::planning::Work;
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{
-        SurfaceSortieScenario, SurfaceSortieState, live_planning::LiveObjectivePlanner,
+        SurfaceSortieScenario, SurfaceSortieState,
+        live_planning::{FlagSurveyPlanner, LiveObjectivePlanner},
     },
 };
 use spacewars_ai::{
@@ -28,6 +29,8 @@ struct Run {
     first_claim: Option<u64>,
     boarded: bool,
     farther_choice: bool,
+    flags: Option<FlagSurveyPlanner>,
+    enemy_value_choice: bool,
 }
 impl Run {
     fn new(policy: MissionPolicy, seat: usize, mirror: bool) -> Self {
@@ -46,6 +49,8 @@ impl Run {
             first_claim: None,
             boarded: false,
             farther_choice: false,
+            flags: None,
+            enemy_value_choice: false,
         }
     }
     fn step(&mut self, seat: usize) -> spacewars_ai::combat_pilot::CombatIntent {
@@ -73,7 +78,14 @@ impl Run {
                 .find(|c| Some(c.planet) == self.bot.telemetry().target)
                 .unwrap();
             self.farther_choice = other.distance > current.distance;
-            assert!(other.total_seconds < current.total_seconds);
+            if self.bot.policy() == MissionPolicy::SurveyValuePlanner {
+                self.enemy_value_choice = other.observed_owner == Some(actor.opponent())
+                    && current.observed_owner.is_none()
+                    && other.total_seconds > current.total_seconds
+                    && r.preferred_by_time == Some(current.planet);
+            } else {
+                assert!(other.total_seconds < current.total_seconds);
+            }
         }
         if let Some(capture) = &self.bot.telemetry().capture {
             self.first_claim = self.first_claim.or(capture.landing.claimed_tick);
@@ -82,12 +94,20 @@ impl Run {
         let request = self.evaluator.alternative_request(&o, self.bot.telemetry());
         self.surveys
             .observe_destination_cover(&self.state, seat, &mut o, request);
-        self.evaluator.observe(&o, self.bot.telemetry());
-        let used = self
-            .surveys
-            .advance_with_state(&self.state)
-            .unwrap()
-            .charged;
+        if let Some(flags) = &mut self.flags {
+            let request = self.evaluator.flag_request(&o, self.bot.telemetry());
+            flags.observe(&self.state, seat, &o, request);
+            self.evaluator.observe_with_flag_surveys(
+                &o,
+                self.bot.telemetry(),
+                request,
+                &flags.samples(),
+            );
+        } else {
+            self.evaluator.observe(&o, self.bot.telemetry());
+        }
+        let allocation = self.surveys.advance_with_state(&self.state).unwrap();
+        let used = allocation.charged;
         let graph = self.evaluator.advance(
             self.state.tick(),
             Work {
@@ -98,6 +118,27 @@ impl Run {
         assert!(
             used.graph + graph.graph <= WORK.graph && used.physics_queries <= WORK.physics_queries
         );
+        if let Some(flags) = &mut self.flags {
+            let busy: Vec<_> = allocation
+                .jobs
+                .iter()
+                .filter(|j| j.charged.physics_queries > 0)
+                .map(|j| j.request.actor as usize)
+                .collect();
+            let used_flags = flags
+                .advance(
+                    &self.state,
+                    Work {
+                        graph: WORK.graph - used.graph - graph.graph,
+                        physics_queries: WORK.physics_queries - used.physics_queries,
+                    },
+                    &busy,
+                )
+                .unwrap()
+                .charged;
+            assert!(used.graph + graph.graph + used_flags.graph <= WORK.graph);
+            assert!(used.physics_queries + used_flags.physics_queries <= WORK.physics_queries);
+        }
         SurfaceSortieScenario::step(&mut self.state, &intent.encode(actor), DT);
         intent
     }
@@ -256,6 +297,44 @@ fn owned_foothold_fixture_keeps_real_enemy_and_neutral_choices_in_both_seats() {
             assert!(run.state.terrain_diagnostics().issues.is_empty());
         }
     }
+}
+
+#[test]
+fn surveyed_value_choice_physically_takes_enemy_flag_before_neutral_ground() {
+    let mut run = Run::new(MissionPolicy::SurveyValuePlanner, 0, false);
+    run.state = SurfaceSortieScenario::init_capture_destination_match_trial(
+        42,
+        0,
+        false,
+        0.8,
+        true,
+        Some(Duration::from_secs(600)),
+    );
+    run.flags = Some(FlagSurveyPlanner::new(2));
+    let mut claimed_enemy = false;
+    for _ in 0..180 * 60 {
+        run.step(0);
+        if run.first_claim.is_some() {
+            let o = run.state.mission_observation(0, None);
+            claimed_enemy = o.planets[1].claim.as_ref().unwrap().owner == Some(PlayerId::PLAYER_1)
+                && o.planets[0].claim.as_ref().unwrap().owner.is_none();
+        }
+        if run.bot.telemetry().completed_sorties > 0 {
+            break;
+        }
+    }
+    assert!(run.enemy_value_choice && claimed_enemy);
+    assert!(run.boarded && run.bot.telemetry().completed_sorties > 0);
+    assert_eq!(
+        run.bot
+            .telemetry()
+            .destination_planning
+            .as_ref()
+            .unwrap()
+            .switches,
+        1
+    );
+    assert!(run.state.terrain_diagnostics().issues.is_empty());
 }
 
 #[test]

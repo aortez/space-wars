@@ -1,5 +1,6 @@
-//! Observational remote flag trips. Hosts dispatch these last, with the work
-//! left after local planning and mission evaluation. No result reaches controls.
+//! Historical remote flag trips. Hosts dispatch these last, with the work
+//! left after local planning and mission evaluation. A result is never live
+//! landing permission; experimental hosts may use its cost to rank destinations.
 use super::*;
 use destination_cover::{CoverFinding, CoverMeasurement};
 use engine_core::planning::{JobAllocation, JobPhase};
@@ -148,7 +149,7 @@ impl FlagSurveyPlanner {
         }
     }
     /// Requests are chosen by the AI after controls. No local sensors are
-    /// replaced, and observations/measurements do not enter the mission report.
+    /// replaced; the host decides whether to admit historical costs later.
     pub fn observe(
         &mut self,
         state: &SurfaceSortieState,

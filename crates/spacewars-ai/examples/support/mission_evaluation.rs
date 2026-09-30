@@ -47,6 +47,7 @@ impl EvaluationRun {
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
             work: (super::arg("--schedule-transfer-forecast", "false") == "true"
+                || super::arg("--survey-capture-flags", "false") == "true"
                 || super::arg("--compare-transfer-sources", "none") != "none")
                 .then(|| {
                     BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
@@ -60,8 +61,18 @@ impl EvaluationRun {
         })
     }
     pub fn observe(&mut self, o: &MissionObservationV1, telemetry: &MissionTelemetry) -> f64 {
+        self.observe_with_flag_surveys(o, telemetry, None, &[])
+    }
+    pub fn observe_with_flag_surveys(
+        &mut self,
+        o: &MissionObservationV1,
+        telemetry: &MissionTelemetry,
+        request: Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest>,
+        samples: &[&scenario_spacewars::surface_sortie::live_planning::FlagSurveySample],
+    ) -> f64 {
         let start = Instant::now();
-        self.evaluator.observe(o, telemetry);
+        self.evaluator
+            .observe_with_flag_surveys(o, telemetry, request, samples);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.construction_ms.push(ms);
         ms
@@ -105,7 +116,7 @@ impl EvaluationRun {
         let models = ["--p1-policy", "--p2-policy"]
             .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
         let mut report = json!({
-            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13")), "requested_shared_budget":self.budget,
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14")), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
