@@ -84,3 +84,71 @@ baseline input hash before execution, retains failures, and records source,
 binary, tool and new artifact hashes. Obtain independent review of the code and
 evidence before opening the PR. Device deployment is unnecessary for an opt-in
 diagnostic with unchanged playing behavior.
+
+## Results
+
+Implementation, tests, runner and plan froze at
+`dcb7b3baf608f748291d4823008be2cad6e27860`. The profiled binary SHA-256 is
+`71bc2f913fe2337010901db0a5cd1c221d8fe43029096149d554b0174ecc3ab3`.
+All **16 runs pass**, totaling **88,118 physical ticks**. Both modes match the
+historical complete control/observation traces, physical outcomes, native sensor
+counts, existing forecasts, upstream work and original/fresh comparison ledgers.
+The raw transfer-probe and destination-cover streams match too. No simulation,
+model or runner changes, retries or discarded cases followed these outcomes.
+
+The eight enabled runs retain 36 final candidate records: 16 have no supported
+free-flight forecast, eight have a forecast but lie outside the neutral-idle
+clock domain, and 12 have a numeric conditional opportunity. All twelve use
+H+1 because their retained survey context differs from the destination. Initial,
+published and last-snapshot report copies are all audited, without counting
+them as separate predictions.
+
+Four controlled windows supply native handoff/scan endpoints. Each has an
+original forecast and a later, separately frozen arrival forecast:
+
+| Original source | Fresh source | Native handoff / scan | Original scan error (ticks) | Fresh scan error (ticks) |
+| ---: | ---: | ---: | ---: | ---: |
+| 3816 | 3914 | 5508 / 5509 | +26 | +9 |
+| 3876 | 3974 | 5492 / 5493 | 0 | +13 |
+| 3934 | 4028 | 5508 / 5509 | +14 | +14 |
+| 3997 | 4097 | 5534 / 5535 | +13 | +95 |
+
+Positive errors mean a later predicted scan. Every absolute scan error equals
+its corresponding travel handoff error. Evaluating the schedule at the actual
+handoff reproduces the native next-tick scan in all four windows. This is
+retrospective schedule agreement, not exact end-to-end prediction. The largest
+error is 95 ticks (1.583 seconds), inherited unchanged from the later-source
+point-v1 travel forecast. A later source is not uniformly more accurate.
+
+All four native selectors happen to choose at that first scan. The clock still
+leaves `site_selection_seconds`, existing acquisition estimates and whole-trip
+cost unknown. The ordinary windows and other hypothetical destinations do not
+acquire native success credit. Every joined forecast retains the actually
+recorded last survey: ship form, planet zero, tick 3797. None reconstructs that
+stamp from the observed one-tick wait. Source-to-first-scan neutral material/form
+continuity and uninterrupted native requests pass for these joins.
+
+The [complete record](data/capture-scan-clock-v1.json) is an unchanged copy of
+`target/capture-flag-survey/scan-clock-v1/summary.json`, SHA-256
+`d3cee6648a8c2c05f98d3544d5bc485c931a0556da55d0c002e0934de84e590f`.
+It retains all commands, unknowns, report-copy checks, native windows, source
+and binary identities, tool hashes, baseline binding and all new file hashes.
+
+## Validation and next boundary
+
+Local validation passes **270 AI tests**, **31 soak-harness tests**, **eight
+native mission tests**, and **552 Python analysis tests**, including eleven
+scan-clock audit tests. Formatting and whitespace checks pass. Independent
+review found and prompted fixes for the exact match deadline, omitted report
+copies and raw-stream parity. Ready-result invalidation, reset, prefix gaps,
+history/identity mutations and pre-scan versus post-scan claim changes have
+regression coverage. A later choice or terrain change cannot rewrite an earlier
+first-scan comparison.
+
+The next useful step is a conditional **first-scan-success** composition with
+the existing local trip reference, keeping its geometry epoch and success
+conditions explicit. It must still refuse missing/rejected native candidates
+and unsupported claim domains; these results do not justify filling acquisition
+time unconditionally or using the sum to change playing destination rankings.
+Enemy-flag route acquisition and broader transfer accuracy remain separate
+work, with the earlier investigation records intact.
