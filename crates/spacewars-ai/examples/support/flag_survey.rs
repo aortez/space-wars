@@ -98,11 +98,15 @@ impl FlagSurveyRun {
     pub fn report(&mut self) -> Value {
         self.samples.flush().unwrap();
         self.work.flush().unwrap();
+        let admitted = super::arg("--admit-flag-costs", "none");
         let consuming_seats: Vec<_> = ["--p1-policy", "--p2-policy"]
             .into_iter()
             .enumerate()
             .filter_map(|(seat, flag)| {
-                (super::arg(flag, "material_mission_v9") == "material_mission_v14").then_some(seat)
+                (super::arg(flag, "material_mission_v9") == "material_mission_v14"
+                    || admitted == "both"
+                    || admitted == seat.to_string())
+                .then_some(seat)
             })
             .collect();
         let mut report = json!({"model":"remote_flag_walk_patch_v1", "observational":consuming_seats.is_empty(),

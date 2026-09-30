@@ -75,8 +75,8 @@ impl MissionEvaluator {
                 return None;
             }
             if flag_evidence::is_flag(sample)
-                && ((!flag_evidence::enabled(mission.policy)
-                    && !(self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy)))
+                && (!(flag_evidence::enabled(mission.policy)
+                    || (self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy)))
                     || o.planets
                         .iter()
                         .find(|v| v.index == sample.key.planet)
