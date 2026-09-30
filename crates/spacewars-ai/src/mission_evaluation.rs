@@ -323,8 +323,8 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
-    /// Separate observational experiment. Its results are deliberately not
-    /// admitted to evaluation/selection until coverage and timing are tested.
+    /// Observational by default. Explicitly configured v13 seats also request
+    /// their current enemy target and can admit published conditional costs.
     pub fn flag_request(
         &mut self,
         o: &MissionObservationV1,
