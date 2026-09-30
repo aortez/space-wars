@@ -21,6 +21,8 @@ mod live_planning;
 mod mission_evaluation;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
+#[path = "support/mission_progress.rs"]
+mod mission_progress;
 #[path = "support/native_capture_probe.rs"]
 mod native_capture_probe;
 #[path = "support/physics_profile.rs"]
@@ -99,6 +101,8 @@ fn main() {
         "ground contact tracing needs --trace true"
     );
     let timing_csv = arg("--timing-csv", "false") == "true";
+    let mut progress = (arg("--measure-mission-progress", "false") == "true")
+        .then(|| std::array::from_fn::<_, 2, _>(|_| mission_progress::MissionProgress::default()));
     let mut planning_probe = (arg("--probe-planning-budget", "false") == "true")
         .then(planning_probe::PlanningProbe::default);
     let survey_hz: u8 = arg("--landing-survey-hz", "4").parse().unwrap();
@@ -585,6 +589,9 @@ fn main() {
                     verified_player_ticks += 1;
                 }
                 metrics[i].observe(&o, pilots[i].telemetry());
+                if let Some(progress) = &mut progress {
+                    progress[i].observe(&o, pilots[i].telemetry());
+                }
                 if mode == "pursuit" && i == seat && metrics[i].first_hunt_tick.is_some() {
                     if pursuit_started_tick.is_none() && frames {
                         for player in 0..2 {
@@ -706,7 +713,9 @@ fn main() {
                         live.observe_destination_cover(&state, i, &mut o, request);
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
-                    if !pilots[i].policy().consumes_flag_surveys() || flag_survey.is_none() {
+                    let admit_flags = evaluator.evaluator.uses_flag_costs(owner)
+                        || pilots[i].policy().consumes_flag_surveys();
+                    if !admit_flags || flag_survey.is_none() {
                         successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
                     }
                     if let Some(flags) = &mut flag_survey {
@@ -714,7 +723,7 @@ fn main() {
                         let flag_request =
                             evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
                         flags.planner.observe(&state, i, &o, flag_request);
-                        if pilots[i].policy().consumes_flag_surveys() {
+                        if admit_flags {
                             // Publications from earlier ticks are available to
                             // this source. Dispatch later in this tick cannot
                             // retroactively enter the submitted comparison.
@@ -941,7 +950,19 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if let Some(progress) = progress {
+        report["mission_progress"] = json!({"players":progress,"scope":mission_progress::SCOPE});
+    }
     if let Some(evaluator) = &mut mission_evaluation {
+        for seat in 0..2 {
+            if evaluator
+                .evaluator
+                .uses_flag_costs(PlayerId::from_index(seat).unwrap())
+            {
+                report["policy_configuration"][seat]["flag_cost_model"] =
+                    json!("capture_value_published_flags_v1");
+            }
+        }
         report["mission_evaluation"] = evaluator.report();
     }
     if let Some(trace) = &mut behavior_trace {

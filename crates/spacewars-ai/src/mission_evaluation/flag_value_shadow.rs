@@ -342,6 +342,8 @@ fn preferred(report: &MissionEvaluation) -> Option<usize> {
     report.value_comparison.as_ref().and_then(|v| v.preferred)
 }
 
+/// Shared certificate checks. The opt-in playing experiment also surveys its
+/// current enemy destination; the historical shadow remains alternative-only.
 pub(super) fn admit(
     o: &MissionObservationV1,
     base: &MissionEvaluation,

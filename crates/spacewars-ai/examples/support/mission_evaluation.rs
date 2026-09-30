@@ -51,8 +51,25 @@ impl EvaluationRun {
             !trace_approaches || alternative_survey,
             "approach trace requires alternative survey"
         );
+        let flag_cost_seats = match super::arg("--admit-flag-costs", "none").as_str() {
+            "none" => [false; 2],
+            "0" => [true, false],
+            "1" => [false, true],
+            "both" => [true; 2],
+            _ => panic!("--admit-flag-costs must be none, 0, 1 or both"),
+        };
+        for (seat, admitted) in flag_cost_seats.into_iter().enumerate() {
+            assert!(
+                !admitted
+                    || (enabled
+                        && super::arg("--survey-capture-flags", "false") == "true"
+                        && super::arg(&format!("--p{}-policy", seat + 1), "material_mission_v9")
+                            == "material_mission_v13"),
+                "flag cost candidate requires v13, evaluation and shared flag surveys"
+            );
+        }
         enabled.then(|| Self {
-            evaluator: MissionEvaluator::new(2),
+            evaluator: MissionEvaluator::new(2).with_flag_costs(flag_cost_seats),
             alternative_survey,
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
@@ -163,6 +180,23 @@ impl EvaluationRun {
         });
         if models != [MODEL; 2] {
             report["models_by_seat"] = json!(models);
+        }
+        let seats = [PlayerId::PLAYER_1, PlayerId::PLAYER_2]
+            .map(|actor| self.evaluator.uses_flag_costs(actor));
+        if seats.iter().any(|enabled| *enabled) {
+            report["flag_cost_admission"] = json!({"enabled_seats":seats,
+                "candidate":"capture_value_published_flags_v1", "predecessor":"capture_mission_value_v1"});
+            report["observational"] = json!(false);
+            for (seat, enabled) in seats.into_iter().enumerate() {
+                if enabled {
+                    report["models_by_seat"][seat] = json!("capture_value_published_flags_v1");
+                }
+            }
+            report["model"] = if seats == [true; 2] {
+                json!("capture_value_published_flags_v1")
+            } else {
+                json!("mixed")
+            };
         }
         report
     }

@@ -17,6 +17,7 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_costs;
 mod flag_evidence;
 mod flag_survey;
 mod flag_value_shadow;
@@ -135,6 +136,10 @@ pub struct MissionEvaluation {
     pub transfer_source: Option<TransferSource>,
     pub comparison_reason: &'static str,
     pub charged_work: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_admissions: Option<Vec<FlagShadowAdmission>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_cost_scope: Option<&'static str>,
 }
 
 #[derive(Clone)]
@@ -286,6 +291,7 @@ pub struct MissionEvaluator {
     pub charged_total: u64,
     pub cancelled_total: u64,
     pub completed_total: u64,
+    flag_cost_seats: [bool; 2],
 }
 impl MissionEvaluator {
     pub fn new(capacity: usize) -> Self {
@@ -297,10 +303,21 @@ impl MissionEvaluator {
             charged_total: 0,
             cancelled_total: 0,
             completed_total: 0,
+            flag_cost_seats: [false; 2],
         }
     }
     pub fn reset(&mut self) {
-        *self = Self::new(self.capacity);
+        *self = Self::new(self.capacity).with_flag_costs(self.flag_cost_seats);
+    }
+    /// Headless candidate configuration; all ordinary constructors remain off.
+    /// Only v13 can consume these conditional historical route references.
+    pub fn with_flag_costs(mut self, seats: [bool; 2]) -> Self {
+        assert!(self.actors.is_empty(), "configure before observing actors");
+        self.flag_cost_seats = seats;
+        self
+    }
+    pub fn uses_flag_costs(&self, actor: PlayerId) -> bool {
+        self.flag_cost_seats[actor.index()]
     }
     pub fn latest(&self, actor: PlayerId) -> Option<&MissionEvaluation> {
         self.actors.get(&(actor.index() as u64))?.latest.as_ref()
@@ -310,8 +327,8 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
-    /// Remote walking demand. V13 observes it; V14 can consume published costs
-    /// through observe_with_flag_surveys. Neither path replaces native sensing.
+    /// Remote walking demand. Explicitly configured v13 seats and V14 can
+    /// consume published costs; neither path replaces native sensing.
     pub fn flag_request(
         &mut self,
         o: &MissionObservationV1,
@@ -325,6 +342,7 @@ impl MissionEvaluator {
             &mut self.actors.entry(actor).or_default().flag_survey,
             o,
             mission,
+            self.flag_cost_seats[actor as usize] && flag_costs::enabled(mission.policy),
         )
     }
     /// Optional demand for the host's existing remote-query dispatcher. Call
@@ -348,7 +366,8 @@ impl MissionEvaluator {
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
         self.observe_with_flag_surveys(o, mission, None, &[]);
     }
-    /// V14 and its successors may use published remote walking costs to choose a destination.
+    /// V14 and its successors, plus explicitly configured v13 seats, may consume
+    /// remote walking costs through their separate destination models.
     /// Call after controls and flag demand registration. The historical source
     /// remains a timing reference; native arrival must acquire its own route.
     pub fn observe_with_flag_surveys(
@@ -360,6 +379,7 @@ impl MissionEvaluator {
     ) {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
+        let flag_costs = self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy);
         if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
             return;
         }
@@ -466,6 +486,7 @@ impl MissionEvaluator {
                 state.evidence.push(sample);
             }
         }
+        let admissions = flag_costs.then(|| flag_costs::observe(state, o, mission, samples));
         // A rejected handoff invalidates the current journey's old cost basis,
         // including pending/ready results. New native-selected local evidence
         // may replace it; another remote sample cannot silently reinstate it.
@@ -543,7 +564,12 @@ impl MissionEvaluator {
         {
             return;
         }
-        let report = snapshot(o, mission, &state.evidence);
+        let mut report = snapshot(o, mission, &state.evidence);
+        if let Some(admissions) = admissions {
+            report.model = flag_costs::MODEL;
+            report.flag_admissions = Some(admissions);
+            report.flag_cost_scope = Some(flag_costs::SCOPE);
+        }
         state.submitted_evidence = state.evidence.clone();
         state.dependencies = Some(dependencies);
         let token = self
@@ -780,7 +806,11 @@ fn snapshot(
                 route_source_tick: sample.and_then(|s| s.route_source_tick),
                 route_validated_tick: sample.and_then(|s| s.route_validated_tick),
                 evidence_kind: if sample.is_some_and(flag_evidence::is_flag) {
-                    "historical published flag walk; cover and live feasibility unknown"
+                    if flag_evidence::enabled(mission.policy) {
+                        "historical published flag walk; cover and live feasibility unknown"
+                    } else {
+                        "published flag walk, landing, hatch and climb; acquisition and exposure unmodelled"
+                    }
                 } else if sample.is_some_and(|s| s.remote) {
                     "remote landing, hatch and climb samples; live feasibility unknown"
                 } else if sample.is_some_and(|s| s.tick == p.tick) {
@@ -796,6 +826,8 @@ fn snapshot(
         })
         .collect();
     MissionEvaluation {
+        flag_admissions: None,
+        flag_cost_scope: None,
         model: model_for_policy(mission.policy),
         policy: mission.policy,
         actor: p.owner,
