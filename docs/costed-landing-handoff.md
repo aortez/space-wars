@@ -181,7 +181,8 @@ reached 664 ticks (11.07 s) in both policies; the handoff did not resolve them.
 
 The recorded regression also remained identical: the candidate seat won,
 completed five sorties and made no destination switch. Fresh matches therefore
-establish fallback preservation, not improved strategic decisions.
+establish unchanged behavior with the handoff inactive, not improved strategic
+decisions. The two directed enemy refusals exercise handoff fallback.
 
 ### Decision and next boundary
 
