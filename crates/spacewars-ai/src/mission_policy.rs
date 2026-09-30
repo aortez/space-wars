@@ -23,9 +23,12 @@ pub enum MissionPolicy {
     /// Experimental handoff of the destination's costed landing site.
     #[serde(rename = "material_mission_v15")]
     LandingPlanPlanner,
+    /// Experimental refresh and approach ranking of the two neutral survey sites.
+    #[serde(rename = "material_mission_v16")]
+    ApproachSurveyPlanner,
 }
 impl MissionPolicy {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Legacy,
         Self::Planner,
         Self::JetpackPlanner,
@@ -33,6 +36,7 @@ impl MissionPolicy {
         Self::ValuePlanner,
         Self::SurveyValuePlanner,
         Self::LandingPlanPlanner,
+        Self::ApproachSurveyPlanner,
     ];
     pub fn selects_destination(self) -> bool {
         matches!(
@@ -41,10 +45,17 @@ impl MissionPolicy {
                 | Self::ValuePlanner
                 | Self::SurveyValuePlanner
                 | Self::LandingPlanPlanner
+                | Self::ApproachSurveyPlanner
         )
     }
     pub fn consumes_flag_surveys(self) -> bool {
-        matches!(self, Self::SurveyValuePlanner | Self::LandingPlanPlanner)
+        matches!(
+            self,
+            Self::SurveyValuePlanner | Self::LandingPlanPlanner | Self::ApproachSurveyPlanner
+        )
+    }
+    pub(crate) fn carries_landing_plan(id: &str) -> bool {
+        id == Self::LandingPlanPlanner.id() || id == Self::ApproachSurveyPlanner.id()
     }
     pub fn id(self) -> &'static str {
         match self {
@@ -55,6 +66,7 @@ impl MissionPolicy {
             Self::ValuePlanner => "material_mission_v13",
             Self::SurveyValuePlanner => "material_mission_v14",
             Self::LandingPlanPlanner => "material_mission_v15",
+            Self::ApproachSurveyPlanner => "material_mission_v16",
         }
     }
     pub fn display_name(self) -> &'static str {
@@ -66,6 +78,7 @@ impl MissionPolicy {
             Self::ValuePlanner => "Value bot v13",
             Self::SurveyValuePlanner => "Survey value bot v14",
             Self::LandingPlanPlanner => "Landing plan bot v15",
+            Self::ApproachSurveyPlanner => "Approach survey bot v16",
         }
     }
     pub fn objective_planning(self) -> ObjectivePlanning {
@@ -75,7 +88,8 @@ impl MissionPolicy {
             | Self::DestinationPlanner
             | Self::ValuePlanner
             | Self::SurveyValuePlanner
-            | Self::LandingPlanPlanner => ObjectivePlanning::JointRoundTrip,
+            | Self::LandingPlanPlanner
+            | Self::ApproachSurveyPlanner => ObjectivePlanning::JointRoundTrip,
             Self::JetpackPlanner => ObjectivePlanning::JetpackRoundTrip,
         }
     }
@@ -90,6 +104,7 @@ impl MissionPolicy {
                 Self::ValuePlanner => "mission_cadenced_joint_routes_capture_value_v1",
                 Self::SurveyValuePlanner => "mission_cadenced_joint_routes_survey_value_v1",
                 Self::LandingPlanPlanner => "mission_cadenced_joint_routes_landing_plan_v1",
+                Self::ApproachSurveyPlanner => "mission_cadenced_joint_routes_approach_survey_v1",
             },
             // Cadence bounds frequency, not work. No equal-budget claim yet.
             planning_work_quota: None,
@@ -100,7 +115,7 @@ impl std::str::FromStr for MissionPolicy {
     type Err = String;
     fn from_str(id: &str) -> Result<Self, Self::Err> {
         Self::ALL.into_iter().find(|p| p.id() == id)
-            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9 through material_mission_v15"))
+            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9 through material_mission_v16"))
     }
 }
 #[derive(Debug, Clone, Copy, Serialize)]

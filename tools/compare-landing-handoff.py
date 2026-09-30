@@ -47,9 +47,9 @@ def arguments(item):
     return args, policies
 
 
-def audit_handoffs(records, evaluations, decisions):
+def audit_handoffs(records, evaluations, decisions, policies=(POLICIES[1],)):
     wanted = {(r['seat'], r['switch']['tick']):r for r in decisions['switches']
-        if r['source_forecast']['policy'] == POLICIES[1]}
+        if r['source_forecast']['policy'] in policies}
     latest, native, previous_tick = {}, {}, {}
     for row in records:
         seat, tick, h = row['seat'], row['tick'], row['handoff']
@@ -64,7 +64,7 @@ def audit_handoffs(records, evaluations, decisions):
         c = next(c for c in forecast['candidates'] if c['planet'] == switch['switch']['to'])
         assert h['source_tick'] == forecast['source_tick'] and h['site'] == c['site']
         assert h['evidence_tick'] == c['evidence_tick'] <= h['source_tick'] <= h['switch_tick'] <= tick
-        assert row['mission']['policy'] == POLICIES[1]
+        assert row['mission']['policy'] in policies
         p = row['observation']['local']['combat']['recovery']['flight']['pilot']
         assert p['tick'] == tick and p['owner'] == f'player_{seat+1}'
         capture = row['mission']['capture']
@@ -119,10 +119,10 @@ def audit_handoffs(records, evaluations, decisions):
             assert h['landed_tick'] is not None and h['invalidated_tick'] is None
             assert h['completed_tick'] == switch['actual_visit']['departed_tick']
         latest[key] = h
-    assert latest.keys() == wanted.keys(), 'missing handoff for accepted v15 switch'
+    assert latest.keys() == wanted.keys(), 'missing handoff for accepted planned-site switch'
     suppressed, fresh = 0, 0
     for r in evaluations:
-        if r['policy'] != POLICIES[1]:
+        if r['policy'] not in policies:
             continue
         key = int(r['actor'][-1])-1, r['selected_tick']
         h = latest.get(key)
