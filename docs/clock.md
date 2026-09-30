@@ -356,8 +356,12 @@ paths. Remaining blocks are assigned deterministically to the **latest** digit
 and AM/PM cells, preferring the same block kind and then the nearest spare.
 A denser reading grows extra blocks from existing debris; surplus blocks shrink
 into nearby destinations. These visual slots are reused across further changes,
-still capped at 119, and never allocate replacement physics bodies. Matching
-runs only on return entry or a changed digit/label, not every frame or colon blink.
+still capped at 239 (Classic needs at most 119), and never allocate replacement
+physics bodies. Matching runs only on return entry or a changed digit/label,
+not every frame or colon blink.
+Destinations use the active font's actual cells for Classic, Matrix, Sans and
+Serif. Pending font changes keep the existing post-effect handoff; reassembly
+does not change the font-selection or rotation policy.
 
 Mid-return changes start redirected paths at the current poses and use the
 remaining portion of the original 1.5-second return window; they do not extend

@@ -176,7 +176,9 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
 #[test]
 fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_layouts() {
     use crate::render::{FrameLayout, Viewport};
-    use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat, Scenario};
+    use engine_common::{
+        ClockEventKind, ClockEventProfile, ClockFont, ClockFontSettings, ClockTimeFormat, Scenario,
+    };
     use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
     use std::time::Duration;
     let windows = Rc::new(RefCell::new(Vec::new()));
@@ -202,11 +204,23 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
             ("recovered", 336),
             ("retargeted", 306),
             ("retargeted-recovered", 336),
+            ("serif-reforming", 288),
+            ("serif-retargeted", 306),
+            ("serif-retargeted-recovered", 336),
             ("duck", 90),
             ("controls", 18),
         ] {
+            let font = if name.starts_with("serif-") {
+                ClockFont::Serif
+            } else {
+                ClockFont::Classic
+            };
             let mut state = ClockScenario::init(
                 ClockConfig {
+                    fonts: ClockFontSettings {
+                        selected: font,
+                        ..Default::default()
+                    },
                     aspect_ratio: viewport.aspect_ratio(),
                     event_profile: ClockEventProfile::Off,
                     time_format: ClockTimeFormat::TwelveHour,
@@ -244,7 +258,7 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
                 Duration::ZERO,
             );
             for tick in 0..elapsed {
-                if name.starts_with("retargeted") && tick == 270 {
+                if name.contains("retargeted") && tick == 270 {
                     ClockScenario::step(
                         &mut state,
                         &[ClockAction::set_reading(
@@ -270,9 +284,13 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
             } else {
                 assert!(changed > 100);
             }
-            if name == "retargeted-recovered" {
+            if name.ends_with("retargeted-recovered") {
                 let mut clean = ClockScenario::init(
                     ClockConfig {
+                        fonts: ClockFontSettings {
+                            selected: font,
+                            ..Default::default()
+                        },
                         aspect_ratio: viewport.aspect_ratio(),
                         event_profile: ClockEventProfile::Off,
                         time_format: ClockTimeFormat::TwelveHour,

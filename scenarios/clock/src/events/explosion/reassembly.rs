@@ -38,9 +38,9 @@ fn targets(display: DisplaySnapshot, layout: Layout) -> Vec<Target> {
     let mut segments = digits::create_segments();
     digits::apply_snapshot(&mut segments, display);
     for segment in segments.iter().filter(|segment| segment.lit) {
-        for cell in digits::cells(segment.id.kind) {
+        for cell in segment.cells() {
             targets.push(Target {
-                position: layout.cell_center(segment.id, *cell),
+                position: layout.cell_center(segment.id, cell),
                 side: layout.pitch * 0.8,
                 label: false,
             });
@@ -89,7 +89,10 @@ impl Reassembly {
         tick: u64,
     ) {
         // The colon blinks independently; seconds must not restart flight paths.
-        if self.display.digits != display.digits || self.display.meridiem != display.meridiem {
+        if self.display.font != display.font
+            || self.display.digits != display.digits
+            || self.display.meridiem != display.meridiem
+        {
             self.retarget(cells, display, layout, tick);
         }
     }

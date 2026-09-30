@@ -178,6 +178,7 @@ fn repeated_corrections_reuse_surplus_slots_and_still_finish_at_the_deadline() {
     let layout = Layout::new(0.6);
     let sparse = display(11, 11, ClockTimeFormat::TwentyFourHour);
     let full = DisplaySnapshot {
+        font: engine_common::ClockFont::Classic,
         digits: [Some(8); 4],
         colon_lit: true,
         meridiem: Some("AM"),
@@ -189,13 +190,68 @@ fn repeated_corrections_reuse_surplus_slots_and_still_finish_at_the_deadline() {
         assembly.synchronize(&mut cells, next, layout, tick);
         assert_assignments(&assembly, next, layout);
         assembly.sample(&mut cells, tick + 1);
-        assert_eq!(cells.len(), MAX_EXPLOSION_CELLS, "reuse, never accumulate");
+        assert_eq!(
+            cells.len(),
+            targets(full, layout).len(),
+            "reuse, never accumulate"
+        );
+        assert!(cells.len() <= MAX_EXPLOSION_CELLS);
         assert!(cells.iter().all(|cell| cell.position.x.is_finite()
             && cell.position.y.is_finite()
             && cell.angle.is_finite()
             && cell.side >= 0.0));
     }
     assert_arrived(&cells, sparse, layout);
+}
+
+#[test]
+fn every_font_and_font_change_returns_to_the_actual_glyph_cells() {
+    for aspect in [0.6, 4.0 / 3.0, 5.0 / 3.0] {
+        let layout = Layout::new(aspect);
+        for source_font in engine_common::ClockFont::ALL {
+            for target_font in engine_common::ClockFont::ALL {
+                let mut source = display(23, 58, ClockTimeFormat::TwelveHour);
+                source.font = source_font;
+                let mut target = display(0, 11, ClockTimeFormat::TwelveHour);
+                target.font = target_font;
+                let mut cells = debris(source, layout);
+                let mut assembly = Reassembly::new(&mut cells, source, layout);
+                assembly.sample(&mut cells, 30);
+                assembly.synchronize(&mut cells, target, layout, 30);
+                assert_assignments(&assembly, target, layout);
+                assert!(cells.len() <= MAX_EXPLOSION_CELLS);
+                assembly.sample(&mut cells, REFORMING_TICKS);
+                assert_arrived(&cells, target, layout);
+
+                // Compare directly to the font masks, independently of the
+                // target builder used above, so Classic-only targets cannot pass.
+                for slot in 0..4 {
+                    let actual = cells
+                        .iter()
+                        .filter(|cell| cell.side > 0.0 && !cell.label)
+                        .filter_map(|cell| {
+                            (0..9)
+                                .flat_map(|y| (0..6).map(move |x| digits::GridCell { x, y }))
+                                .find(|grid| {
+                                    cell.position
+                                        == layout.cell_center(
+                                            crate::SegmentId {
+                                                digit_slot: slot as u8,
+                                                kind: crate::SegmentKind::Top,
+                                            },
+                                            *grid,
+                                        )
+                                })
+                        })
+                        .fold(0u64, |mask, grid| mask | (1 << (grid.y * 6 + grid.x)));
+                    assert_eq!(
+                        actual,
+                        crate::fonts::glyph(target_font, target.digits[slot]).0
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
