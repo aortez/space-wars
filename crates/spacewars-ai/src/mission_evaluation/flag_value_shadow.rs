@@ -349,6 +349,19 @@ fn admit(
     s: &FlagSurveySample,
     baseline_key: Option<&PlanetKey>,
 ) -> Result<PhaseCosts, &'static str> {
+    admitted_costs(o, base, request, s, baseline_key, false)
+}
+
+/// Shared certificate checks. The opt-in playing experiment also surveys its
+/// current enemy destination; the historical shadow remains alternative-only.
+pub(super) fn admitted_costs(
+    o: &MissionObservationV1,
+    base: &MissionEvaluation,
+    request: Option<FlagSurveyRequest>,
+    s: &FlagSurveySample,
+    baseline_key: Option<&PlanetKey>,
+    allow_current: bool,
+) -> Result<PhaseCosts, &'static str> {
     let p = &o.local.combat.recovery.flight.pilot;
     let request = request.ok_or("flag demand absent")?;
     if s.actor != p.owner
@@ -423,7 +436,7 @@ fn admit(
         .iter()
         .find(|c| c.planet == planet.index)
         .ok_or("flag outside comparison shortlist")?;
-    if candidate.current
+    if (!allow_current && candidate.current)
         || candidate.revision != planet.revision
         || candidate.observed_owner != claim.owner
         || !candidate.ownership_known
@@ -477,4 +490,4 @@ fn admit(
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;
