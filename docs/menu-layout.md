@@ -38,11 +38,11 @@ row. Its child page shares the same frame and fixed actions.
 Back, save status, and Retry Save stay outside the scroll area. A save failure
 does not prevent adjustment, navigation, or retrying the same settings.
 
-Future Network and Controllers pages belong beside Device Info, not in the
-scenario picker. When adding a row, update its focus mapping, body extent,
-reveal range, and stable control inventory together. Do not add non-working
-placeholder entries. Network permissions and credential entry remain separate
-work; see [Device Info and app navigation](device-info.md).
+Controllers and [Network](network-setup.md) are App Settings pages beside Device
+Info, not entries in the scenario picker. When adding a row, update its focus
+mapping, body extent, reveal range, and stable control inventory together. Do not
+add non-working placeholder entries. Network permissions and credential entry are isolated from
+ordinary app preferences; see [Device Info and app navigation](device-info.md).
 
 ## Verification
 

@@ -40,6 +40,8 @@ pub enum UiScreen {
     LauncherAutostart,
     #[serde(rename = "launcher.controllers")]
     LauncherControllers,
+    #[serde(rename = "launcher.network")]
+    LauncherNetwork,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
     #[serde(rename = "launcher.controls")]
@@ -58,6 +60,8 @@ pub enum UiScreen {
     PauseAutostart,
     #[serde(rename = "pause.controllers")]
     PauseControllers,
+    #[serde(rename = "pause.network")]
+    PauseNetwork,
     #[serde(rename = "pause.controls")]
     PauseControls,
     #[serde(rename = "pause.clock")]
@@ -75,6 +79,7 @@ impl UiScreen {
             Self::LauncherInfo => "launcher.info",
             Self::LauncherAutostart => "launcher.autostart",
             Self::LauncherControllers => "launcher.controllers",
+            Self::LauncherNetwork => "launcher.network",
             Self::LauncherSettings => "launcher.settings",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
@@ -84,6 +89,7 @@ impl UiScreen {
             Self::PauseInfo => "pause.info",
             Self::PauseAutostart => "pause.autostart",
             Self::PauseControllers => "pause.controllers",
+            Self::PauseNetwork => "pause.network",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
             Self::GameOver => "game-over",
@@ -99,6 +105,7 @@ impl UiScreen {
                 | Self::LauncherInfo
                 | Self::LauncherAutostart
                 | Self::LauncherControllers
+                | Self::LauncherNetwork
                 | Self::LauncherSettings
                 | Self::LauncherControls
                 | Self::LauncherTouchTest

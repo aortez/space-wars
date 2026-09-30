@@ -24,6 +24,8 @@ mod native_video;
 mod nes_audio;
 mod nes_realtime;
 mod nes_roms;
+mod network;
+mod network_controls;
 mod presentation_probe;
 mod raster;
 mod render;
@@ -483,6 +485,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&settings),
         settings_writer.clone(),
     );
+    network_controls::install(&window);
     device_info::install(
         &window,
         settings_path
@@ -1213,7 +1216,9 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_controllers_visible() && window.get_sound_visible() {
+    if window.get_network_visible() && window.get_sound_visible() {
+        network_controls::handle_action(window, action);
+    } else if window.get_controllers_visible() && window.get_sound_visible() {
         controller_controls::handle_action(window, action);
     } else if window.get_autostart_settings_visible() && window.get_sound_visible() {
         autostart::handle_action(window, action);

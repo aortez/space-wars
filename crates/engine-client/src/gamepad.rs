@@ -495,6 +495,11 @@ fn button_route(
             Button::East => ButtonRoute::Menu(UiAction::Back),
             Button::Start => ButtonRoute::Menu(UiAction::Start),
             Button::Select => ButtonRoute::Menu(UiAction::Controls),
+            Button::West
+                if window.get_network_visible() && window.get_network_password_visible() =>
+            {
+                ButtonRoute::Menu(UiAction::Controls)
+            }
             _ => ButtonRoute::Scenario,
         };
     }

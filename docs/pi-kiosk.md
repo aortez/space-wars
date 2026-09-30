@@ -532,6 +532,11 @@ destination slot. If SSH is lost during installation, reconnect and check
 `spacewars-cli status`/service health before retrying; do not assume success
 from a dropped connection.
 
+After boot, [App Settings → Network](network-setup.md) can scan and connect using
+the cabinet, controller or touch input. Its timed trial restores the previous
+configuration unless the new connection is explicitly kept. NetworkManager
+stores credentials in the same persistent directory used by provisioning.
+
 For first-boot Wi-Fi, create `yocto/wifi-creds.local` before flashing:
 
 ```json

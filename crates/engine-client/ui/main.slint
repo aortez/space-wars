@@ -2,6 +2,7 @@
 
 export struct DeviceInfoRow { id: string, label: string, value: string }
 export struct ControllerRow { id: string, label: string }
+export struct NetworkRow { id: string, label: string, detail: string, badge: string, enabled: bool }
 
 export global UserActivity {
     callback notify() -> bool;
@@ -124,6 +125,8 @@ component PlayerStatusPanel inherits Rectangle {
 
 component MenuButton inherits Rectangle {
     in property <string> text;
+    in property <string> detail;
+    in property <string> badge;
     in property <length> text-padding: 12px;
     in property <bool> selected: false;
     in property <bool> enabled: true;
@@ -139,16 +142,34 @@ component MenuButton inherits Rectangle {
 
     Text {
         x: root.text-padding;
-        width: parent.width - 2 * root.text-padding;
-        height: parent.height;
+        y: root.detail == "" ? 0px : 5px;
+        width: parent.width - 2 * root.text-padding - (root.badge == "" ? 0px : 92px);
+        height: root.detail == "" ? parent.height : 24px;
         text: root.text;
         color: button-touch.pressed || root.selected ? #ffffff : #d9e1ec;
         font-size: 16px;
         font-weight: button-touch.pressed || root.selected ? 700 : 500;
         wrap: word-wrap;
         overflow: elide;
-        horizontal-alignment: center;
+        horizontal-alignment: root.detail == "" ? center : left;
         vertical-alignment: center;
+    }
+
+    if root.detail != "": Text {
+        x: root.text-padding; y: 30px;
+        width: parent.width - 2 * root.text-padding; height: 18px;
+        text: root.detail; color: #9fb4cc; font-size: 13px; overflow: elide;
+    }
+
+    if root.badge != "": Rectangle {
+        x: parent.width - 100px; y: 7px; width: 88px; height: 22px;
+        background: root.badge == "Connected" ? #164a42 : #26394d;
+        border-radius: 4px;
+        Text {
+            width: parent.width; height: parent.height;
+            text: root.badge; color: #d8f5ef; font-size: 13px;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
     }
 
     button-touch := TouchArea {
@@ -454,6 +475,23 @@ export component MainWindow inherits Window {
     callback autostart-start-now();
     callback autostart-return();
     in-out property <bool> sound-visible: false;
+    in-out property <bool> network-visible: false;
+    in-out property <int> network-focus-index: 0;
+    in property <[NetworkRow]> network-rows;
+    in property <string> network-title;
+    in property <string> network-subtitle;
+    in property <string> network-detail;
+    in property <bool> network-password-visible: false;
+    in-out property <bool> network-password-revealed: false;
+    in property <string> network-password-text;
+    in property <string> network-password-mask;
+    in property <string> network-password-caption;
+    callback network-conceal();
+    out property <int> network-keyboard-columns: root.width >= 640px ? 10 : 8;
+    callback network-open();
+    callback network-command(string);
+    callback network-text(string);
+    callback network-visibility-changed();
     in-out property <bool> controllers-visible: false;
     in-out property <int> controllers-focus-index: 0;
     in property <[ControllerRow]> controllers-rows;
@@ -604,11 +642,16 @@ export component MainWindow inherits Window {
         if !root.sound-visible {
             root.device-info-visible = false;
             root.controllers-visible = false;
+            root.network-visible = false;
         }
         launcher-shortcuts.focus();
     }
     changed controllers-visible => {
         root.controllers-visibility-changed();
+        launcher-shortcuts.focus();
+    }
+    changed network-visible => {
+        root.network-visibility-changed();
         launcher-shortcuts.focus();
     }
     changed device-info-visible => {
@@ -1453,6 +1496,15 @@ export component MainWindow inherits Window {
         capture-key-pressed(event) => {
             if (UserActivity.key-event(event.text, true)) { return accept; }
             if (root.launcher-busy) { return accept; }
+            if (root.network-visible && root.network-password-visible) {
+                if (event.text == Key.Backspace) { root.network-command("network.erase"); return accept; }
+                if (event.text == Key.Return) { root.network-command("network.connect-password"); return accept; }
+                if (event.text != Key.Escape && event.text != Key.UpArrow && event.text != Key.DownArrow
+                    && event.text != Key.LeftArrow && event.text != Key.RightArrow) {
+                    root.network-text(event.text);
+                    return accept;
+                }
+            }
             if (root.launcher-scenario == "clock" && !root.launcher-visible
                 && !root.ingame-menu-visible && !root.game-over-visible) {
                 if (event.text == "d" || event.text == "D") {
@@ -2530,7 +2582,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.sound-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+    if root.sound-visible && !root.network-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514;
@@ -2547,11 +2599,11 @@ export component MainWindow inherits Window {
                 x: 24px; y: 82px; width: parent.width - 48px; height: parent.height - 214px;
                 viewport-width: self.width;
                 viewport-height: settings-body.height;
-                property <int> focused-item: root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
+                property <int> focused-item: root.sound-focus-index == 8 ? 6 : root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
                 property <length> row-height: parent.row-height;
                 property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
                 function reveal-focus() {
-                    if self.focused-item >= 0 && self.focused-item < 6 {
+                    if self.focused-item >= 0 && self.focused-item < 7 {
                         let top = self.focused-item * (self.row-height + 10px);
                         let bottom = top + self.row-height;
                         if -self.viewport-y > top { self.viewport-y = -top; }
@@ -2564,7 +2616,7 @@ export component MainWindow inherits Window {
                 init => { self.reveal-focus(); }
                 settings-body := Rectangle {
                     x: 0px; y: 0px;
-                    width: settings-scroll.width; height: 6 * settings-scroll.row-height + 50px;
+                    width: settings-scroll.width; height: 7 * settings-scroll.row-height + 60px;
                     VolumeRow {
                         x: 0px; y: 0px;
                         width: parent.width; height: settings-scroll.row-height;
@@ -2601,6 +2653,12 @@ export component MainWindow inherits Window {
                         width: parent.width; height: settings-scroll.row-height;
                         label: "Controllers"; navigation: true; selected: root.sound-focus-index == 7;
                         activated => { root.controllers-open(); }
+                    }
+                    SettingsRow {
+                        y: 6 * (settings-scroll.row-height + 10px);
+                        width: parent.width; height: settings-scroll.row-height;
+                        label: "Network"; navigation: true; selected: root.sound-focus-index == 8;
+                        activated => { root.network-open(); }
                     }
                 }
             }
@@ -2640,6 +2698,78 @@ export component MainWindow inherits Window {
                 text: "Retry Save";
                 selected: root.sound-focus-index == 6;
                 activated => { root.sound-retry(); }
+            }
+        }
+    }
+
+    if root.network-visible && root.sound-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+        width: parent.width; height: parent.height;
+        background: #050514;
+        TouchArea { width: parent.width; height: parent.height; }
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            height: Math.min(self.available-height - 24px, 680px);
+            heading: root.network-title;
+            subtitle: root.network-subtitle;
+            property <length> password-height: root.width >= 640px ? 48px : 64px;
+            hint: root.network-password-visible ? "D-pad/A type · B back · Select erase · Start connect" : "D-pad selects · A confirms · B back";
+            if !root.network-password-visible: Text {
+                x: 24px; y: 82px; width: parent.width - 48px;
+                height: 64px;
+                text: root.network-detail; color: #d8e8f8; font-size: 15px;
+                wrap: word-wrap; overflow: elide;
+            }
+            if root.network-password-visible: Text {
+                x: 24px; y: 82px; width: parent.width - 48px; height: parent.password-height;
+                text: root.network-password-revealed ? root.network-password-text : root.network-password-mask;
+                color: #ffffff; font-size: 14px; wrap: char-wrap;
+            }
+            if root.network-password-visible: Text {
+                x: 24px; y: 84px + parent.password-height; width: parent.width - 48px; height: 18px;
+                text: root.network-password-caption; color: #9fb4cc; font-size: 13px;
+                overflow: elide;
+            }
+            if root.network-password-visible: Rectangle {
+                x: 24px; y: 106px + parent.password-height; width: parent.width - 48px; height: (40 / root.network-keyboard-columns + 2) * 44px;
+                property <length> key-width: (self.width - (root.network-keyboard-columns - 1) * 4px) / root.network-keyboard-columns;
+                for row[index] in root.network-rows: Rectangle {
+                    x: index < 40 ? Math.mod(index, root.network-keyboard-columns) * (parent.key-width + 4px)
+                        : index < 44 ? (index - 40) * (parent.width + 4px) / 4 : (index - 44) * (parent.width + 4px) / 3;
+                    y: index < 40 ? Math.floor(index / root.network-keyboard-columns) * 44px
+                        : (40 / root.network-keyboard-columns + (index < 44 ? 0 : 1)) * 44px;
+                    width: index < 40 ? parent.key-width : index < 44 ? (parent.width - 12px) / 4 : (parent.width - 8px) / 3;
+                    height: 40px;
+                    MenuButton {
+                        width: parent.width; height: parent.height; text-padding: 1px;
+                        text: row.label; enabled: row.enabled;
+                        selected: root.network-focus-index == index;
+                        activated => { root.network-command(row.id); }
+                    }
+                }
+            }
+            if !root.network-password-visible: Flickable {
+                x: 24px; y: 154px; width: parent.width - 48px; height: parent.height - 192px;
+                viewport-width: self.width;
+                viewport-height: root.network-rows.length * 60px;
+                property <int> focus-index: root.network-focus-index;
+                property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
+                function reveal-focus() {
+                    let top = self.focus-index * 60px;
+                    let bottom = top + 52px;
+                    if -self.viewport-y > top { self.viewport-y = -top; }
+                    if -self.viewport-y + self.height < bottom { self.viewport-y = self.height - bottom; }
+                    self.viewport-y = Math.max(-self.scroll-limit, Math.min(0px, self.viewport-y));
+                }
+                changed focus-index => { self.reveal-focus(); }
+                changed scroll-limit => { self.reveal-focus(); }
+                init => { self.reveal-focus(); }
+                for row[index] in root.network-rows: MenuButton {
+                    x: 0px; y: index * 60px; width: parent.width; height: 52px;
+                    text: row.label; enabled: row.enabled;
+                    detail: row.detail; badge: row.badge;
+                    selected: root.network-focus-index == index;
+                    activated => { root.network-command(row.id); }
+                }
             }
         }
     }
