@@ -70,6 +70,136 @@ fn fully_lit_face_respects_the_cell_cap_including_meridiem() {
 }
 
 #[test]
+fn returning_blocks_stay_opaque_instead_of_crossfading_to_a_second_face() {
+    let mut state = ready(4.0 / 3.0, 42, ClockTimeFormat::TwelveHour);
+    state.preview_event(ClockEventKind::Explosion);
+    let count = cells(&state).len();
+    ticks(
+        &mut state,
+        WARNING_TICKS + BURST_TICKS + REFORMING_TICKS / 2,
+    );
+    let frame = ClockScenario::render_frame(&state);
+    let blocks = frame
+        .layers
+        .iter()
+        .filter(|layer| layer.z == 3 || layer.z == 4)
+        .flat_map(|layer| &layer.primitives)
+        .filter_map(|primitive| match primitive {
+            engine_common::RenderPrimitive::Polygon(polygon) => Some(polygon),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        blocks
+            .iter()
+            .all(|block| block.fill.unwrap().color.a == 1.0),
+        "returning debris must remain fully visible, not fade into a separate face"
+    );
+    assert_eq!(
+        blocks.len(),
+        count + 2,
+        "one block per cell, plus the colon"
+    );
+}
+
+#[test]
+fn changed_readings_reassemble_the_latest_face_before_the_final_handoff() {
+    // Actual event lifecycle, including changes during warning, burst, return,
+    // and its very last tick. The phase deadline must not keep getting extended.
+    for elapsed in [0, 18, 180, 246, 280, EXPLOSION_TICKS - 2] {
+        for (hour, minute, format) in [
+            (11, 11, ClockTimeFormat::TwentyFourHour),
+            (20, 8, ClockTimeFormat::TwentyFourHour),
+            (0, 0, ClockTimeFormat::TwelveHour),
+            (12, 0, ClockTimeFormat::TwelveHour),
+        ] {
+            let mut state = ready(4.0 / 3.0, 42, ClockTimeFormat::TwelveHour);
+            state.preview_event(ClockEventKind::Explosion);
+            ticks(&mut state, elapsed);
+            let before = cells(&state).to_vec();
+            let phase_tick = state.phase_tick();
+            let mut settings = state.settings();
+            settings.time_format = format;
+            ClockScenario::step(
+                &mut state,
+                &[
+                    ClockAction::configure(settings),
+                    ClockAction::set_reading(ClockReading::new(hour, minute, 0).unwrap()),
+                ],
+                Duration::ZERO,
+            );
+            assert_eq!(cells(&state), before, "paused changes do not move debris");
+            assert_eq!(state.phase_tick(), phase_tick);
+            ticks(&mut state, EXPLOSION_TICKS - elapsed - 1);
+            assert_eq!(state.event_phase(), Some(EventPhase::Reforming));
+            assert_eq!(state.phase_tick(), REFORMING_TICKS - 1);
+            assert_eq!(state.body_count(), 0);
+            let layout = Layout::new(state.aspect_ratio());
+            let mut expected = Vec::new();
+            for segment in state.segments().iter().filter(|segment| segment.lit) {
+                for cell in digits::cells(segment.id.kind) {
+                    expected.push((
+                        layout.cell_center(segment.id, *cell),
+                        layout.pitch * 0.8,
+                        false,
+                    ));
+                }
+            }
+            for glyph in state
+                .display()
+                .meridiem
+                .into_iter()
+                .flat_map(meridiem::Glyph::for_label)
+            {
+                for cell in glyph.cells() {
+                    expected.push((
+                        glyph.cell_center(layout, cell),
+                        layout.pitch * meridiem::PIXEL_SIZE,
+                        true,
+                    ));
+                }
+            }
+            // Let the event sample its exact endpoint without ClockState dropping
+            // it, so the ordinary face cannot mask a wrong assignment in a test.
+            let floor = state.floor.geometry(layout);
+            let Some(ActiveEvent::Explosion(event)) = &mut state.active_event else {
+                panic!()
+            };
+            assert!(event.step(
+                events::EventContext {
+                    segments: &mut state.segments,
+                    display: state.display,
+                    layout,
+                    floor,
+                },
+                None
+            ));
+            let visible = event
+                .cells
+                .iter()
+                .filter(|cell| cell.side > 0.0)
+                .collect::<Vec<_>>();
+            assert_eq!(visible.len(), expected.len());
+            for (position, side, label) in expected {
+                assert_eq!(
+                    visible
+                        .iter()
+                        .filter(|cell| cell.position == position
+                            && cell.side == side
+                            && cell.label == label
+                            && cell.angle == 0.0)
+                        .count(),
+                    1
+                );
+            }
+            state.finish_event();
+            assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+            assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
+        }
+    }
+}
+
+#[test]
 fn shared_world_steps_once_through_release_reformation_and_final_tick() {
     let mut baseline = ready(4.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);
     let mut state = ready(4.0 / 3.0, 42, ClockTimeFormat::TwentyFourHour);

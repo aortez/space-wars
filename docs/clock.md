@@ -13,7 +13,8 @@ Rain (#79) adds variable showers and a passive floating rubber duck. Storm effec
 flashlight effects and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
-Explosion (#76) scatters individual lit cells as bouncing rigid-body debris.
+Explosion (#76) scatters individual lit cells as bouncing rigid-body debris;
+its reassembly (#135) brings the blocks back into the latest clock face.
 
 ## Layout
 
@@ -344,14 +345,32 @@ once per tick. Debris can hit the duck; controller ownership and motion continue
 Departure/rejoining hands the same arena back and forth without duplicating
 bodies. The crow leaves when the digit perches disappear.
 
-At reformation, only the event's debris bodies are removed; their last poses
-ease visually back toward the source face while the **latest** reading fades in.
-Standalone physics is already released at this point. Pause freezes the event;
-time/format changes do not recreate its debris. Preview replacement, resize,
-restart and normal completion all release its batch without deleting a live duck.
+At reformation, only the event's debris bodies are removed. Their last poses
+become **fully opaque returning blocks**, not a fading overlay on a second face.
+Each block eases into its own cell with the shortest settling rotation. The
+ordinary clock takes over only once the return is complete. This is visual
+choreography: returning blocks do not collide with or drag the duck.
+
+If the time or format changes, unchanged cell destinations keep their existing
+paths. Remaining blocks are assigned deterministically to the **latest** digit
+and AM/PM cells, preferring the same block kind and then the nearest spare.
+A denser reading grows extra blocks from existing debris; surplus blocks shrink
+into nearby destinations. These visual slots are reused across further changes,
+still capped at 119, and never allocate replacement physics bodies. Matching
+runs only on return entry or a changed digit/label, not every frame or colon blink.
+
+Mid-return changes start redirected paths at the current poses and use the
+remaining portion of the original 1.5-second return window; they do not extend
+the event indefinitely. Consequently, a correction immediately before completion
+has a very short return. Pause freezes the blocks; changed readings are applied
+to their paths on the next simulation tick. Standalone physics is already released
+during reassembly. Preview replacement, resize, restart and normal completion all
+release the batch without deleting a live duck.
 
 `clock state` exposes `explosion.cells`, `live_cells`, `max_cells` and
-`shared_arena`, alongside the ordinary event/phase/tick diagnostics. From idle:
+`shared_arena`, alongside the ordinary event/phase/tick diagnostics. During
+reformation, `cells` includes reused/growing/shrinking visual slots while
+`live_cells` is zero. From idle:
 
 ```sh
 spacewars-cli clock trigger explosion
@@ -364,7 +383,12 @@ Fixed-tick tests cover replay, six aspect ratios, both time formats, full-capaci
 cleanup, paused reading changes, join/depart/rejoin, replacements, real cell–duck
 contact and single stepping through the final event tick. A real-client workflow
 covers launcher/live settings, paused state, recovery, persistence and restart.
-The display-free production-renderer fixture covers Picade, HyperPixel and portrait:
+Reassembly tests check opaque rendering without a duplicate face, exact one-to-one
+destination coverage before cleanup, denser/sparser readings, midnight/noon and
+format changes, shortest rotation, continuous mid-return retargeting, unchanged
+paths, and the cell/deadline caps under repeated corrections. The display-free
+production-renderer fixture covers Picade, HyperPixel and portrait, with early,
+middle and late return frames plus a reading change during reassembly:
 
 ```sh
 SPACEWARS_EXPLOSION_ARTIFACTS=/tmp/clock-explosion \
@@ -372,7 +396,8 @@ SPACEWARS_EXPLOSION_ARTIFACTS=/tmp/clock-explosion \
   clock_explosion_captures
 ```
 
-**Device validation (2026-09-26):** Fast-deployed the release client and matching
+**Historical device validation (2026-09-26, before #135's reassembly change):**
+Fast-deployed the release client and matching
 CLI to **sw-picade-2 only** (Pi 4, 1024×768, raster scale 2.0), restarting the app
 without rebooting. Phase-aware captures caught an automatic duck sharing the
 event: 54 debris bodies raised the existing arena from 4 to 58 bodies, then

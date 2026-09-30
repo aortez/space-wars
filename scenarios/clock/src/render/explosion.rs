@@ -4,21 +4,12 @@ use crate::events::{
     explosion::{ExplosionEvent, WARNING_TICKS},
 };
 
-pub(super) fn progress(event: &ExplosionEvent) -> f32 {
-    if event.phase() != EventPhase::Reforming {
-        return 0.0;
-    }
-    let t = (event.phase_tick() as f32 / REFORMING_TICKS as f32).min(1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
 pub(super) fn render(
     frame: &mut RenderFrame,
     state: &ClockState,
     event: &ExplosionEvent,
     layout: Layout,
 ) {
-    let progress = progress(event);
     let mut palette = DigitPalette::default();
     if event.phase() == EventPhase::Warning {
         // One smooth amber pulse, not a strobe or full-screen flash.
@@ -36,27 +27,24 @@ pub(super) fn render(
                 layout.cell_center(segment.id, cell),
                 layout.pitch,
                 0.0,
-                if segment.lit && segment.shape.contains(cell) {
-                    progress
-                } else {
-                    0.0
-                },
+                0.0,
                 DigitPalette::default(),
             );
         }
     }
     for cell in &event.cells {
-        let position = cell.position + (cell.origin - cell.position) * progress;
-        let angle = cell.angle * (1.0 - progress);
+        if cell.side <= 0.0 {
+            continue;
+        }
         if cell.label {
-            meridiem::pixel(frame, position, cell.side, angle, 1.0 - progress);
+            meridiem::pixel(frame, cell.position, cell.side, cell.angle, 1.0);
         } else {
             render_square(
                 frame,
-                position,
+                cell.position,
                 cell.side / 0.8,
-                angle,
-                1.0 - progress,
+                cell.angle,
+                1.0,
                 palette,
             );
         }
