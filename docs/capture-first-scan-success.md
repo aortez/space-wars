@@ -54,3 +54,37 @@ The baseline path names retained local evidence; the runner verifies its
 manifest and every consumed file. Use a new output directory. Results will be
 recorded separately after this plan is frozen. Bot-policy promotion requires
 the separate directed and held-out evaluation under #142.
+
+## Results at `7c59c6c`
+
+All sixteen recordings passed the frozen replay checks. Full controls and
+observations, native sensor work, physical outcomes, existing forecasts and
+planning charges matched the archived corpus. The
+[committed result](data/capture-first-scan-success-v1.json) is an unchanged
+copy of the runner summary, including commands, source/binary/tool hashes,
+raw file hashes and every audited public report copy.
+
+The four ordinary windows produced no numeric first-scan composition. The
+four controlled windows retained twelve final site records: ten conditional
+references and two unavailable source landings. All twelve remain in the
+results. Only the four bearing-33 records matched the actual native
+material/site/direction and uninterrupted capture; the other sites receive
+no actual-duration credit.
+
+| Fresh comparison source tick | Conditional seconds | Actual departure seconds from source | Predicted minus actual |
+| ---: | ---: | ---: | ---: |
+| 3914 | 51.500 | 51.467 | +0.033 |
+| 3974 | 50.300 | 50.500 | −0.200 |
+| 4028 | 49.683 | 47.667 | +2.017 |
+| 4097 | 50.317 | 47.800 | +2.517 |
+
+These are four correlated windows in the same quiet world, with controlled
+nominations. They check the composition and its evidence binding; they do
+not calibrate general acquisition, combat survival or destination quality.
+The original geometry epoch is retained even when the scan occurs later.
+Actual site-selection and unconditional whole-trip duration remain unknown.
+
+Validation passed: 273 AI unit tests, including arithmetic/epoch binding,
+eighteen missing or incompatible evidence mutations and unchanged comparison
+work; 553 Python tests, including independent audit mutations; Rust formatting.
+The release binary used Rust 1.89.0 and the frozen implementation commit.
