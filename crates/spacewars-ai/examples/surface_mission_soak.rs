@@ -371,21 +371,27 @@ fn main() {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
                         live.observe(&state, i, &mut o.local, request.objective_planning);
-                        live.observe_destination_cover(
-                            &state,
-                            i,
-                            &mut o,
-                            request.destination_cover,
-                        );
+                        if request.destination_cover.is_some()
+                            || !mission_evaluation
+                                .as_ref()
+                                .is_some_and(|e| e.alternative_survey)
+                        {
+                            live.observe_destination_cover(
+                                &state,
+                                i,
+                                &mut o,
+                                request.destination_cover,
+                            );
+                        }
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
                     }
                 };
                 #[cfg(not(feature = "sensor-profile"))]
-                let o = observe();
+                let mut o = observe();
                 #[cfg(feature = "sensor-profile")]
-                let (o, profile) =
+                let (mut o, profile) =
                     scenario_spacewars::surface_sortie::sensor_profile::measure(&mut observe);
                 let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
                 if let Some(probe) = &mut landing_probe {
@@ -434,9 +440,6 @@ fn main() {
                 };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
-                if let Some(evaluator) = &mut mission_evaluation {
-                    successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
-                }
                 if let Some(probe) = &mut successor_probe {
                     successor_construction_ms += probe.observe(i, &pilots[i], &o);
                 }
@@ -577,6 +580,22 @@ fn main() {
                     events.push(json!({"tick":tick,"seat":i,"label":label,"telemetry":pilots[i].telemetry()}));
                     eprintln!("{:.2}s P{} {label}", tick as f64 / 60.0, i + 1);
                     last[i] = label;
+                }
+                // Preserve the complete controller trace; observational remote
+                // demand is attached only after controls and their diagnostics.
+                if let Some(evaluator) = &mut mission_evaluation {
+                    if evaluator.alternative_survey
+                        && request.destination_cover.is_none()
+                        && let Some(live) = live_planning.as_mut().filter(|l| l.enabled_for(i))
+                    {
+                        let clock = Instant::now();
+                        let request = evaluator
+                            .evaluator
+                            .alternative_request(&o, pilots[i].telemetry());
+                        live.observe_destination_cover(&state, i, &mut o, request);
+                        successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    }
+                    successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
                 }
             } else if mode == "intercept" {
                 let clock = Instant::now();

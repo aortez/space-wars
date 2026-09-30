@@ -220,6 +220,9 @@ impl MaterialMissionPilot {
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry
     }
+    pub fn policy(&self) -> crate::mission_policy::MissionPolicy {
+        self.policy
+    }
     pub fn label(&self) -> String {
         let task = if self.telemetry.goal == MissionGoal::Capture {
             self.capture

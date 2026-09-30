@@ -42,6 +42,7 @@ impl PlanetKey {
 
 #[derive(Clone)]
 pub(super) struct LocalEvidence {
+    pub remote: bool,
     pub key: PlanetKey,
     pub site: LandingSiteId,
     pub tick: u64,
@@ -51,6 +52,17 @@ pub(super) struct LocalEvidence {
     pub choice: Option<(u64, u64)>,
     pub route_source_tick: Option<u64>,
     pub route_validated_tick: Option<u64>,
+}
+
+pub(super) fn no_flag_costs() -> PhaseCosts {
+    PhaseCosts {
+        landing: 17.866_667,
+        exit: 1.0 / 60.0,
+        outbound: 4.0 / 60.0,
+        claim: 3.0 + 1.0 / 60.0,
+        return_board: 2.0 / 60.0,
+        departure: 3.766_667,
+    }
 }
 
 /// The existing empirical v1 phase medians, without extrapolating walking
@@ -68,14 +80,7 @@ pub(super) fn local_costs(
         if claim.owner.is_some() || (claim.stage_required_seconds - 3.0).abs() > 0.001 {
             return Err("claim state outside no-flag calibration");
         }
-        return Ok(PhaseCosts {
-            landing: 17.866_667,
-            exit: 1.0 / 60.0,
-            outbound: 4.0 / 60.0,
-            claim: 3.0 + 1.0 / 60.0,
-            return_board: 2.0 / 60.0,
-            departure: 3.766_667,
-        });
+        return Ok(no_flag_costs());
     }
     let survey = o
         .local
@@ -163,6 +168,7 @@ pub(super) fn observe_local(
         })?;
     let costs = local_costs(o, site.id);
     Some(LocalEvidence {
+        remote: false,
         key: PlanetKey::read(&p.planet),
         site: site.id,
         tick: p.tick,
