@@ -106,11 +106,13 @@ pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout
     }
 
     let radius = ((layout.bounds_max.x - layout.bounds_min.x) * 0.22).min(96.0);
+    // Nestle the lamp housings just inside the junction of the two rails.
+    let lamp_inset = width * 1.3;
     for x in [
-        layout.bounds_min.x + width * 1.8,
-        layout.bounds_max.x - width * 1.8,
+        layout.bounds_min.x + lamp_inset,
+        layout.bounds_max.x - lamp_inset,
     ] {
-        let center = RenderPoint::new(x, layout.bounds_max.y - width * 1.8);
+        let center = RenderPoint::new(x, layout.bounds_max.y - lamp_inset);
         for shell in (1..=12).rev() {
             frame.push_primitive(
                 LAMP_LAYER,

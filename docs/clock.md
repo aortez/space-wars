@@ -66,7 +66,8 @@ share the frame's warm color, bevel and grain. The physical floor supplies the
 base, so drain gaps remain open all the way through; no second decorative rail
 covers them. Floor heights, colliders and duck courses retain their geometry.
 
-Two small amber lights illuminate the upper corners. Lit digit cells, the colon
+Two small amber lights sit just inside the junctions of the top and side rails,
+illuminating the upper corners. Lit digit cells, the colon
 and AM/PM cast a dim halo in their current color, while inactive cells stay
 subdued. The header uses a dark warm finish, and narrow shadows inside the side
 and top rails give the room depth. The frame scales with the shorter display
