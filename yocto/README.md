@@ -39,6 +39,13 @@ Yocto's own Rust bootstrap does not accidentally discover Space-Wars'
 other builds. Override `KAS_BUILD_DIR` if you need a different build location;
 use the same override when flashing or updating. Downloads/sstate remain shared.
 
+Builds first run [bounded local Cargo cache maintenance](../docs/build-cache-maintenance.md).
+If free space is below 40 GiB or this checkout's debug profile exceeds 60 GiB,
+Cargo cleans workspace-package debug artifacts only, preserving dependency
+builds and experiment data. Preview with `npm run cache:check`, apply separately
+with `npm run cache:clean`, or set `SPACEWARS_BUILD_CACHE=report` / `off` to
+preview / disable automatic cleanup. No sibling checkout or Yocto cache is pruned.
+
 `rm_work` is enabled. The build warns below 25 GiB free, stops scheduling tasks
 below 20 GiB, and halts below 10 GiB. Free space and rerun to resume.
 `npm test` runs hardware-profile, compiled input-layout and update-compatibility

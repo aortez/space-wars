@@ -255,6 +255,20 @@ impl SurfaceSortieScenario {
 
     /// Vary launch faces without prescribing any motion after construction.
     pub fn init_material_travel_trial(seed: u64, mirror: bool, bearing: f32) -> SurfaceSortieState {
+        Self::init_material_travel_surface_trial(
+            seed,
+            mirror,
+            bearing,
+            engine_terrain::TerrainSurface::default(),
+        )
+    }
+
+    pub(super) fn init_material_travel_surface_trial(
+        seed: u64,
+        mirror: bool,
+        bearing: f32,
+        surface: engine_terrain::TerrainSurface,
+    ) -> SurfaceSortieState {
         assert!(bearing.is_finite());
         let up = Vec2::Y.rotate_radians(bearing);
         let mut world = Self::init(SurfaceMotionPreset::Stationary, seed).world;
@@ -267,6 +281,7 @@ impl SurfaceSortieScenario {
         world.rover_builds = vec![RoverBuildState::default(); 2];
         let mut state = Self::on_surface(world, SurfaceMotionPreset::Stationary, 0, up, None);
         state.world.terrain.legacy_services = false;
+        state.world.terrain.surface = surface;
         for index in 0..2 {
             state
                 .world

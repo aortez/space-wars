@@ -7,7 +7,7 @@ use engine_common::Scenario;
 use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, SurfaceSortieState};
 use std::time::Duration;
 
-fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
+pub(super) fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
     let mut state = SurfaceSortieScenario::init_material_match(42);
     SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
     let bot = MissionBot::new(
@@ -21,8 +21,9 @@ fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
     let o = state.mission_observation(0, None);
     (state, o, bot)
 }
-fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvidence {
+pub(super) fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvidence {
     LocalEvidence {
+        remote: false,
         key: PlanetKey::read(planet),
         site: LandingSiteId {
             planet: planet.index,
@@ -33,6 +34,7 @@ fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvide
         choice: None,
         route_source_tick: None,
         route_validated_tick: None,
+        route_objective: None,
         costs: Some(PhaseCosts {
             landing: seconds,
             exit: 0.0,
@@ -44,7 +46,7 @@ fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvide
         reason: None,
     }
 }
-fn finish(report: MissionEvaluation) -> MissionEvaluation {
+pub(super) fn finish(report: MissionEvaluation) -> MissionEvaluation {
     let mut job = EvaluationJob {
         report,
         cursor: 0,
@@ -285,7 +287,7 @@ fn published_result_expires_without_cancelling_its_starved_refresh() {
 fn pending_reports_use_pinned_dependencies_and_cancel_changed_route_support() {
     let (_, mut o, bot) = fixture();
     o.local.combat.recovery.flight.pilot.queries_ready = false;
-    o.local.combat.recovery.flight.pilot.gravity = Vec2::ZERO;
+    o.local.objective_gravity = 0.0;
     let mut host = MissionEvaluator::new(2);
     let local = o
         .planets
@@ -307,7 +309,7 @@ fn pending_reports_use_pinned_dependencies_and_cancel_changed_route_support() {
     host.advance(1, Work::default());
     for tick in 2..=4 {
         o.local.combat.recovery.flight.pilot.tick = tick;
-        o.local.combat.recovery.flight.pilot.gravity += Vec2::X * 0.004;
+        o.local.objective_gravity += 0.004;
         host.observe(&o, bot.telemetry());
     }
     assert_eq!(
@@ -315,7 +317,7 @@ fn pending_reports_use_pinned_dependencies_and_cancel_changed_route_support() {
         "small changes accumulate against submitted gravity"
     );
     let mut rejected = known(local, 1, 20.0);
-    rejected.gravity = o.local.combat.recovery.flight.pilot.gravity.length();
+    rejected.gravity = o.local.objective_gravity;
     rejected.costs = None;
     rejected.reason = Some("newly rejected route");
     rejected.route_source_tick = Some(0);
@@ -390,8 +392,7 @@ fn match_clock_context_distinguishes_labs_unlimited_and_finished_matches() {
     assert!(result.preferred_by_time.is_none());
 }
 
-#[test]
-fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes() {
+pub(super) fn add_flagged_route(o: &mut MissionObservationV1) -> LandingSiteId {
     use scenario_spacewars::surface_sortie::{
         PlanetFlagObservation,
         ground_navigation::GroundRouteDiagnostics,
@@ -399,7 +400,6 @@ fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes
             LandingObjective, LandingObjectiveRoute, LandingObjectiveSurvey, ObjectivePlanning,
         },
     };
-    let (_, mut o, _) = fixture();
     let p = &mut o.local.combat.recovery.flight.pilot;
     let site = LandingSiteId {
         planet: p.planet.index,
@@ -443,6 +443,13 @@ fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes
         }],
         actual: None,
     });
+    site
+}
+
+#[test]
+fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes() {
+    let (_, mut o, _) = fixture();
+    let site = add_flagged_route(&mut o);
     let valid = o.clone();
     assert!(model::local_costs(&o, site).is_ok());
     for mutation in 0..7 {
@@ -485,6 +492,29 @@ fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes
         .unwrap()
         .position += Vec2::X * 5.0;
     assert!(!old.matches(&PlanetKey::read(&rotated)));
+}
+
+#[test]
+fn native_route_cadence_gap_does_not_refresh_age_or_hide_stale_work() {
+    let (_, mut o, _) = fixture();
+    let mut sample = known(&o.local.combat.recovery.flight.pilot.planet, 30, 20.0);
+    sample.route_source_tick = Some(30);
+    o.local.landing_objective = None;
+    o.local.objective_work = None;
+    for tick in [31, 45, 59] {
+        o.local.combat.recovery.flight.pilot.tick = tick;
+        assert!(model::route_cadence_gap(&o, &sample));
+        assert_eq!(sample.tick, 30);
+    }
+    o.local.combat.recovery.flight.pilot.tick = 60;
+    assert!(!model::route_cadence_gap(&o, &sample));
+    o.local.combat.recovery.flight.pilot.tick = 31;
+    o.local.objective_work =
+        Some(scenario_spacewars::surface_sortie::live_planning::ObjectiveWorkState::Stale);
+    assert!(!model::route_cadence_gap(&o, &sample));
+    o.local.objective_work = None;
+    sample.reason = Some("round trip incomplete");
+    assert!(!model::route_cadence_gap(&o, &sample));
 }
 
 #[test]

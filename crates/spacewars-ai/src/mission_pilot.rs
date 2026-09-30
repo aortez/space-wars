@@ -19,6 +19,41 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_destination.rs"]
+mod destination;
+pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, DestinationSwitch};
+
+#[path = "mission_transfer_forecast.rs"]
+mod transfer_forecast;
+pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferForecastReport};
+
+#[path = "mission_transfer_queue.rs"]
+mod transfer_queue;
+pub use transfer_queue::{
+    ArrivalSurveyPlan, TransferForecastQueue, TransferForecastState, TransferQueuePhase,
+};
+
+#[path = "mission_transfer_comparison.rs"]
+mod transfer_comparison;
+pub use transfer_comparison::{TransferComparisonJob, TransferComparisonReport};
+#[path = "mission_arrival_local.rs"]
+mod arrival_local;
+#[path = "mission_arrival_preference.rs"]
+mod arrival_preference;
+#[path = "mission_remote_arrival.rs"]
+mod remote_arrival;
+pub use arrival_local::{ArrivalLocalReference, ArrivalLocalReport};
+pub use arrival_preference::{
+    ArrivalPreferenceReport, ArrivalSiteAssessment, ArrivalSitePreference,
+};
+pub use remote_arrival::{
+    RemoteArrivalDirection, RemoteArrivalFrame, RemoteArrivalScreen, RemoteArrivalSite,
+};
+#[path = "mission_remote_surveys.rs"]
+mod remote_surveys;
+pub use remote_surveys::{RemoteSurveyMemory, RemoteSurveySnapshot};
+pub type TransferComparisonQueue = TransferForecastQueue<TransferComparisonJob>;
+
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{
@@ -94,6 +129,8 @@ pub struct MissionTelemetry {
     pub pursuit: Option<MissionPursuit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disengagement: Option<MissionDisengagement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_planning: Option<DestinationPlanningTelemetry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -141,6 +178,7 @@ pub struct MaterialMissionPilot {
     next_pursuit_tick: u64,
     last_survey: Option<LandingSurveyStamp>,
     pub(crate) bounded_acquisition: bool,
+    destination_switched: bool,
 }
 
 impl MaterialMissionPilot {
@@ -178,6 +216,9 @@ impl MaterialMissionPilot {
                 combat: None,
                 pursuit: None,
                 disengagement: None,
+                destination_planning: policy
+                    .selects_destination()
+                    .then(DestinationPlanningTelemetry::default),
             },
             capture: None,
             recovery: None,
@@ -198,6 +239,7 @@ impl MaterialMissionPilot {
             next_pursuit_tick: 0,
             last_survey: None,
             bounded_acquisition: false,
+            destination_switched: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -219,6 +261,9 @@ impl MaterialMissionPilot {
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry
+    }
+    pub fn policy(&self) -> crate::mission_policy::MissionPolicy {
+        self.policy
     }
     pub fn label(&self) -> String {
         let task = if self.telemetry.goal == MissionGoal::Capture {
@@ -275,6 +320,45 @@ impl MaterialMissionPilot {
         capture.start_acquisition(&o.local);
         capture
     }
+    /// Host-only same-observation reassessment of a fresh native landing choice.
+    /// The caller must supply the observation used for this tick's intent; this
+    /// does not authorize a remote site or refresh its historical evidence.
+    pub fn landing_choice_comparison(
+        &self,
+        o: &MissionObservationV1,
+        reference: LandingSiteId,
+    ) -> Result<crate::tactical_sortie::LandingChoiceComparison, &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.previous_tick != Some(p.tick)
+            || self.telemetry.goal != MissionGoal::Capture
+            || self.telemetry.target != Some(p.planet.index)
+            || self.recovery.is_some()
+        {
+            return Err("no current native capture intent");
+        }
+        self.capture
+            .as_ref()
+            .ok_or("capture task unavailable")?
+            .landing_choice_comparison(&o.local, reference)
+    }
+    /// Observational first-choice timing, with combat cover recorded separately.
+    /// Supply the exact immutable observation used for this tick's intent. The
+    /// native controller validates the choice; no report enters its decisions.
+    pub fn landing_choice_with_neutral_timing(
+        &self,
+        o: &MissionObservationV1,
+        reference: LandingSiteId,
+    ) -> Result<
+        (
+            crate::tactical_sortie::LandingChoiceComparison,
+            crate::mission_evaluation::NeutralCaptureTiming,
+        ),
+        &'static str,
+    > {
+        let choice = self.landing_choice_comparison(o, reference)?;
+        let timing = crate::mission_evaluation::neutral_capture_timing(o, &self.telemetry, &choice);
+        Ok((choice, timing))
+    }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
             self.telemetry.goal = goal;
@@ -310,10 +394,98 @@ impl MaterialMissionPilot {
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
         self.intent_with_continuation(o, None)
     }
+    /// Experimental destination policies consume only a completed, revalidated comparison.
+    /// Other identities follow their original path even when evidence is ready.
+    pub fn intent_with_evaluation(
+        &mut self,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+    ) -> CombatIntent {
+        let selection = self
+            .policy
+            .selects_destination()
+            .then(|| evaluator.selection(o, &self.telemetry))
+            .flatten();
+        self.intent_with_planning(o, None, selection)
+    }
     fn intent_with_continuation(
         &mut self,
         o: &MissionObservationV1,
+        continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
+        self.intent_with_planning(o, continuation, None)
+    }
+    fn intent_with_planning(
+        &mut self,
+        o: &MissionObservationV1,
+        continuation: Option<&mut SuccessorContinuation>,
+        selection: Option<crate::mission_evaluation::CaptureSelection>,
+    ) -> CombatIntent {
+        self.intent_with_inputs(o, continuation, selection, None, false)
+    }
+
+    /// Offline, externally nominated transfer experiment. Call before ordinary
+    /// intent on the nominated tick. Rejected nominations retain ordinary
+    /// selection, and later ticks use the regular evaluator/controller again.
+    pub fn intent_with_destination_probe(
+        &mut self,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        destination: usize,
+    ) -> (CombatIntent, DestinationProbeResult) {
+        let mut probe = DestinationProbeResult {
+            destination,
+            accepted: false,
+            reason: Some("higher priority control"),
+        };
+        let selection = self
+            .policy
+            .selects_destination()
+            .then(|| evaluator.selection(o, &self.telemetry))
+            .flatten();
+        let intent = self.intent_with_inputs(o, None, selection, Some(&mut probe), false);
+        (intent, probe)
+    }
+
+    /// Offline second intervention: defer new pursuit during this nominated
+    /// transfer only. The caller must opt in on every tick; no bot setting or
+    /// observation is changed. Existing pursuits, recovery and safety retain
+    /// priority. The source tick itself always uses ordinary nomination.
+    pub fn intent_for_transfer_calibration(
+        &mut self,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        destination: usize,
+        source_tick: u64,
+    ) -> CombatIntent {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let defer_new_pursuit = self.selected_tick == source_tick
+            && self.destination_switched
+            && self.telemetry.target == Some(destination)
+            && p.tick > source_tick
+            && p.tick - source_tick <= 60 * 60
+            && self.capture.is_none()
+            && self.recovery.is_none()
+            && self.telemetry.pursuit.is_none()
+            && !self.disengaging()
+            && p.ship_available
+            && p.ship_form == ShipForm::Ship
+            && p.location != PilotLocation::OnFoot;
+        let selection = self
+            .policy
+            .selects_destination()
+            .then(|| evaluator.selection(o, &self.telemetry))
+            .flatten();
+        self.intent_with_inputs(o, None, selection, None, defer_new_pursuit)
+    }
+
+    fn intent_with_inputs(
+        &mut self,
+        o: &MissionObservationV1,
         mut continuation: Option<&mut SuccessorContinuation>,
+        selection: Option<crate::mission_evaluation::CaptureSelection>,
+        probe: Option<&mut DestinationProbeResult>,
+        defer_new_pursuit: bool,
     ) -> CombatIntent {
         let c = &o.local.combat;
         let f = &c.recovery.flight;
@@ -327,9 +499,15 @@ impl MaterialMissionPilot {
             || p.version != 1
             || p.owner != self.context.actor
         {
+            if let Some(probe) = probe {
+                probe.reason = Some("observation version or actor mismatch");
+            }
             return CombatIntent::default();
         }
         if self.previous_tick == Some(p.tick) {
+            if let Some(probe) = probe {
+                probe.reason = Some("control already issued for source tick");
+            }
             return self.previous_intent;
         }
         if self.last_frame.is_some_and(|index| index != p.planet.index) {
@@ -343,7 +521,13 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose_with_continuation(o, continuation.as_deref_mut());
+        let result = self.choose_with_continuation(
+            o,
+            continuation.as_deref_mut(),
+            selection,
+            probe,
+            defer_new_pursuit,
+        );
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
@@ -354,12 +538,15 @@ impl MaterialMissionPilot {
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
-        self.choose_with_continuation(o, None)
+        self.choose_with_continuation(o, None, None, None, false)
     }
     fn choose_with_continuation(
         &mut self,
         o: &MissionObservationV1,
         mut continuation: Option<&mut SuccessorContinuation>,
+        selection: Option<crate::mission_evaluation::CaptureSelection>,
+        probe: Option<&mut DestinationProbeResult>,
+        defer_new_pursuit: bool,
     ) -> CombatIntent {
         self.telemetry.avoidance = None;
         self.telemetry.opponent = None;
@@ -454,7 +641,7 @@ impl MaterialMissionPilot {
         if !p.controls_armed {
             return CombatIntent::default();
         }
-        if self.pursuit_opportunity(o) {
+        if self.pursuit_opportunity(o, defer_new_pursuit) {
             return self.hunt(o);
         }
         if let Some(intent) = self.disengagement_intent(o) {
@@ -474,6 +661,15 @@ impl MaterialMissionPilot {
             } else if self.capture.is_none() && planet.is_some_and(owned) {
                 self.reconsider(p.tick, "destination already secured", false);
             }
+        }
+        let nominated = if let Some(probe) = probe {
+            self.apply_destination_probe(o, probe);
+            probe.accepted
+        } else {
+            false
+        };
+        if !nominated && let Some(selection) = selection {
+            self.apply_destination_selection(o, selection);
         }
         if self.telemetry.target.is_none() {
             self.deferred.retain(|(_, until)| p.tick < *until);
@@ -501,6 +697,7 @@ impl MaterialMissionPilot {
                         .total_cmp(&b.motion.position.distance_to(p.ship.position))
                 });
             if let Some(planet) = selected {
+                self.destination_switched = false;
                 self.telemetry.target = Some(planet.index);
                 self.selected_tick = p.tick;
                 self.progress_tick = p.tick;
@@ -655,7 +852,7 @@ impl MaterialMissionPilot {
         }
     }
 
-    fn pursuit_opportunity(&mut self, o: &MissionObservationV1) -> bool {
+    fn pursuit_opportunity(&mut self, o: &MissionObservationV1, defer_new: bool) -> bool {
         if self.disengaging() {
             return false;
         }
@@ -722,6 +919,11 @@ impl MaterialMissionPilot {
         } else {
             return false;
         };
+        // Offline calibration changes only this new-mission decision. All
+        // ordinary eligibility, pursuit maintenance and safety ran above.
+        if defer_new {
+            return false;
+        }
         self.reconsider(p.tick, "pausing travel for nearby opponent", false);
         self.telemetry.pursuit = Some(MissionPursuit {
             started_tick: p.tick,

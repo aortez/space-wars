@@ -9,6 +9,9 @@ pub(super) struct PlanetKey {
     known: bool,
     flag: Option<(PlayerId, Vec2)>,
     stage_seconds: Option<f32>,
+    // Retained for the historical shadow; ordinary matching remains unchanged.
+    radius: f32,
+    flag_range: Option<f32>,
 }
 impl PlanetKey {
     pub fn read(planet: &PilotPlanetObservation) -> Self {
@@ -24,6 +27,11 @@ impl PlanetKey {
                 )
             }),
             stage_seconds: planet.claim.as_ref().map(|c| c.stage_required_seconds),
+            radius: planet.radius,
+            flag_range: planet
+                .claim
+                .as_ref()
+                .map(|c| c.flag_interaction_range - 0.2),
         }
     }
     pub fn matches(&self, other: &Self) -> bool {
@@ -38,10 +46,45 @@ impl PlanetKey {
                 _ => false,
             }
     }
+    /// Stricter identity for the observational transfer/local join. Ordinary
+    /// evaluator matching and its playing policies remain unchanged.
+    pub fn reference_matches(&self, other: &Self) -> bool {
+        self.matches(other)
+            && self.radius.is_finite()
+            && self.radius > 0.0
+            && self.radius == other.radius
+            && self.stage_seconds.is_none_or(f32::is_finite)
+            && self.flag_range == other.flag_range
+            && self.flag_range.is_none_or(|v| v.is_finite() && v > 0.0)
+            && match (self.flag, other.flag) {
+                (Some((_, a)), Some((_, b))) => a.distance_to(b) <= 0.002,
+                (None, None) => true,
+                _ => false,
+            }
+    }
+    pub fn flag_identity_matches(&self, objective: LandingObjective, radius: f32) -> bool {
+        let Some((owner, position)) = self.flag else {
+            return false;
+        };
+        self.known
+            && self.owner == Some(owner)
+            && self.radius == radius
+            && self
+                .stage_seconds
+                .is_some_and(|v| v.is_finite() && (v - 3.0).abs() <= 0.001)
+            && self.planet == objective.planet
+            && self.revision == objective.revision
+            && owner == objective.owner
+            && position.distance_to(objective.position) <= 0.002
+            && self
+                .flag_range
+                .is_some_and(|v| (v - objective.range).abs() <= 0.0001)
+    }
 }
 
 #[derive(Clone)]
 pub(super) struct LocalEvidence {
+    pub remote: bool,
     pub key: PlanetKey,
     pub site: LandingSiteId,
     pub tick: u64,
@@ -51,6 +94,31 @@ pub(super) struct LocalEvidence {
     pub choice: Option<(u64, u64)>,
     pub route_source_tick: Option<u64>,
     pub route_validated_tick: Option<u64>,
+    pub route_objective: Option<LandingObjective>,
+}
+
+pub(super) fn route_cadence_gap(o: &MissionObservationV1, sample: &LocalEvidence) -> bool {
+    let p = &o.local.combat.recovery.flight.pilot;
+    o.local.landing_objective.is_none()
+        && o.local.objective_work.is_none()
+        && sample.costs.is_some()
+        && sample.reason.is_none()
+        && sample.route_source_tick.is_some_and(|tick| {
+            tick <= p.tick
+                && p.tick - tick
+                    < scenario_spacewars::surface_sortie::ground_navigation::GROUND_REFRESH_TICKS
+        })
+}
+
+pub(crate) fn no_flag_costs() -> PhaseCosts {
+    PhaseCosts {
+        landing: 17.866_667,
+        exit: 1.0 / 60.0,
+        outbound: 4.0 / 60.0,
+        claim: 3.0 + 1.0 / 60.0,
+        return_board: 2.0 / 60.0,
+        departure: 3.766_667,
+    }
 }
 
 /// The existing empirical v1 phase medians, without extrapolating walking
@@ -68,14 +136,7 @@ pub(super) fn local_costs(
         if claim.owner.is_some() || (claim.stage_required_seconds - 3.0).abs() > 0.001 {
             return Err("claim state outside no-flag calibration");
         }
-        return Ok(PhaseCosts {
-            landing: 17.866_667,
-            exit: 1.0 / 60.0,
-            outbound: 4.0 / 60.0,
-            claim: 3.0 + 1.0 / 60.0,
-            return_board: 2.0 / 60.0,
-            departure: 3.766_667,
-        });
+        return Ok(no_flag_costs());
     }
     let survey = o
         .local
@@ -95,6 +156,14 @@ pub(super) fn local_costs(
         .take(8)
         .find(|r| r.site == Some(site))
         .ok_or("site round trip unmeasured")?;
+    walking_costs(route, claim.stage_required_seconds)
+}
+
+/// Shared phase calibration for local routes and the historical flag shadow.
+pub(super) fn walking_costs(
+    route: &scenario_spacewars::surface_sortie::landing_objective::LandingObjectiveRoute,
+    stage_seconds: f32,
+) -> Result<PhaseCosts, &'static str> {
     if route.cost().is_none() {
         return Err("round trip incomplete");
     }
@@ -111,7 +180,8 @@ pub(super) fn local_costs(
     let returning = returning.length / 5.0;
     if !(0.0..=10.599_817).contains(&outbound)
         || !(0.0..=10.118_012).contains(&returning)
-        || (claim.stage_required_seconds - 3.0).abs() > 0.001
+        || !stage_seconds.is_finite()
+        || (stage_seconds - 3.0).abs() > 0.001
     {
         return Err("walking or claim reference outside calibration");
     }
@@ -163,10 +233,11 @@ pub(super) fn observe_local(
         })?;
     let costs = local_costs(o, site.id);
     Some(LocalEvidence {
+        remote: false,
         key: PlanetKey::read(&p.planet),
         site: site.id,
         tick: p.tick,
-        gravity: p.gravity.length(),
+        gravity: o.local.objective_gravity,
         costs: costs.as_ref().ok().cloned(),
         reason: costs.err(),
         choice: (selected == Some(site.id)).then(|| {
@@ -184,5 +255,6 @@ pub(super) fn observe_local(
             .landing_objective
             .as_ref()
             .map(|s| s.validated_tick.unwrap_or(s.tick)),
+        route_objective: o.local.landing_objective.as_ref().map(|s| s.objective),
     })
 }

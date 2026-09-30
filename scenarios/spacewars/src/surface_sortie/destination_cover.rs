@@ -10,6 +10,7 @@ pub const MAX_COVER_CANDIDATES: usize = 4;
 pub struct DestinationCoverRequest {
     pub generation: u64,
     pub candidates: [Option<LandingSiteId>; MAX_COVER_CANDIDATES],
+    pub sample_climb: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -49,6 +50,9 @@ pub struct CoverMeasurement {
     pub finding: CoverFinding,
     pub site: Option<PilotLandingSite>,
     pub cover: Option<LandingCover>,
+    /// Full hull clearance at 7, 30 and 60 units above the proposed pose.
+    /// Sampled geometry only, not a swept path or a flight prediction.
+    pub climb_clear: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -185,7 +185,14 @@ impl Destinations {
                 continue;
             }
             let fuel = QueryFuel::default();
-            let measurement = measure(state, player, candidate.id, request.opponent, &fuel);
+            let measurement = measure(
+                state,
+                player,
+                candidate.id,
+                request.opponent,
+                request.request.sample_climb,
+                &fuel,
+            );
             let finding = measurement.finding;
             candidate.measurement = Some(measurement);
             candidate.status = match finding {
@@ -212,9 +219,29 @@ pub(super) fn measure(
     player: usize,
     id: pilot::LandingSiteId,
     enemy: Option<combat::CombatTarget>,
+    sample_climb: bool,
     fuel: &QueryFuel,
 ) -> CoverMeasurement {
-    let site = state.vehicle_landing_site_with_queries(player, id, false, || fuel.charge());
+    measure_with_query_observer(state, player, id, enemy, sample_climb, fuel, |_| {})
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn measure_with_query_observer(
+    state: &SurfaceSortieState,
+    player: usize,
+    id: pilot::LandingSiteId,
+    enemy: Option<combat::CombatTarget>,
+    sample_climb: bool,
+    fuel: &QueryFuel,
+    record: impl Fn(pilot::LandingQuery),
+) -> CoverMeasurement {
+    let site = state.vehicle_landing_site_with_query_observer(player, id, false, |query| {
+        if !fuel.charge() {
+            return false;
+        }
+        record(query);
+        true
+    });
     let armed = enemy.is_some_and(|e| {
         let p = &state.pilots[e.owner.index()];
         p.body.is_none() && state.world.ships[p.vehicle.0].form == ShipForm::Ship
@@ -223,6 +250,24 @@ pub(super) fn measure(
         .as_ref()
         .filter(|_| !fuel.exhausted() && armed)
         .map(|site| state.landing_cover_with_queries(site, enemy, || fuel.charge()));
+    let climb_clear = site
+        .as_ref()
+        .filter(|_| sample_climb && !fuel.exhausted())
+        .map(|site| {
+            [7.0, 30.0, 60.0].into_iter().all(|height| {
+                if !fuel.charge() {
+                    return false;
+                }
+                let position = site.vehicle_position + site.normal * height;
+                let angle = rotation_for_direction(site.normal);
+                record(pilot::LandingQuery::Hull { position, angle });
+                state.world.physics.surface_hull_fits_at(
+                    state.pilots[player].vehicle.0,
+                    position,
+                    angle,
+                )
+            })
+        });
     let finding = if fuel.exhausted() {
         CoverFinding::Incomplete
     } else if site.is_none() {
@@ -260,5 +305,6 @@ pub(super) fn measure(
         finding,
         site: (!fuel.exhausted()).then_some(site).flatten(),
         cover: (!fuel.exhausted()).then_some(cover).flatten(),
+        climb_clear: (!fuel.exhausted()).then_some(climb_clear).flatten(),
     }
 }

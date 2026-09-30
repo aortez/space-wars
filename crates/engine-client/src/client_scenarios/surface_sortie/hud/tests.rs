@@ -175,9 +175,17 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         );
     }
     assert_eq!(sortie.state.player_hud(0).mode, "ON FOOT");
-    let mut flight = super::super::SurfaceSortieClientScenario::new(
-        SurfaceSortieScenario::init_material_match(42),
-    );
+    let mut settings = engine_common::Settings::default();
+    settings.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
+    settings.spacewars.player_2_controller = engine_common::SpacewarsController::PlannerBot;
+    let mut flight = (super::super::MATCH_REGISTRATION.create)(
+        42,
+        &settings,
+        Viewport::new(1024.0, 768.0),
+        super::super::ScenarioStartMode::Normal,
+        &super::super::ScenarioAsset::None,
+    )
+    .unwrap();
     flight.step(&[], dt);
     for (profile, viewport) in [
         ("picade", Viewport::new(1024.0, 768.0)),
@@ -186,7 +194,10 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         window
             .window()
             .set_size(slint::LogicalSize::new(viewport.width, viewport.height));
-        for (name, scenario) in [("on-foot", &sortie), ("flight", &flight)] {
+        for (name, scenario) in [
+            ("on-foot", &sortie as &dyn ClientScenario),
+            ("flight", flight.as_ref()),
+        ] {
             for (backend, scale, suffix) in [
                 (RenderBackend::Raster, 1.0, "raster-1x"),
                 (RenderBackend::Raster, 2.0, "raster-2x"),

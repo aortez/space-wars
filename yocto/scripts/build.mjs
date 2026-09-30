@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { accessSync, constants, existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from 'fs';
 import { delimiter, join } from 'path';
 import { defaultBuildDir, YOCTO_DIR } from './paths.mjs';
+import { buildCachePreflight } from './build-cache.mjs';
 
 const BUILD_DIR = defaultBuildDir();
 
@@ -85,6 +86,7 @@ async function main() {
   }
 
   const config = join(YOCTO_DIR, 'kas-spacewars.yml');
+  buildCachePreflight({ buildDir: BUILD_DIR });
   const env = prepareHosttools();
   const child = spawn('kas', ['build', config, ...args], {
     cwd: YOCTO_DIR,

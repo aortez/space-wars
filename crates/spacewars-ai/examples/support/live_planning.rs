@@ -23,6 +23,7 @@ pub struct LivePlanningRun {
     dispatch: Vec<f64>,
     active_dispatch: Vec<f64>,
     last_charged: Work,
+    physical_actors: Vec<usize>,
 }
 impl LivePlanningRun {
     pub fn from_args(out: &Path) -> Option<Self> {
@@ -38,10 +39,11 @@ impl LivePlanningRun {
                 .unwrap(),
         };
         let seats = match super::arg("--live-objective-seats", "both").as_str() {
+            "none" => vec![],
             "both" => vec![0, 1],
             "0" => vec![0],
             "1" => vec![1],
-            _ => panic!("--live-objective-seats must be both, 0 or 1"),
+            _ => panic!("--live-objective-seats must be both, none, 0 or 1"),
         };
         let planner = match super::arg("--reuse-objective-ground", "false").as_str() {
             "false" => LiveObjectivePlanner::new(2, work),
@@ -78,10 +80,15 @@ impl LivePlanningRun {
             dispatch: Vec::new(),
             active_dispatch: Vec::new(),
             last_charged: Work::default(),
+            physical_actors: Vec::new(),
         })
     }
     pub fn enabled_for(&self, seat: usize) -> bool {
         self.seats.contains(&seat)
+    }
+    #[allow(dead_code)] // The mission runner also supports native synchronous local sensing.
+    pub fn destination_enabled_for(&self, seat: usize) -> bool {
+        self.seats.is_empty() || self.enabled_for(seat)
     }
     #[allow(dead_code)] // Only the mission runner has successor jobs.
     pub fn remaining_work(&self) -> Work {
@@ -90,6 +97,10 @@ impl LivePlanningRun {
             physics_queries: self.planner.allowance().physics_queries
                 - self.last_charged.physics_queries,
         }
+    }
+    #[allow(dead_code)] // Only the mission runner has the flag survey experiment.
+    pub fn physical_actors(&self) -> &[usize] {
+        &self.physical_actors
     }
     pub fn observe(
         &mut self,
@@ -100,6 +111,18 @@ impl LivePlanningRun {
     ) {
         self.profiles.insert(seat, planning);
         self.planner.observe_with_planning(state, seat, o, planning);
+    }
+    #[allow(dead_code)] // Only the mission runner requests remote evidence.
+    pub fn remote_snapshot(
+        &self,
+        seat: usize,
+        tick: u64,
+    ) -> Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>
+    {
+        self.planner
+            .destination_cover_observations(tick)
+            .into_iter()
+            .find_map(|(actor, evidence)| (actor == seat).then_some(evidence))
     }
     #[allow(dead_code)] // Only the mission runner requests remote evidence.
     pub fn observe_destination_cover(
@@ -119,6 +142,12 @@ impl LivePlanningRun {
         let start = Instant::now();
         let report = self.planner.advance_with_state(state).unwrap();
         self.last_charged = report.charged;
+        self.physical_actors = report
+            .jobs
+            .iter()
+            .filter(|j| j.charged.physics_queries > 0)
+            .map(|j| j.request.actor as usize)
+            .collect();
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch.push(ms);
         if report.charged != Work::default() {

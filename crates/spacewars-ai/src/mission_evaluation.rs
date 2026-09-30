@@ -1,4 +1,5 @@
-//! Observational capture comparisons. No controller or mutable world is held.
+//! Bounded capture comparisons. No controller or mutable world is held.
+//! v12/v13 can consume validated reports; earlier policies remain observational.
 //! One charged step evaluates one candidate; a final step compares at most three.
 use crate::mission_pilot::MissionTelemetry;
 use engine_core::{
@@ -16,12 +17,39 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_survey;
+mod flag_value_shadow;
 mod model;
+mod neutral_capture;
+mod selection;
+mod source_local;
+mod survey;
+mod transfer;
+mod value;
+pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
+pub(crate) use model::no_flag_costs as neutral_phase_costs;
 use model::{LocalEvidence, PlanetKey};
+pub(crate) use neutral_capture::NeutralTimingContext;
+pub(crate) use neutral_capture::neutral_capture_timing;
+pub use neutral_capture::{NeutralCaptureTiming, NeutralTimingValidation};
+pub(crate) use selection::CaptureSelection;
+pub(crate) use source_local::LocalReferenceContext;
+pub use source_local::{LocalCostReference, LocalEvidenceSource};
+pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
+pub use value::{CaptureValue, ValueComparison, ValueDecision};
+#[cfg(test)]
+mod survey_tests;
 #[cfg(test)]
 mod tests;
 
 pub const MODEL: &str = "capture_mission_reference_v1";
+pub fn model_for_policy(policy: &str) -> &'static str {
+    if value::enabled(policy) {
+        value::MODEL
+    } else {
+        MODEL
+    }
+}
 pub const MAX_PLANETS: usize = 8;
 pub const MAX_OPTIONS: usize = 3;
 pub const REFRESH_TICKS: u64 = 60;
@@ -42,7 +70,7 @@ pub struct PhaseCosts {
     pub departure: f32,
 }
 impl PhaseCosts {
-    fn total(&self) -> f32 {
+    pub(crate) fn total(&self) -> f32 {
         self.landing + self.exit + self.outbound + self.claim + self.return_board + self.departure
     }
 }
@@ -57,8 +85,12 @@ pub struct CaptureCandidate {
     pub adds_ownership: bool,
     pub first_rebuild_foothold: bool,
     pub distance: f32,
-    /// Nominal flight reference, excluding detours, acceleration and opposition.
+    /// Nominal v12 travel or staged v13 reference; neither models opposition.
     pub travel_seconds: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer: Option<TransferReference>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<CaptureValue>,
     pub site: Option<LandingSiteId>,
     pub evidence_tick: Option<u64>,
     pub evidence_age_ticks: Option<u64>,
@@ -94,6 +126,10 @@ pub struct MissionEvaluation {
     /// Only a time-reference comparison with full shortlist coverage.
     /// This is not a survival/utility recommendation or execution permission.
     pub preferred_by_time: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_comparison: Option<ValueComparison>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_source: Option<TransferSource>,
     pub comparison_reason: &'static str,
     pub charged_work: u32,
 }
@@ -115,6 +151,20 @@ impl PlanningJob for EvaluationJob {
         }
         self.report.charged_work += 1;
         if let Some(candidate) = self.report.candidates.get_mut(self.cursor) {
+            if let Some(source) = &self.report.transfer_source
+                && candidate.unknown_reason.is_none()
+            {
+                let estimate = candidate
+                    .transfer
+                    .map_or_else(|| source.estimate(candidate.planet), Ok);
+                match estimate {
+                    Ok(transfer) => {
+                        candidate.travel_seconds = transfer.total();
+                        candidate.transfer = Some(transfer);
+                    }
+                    Err(reason) => candidate.unknown_reason = Some(reason),
+                }
+            }
             candidate.total_seconds = candidate
                 .local
                 .as_ref()
@@ -129,6 +179,12 @@ impl PlanningJob for EvaluationJob {
                         .and_then(|m| m.remaining_seconds),
                 )
                 .map(|(cost, remaining)| f64::from(cost) > remaining);
+            if let Some(value) = &mut candidate.value {
+                value.seconds_per_unit = candidate
+                    .total_seconds
+                    .filter(|_| value.priority_units != 0)
+                    .map(|seconds| seconds / f32::from(value.priority_units));
+            }
             self.cursor += 1;
             return;
         }
@@ -166,6 +222,7 @@ impl PlanningJob for EvaluationJob {
             self.report.preferred_by_time = self.report.fastest_supported;
             "lowest supported completion-time reference; combat risk unmodelled"
         };
+        value::finish(&mut self.report);
         self.complete = true;
     }
     fn output(&self) -> Option<&Self::Output> {
@@ -175,6 +232,7 @@ impl PlanningJob for EvaluationJob {
 
 #[derive(Clone, PartialEq)]
 struct EvidenceIdentity {
+    remote: bool,
     site: LandingSiteId,
     costs: Option<PhaseCosts>,
     reason: Option<&'static str>,
@@ -183,6 +241,8 @@ struct EvidenceIdentity {
 
 #[derive(Clone, PartialEq)]
 struct Dependencies {
+    policy: &'static str,
+    transfer: Option<TransferSource>,
     planets: Vec<PlanetKey>,
     target: Option<usize>,
     location: PilotLocation,
@@ -197,12 +257,18 @@ struct Dependencies {
 }
 #[derive(Clone, Default)]
 struct ActorState {
+    local_choice: Option<source_local::LocalChoice>,
+    survey: Option<survey::AlternativeSurvey>,
+    flag_survey: Option<flag_survey::RequestState>,
     last_tick: Option<u64>,
     submitted_tick: Option<u64>,
     dependencies: Option<Dependencies>,
     evidence: Vec<LocalEvidence>,
     pending: Option<RequestToken>,
     latest: Option<MissionEvaluation>,
+    latest_dependencies: Option<Dependencies>,
+    latest_evidence: Vec<LocalEvidence>,
+    submitted_evidence: Vec<LocalEvidence>,
 }
 
 /// Shared, capacity-limited diagnostic queue. Construction visits at most eight
@@ -240,6 +306,41 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
+    /// Separate observational experiment. Its results are deliberately not
+    /// admitted to evaluation/selection until coverage and timing are tested.
+    pub fn flag_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest> {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        flag_survey::request(
+            &mut self.actors.entry(actor).or_default().flag_survey,
+            o,
+            mission,
+        )
+    }
+    /// Optional demand for the host's existing remote-query dispatcher. Call
+    /// after controls; this never changes the bot's own sensor request.
+    pub fn alternative_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest>
+    {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        survey::request(
+            &mut self.actors.entry(actor).or_default().survey,
+            o,
+            mission,
+        )
+    }
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
@@ -258,7 +359,15 @@ impl MissionEvaluator {
             *state = ActorState::default();
         }
         state.last_tick = Some(p.tick);
+        state.local_choice = source_local::LocalChoice::observe(
+            state.local_choice.as_ref(),
+            o,
+            mission,
+            selection_tick(mission),
+        );
         let mut dependencies = Dependencies {
+            policy: mission.policy,
+            transfer: value::enabled(mission.policy).then(|| TransferSource::from_observation(o)),
             planets: o
                 .planets
                 .iter()
@@ -273,7 +382,7 @@ impl MissionEvaluator {
                 .match_context
                 .as_ref()
                 .is_some_and(|m| m.finished || !m.pilots_alive[p.owner.index()]),
-            gravity: p.gravity.length(),
+            gravity: o.local.objective_gravity,
             selected_tick: selection_tick(mission),
             selected_site: mission.capture.as_ref().and_then(|c| c.site),
             landed: mission
@@ -289,10 +398,29 @@ impl MissionEvaluator {
                     .planets
                     .iter()
                     .any(|key| key.matches(&sample.key))
-                && (sample.key.planet != p.planet.index
+                && (!sample.remote || p.queries_ready)
+                && (sample.remote
+                    || sample.key.planet != p.planet.index
                     || (sample.gravity - dependencies.gravity).abs() <= 0.01)
         });
+        if let Some(sample) = survey::evidence(&state.survey, o) {
+            state
+                .evidence
+                .retain(|old| old.key.planet != sample.key.planet);
+            if state.evidence.len() == MAX_PLANETS {
+                state.evidence.remove(0);
+            }
+            state.evidence.push(sample);
+        }
         if let Some(mut sample) = model::observe_local(o, mission) {
+            // Native route surveys are cadenced. Missing work between surveys
+            // is not a fresh negative measurement and cannot renew its age.
+            if let Some(old) = state.evidence.iter().find(|old| old.site == sample.site)
+                && sample.reason == Some("objective route unmeasured")
+                && model::route_cadence_gap(o, old)
+            {
+                sample = old.clone();
+            }
             if let Some(old) = state.evidence.iter().find(|old| old.site == sample.site)
                 && let (Some((visit, tick)), Some((new_visit, _))) = (old.choice, sample.choice)
                 && visit == new_visit
@@ -311,6 +439,7 @@ impl MissionEvaluator {
             .evidence
             .iter()
             .map(|s| EvidenceIdentity {
+                remote: s.remote,
                 site: s.site,
                 costs: s.costs.clone(),
                 reason: s.reason,
@@ -323,12 +452,17 @@ impl MissionEvaluator {
         if !state
             .evidence
             .iter()
-            .any(|s| s.key.planet == p.planet.index && s.costs.is_some())
+            .any(|s| !s.remote && s.key.planet == p.planet.index && s.costs.is_some())
         {
             dependencies.gravity = 0.0;
         }
         let changed = state.dependencies.as_ref().is_none_or(|old| {
-            old.target != dependencies.target
+            old.policy != dependencies.policy
+                || old
+                    .transfer
+                    .as_ref()
+                    .is_some_and(|source| !source.is_current(o))
+                || old.target != dependencies.target
                 || old.location != dependencies.location
                 || old.form != dependencies.form
                 || old.available != dependencies.available
@@ -372,6 +506,7 @@ impl MissionEvaluator {
             return;
         }
         let report = snapshot(o, mission, &state.evidence);
+        state.submitted_evidence = state.evidence.clone();
         state.dependencies = Some(dependencies);
         let token = self
             .queue
@@ -415,6 +550,8 @@ impl MissionEvaluator {
                 let state = self.actors.get_mut(&row.request.actor).unwrap();
                 state.pending = None;
                 state.latest = Some(report);
+                state.latest_dependencies = state.dependencies.clone();
+                state.latest_evidence = state.submitted_evidence.clone();
                 self.completed_total += 1;
             }
         }
@@ -429,6 +566,37 @@ fn selection_tick(mission: &MissionTelemetry) -> Option<u64> {
         .rev()
         .find(|e| e.kind == "selected" && e.planet == mission.target)
         .map(|e| e.tick)
+}
+
+fn candidate_planets<'a>(
+    o: &'a MissionObservationV1,
+    mission: &MissionTelemetry,
+) -> Vec<&'a PilotPlanetObservation> {
+    let p = &o.local.combat.recovery.flight.pilot;
+    let mut options: Vec<&PilotPlanetObservation> = o
+        .planets
+        .iter()
+        .take(MAX_PLANETS)
+        .filter(|planet| {
+            Some(planet.index) == mission.target
+                || planet
+                    .claim
+                    .as_ref()
+                    .is_none_or(|c| c.owner != Some(p.owner))
+        })
+        .collect();
+    options.sort_by(|a, b| {
+        (Some(b.index) == mission.target)
+            .cmp(&(Some(a.index) == mission.target))
+            .then_with(|| {
+                p.ship
+                    .position
+                    .distance_to(a.motion.position)
+                    .total_cmp(&p.ship.position.distance_to(b.motion.position))
+            })
+            .then_with(|| a.index.cmp(&b.index))
+    });
+    options
 }
 
 fn snapshot(
@@ -459,29 +627,7 @@ fn snapshot(
     } else {
         None
     };
-    let mut options: Vec<&PilotPlanetObservation> = o
-        .planets
-        .iter()
-        .take(MAX_PLANETS)
-        .filter(|planet| {
-            Some(planet.index) == mission.target
-                || planet
-                    .claim
-                    .as_ref()
-                    .is_none_or(|c| c.owner != Some(p.owner))
-        })
-        .collect();
-    options.sort_by(|a, b| {
-        (Some(b.index) == mission.target)
-            .cmp(&(Some(a.index) == mission.target))
-            .then_with(|| {
-                p.ship
-                    .position
-                    .distance_to(a.motion.position)
-                    .total_cmp(&p.ship.position.distance_to(b.motion.position))
-            })
-            .then_with(|| a.index.cmp(&b.index))
-    });
+    let mut options = candidate_planets(o, mission);
     let truncated = o.planets.len() > MAX_PLANETS || options.len() > MAX_OPTIONS;
     options.truncate(MAX_OPTIONS);
     let own_count = o.match_context.as_ref().map_or_else(
@@ -539,12 +685,34 @@ fn snapshot(
                 } else {
                     (distance - planet.radius - 85.0).max(0.0) / 38.0
                 },
+                transfer: (value::enabled(mission.policy) && active_choice).then_some(
+                    TransferReference {
+                        continuing_approach: true,
+                        ..Default::default()
+                    },
+                ),
+                value: value::enabled(mission.policy).then(|| {
+                    let swing = if planet.claim.is_none() || owner == Some(p.owner) {
+                        0
+                    } else if owner.is_some() {
+                        2
+                    } else {
+                        1
+                    };
+                    CaptureValue {
+                        ownership_swing: swing,
+                        priority_units: if own_count == 0 { swing.min(1) } else { swing },
+                        seconds_per_unit: None,
+                    }
+                }),
                 site: sample.map(|s| s.site),
                 evidence_tick: sample.map(|s| s.tick),
                 evidence_age_ticks: sample.map(|s| p.tick - s.tick),
                 route_source_tick: sample.and_then(|s| s.route_source_tick),
                 route_validated_tick: sample.and_then(|s| s.route_validated_tick),
-                evidence_kind: if sample.is_some_and(|s| s.tick == p.tick) {
+                evidence_kind: if sample.is_some_and(|s| s.remote) {
+                    "remote landing, hatch and climb samples; live feasibility unknown"
+                } else if sample.is_some_and(|s| s.tick == p.tick) {
                     "current local measurement"
                 } else {
                     "historical timing reference; live feasibility unknown"
@@ -557,7 +725,7 @@ fn snapshot(
         })
         .collect();
     MissionEvaluation {
-        model: MODEL,
+        model: model_for_policy(mission.policy),
         policy: mission.policy,
         actor: p.owner,
         source_tick: p.tick,
@@ -579,6 +747,16 @@ fn snapshot(
         candidates,
         fastest_supported: None,
         preferred_by_time: None,
+        value_comparison: value::enabled(mission.policy).then_some(ValueComparison {
+            objective: if own_count == 0 {
+                "first rebuild foothold"
+            } else {
+                "ownership swing per completion second"
+            },
+            preferred: None,
+        }),
+        transfer_source: value::enabled(mission.policy)
+            .then(|| TransferSource::from_observation(o)),
         comparison_reason: "pending",
         charged_work: 0,
     }

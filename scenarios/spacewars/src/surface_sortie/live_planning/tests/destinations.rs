@@ -31,6 +31,7 @@ fn request(state: &SurfaceSortieState, player: usize) -> DestinationCoverRequest
         .collect();
     assert_eq!(ids.len(), 2);
     DestinationCoverRequest {
+        sample_climb: true,
         generation: 7,
         candidates: [Some(ids[0]), Some(ids[1]), None, None],
     }
@@ -183,6 +184,7 @@ fn local_jobs_get_the_same_allocation_before_remote_checks() {
     let mut probe = control.clone();
     let mut remote = flying_observation(&state, 0);
     let req = DestinationCoverRequest {
+        sample_climb: false,
         generation: 7,
         candidates: [
             Some(pilot::LandingSiteId {
@@ -231,7 +233,7 @@ fn exhaustion_discards_partial_site_and_cover_instead_of_reporting_no_landing() 
         assert!(fuel.charge());
     }
     let enemy = flying_observation(&state, 0).local.combat.target;
-    let sample = measure(&state, 0, id, enemy, &fuel);
+    let sample = measure(&state, 0, id, enemy, true, &fuel);
     assert_eq!(sample.finding, CoverFinding::Incomplete);
     assert_eq!(sample.queries, SITE_QUERY_CAP);
     assert_eq!(sample.site, None);
@@ -347,6 +349,40 @@ fn moving_obstacle_blocks_a_new_measurement_without_reusing_the_old_landing() {
     assert_eq!(sample.finding, CoverFinding::NoLanding);
     assert_eq!(sample.site, None);
     assert_eq!(sample.cover, None);
+}
+
+#[test]
+fn climb_samples_are_charged_separately_and_do_not_confuse_a_clear_hatch_with_departure() {
+    use super::super::{destinations::measure, query_budget::QueryFuel};
+    use engine_rapier::world::{
+        BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    };
+    let mut state = fixture();
+    let id = request(&state, 0).candidates[0].unwrap();
+    let old = measure(&state, 0, id, None, false, &QueryFuel::default());
+    let clear = measure(&state, 0, id, None, true, &QueryFuel::default());
+    assert_eq!(old.climb_clear, None);
+    assert_eq!(clear.climb_clear, Some(true));
+    assert_eq!(clear.queries, old.queries + 3);
+    let site = clear.site.unwrap();
+    let entity = PhysicsId::new(terrain::FRAGMENT_ID_BASE + 995);
+    assert!(state.world.physics.world.insert_body(
+        BodyId::new(entity, BodyRole::PRIMARY),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: site.vehicle_position + site.normal * 30.0,
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(
+            ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+            3.0
+        )],
+    ));
+    state.world.physics.world.step(DT.as_secs_f32());
+    let blocked = measure(&state, 0, id, None, true, &QueryFuel::default());
+    assert_eq!(blocked.finding, CoverFinding::Measured);
+    assert!(blocked.site.is_some(), "landing and hatch remain clear");
+    assert_eq!(blocked.climb_clear, Some(false));
 }
 
 #[test]

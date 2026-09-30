@@ -10,6 +10,7 @@
 
 pub mod combat_pilot;
 pub mod flight_pilot;
+mod flight_prediction;
 pub mod ground_task;
 pub mod jetpack_crossing;
 mod landing_safety;

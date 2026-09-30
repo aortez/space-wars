@@ -14,6 +14,12 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
             ("planner bot", "legacy bot", "raster"),
             ("legacy bot", "planner bot", "vector"),
             ("planner bot", "planner bot", "raster"),
+            ("value v13", "planner bot", "vector"),
+            ("planner bot", "value v13", "raster"),
+            ("value v13", "value v13", "raster"),
+            ("mission v12", "planner bot", "vector"),
+            ("planner bot", "mission v12", "raster"),
+            ("mission v12", "mission v12", "raster"),
         ] {
             state = harness.activate_guarded("launcher.settings", &state);
             assert_eq!(
@@ -32,10 +38,13 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.player-2.next", p2),
                 ("launcher.settings.renderer.next", renderer),
             ] {
-                for _ in 0..3 {
-                    if control_value(&state, control) == Some(expected) {
-                        break;
-                    }
+                let mut visited = std::collections::BTreeSet::new();
+                while control_value(&state, control) != Some(expected) {
+                    let value = control_value(&state, control).unwrap().to_owned();
+                    assert!(
+                        visited.insert(value),
+                        "{expected:?} is absent from {control}"
+                    );
                     state = harness.activate_guarded(control, &state);
                 }
                 assert_eq!(control_value(&state, control), Some(expected));

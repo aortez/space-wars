@@ -2,7 +2,7 @@ use engine_core::planning::Work;
 use scenario_spacewars::{PlayerId, surface_sortie::mission::MissionObservationV1};
 use serde_json::{Value, json};
 use spacewars_ai::{
-    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator},
+    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy},
     mission_pilot::MissionTelemetry,
 };
 use std::{
@@ -14,7 +14,10 @@ use std::{
 
 pub struct EvaluationRun {
     pub evaluator: MissionEvaluator,
+    pub alternative_survey: bool,
+    pub last_charged: Work,
     file: BufWriter<File>,
+    work: Option<BufWriter<File>>,
     written: [Option<u64>; 2],
     budget: u32,
     construction_ms: Vec<f64>,
@@ -27,9 +30,27 @@ impl EvaluationRun {
             "false" => false,
             _ => panic!("--evaluate-missions must be true or false"),
         };
+        let alternative_survey = match super::arg("--survey-capture-alternative", "false").as_str()
+        {
+            "true" => true,
+            "false" => false,
+            _ => panic!("--survey-capture-alternative must be true or false"),
+        };
+        assert!(
+            !alternative_survey
+                || (enabled && super::arg("--live-objective-planning", "false") == "true"),
+            "alternative survey requires mission evaluation and shared live planning"
+        );
         enabled.then(|| Self {
             evaluator: MissionEvaluator::new(2),
+            alternative_survey,
+            last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
+            work: (super::arg("--schedule-transfer-forecast", "false") == "true"
+                || super::arg("--compare-transfer-sources", "none") != "none")
+                .then(|| {
+                    BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
+                }),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
                 .parse()
@@ -52,9 +73,19 @@ impl EvaluationRun {
             physics_queries: 0,
         };
         let charged = self.evaluator.advance(tick, allowed);
+        self.last_charged = charged;
         assert!(charged.graph <= allowed.graph && charged.physics_queries == 0);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
+        if let Some(file) = &mut self.work {
+            serde_json::to_writer(
+                &mut *file,
+                &json!({"tick":tick,
+                "remaining_before_evaluation":remaining,"allowance":allowed,"charged":charged}),
+            )
+            .unwrap();
+            writeln!(file).unwrap();
+        }
         for seat in 0..2 {
             if let Some(report) = self.evaluator.latest(PlayerId::from_index(seat).unwrap())
                 && self.written[seat] != Some(report.source_tick)
@@ -68,14 +99,24 @@ impl EvaluationRun {
     }
     pub fn report(&mut self) -> Value {
         self.file.flush().unwrap();
-        json!({
-            "model":MODEL, "observational":true, "requested_shared_budget":self.budget,
+        if let Some(file) = &mut self.work {
+            file.flush().unwrap();
+        }
+        let models = ["--p1-policy", "--p2-policy"]
+            .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
+        let mut report = json!({
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13")), "requested_shared_budget":self.budget,
+            "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
             "pending": ([PlayerId::PLAYER_1,PlayerId::PLAYER_2].map(|p| self.evaluator.pending(p))),
             "construction":super::timing(self.construction_ms.clone()),
             "dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
-        })
+        });
+        if models != [MODEL; 2] {
+            report["models_by_seat"] = json!(models);
+        }
+        report
     }
 }

@@ -17,6 +17,9 @@ use crate::{
     physics::FallingWorld,
 };
 
+mod reassembly;
+use reassembly::Reassembly;
+
 pub const WARNING_TICKS: u64 = 36;
 pub const BURST_TICKS: u64 = 210;
 pub const EXPLOSION_TICKS: u64 = WARNING_TICKS + BURST_TICKS + REFORMING_TICKS;
@@ -46,6 +49,7 @@ pub(crate) struct ExplosionEvent {
     live_bodies: bool,
     mechanics: Mechanics,
     drain: Option<DrainGeometry>,
+    reassembly: Option<Reassembly>,
 }
 
 fn body_id(index: usize) -> BodyId {
@@ -139,6 +143,7 @@ impl ExplosionEvent {
             live_bodies: false,
             mechanics,
             drain,
+            reassembly: None,
         }
     }
 
@@ -280,6 +285,13 @@ impl ExplosionEvent {
     }
 
     pub fn step(&mut self, context: EventContext<'_>, mut duck: Option<&mut DuckEvent>) -> bool {
+        // Reading/control updates do not move paused debris. On the next tick,
+        // redirect only changed destinations from their current visible poses.
+        if let Some(reassembly) = &mut self.reassembly {
+            reassembly.synchronize(&mut self.cells, context.display, context.layout, self.tick);
+        }
+        let display = context.display;
+        let layout = context.layout;
         let finished = self.advance_phase(context, duck.as_deref_mut());
         let world = match &mut self.mechanics {
             Mechanics::Standalone(world) => world.as_deref_mut().map(|world| {
@@ -296,6 +308,12 @@ impl ExplosionEvent {
                 cell.position = motion.position;
                 cell.angle = motion.angle;
             }
+        }
+        if self.phase == EventPhase::Reforming {
+            let reassembly = self
+                .reassembly
+                .get_or_insert_with(|| Reassembly::new(&mut self.cells, display, layout));
+            reassembly.sample(&mut self.cells, self.tick);
         }
         finished
     }

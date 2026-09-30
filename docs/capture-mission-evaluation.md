@@ -1,5 +1,10 @@
 # Native capture-mission evaluation
 
+This records the original evaluator checkpoint. The subsequent
+[bounded alternative survey](capture-alternative-survey.md) supplies neutral
+remote evidence while preserving controls; its results and quota scope are
+documented separately.
+
 ## Declared scope and acceptance cases
 
 This PR adds an observational evaluator at ordinary mission decisions. It never

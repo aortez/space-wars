@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 
 mod query_snapshot;
 pub use query_snapshot::{
-    AreaValidation, CapsuleQuery, QueryArea, QueryFrame, QueryRegion, QuerySnapshot,
+    AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
+    QueryRegion, QuerySnapshot, RegionChanges,
 };
 
 const SNAPSHOT_VERSION: u32 = 1;
@@ -215,6 +216,20 @@ pub enum ColliderShape {
     },
 }
 
+impl ColliderShape {
+    /// Center of a uniform-density shape, in its own local coordinates.
+    /// Uses the same backend shape construction as physical colliders, including
+    /// convex-hull simplification. Does not create or query a physics world.
+    pub fn local_center_of_mass(&self) -> Option<Vec2> {
+        if !valid_shape(self) {
+            return None;
+        }
+        let mass = build_shape(self)?.mass_properties(1.0);
+        let center = from_rapier(mass.local_com);
+        (mass.mass() > 0.0 && finite_vec2(center)).then_some(center)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompoundChild {
     pub shape: ColliderShape,
@@ -222,7 +237,7 @@ pub struct CompoundChild {
     pub angle: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct CollisionGroups {
     pub memberships: u32,
     pub filter: u32,
@@ -2256,6 +2271,30 @@ mod tests {
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);
+
+    #[test]
+    fn standalone_shape_centroid_uses_local_geometry_and_rejects_invalid_shapes() {
+        let shape = ColliderShape::ConvexPolygon {
+            vertices: vec![
+                Vec2::new(2.0, 3.0),
+                Vec2::new(4.0, 3.0),
+                Vec2::new(4.0, 5.0),
+                Vec2::new(2.0, 5.0),
+            ],
+        };
+        assert_eq!(shape.local_center_of_mass(), Some(Vec2::new(3.0, 4.0)));
+        assert_eq!(
+            ColliderShape::Ball { radius: f32::NAN }.local_center_of_mass(),
+            None
+        );
+        assert_eq!(
+            ColliderShape::Polyline {
+                vertices: vec![Vec2::ZERO, Vec2::X],
+            }
+            .local_center_of_mass(),
+            None
+        );
+    }
 
     fn ball_ids(value: u64) -> (PhysicsId, BodyId, ColliderId) {
         let entity = PhysicsId::new(value);

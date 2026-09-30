@@ -20,13 +20,16 @@ use scenario_spacewars::{
     },
 };
 use serde::Serialize;
-use std::cell::Cell;
 
 mod acquisition;
 mod acquisition_wait;
-use acquisition::count;
+mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+#[cfg(test)]
+pub(crate) use selection::select as select_for_test;
+pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};
+pub(crate) use selection::{approach_score, preferred_side};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -114,6 +117,16 @@ pub struct TacticalSortiePilot {
     bounded_acquisition: bool,
 }
 impl TacticalSortiePilot {
+    /// Read-only phase context for a separately validated timing reference.
+    pub(crate) fn selected_approach(&self) -> Option<(f32, bool)> {
+        self.site?;
+        match self.telemetry.goal {
+            TacticalGoal::SeekCover => Some((self.side, true)),
+            TacticalGoal::Approach => Some((self.side, false)),
+            _ => None,
+        }
+    }
+
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
         let landing = RulePilotV1::new(context);
         Self {
@@ -376,9 +389,7 @@ impl TacticalSortiePilot {
             self.goal(TacticalGoal::Blocked, p.tick);
             return self.combat.intent(c);
         }
-        let exposed = c.target.is_some_and(|t| {
-            !t.ground_occluded && t.motion.position.distance_to(p.ship.position) < 300.0
-        });
+        let exposed = selection::exposed(o);
         if matches!(p.location, PilotLocation::Aboard(_)) {
             self.telemetry.exposed_ticks += u64::from(exposed);
             self.telemetry.covered_ticks += u64::from(!exposed);
@@ -468,21 +479,7 @@ impl TacticalSortiePilot {
             .then(|| LandingObjective::read(p))
             .flatten();
         let survey = o.landing_objective.as_ref().filter(|survey| {
-            let reason = if survey.version != 1 {
-                Some("survey_version")
-            } else if survey.actor != p.owner {
-                Some("survey_actor")
-            } else if !survey.is_current(p.tick) {
-                Some("survey_age")
-            } else if !objective.is_some_and(|target| target.matches(survey.objective)) {
-                Some("survey_objective")
-            } else if survey.sites.len()
-                > scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
-            {
-                Some("survey_size")
-            } else {
-                None
-            };
+            let reason = selection::survey_rejection(o, objective, survey);
             if let Some(acquisition) = &mut self.telemetry.acquisition {
                 acquisition.survey_rejected_by = reason;
             }
@@ -630,111 +627,9 @@ impl TacticalSortiePilot {
         }
         if self.site.is_none() {
             self.solar_rejected.retain(|(_, until)| p.tick < *until);
-            let commit_descent = self.commit_descent;
-            let checks = Cell::new(CandidateCheckCounts::default());
-            let checks_ref = &checks;
-            let selected = p
-                .sites
-                .iter()
-                .filter(|site| {
-                    let allowed = self
-                        .required_site
-                        .is_none_or(|id| site.id == id && site.revision == p.planet.revision);
-                    if !allowed {
-                        count(checks_ref, |c| c.required_site += 1);
-                    }
-                    allowed
-                })
-                .filter(|site| {
-                    let allowed = !self.rejected_sites.contains(&(site.id, site.revision));
-                    if !allowed {
-                        count(checks_ref, |c| c.previously_rejected += 1);
-                    }
-                    allowed
-                })
-                .filter(|site| {
-                    let allowed = !self.solar_rejected.iter().any(|(id, _)| *id == site.id);
-                    if !allowed {
-                        count(checks_ref, |c| c.solar_cooldown += 1);
-                    }
-                    allowed
-                })
-                .flat_map(|site| {
-                    let direction = (site.vehicle_position - p.planet.motion.position).normalized();
-                    let short = angle_between(up, direction);
-                    let preferred = if short < 0.0 { -1.0 } else { 1.0 };
-                    [preferred, -preferred].into_iter().filter_map(move |side| {
-                        if side != preferred && (!commit_descent || o.sun.is_none()) {
-                            return None;
-                        }
-                        count(checks_ref, |c| c.directions += 1);
-                        let solar = commit_descent
-                            .then(|| crate::landing_safety::assess(o, *site, side, true))
-                            .flatten();
-                        if let Some(plan) = solar.filter(|plan| !plan.safe()) {
-                            count(checks_ref, |c| {
-                                c.unsafe_solar += 1;
-                                c.unsafe_approach += usize::from(plan.approach_clearance < 0.0);
-                                c.unsafe_parking += usize::from(plan.parked_clearance < 0.0);
-                                c.unsafe_departure += usize::from(plan.departure_clearance < 0.0);
-                            });
-                            return None;
-                        }
-                        let cover = o.cover.iter().find(|s| s.site == site.id);
-                        let ground_cost = if objective.is_some() {
-                            let Some(survey) = survey else {
-                                count(checks_ref, |c| c.survey_unavailable += 1);
-                                return None;
-                            };
-                            let Some(route) = survey
-                                .sites
-                                .iter()
-                                .find(|route| route.site == Some(site.id))
-                            else {
-                                count(checks_ref, |c| c.route_absent += 1);
-                                return None;
-                            };
-                            let Some(cost) = route.cost() else {
-                                count(checks_ref, |c| c.route_unusable += 1);
-                                return None;
-                            };
-                            cost
-                        } else {
-                            0.0
-                        };
-                        // Avoid a long cover detour when this ship is already
-                        // unexposed. Such detours can leave a moving planet's
-                        // approach frame during an otherwise local retry.
-                        let penalty = if commit_descent && !exposed {
-                            0.0
-                        } else {
-                            cover.map_or(400.0, |s| {
-                                if s.departure && s.approach && s.grounded {
-                                    0.0
-                                } else {
-                                    400.0
-                                }
-                            })
-                        };
-                        let angle = if solar.is_some() {
-                            crate::landing_safety::directed_angle(short, side)
-                        } else {
-                            short
-                        };
-                        count(checks_ref, |c| c.eligible += 1);
-                        Some((
-                            *site,
-                            side,
-                            solar,
-                            angle.abs() * (p.planet.radius + 60.0)
-                                + penalty * if objective.is_some() { 10.0 } else { 1.0 }
-                                + ground_cost,
-                        ))
-                    })
-                })
-                .min_by(|a, b| a.3.total_cmp(&b.3));
+            let (selected, checks) = selection::select(self, o, objective, survey, exposed, |_| {});
             if let Some(acquisition) = &mut self.telemetry.acquisition {
-                acquisition.checks = checks.get();
+                acquisition.checks = checks;
             }
             if let Some((site, side, solar, _)) = selected {
                 self.acquisition_reason("selected_site");
@@ -953,7 +848,7 @@ impl TacticalSortiePilot {
         }
     }
 }
-fn angle_between(a: Vec2, b: Vec2) -> f32 {
+pub(crate) fn angle_between(a: Vec2, b: Vec2) -> f32 {
     (a.x * b.y - a.y * b.x).atan2(a.dot(b))
 }
 

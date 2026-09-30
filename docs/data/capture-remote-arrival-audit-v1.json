@@ -1,0 +1,834 @@
+{
+  "schema": 1,
+  "complete": true,
+  "summary_sha256": "a0570be53793ec6989c2e44971419f76f90d2d5b1437c501f5fae999f2b7f7ea",
+  "source_commit": "fe2935ae2dabc96a9f9765c91dc3ebf0be7b1439",
+  "audit_script_sha256": "a18023881366aa25e2638de94e7c5699ef51106f9c5c3445540bb0017f2ea6c1",
+  "reference_sha256": "8134f05273ca9bae1a1c0472b038a59d1996789fc7e9284241dd1c83bf1d3d16",
+  "solar_helper_sha256": "b27a962a6236064f6948cdc6ae6dbf757fb5a8ca693e2a3a2f4c84d74465e7d9",
+  "pairs": {
+    "world0-asteroids3-on-s0t5952-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:source remote survey unavailable or incompatible": 1,
+        "candidates": 2,
+        "unknown:source destination is not known neutral ground": 1,
+        "sources": 1
+      },
+      "trace": {
+        "rows": 12240,
+        "bytes": 105936195,
+        "sha256": "ac55bd066cfd3860468fa4fc6c4298d09990260ef371249c890d9b0b9696bd5a"
+      },
+      "sensors": {
+        "rows": 12240,
+        "sha256": "dab202179708af0301dc1b538cfb8b001006a12e252d0053ef5dadf97079ab65"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 12539,
+        "evaluator_graph": 13834,
+        "flag_graph": 602,
+        "flag_queries": 1318,
+        "shadow_graph": 3
+      },
+      "queues": [
+        {
+          "graph": 443,
+          "screen_graph": 0,
+          "ready": 1
+        },
+        {
+          "graph": 443,
+          "screen_graph": 0,
+          "ready": 1
+        }
+      ],
+      "physical_ticks": 12240,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 5952,
+          "publication_delay": 0,
+          "final_reason": "planet material or ownership changed"
+        }
+      ],
+      "files": 24
+    },
+    "world1-asteroids0-on-s0t3816-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:source remote survey unavailable or incompatible": 2,
+        "candidates": 3,
+        "unknown:source destination is not known neutral ground": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_without_snapshot": 1,
+        "sources": 1
+      },
+      "trace": {
+        "rows": 7920,
+        "bytes": 62094053,
+        "sha256": "407a1c16154d1560e08bd5c83a25933cad09f08ff59e9515967ea730e2d0fdc8"
+      },
+      "sensors": {
+        "rows": 7920,
+        "sha256": "5f208742423c24953767e701e2ef1ef7be594c45e736fba7d2c41930f063761d"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 11148,
+        "evaluator_graph": 7977,
+        "flag_graph": 310,
+        "flag_queries": 531,
+        "shadow_graph": 12
+      },
+      "queues": [
+        {
+          "graph": 2241,
+          "screen_graph": 0,
+          "ready": 1
+        },
+        {
+          "graph": 2241,
+          "screen_graph": 0,
+          "ready": 1
+        }
+      ],
+      "physical_ticks": 7920,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 3816,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "world1-asteroids0-on-s0t3876-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:source remote survey unavailable or incompatible": 2,
+        "candidates": 3,
+        "unknown:source destination is not known neutral ground": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_without_snapshot": 1,
+        "sources": 1
+      },
+      "trace": {
+        "rows": 8040,
+        "bytes": 63184796,
+        "sha256": "6d2cec33ab069885467c29200d0170f64f7726e7e0ddc6b159ecc723561756f6"
+      },
+      "sensors": {
+        "rows": 8040,
+        "sha256": "0cbf21a7ca5fa30b37c60f7e060b60d0badc36dc629edd79ff9c46479d51c4e6"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 11148,
+        "evaluator_graph": 8043,
+        "flag_graph": 310,
+        "flag_queries": 531,
+        "shadow_graph": 16
+      },
+      "queues": [
+        {
+          "graph": 2035,
+          "screen_graph": 0,
+          "ready": 1
+        },
+        {
+          "graph": 2035,
+          "screen_graph": 0,
+          "ready": 1
+        }
+      ],
+      "physical_ticks": 8040,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 3876,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "world1-asteroids0-on-s0t3934-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:source remote survey unavailable or incompatible": 2,
+        "candidates": 3,
+        "unknown:source destination is not known neutral ground": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_without_snapshot": 1,
+        "sources": 1
+      },
+      "trace": {
+        "rows": 8160,
+        "bytes": 64277669,
+        "sha256": "c66015565f9a0aa0426e6b13734bc284dfd38b0f3a2b6eef76c8bdc1c50a7076"
+      },
+      "sensors": {
+        "rows": 8160,
+        "sha256": "85850411ff60839f39f8f0923b1a546c44f491a095d7e3dbec5f576e1143cc61"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 11148,
+        "evaluator_graph": 8133,
+        "flag_graph": 310,
+        "flag_queries": 531,
+        "shadow_graph": 20
+      },
+      "queues": [
+        {
+          "graph": 1981,
+          "screen_graph": 0,
+          "ready": 1
+        },
+        {
+          "graph": 1981,
+          "screen_graph": 0,
+          "ready": 1
+        }
+      ],
+      "physical_ticks": 8160,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 3934,
+          "publication_delay": 0,
+          "final_reason": "unassisted flight ended"
+        }
+      ],
+      "files": 24
+    },
+    "world1-asteroids0-on-s0t3997-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:source remote survey unavailable or incompatible": 2,
+        "candidates": 3,
+        "unknown:source destination is not known neutral ground": 1,
+        "numeric_remote_reference": 1,
+        "numeric_remote_without_snapshot": 1,
+        "sources": 1
+      },
+      "trace": {
+        "rows": 8280,
+        "bytes": 65368868,
+        "sha256": "fffa495a2e577fcc692f240f16bb6e9754273535ed047ea12a4cbce8925c3f3f"
+      },
+      "sensors": {
+        "rows": 8280,
+        "sha256": "6fa8dcbe97f09d58980e42236a54bbde3a685f879449e4893c6b92f04b72b149"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 11148,
+        "evaluator_graph": 8249,
+        "flag_graph": 310,
+        "flag_queries": 531,
+        "shadow_graph": 24
+      },
+      "queues": [
+        {
+          "graph": 1907,
+          "screen_graph": 0,
+          "ready": 1
+        },
+        {
+          "graph": 1907,
+          "screen_graph": 0,
+          "ready": 1
+        }
+      ],
+      "physical_ticks": 8280,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 3997,
+          "publication_delay": 0,
+          "final_reason": "unassisted flight ended"
+        }
+      ],
+      "files": 24
+    },
+    "fresh0-asteroids0-s0t132-s1t134-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "uncertain_departure_order": 7,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "sources": 2,
+        "publication_delay_1": 1
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3830135,
+        "sha256": "acf6519974070f7fe5a967e7fd9d9e96d9e2c1a80035fdea00be973031c83978"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 526,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 6433,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 6441,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 132,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 134,
+          "publication_delay": 1,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "fresh0-asteroids3-s0t132-s1t134-budget64": {
+      "counts": {
+        "publication_delay_0": 1,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "uncertain_departure_order": 7,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "sources": 2,
+        "publication_delay_1": 1
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3830380,
+        "sha256": "c71b87de139093faf2a05b138f03d97e67e8f16dee0a0b219e381d316e6584a1"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2646,
+        "evaluator_graph": 532,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 6433,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 6441,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 132,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 134,
+          "publication_delay": 1,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "fresh1-asteroids0-s0t131-s1t131-budget64": {
+      "counts": {
+        "publication_delay_0": 2,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "uncertain_departure_order": 5,
+        "sources": 2
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3830976,
+        "sha256": "2c83b8de4c8b30014842243604586db0c5f8ee8c77b46f2bf87bedcd6ed210fc"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 520,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5852,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5860,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 3.0517578125e-05,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 131,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 131,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "fresh1-asteroids3-s0t131-s1t131-budget64": {
+      "counts": {
+        "publication_delay_0": 2,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "uncertain_departure_order": 5,
+        "sources": 2
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3830976,
+        "sha256": "2c83b8de4c8b30014842243604586db0c5f8ee8c77b46f2bf87bedcd6ed210fc"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 520,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5852,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5860,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 3.0517578125e-05,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 131,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 131,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "holdout0-asteroids0-s0t131-s1t134-budget64": {
+      "counts": {
+        "publication_delay_1": 1,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "uncertain_departure_order": 5,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "sources": 2,
+        "publication_delay_0": 1
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3829867,
+        "sha256": "354db06f1ec680a9cd4ed58ff9ddf904305afbed2bba0e047e5083590ffc8251"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 532,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5693,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5701,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 131,
+          "publication_delay": 1,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 134,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "holdout0-asteroids3-s0t131-s1t134-budget64": {
+      "counts": {
+        "publication_delay_1": 1,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "uncertain_departure_order": 5,
+        "directions": 8,
+        "solar_clear": 7,
+        "sites": 4,
+        "sources": 2,
+        "publication_delay_0": 1
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3829867,
+        "sha256": "354db06f1ec680a9cd4ed58ff9ddf904305afbed2bba0e047e5083590ffc8251"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 532,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5693,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5701,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 131,
+          "publication_delay": 1,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 134,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "holdout1-asteroids0-s0t130-s1t133-budget64": {
+      "counts": {
+        "publication_delay_0": 2,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "directions": 8,
+        "solar_clear": 8,
+        "sites": 4,
+        "sources": 2,
+        "uncertain_departure_order": 2
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3836949,
+        "sha256": "bee0f9d3c712c6e0ad8530d48b21529aa8670b7a58bbff0f6056ff4f66897ad0"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 518,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5761,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5769,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 130,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 133,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    },
+    "holdout1-asteroids3-s0t130-s1t133-budget64": {
+      "counts": {
+        "publication_delay_0": 2,
+        "unknown:no source remote sites for destination": 4,
+        "candidates": 6,
+        "screened_candidates": 2,
+        "numeric_remote_reference": 2,
+        "numeric_remote_with_screen": 2,
+        "directions": 8,
+        "solar_clear": 8,
+        "sites": 4,
+        "sources": 2,
+        "uncertain_departure_order": 2
+      },
+      "trace": {
+        "rows": 600,
+        "bytes": 3836949,
+        "sha256": "bee0f9d3c712c6e0ad8530d48b21529aa8670b7a58bbff0f6056ff4f66897ad0"
+      },
+      "sensors": {
+        "rows": 600,
+        "sha256": "c9dec19040e76d413c970e2f45cbdf85ac57e0754b455ea310844986411805a5"
+      },
+      "upstream": {
+        "live_graph": 0,
+        "live_queries": 2520,
+        "evaluator_graph": 518,
+        "flag_graph": 0,
+        "flag_queries": 0,
+        "shadow_graph": 0
+      },
+      "queues": [
+        {
+          "graph": 5761,
+          "screen_graph": 0,
+          "ready": 2
+        },
+        {
+          "graph": 5769,
+          "screen_graph": 8,
+          "ready": 2
+        }
+      ],
+      "physical_ticks": 600,
+      "maximum_solar_error": 0.0,
+      "sources": [
+        {
+          "seat": 0,
+          "tick": 130,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        },
+        {
+          "seat": 1,
+          "tick": 133,
+          "publication_delay": 0,
+          "final_reason": "source expired"
+        }
+      ],
+      "files": 24
+    }
+  },
+  "errors": [],
+  "binary_sha256": "539b8179c82b5dd006356fa56a17a1bdde4e6b28cdda3482e95ddd7d5aed31b1",
+  "counts": {
+    "publication_delay_0": 17,
+    "unknown:source remote survey unavailable or incompatible": 9,
+    "candidates": 62,
+    "unknown:source destination is not known neutral ground": 5,
+    "sources": 21,
+    "numeric_remote_reference": 20,
+    "numeric_remote_without_snapshot": 4,
+    "unknown:no source remote sites for destination": 32,
+    "screened_candidates": 16,
+    "numeric_remote_with_screen": 16,
+    "uncertain_departure_order": 38,
+    "directions": 64,
+    "solar_clear": 58,
+    "sites": 32,
+    "publication_delay_1": 4
+  },
+  "physical_ticks": 49440,
+  "trace_rows": 98880,
+  "trace_bytes": 783035360,
+  "files": 312,
+  "maximum_solar_error": 3.0517578125e-05,
+  "log_hashes": {
+    "fresh0-asteroids0-s0t132-s1t134-budget64-off.log": "adfa59950f15537b22fae4d8c704a390ef22eb7ea22fb93b3758e00704456b6c",
+    "fresh0-asteroids0-s0t132-s1t134-budget64-on.log": "9be12eec8b2ce688f3df60916a01480060e2c628da26645b71bd471302d1e4ad",
+    "fresh0-asteroids3-s0t132-s1t134-budget64-off.log": "8e747cb48f15b035acf635f2b0901fe871483d5e92fa4be1b06c8a74856a16e8",
+    "fresh0-asteroids3-s0t132-s1t134-budget64-on.log": "8242222fe2f325f0aae61d23948782e90da7fc40e1416c955fc7ab6cd3490c38",
+    "fresh1-asteroids0-s0t131-s1t131-budget64-off.log": "2d0137e6588e9560d6c0c606b65f0bdcbf33e98501a9dbdfe51fcd43466c833c",
+    "fresh1-asteroids0-s0t131-s1t131-budget64-on.log": "edafaea907c2a64144b80759100727a921ea4b00a8b963bfc8aba873113f36f0",
+    "fresh1-asteroids3-s0t131-s1t131-budget64-off.log": "1acda5aaeaeda418d950eaae703e7de7dfc478f3850e9434dda56d9c5653116c",
+    "fresh1-asteroids3-s0t131-s1t131-budget64-on.log": "e90dbf73e58687ba24990fca302530cffcafdf56fa077188091fa2e16896a0de",
+    "holdout0-asteroids0-s0t131-s1t134-budget64-off.log": "5365421982fe166eb69fa914eaab9ffd519f0203274e58ea8bc0c3516bf56535",
+    "holdout0-asteroids0-s0t131-s1t134-budget64-on.log": "e94db094f0454659271756a1018ffd316eeda2c7955a773c33b2147eb8fcfb38",
+    "holdout0-asteroids3-s0t131-s1t134-budget64-off.log": "c510fcf9895bdc069752ec9c7e77f1aa9e0eb13eb2ca053c5af68a27cf689310",
+    "holdout0-asteroids3-s0t131-s1t134-budget64-on.log": "ae6b9cf4329ed4aa7159b7aa74fbc24ede47059606599432d332bcd267a5be5c",
+    "holdout1-asteroids0-s0t130-s1t133-budget64-off.log": "6631bf3608081707d178e943b6404065144ae8f6da447769621d6b8c1c990920",
+    "holdout1-asteroids0-s0t130-s1t133-budget64-on.log": "61c2bc9f0ee1d9f9c5fbd6f0a7c8191c3d14c251bcf8cf5ffeaafca832ae2be9",
+    "holdout1-asteroids3-s0t130-s1t133-budget64-off.log": "0e6f09fdb75a18d1922cf84f18961331c2473ee29107ca6ce705eb6bccef6bde",
+    "holdout1-asteroids3-s0t130-s1t133-budget64-on.log": "d74f9e995c958f3cd5757b79a6867f763628ca6ae75cbbd44761840ddd354e8b",
+    "world0-asteroids3-on-s0t5952-budget64-off.log": "08bf11f784a0ac95afe7105e5abaa6784217fd520416d5c3627f371462206d5c",
+    "world0-asteroids3-on-s0t5952-budget64-on.log": "a2a2ea8548bd0e0aa96e50fa4d6fb939b3e4c38c6ac0af8e93dddeb91b2e3d81",
+    "world1-asteroids0-on-s0t3816-budget64-off.log": "933210d28ff90a81437302d7b770eda299c9f45038363b6bdcd020b14af2c109",
+    "world1-asteroids0-on-s0t3816-budget64-on.log": "09a594c98df7b0ef0d0ef0954276fb21f39f77325a0823228d16353184f8a944",
+    "world1-asteroids0-on-s0t3876-budget64-off.log": "a6ba80ae9396c6917cee3a680a7996ad7a9f0073dd8110656c958dc57e406f77",
+    "world1-asteroids0-on-s0t3876-budget64-on.log": "d6d01fa8d61e99674f093939b2b51dac1eb0e6aac78266129ddf36c567ad27b9",
+    "world1-asteroids0-on-s0t3934-budget64-off.log": "22bc196fc984f975394761066e260814fe714036140fd5d9cf39a54c9cb4173b",
+    "world1-asteroids0-on-s0t3934-budget64-on.log": "dff8202d73f85e021fd0536534dc8953f24d3d46aaf2c65b2b6b8e9fd01436f8",
+    "world1-asteroids0-on-s0t3997-budget64-off.log": "fcfaaf4164f1a71f0082902bc8b2793f738779a880e7ff0ebaa7f68dd8899296",
+    "world1-asteroids0-on-s0t3997-budget64-on.log": "0ee4eb575bfa9420398ee10625c28c622e77a22583d8e9f990cafd660613114f"
+  },
+  "projection": {
+    "path": "docs/data/capture-remote-arrival-v1.json",
+    "sha256": "e1f61512ce3044e4d436e99c10e88c022c0fc388512500a3734275b19c73a894",
+    "full_summary_conformance": true
+  },
+  "documentation": {
+    "path": "docs/capture-remote-arrival.md",
+    "sha256": "93bb31ccefb32fafef6b12fc6d4c3e6dd20fd532d26a185cca4a914824298359",
+    "reviewed_result_claims": [
+      "fixed 26 runs / 21 sources / 62 candidates",
+      "all off archive digests and queue summaries",
+      "49,440 physical ticks / 98,880 controller and sensor rows per kind across both arms",
+      "16 screened candidates / 32 sites / 64 directions / 58 solar clear",
+      "46 explicit unknown candidates including four cached numeric references lacking raw snapshots",
+      "17 unchanged and four one-tick publication delays",
+      "38 unresolved departure corridor orders",
+      "56,085 versus 56,149 graph operations and zero diagnostic queries",
+      "conditional nearby coverage; no live planning or threat claim"
+    ],
+    "limitations": [
+      "No Pi performance or bot-strength claim validated.",
+      "Future native site choice/acquisition delay and combat threat remain unmodeled.",
+      "Prior solar reconstruction helper reused; new study runner not imported.",
+      "Assertions evaluate this completed corpus; they are not a general-purpose malformed-data validator."
+    ]
+  }
+}

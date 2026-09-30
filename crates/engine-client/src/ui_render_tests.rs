@@ -271,7 +271,9 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
 #[test]
 fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_layouts() {
     use crate::render::{FrameLayout, Viewport};
-    use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat, Scenario};
+    use engine_common::{
+        ClockEventKind, ClockEventProfile, ClockFont, ClockFontSettings, ClockTimeFormat, Scenario,
+    };
     use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
     use std::time::Duration;
     let windows = Rc::new(RefCell::new(Vec::new()));
@@ -290,13 +292,30 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
             ("warning", 18),
             ("burst", 54),
             ("bounce", 170),
+            ("return-start", 246),
+            ("return-early", 270),
             ("reforming", 288),
+            ("return-late", 324),
             ("recovered", 336),
+            ("retargeted", 306),
+            ("retargeted-recovered", 336),
+            ("serif-reforming", 288),
+            ("serif-retargeted", 306),
+            ("serif-retargeted-recovered", 336),
             ("duck", 90),
             ("controls", 18),
         ] {
+            let font = if name.starts_with("serif-") {
+                ClockFont::Serif
+            } else {
+                ClockFont::Classic
+            };
             let mut state = ClockScenario::init(
                 ClockConfig {
+                    fonts: ClockFontSettings {
+                        selected: font,
+                        ..Default::default()
+                    },
                     aspect_ratio: viewport.aspect_ratio(),
                     event_profile: ClockEventProfile::Off,
                     time_format: ClockTimeFormat::TwelveHour,
@@ -333,7 +352,18 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
                 &[ClockAction::preview_event(ClockEventKind::Explosion)],
                 Duration::ZERO,
             );
-            for _ in 0..elapsed {
+            for tick in 0..elapsed {
+                if name.contains("retargeted") && tick == 270 {
+                    ClockScenario::step(
+                        &mut state,
+                        &[ClockAction::set_reading(
+                            ClockReading::new(0, 11, 0)
+                                .unwrap()
+                                .with_date(ClockDate::new(2026, 9, 27).unwrap()),
+                        )],
+                        Duration::ZERO,
+                    );
+                }
                 ClockScenario::step(&mut state, &[], Duration::from_millis(16));
             }
             let frame = ClockScenario::render_frame(&state);
@@ -348,6 +378,28 @@ fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_lay
                 assert_eq!(changed, 0);
             } else {
                 assert!(changed > 100);
+            }
+            if name.ends_with("retargeted-recovered") {
+                let mut clean = ClockScenario::init(
+                    ClockConfig {
+                        fonts: ClockFontSettings {
+                            selected: font,
+                            ..Default::default()
+                        },
+                        aspect_ratio: viewport.aspect_ratio(),
+                        event_profile: ClockEventProfile::Off,
+                        time_format: ClockTimeFormat::TwelveHour,
+                        show_date: true,
+                        ..Default::default()
+                    },
+                    42,
+                );
+                ClockScenario::step(
+                    &mut clean,
+                    &[ClockAction::set_reading(state.reading().unwrap())],
+                    Duration::ZERO,
+                );
+                assert_eq!(frame, ClockScenario::render_frame(&clean));
             }
             let vector = crate::thruster_visual_tests::svg(&frame, viewport);
             assert!(!vector.contains("NaN") && !vector.contains("inf"));

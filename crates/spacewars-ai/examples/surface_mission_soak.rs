@@ -1,4 +1,14 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/acquisition_probe.rs"]
+mod acquisition_probe;
+#[path = "support/arrival_survey.rs"]
+mod arrival_survey;
+#[path = "support/capture_probe.rs"]
+mod capture_probe;
+#[path = "support/flag_survey.rs"]
+mod flag_survey;
+#[path = "support/flag_value_shadow.rs"]
+mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -9,6 +19,8 @@ mod live_planning;
 mod mission_evaluation;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
+#[path = "support/native_capture_probe.rs"]
+mod native_capture_probe;
 #[path = "support/physics_profile.rs"]
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
@@ -17,6 +29,14 @@ mod planning_probe;
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
 mod successor_probe;
+#[path = "support/transfer_comparison.rs"]
+mod transfer_comparison;
+#[path = "support/transfer_probe.rs"]
+mod transfer_probe;
+#[path = "support/transfer_schedule.rs"]
+mod transfer_schedule;
+#[path = "support/transfer_sources.rs"]
+mod transfer_sources;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -150,11 +170,22 @@ fn main() {
     assert!(["quiet", "intercept", "duel", "hunt", "pursuit"].contains(&mode.as_str()));
     assert!(!require_hunt || mode == "hunt" || mode == "pursuit");
     assert!((1..=180).contains(&prepare_seconds));
-    assert!(["fixed", "generated"].contains(&world_kind.as_str()));
+    assert!(["fixed", "generated", "destination"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
+    let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
+    let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
+    let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
+    assert!(
+        !native_capture_probe::timing_enabled()
+            || native_capture_probe.is_some()
+            || arg("--probe-capture-seconds", "none") != "none",
+        "neutral timing needs a capture probe"
+    );
+    let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
+    let mut transfer_comparison = transfer_comparison::TransferComparisonRun::from_args(&out, seed);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -190,6 +221,13 @@ fn main() {
                 },
             )
         }
+    } else if world_kind == "destination" {
+        SurfaceSortieScenario::init_capture_destination_trial(
+            seed,
+            seat,
+            mirror,
+            arg("--flag-bearing", "1.2").parse().unwrap(),
+        )
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
@@ -228,6 +266,10 @@ fn main() {
         compare_successors.then(|| successor_probe::SuccessorProbe::new(&out));
     let mut continuation = successor_continuation::ContinuationRun::from_args(&out);
     assert!(
+        continuation.is_none() || !selected_policies.iter().any(|p| p.selects_destination()),
+        "destination planning is not supported with --continue-successor"
+    );
+    assert!(
         continuation.is_none() || (compare_successors && mode == "duel" && match_rules),
         "physical continuations require successor probes and a duel with match rules"
     );
@@ -256,11 +298,14 @@ fn main() {
     );
     assert!(
         live_planning.as_ref().is_none_or(|live| {
-            (0..2).any(|i| {
-                live.enabled_for(i)
-                    && !selected_policies[i].objective_planning().is_legacy()
-                    && (i == seat || mode == "duel")
-            })
+            mission_evaluation
+                .as_ref()
+                .is_some_and(|e| e.alternative_survey)
+                || (0..2).any(|i| {
+                    live.enabled_for(i)
+                        && !selected_policies[i].objective_planning().is_legacy()
+                        && (i == seat || mode == "duel")
+                })
         }),
         "live objective planning needs an active planner seat"
     );
@@ -371,21 +416,27 @@ fn main() {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
                         live.observe(&state, i, &mut o.local, request.objective_planning);
-                        live.observe_destination_cover(
-                            &state,
-                            i,
-                            &mut o,
-                            request.destination_cover,
-                        );
+                        if request.destination_cover.is_some()
+                            || !mission_evaluation
+                                .as_ref()
+                                .is_some_and(|e| e.alternative_survey)
+                        {
+                            live.observe_destination_cover(
+                                &state,
+                                i,
+                                &mut o,
+                                request.destination_cover,
+                            );
+                        }
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
                     }
                 };
                 #[cfg(not(feature = "sensor-profile"))]
-                let o = observe();
+                let mut o = observe();
                 #[cfg(feature = "sensor-profile")]
-                let (o, profile) =
+                let (mut o, profile) =
                     scenario_spacewars::surface_sortie::sensor_profile::measure(&mut observe);
                 let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
                 if let Some(probe) = &mut landing_probe {
@@ -426,22 +477,64 @@ fn main() {
                 if o.local.landing_objective.is_some() {
                     objective_sensors.push(sensor_ms);
                 }
+                if let Some(sources) = &mut transfer_sources {
+                    sources.observe(i, &pilots[i], &o);
+                }
+                let comparison_before = transfer_comparison
+                    .as_mut()
+                    .and_then(|c| c.before_intent(&pilots[i], i, &o, live_planning.as_ref()));
                 let clock = Instant::now();
-                let mut intent = if let Some(trial) = &mut continuation {
+                let nominated = transfer_probe.as_mut().and_then(|probe| {
+                    probe.intent(
+                        i,
+                        &mut pilots[i],
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    )
+                });
+                let mut intent = if let Some(intent) = nominated {
+                    intent
+                } else if let Some(trial) = &mut continuation {
                     trial.intent(i, &mut pilots[i], &o)
+                } else if let Some(evaluation) = &mission_evaluation {
+                    pilots[i].intent_with_evaluation(&o, &evaluation.evaluator)
                 } else {
                     pilots[i].intent(&o)
                 };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
-                if let Some(evaluator) = &mut mission_evaluation {
-                    successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
+                if let Some(comparison) = &mut transfer_comparison {
+                    comparison.observe(
+                        comparison_before.as_ref(),
+                        &pilots[i],
+                        &state,
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    );
                 }
                 if let Some(probe) = &mut successor_probe {
                     successor_construction_ms += probe.observe(i, &pilots[i], &o);
                 }
                 if let Some(trial) = &mut continuation {
                     trial.record(i, &pilots[i], &state, &o, intent);
+                }
+                if let Some(probe) = &mut transfer_probe {
+                    probe.record(
+                        i,
+                        &pilots[i],
+                        &state,
+                        &o,
+                        intent,
+                        mission_evaluation.as_ref().map(|e| &e.evaluator),
+                    );
+                }
+                if let Some(probe) = &mut native_capture_probe {
+                    probe.record(
+                        i,
+                        &pilots[i],
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    );
                 }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
@@ -578,6 +671,39 @@ fn main() {
                     eprintln!("{:.2}s P{} {label}", tick as f64 / 60.0, i + 1);
                     last[i] = label;
                 }
+                // Preserve the complete controller trace; observational remote
+                // demand is attached only after controls and their diagnostics.
+                if let Some(evaluator) = &mut mission_evaluation {
+                    if evaluator.alternative_survey
+                        && request.destination_cover.is_none()
+                        && let Some(live) = live_planning
+                            .as_mut()
+                            .filter(|l| l.destination_enabled_for(i))
+                    {
+                        let clock = Instant::now();
+                        let request = evaluator
+                            .evaluator
+                            .alternative_request(&o, pilots[i].telemetry());
+                        live.observe_destination_cover(&state, i, &mut o, request);
+                        successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    }
+                    successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
+                    if let Some(flags) = &mut flag_survey {
+                        let clock = Instant::now();
+                        let flag_request =
+                            evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
+                        flags.planner.observe(&state, i, &o, flag_request);
+                        if let Some(shadow) = &mut flags.shadow {
+                            shadow.observe(
+                                &o,
+                                &evaluator.evaluator,
+                                flag_request,
+                                &flags.planner.samples(),
+                            );
+                        }
+                        successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    }
+                }
             } else if mode == "intercept" {
                 let clock = Instant::now();
                 let o = state.combat_observation(i, interceptor.site_request());
@@ -589,6 +715,15 @@ fn main() {
                 policy_times[i] = *policies.last().unwrap();
                 actions.extend(intent.encode(owner));
             }
+        }
+        if transfer_probe
+            .as_ref()
+            .is_some_and(|probe| probe.run_done())
+            || native_capture_probe
+                .as_ref()
+                .is_some_and(|probe| probe.done())
+        {
+            break;
         }
         let mut planning_ms = successor_construction_ms
             + live_planning
@@ -612,6 +747,28 @@ fn main() {
                     .map_or(0, |probe| probe.last_charged),
             );
             planning_ms += evaluator.advance(state.tick(), remaining);
+            remaining.graph -= evaluator.last_charged.graph;
+            remaining.physics_queries -= evaluator.last_charged.physics_queries;
+            if let Some(flags) = &mut flag_survey {
+                planning_ms += flags.advance(
+                    &state,
+                    remaining,
+                    live_planning.as_ref().unwrap().physical_actors(),
+                );
+                remaining.graph -= flags.last_charged.graph;
+                remaining.physics_queries -= flags.last_charged.physics_queries;
+            }
+            if let Some(probe) = &mut transfer_probe {
+                planning_ms += probe.advance(state.tick(), remaining);
+            }
+            if let Some(comparison) = &mut transfer_comparison {
+                planning_ms += comparison.advance(state.tick(), remaining);
+                let mut busy = live_planning.as_ref().unwrap().physical_actors().to_vec();
+                if let Some(flags) = &flag_survey {
+                    busy.extend(&flags.physical_actors);
+                }
+                planning_ms += comparison.survey_arrival(&state, remaining, &busy);
+            }
         }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
@@ -754,6 +911,24 @@ fn main() {
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
     if let Some(evaluator) = &mut mission_evaluation {
         report["mission_evaluation"] = evaluator.report();
+    }
+    if let Some(flags) = &mut flag_survey {
+        report["flag_survey"] = flags.report();
+    }
+    if let Some(probe) = &mut transfer_probe {
+        report["termination"] = json!("transfer_probe_finished");
+        report["transfer_probe"] = probe.finish(&state, &pilots[probe.seat()]);
+    }
+    if let Some(probe) = &mut native_capture_probe {
+        report["termination"] = json!("native_capture_probe_finished");
+        report["native_capture_probe"] =
+            probe.finish(state.tick(), state.match_outcome().is_some());
+    }
+    if let Some(sources) = &mut transfer_sources {
+        report["transfer_sources"] = sources.report();
+    }
+    if let Some(comparison) = &mut transfer_comparison {
+        report["transfer_comparison"] = comparison.finish(state.tick());
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({

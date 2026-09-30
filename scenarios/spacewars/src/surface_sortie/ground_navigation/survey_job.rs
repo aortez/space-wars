@@ -2,6 +2,8 @@
 use super::*;
 use engine_core::planning::{PlanningJob, WorkKind};
 use engine_rapier::world::{CapsuleQuery, QuerySnapshot, RayCastOptions, RayHit};
+use query_footprint::QueryFootprint;
+use std::cell::RefCell;
 use std::sync::Arc;
 
 #[derive(Clone, Copy)]
@@ -77,6 +79,7 @@ pub(crate) struct GroundMeasurements {
     planet: usize,
     revision: u64,
     pub tick: u64,
+    pub footprint: Option<RefCell<QueryFootprint>>,
     nodes: [Option<Measurement<Result<GroundNode, GroundNodeRejection>>>; GROUND_SAMPLES],
     walks: [[Option<Measurement<bool>>; 2]; GROUND_SAMPLES],
 }
@@ -89,6 +92,8 @@ pub(crate) struct GroundSurveyJob {
     by_id: [Option<GroundNode>; GROUND_SAMPLES],
     map: GroundMap,
     phase: Phase,
+    walk_patch: Option<(u16, u16)>,
+    node_cursor: u16,
 }
 impl SurfaceSortieState {
     pub(crate) fn ground_survey_job(
@@ -125,6 +130,7 @@ impl SurfaceSortieState {
             planet,
             revision,
             tick: self.world.tick,
+            footprint: None,
             nodes: [None; GROUND_SAMPLES],
             walks: [[None; 2]; GROUND_SAMPLES],
         });
@@ -149,7 +155,49 @@ impl GroundSurveyJob {
             },
             measurements,
             phase: Phase::NodeRay(0),
+            walk_patch: None,
+            node_cursor: 0,
         }
+    }
+    /// A sparse outer-contour hypothesis, never evidence that routes outside
+    /// this patch are impossible. Ordinary surveys retain their full domain.
+    pub(crate) fn with_walk_patch(mut self, center: u16, half_width: u16) -> Self {
+        assert!(matches!(self.phase, Phase::NodeRay(0)));
+        assert!(half_width <= 16 && center < GROUND_SAMPLES as u16);
+        self.walk_patch = Some((
+            (center + GROUND_SAMPLES as u16 - half_width) % GROUND_SAMPLES as u16,
+            half_width * 2 + 1,
+        ));
+        self.measurements.footprint = Some(RefCell::new(QueryFootprint::new(
+            self.measurements.position,
+            self.measurements.angle,
+        )));
+        if self.measurements.nodes.iter().any(Option::is_some)
+            || self
+                .measurements
+                .walks
+                .iter()
+                .flatten()
+                .any(Option::is_some)
+        {
+            // Retained queries predate this capture. Never certify a partial
+            // footprint if a future caller starts a patch from warm evidence.
+            self.measurements
+                .footprint
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .complete = false;
+        }
+        self
+    }
+    fn node_count(&self) -> u16 {
+        self.walk_patch.map_or(GROUND_SAMPLES as u16, |(_, n)| n)
+    }
+    fn node_id(&self, cursor: u16) -> u16 {
+        self.walk_patch.map_or(cursor, |(start, _)| {
+            (start + cursor) % GROUND_SAMPLES as u16
+        })
     }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
         self.reused
@@ -168,6 +216,15 @@ impl GroundSurveyJob {
         self.measurements.position + point.rotate_radians(self.measurements.angle)
     }
     fn clear(&self, point: Vec2) -> bool {
+        if let Some(footprint) = &self.measurements.footprint {
+            let spec = SurfaceSortieState::spec();
+            footprint.borrow_mut().capsule(
+                self.world(point),
+                rotation_for_direction(point.normalized().rotate_radians(self.measurements.angle)),
+                spec.half_segment,
+                spec.radius + 0.02,
+            );
+        }
         self.measurements.capsule.is_clear(
             &self.measurements.snapshot,
             self.world(point),
@@ -175,6 +232,9 @@ impl GroundSurveyJob {
         )
     }
     fn ray(&self, origin: Vec2, direction: Vec2, distance: f32) -> Option<RayHit> {
+        if let Some(footprint) = &self.measurements.footprint {
+            footprint.borrow_mut().ray(origin, direction, distance);
+        }
         self.measurements
             .snapshot
             .cast_ray(
@@ -197,7 +257,8 @@ impl GroundSurveyJob {
             }
             Err(reason) => self.map.rejected.push(GroundRejectedNode { id, reason }),
         }
-        self.phase = Phase::NodeRay(id + 1);
+        self.node_cursor += 1;
+        self.phase = Phase::NodeRay(self.node_cursor);
     }
     fn walk_index(path: Path) -> (usize, usize) {
         (
@@ -221,7 +282,7 @@ impl GroundSurveyJob {
         self.phase = if path.can_jump {
             Phase::Capsule(path, true, 0)
         } else {
-            Phase::Candidate(path.cursor.next(false))
+            Phase::Candidate(path.cursor.next(self.walk_patch.is_some()))
         };
     }
     fn edge(&mut self, path: Path, walk: bool) {
@@ -244,8 +305,10 @@ impl PlanningJob for GroundSurveyJob {
         match self.phase {
             Phase::Done => None,
             Phase::Candidate(_) => Some(WorkKind::Graph),
-            Phase::NodeRay(id) if usize::from(id) == GROUND_SAMPLES => Some(WorkKind::Graph),
-            Phase::NodeRay(id) if self.measurements.nodes[usize::from(id)].is_some() => {
+            Phase::NodeRay(id) if id == self.node_count() => Some(WorkKind::Graph),
+            Phase::NodeRay(id)
+                if self.measurements.nodes[usize::from(self.node_id(id))].is_some() =>
+            {
                 Some(WorkKind::Graph)
             }
             _ => Some(WorkKind::PhysicsQuery),
@@ -258,7 +321,7 @@ impl PlanningJob for GroundSurveyJob {
         let spec = SurfaceSortieState::spec();
         let height = spec.jump_speed.powi(2) / (2.0 * self.gravity);
         match self.phase {
-            Phase::NodeRay(id) if usize::from(id) == GROUND_SAMPLES => {
+            Phase::NodeRay(id) if id == self.node_count() => {
                 self.phase = Phase::Candidate(Cursor {
                     node: 0,
                     direction: -1,
@@ -266,6 +329,7 @@ impl PlanningJob for GroundSurveyJob {
                 });
             }
             Phase::NodeRay(id) => {
+                let id = self.node_id(id);
                 if let Some(saved) = self.measurements.nodes[usize::from(id)] {
                     self.reused.nodes += 1;
                     self.reused.physics_queries += u64::from(saved.queries);
@@ -312,14 +376,14 @@ impl PlanningJob for GroundSurveyJob {
                 let id = (i32::from(from.id) + cursor.direction * cursor.span as i32)
                     .rem_euclid(GROUND_SAMPLES as i32) as usize;
                 let Some(to) = self.by_id[id] else {
-                    self.phase = Phase::Candidate(cursor.next(false));
+                    self.phase = Phase::Candidate(cursor.next(self.walk_patch.is_some()));
                     return;
                 };
                 let offset = to.position - from.position;
                 let length = offset.length();
                 let rise = offset.dot((from.position + to.position).normalized());
                 if rise > height * 0.75 || rise < -2.5 {
-                    self.phase = Phase::Candidate(cursor.next(false));
+                    self.phase = Phase::Candidate(cursor.next(self.walk_patch.is_some()));
                     return;
                 }
                 let path = Path {
@@ -328,8 +392,8 @@ impl PlanningJob for GroundSurveyJob {
                     to,
                     offset,
                     length,
-                    can_jump: length
-                        <= spec.walk_speed * (2.0 * spec.jump_speed / self.gravity) * 0.9,
+                    can_jump: self.walk_patch.is_none()
+                        && length <= spec.walk_speed * (2.0 * spec.jump_speed / self.gravity) * 0.9,
                 };
                 if rise.abs() < 0.3 && cursor.span == 1 {
                     let (node, direction) = Self::walk_index(path);
@@ -393,6 +457,48 @@ impl PlanningJob for GroundSurveyJob {
 mod tests {
     use super::*;
     use engine_core::planning::{JobLimits, JobPoll, PlanningQueue, Work};
+
+    #[test]
+    fn walking_patch_matches_the_full_measured_contour_at_wraparound() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let planet = state.motion_planet_index(0);
+        let snapshot = Arc::new(state.world.physics.world.query_snapshot());
+        let cold = || {
+            state
+                .ground_survey_job(0, planet, 18.0, Arc::clone(&snapshot))
+                .unwrap()
+        };
+        let (full, _) = finish(cold(), 4096);
+        let full = full.output().unwrap();
+        for center in [0, 8, 255, 511] {
+            let (patch, spent) = finish(cold().with_walk_patch(center, 8), 1);
+            let patch = patch.output().unwrap();
+            let ids: Vec<_> = (0..17).map(|i| (center + 512 - 8 + i) % 512).collect();
+            let nodes: Vec<_> = ids
+                .iter()
+                .filter_map(|id| full.nodes.iter().find(|n| n.id == *id))
+                .copied()
+                .collect();
+            assert_eq!(patch.nodes, nodes);
+            assert_eq!(patch.nodes.len() + patch.rejected.len(), 17);
+            assert!(
+                patch
+                    .edges
+                    .iter()
+                    .all(|e| e.kind == GroundEdgeKind::Walk && full.edges.contains(e))
+            );
+            let expected = full
+                .edges
+                .iter()
+                .filter(|e| {
+                    e.kind == GroundEdgeKind::Walk && ids.contains(&e.from) && ids.contains(&e.to)
+                })
+                .count();
+            assert_eq!(patch.edges.len(), expected);
+            assert!(spent.physics_queries < 512 && spent.graph < 100);
+        }
+    }
 
     fn finish(job: GroundSurveyJob, quota: u32) -> (GroundSurveyJob, Work) {
         let mut queue = PlanningQueue::new(1);
