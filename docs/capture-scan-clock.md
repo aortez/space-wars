@@ -145,10 +145,11 @@ history/identity mutations and pre-scan versus post-scan claim changes have
 regression coverage. A later choice or terrain change cannot rewrite an earlier
 first-scan comparison.
 
-The next useful step is a conditional **first-scan-success** composition with
-the existing local trip reference, keeping its geometry epoch and success
-conditions explicit. It must still refuse missing/rejected native candidates
-and unsupported claim domains; these results do not justify filling acquisition
-time unconditionally or using the sum to change playing destination rankings.
+The companion [first-scan-success composition](capture-first-scan-success.md)
+now combines this schedule with the existing local trip reference, retaining
+its original geometry epoch and explicit success conditions. Missing/rejected
+native candidates and unsupported claim domains remain unknown. The
+[destination evaluation](capture-value-promotion.md) measures existing policy
+decisions separately; neither diagnostic changes playing destination rankings.
 Enemy-flag route acquisition and broader transfer accuracy remain separate
 work, with the earlier investigation records intact.
