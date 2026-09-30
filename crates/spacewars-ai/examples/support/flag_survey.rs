@@ -102,6 +102,12 @@ impl FlagSurveyRun {
             "telemetry":self.planner.telemetry(), "dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; results never enter controls",
             "timing_scope":"dispatch includes snapshot construction and publication geometry validation; those stages are outside operation quotas; trace IO excluded"});
+        if super::arg("--admit-flag-costs", "none") != "none" {
+            report["observational"] = json!(false);
+            report["scope"] = json!(
+                "17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; opt-in v13 seats may use published certificates as conditional destination costs"
+            );
+        }
         if let Some(shadow) = &mut self.shadow {
             report["shadow"] = shadow.report();
         }

@@ -9,7 +9,7 @@ use scenario_spacewars::surface_sortie::{
     pilot::{PilotLandingSite, PilotMotion},
 };
 
-fn fixture() -> (
+pub(in crate::mission_evaluation) fn fixture() -> (
     MissionObservationV1,
     MissionEvaluator,
     FlagSurveyRequest,

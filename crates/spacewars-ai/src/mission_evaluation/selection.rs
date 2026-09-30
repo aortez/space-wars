@@ -74,6 +74,17 @@ impl MissionEvaluator {
             if sample.tick > p.tick || p.tick - sample.tick > MAX_EVIDENCE_AGE {
                 return None;
             }
+            if flag_costs::is_flag(sample)
+                && (!self.uses_flag_costs(p.owner)
+                    || o.planets
+                        .iter()
+                        .find(|p| p.index == sample.key.planet)
+                        .is_none_or(|planet| {
+                            !sample.key.reference_matches(&PlanetKey::read(planet))
+                        }))
+            {
+                return None;
+            }
             if !sample.remote && sample.key.planet == p.planet.index && sample.costs.is_some() {
                 if !sample.key.matches(&PlanetKey::read(&p.planet))
                     || (sample.gravity - o.local.objective_gravity).abs() > 0.01

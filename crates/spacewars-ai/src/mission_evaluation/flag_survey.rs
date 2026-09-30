@@ -6,7 +6,7 @@ use scenario_spacewars::surface_sortie::{
 
 #[derive(Clone)]
 pub(super) struct RequestState {
-    request: FlagSurveyRequest,
+    pub(super) request: FlagSurveyRequest,
     key: PlanetKey,
     target: usize,
     visit: Option<u64>,
@@ -16,6 +16,7 @@ pub(super) fn request(
     retained: &mut Option<RequestState>,
     o: &MissionObservationV1,
     mission: &MissionTelemetry,
+    include_current: bool,
 ) -> Option<FlagSurveyRequest> {
     let p = &o.local.combat.recovery.flight.pilot;
     let eligible = o.planets.len() <= MAX_PLANETS
@@ -38,7 +39,7 @@ pub(super) fn request(
         .into_iter()
         .take(MAX_OPTIONS)
         .find(|planet| {
-            planet.index != target
+            (include_current || planet.index != target)
                 && planet.claim.as_ref().is_some_and(|c| {
                     c.owner.is_some_and(|owner| owner != p.owner)
                         && c.flag.is_some_and(|f| Some(f.player) == c.owner)
