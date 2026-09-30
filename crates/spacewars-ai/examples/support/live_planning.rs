@@ -23,6 +23,7 @@ pub struct LivePlanningRun {
     dispatch: Vec<f64>,
     active_dispatch: Vec<f64>,
     last_charged: Work,
+    physical_actors: Vec<usize>,
 }
 impl LivePlanningRun {
     pub fn from_args(out: &Path) -> Option<Self> {
@@ -79,6 +80,7 @@ impl LivePlanningRun {
             dispatch: Vec::new(),
             active_dispatch: Vec::new(),
             last_charged: Work::default(),
+            physical_actors: Vec::new(),
         })
     }
     pub fn enabled_for(&self, seat: usize) -> bool {
@@ -96,6 +98,10 @@ impl LivePlanningRun {
                 - self.last_charged.physics_queries,
         }
     }
+    #[allow(dead_code)] // Only the mission runner has the flag survey experiment.
+    pub fn physical_actors(&self) -> &[usize] {
+        &self.physical_actors
+    }
     pub fn observe(
         &mut self,
         state: &SurfaceSortieState,
@@ -105,6 +111,18 @@ impl LivePlanningRun {
     ) {
         self.profiles.insert(seat, planning);
         self.planner.observe_with_planning(state, seat, o, planning);
+    }
+    #[allow(dead_code)] // Only the mission runner requests remote evidence.
+    pub fn remote_snapshot(
+        &self,
+        seat: usize,
+        tick: u64,
+    ) -> Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>
+    {
+        self.planner
+            .destination_cover_observations(tick)
+            .into_iter()
+            .find_map(|(actor, evidence)| (actor == seat).then_some(evidence))
     }
     #[allow(dead_code)] // Only the mission runner requests remote evidence.
     pub fn observe_destination_cover(
@@ -124,6 +142,12 @@ impl LivePlanningRun {
         let start = Instant::now();
         let report = self.planner.advance_with_state(state).unwrap();
         self.last_charged = report.charged;
+        self.physical_actors = report
+            .jobs
+            .iter()
+            .filter(|j| j.charged.physics_queries > 0)
+            .map(|j| j.request.actor as usize)
+            .collect();
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch.push(ms);
         if report.charged != Work::default() {

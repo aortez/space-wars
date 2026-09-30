@@ -184,6 +184,8 @@ fn thrust_lifts_off_physically_and_released_thrust_returns_to_a_landed_ship() {
 #[test]
 fn hovering_or_nose_contact_does_not_allow_transfer_and_settling_takes_time() {
     let mut state = approach(std::f32::consts::FRAC_PI_2, 1.0, 0.0, 0.0, 0.0);
+    assert_eq!(state.transfer_solver_contact(0), Some(false));
+    assert_eq!(state.transfer_solver_contact(99), None);
     idle(&mut state, 1);
     assert_eq!(state.try_transfer(0), TransferResult::ShipNotSettled);
     let mut saw_settling = false;
@@ -198,6 +200,7 @@ fn hovering_or_nose_contact_does_not_allow_transfer_and_settling_takes_time() {
         }
     }
     assert!(saw_settling && state.vehicle_settled(0));
+    assert_eq!(state.transfer_solver_contact(0), Some(true));
 
     let mut nose_first = approach(
         std::f32::consts::FRAC_PI_2,
@@ -207,8 +210,10 @@ fn hovering_or_nose_contact_does_not_allow_transfer_and_settling_takes_time() {
         0.0,
     );
     let mut touched_hull = false;
+    let mut forecast_contact = false;
     for _ in 0..60 {
         idle(&mut nose_first, 1);
+        forecast_contact |= nose_first.transfer_solver_contact(0) == Some(true);
         assert!(!nose_first.vehicle_settled(0));
         assert_eq!(nose_first.pilots[0].landing.assist_strength, 0.0);
         touched_hull |= nose_first.world.physics.contacts().iter().any(|contact| {
@@ -222,6 +227,7 @@ fn hovering_or_nose_contact_does_not_allow_transfer_and_settling_takes_time() {
         });
     }
     assert!(touched_hull, "test must exercise a physical hull collision");
+    assert!(forecast_contact, "forecast must reject hull-only contacts");
     assert_eq!(nose_first.try_transfer(0), TransferResult::ShipNotSettled);
 }
 

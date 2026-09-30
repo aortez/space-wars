@@ -17,14 +17,25 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_survey;
+mod flag_value_shadow;
 mod model;
+mod neutral_capture;
 mod selection;
+mod source_local;
 mod survey;
 mod transfer;
 mod value;
+pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
+pub(crate) use model::no_flag_costs as neutral_phase_costs;
 use model::{LocalEvidence, PlanetKey};
+pub(crate) use neutral_capture::NeutralTimingContext;
+pub(crate) use neutral_capture::neutral_capture_timing;
+pub use neutral_capture::{NeutralCaptureTiming, NeutralTimingValidation};
 pub(crate) use selection::CaptureSelection;
-pub use transfer::{TransferReference, TransferSource};
+pub(crate) use source_local::LocalReferenceContext;
+pub use source_local::{LocalCostReference, LocalEvidenceSource};
+pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
 pub use value::{CaptureValue, ValueComparison, ValueDecision};
 #[cfg(test)]
 mod survey_tests;
@@ -59,7 +70,7 @@ pub struct PhaseCosts {
     pub departure: f32,
 }
 impl PhaseCosts {
-    fn total(&self) -> f32 {
+    pub(crate) fn total(&self) -> f32 {
         self.landing + self.exit + self.outbound + self.claim + self.return_board + self.departure
     }
 }
@@ -246,7 +257,9 @@ struct Dependencies {
 }
 #[derive(Clone, Default)]
 struct ActorState {
+    local_choice: Option<source_local::LocalChoice>,
     survey: Option<survey::AlternativeSurvey>,
+    flag_survey: Option<flag_survey::RequestState>,
     last_tick: Option<u64>,
     submitted_tick: Option<u64>,
     dependencies: Option<Dependencies>,
@@ -293,6 +306,23 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
+    /// Separate observational experiment. Its results are deliberately not
+    /// admitted to evaluation/selection until coverage and timing are tested.
+    pub fn flag_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest> {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        flag_survey::request(
+            &mut self.actors.entry(actor).or_default().flag_survey,
+            o,
+            mission,
+        )
+    }
     /// Optional demand for the host's existing remote-query dispatcher. Call
     /// after controls; this never changes the bot's own sensor request.
     pub fn alternative_request(
@@ -329,9 +359,15 @@ impl MissionEvaluator {
             *state = ActorState::default();
         }
         state.last_tick = Some(p.tick);
+        state.local_choice = source_local::LocalChoice::observe(
+            state.local_choice.as_ref(),
+            o,
+            mission,
+            selection_tick(mission),
+        );
         let mut dependencies = Dependencies {
             policy: mission.policy,
-            transfer: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+            transfer: value::enabled(mission.policy).then(|| TransferSource::from_observation(o)),
             planets: o
                 .planets
                 .iter()
@@ -719,7 +755,8 @@ fn snapshot(
             },
             preferred: None,
         }),
-        transfer_source: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+        transfer_source: value::enabled(mission.policy)
+            .then(|| TransferSource::from_observation(o)),
         comparison_reason: "pending",
         charged_work: 0,
     }

@@ -36,6 +36,7 @@ mod outpost;
 pub mod pilot;
 pub mod pod_righting;
 mod profiles;
+mod query_footprint;
 pub mod rebuild_placement;
 mod recovery;
 pub mod recovery_sensors;
@@ -44,6 +45,7 @@ pub mod return_trial;
 #[cfg(feature = "sensor-profile")]
 pub mod sensor_profile;
 pub(crate) mod solar;
+pub mod transfer_environment;
 mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,

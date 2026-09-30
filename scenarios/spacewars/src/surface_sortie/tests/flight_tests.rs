@@ -28,6 +28,28 @@ fn airborne() -> SurfaceSortieState {
     wing_tick(&mut s, false, SurfaceSortieAction::default());
     s
 }
+
+#[test]
+fn forecast_ship_centroid_matches_native_mass_across_wing_shapes() {
+    let mut s = airborne();
+    let index = s.pilots[0].vehicle.0;
+    for i in 0..=128 {
+        let sweep = i as f32 / 128.0;
+        s.world.ships[index].wing_theta = MAX_WING_THETA * sweep;
+        s.world
+            .physics
+            .reconcile_surface_vehicle(index, &s.world.ships[index]);
+        let body = s.world.physics.ship_body(index);
+        let pose = s.world.physics.world.motion(body).unwrap();
+        let center = s.world.physics.world.center_of_mass(body).unwrap();
+        let expected = (center - pose.position).rotate_radians(-pose.angle);
+        let predicted = flight::ship_local_center_of_mass(sweep);
+        assert!(
+            predicted.distance_to(expected) < 0.0001,
+            "sweep={sweep}: predicted={predicted:?} native={expected:?}"
+        );
+    }
+}
 #[test]
 fn sweeping_preserves_body_feet_mass_pose_and_origin_velocity() {
     let mut s = airborne();
