@@ -80,7 +80,7 @@ def compatible_measurements(row):
         m = c['measurement']
         if m is None or planet is None or neutral_key(planet) is None:
             continue
-        if (evidence['generation'] <= m['tick'] <= row['tick'] <= m['tick']+1800
+        if (evidence['generation'] <= m['tick'] < row['tick'] <= m['tick']+1800
                 and m['revision'] == planet['revision'] and m['ship_form'] == 'ship'):
             result.append((c,neutral_key(planet)))
     return result
@@ -109,8 +109,10 @@ def audit_approaches(records, evaluations, *, start_tick, ticks, actors):
         assert row['policy'] == POLICIES[1]
         counts['input_rows'] += 1
         keys = {k for p in row['planets'] if (k := neutral_key(p)) is not None}
-        admitted = {k:v for k,v in admitted.items() if k[0] != actor or (
-            row['queries_ready'] and v['key'] in keys and 0 <= tick-v['measurement']['tick'] <= 1800)}
+        for key in list(admitted):
+            if key[0] == actor:
+                admitted[key] = [v for v in admitted[key] if row['queries_ready']
+                    and v['key'] in keys and 0 <= tick-v['measurement']['tick'] <= 1800]
         evidence = row['evidence']
         if evidence is not None:
             assert len(evidence['candidates']) == 2
@@ -131,7 +133,7 @@ def audit_approaches(records, evaluations, *, start_tick, ticks, actors):
             generations.add((actor, evidence['generation']))
             for c in evidence['candidates']:
                 if (m := c['measurement']) is not None:
-                    assert m['tick'] <= tick
+                    assert m['tick'] < tick, 'same-tick remote dispatch is not yet visible'
                     identity = actor, m['tick'], c['id']['planet'], c['id']['bearing']
                     assert seen.setdefault(identity, m) == m, 'original measurement changed'
         else:
@@ -146,8 +148,12 @@ def audit_approaches(records, evaluations, *, start_tick, ticks, actors):
                 admitted.pop((actor,planet), None)
                 counts['negative_replacements'] += 1
             else:
-                c,key = min(choices, key=lambda v: (angle(row,v[0]['measurement']),-v[0]['measurement']['tick'],v[0]['id']['bearing']))
-                admitted[actor,planet] = dict(key=key,measurement=c['measurement'])
+                shortest = min(angle(row,c['measurement']) for c,_ in choices)
+                # Independent doubles can distinguish angles that tie in Rust
+                # f32. Retain only the tolerance-sized set of possible winners;
+                # bind the actual report to one. Exact ties are tested in Rust.
+                admitted[actor,planet] = [dict(key=key,measurement=c['measurement'])
+                    for c,key in choices if angle(row,c['measurement']) <= shortest+1e-5]
         report = wanted.pop((actor,tick), None)
         if report is None:
             continue
@@ -157,8 +163,8 @@ def audit_approaches(records, evaluations, *, start_tick, ticks, actors):
             if c['evidence_kind'] != NEUTRAL_KIND or c['local'] is None:
                 continue
             assert row['queries_ready']
-            m = admitted[actor,c['planet']]['measurement']
-            assert m['tick'] == c['evidence_tick'] and m['site']['id'] == c['site'], 'reference was not retained or newly admitted'
+            m = next(v['measurement'] for v in admitted[actor,c['planet']]
+                if v['measurement']['tick'] == c['evidence_tick'] and v['measurement']['site']['id'] == c['site'])
             assert m['revision'] == c['revision'] and c['observed_owner'] is None
             assert c['evidence_age_ticks'] == tick-m['tick'] <= 1800
             counts['neutral_references'] += 1

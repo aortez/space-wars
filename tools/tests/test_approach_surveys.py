@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import math
 from pathlib import Path
+import struct
 import unittest
 
 spec = importlib.util.spec_from_file_location('approach_surveys', Path(__file__).parents[1]/'compare-approach-surveys.py')
@@ -60,7 +61,7 @@ class ApproachSurveyAudit(unittest.TestCase):
             self.assertEqual(result['two_site_rankings'],1)
 
     def test_source_and_ranking_mutations_fail(self):
-        for mutation in range(14):
+        for mutation in range(15):
             row, report = fixture()
             c = report['candidates'][0]
             if mutation==0: c.update(site=dict(planet=0,bearing=16),evidence_tick=7,evidence_age_ticks=3)
@@ -77,6 +78,9 @@ class ApproachSurveyAudit(unittest.TestCase):
             if mutation==11: row['evidence']['candidates'].append(copy.deepcopy(row['evidence']['candidates'][0]))
             if mutation==12: row['evidence']['candidates'].pop()
             if mutation==13: report['selected_tick']+=1
+            if mutation==14:
+                row['evidence']['candidates'][0]['measurement']['tick']=10
+                c.update(evidence_tick=10,evidence_age_ticks=0)
             with self.subTest(mutation=mutation), self.assertRaises((AssertionError,KeyError,StopIteration)):
                 audit([row],[report])
 
@@ -101,7 +105,7 @@ class ApproachSurveyAudit(unittest.TestCase):
             later['tick']=11
             if mutation==0:
                 for c in later['evidence']['candidates']:
-                    c['measurement'].update(tick=11,finding='no_landing',site=None)
+                    c['measurement'].update(tick=10,finding='no_landing',site=None)
             if mutation==1:
                 row['ship_position']=dict(x=0,y=0)
                 later['evidence']=None
@@ -134,6 +138,20 @@ class ApproachSurveyAudit(unittest.TestCase):
         report['candidates'][0]['evidence_age_ticks']=5
         self.assertEqual(audit([row,pending],[report])['retained_references_without_current_measurement'],1)
         with self.assertRaises(AssertionError): audit([row],[],ticks=2)
+
+    def test_float_rounding_ties_accept_newer_but_cannot_admit_a_longer_approach(self):
+        row, report = fixture()
+        row['planets'][0]['motion']['angle']=0
+        for index,c in enumerate(row['evidence']['candidates']):
+            c['measurement']['planet']['position']=dict(x=0,y=0)
+            c['measurement']['site']['vehicle_position']=dict(x=(index+1)*1e-6,y=60)
+        angles = [A.angle(row,c['measurement']) for c in row['evidence']['candidates']]
+        self.assertLess(angles[0],angles[1])
+        self.assertEqual(struct.pack('f',angles[0]),struct.pack('f',angles[1]))
+        report['candidates'][0].update(site=dict(planet=0,bearing=16),evidence_tick=7,evidence_age_ticks=3)
+        self.assertEqual(audit([row],[report])['ranked_references'],1)
+        row['evidence']['candidates'][1]['measurement']['site']['vehicle_position']['x']=2
+        with self.assertRaises(StopIteration): audit([row],[report])
 
     def test_handoff_audit_also_validates_v16_and_keeps_its_v15_default(self):
         spec = importlib.util.spec_from_file_location('handoff_tests', Path(__file__).with_name('test_landing_handoff.py'))

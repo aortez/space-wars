@@ -108,7 +108,9 @@ constants, and check angular ranking where current measurements exist. Separatel
 count retained references while replacement measurements are absent. Track
 positive admission separately from the raw measurement registry; a negative
 replacement, missing query readiness, expiry or changed material/ownership
-cannot authorize a later retained numeric reference. A
+cannot authorize a later retained numeric reference. Independent double
+arithmetic admits only winners within 0.00001 radians of the shortest approach;
+Rust tests cover exact recency/bearing tie ordering. A
 post-dispatch `destination-cover.jsonl` publication is not evidence that the
 same-tick decision had that sample available.
 
