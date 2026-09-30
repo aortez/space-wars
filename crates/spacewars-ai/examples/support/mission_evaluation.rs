@@ -133,7 +133,7 @@ impl EvaluationRun {
         let models = ["--p1-policy", "--p2-policy"]
             .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
         let mut report = json!({
-            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14")), "requested_shared_budget":self.budget,
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14" | "material_mission_v15")), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,

@@ -318,7 +318,7 @@ impl LocalChoice {
             observed_tick: p.tick,
             visit,
             site,
-            key: old.map_or(key, |c| c.key.clone()),
+            key: old.map_or(key, |c| c.key),
             gravity: old.map_or(o.local.objective_gravity, |c| c.gravity),
         })
     }

@@ -72,7 +72,7 @@ def rows(path):
         yield from map(json.loads, stream)
 
 
-def flag_references(evaluations, samples):
+def flag_references(evaluations, samples, policies=('material_mission_v14',)):
     """Bind every consumed reference to one published source, independently of Rust."""
     surveys = {(s['actor'], s['source_tick'], s['site']['planet'], s['site']['bearing']):s for s in samples}
     assert len(surveys) == len(samples)
@@ -81,7 +81,7 @@ def flag_references(evaluations, samples):
         for c in r['candidates']:
             if c['evidence_kind'] != FLAG_KIND:
                 continue
-            assert r['policy'] == 'material_mission_v14' and r['model'] == 'capture_mission_survey_value_v1'
+            assert r['policy'] in policies and r['model'] == 'capture_mission_survey_value_v1'
             identity = r['actor'], c['evidence_tick'], c['site']['planet'], c['site']['bearing']
             s = surveys[identity]
             assert s['reason'] is None and s['site'] == c['site']

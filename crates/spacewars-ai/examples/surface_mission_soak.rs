@@ -714,7 +714,7 @@ fn main() {
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
                     let admit_flags = evaluator.evaluator.uses_flag_costs(owner)
-                        || pilots[i].policy() == MissionPolicy::SurveyValuePlanner;
+                        || pilots[i].policy().consumes_flag_surveys();
                     if !admit_flags || flag_survey.is_none() {
                         successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
                     }

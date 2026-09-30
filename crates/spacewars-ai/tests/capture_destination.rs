@@ -78,7 +78,7 @@ impl Run {
                 .find(|c| Some(c.planet) == self.bot.telemetry().target)
                 .unwrap();
             self.farther_choice = other.distance > current.distance;
-            if self.bot.policy() == MissionPolicy::SurveyValuePlanner {
+            if self.bot.policy().consumes_flag_surveys() {
                 self.enemy_value_choice = other.observed_owner == Some(actor.opponent())
                     && current.observed_owner.is_none()
                     && other.total_seconds > current.total_seconds
@@ -333,6 +333,59 @@ fn surveyed_value_choice_physically_takes_enemy_flag_before_neutral_ground() {
             .unwrap()
             .switches,
         1
+    );
+    assert!(run.state.terrain_diagnostics().issues.is_empty());
+}
+
+#[test]
+fn costed_landing_site_is_freshly_acquired_and_physically_completed() {
+    let mut run = Run::new(MissionPolicy::LandingPlanPlanner, 0, false);
+    run.state = SurfaceSortieScenario::init_capture_destination_match_trial(
+        42,
+        0,
+        false,
+        0.8,
+        false,
+        Some(Duration::from_secs(600)),
+    );
+    run.flags = Some(FlagSurveyPlanner::new(2));
+    let mut native_touchdown = false;
+    for _ in 0..90 * 60 {
+        run.step(0);
+        let t = run.bot.telemetry();
+        if let Some(h) = &t.destination_planning.as_ref().unwrap().landing_handoff {
+            if h.landed_tick.is_some() && h.completed_tick.is_none() {
+                let capture = t.capture.as_ref().unwrap();
+                assert_eq!(capture.site, Some(h.site));
+                assert!(capture.landing.landed_tick.is_some());
+                native_touchdown = true;
+            }
+            if h.completed_tick.is_some() {
+                break;
+            }
+        }
+    }
+    let t = run.bot.telemetry();
+    let h = t
+        .destination_planning
+        .as_ref()
+        .unwrap()
+        .landing_handoff
+        .as_ref()
+        .unwrap();
+    assert!(h.invalidated_tick.is_none());
+    assert!(h.accepted_tick.unwrap() < h.started_tick.unwrap() + 120);
+    assert!(h.accepted_tick.unwrap() <= h.landed_tick.unwrap());
+    assert!(h.landed_tick.unwrap() < h.completed_tick.unwrap());
+    assert!(native_touchdown && run.first_claim.is_some() && run.boarded);
+    assert_eq!(t.completed_sorties, 1);
+    assert_eq!(
+        run.state.mission_observation(0, None).planets[h.site.planet]
+            .claim
+            .as_ref()
+            .unwrap()
+            .owner,
+        Some(PlayerId::PLAYER_1)
     );
     assert!(run.state.terrain_diagnostics().issues.is_empty());
 }

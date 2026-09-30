@@ -22,6 +22,9 @@ use serde::Serialize;
 #[path = "mission_destination.rs"]
 mod destination;
 pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, DestinationSwitch};
+#[path = "mission_landing_handoff.rs"]
+mod landing_handoff;
+pub use landing_handoff::LandingHandoff;
 
 #[path = "mission_transfer_forecast.rs"]
 mod transfer_forecast;
@@ -184,6 +187,7 @@ pub struct MaterialMissionPilot {
     last_survey: Option<LandingSurveyStamp>,
     pub(crate) bounded_acquisition: bool,
     destination_switched: bool,
+    landing_reference: Option<crate::mission_evaluation::CostedLandingReference>,
 }
 
 impl MaterialMissionPilot {
@@ -245,6 +249,7 @@ impl MaterialMissionPilot {
             last_survey: None,
             bounded_acquisition: false,
             destination_switched: false,
+            landing_reference: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -322,6 +327,9 @@ impl MaterialMissionPilot {
             self.policy.objective_planning(),
         )
         .with_bounded_acquisition(self.bounded_acquisition);
+        if let Some(reference) = self.landing_reference {
+            capture = capture.requiring_site(reference.site);
+        }
         capture.start_acquisition(&o.local);
         capture
     }
@@ -383,6 +391,7 @@ impl MaterialMissionPilot {
         });
     }
     fn reconsider(&mut self, tick: u64, reason: &'static str, defer: bool) {
+        self.invalidate_landing_handoff(tick, reason);
         self.event(tick, "replan", Some(reason));
         if defer && let Some(planet) = self.telemetry.target {
             self.deferred.retain(|(p, _)| *p != planet);
@@ -526,6 +535,7 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
+        self.prepare_landing_handoff(o);
         let result = self.choose_with_continuation(
             o,
             continuation.as_deref_mut(),
@@ -533,6 +543,7 @@ impl MaterialMissionPilot {
             probe,
             defer_new_pursuit,
         );
+        self.observe_landing_handoff(o);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
@@ -733,6 +744,7 @@ impl MaterialMissionPilot {
                 && p.location != PilotLocation::OnFoot
                 && distance > target.radius + 70.0;
             if t.completed_tick.is_some() || departed {
+                self.finish_landing_handoff(p.tick);
                 self.telemetry.completed_sorties += 1;
                 self.event(p.tick, "departed", None);
                 self.telemetry.target = None;
