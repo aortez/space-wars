@@ -324,6 +324,22 @@ impl ClientScenario for MaterialMissionClientScenario {
     fn game_over_message(&self) -> Option<String> {
         self.sortie.state.match_result_message()
     }
+    fn round_result(&self) -> Option<crate::scoreboard::RoundResult> {
+        let round = self.sortie.state.match_observation()?;
+        Some(crate::scoreboard::RoundResult {
+            outcome: round.outcome?,
+            elapsed: Duration::from_secs_f64(round.elapsed_seconds),
+            planets: round.owned_planets,
+            controllers: std::array::from_fn(|seat| {
+                if !self.bots[seat] {
+                    "Human"
+                } else {
+                    self.pilots[seat].policy().display_name()
+                }
+                .into()
+            }),
+        })
+    }
     fn runtime_diagnostics(&self) -> String {
         let Some(round) = self.sortie.state.match_observation() else {
             return String::new();
@@ -769,6 +785,42 @@ mod tests {
     }
 
     #[test]
+    fn finished_match_scoreboard_identifies_humans_and_all_bot_policies() {
+        let choices = [
+            (Human, "Human"),
+            (RuleBot, "Legacy bot v9"),
+            (PlannerBot, "Planner bot v10"),
+            (DestinationBot, "Destination bot v12"),
+            (ValueBot, "Value bot v13"),
+        ];
+        for (p1, label1) in choices {
+            for (p2, label2) in choices {
+                let mut settings = Settings::default();
+                settings.spacewars.player_1_controller = p1;
+                settings.spacewars.player_2_controller = p2;
+                settings.spacewars_match.time_limit_seconds = 1;
+                let mut client = create_match(
+                    7,
+                    &settings,
+                    Viewport::new(800.0, 480.0),
+                    ScenarioStartMode::Normal,
+                    &ScenarioAsset::None,
+                )
+                .unwrap();
+                assert_eq!(client.round_result(), None);
+                for _ in 0..60 {
+                    client.step(&[], Duration::from_nanos(16_666_667));
+                }
+                let result = client.round_result().unwrap();
+                assert_eq!(result.controllers, [label1, label2]);
+                assert_eq!(result.elapsed, Duration::from_secs(1));
+                assert_eq!(result.outcome, MatchOutcome::Draw);
+                assert_eq!(result.planets, [0, 0]);
+            }
+        }
+    }
+
+    #[test]
     fn physical_finished_match_supplies_menu_result_freezes_bots_and_restarts_healthy() {
         // Physical combat exercises the terminal UI, not a prescribed winner:
         // changes such as missile mount placement can alter the fight's result.
@@ -823,6 +875,11 @@ mod tests {
             .unwrap();
         client.sortie = SurfaceSortieClientScenario::new(state);
         assert!(client.is_game_over());
+        let score = client.round_result().unwrap();
+        assert_eq!(score.outcome, MatchOutcome::Winner(winner));
+        assert_eq!(score.planets, round.owned_planets);
+        assert_eq!(score.elapsed.as_secs_f64(), round.elapsed_seconds);
+        assert_eq!(score.controllers, ["Legacy bot v9", "Legacy bot v9"]);
         assert_eq!(
             client.game_over_message().as_deref(),
             Some(expected_message.as_str())
@@ -855,6 +912,7 @@ mod tests {
         .unwrap();
         assert!(!reset.is_game_over());
         assert_eq!(reset.game_over_message(), None);
+        assert_eq!(reset.round_result(), None);
         let reset = reset
             .as_any()
             .downcast_ref::<MaterialMissionClientScenario>()

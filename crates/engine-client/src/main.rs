@@ -31,6 +31,7 @@ mod presentation_probe;
 mod raster;
 mod render;
 mod renderer_policy;
+mod scoreboard;
 mod settings;
 mod settings_writer;
 mod sound_controls;
@@ -709,6 +710,7 @@ fn show_launcher(
     window.set_ingame_clock_visible(false);
     window.set_clock_controls_pending(false);
     window.set_game_over_visible(false);
+    window.set_scoreboard_visible(false);
     window.set_scenario_error_text(SharedString::from(""));
     clear_runtime_diagnostics(window);
     let scenario_names = host::launcher_scenario_names()
