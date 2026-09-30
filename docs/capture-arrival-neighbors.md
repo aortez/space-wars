@@ -196,9 +196,9 @@ runtime, experiment or result. The retained checker is
 `target/capture-flag-survey/arrival-neighbors-post-audit.py`, SHA-256
 `939900bd392a9df9d0fb11d8d60225260a37489f6d867192a438ca04363df793`.
 
-The next useful slice is native acquisition evidence: how query availability,
-intermittent footing results and the local selector affect the wait before a
-site is actually selected. The wider bounded-acquisition study already found
-waits exceeding twenty seconds. These quiet one-tick arrivals cannot supply a
-general acquisition estimator, and this multisite result does not remove that
-missing part of a whole-trip comparison.
+The [native acquisition audit](capture-acquisition-waits.md) follows up how query
+availability and the local selector affect the wait before selection. It
+separates the wider study's enemy-flag waits exceeding twenty seconds from
+no-flag scan scheduling. These quiet one-tick arrivals cannot supply a general
+acquisition estimator, and this multisite result does not remove that missing
+part of a whole-trip comparison.
