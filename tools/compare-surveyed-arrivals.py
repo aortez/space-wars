@@ -78,7 +78,7 @@ def audit_trigger(actor, observed, survey, seed, mode):
         groups=len(expected),findings=[c['measurement']['finding'] for g in expected for c in g['survey']['candidates'] if c['measurement']])
 
 
-def audit_allocation(row, original, charges, states, dispatch_index, sources, local_reference=False):
+def audit_allocation(row, original, charges, states, dispatch_index, sources, local_reference=False, site_preference=False):
     assert row['queue'] == KEY and row['tick'] == original['tick']
     prior = original['playing_charged_graph']
     original_charge = original['allocation']['charged']
@@ -130,7 +130,7 @@ def audit_allocation(row, original, charges, states, dispatch_index, sources, lo
         if seat in states and states[seat]['phase'] == 'stale': assert state == states[seat]
         states[seat] = state
         extra = charges[seat]-sum(c['charged_graph'] for c in actor['candidates'])-int(actor['ranked'])
-        assert 0 <= extra <= 2+int(local_reference), 'one retained site allows two screens and at most one opted-in reference'
+        assert 0 <= extra <= 2+int(local_reference)+int(site_preference), 'one retained site allows two screens and one step per opted-in reference/preference'
     return prior+original_charge['graph']+used['graph']
 
 
@@ -139,9 +139,11 @@ def audit_rejected(source):
     assert all(source[k] is None for k in ['initial','last_snapshot','last_snapshot_tick','published','published_state','final_state'])
 
 
-def audit_fresh(root, report, case, controlled, local_reference=False):
+def audit_fresh(root, report, case, controlled, local_reference=False, site_preference=False):
     schedule = report['transfer_comparison'][KEY]
     assert schedule.get('arrival_local_reference',False) == local_reference
+    assert schedule.get('arrival_site_preference',False) == site_preference
+    assert not site_preference or local_reference
     assert schedule['queue'] == KEY and schedule['observational'] and schedule['physics_queries'] == 0
     assert schedule['max_source_age_ticks'] == 120
     survey = list(T.rows(root/'arrival-survey.jsonl'))
@@ -157,7 +159,7 @@ def audit_fresh(root, report, case, controlled, local_reference=False):
     assert [r['tick'] for r in ledger] == ([t for t in original if t >= min(starts)] if starts else [])
     charges,states,high,after_retirement = Counter(),{},0,Counter()
     for ordinal,row in enumerate(ledger,1):
-        high = max(high,audit_allocation(row,original[row['tick']],charges,states,ordinal,sources,local_reference))
+        high = max(high,audit_allocation(row,original[row['tick']],charges,states,ordinal,sources,local_reference,site_preference))
         for actor in row['actors']:
             state = actor['state']
             old = next((a['state'] for a in original[row['tick']]['actors'] if a['seat'] == actor['seat']),None)
@@ -191,12 +193,14 @@ def audit_fresh(root, report, case, controlled, local_reference=False):
         assert state == states[source['seat']]
         assert state['charged_graph'] == final['charged_graph'] == charges[source['seat']]
         extra = sum(c['remote_arrival']['local_reference']['charged_graph'] for c in final['candidates']) if local_reference else 0
+        if site_preference: extra += sum(c['remote_arrival']['site_preference']['charged_graph'] for c in final['candidates'])
         assert final['charged_graph'] == sum(c['forecast']['charged_graph'] for c in final['candidates'] if c['forecast'])+int(final['ranked'])+sum(c['remote_arrival']['charged_graph'] for c in final['candidates'])+extra
         counts['published'] += source['published'] is not None
         counts['cancellation:'+state['reason']] += 1
         for first,candidate in zip(source['initial']['candidates'],final['candidates']):
             screen = candidate['remote_arrival']
             assert ('local_reference' in screen) == local_reference
+            assert ('site_preference' in screen) == site_preference
             assert [s['source'] for s in screen['sites']] == [s['source'] for s in first['remote_arrival']['sites']], 'frozen evidence changed'
             attached = actor['attached_source']
             group = next((g for g in attached['groups'] if g['identity']['planet'] == candidate['destination']),None)

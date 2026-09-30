@@ -37,6 +37,7 @@ pub(super) struct ArrivalComparisonRun {
     actors: [Actor; 2],
     measured: bool,
     local_reference: bool,
+    site_preference: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
@@ -49,6 +50,15 @@ impl ArrivalComparisonRun {
             "on" => true,
             _ => panic!("--arrival-local-reference must be off or on"),
         };
+        let site_preference = match crate::arg("--arrival-site-preference", "off").as_str() {
+            "off" => false,
+            "on" => true,
+            _ => panic!("--arrival-site-preference must be off or on"),
+        };
+        assert!(
+            !site_preference || local_reference,
+            "arrival-site preference requires arrival-local reference"
+        );
         let measured = match crate::arg("--compare-surveyed-arrival", "none").as_str() {
             "none" => {
                 assert!(
@@ -63,6 +73,7 @@ impl ArrivalComparisonRun {
         };
         let mut run = Self::new(out, seed, measured);
         run.local_reference = local_reference;
+        run.site_preference = site_preference;
         Some(run)
     }
 
@@ -85,6 +96,7 @@ impl ArrivalComparisonRun {
             }),
             measured,
             local_reference: false,
+            site_preference: false,
             work: BufWriter::new(
                 File::create(out.join("surveyed-arrival-comparison.jsonl")).unwrap(),
             ),
@@ -191,7 +203,9 @@ impl ArrivalComparisonRun {
         if let Some(before) = before {
             source.environment = environment.as_ref().ok().map(|e| json!(e));
             match environment.and_then(|e| {
-                let submit = if self.local_reference {
+                let submit = if self.site_preference {
+                    TransferComparisonQueue::submit_comparison_with_arrival_site_preference
+                } else if self.local_reference {
                     TransferComparisonQueue::submit_comparison_with_arrival_local_reference
                 } else {
                     TransferComparisonQueue::submit_comparison_with_retained_remote_arrival
@@ -296,6 +310,9 @@ impl ArrivalComparisonRun {
             "scope":"First charged survey attempt only, including negatives. New source on next real pre-intent tick, with historical measurement age one; invalid or missed sources never retry. Raw candidate status and actual measurement epochs preserved. Separate queue/token namespace, shared graph residual after playing and original comparison, no new physical queries. No playing input, evaluator, ranker, original source or unavailable cost is updated. Published reports remain historical after cancellation."});
         if self.local_reference {
             report["arrival_local_reference"] = json!(true);
+        }
+        if self.site_preference {
+            report["arrival_site_preference"] = json!(true);
         }
         report
     }
@@ -595,6 +612,7 @@ mod tests {
         let (_, _, _, path) = fixture("two-jobs", true);
         let mut run = ArrivalComparisonRun::new(&path, seed, true);
         run.local_reference = true;
+        run.site_preference = true;
         let mut state = SurfaceSortieScenario::init_material_arena(seed);
         state.enable_match_rules();
         let mut bots: [_; 2] = std::array::from_fn(|seat| {

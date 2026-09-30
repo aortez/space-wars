@@ -1,6 +1,7 @@
 //! Conditional solar screening of source-measured remote sites. No future
 //! survey, acquisition duration, enemy forecast or landing permission is implied.
 use super::arrival_local::ArrivalLocalReport;
+use super::arrival_preference::ArrivalPreferenceReport;
 use crate::{landing_safety, mission_evaluation::MAX_EVIDENCE_AGE};
 use engine_core::Vec2;
 use scenario_spacewars::{
@@ -65,6 +66,8 @@ pub struct RemoteArrivalScreen {
     /// screen's solar completion/charge accounting or old local cost evidence.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_reference: Option<ArrivalLocalReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub site_preference: Option<ArrivalPreferenceReport>,
 }
 
 #[derive(Clone)]
@@ -146,6 +149,7 @@ impl ArrivalScreenJob {
             acquisition: "requires fresh native survey; choice and duration unknown",
             future_threat: "unmodeled; source cover and opponent are historical only",
             local_reference: None,
+            site_preference: None,
         };
         report.unknown = if o.local.sun.is_some() != o.sun.is_some()
             || o.local
@@ -221,11 +225,22 @@ impl ArrivalScreenJob {
         self
     }
 
+    pub fn with_site_preference(mut self, fresh_capture: bool) -> Self {
+        self.report.site_preference =
+            Some(ArrivalPreferenceReport::new(&self.report, fresh_capture));
+        self
+    }
+
     fn reject_unavailable_reference(&mut self) {
         if let Some(reference) = &mut self.report.local_reference
             && let Some(reason) = self.report.unknown
         {
             reference.reject(reason);
+        }
+        if let Some(preference) = &mut self.report.site_preference
+            && let Some(reason) = self.report.unknown
+        {
+            preference.reject(reason);
         }
     }
 
@@ -299,11 +314,16 @@ impl ArrivalScreenJob {
     pub fn has_work(&self) -> bool {
         self.has_solar_work()
             || (self.report.complete
-                && self
+                && (self
                     .report
                     .local_reference
                     .as_ref()
-                    .is_some_and(|r| !r.complete))
+                    .is_some_and(|r| !r.complete)
+                    || self
+                        .report
+                        .site_preference
+                        .as_ref()
+                        .is_some_and(|r| !r.complete)))
     }
 
     fn has_solar_work(&self) -> bool {
@@ -320,9 +340,20 @@ impl ArrivalScreenJob {
     /// two directions; solar assessment itself has fixed bounded sampling.
     pub fn step(&mut self) {
         if !self.has_solar_work() {
-            let mut reference = self.report.local_reference.take().unwrap();
-            reference.step(&self.report);
-            self.report.local_reference = Some(reference);
+            if self
+                .report
+                .local_reference
+                .as_ref()
+                .is_some_and(|r| !r.complete)
+            {
+                let mut reference = self.report.local_reference.take().unwrap();
+                reference.step(&self.report);
+                self.report.local_reference = Some(reference);
+            } else {
+                let mut preference = self.report.site_preference.take().unwrap();
+                preference.step(&self.report);
+                self.report.site_preference = Some(preference);
+            }
             return;
         }
         let site = self
@@ -447,3 +478,7 @@ pub(super) mod tests;
 #[cfg(test)]
 #[path = "mission_arrival_local_tests.rs"]
 mod local_reference_tests;
+
+#[cfg(test)]
+#[path = "mission_arrival_preference_tests.rs"]
+mod preference_tests;

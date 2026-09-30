@@ -64,6 +64,19 @@ pub struct LandingChoiceComparison {
 
 pub(super) type Selected = (PilotLandingSite, f32, Option<SolarLandingPlan>, f32);
 
+pub(crate) fn preferred_side(short: f32) -> f32 {
+    if short < 0.0 { -1.0 } else { 1.0 }
+}
+
+pub(crate) fn approach_score(short: f32, side: f32, solar: bool, radius: f32) -> f32 {
+    let angle = if solar {
+        crate::landing_safety::directed_angle(short, side)
+    } else {
+        short
+    };
+    angle.abs() * (radius + 60.0)
+}
+
 pub(super) fn exposed(o: &TacticalSortieObservationV1) -> bool {
     let p = &o.combat.recovery.flight.pilot;
     o.combat.target.is_some_and(|t| {
@@ -97,7 +110,7 @@ pub(super) fn survey_rejection(
 /// Keep site order, preferred/opposite direction order, check precedence and
 /// f32 arithmetic identical for the playing selector and its diagnostic. The
 /// native call has a no-op sink, with no retained ledger or allocation.
-pub(super) fn select(
+pub(crate) fn select(
     pilot: &TacticalSortiePilot,
     o: &TacticalSortieObservationV1,
     objective: Option<LandingObjective>,
@@ -133,7 +146,7 @@ pub(super) fn select(
         }
         let direction = (site.vehicle_position - p.planet.motion.position).normalized();
         let short = angle_between(up, direction);
-        let preferred = if short < 0.0 { -1.0 } else { 1.0 };
+        let preferred = preferred_side(short);
         for (direction_order, side) in [preferred, -preferred].into_iter().enumerate() {
             if side != preferred && (!pilot.commit_descent || o.sun.is_none()) {
                 continue;
@@ -196,13 +209,8 @@ pub(super) fn select(
                     }
                 })
             };
-            let angle = if solar.is_some() {
-                crate::landing_safety::directed_angle(short, side)
-            } else {
-                short
-            };
             checks.eligible += 1;
-            let approach = angle.abs() * (p.planet.radius + 60.0);
+            let approach = approach_score(short, side, solar.is_some(), p.planet.radius);
             let cover_penalty = penalty * if objective.is_some() { 10.0 } else { 1.0 };
             let score = approach + cover_penalty + ground_cost;
             assessment.approach_score = Some(approach);
