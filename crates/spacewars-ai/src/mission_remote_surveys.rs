@@ -145,6 +145,29 @@ impl RemoteSurveyMemory {
         *self = Self::new(context);
     }
 
+    /// Host collection guard before `observe`: no missed frame, actor/vehicle
+    /// change or neutral material identity change since the preceding frame.
+    /// This neither admits evidence nor authorizes a landing.
+    pub fn continues_neutral_material(&self, o: &MissionObservationV1, planet: usize) -> bool {
+        let Some(frame) = Frame::read(self.context, o) else {
+            return false;
+        };
+        self.previous.as_ref().is_some_and(|previous| {
+            previous.binding == frame.binding
+                && previous.tick.checked_add(1) == Some(frame.tick)
+                && previous
+                    .planet(planet)
+                    .and_then(NeutralIdentity::read)
+                    .is_some_and(|identity| {
+                        frame
+                            .planet(planet)
+                            .and_then(NeutralIdentity::read)
+                            .as_ref()
+                            == Some(&identity)
+                    })
+        })
+    }
+
     /// Observe once before controls. The active planner dispatches after that
     /// observation, so a new sample can belong to this or the previous tick.
     /// Older first-seen samples are never imported, even after a reset or gap.

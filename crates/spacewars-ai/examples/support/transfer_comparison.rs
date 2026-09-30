@@ -102,7 +102,11 @@ impl TransferComparisonRun {
     pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
         let specification = super::arg("--compare-transfer-sources", "none");
         let arrival_survey = super::arrival_survey::ArrivalSurveyRun::from_args(out);
-        let arrival_comparison = arrival_comparison::ArrivalComparisonRun::from_args(out, seed);
+        let arrival_comparison = arrival_comparison::ArrivalComparisonRun::from_args(
+            out,
+            seed,
+            arrival_survey.as_ref().is_some_and(|s| s.neighbors),
+        );
         assert!(
             arrival_comparison.is_none() || arrival_survey.is_some(),
             "surveyed arrival comparison needs predicted-arrival surveys"
@@ -304,9 +308,13 @@ impl TransferComparisonRun {
         self.observation_ms
             .push(start.elapsed().as_secs_f64() * 1000.0);
         if let Some(survey) = &mut self.arrival_survey {
-            let plan = source
-                .token
-                .and_then(|t| self.queue.arrival_survey(t, p.tick));
+            let plan = source.token.and_then(|t| {
+                if survey.neighbors {
+                    self.queue.arrival_survey_neighbors(t, p.tick)
+                } else {
+                    self.queue.arrival_survey(t, p.tick)
+                }
+            });
             survey.observe(seat, o, plan);
         }
     }
@@ -320,8 +328,12 @@ impl TransferComparisonRun {
         let Some(survey) = &mut self.arrival_survey else {
             return 0.0;
         };
+        if let Some(comparison) = &self.arrival_comparison {
+            survey.reject_collections(comparison.collection_refusals());
+        }
         let (ms, attempts) = survey.advance(state, remaining, busy);
         if let Some(comparison) = &mut self.arrival_comparison {
+            comparison.reject_collections(survey.collection_refusals());
             comparison.receive(attempts);
         }
         ms

@@ -22,7 +22,7 @@ def original_report(report):
     return R.stable_schedule(original)
 
 
-def audit_trigger(actor, observed, survey, seed, mode):
+def audit_trigger(actor, observed, survey, seed, mode, neighbors=False):
     seat = actor['seat']
     events = [r for r in survey if r['seat'] == seat and r['allocation']
               and r['allocation']['charged']['physics_queries'] > 0]
@@ -35,14 +35,24 @@ def audit_trigger(actor, observed, survey, seed, mode):
     assert actor['trigger'] == dict(tick=row['tick'],plan=row['plan'],evidence=evidence), 'first charged attempt changed'
     assert not actor['untriggered']
     source = actor['source']
+    due = row['tick']+(61 if neighbors else 1)
+    freeze = min((t for t,s in observed if s == seat and t >= due),default=None) if neighbors else due
     if source is None:
-        assert actor['unobserved'] and (row['tick']+1,seat) not in observed
+        assert actor['unobserved'] and (freeze,seat) not in observed
         assert actor['retained_source'] is actor['attached_source'] is None
         return dict(triggered=True,unobserved=True)
     assert not actor['unobserved'] and source['attempted'] and source['seat'] == seat
     tick = source['source_tick']
-    assert tick == row['tick']+1, 'source did not consume the first attempt next tick'
+    assert tick == freeze, 'source did not freeze at its first eligible observation tick'
     p, old = A.P.pilot(observed[tick,seat]), A.P.pilot(observed[row['tick'],seat])
+    if neighbors:
+        disruptions = S.collection_disruptions(observed,survey,row,tick)
+        if disruptions:
+            assert source['rejected'] == disruptions[0]['reason']
+            assert actor['attached_source'] is None
+            audit_rejected(source)
+            return dict(triggered=True,source_tick=tick,attempt_tick=row['tick'],collection_ticks=60,
+                rejected=source['rejected'],disruptions=disruptions)
     retained = actor['retained_source']
     if retained is None:
         assert source['rejected'] == 'retained survey source unavailable' and actor['attached_source'] is None
@@ -51,6 +61,46 @@ def audit_trigger(actor, observed, survey, seed, mode):
     for key in ['actor','vehicle','spaceling']:
         assert retained[key] == p[key if key != 'actor' else 'owner']
     expected = []
+    if neighbors:
+        ids = [v for v in row['plan']['request']['candidates'] if v]
+        assert len(ids) == 3
+        collected = [dict(id=v,status='pending',reason='sample not observed at measurement tick',measurement=None) for v in ids]
+        dest = ids[0]['planet']
+        frames = [observed[t,seat] for t in range(row['tick'],tick+1)]
+        identity = R.neutral_identity(next(v for v in frames[0]['observation']['planets'] if v['index'] == dest))
+        # This fixed quiet corpus inherits complete unchanged physical traces;
+        # validate continuous material/actor identity before accepting a group.
+        for frame in frames:
+            current = A.P.pilot(frame)
+            assert all(current[k] == old[k] for k in ['owner','vehicle','spaceling'])
+            assert current['ship_available'] and current['ship_form'] == 'ship'
+            assert T.f32_identity(identity) == T.f32_identity(R.neutral_identity(next(v for v in frame['observation']['planets'] if v['index'] == dest)))
+        assert source['rejected'] is None
+        for event in events:
+            if event['tick'] >= tick: continue
+            assert event['plan'] == row['plan'] and event['tick'] <= row['tick']+60
+            result = next((e for s,e in event['evidence'] if s == seat),None)
+            if result is None: continue
+            assert result['generation'] == row['plan']['request']['generation'] and [c['id'] for c in result['candidates']] == ids
+            for i,c in enumerate(result['candidates']):
+                m = c['measurement']
+                if m is None: continue
+                assert collected[i]['measurement'] is None, 'slot was retried'
+                assert m['tick'] == event['tick'] and m['ship_form'] == 'ship'
+                planet = next(v for v in observed[event['tick'],seat]['observation']['planets'] if v['index'] == dest)
+                assert T.f32_identity(m['planet']) == T.f32_identity(planet['motion']) and m['revision'] == planet['revision']
+                collected[i] = c
+        measured = [c['measurement'] for c in collected if c['measurement']]
+        if measured:
+            expected = [dict(identity=identity,observed_tick=max(m['tick'] for m in measured)+1,
+                survey=dict(generation=row['plan']['request']['generation'],candidates=collected))]
+        assert T.f32_identity(retained['groups']) == T.f32_identity(expected)
+        attached = copy.deepcopy(retained)
+        if mode == 'empty': attached['groups'] = []
+        assert actor['attached_source'] == attached
+        return dict(triggered=True,source_tick=tick,attempt_tick=row['tick'],collection_ticks=60,
+            groups=len(expected),measured_slots=len(measured),missing_slots=3-len(measured),
+            sample_ages=[tick-m['tick'] for m in measured],findings=[m['finding'] for m in measured])
     if evidence:
         assert row['plan']['request']['generation'] == evidence['generation'] <= row['tick']
         for candidate in evidence['candidates']:
@@ -78,7 +128,7 @@ def audit_trigger(actor, observed, survey, seed, mode):
         groups=len(expected),findings=[c['measurement']['finding'] for g in expected for c in g['survey']['candidates'] if c['measurement']])
 
 
-def audit_allocation(row, original, charges, states, dispatch_index, sources, local_reference=False, site_preference=False):
+def audit_allocation(row, original, charges, states, dispatch_index, sources, local_reference=False, site_preference=False, neighbors=False):
     assert row['queue'] == KEY and row['tick'] == original['tick']
     prior = original['playing_charged_graph']
     original_charge = original['allocation']['charged']
@@ -130,7 +180,9 @@ def audit_allocation(row, original, charges, states, dispatch_index, sources, lo
         if seat in states and states[seat]['phase'] == 'stale': assert state == states[seat]
         states[seat] = state
         extra = charges[seat]-sum(c['charged_graph'] for c in actor['candidates'])-int(actor['ranked'])
-        assert 0 <= extra <= 2+int(local_reference)+int(site_preference), 'one retained site allows two screens and one step per opted-in reference/preference'
+        sites = sum(len(c['remote_arrival']['sites']) for c in source['initial']['candidates']) if neighbors else 1
+        assert 0 <= sites <= 3
+        assert 0 <= extra <= sites*(2+int(local_reference)+int(site_preference)), 'per-site screens/reference/preference exceeded bound'
     return prior+original_charge['graph']+used['graph']
 
 
@@ -141,6 +193,8 @@ def audit_rejected(source):
 
 def audit_fresh(root, report, case, controlled, local_reference=False, site_preference=False):
     schedule = report['transfer_comparison'][KEY]
+    neighbors = 'arrival_collection' in schedule
+    if neighbors: assert schedule['arrival_collection'] == dict(model='neighbors3_window_v1',ticks=60)
     assert schedule.get('arrival_local_reference',False) == local_reference
     assert schedule.get('arrival_site_preference',False) == site_preference
     assert not site_preference or local_reference
@@ -151,7 +205,7 @@ def audit_fresh(root, report, case, controlled, local_reference=False, site_pref
     observed = {(r['tick'],r['seat']):r for r in controls}
     actors = schedule['actors']
     assert [a['seat'] for a in actors] == [0,1]
-    triggers = [audit_trigger(a,observed,survey,report['seed'],schedule['mode']) for a in actors]
+    triggers = [audit_trigger(a,observed,survey,report['seed'],schedule['mode'],neighbors) for a in actors]
     original = {r['tick']:r for r in T.rows(root/'transfer-comparison-work.jsonl')}
     ledger = list(T.rows(root/'surveyed-arrival-comparison.jsonl'))
     starts = [a['source']['source_tick'] for a in actors if a['source']]
@@ -159,7 +213,7 @@ def audit_fresh(root, report, case, controlled, local_reference=False, site_pref
     assert [r['tick'] for r in ledger] == ([t for t in original if t >= min(starts)] if starts else [])
     charges,states,high,after_retirement = Counter(),{},0,Counter()
     for ordinal,row in enumerate(ledger,1):
-        high = max(high,audit_allocation(row,original[row['tick']],charges,states,ordinal,sources,local_reference,site_preference))
+        high = max(high,audit_allocation(row,original[row['tick']],charges,states,ordinal,sources,local_reference,site_preference,neighbors))
         for actor in row['actors']:
             state = actor['state']
             old = next((a['state'] for a in original[row['tick']]['actors'] if a['seat'] == actor['seat']),None)
@@ -212,11 +266,13 @@ def audit_fresh(root, report, case, controlled, local_reference=False, site_pref
             for site in screen['sites']:
                 if site['unknown']: counts['site_unknown:'+site['unknown']] += 1
             screen_records.append(dict(seat=source['seat'],source_tick=source['source_tick'],screen=screen,audit=check))
-            if controlled and candidate['destination'] == case['destination'] and screen['complete'] and screen['unknown'] is None and screen['sites'] and all(s['projected'] is not None and s['unknown'] is None for s in screen['sites']):
+            admitted = [s for s in screen['sites'] if s['projected'] is not None and s['unknown'] is None]
+            if controlled and candidate['destination'] == case['destination'] and screen['complete'] and screen['unknown'] is None and admitted and (neighbors or len(admitted) == len(screen['sites'])):
                 probe = report['transfer_probe']
                 start = source['source_tick']
                 physical = [r for r in controls if r['seat'] == source['seat'] and r['tick'] >= start]
-                retrospectives.append(A.compare_screen(dict(case,source_tick=start),screen,physical,
+                joined_screen = dict(screen,sites=admitted) if neighbors else screen
+                retrospectives.append(A.compare_screen(dict(case,source_tick=start),joined_screen,physical,
                     probe['acquisition']['started_tick'],probe['acquisition']['outcome']['tick'],probe['landing_choice']))
         for cost in final['capture_costs']:
             assert cost['remaining_trip_seconds'] is None and cost['unknown'], 'arrival geometry must not invent acquisition time'

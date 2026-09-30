@@ -54,6 +54,25 @@ impl TransferForecastQueue<TransferComparisonJob> {
     /// completed comparison may request a later, separately timestamped query.
     /// The current neutral destination takes priority over neutral alternatives.
     pub fn arrival_survey(&mut self, token: RequestToken, tick: u64) -> Option<ArrivalSurveyPlan> {
+        self.arrival_survey_pattern(token, tick, false)
+    }
+
+    /// Fixed nearest/previous/next bearings, measured separately by the host.
+    /// Calling either API again cannot change an already issued request.
+    pub fn arrival_survey_neighbors(
+        &mut self,
+        token: RequestToken,
+        tick: u64,
+    ) -> Option<ArrivalSurveyPlan> {
+        self.arrival_survey_pattern(token, tick, true)
+    }
+
+    fn arrival_survey_pattern(
+        &mut self,
+        token: RequestToken,
+        tick: u64,
+        neighbors: bool,
+    ) -> Option<ArrivalSurveyPlan> {
         if !matches!(self.poll(token, tick), JobPoll::Ready(_)) {
             return None;
         }
@@ -65,7 +84,7 @@ impl TransferForecastQueue<TransferComparisonJob> {
         let request = if source.survey_blocked.is_none() {
             Some(*slot.survey_request.get_or_insert(DestinationCoverRequest {
                 generation: tick,
-                candidates: [Some(site), None, None, None],
+                candidates: survey_candidates(site, neighbors),
                 sample_climb: true,
             }))
         } else {
@@ -84,6 +103,19 @@ impl TransferForecastQueue<TransferComparisonJob> {
             deferred: source.survey_blocked,
         })
     }
+}
+
+fn survey_candidates(site: LandingSiteId, neighbors: bool) -> [Option<LandingSiteId>; 4] {
+    let adjacent = |offset| LandingSiteId {
+        bearing: (site.bearing + offset) % LANDING_SITE_COUNT,
+        ..site
+    };
+    [
+        Some(site),
+        neighbors.then(|| adjacent(LANDING_SITE_COUNT - 1)),
+        neighbors.then(|| adjacent(1)),
+        None,
+    ]
 }
 
 fn select<'a>(
@@ -113,6 +145,32 @@ fn select<'a>(
 mod tests {
     use super::*;
     use crate::mission_evaluation::MissionEvaluator;
+
+    #[test]
+    fn neighbor_ids_wrap_and_issued_requests_cannot_change_patterns() {
+        for bearing in 0..LANDING_SITE_COUNT {
+            let site = LandingSiteId { planet: 2, bearing };
+            let ids = survey_candidates(site, true);
+            assert_eq!(ids[0], Some(site));
+            assert_eq!(ids[1].unwrap().bearing, (bearing + 63) % 64);
+            assert_eq!(ids[2].unwrap().bearing, (bearing + 1) % 64);
+            assert!(ids[3].is_none());
+            assert_eq!(
+                survey_candidates(site, false),
+                [Some(site), None, None, None]
+            );
+        }
+        let (mut q, t, mut bot, mut o, mut e) = fixture();
+        ready(&mut q, e.tick);
+        next(&mut q, t, &mut bot, &mut o, &mut e);
+        let first = q.arrival_survey_neighbors(t, e.tick).unwrap();
+        assert_eq!(
+            first.request.unwrap().candidates,
+            survey_candidates(first.site, true)
+        );
+        next(&mut q, t, &mut bot, &mut o, &mut e);
+        assert_eq!(q.arrival_survey(t, e.tick), Some(first));
+    }
 
     fn fixture() -> (
         TransferComparisonQueue,

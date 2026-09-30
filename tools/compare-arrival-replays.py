@@ -227,7 +227,9 @@ def compare_screen(case, screen, control, handoff_tick, choice_tick, native):
                 native_minus_frozen=solar_difference(frozen['solar'],native_solar),
                 native_minus_retrospective=solar_difference(reprojected['solar'],native_solar)))
         result['sites'].append(entry)
-    viable = [a for s in result['sites'] for a in s['fresh_native_assessments'] if a['rejection'] is None]
+    # Preserve the actual selector's tie order, not remote request order.
+    retained_ids = [s['id'] for s in result['sites']]
+    viable = [a for a in native['report']['assessments'] if a['site'] in retained_ids and a['rejection'] is None]
     best = min(viable,key=lambda a:a['total_score']) if viable else None
     result['native_best_retained'] = best
     result['retained_score_above_native_choice'] = best['total_score']-selected['total_score'] if best else None

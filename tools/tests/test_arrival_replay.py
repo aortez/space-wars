@@ -60,6 +60,16 @@ def fixture(handoff=14, choice=15, predicted=16):
 
 
 class ArrivalReplayTests(unittest.TestCase):
+    def test_native_retained_tie_uses_native_order_not_remote_request_order(self):
+        args = fixture()
+        screen,native = args[1],args[-1]['report']
+        second = copy.deepcopy(screen['sites'][0])
+        second['source']['id'] = second['source']['measurement']['site']['id'] = second['projected']['id'] = dict(planet=0,bearing=1)
+        screen['sites'] = [second,screen['sites'][0]]
+        for a in native['assessments']: a['total_score'] = 1.
+        result = A.compare_screen(*args)
+        self.assertEqual(result['native_best_retained'],native['assessments'][0])
+
     def test_three_clocks_and_source_evidence_remain_separate(self):
         args = fixture()
         original = copy.deepcopy(args)
