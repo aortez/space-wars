@@ -231,24 +231,30 @@ exploratory run's exact physical outcomes and mission telemetry.
 The largest combined allocation remained **4 graph operations / 160 queries**,
 inside the 4/384 allowance. Remote survey work nevertheless increased:
 
-| Directed + regression aggregate (17 runs per policy) | V15 | V16 |
+| Directed + regression aggregate (17 runs per version) | V15 runs | V16 runs |
 | --- | ---: | ---: |
-| Remote survey queries | 102,023 | 109,734 |
-| Submitted remote requests | 54 | 320 |
+| Destination-cover queries | 102,023 | 109,734 |
+| Flag-survey queries | 31,456 | 30,973 |
+| Both remote query queues combined | 133,479 | 140,707 |
+| Submitted destination-cover requests | 54 | 320 |
 | Evaluator graph operations | 91,429 | 90,320 |
 | Cancelled evaluator jobs | 2,025 | 1,538 |
 | Reports with multiple numeric destinations | 1,142 | 1,274 |
 
-Remote queries increased **7.56%**; request submissions grew almost sixfold.
-Fresh candidate matches used **2.95–11.57%** more remote queries than their
-paired controls, with unchanged behavior. Evaluator work and cancellations
+Destination-cover queries increased **7.56%**; those request submissions grew
+almost sixfold. Including the separate flag-survey queue, combined remote
+queries increased **5.42%**. Fresh candidate matches used **2.95–11.57%** more
+destination-cover queries than their paired controls, with unchanged behavior.
+Evaluator work and cancellations
 decreased in the directed/regression aggregate; none of these operation counts
 includes synchronous native queries, snapshot construction or serialization.
-Repeated report counts are not additional independent decisions.
+Totals cover both evaluated seats in each run, including the v10 opponent in
+the regression. Repeated report counts are not additional independent decisions.
 
 The dominant unknown remained unmeasured remote/local surface evidence:
-18,288 v15 candidate entries versus 18,204 for v16 in the directed/regression
-set. Incomplete round trips, unavailable routes and unmodelled transfer
+18,288 candidate entries across v15 runs versus 18,204 across v16 runs in the
+directed/regression set. Each includes 530 v10-opponent entries. Incomplete
+round trips, unavailable routes and unmodelled transfer
 detours also remain. The complete summary retains every unknown reason.
 
 ### Decision and next boundary
@@ -273,3 +279,5 @@ Validation: 290 AI unit tests, six physical destination integration tests,
 31 soak-harness tests and 581 Python tests passed. Formatting and strict Clippy
 passed for the changed AI library/example/integration targets. Independent
 runtime and audit review completed before the freeze.
+Independent results review also verified the raw artifacts, all 18 recorded
+switch/native-handoff joins, work ledgers and complete fresh trace comparisons.
