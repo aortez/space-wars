@@ -181,6 +181,7 @@ fn autostart_bot_matches_use_match_results_repeat_fresh_worlds_and_preserve_huma
         let mut worlds = BTreeSet::new();
         for round in 0..3 {
             let result = wait_screen(h, UiScreen::GameOver);
+            spacewars_match::assert_scoreboard(&result, round + 1, ["Legacy bot", "Legacy bot"]);
             assert!(instances.insert(result.scenario_revision.unwrap()));
             let diagnostics = status(h);
             assert!(diagnostics.contains("match_finish_reason=Some(TimeLimit)"));

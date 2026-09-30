@@ -177,7 +177,12 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
             );
             assert_timed_match_result(harness);
             assert_eq!(
-                control_ids(&state),
+                state
+                    .controls
+                    .iter()
+                    .filter(|c| c.enabled)
+                    .map(|c| c.id.as_str())
+                    .collect::<Vec<_>>(),
                 [
                     "game-over.play-again",
                     "game-over.new-match",
@@ -186,6 +191,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
             );
             assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
             harness.capture_screenshot("physical-result.png");
+            assert_scoreboard(&state, 1, ["Legacy bot", "Legacy bot"]);
             harness.activate_guarded("game-over.play-again", &state);
             state = harness.wait_for(
                 UiStatePredicate {
@@ -218,6 +224,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
                 Duration::from_secs(180),
             );
             assert_timed_match_result(harness);
+            assert_scoreboard(&state, 2, ["Legacy bot", "Legacy bot"]);
             assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
             harness.activate_guarded("game-over.new-match", &state);
             state = harness.wait_for(
@@ -260,6 +267,109 @@ fn assert_timed_match_result(harness: &FunctionalHarness) {
     );
     assert!(status.contains("match_remaining_seconds=0.000"), "{status}");
     assert!(status.contains("autostart_session=manual"), "{status}");
+}
+
+pub(super) fn assert_scoreboard(state: &UiState, rounds: u64, controllers: [&str; 2]) {
+    assert!(
+        control_value(state, "game-over.scoreboard.round")
+            .unwrap()
+            .starts_with(&format!("Round {rounds} · "))
+    );
+    let counts: [[u64; 3]; 2] = std::array::from_fn(|seat| {
+        assert_eq!(
+            control_value(
+                state,
+                &format!("game-over.scoreboard.p{}.controller", seat + 1)
+            ),
+            Some(controllers[seat])
+        );
+        ["wins", "losses", "draws"].map(|field| {
+            let id = format!("game-over.scoreboard.p{}.{field}", seat + 1);
+            let control = state.controls.iter().find(|c| c.id == id).unwrap();
+            assert!(!control.enabled);
+            control.value.as_ref().unwrap().parse().unwrap()
+        })
+    });
+    assert_eq!(counts[0].iter().sum::<u64>(), rounds);
+    assert_eq!(counts[1].iter().sum::<u64>(), rounds);
+    assert_eq!(counts[0][0], counts[1][1]);
+    assert_eq!(counts[0][1], counts[1][0]);
+    assert_eq!(counts[0][2], counts[1][2]);
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn scoreboard_keeps_rematches_and_new_worlds_and_resets_at_launcher() {
+    let mut settings = engine_common::Settings::default();
+    settings.video.width = 800;
+    settings.video.height = 480;
+    settings.audio.muted = true;
+    settings.spacewars_match.time_limit_seconds = 3;
+    run_functional_test_with_settings(
+        "spacewars-scoreboard",
+        "winit-software",
+        7,
+        Some(settings),
+        |h| {
+            let root = h.wait_until_ready();
+            h.activate_guarded("launcher.start", &root);
+            let game = wait_match(h);
+            // Restarting an unfinished round must not award a result.
+            h.pause_guarded(&game);
+            let pause = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            h.activate_guarded("pause.restart", &pause);
+            wait_match(h);
+            for round in 1..=3 {
+                let result = h.wait_for(
+                    UiStatePredicate {
+                        screen: Some(UiScreen::GameOver),
+                        ..Default::default()
+                    },
+                    TRANSITION_TIMEOUT,
+                );
+                assert_scoreboard(&result, round, ["Human", "Human"]);
+                assert_eq!(selected_control(&result), "game-over.play-again");
+                h.capture_screenshot(&format!("round-{round}.png"));
+                // Multiple render/observation passes cannot award another result.
+                let deadline = Instant::now() + Duration::from_millis(150);
+                while Instant::now() < deadline {
+                    assert_eq!(h.state(), result);
+                    thread::sleep(POLL_INTERVAL);
+                }
+                if round < 3 {
+                    h.activate_guarded(
+                        if round == 1 {
+                            "game-over.play-again"
+                        } else {
+                            "game-over.new-match"
+                        },
+                        &result,
+                    );
+                    wait_match(h);
+                } else {
+                    let root = h.activate_guarded("game-over.return-to-launcher", &result);
+                    assert_launcher_main(&root);
+                    h.activate_guarded("launcher.start", &root);
+                    wait_match(h);
+                }
+            }
+            let result = h.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::GameOver),
+                    ..Default::default()
+                },
+                TRANSITION_TIMEOUT,
+            );
+            assert_scoreboard(&result, 1, ["Human", "Human"]);
+            h.capture_screenshot("fresh-session.png");
+        },
+    );
 }
 
 fn wait_match(harness: &mut FunctionalHarness) -> UiState {

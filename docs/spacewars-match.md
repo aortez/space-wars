@@ -46,6 +46,34 @@ Pilot death on the final step takes precedence over the time-limit result.
 Rematch and New Match reset the clock. This rule applies to human and bot seats
 alike, including [automatically repeated matches](auto-start.md).
 
+The **Round Complete** menu includes a session scoreboard: wins, losses and
+draws for each player, with Human, Legacy bot or Planner bot labels. It also
+shows the completed round number, gameplay duration, final planet ownership
+and world seed. The result uses the match rules above; planet counts do not
+override a pilot-death victory.
+
+Rematch, New Match and automatic bot matches keep the same series totals.
+Restarting an unfinished round awards no result. Returning to the launcher or
+closing the app ends the series; scores are not saved across sessions. Player
+and bot choices can therefore be changed in the launcher for a fresh series.
+
+![Session scoreboard at 800×480](screenshots/spacewars/scoreboard-800x480.png)
+
+The screenshot is a rendered layout fixture. Score accounting and seat labels
+have headless coverage; functional workflows play short timed human and bot
+matches through the public UI, including rematches, new worlds, abandoned
+rounds and a fresh session. Layout and pointer checks cover 800×480, 1024×768
+and 480×800.
+
+Device validation: the application-only build was installed on
+`spacewars.local` (800×480). Three real 15-second bot rounds recorded one,
+two and three draws across Rematch and New Match; the first two shared seed 7
+and the third used a fresh seed. The fast-update helper verified the client
+and CLI against the build bundle, with no unexpected service restarts during
+the check. Original settings and the running Clock were restored afterward.
+
+![Scoreboard after three bot rounds on the Pi](screenshots/spacewars/scoreboard-device.png)
+
 | Action | Assigned gamepad | P1 keyboard | P2 keyboard |
 | --- | --- | --- | --- |
 | Turn aboard / walk or steer on foot | Left/right | A/D | Numpad 4/6 |

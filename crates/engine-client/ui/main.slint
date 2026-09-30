@@ -3,6 +3,51 @@
 export struct DeviceInfoRow { id: string, label: string, value: string }
 export struct ControllerRow { id: string, label: string }
 export struct NetworkRow { id: string, label: string, detail: string, badge: string, enabled: bool }
+export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
+
+component ScoreboardTable inherits Rectangle {
+    in property <[ScoreboardRow]> rows;
+
+    Text {
+        x: 12px; y: 0px; height: 24px; width: parent.width * 0.46;
+        text: "SESSION SCORE"; color: #9fb4cc; font-size: 12px;
+        vertical-alignment: center;
+    }
+    for heading[index] in ["Wins", "Losses", "Draws"]: Text {
+        x: parent.width * (0.46 + index * 0.18);
+        y: 0px;
+        width: parent.width * 0.18; height: 24px;
+        text: heading; color: #9fb4cc; font-size: 13px;
+        horizontal-alignment: center; vertical-alignment: center;
+    }
+    for row[index] in root.rows: Rectangle {
+        y: 28px + index * 64px; width: parent.width; height: 58px;
+        background: row.won ? #1b2436 : #111827;
+        border-radius: 5px;
+        Rectangle {
+            x: 0px; y: 0px; width: 3px; height: parent.height;
+            background: index == 0 ? #80d8ff : #ffb88a;
+        }
+        Text {
+            x: 14px; y: 7px; width: parent.width * 0.46 - 20px; height: 24px;
+            text: row.player; color: index == 0 ? #80d8ff : #ffb88a;
+            font-size: 18px; font-weight: 700;
+        }
+        Text {
+            x: 14px; y: 32px; width: parent.width * 0.46 - 20px; height: 18px;
+            text: row.controller; color: #b9c7db; font-size: 13px;
+        }
+        for score[column] in [row.wins, row.losses, row.draws]: Text {
+            x: parent.width * (0.46 + column * 0.18);
+            width: parent.width * 0.18; height: parent.height;
+            text: score; color: column == 0 ? #ffffff : #b9c7db;
+            font-size: 25px;
+            font-weight: column == 0 ? 700 : 400;
+            horizontal-alignment: center; vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
 
 export global UserActivity {
     callback notify() -> bool;
@@ -518,6 +563,10 @@ export component MainWindow inherits Window {
     in property <string> settings-save-error: "";
     in-out property <bool> game-over-visible: false;
     in-out property <int> game-over-focus-index: 0;
+    in property <bool> scoreboard-visible: false;
+    in property <[ScoreboardRow]> scoreboard-rows;
+    in property <string> scoreboard-round;
+    in property <string> scoreboard-planets;
     in property <[string]> launcher-scenarios;
     in property <string> launcher-scenario-title: "Space-Wars";
     in-out property <string> launcher-scenario: "spacewars";
@@ -1400,28 +1449,29 @@ export component MainWindow inherits Window {
         background: #050514c8;
 
         Rectangle {
+            property <length> action-y: root.scoreboard-visible ? 340px : (root.launcher-material-match ? 180px : 150px);
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: root.width < 592px ? root.width - 32px : 560px;
-            height: root.launcher-material-match ? 284px : 254px;
+            width: min(root.width - 32px, root.scoreboard-visible ? 640px : 560px);
+            height: root.scoreboard-visible ? 424px : (root.launcher-material-match ? 284px : 254px);
             background: #080a12f8;
             border-color: #f6f2a6;
             border-width: 2px;
             border-radius: 10px;
 
             Text {
-                y: 24px;
+                y: root.scoreboard-visible ? 16px : 24px;
                 width: parent.width;
                 text: "Round Complete";
                 color: #ffffff;
-                font-size: 30px;
+                font-size: root.scoreboard-visible ? 26px : 30px;
                 font-weight: 700;
                 horizontal-alignment: center;
             }
 
             Text {
                 x: 24px;
-                y: 72px;
+                y: root.scoreboard-visible ? 50px : 72px;
                 width: parent.width - 48px;
                 height: 38px;
                 text: root.spacewars-message-text;
@@ -1429,34 +1479,50 @@ export component MainWindow inherits Window {
                 font-size: 17px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+                wrap: word-wrap;
+            }
+
+            if root.scoreboard-visible: Text {
+                x: 24px; y: 96px; width: parent.width - 48px; height: 20px;
+                text: root.scoreboard-round; color: #b9c7db; font-size: 14px;
+                horizontal-alignment: center;
+            }
+            if root.scoreboard-visible: ScoreboardTable {
+                x: 24px; y: 126px; width: parent.width - 48px; height: 150px;
+                rows: root.scoreboard-rows;
+            }
+            if root.scoreboard-visible: Text {
+                x: 24px; y: 286px; width: parent.width - 48px; height: 20px;
+                text: root.scoreboard-planets; color: #b9c7db; font-size: 13px;
+                horizontal-alignment: center;
             }
 
             Text {
                 x: 24px;
-                y: 112px;
+                y: root.scoreboard-visible ? 309px : 112px;
                 width: parent.width - 48px;
-                text: root.launcher-material-match ? "World seed: " + root.launcher-seed-text : "Tap a choice  ·  A selects  ·  Start plays again  ·  B returns to launcher";
+                text: root.scoreboard-visible || root.launcher-material-match ? "World seed: " + root.launcher-seed-text : "Tap a choice  ·  A selects  ·  Start plays again  ·  B returns to launcher";
                 color: #80d8ff;
                 font-size: 13px;
                 horizontal-alignment: center;
             }
 
             Text {
-                visible: root.launcher-material-match;
+                visible: root.launcher-material-match || root.scoreboard-visible;
                 x: 24px;
-                y: 140px;
+                y: root.scoreboard-visible ? 398px : 140px;
                 width: parent.width - 48px;
-                text: "A selects  ·  Start rematches  ·  B returns to launcher";
+                text: root.scoreboard-visible ? "A selects  ·  Start rematches  ·  Launcher resets scores" : "A selects  ·  Start rematches  ·  B returns to launcher";
                 color: #80d8ff;
-                font-size: 13px;
+                font-size: root.scoreboard-visible ? 12px : 13px;
                 horizontal-alignment: center;
             }
 
             MenuButton {
                 x: 24px;
-                y: root.launcher-material-match ? 180px : 150px;
+                y: parent.action-y;
                 width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
-                height: 64px;
+                height: root.scoreboard-visible ? 48px : 64px;
                 text: root.launcher-material-match ? "Rematch" : "Play Again";
                 selected: root.game-over-focus-index == 0;
                 activated => {
@@ -1468,9 +1534,9 @@ export component MainWindow inherits Window {
             MenuButton {
                 visible: root.launcher-material-match;
                 x: 24px + (parent.width - 38px) / 3;
-                y: 180px;
+                y: parent.action-y;
                 width: (parent.width - 68px) / 3;
-                height: 64px;
+                height: root.scoreboard-visible ? 48px : 64px;
                 text: "New Match";
                 selected: root.game-over-focus-index == 1;
                 activated => {
@@ -1481,9 +1547,9 @@ export component MainWindow inherits Window {
 
             MenuButton {
                 x: root.launcher-material-match ? 24px + 2 * (parent.width - 38px) / 3 : parent.width / 2 + 5px;
-                y: root.launcher-material-match ? 180px : 150px;
+                y: parent.action-y;
                 width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
-                height: 64px;
+                height: root.scoreboard-visible ? 48px : 64px;
                 text: "Launcher";
                 selected: root.game-over-focus-index == (root.launcher-material-match ? 2 : 1);
                 activated => {

@@ -526,6 +526,8 @@ pub fn start_scenario_loop(
         input.reset_spacewars_controls();
     }
     let controls = controls.unwrap_or_else(new_scenario_controls);
+    let mut scoreboard = crate::scoreboard::Scoreboard::default();
+    window.set_scoreboard_visible(false);
 
     let timer = Timer::default();
     let weak_window = window.as_weak();
@@ -768,6 +770,12 @@ pub fn start_scenario_loop(
             performance.cpu_profile.clear();
         }
         let game_over = scenario.is_game_over();
+        if game_over && !scoreboard.has_recorded(scenario_revision)
+            && let Some(result) = scenario.inner.round_result()
+        {
+            scoreboard.record(scenario_revision, &result);
+            scoreboard.publish(&window, &result);
+        }
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);

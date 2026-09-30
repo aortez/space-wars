@@ -9,6 +9,101 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn scoreboard_renders_and_buttons_work_on_device_layouts() {
+    use crate::scoreboard::{RoundResult, Scoreboard};
+    use scenario_spacewars::{PlayerId, surface_sortie::match_rules::MatchOutcome};
+    use slint::platform::{PointerEventButton, WindowEvent};
+    use std::cell::Cell;
+    use std::time::Duration;
+
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let clicked = Rc::new(Cell::new(None));
+    let next = clicked.clone();
+    ui.on_ingame_restart(move || next.set(Some(0)));
+    let next = clicked.clone();
+    ui.on_ingame_new_match(move || next.set(Some(1)));
+    let next = clicked.clone();
+    ui.on_ingame_return_launcher(move || next.set(Some(2)));
+    let output = std::env::var_os("SPACEWARS_SCOREBOARD_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(path) = &output {
+        std::fs::create_dir_all(path).unwrap();
+    }
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        reset_panels(&ui);
+        ui.set_launcher_scenario("spacewars".into());
+        ui.set_launcher_seed_text(u64::MAX.to_string().into());
+        ui.set_game_over_visible(true);
+        let mut scores = Scoreboard::default();
+        let mut result = RoundResult {
+            outcome: MatchOutcome::Winner(PlayerId::PLAYER_1),
+            elapsed: Duration::from_secs(135),
+            planets: [2, 1],
+            controllers: ["Human".into(), "Planner bot".into()],
+        };
+        for revision in 1..=12 {
+            scores.record(revision, &result);
+        }
+        for (name, outcome, message) in [
+            (
+                "winner",
+                MatchOutcome::Winner(PlayerId::PLAYER_2),
+                "Player 2 wins / time limit / more planets owned",
+            ),
+            ("draw", MatchOutcome::Draw, "Draw / both pilots lost"),
+        ] {
+            result.outcome = outcome;
+            result.planets = [0, 2];
+            let revision = if name == "winner" { 13 } else { 14 };
+            scores.record(revision, &result);
+            scores.publish(&ui, &result);
+            ui.set_spacewars_message_text(message.into());
+            slint::platform::update_timers_and_animations();
+            let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows.borrow()[0].request_redraw();
+            windows.borrow()[0].draw_if_needed(|renderer| {
+                renderer.render(pixels.make_mut_slice(), width as usize);
+            });
+            if let Some(path) = &output {
+                crate::thruster_visual_tests::write_png(
+                    &path.join(format!("{name}-{width}x{height}.png")),
+                    &pixels,
+                );
+            }
+            let panel_width = (width as f32 - 32.0).min(640.0);
+            for button in 0..3 {
+                clicked.set(None);
+                let x = (width as f32 - panel_width) / 2.0
+                    + 24.0
+                    + button as f32 * (panel_width - 38.0) / 3.0
+                    + (panel_width - 68.0) / 6.0;
+                let y = height as f32 / 2.0 - 212.0 + 364.0;
+                for event in [
+                    WindowEvent::PointerPressed {
+                        position: slint::LogicalPosition::new(x, y),
+                        button: PointerEventButton::Left,
+                    },
+                    WindowEvent::PointerReleased {
+                        position: slint::LogicalPosition::new(x, y),
+                        button: PointerEventButton::Left,
+                    },
+                ] {
+                    ui.window().dispatch_event(event);
+                }
+                assert_eq!(
+                    clicked.get(),
+                    Some(button),
+                    "{name} {width}x{height} button {button}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
     use crate::controller_controls::{self, Device};
     use crate::controller_profile::RawState;
@@ -725,6 +820,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_ingame_clock_visible(false);
     ui.set_clock_fonts_visible(false);
     ui.set_game_over_visible(false);
+    ui.set_scoreboard_visible(false);
     ui.set_autostart_settings_visible(false);
     ui.set_autostart_running(false);
     ui.set_autostart_caption("".into());

@@ -73,6 +73,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) scoreboard_controls: Vec<UiControl>,
     pub(crate) font_controls: Vec<UiControl>,
     pub(crate) font_focus: i32,
     pub(crate) automatic: bool,
@@ -330,6 +331,7 @@ fn game_over_inventory(context: &UiInventoryContext) -> UiInventory {
                 .with_value(context.world_seed.clone()),
         );
     }
+    controls.extend(context.scoreboard_controls.clone());
     UiInventory {
         selected_control: selected_from_index(&ids, context.game_over_focus_index),
         controls,

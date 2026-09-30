@@ -940,6 +940,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            scoreboard_controls: crate::scoreboard::inventory(window),
             font_controls: if window.get_clock_fonts_visible() {
                 crate::clock_fonts::inventory(window)
             } else {

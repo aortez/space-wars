@@ -321,6 +321,10 @@ pub trait ClientScenario {
         None
     }
 
+    fn round_result(&self) -> Option<crate::scoreboard::RoundResult> {
+        None
+    }
+
     fn runtime_error(&self) -> Option<String> {
         None
     }
