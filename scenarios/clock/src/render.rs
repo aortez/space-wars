@@ -26,7 +26,7 @@ const ARENA_LAYER: i32 = 1;
 pub(crate) const GLOW_LAYER: i32 = 2;
 const INACTIVE_CELL_LAYER: i32 = 3;
 pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
-const LABEL_LAYER: i32 = 5;
+pub(crate) const LABEL_LAYER: i32 = 5;
 
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
 const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.22, 0.14, 0.078);
