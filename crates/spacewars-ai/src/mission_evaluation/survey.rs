@@ -156,7 +156,7 @@ pub(super) fn evidence(
                 None
             };
             Some(LocalEvidence {
-                key: request.key.clone(),
+                key: request.key,
                 site: candidate.id,
                 tick: m.tick,
                 gravity: 0.0,

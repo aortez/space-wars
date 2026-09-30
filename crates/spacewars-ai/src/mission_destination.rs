@@ -6,6 +6,8 @@ use scenario_spacewars::surface_sortie::LandingPhase;
 pub struct DestinationPlanningTelemetry {
     pub switches: u32,
     pub last_switch: Option<DestinationSwitch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub landing_handoff: Option<super::landing_handoff::LandingHandoff>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -50,7 +52,11 @@ impl MaterialMissionPilot {
             "shorter supported capture trip"
         };
         self.switch_destination(p.tick, choice.destination, reason);
+        self.landing_reference = choice.landing;
         let telemetry = self.telemetry.destination_planning.as_mut().unwrap();
+        telemetry.landing_handoff = choice.landing.map(|reference| {
+            super::landing_handoff::LandingHandoff::new(reference, choice.source_tick, p.tick)
+        });
         telemetry.switches += 1;
         telemetry.last_switch = Some(DestinationSwitch {
             tick: p.tick,
@@ -212,6 +218,7 @@ mod tests {
             current_seconds: 60.0,
             destination_seconds: 30.0,
             value: None,
+            landing: None,
         };
         (bot, o, choice)
     }

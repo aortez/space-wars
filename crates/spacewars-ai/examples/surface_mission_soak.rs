@@ -706,9 +706,7 @@ fn main() {
                         live.observe_destination_cover(&state, i, &mut o, request);
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
-                    if pilots[i].policy() != MissionPolicy::SurveyValuePlanner
-                        || flag_survey.is_none()
-                    {
+                    if !pilots[i].policy().consumes_flag_surveys() || flag_survey.is_none() {
                         successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
                     }
                     if let Some(flags) = &mut flag_survey {
@@ -716,7 +714,7 @@ fn main() {
                         let flag_request =
                             evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
                         flags.planner.observe(&state, i, &o, flag_request);
-                        if pilots[i].policy() == MissionPolicy::SurveyValuePlanner {
+                        if pilots[i].policy().consumes_flag_surveys() {
                             // Publications from earlier ticks are available to
                             // this source. Dispatch later in this tick cannot
                             // retroactively enter the submitted comparison.

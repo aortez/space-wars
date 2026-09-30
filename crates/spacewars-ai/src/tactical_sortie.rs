@@ -26,6 +26,7 @@ mod acquisition_wait;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+pub(crate) use selection::exposed;
 #[cfg(test)]
 pub(crate) use selection::select as select_for_test;
 pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};

@@ -16,6 +16,54 @@ pub(crate) struct CaptureSelection {
     pub current_seconds: f32,
     pub destination_seconds: f32,
     pub value: Option<ValueDecision>,
+    pub landing: Option<CostedLandingReference>,
+}
+
+/// A nomination, never live landing permission. Its original identity and age
+/// survive transfer; the native capture controller must acquire fresh geometry.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CostedLandingReference {
+    pub site: LandingSiteId,
+    pub evidence_tick: u64,
+    key: PlanetKey,
+}
+impl CostedLandingReference {
+    #[cfg(test)]
+    pub(crate) fn fixture(planet: &PilotPlanetObservation, site: LandingSiteId, tick: u64) -> Self {
+        Self {
+            key: PlanetKey::read(planet),
+            site,
+            evidence_tick: tick,
+        }
+    }
+    pub(crate) fn rejection(
+        &self,
+        o: &MissionObservationV1,
+        acquired: bool,
+        landed: bool,
+    ) -> Option<&'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.evidence_tick > p.tick
+            || (!acquired && p.tick - self.evidence_tick > MAX_EVIDENCE_AGE)
+        {
+            Some("landing reference expired")
+        } else if o
+            .planets
+            .iter()
+            .find(|planet| planet.index == self.site.planet)
+            .is_none_or(|planet| {
+                if landed {
+                    !self.key.capture_progress_matches(planet, p.owner)
+                } else {
+                    !self.key.reference_matches(&PlanetKey::read(planet))
+                }
+            })
+        {
+            Some("landing reference identity changed")
+        } else {
+            None
+        }
+    }
 }
 
 impl MissionEvaluator {
@@ -44,6 +92,8 @@ impl MissionEvaluator {
             || report.current_target != mission.target
             || report.selected_tick != selection_tick(mission)
             || dependencies.selected_site != mission.capture.as_ref().and_then(|c| c.site)
+            || dependencies.handoff_invalidation
+                != handoff_invalidation(mission).map(|(h, t)| (h.switch_tick, t))
             || dependencies.location != p.location
             || dependencies.form != p.ship_form
             || report
@@ -71,7 +121,10 @@ impl MissionEvaluator {
         // Pin the result's evidence, not a newer pending refresh. In particular,
         // route replacement and accumulated gravity drift revoke local costs.
         for sample in &state.latest_evidence {
-            if sample.tick > p.tick || p.tick - sample.tick > MAX_EVIDENCE_AGE {
+            if !supports_handoff(mission, sample)
+                || sample.tick > p.tick
+                || p.tick - sample.tick > MAX_EVIDENCE_AGE
+            {
                 return None;
             }
             if flag_evidence::is_flag(sample)
@@ -173,6 +226,22 @@ impl MissionEvaluator {
             current_seconds,
             destination_seconds,
             value,
+            landing: (mission.policy
+                == crate::mission_policy::MissionPolicy::LandingPlanPlanner.id())
+            .then(|| {
+                let candidate = report.candidates.iter().find(|c| c.planet == destination)?;
+                let sample = state.latest_evidence.iter().find(|s| {
+                    Some(s.site) == candidate.site
+                        && Some(s.tick) == candidate.evidence_tick
+                        && s.key.planet == destination
+                })?;
+                Some(CostedLandingReference {
+                    site: sample.site,
+                    evidence_tick: sample.tick,
+                    key: sample.key,
+                })
+            })
+            .flatten(),
         })
     }
 }
@@ -375,5 +444,154 @@ mod tests {
         o.local.cover[0].departure = true;
         o.local.combat.recovery.flight.pilot.tick = 32;
         assert!(evaluator.selection(&o, &mission).is_none());
+    }
+    #[test]
+    fn refused_handoff_revokes_ready_and_pending_costs_without_waiting_for_refresh() {
+        for ready in [false, true] {
+            let (mut e, mut o, mut m) = fixture();
+            m.policy = MissionPolicy::LandingPlanPlanner.id();
+            for tick in 3..=4 {
+                o.local.combat.recovery.flight.pilot.tick = tick;
+                e.observe(&o, &m);
+                if ready {
+                    e.advance(tick, DEFAULT_WORK);
+                }
+            }
+            assert_eq!(e.latest(PlayerId::PLAYER_1).is_some(), ready);
+            let old = e.actors[&0]
+                .evidence
+                .iter()
+                .find(|s| s.key.planet == 0)
+                .unwrap()
+                .clone();
+            let old_pending = e.actors[&0].pending;
+            m.destination_planning = Some(crate::mission_pilot::DestinationPlanningTelemetry {
+                landing_handoff: Some(crate::mission_pilot::LandingHandoff {
+                    site: old.site,
+                    evidence_tick: old.tick,
+                    source_tick: 1,
+                    switch_tick: 1,
+                    started_tick: Some(3),
+                    accepted_tick: None,
+                    landed_tick: None,
+                    completed_tick: None,
+                    invalidated_tick: Some(5),
+                    reason: Some("test native refusal"),
+                }),
+                ..Default::default()
+            });
+            o.local.combat.recovery.flight.pilot.tick = 5;
+            assert!(e.selection(&o, &m).is_none());
+            e.observe(&o, &m);
+            e.advance(5, Work::default());
+            assert!(e.latest(PlayerId::PLAYER_1).is_none());
+            if let Some(old) = old_pending {
+                assert_ne!(e.actors[&0].pending, Some(old));
+            }
+            for tick in 6..=7 {
+                e.advance(tick, DEFAULT_WORK);
+            }
+            assert!(
+                e.latest(PlayerId::PLAYER_1)
+                    .unwrap()
+                    .candidates
+                    .iter()
+                    .find(|c| c.current)
+                    .unwrap()
+                    .total_seconds
+                    .is_none()
+            );
+            assert!(!supports_handoff(&m, &old));
+            let mut native = old.clone();
+            native.remote = false;
+            native.tick = 5;
+            native.choice = Some((1, 5));
+            let mut capture = crate::tactical_capture::TacticalCapturePilot::with_planning(
+                crate::BrainReset { actor: PlayerId::PLAYER_1, episode_seed: 42 }, Default::default(),
+                scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JointRoundTrip
+            ).telemetry().clone();
+            capture.sortie.site = Some(native.site);
+            m.capture = Some(capture);
+            assert!(supports_handoff(&m, &native));
+            native.tick = 4;
+            assert!(!supports_handoff(&m, &native));
+            m.capture = None;
+            // The refusal is scoped to this visit, not a permanent blacklist.
+            m.events.push(MissionEvent {
+                tick: 8,
+                planet: Some(0),
+                kind: "selected",
+                reason: None,
+            });
+            assert!(supports_handoff(&m, &old));
+            e.actors.get_mut(&0).unwrap().evidence.push(old);
+            o.local.combat.recovery.flight.pilot.tick = 8;
+            e.observe(&o, &m);
+            for tick in 8..=9 {
+                e.advance(tick, DEFAULT_WORK);
+            }
+            assert!(
+                e.latest(PlayerId::PLAYER_1)
+                    .unwrap()
+                    .candidates
+                    .iter()
+                    .find(|c| c.current)
+                    .unwrap()
+                    .total_seconds
+                    .is_some()
+            );
+        }
+    }
+    #[test]
+    fn landed_reference_allows_own_capture_but_rejects_unrelated_objective_changes() {
+        use scenario_spacewars::surface_sortie::{PlanetClaimPhase, PlanetFlagObservation};
+        let (_, mut o, _) = fixture();
+        let actor = o.local.combat.recovery.flight.pilot.owner;
+        let site = LandingSiteId {
+            planet: 0,
+            bearing: 0,
+        };
+        let neutral = CostedLandingReference::fixture(&o.planets[0], site, 1);
+        let flag = PlanetFlagObservation {
+            player: actor.opponent(),
+            position: o.planets[0].motion.position + Vec2::Y * o.planets[0].radius,
+            normal: Vec2::Y,
+            raised_fraction: 1.0,
+        };
+        let claim = o.planets[0].claim.as_mut().unwrap();
+        claim.owner = Some(actor.opponent());
+        claim.flag = Some(flag);
+        assert!(neutral.rejection(&o, true, true).is_some());
+        let enemy = CostedLandingReference::fixture(&o.planets[0], site, 1);
+        o.planets[0]
+            .claim
+            .as_mut()
+            .unwrap()
+            .flag
+            .as_mut()
+            .unwrap()
+            .position
+            .x += 1.0;
+        assert!(enemy.rejection(&o, true, true).is_some());
+        let claim = o.planets[0].claim.as_mut().unwrap();
+        claim.flag = Some(flag);
+        claim.claimant = Some(actor);
+        claim.phase = PlanetClaimPhase::Lowering;
+        assert!(enemy.rejection(&o, true, true).is_none());
+        let claim = o.planets[0].claim.as_mut().unwrap();
+        claim.owner = None;
+        claim.phase = PlanetClaimPhase::Raising;
+        claim.flag.as_mut().unwrap().player = actor;
+        assert!(enemy.rejection(&o, true, true).is_none());
+        let claim = o.planets[0].claim.as_mut().unwrap();
+        claim.owner = Some(actor);
+        claim.phase = PlanetClaimPhase::Idle;
+        claim.claimant = None;
+        assert!(enemy.rejection(&o, true, true).is_none());
+        o.planets[0].claim.as_mut().unwrap().claimant = Some(actor.opponent());
+        assert!(enemy.rejection(&o, true, true).is_some());
+        o.planets[0].claim.as_mut().unwrap().claimant = None;
+        o.planets[0].revision += 1;
+        assert!(enemy.rejection(&o, true, true).is_some());
     }
 }

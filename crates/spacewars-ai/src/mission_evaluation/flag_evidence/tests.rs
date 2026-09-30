@@ -61,6 +61,7 @@ fn only_v14_consumes_published_costs_and_retains_the_original_source() {
     for policy in [
         MissionPolicy::ValuePlanner,
         MissionPolicy::SurveyValuePlanner,
+        MissionPolicy::LandingPlanPlanner,
     ] {
         let (mut o, mut mission, mut evaluator, request, sample) = fixture();
         mission.policy = policy.id();
@@ -189,18 +190,16 @@ fn v14_requests_current_destinations_without_changing_v13_requests() {
     for policy in [
         MissionPolicy::ValuePlanner,
         MissionPolicy::SurveyValuePlanner,
+        MissionPolicy::LandingPlanPlanner,
     ] {
         mission.policy = policy.id();
         let mut host = MissionEvaluator::new(1);
         mission.target = Some(0);
         let neutral = host.alternative_request(&o, &mission);
-        assert_eq!(
-            neutral.is_some(),
-            policy == MissionPolicy::SurveyValuePlanner
-        );
+        assert_eq!(neutral.is_some(), policy.consumes_flag_surveys());
         mission.target = Some(1);
         let flag = host.flag_request(&o, &mission);
-        assert_eq!(flag.is_some(), policy == MissionPolicy::SurveyValuePlanner);
+        assert_eq!(flag.is_some(), policy.consumes_flag_surveys());
         if let Some(request) = flag {
             assert_eq!(request.objective.planet, 1);
         }

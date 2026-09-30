@@ -1,5 +1,5 @@
-//! V14's narrow admission of historical remote flag walking evidence. This
-//! changes destination comparison only; it cannot provide a native landing site.
+//! V14/V15's narrow admission of historical remote flag walking evidence.
+//! These costs cannot replace fresh native landing or surface-route evidence.
 use super::*;
 use scenario_spacewars::surface_sortie::live_planning::{FlagSurveyRequest, FlagSurveySample};
 
@@ -7,6 +7,7 @@ pub(super) const MODEL: &str = "capture_mission_survey_value_v1";
 
 pub(super) fn enabled(policy: &str) -> bool {
     policy == crate::mission_policy::MissionPolicy::SurveyValuePlanner.id()
+        || policy == crate::mission_policy::MissionPolicy::LandingPlanPlanner.id()
 }
 
 pub(super) fn is_flag(sample: &LocalEvidence) -> bool {

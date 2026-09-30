@@ -1,7 +1,7 @@
 use super::*;
 use scenario_spacewars::surface_sortie::landing_objective::LandingObjective;
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct PlanetKey {
     pub planet: usize,
     revision: u64,
@@ -14,6 +14,37 @@ pub(super) struct PlanetKey {
     flag_range: Option<f32>,
 }
 impl PlanetKey {
+    pub fn material_matches(&self, other: &Self) -> bool {
+        self.planet == other.planet
+            && self.revision == other.revision
+            && self.radius == other.radius
+    }
+    pub fn capture_progress_matches(
+        &self,
+        planet: &PilotPlanetObservation,
+        actor: PlayerId,
+    ) -> bool {
+        use scenario_spacewars::surface_sortie::PlanetClaimPhase;
+        let now = Self::read(planet);
+        let Some(claim) = &planet.claim else {
+            return false;
+        };
+        if !self.material_matches(&now)
+            || self.stage_seconds != now.stage_seconds
+            || self.flag_range != now.flag_range
+            || claim.claimant.is_some_and(|p| p != actor)
+        {
+            return false;
+        }
+        // Lowering retains the original objective. Raising and securing this
+        // pilot's own flag are expected consequences of physical capture.
+        self.reference_matches(&now)
+            || (claim.flag.is_some_and(|flag| flag.player == actor)
+                && (claim.owner == Some(actor)
+                    || (claim.owner.is_none()
+                        && claim.claimant == Some(actor)
+                        && claim.phase == PlanetClaimPhase::Raising)))
+    }
     pub fn read(planet: &PilotPlanetObservation) -> Self {
         Self {
             planet: planet.index,
