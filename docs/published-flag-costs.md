@@ -61,8 +61,10 @@ These are development observations, not held-out strength evidence.
 ticks without a new best distance to the active goal (2 world units in flight,
 0.2 on foot), a claim-fraction improvement of 0.005, or an actual
 arrival/landing/claim/boarding/departure/recovery milestone. Ground distances use
-the rotating planet frame. New goals and replans initialize distance baselines
-without resetting elapsed time. Oscillation must beat the previous best.
+the rotating planet frame. Changed goals, sites, ground tasks and local ground
+endpoints initialize distance baselines without resetting elapsed time.
+Replanning to the same endpoint retains its previous best, so oscillation must
+still beat that distance.
 
 Reports include the longest interval, ticks beyond 20 seconds without observed
 progress, eligible ticks and distance coverage. Combat, avoidance, patrol and
@@ -122,6 +124,22 @@ All v1 artifacts remain intact. Validation replays the same plan and identical
 frozen binary in `target/published-flag-costs/v2`; this is an audit correction,
 not a new candidate or new held-out seeds. All 33 overlapping physical results
 and evaluation streams matched exactly on replay.
+
+### Progress observer correction replay
+
+Local review found that the ground-distance baseline identified only the planet
+and destination kind. Replacing a route endpoint with a nearer one could count
+as progress while the actor stood still. The corrected observer also identifies
+the mission goal, ground task and planet-local endpoint; changing that identity
+sets a baseline without resetting the no-progress interval. Replanning to the
+same endpoint within the same task retains its best distance.
+
+Freeze this correction and its regression tests before replaying the identical
+64-case plan in `target/published-flag-costs/v3`. Preserve v2 and its binary.
+Compare all 64 recorded physical outcomes and evaluator streams against v2,
+then refresh progress statistics and archive the replay hashes. This corrects
+measurement of the existing study; it introduces no new held-out seeds,
+candidate behavior, thresholds or promotion claim.
 
 ### Completed validation
 

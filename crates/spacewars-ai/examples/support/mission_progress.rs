@@ -29,7 +29,7 @@ pub struct MissionProgress {
     milestones: BTreeSet<(&'static str, u64)>,
 }
 
-pub const SCOPE: &str = "Per-tick observed progress during capture, transfer, launch, recovery and blocked/selection states: a new best goal distance (2 world units in flight, 0.2 on foot), a claim-fraction increase of 0.005, or a new arrived/landed/claimed/boarded/departed/recovery milestone. New goals, sites and replans initialize distance baselines but do not reset the no-progress clock. Combat, avoidance, patrol and watch ticks are excluded and end an interval. Missing distance observations still permit milestone/claim progress; report distance coverage separately. This measures lack of observed objective progress, not immobility, guaranteed failure or combat effectiveness. Detours can count as no progress.";
+pub const SCOPE: &str = "Per-tick observed progress during capture, transfer, launch, recovery and blocked/selection states: a new best goal distance (2 world units in flight, 0.2 on foot), a claim-fraction increase of 0.005, or a new arrived/landed/claimed/boarded/departed/recovery milestone. Changed goal, site, ground-task or local ground-endpoint identity initializes a distance baseline without resetting the no-progress clock. Replanning to the same ground endpoint retains its best distance. Combat, avoidance, patrol and watch ticks are excluded and end an interval. Missing distance observations still permit milestone/claim progress; report distance coverage separately. This measures lack of observed objective progress, not immobility, guaranteed failure or combat effectiveness. Detours can count as no progress.";
 
 fn improved(previous: &mut Option<(String, f32)>, sample: Option<(String, f32, f32)>) -> bool {
     let Some((key, value, threshold)) = sample.filter(|s| s.1.is_finite()) else {
@@ -160,8 +160,14 @@ impl MissionProgress {
         let distance = if let Some(g) = ground
             && let Some(distance) = g.target.and_then(|target| ground_distance(p, target))
         {
+            // A route can choose a closer endpoint while the actor stands
+            // still. Compare distances only within the same task and local
+            // endpoint; a replan to that same endpoint must keep its best.
             Some((
-                format!("ground:{}:{:?}", p.planet.index, g.destination),
+                format!(
+                    "ground:{:?}:{}:{:?}:{:?}:{:?}",
+                    m.goal, p.planet.index, g.destination, g.started_tick, g.target
+                ),
                 distance,
                 0.2,
             ))
@@ -208,6 +214,117 @@ impl MissionProgress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scenario_spacewars::{
+        PlayerId,
+        surface_sortie::{PilotLocation, SurfaceSortieScenario},
+    };
+    use spacewars_ai::{
+        BrainReset,
+        ground_task::{GroundDestination, GroundNavigationTask},
+        mission_pilot::MaterialMissionPilot,
+        tactical_capture::TacticalCapturePilot,
+    };
+
+    fn ground_fixture() -> (MissionObservationV1, MissionTelemetry) {
+        let state = SurfaceSortieScenario::init_material_travel(42, false);
+        let mut o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut m = MaterialMissionPilot::new(context, Default::default())
+            .telemetry()
+            .clone();
+        m.goal = MissionGoal::Capture;
+        let mut capture = TacticalCapturePilot::new(context, Default::default())
+            .telemetry()
+            .clone();
+        let mut ground = GroundNavigationTask::new(context, GroundDestination::Flag)
+            .telemetry()
+            .clone();
+        ground.started_tick = Some(1);
+        ground.target = Some(Vec2::new(20.0, 150.0));
+        capture.ground = Some(ground);
+        m.capture = Some(capture);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.location = PilotLocation::OnFoot;
+        p.planet.motion.position = Vec2::ZERO;
+        p.planet.motion.angle = 0.0;
+        p.planet.claim = None;
+        p.actor = Some(p.ship);
+        p.actor.as_mut().unwrap().position = Vec2::new(0.0, 150.0);
+        (o, m)
+    }
+
+    #[test]
+    fn a_new_ground_endpoint_does_not_erase_a_stationary_stall() {
+        let (mut o, mut m) = ground_fixture();
+        let mut progress = MissionProgress::default();
+        for tick in 1..=1300 {
+            o.local.combat.recovery.flight.pilot.tick = tick;
+            progress.observe(&o, &m);
+        }
+        let ground = m.capture.as_mut().unwrap().ground.as_mut().unwrap();
+        ground.target = Some(Vec2::new(10.0, 150.0));
+        ground.replans += 1;
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        progress.observe(&o, &m);
+        assert_eq!(progress.progress_ticks, 0);
+        assert_eq!(progress.longest_no_progress_ticks, 1301);
+        assert_eq!(progress.ticks_after_20s_without_progress, 101);
+        // Movement toward the newly established endpoint still counts.
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.actor.as_mut().unwrap().position.x = 1.0;
+        progress.observe(&o, &m);
+        assert_eq!(progress.progress_ticks, 1);
+        assert_eq!(progress.age, 0);
+    }
+
+    #[test]
+    fn the_same_endpoint_keeps_its_best_distance_until_the_ground_task_changes() {
+        let (mut o, mut m) = ground_fixture();
+        let mut progress = MissionProgress::default();
+        for (tick, x) in [(1, 0.0), (2, 1.0), (3, 0.0)] {
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.actor.as_mut().unwrap().position.x = x;
+            progress.observe(&o, &m);
+        }
+        m.capture.as_mut().unwrap().ground.as_mut().unwrap().replans += 1;
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 4;
+        p.actor.as_mut().unwrap().position.x = 1.0;
+        progress.observe(&o, &m);
+        assert_eq!(
+            progress.progress_ticks, 1,
+            "replanning must not reward oscillation"
+        );
+        assert_eq!(progress.age, 2);
+        m.capture
+            .as_mut()
+            .unwrap()
+            .ground
+            .as_mut()
+            .unwrap()
+            .started_tick = Some(5);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 5;
+        p.actor.as_mut().unwrap().position.x = 2.0;
+        progress.observe(&o, &m);
+        assert_eq!(
+            progress.progress_ticks, 1,
+            "a new task initializes its distance baseline"
+        );
+        assert_eq!(progress.age, 3);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 6;
+        p.actor.as_mut().unwrap().position.x = 3.0;
+        progress.observe(&o, &m);
+        assert_eq!(progress.progress_ticks, 2);
+        assert_eq!(progress.age, 0);
+    }
+
     #[test]
     fn ground_distance_uses_the_rotating_planet_frame() {
         use engine_common::Scenario;
