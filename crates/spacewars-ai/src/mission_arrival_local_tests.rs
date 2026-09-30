@@ -310,6 +310,203 @@ fn arrival_local_comparison_keeps_every_old_component_and_accounts_new_work() {
     assert_eq!(&result, off.output().unwrap());
 }
 
+fn first_scan_fixture() -> (
+    crate::mission_pilot::TransferForecastReport,
+    crate::mission_pilot::TransferScanClock,
+    RemoteArrivalScreen,
+) {
+    use crate::mission_pilot::{TransferForecastEnd, TransferForecastReport, TransferScanClock};
+    use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+    let o = fixture();
+    let p = &o.local.combat.recovery.flight.pilot;
+    let mut arrival = o.local.clone();
+    arrival.combat.recovery.flight.pilot.tick += 30;
+    let mut job =
+        ArrivalScreenJob::new(&o, p.planet.index).with_local_reference("material_mission_v13", &o);
+    job.begin(Some(arrival));
+    finish(&mut job);
+    assert!(
+        job.report.local_reference.as_ref().unwrap().references[0]
+            .unknown
+            .is_none()
+    );
+    let clock = TransferScanClock {
+        model: "conditional_neutral_scan_v1",
+        source_tick: p.tick,
+        actor: p.owner,
+        destination: p.planet.index,
+        revision: p.planet.revision,
+        form: p.ship_form,
+        cadence: LandingSurveyCadence::FourHz,
+        last_survey: None,
+        match_remaining_ticks: Some(60 * 600),
+        complete: true,
+        handoff_tick: Some(p.tick + 30),
+        request_tick: Some(p.tick + 31),
+        opportunity_tick: Some(p.tick + 31),
+        handoff_to_scan_ticks: Some(1),
+        unknown: None,
+        conditions: "fixture conditional handoff",
+        site_selection_seconds: None,
+    };
+    let forecast = TransferForecastReport {
+        model: "guided_transfer_forecast_v1",
+        source_tick: p.tick,
+        destination: p.planet.index,
+        horizon_ticks: 3600,
+        ticks: 30,
+        charged_graph: 30,
+        end: Some(TransferForecastEnd::KinematicHandoff),
+        handoff_seconds: Some(0.5),
+        scan_clock: Some(clock.clone()),
+        launch_ticks: 0,
+        transfer_ticks: 30,
+        solar_escape_ticks: 0,
+        avoidance_ticks: 0,
+        boundary_ticks: 0,
+        frame_changes: 0,
+        minimum_planet_clearance: 20.0,
+        minimum_sun_clearance: None,
+        minimum_boundary_clearance: 100.0,
+        phases_truncated: false,
+        phases: Vec::new(),
+        samples: Vec::new(),
+    };
+    (forecast, clock, job.report)
+}
+
+#[test]
+fn first_scan_success_preserves_geometry_epoch_and_unknown_actual_selection() {
+    use crate::mission_pilot::FirstScanSuccessReport;
+    let (forecast, clock, screen) = first_scan_fixture();
+    let original = screen.clone();
+    for delay in [1, 13, 15] {
+        let mut clock = clock.clone();
+        clock.handoff_to_scan_ticks = Some(delay);
+        clock.opportunity_tick = clock.handoff_tick.map(|tick| tick + delay);
+        let report = FirstScanSuccessReport::compose(&forecast, &clock, &screen);
+        assert!(report.unknown.is_none() && report.remaining_trip_seconds.is_none());
+        let r = &report.references[0];
+        assert!(r.unknown.is_none());
+        assert_eq!(Some(r.geometry_tick), clock.handoff_tick);
+        assert_ne!(Some(r.geometry_tick), clock.opportunity_tick);
+        assert_eq!(r.measurement_tick, Some(clock.source_tick));
+        assert_eq!(r.eligible_sides, [-1.0, 1.0]);
+        let expected = 0.5 + delay as f32 / 60.0 + neutral_phase_costs().total();
+        assert!((r.conditional_total_seconds.unwrap() - expected).abs() < 0.00001);
+        assert_eq!(r.exceeds_match_time, Some(false));
+        assert_eq!(clock.site_selection_seconds, None);
+    }
+    assert_eq!(screen, original);
+}
+
+#[test]
+fn first_scan_success_refuses_missing_rejected_stale_and_mixed_epoch_evidence() {
+    use crate::mission_pilot::FirstScanSuccessReport;
+    for mutation in 0..18 {
+        let (mut forecast, mut clock, mut screen) = first_scan_fixture();
+        match mutation {
+            0 => clock.unknown = Some("scan rejected"),
+            1 => clock.complete = false,
+            2 => clock.opportunity_tick = None,
+            3 => clock.source_tick += 1,
+            4 => clock.revision += 1,
+            5 => screen.source_tick += 1,
+            6 => screen.arrival.as_mut().unwrap().tick += 1,
+            7 => {
+                screen
+                    .arrival
+                    .as_mut()
+                    .unwrap()
+                    .planet
+                    .claim
+                    .as_mut()
+                    .unwrap()
+                    .owner = Some(PlayerId::PLAYER_2)
+            }
+            8 => screen.local_reference.as_mut().unwrap().complete = false,
+            9 => {
+                screen.local_reference.as_mut().unwrap().references[0].unknown = Some("no landing")
+            }
+            10 => screen.local_reference.as_mut().unwrap().references[0].projected = None,
+            11 => screen.local_reference.as_mut().unwrap().references[0]
+                .eligible_sides
+                .clear(),
+            12 => {
+                screen.local_reference.as_mut().unwrap().references[0].conditional_seconds =
+                    Some(f32::NAN)
+            }
+            13 => {
+                screen.local_reference.as_mut().unwrap().references[0].measurement_tick =
+                    Some(clock.source_tick + 1)
+            }
+            14 => screen.local_reference.as_mut().unwrap().references[0].arrival_tick += 1,
+            15 => forecast.end = Some(crate::mission_pilot::TransferForecastEnd::Horizon),
+            16 => forecast.handoff_seconds = None,
+            _ => {
+                // It was fresh at arrival, but expires before the deferred scan.
+                let handoff = clock.source_tick + crate::mission_evaluation::MAX_EVIDENCE_AGE;
+                clock.handoff_tick = Some(handoff);
+                clock.opportunity_tick = Some(handoff + 1);
+                forecast.ticks = crate::mission_evaluation::MAX_EVIDENCE_AGE;
+                screen.arrival.as_mut().unwrap().tick = handoff;
+                screen.local_reference.as_mut().unwrap().references[0].arrival_tick = handoff;
+            }
+        }
+        let r = FirstScanSuccessReport::compose(&forecast, &clock, &screen);
+        assert!(
+            r.references
+                .iter()
+                .all(|r| r.conditional_total_seconds.is_none() && r.unknown.is_some()),
+            "mutation {mutation}"
+        );
+        assert!(r.remaining_trip_seconds.is_none());
+    }
+}
+
+#[test]
+fn conditional_capture_composition_preserves_playing_work_and_prior_reports() {
+    use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+    let (state, before, actual, mut o) = transfer_forecast::tests::source_with_before();
+    let tick = o.local.combat.recovery.flight.pilot.tick;
+    o.destination_cover = Some(
+        scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation {
+            generation: tick,
+            candidates: o
+                .planets
+                .iter()
+                .map(|p| super::tests::sample(p, tick))
+                .collect(),
+        },
+    );
+    let env = state.transfer_environment().unwrap();
+    let mut off =
+        TransferComparisonJob::new(&before, &actual, &o, &MissionEvaluator::new(1), env.clone())
+            .unwrap()
+            .with_remote_arrival(&o, o.destination_cover.as_ref(), &env)
+            .with_arrival_local_reference(&actual, &o);
+    let mut on = off
+        .clone()
+        .with_scan_clock(Some(LandingSurveyCadence::FourHz));
+    let controls = actual.previous_intent;
+    while off.next_work().is_some() {
+        assert_eq!(on.next_work(), off.next_work());
+        off.step();
+        on.step();
+    }
+    let mut report = on.output().unwrap().clone();
+    let composed = report.first_scan_success.take().unwrap();
+    assert!(!composed.is_empty());
+    assert!(composed.iter().all(|r| r.remaining_trip_seconds.is_none()));
+    for c in &mut report.candidates {
+        if let Some(f) = &mut c.forecast {
+            f.scan_clock = None;
+        }
+    }
+    assert_eq!(&report, off.output().unwrap());
+    assert_eq!(controls, actual.previous_intent);
+}
+
 #[test]
 fn arrival_local_claim_changes_cancel_pending_and_ready_only_when_opted_in() {
     for ready in [false, true] {

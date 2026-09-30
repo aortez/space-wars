@@ -22,7 +22,7 @@ W = module('waits', 'audit-acquisition-waits.py')
 
 def clean(value):
     if isinstance(value, dict):
-        return {k: clean(v) for k, v in value.items() if k not in ('scan_clock', 'scan_cadence')}
+        return {k: clean(v) for k, v in value.items() if k not in ('scan_clock', 'scan_cadence', 'first_scan_success')}
     if isinstance(value, list): return [clean(v) for v in value]
     return value
 
@@ -190,6 +190,109 @@ def audit(root, report):
     return dict(records=records, native=native)
 
 
+def audit_composition(candidate, composition):
+    """Check the conditional sum against its separately recorded source parts."""
+    f = candidate['forecast']
+    clock = f['scan_clock']
+    screen = candidate['remote_arrival']
+    local = screen['local_reference']
+    for key, value in dict(model='conditional_first_scan_success_v1', actor=clock['actor'],
+        source_tick=clock['source_tick'], destination=candidate['destination'],
+        revision=clock['revision'], handoff_tick=clock['handoff_tick'],
+        scan_tick=clock['opportunity_tick'], remaining_trip_seconds=None).items():
+        assert composition[key] == value, ('composition binding', key)
+    assert 'first scan selects this retained usable site' in composition['conditions']
+    assert len(composition['references']) == len(local['references'])
+    parent_valid = (clock['unknown'] is None and clock['complete'] and
+        f['end'] == 'kinematic_handoff' and screen['complete'] and screen['unknown'] is None and
+        local['complete'] and local['unknown'] is None and
+        clock['opportunity_tick'] is not None and clock['handoff_tick'] is not None and
+        f['handoff_seconds'] is not None)
+    assert (composition['unknown'] is None) == parent_valid, 'unexpected parent admission/refusal'
+    for reference, source in zip(composition['references'], local['references']):
+        for key, value in dict(site=source['site'], measurement_tick=source['measurement_tick'],
+            geometry_tick=source['arrival_tick'], eligible_sides=source['eligible_sides'],
+            local_seconds=source['conditional_seconds']).items():
+            assert reference[key] == value, ('reference binding', key)
+        total = reference['conditional_total_seconds']
+        valid = (parent_valid and source['unknown'] is None and
+            source['measurement_tick'] is not None and clock['opportunity_tick'] is not None and
+            0 <= clock['opportunity_tick']-source['measurement_tick'] <= 1800 and
+            source['projected'] is not None and bool(source['eligible_sides']) and
+            source['conditional_seconds'] is not None)
+        assert (total is not None) == valid, 'invented or missing conditional reference'
+        if valid:
+            assert reference['unknown'] is None
+            assert clock['source_tick']+f['ticks'] == clock['handoff_tick'] == source['arrival_tick']
+            delay = clock['opportunity_tick']-clock['handoff_tick']
+            assert 1 <= delay <= 15 and delay == clock['handoff_to_scan_ticks']
+            assert abs(composition['travel_seconds']-f['handoff_seconds']) < 0.00001
+            assert abs(composition['scan_wait_seconds']-delay/60) < 0.00001
+            expected = f['handoff_seconds']+delay/60+source['conditional_seconds']
+            assert math.isfinite(total) and abs(total-expected) < 0.00002
+            assert abs(source['conditional_seconds']-sum(source['phases'].values())) < 0.00002
+        else:
+            assert reference['unknown'] is not None and reference['exceeds_match_time'] is None
+
+
+def audit_capture_compositions(root, report, case, controlled):
+    """Freeze report copies, then join actual choice/capture only retrospectively."""
+    fresh = N.M.audit_fresh(root, report, case, controlled, True, True)
+    local = N.L.audit_local(root, report, case, controlled, fresh)
+    clocks = audit(root, report)
+    native = clocks['native']
+    records, joins = [], []
+    for stage, seat, source in sources(report):
+        for view, snapshot in snapshots(source):
+            compositions = snapshot.get('first_scan_success', [])
+            expected = [c for c in snapshot['candidates'] if c.get('forecast') and
+                c['forecast'].get('scan_clock') and c.get('remote_arrival') and
+                c['remote_arrival'].get('local_reference')]
+            if snapshot['ranked']:
+                assert [r['destination'] for r in compositions] == [c['destination'] for c in expected]
+            else:
+                assert not compositions
+            for candidate, composition in zip(expected, compositions):
+                audit_composition(candidate, composition)
+                records.append(dict(stage=stage, seat=seat, view=view, composition=composition))
+                # Earlier report copies remain audited above. Count only the
+                # final source reference once, never as independent predictions.
+                if stage != 'surveyed_arrival' or view != 'last_snapshot' or not controlled:
+                    continue
+                if native is None or native['seat'] != seat or native['destination'] != candidate['destination']:
+                    continue
+                for reference in composition['references']:
+                    matches = [j for j in local['retrospectives'] if j.get('matched') and
+                        j['selected']['site'] == reference['site'] and
+                        j['measurement_tick'] == reference['measurement_tick']]
+                    assert len(matches) <= 1
+                    actual = matches[0] if matches else None
+                    clock_record = next(r for r in clocks['records'] if r.get('clock') and
+                        r['stage'] == stage and r['view'] == view and r['seat'] == seat and
+                        r['destination'] == candidate['destination'])
+                    scan_join = clock_record['native']
+                    reason = (reference['unknown'] or
+                        ('native first scan/choice differs' if native['first_scan'] != native['choice'] else None) or
+                        ('scan history/domain changed' if not scan_join or not scan_join['comparable'] else None) or
+                        ('native material/site/direction not covered' if actual is None else None) or
+                        (actual['timing_unknown'] if actual else None))
+                    milestones = actual['milestones'] if actual else None
+                    departure = milestones.get('departed') if milestones else None
+                    if departure is None:
+                        reason = reason or 'capture did not complete departure'
+                    join = dict(seat=seat, destination=candidate['destination'], source_tick=source['source_tick'],
+                        site=reference['site'], measurement_tick=reference['measurement_tick'],
+                        geometry_tick=reference['geometry_tick'], native_first_scan=native['first_scan'],
+                        native_choice=native['choice'], conditional_total_seconds=reference['conditional_total_seconds'],
+                        unknown=reason, actual=actual)
+                    if reason is None:
+                        observed = (departure-source['source_tick'])/60
+                        join.update(observed_total_seconds=observed,
+                            error_seconds=reference['conditional_total_seconds']-observed)
+                    joins.append(join)
+    return dict(records=records, retrospective_captures=joins)
+
+
 def parity(baseline, root, old, report):
     result = N.L.D.unchanged(baseline, root)
     assert N.M.S.sensor_digest(baseline) == N.M.S.sensor_digest(root)
@@ -222,6 +325,7 @@ def main():
     binary = args.binary.resolve(strict=True)
     args.out.mkdir(parents=True, exist_ok=False)
     commands = {}
+    cases = {spec['case']['name']: spec['case'] for spec in baseline['plan']}
     for name in baseline['pairs']:
         commands[name] = {}
         for mode in ['off', 'on']:
@@ -232,7 +336,7 @@ def main():
         binary_sha256=W.digest(binary), baseline_sha256=W.digest(args.baseline/'summary.json'),
         tools={p.name:W.digest(p) for p in [Path(__file__), Path(W.__file__), Path(N.__file__)]},
         commands=commands, pairs={}, complete=False,
-        scope='Four correlated source ticks in one quiet world, ordinary and controlled, off/on. Scan opportunity only; selection duration and whole-trip price remain unknown. Actual-handoff schedule agreement is a retrospective diagnostic, not a retimed forecast.')
+        scope='Four correlated source ticks in one quiet world, ordinary and controlled, off/on. Conditional first-scan-success references preserve geometry epochs and do not establish actual selection or whole-trip duration. Actual-handoff schedule agreement and capture joins are retrospective, not retimed forecasts.')
     def save(): (args.out/'summary.json').write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     save()
     for name, modes in commands.items():
@@ -249,6 +353,8 @@ def main():
                 if mode == 'on': assert report['transfer_comparison']['scan_cadence'] == 'FourHz'
                 else: assert 'scan_clock' not in json.dumps(report) and 'scan_cadence' not in report['transfer_comparison']
                 pair[mode] = dict(parity=same, audit=audit(root, report) if mode == 'on' else None,
+                    capture_compositions=audit_capture_compositions(root, report,
+                        cases[name.rsplit('-', 1)[0]], name.endswith('-controlled')) if mode == 'on' else None,
                     log_sha256=W.digest(logpath), hashes={p.name:W.digest(p) for p in sorted(root.iterdir()) if p.is_file()})
                 save(); print(name, mode, 'audited', flush=True)
             except Exception as error:

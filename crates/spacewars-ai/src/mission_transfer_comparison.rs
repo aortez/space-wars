@@ -89,6 +89,10 @@ pub struct TransferComparisonReport {
     pub capture_costs: Vec<CaptureCostComposition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neutral_timing_costs: Option<Vec<NeutralTimingComposition>>,
+    /// A separate conditional reference when both optional scan scheduling and
+    /// arrival-local evidence are enabled. It never fills ordinary trip costs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_scan_success: Option<Vec<FirstScanSuccessReport>>,
 }
 
 #[derive(Clone)]
@@ -177,6 +181,7 @@ impl TransferComparisonJob {
                 preferred_handoffs: Vec::new(),
                 capture_costs: Vec::new(),
                 neutral_timing_costs: None,
+                first_scan_success: None,
             },
             jobs: Vec::with_capacity(MAX_CANDIDATES),
             cursor: 0,
@@ -415,6 +420,21 @@ impl TransferComparisonJob {
             .iter()
             .map(TransferCandidateForecast::compose)
             .collect();
+        let conditional: Vec<_> = self
+            .report
+            .candidates
+            .iter()
+            .filter_map(|candidate| {
+                let forecast = candidate.forecast.as_ref()?;
+                let clock = forecast.scan_clock.as_ref()?;
+                let screen = candidate.remote_arrival.as_ref()?;
+                screen.local_reference.as_ref()?;
+                Some(FirstScanSuccessReport::compose(forecast, clock, screen))
+            })
+            .collect();
+        if !conditional.is_empty() {
+            self.report.first_scan_success = Some(conditional);
+        }
         if self.report.neutral_timing_costs.is_some() {
             self.report.neutral_timing_costs = Some(
                 self.report

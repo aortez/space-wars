@@ -33,6 +33,40 @@ def fixture():
 
 
 class ScanClockTests(unittest.TestCase):
+    def test_conditional_sum_binds_scan_wait_and_original_geometry(self):
+        source = dict(site={'planet':1, 'bearing':3}, measurement_tick=10, arrival_tick=30,
+            eligible_sides=[1], conditional_seconds=20.0, phases={'landing':17.0, 'claim':3.0},
+            projected={'id':{'planet':1, 'bearing':3}}, unknown=None)
+        f, _, _ = fixture()
+        f['handoff_seconds'] = 20/60
+        candidate = dict(destination=1, forecast=f, remote_arrival=dict(complete=True,
+            unknown=None, local_reference=dict(complete=True, unknown=None, references=[source])))
+        composition = dict(model='conditional_first_scan_success_v1', actor='player_1',
+            source_tick=10, destination=1, revision=3, handoff_tick=30, scan_tick=31,
+            remaining_trip_seconds=None, conditions='first scan selects this retained usable site',
+            travel_seconds=20/60, scan_wait_seconds=1/60, unknown=None,
+            references=[dict(site=source['site'], measurement_tick=10, geometry_tick=30,
+                eligible_sides=[1], local_seconds=20.0, conditional_total_seconds=20+21/60,
+                unknown=None, exceeds_match_time=None)])
+        S.audit_composition(candidate, composition)
+        for mutation in range(8):
+            bad = copy.deepcopy(composition)
+            r = bad['references'][0]
+            if mutation == 0: bad['scan_wait_seconds'] = 0
+            elif mutation == 1: r['geometry_tick'] = 31
+            elif mutation == 2: r['measurement_tick'] = 11
+            elif mutation == 3: r['conditional_total_seconds'] -= 1/60
+            elif mutation == 4: bad['remaining_trip_seconds'] = 20+21/60
+            elif mutation == 5: r['eligible_sides'] = [-1]
+            elif mutation == 6: bad['unknown'] = 'hide valid result'
+            else: r['conditional_total_seconds'] = None
+            with self.subTest(mutation=mutation), self.assertRaises(AssertionError):
+                S.audit_composition(candidate, bad)
+        candidate['remote_arrival']['local_reference']['references'][0]['unknown'] = 'native site unavailable'
+        with self.assertRaises(AssertionError): S.audit_composition(candidate, composition)
+        composition['references'][0].update(conditional_total_seconds=None, unknown='native site unavailable')
+        S.audit_composition(candidate, composition)
+
     def test_arrival_error_is_separate_from_schedule_and_choice(self):
         f, row, native = fixture()
         r = S.audit_clock(f, 0, row, None, native)
