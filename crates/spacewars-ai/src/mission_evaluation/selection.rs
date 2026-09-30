@@ -74,13 +74,20 @@ impl MissionEvaluator {
             if sample.tick > p.tick || p.tick - sample.tick > MAX_EVIDENCE_AGE {
                 return None;
             }
-            if flag_costs::is_flag(sample)
-                && (!self.uses_flag_costs(p.owner)
+            if flag_evidence::is_flag(sample)
+                && (!(flag_evidence::enabled(mission.policy)
+                    || (self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy)))
                     || o.planets
                         .iter()
-                        .find(|p| p.index == sample.key.planet)
+                        .find(|v| v.index == sample.key.planet)
                         .is_none_or(|planet| {
-                            !sample.key.reference_matches(&PlanetKey::read(planet))
+                            let key = PlanetKey::read(planet);
+                            !sample.key.reference_matches(&key)
+                                || (flag_evidence::enabled(mission.policy)
+                                    && !key.flag_identity_matches(
+                                        sample.route_objective.unwrap(),
+                                        planet.radius,
+                                    ))
                         }))
             {
                 return None;

@@ -1,4 +1,5 @@
-//! One neutral alternative, two fixed material bearings. The host registers this
+//! One neutral destination, two fixed material bearings. V14 also measures its
+//! current destination; earlier policies request alternatives only. The host registers this
 //! demand after controls and dispatches it through its existing query budget.
 use super::*;
 use scenario_spacewars::surface_sortie::{
@@ -40,7 +41,7 @@ pub(super) fn request(
         .into_iter()
         .take(MAX_OPTIONS)
         .find(|planet| {
-            planet.index != target
+            (planet.index != target || flag_evidence::enabled(mission.policy))
                 && planet.claim.as_ref().is_some_and(|c| {
                     c.owner.is_none()
                         && c.flag.is_none()
