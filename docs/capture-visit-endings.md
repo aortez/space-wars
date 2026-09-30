@@ -36,7 +36,8 @@ before-arrival evidence counts are unaffected.
 
 The original study and archive remain frozen. The correction ledger supersedes
 their `reason` and post-departure `abandoned_tick` fields; consumers must not use
-the original reasons as causal labels.
+the original reasons as causal labels. The [archived audit and replays](data/capture-visit-endings-v1.json)
+retain every checked visit, the original report hashes and the corrections.
 
 ## Failure chronology
 
@@ -52,6 +53,9 @@ attempts, the native controller repeatedly chooses site `{planet: 1, bearing: 41
 rejects its cover and chooses it again. Eight cover replans exhaust the existing
 retry allowance. `replan_for_cover` clears the site without adding it to the
 rejected-site list, and the ranker can select that same site again.
+The first choices are unexposed; the subsequent seven choices in each attempt
+are exposed and still have all three cover flags false. The successful +0.8
+control instead selects a site with all three cover flags true after its retry.
 
 The generated-match attempt has five cover replans, a solar replan and an
 objective replan before leaving the destination's approach frame. Those observed
@@ -90,3 +94,40 @@ python3 tools/validate-visit-metrics.py \
   --binary target/release/examples/surface_mission_soak \
   --out target/visit-terminal-audit/validation-v1
 ```
+
+## Validation results
+
+Source and plan were frozen at `1985ca2`. The completed executable is preserved
+as `target/visit-terminal-audit/surface_mission_soak-1985ca2-complete`, SHA-256
+`c617a92d701039549b7389fa277863e089cc000a17a101d574215b73f2be7d51`.
+The successful six-run comparison is in `target/visit-terminal-audit/validation-v2`.
+
+All three before/after pairs preserve the original study's physical reports,
+mission events, samples and progress. The entire controller/observation trace,
+evaluator records, evaluator work, flag publications, flag work and destination
+surveys are byte-identical between builds. Among their 36 visits, the fixed
+observer changes ten reasons and clears two post-departure abandonment markers,
+exactly matching the independent correction ledger. The updated study validator
+accepts all three fixed reports with no remaining visit discrepancy.
+
+Both arms audit the same 56,923 dispatch ticks each, 113,846 in total. Maximum
+combined work is four graph operations and 161 physics queries in a tick, within
+the existing 4/384 allowance. Reanalysis of all 64 original cases confirms that
+first-evidence forecasts, availability counts and visit outcome classifications
+are unchanged by the corrected terminal fields.
+
+All 39 harness tests and 581 Python tests pass, including consecutive replans,
+an unknown first reason, completed visits, same-tick reselection, wrong-planet
+events, stale milestones, truncated histories and strict replay comparison.
+Rust formatting, diff checks and strict harness Clippy with `--no-deps` pass.
+No bot policy, default, performance threshold or model coefficient changes.
+
+One earlier validation attempt copied the previous release executable before
+the concurrent build finished. Its hash matches the old binary and the metrics
+assertion rejected it. That failed manifest remains in `validation-v1` and the
+archive; the successful run used the completed build without source changes.
+
+**Decision:** retain defaults. The next behavior experiment should address native
+cover retries and usable landing alternatives. These cases provide regression
+coverage, not a calibrated prospective completion probability or evidence for
+changing combat priority.
