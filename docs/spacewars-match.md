@@ -47,7 +47,7 @@ Rematch and New Match reset the clock. This rule applies to human and bot seats
 alike, including [automatically repeated matches](auto-start.md).
 
 The **Round Complete** menu includes a session scoreboard: wins, losses and
-draws for each player, with Human, Legacy bot or Planner bot labels. It also
+draws for each player, with Human or the bot's name and version as labels. It also
 shows the completed round number, gameplay duration, final planet ownership
 and world seed. The result uses the match rules above; planet counts do not
 override a pilot-death victory.

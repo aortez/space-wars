@@ -200,7 +200,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
             );
             assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
             harness.capture_screenshot("physical-result.png");
-            assert_scoreboard(&state, 1, ["Legacy bot", "Legacy bot"]);
+            assert_scoreboard(&state, 1, ["Legacy bot v9", "Legacy bot v9"]);
             harness.activate_guarded("game-over.play-again", &state);
             state = harness.wait_for(
                 UiStatePredicate {
@@ -233,7 +233,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
                 Duration::from_secs(180),
             );
             assert_timed_match_result(harness);
-            assert_scoreboard(&state, 2, ["Legacy bot", "Legacy bot"]);
+            assert_scoreboard(&state, 2, ["Legacy bot v9", "Legacy bot v9"]);
             assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
             harness.activate_guarded("game-over.new-match", &state);
             state = harness.wait_for(

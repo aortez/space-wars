@@ -42,7 +42,7 @@ fn scoreboard_renders_and_buttons_work_on_device_layouts() {
             outcome: MatchOutcome::Winner(PlayerId::PLAYER_1),
             elapsed: Duration::from_secs(135),
             planets: [2, 1],
-            controllers: ["Human".into(), "Planner bot".into()],
+            controllers: ["Value bot v13".into(), "Destination bot v12".into()],
         };
         for revision in 1..=12 {
             scores.record(revision, &result);

@@ -333,10 +333,8 @@ impl ClientScenario for MaterialMissionClientScenario {
             controllers: std::array::from_fn(|seat| {
                 if !self.bots[seat] {
                     "Human"
-                } else if self.pilots[seat].telemetry().policy == MissionPolicy::Planner.id() {
-                    "Planner bot"
                 } else {
-                    "Legacy bot"
+                    self.pilots[seat].policy().display_name()
                 }
                 .into()
             }),
@@ -787,12 +785,13 @@ mod tests {
     }
 
     #[test]
-    fn finished_match_scoreboard_identifies_humans_and_both_bot_policies() {
-        use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
+    fn finished_match_scoreboard_identifies_humans_and_all_bot_policies() {
         let choices = [
             (Human, "Human"),
-            (RuleBot, "Legacy bot"),
-            (PlannerBot, "Planner bot"),
+            (RuleBot, "Legacy bot v9"),
+            (PlannerBot, "Planner bot v10"),
+            (DestinationBot, "Destination bot v12"),
+            (ValueBot, "Value bot v13"),
         ];
         for (p1, label1) in choices {
             for (p2, label2) in choices {
@@ -880,7 +879,7 @@ mod tests {
         assert_eq!(score.outcome, MatchOutcome::Winner(winner));
         assert_eq!(score.planets, round.owned_planets);
         assert_eq!(score.elapsed.as_secs_f64(), round.elapsed_seconds);
-        assert_eq!(score.controllers, ["Legacy bot", "Legacy bot"]);
+        assert_eq!(score.controllers, ["Legacy bot v9", "Legacy bot v9"]);
         assert_eq!(
             client.game_over_message().as_deref(),
             Some(expected_message.as_str())
