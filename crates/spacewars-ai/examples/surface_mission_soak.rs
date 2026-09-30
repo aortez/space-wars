@@ -170,7 +170,10 @@ fn main() {
     assert!(["quiet", "intercept", "duel", "hunt", "pursuit"].contains(&mode.as_str()));
     assert!(!require_hunt || mode == "hunt" || mode == "pursuit");
     assert!((1..=180).contains(&prepare_seconds));
-    assert!(["fixed", "generated", "destination"].contains(&world_kind.as_str()));
+    assert!(
+        ["fixed", "generated", "destination", "value-destination"].contains(&world_kind.as_str())
+    );
+    assert!(world_kind != "value-destination" || match_rules);
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
@@ -222,6 +225,15 @@ fn main() {
                 },
             )
         }
+    } else if match_rules && ["destination", "value-destination"].contains(&world_kind.as_str()) {
+        SurfaceSortieScenario::init_capture_destination_match_trial(
+            seed,
+            seat,
+            mirror,
+            arg("--flag-bearing", "1.2").parse().unwrap(),
+            world_kind == "value-destination",
+            Some(Duration::from_secs(600)),
+        )
     } else if world_kind == "destination" {
         SurfaceSortieScenario::init_capture_destination_trial(
             seed,
@@ -232,7 +244,7 @@ fn main() {
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
-    if match_rules {
+    if match_rules && !["destination", "value-destination"].contains(&world_kind.as_str()) {
         state.enable_match_rules();
     }
     let initial_world = state.mission_observation(seat, None);

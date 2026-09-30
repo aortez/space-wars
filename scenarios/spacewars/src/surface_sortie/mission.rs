@@ -291,6 +291,18 @@ impl SurfaceSortieScenario {
         bearing: f32,
         surface: engine_terrain::TerrainSurface,
     ) -> SurfaceSortieState {
+        Self::init_material_travel_fixture(seed, mirror, bearing, surface, false)
+    }
+
+    /// The optional third body supplies a physical foothold in value-policy
+    /// trials. Ordinary two-planet travel fixtures retain their original world.
+    pub(super) fn init_material_travel_fixture(
+        seed: u64,
+        mirror: bool,
+        bearing: f32,
+        surface: engine_terrain::TerrainSurface,
+        extra_planet: bool,
+    ) -> SurfaceSortieState {
         assert!(bearing.is_finite());
         let up = Vec2::Y.rotate_radians(bearing);
         let mut world = Self::init(SurfaceMotionPreset::Stationary, seed).world;
@@ -300,11 +312,17 @@ impl SurfaceSortieScenario {
         second.position = Vec2::new(500.0 + side * 220.0, 500.0);
         second.wrapper_omega = -second.wrapper_omega;
         world.planets.push(second);
-        world.rover_builds = vec![RoverBuildState::default(); 2];
+        if extra_planet {
+            let mut third = world.planets[0];
+            third.position = Vec2::new(500.0, 850.0);
+            world.planets.push(third);
+        }
+        let planet_count = world.planets.len();
+        world.rover_builds = vec![RoverBuildState::default(); planet_count];
         let mut state = Self::on_surface(world, SurfaceMotionPreset::Stationary, 0, up, None);
         state.world.terrain.legacy_services = false;
         state.world.terrain.surface = surface;
-        for index in 0..2 {
+        for index in 0..planet_count {
             state
                 .world
                 .enable_planet_terrain(index)
