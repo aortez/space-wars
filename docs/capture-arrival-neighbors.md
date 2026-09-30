@@ -93,3 +93,112 @@ python3 tools/compare-arrival-neighbors.py \
 
 Use a clean checkout, a new output directory and the archived raw baseline at
 `target/capture-flag-survey/arrival-preference-v1`.
+
+## Results
+
+Implementation, tests, runner and plan froze at
+`e5b458e6efa63022d46939a59a1517480074c828`. Profiled binary SHA-256:
+`2bbf3ed5822652736b65557eb22e19a36ddc940db412290d61888717e71ffb39`.
+All **16 runs** pass, totaling **88,118 physical ticks**. Full controls and
+observations, native sensor counts, upstream evidence/work, original transfer
+forecasts and native outcomes match the historical runs. The nearest-mode
+fresh reports and work ledgers match too. No runtime, model, runner, case or
+coefficient changes followed the new replay outcomes; no runs were retried or
+dropped. All four ordinary cases remain untriggered in each mode.
+
+Each controlled neighbor collection attempts bearings **33, 32, 34**, in that
+order, at first/first+30/first+60. It freezes at first+61 with original sample
+ages **61, 31, 1**. All 12 slots have actual measurements; **ten** provide usable
+landing geometry and **two** report `no_landing`. The latter remain explicit
+unknown sites in the conditional comparison.
+
+| Original source | Neighbor source | Ready tick | Usable sites | Unassessed bearings | Physical queries | Fresh graph work |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| 3816 | 3914 | 3940 | 3 | 61 | 180 | 1616 |
+| 3876 | 3974 | 3999 | 2 | 62 | 122 | 1542 |
+| 3934 | 4028 | 4052 | 2 | 62 | 122 | 1505 |
+| 3997 | 4097 | 4122 | 3 | 61 | 180 | 1545 |
+
+In all four flights, both the center-only preference evaluated at the new
+endpoint and the full retained-subset preference select **33 / +1**. This
+matches both the actual full native choice and the actual best among the
+source-admitted/projected retained sites. All ten material/age/geometry joins
+pass, with maximum same-frame residual **0.000273 world units**. Every usable
+site has two eligible solar directions; the native small-angle correction
+makes each site's direction scores tie, so its preferred-direction ordering
+still matters.
+
+| Original source | Center score | Previous-neighbor score | Next-neighbor score |
+| --- | ---: | ---: | ---: |
+| 3816 | 1.619427 | 8.130936 | 11.370341 |
+| 3876 | 1.106288 | Unknown | 10.856565 |
+| 3934 | 1.487643 | Unknown | 11.237622 |
+| 3997 | 3.551586 | 6.198925 | 13.301942 |
+
+These scores are native approach units, **not seconds**. The extra measured
+alternatives confirm the center's conditional preference in this corpus; they
+do not improve or change it. The real native selection still visits many more
+bearings. Four correlated flights with the same central winner do not establish
+general selection accuracy or stronger live play.
+
+Neighbor surveys cost **604 queries**, versus **720** in nearest mode, with
+12 charged attempts in each. The old path remeasures the same center on later
+ticks; the new path spends those attempts on different slots. Two early
+negative results cost only two queries each, accounting for the 116-query
+difference. The maximum observed combined physical charge is **126**, under
+the unchanged cap of 384; the 192-query per-attempt reservation and 30-tick
+refresh gate hold.
+
+Fresh graph work totals **6208**, versus **6332** for nearest mode. This is
+**not a demonstrated planning speedup**: neighbor sources start 60 ticks later
+and therefore have different remaining forecasts. Screening, local-reference
+and preference work is separately accounted per retained slot, including
+refusals, under the same 64-operation shared cap. Source-to-publication delays
+are 24–26 ticks; collecting all three samples adds one second before that
+comparison starts. Observed acquisition remains one tick in these four native
+flights, while predicted acquisition and whole-trip duration remain unknown.
+
+The negative samples at **bearing 32 / ticks 3943 and 3997** are particularly
+useful. Native selection later has a usable bearing-32 site in both flights.
+Thus an earlier `no_landing` cannot be treated as proof of future native
+unavailability. Both attempts spend exactly two queries. Reading
+`vehicle_landing_site_with_query_observer` places the failure in the two
+footing-ray/slope checks, before hull placement, cover or climb checks; the
+current log does not identify which check failed. To investigate, replay the
+same frozen commands and record the existing `LandingQuery` observer plus ray
+hits/normals at those exact ticks, without changing the decision. Compare the
+later same-ID native survey in its own material frame. Do not fill the old
+negative slots from that later successful survey.
+
+Local validation passes **417 Rust tests**, **520 Python analysis tests**,
+formatting and diff checks. Clippy reports eight existing dependency warnings
+and none in the AI/harness. Independent pre-freeze review checked collection
+lifecycle, throttling, terminal refusals, mode enforcement, native tie order
+and retrospective validity. Its findings added explicit charged-absence and
+pending-slot handling, missed-deadline refusal checks, and a same-frame
+center-only comparison with an explicit admitted-site denominator.
+
+The [compact tracked projection](data/capture-arrival-neighbors-v1.json) retains
+commands, hashes, slot findings, actual native assessments, preferences,
+same-frame comparisons and accounting. Full proofs remain in
+`target/capture-flag-survey/arrival-neighbors-v1/summary.json`, SHA-256
+`5fa9867a57a477ef1c945914a4ebe6fccb1d8008ae987d459ca6c8443253aacd`.
+
+The [independent post-run audit](data/capture-arrival-neighbors-audit-v1.json)
+passes with no findings. It checks 232 raw files and 16 logs, 176,252 complete
+control/observation rows and the same number of native sensor rows, 23,932 fresh
+work-ledger rows and 968 active validations. It reconstructs 14 native material
+joins (four nearest and ten neighbor sites), scores and solar comparisons;
+score and solar reconstruction errors are zero. The compact projection,
+quantitative notes and saved test logs pass too. One checker-only correction
+handled the projection's explicit transformation of raw records; it changed no
+runtime, experiment or result. The retained checker is
+`target/capture-flag-survey/arrival-neighbors-post-audit.py`, SHA-256
+`939900bd392a9df9d0fb11d8d60225260a37489f6d867192a438ca04363df793`.
+
+The next useful slice is native acquisition evidence: how query availability,
+intermittent footing results and the local selector affect the wait before a
+site is actually selected. The wider bounded-acquisition study already found
+waits exceeding twenty seconds. These quiet one-tick arrivals cannot supply a
+general acquisition estimator, and this multisite result does not remove that
+missing part of a whole-trip comparison.
