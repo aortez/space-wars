@@ -185,7 +185,8 @@ fn main() {
         "neutral timing needs a capture probe"
     );
     let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
-    let mut transfer_comparison = transfer_comparison::TransferComparisonRun::from_args(&out, seed);
+    let mut transfer_comparison =
+        transfer_comparison::TransferComparisonRun::from_args(&out, seed, cadence);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));

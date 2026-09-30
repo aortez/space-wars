@@ -139,6 +139,9 @@ live destination-ranking change or complete trip estimate follows from this
 audit. It narrows the next implementation and avoids importing the historical
 enemy-flag tail into an unrelated neutral timing reference.
 
+The next implementation and fixed replay plan are documented in the
+[conditional scan clock](capture-scan-clock.md).
+
 ## Validation and retained evidence
 
 The [complete audit record](data/capture-acquisition-waits-v1.json) preserves

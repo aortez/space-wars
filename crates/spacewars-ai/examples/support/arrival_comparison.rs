@@ -47,7 +47,12 @@ pub(super) struct ArrivalComparisonRun {
 }
 
 impl ArrivalComparisonRun {
-    pub fn from_args(out: &Path, seed: u64, neighbors: bool) -> Option<Self> {
+    pub fn from_args(
+        out: &Path,
+        seed: u64,
+        neighbors: bool,
+        scan_cadence: Option<scenario_spacewars::surface_sortie::mission::LandingSurveyCadence>,
+    ) -> Option<Self> {
         let local_reference = match crate::arg("--arrival-local-reference", "off").as_str() {
             "off" => false,
             "on" => true,
@@ -75,6 +80,9 @@ impl ArrivalComparisonRun {
             _ => panic!("--compare-surveyed-arrival must be none, empty or measured"),
         };
         let mut run = Self::new(out, seed, measured);
+        if let Some(cadence) = scan_cadence {
+            run.queue = run.queue.with_scan_clock(cadence);
+        }
         run.local_reference = local_reference;
         run.site_preference = site_preference;
         run.neighbors = neighbors;

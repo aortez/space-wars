@@ -14,7 +14,7 @@ pub enum LandingSurveyCadence {
 }
 
 /// Planner-owned history, never a cached collision result. A new planet or
-/// vehicle gets an immediate first scan; subsequent scans use the fixed cadence.
+/// ship form gets an immediate first scan; subsequent scans use the fixed cadence.
 /// Flag approaches wait for their route survey, which is required to select a site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct LandingSurveyStamp {
@@ -32,6 +32,34 @@ pub struct MissionSensorRequest {
 }
 
 impl LandingSurveyCadence {
+    /// Pure scheduling only: delay until a requested survey's next slot. This
+    /// does not establish query readiness, landing geometry or site eligibility.
+    /// History is keyed by planet and ship form, not by vehicle identity.
+    pub fn survey_delay_ticks(
+        self,
+        tick: u64,
+        player: usize,
+        context: (usize, ShipForm),
+        last: Option<LandingSurveyStamp>,
+        flag_approach: bool,
+    ) -> u64 {
+        if self == Self::EveryTick {
+            return 0;
+        }
+        let (period, stride) = if flag_approach {
+            (ground_navigation::GROUND_REFRESH_TICKS, 15)
+        } else {
+            (15, 7)
+        };
+        let phase = (tick % period + (player as u64 % period) * stride) % period;
+        let same_survey = last.is_some_and(|s| (s.planet, s.form) == context && s.tick < tick);
+        if (flag_approach || same_survey) && phase != 0 {
+            period - phase
+        } else {
+            0
+        }
+    }
+
     fn query(
         self,
         query: LandingSiteQuery,
@@ -46,16 +74,10 @@ impl LandingSurveyCadence {
         }
         // A flag approach cannot select a candidate without a route to the
         // flag and back. Preserve those decision ticks and skip unused scans.
-        let (period, offset) = if flag_approach {
-            (ground_navigation::GROUND_REFRESH_TICKS, player as u64 * 15)
-        } else {
-            (15, player as u64 * 7)
-        };
-        let phase = (tick + offset) % period;
-        let same_survey = last.is_some_and(|s| (s.planet, s.form) == context && s.tick < tick);
-        if (flag_approach || same_survey) && phase != 0 {
+        let delay = self.survey_delay_ticks(tick, player, context, last, flag_approach);
+        if delay != 0 {
             LandingSiteQuery::Deferred {
-                next_tick: tick + period - phase,
+                next_tick: tick + delay,
             }
         } else {
             query
@@ -488,6 +510,102 @@ impl SurfaceSortieState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scan_schedule_preserves_phases_context_and_non_survey_requests() {
+        for seat in 0..2 {
+            for tick in 60..120 {
+                for cadence in [
+                    LandingSurveyCadence::FourHz,
+                    LandingSurveyCadence::EveryTick,
+                ] {
+                    for flag in [false, true] {
+                        for last in [
+                            None,
+                            Some(LandingSurveyStamp {
+                                tick: 1,
+                                planet: 2,
+                                form: ShipForm::Ship,
+                            }),
+                            Some(LandingSurveyStamp {
+                                tick: 1,
+                                planet: 1,
+                                form: ShipForm::Ship,
+                            }),
+                            Some(LandingSurveyStamp {
+                                tick,
+                                planet: 2,
+                                form: ShipForm::Ship,
+                            }),
+                        ] {
+                            let matching = last.is_some_and(|s| s.tick < tick && s.planet == 2);
+                            let (period, offset) = if flag {
+                                (ground_navigation::GROUND_REFRESH_TICKS, seat as u64 * 15)
+                            } else {
+                                (15, seat as u64 * 7)
+                            };
+                            let expected = if cadence == LandingSurveyCadence::EveryTick
+                                || !(flag || matching)
+                            {
+                                0
+                            } else {
+                                (period - (tick + offset) % period) % period
+                            };
+                            assert_eq!(
+                                cadence.survey_delay_ticks(
+                                    tick,
+                                    seat,
+                                    (2, ShipForm::Ship),
+                                    last,
+                                    flag
+                                ),
+                                expected
+                            );
+                            assert_eq!(
+                                cadence.query(
+                                    LandingSiteQuery::Survey,
+                                    tick,
+                                    seat,
+                                    (2, ShipForm::Ship),
+                                    last,
+                                    flag
+                                ),
+                                if expected == 0 {
+                                    LandingSiteQuery::Survey
+                                } else {
+                                    LandingSiteQuery::Deferred {
+                                        next_tick: tick + expected,
+                                    }
+                                }
+                            );
+                            for query in [
+                                LandingSiteQuery::NotRequested,
+                                LandingSiteQuery::Deferred {
+                                    next_tick: tick + 3,
+                                },
+                                LandingSiteQuery::Selected(LandingSiteId {
+                                    planet: 2,
+                                    bearing: 7,
+                                }),
+                            ] {
+                                assert_eq!(
+                                    cadence.query(
+                                        query,
+                                        tick,
+                                        seat,
+                                        (2, ShipForm::Ship),
+                                        last,
+                                        flag
+                                    ),
+                                    query
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn mission_boundary_exposes_the_enclosing_world_without_a_query() {

@@ -25,7 +25,9 @@ pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, Dest
 
 #[path = "mission_transfer_forecast.rs"]
 mod transfer_forecast;
-pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferForecastReport};
+pub use transfer_forecast::{
+    TransferForecastEnd, TransferForecastJob, TransferForecastReport, TransferScanClock,
+};
 
 #[path = "mission_transfer_queue.rs"]
 mod transfer_queue;

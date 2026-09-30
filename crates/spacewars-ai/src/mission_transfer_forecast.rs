@@ -6,9 +6,14 @@ use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::surface_sortie::{
     LandingPhase,
     combat::TacticalSortieObservationV1,
+    mission::LandingSurveyCadence,
     pilot::PilotMotion,
     transfer_environment::{MAX_TRANSFER_PLANETS, TransferEnvironment},
 };
+
+#[path = "mission_scan_clock.rs"]
+mod scan_clock;
+pub use scan_clock::TransferScanClock;
 
 const DT: f32 = 1.0 / 60.0;
 pub const MAX_TICKS: u64 = 3600;
@@ -70,6 +75,9 @@ pub struct TransferForecastReport {
     pub end: Option<TransferForecastEnd>,
     /// Conditional model endpoint, without future query readiness or contacts.
     pub handoff_seconds: Option<f32>,
+    /// Opt-in schedule after a conditional handoff, never a site-choice time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_clock: Option<TransferScanClock>,
     pub launch_ticks: u64,
     pub transfer_ticks: u64,
     pub solar_escape_ticks: u64,
@@ -204,6 +212,7 @@ impl MaterialMissionPilot {
                 charged_graph: 0,
                 end: None,
                 handoff_seconds: None,
+                scan_clock: None,
                 launch_ticks: 0,
                 transfer_ticks: 0,
                 solar_escape_ticks: 0,
@@ -224,6 +233,19 @@ impl MaterialMissionPilot {
 }
 
 impl TransferForecastJob {
+    /// The host supplies the cadence used by native observations. No queries,
+    /// future controller permissions or additional simulation steps are added.
+    pub fn with_scan_clock(mut self, cadence: LandingSurveyCadence) -> Self {
+        assert_eq!(self.report.ticks, 0, "select scan clock before forecasting");
+        self.report.scan_clock = Some(TransferScanClock::new(
+            &self.bot,
+            &self.predicted,
+            self.report.destination,
+            cadence,
+        ));
+        self
+    }
+
     /// Opt-in body-origin transport for a newly captured transfer job. Keep the
     /// original model available for paired diagnostics and historical callers.
     pub fn with_body_origin_motion(mut self) -> Self {
@@ -462,6 +484,13 @@ impl PlanningJob for TransferForecastJob {
         }
         if self.report.end == Some(TransferForecastEnd::KinematicHandoff) {
             self.report.handoff_seconds = Some(self.report.ticks as f32 * DT);
+        }
+        if let Some(end) = self.report.end
+            && let Some(clock) = &mut self.report.scan_clock
+        {
+            // Constant-time arithmetic shares this already charged terminal
+            // step. It neither advances physics nor requests a material scan.
+            clock.finish(end, self.report.ticks);
         }
         if self.report.end.is_some() || self.report.ticks.is_multiple_of(60) {
             self.record_sample();
@@ -885,7 +914,8 @@ pub(super) mod tests {
         let (state, bot, o) = source();
         let mut job = bot
             .forecast_nominated_transfer(&o, state.transfer_environment().unwrap(), 1)
-            .unwrap();
+            .unwrap()
+            .with_scan_clock(LandingSurveyCadence::EveryTick);
         let target = job.predicted.planets[job.report.destination].clone();
         let outward = (target.motion.position - job.predicted.sun.unwrap().position).normalized();
         let p = &mut job.predicted.local.combat.recovery.flight.pilot;
@@ -903,6 +933,10 @@ pub(super) mod tests {
         assert_eq!(job.report.end, Some(TransferForecastEnd::KinematicHandoff));
         assert_eq!(job.report.handoff_seconds, Some(DT));
         assert_eq!(job.report.charged_graph, 1);
+        let clock = job.report.scan_clock.as_ref().unwrap();
+        assert_eq!(clock.handoff_tick, Some(job.report.source_tick + 1));
+        assert_eq!(clock.opportunity_tick, Some(job.report.source_tick + 2));
+        assert_eq!(clock.site_selection_seconds, None);
         let arrival = job.arrival_frame().unwrap();
         assert_eq!(
             arrival.planet_orbit_omega,
