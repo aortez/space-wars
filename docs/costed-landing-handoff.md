@@ -105,3 +105,100 @@ Use a clean checkout and new output directory. The runner binds the archived
 predecessor summary and checks its input hashes. Publish the full outcomes and
 a retain/promote decision after independent review. Leave #142 open unless
 useful general decisions and regressions actually support promotion.
+
+
+## Results at `ea0acc3`
+
+All **46 runs / 25 comparisons** completed on the first frozen execution:
+**657,559 physical ticks / 182.66 simulated minutes**. All physics checks,
+flag-publication joins, handoff joins and per-tick shared-work audits passed.
+The largest combined allocation was **4 graph operations / 160 queries**,
+within 4/384. All **17** directed/regression v14 replays matched the predecessor's
+exact evaluator bytes, mission telemetry and recorded physical outcomes. Every
+paired action/range/ownership prefix check passed.
+
+The [complete summary](data/costed-landing-handoff-v1.json) is an unchanged copy
+of the raw summary, SHA-256
+`03e2ca83139228fcb78fe998df4afa2f3c4fcc4e671a5c08d8080800e8813f3c`.
+It retains the full plan, commands, accepted switch forecasts, exact visits,
+prediction attempts, unknowns, work/progress audits, outcomes and artifact hashes.
+Full reports, native observations, timing records and traces remain under
+`target/costed-landing-handoff/frozen-v1`. Timing is instrumented desktop data;
+an unrelated build ran concurrently, so this is not a CPU speed comparison.
+
+### Directed behavior
+
+V15 made the same **six destination switches** as v14. All six switched visits
+physically captured, boarded and departed, but only **four** executed the original
+landing reference through departure. These were the neutral destinations in
+both seats at bearings 0.8 and 1.2. Their native selected site matched the source
+site; observed touchdown offsets were 0.89–1.79 units, within the existing
+10-unit validation envelope. They were **slower** than v14:
+
+| Case | Handoff result | First claim change | First departure change | All planets owned change |
+| --- | --- | ---: | ---: | ---: |
+| Neutral, P1, 0.8 | Completed | +3.57 s | +3.55 s | +4.48 s |
+| Neutral, P1, 1.2 | Completed | +3.63 s | +3.63 s | +6.50 s |
+| Neutral, P2, 0.8 | Completed | +2.02 s | +1.98 s | +2.75 s |
+| Neutral, P2, 1.2 | Completed | +1.65 s | +1.63 s | +3.22 s |
+| Enemy, P1, 0.8 | Cover refusal; fallback completed | −0.45 s | +0.23 s | −0.83 s |
+| Enemy, P1, 1.2 | Cover refusal; fallback completed | +5.18 s | +9.48 s | +10.03 s |
+
+Changes are v15 minus v14; positive means later. The other ten directed pairs
+remained unchanged. Both bearing-zero original-destination cases still made no
+capture; failures and incomplete trips are retained.
+
+The four completed reference trips had whole-trip forecast errors from −1.05 to
++0.59 seconds, versus +1.56 to +4.22 seconds for v14. That closer agreement came
+with slower execution; it is not evidence of better site selection or a general
+calibration result. No constants were fitted and all four share a small fixture
+family. Matching a site does not establish an identical walking route.
+
+Both enemy references were initially accepted, then invalidated when exposure
+made cover unsuitable. Their original departure forecasts remained frozen and
+underestimated the eventual fallback trips by **37.31 s** and **9.18 s**. Those
+fallback completions do not count as executing the original landing plan.
+After refusal, **194** reports left the current-trip cost unknown and
+**410** reports used fresh native-selected local evidence. These are repeated
+reports, not independent decisions. The original remote costs were not readmitted
+for those visits.
+
+The four neutral cases' longest transfer interval without a two-unit range gain
+increased by 3–46 ticks (0.05–0.77 s); none exceeded ten seconds. Enemy-case
+transfer progress remained unchanged. This metric excludes landing, walking,
+recovery and combat, so it cannot explain the full trip regressions.
+
+### Fresh matches and regression
+
+All **12 fresh matches** finished. V15 made **zero switches**, and all eight
+candidate/control comparisons retained identical recorded physical outcomes
+and complete action/range/ownership traces. Candidate seats won four and lost
+four, exactly matching those seats in the controls. Captures, departures,
+recoveries, pilot losses and the progress measure were unchanged. These are two
+fresh worlds with correlated seat/asteroid variants, not eight independent
+strength samples. Longest transfer intervals without a two-unit range gain
+reached 664 ticks (11.07 s) in both policies; the handoff did not resolve them.
+
+The recorded regression also remained identical: the candidate seat won,
+completed five sorties and made no destination switch. Fresh matches therefore
+establish fallback preservation, not improved strategic decisions.
+
+### Decision and next boundary
+
+**Retain v15 as headless experimental; leave defaults unchanged and #142 open.**
+The useful result is an observable, safely revocable connection between a
+forecast site and ordinary native arrival. Pinning that site by itself made
+four neutral trips slower and one enemy fallback materially slower.
+
+The next behavior change should address **which arrival site is worth choosing**:
+compare the planned site's acquisition/approach and exposure assumptions with
+the alternatives the native ranker would choose, using the retained refusal
+and phase records. First explain the neutral slowdown and enemy cover refusal;
+then test a bounded site-ranking or admission change. Keep v14 and this frozen
+v15 corpus as controls. This does not justify wider search, new value weights,
+or promoting a new default yet.
+
+Local validation: 286 AI unit tests, six physical destination integration tests,
+31 soak-harness tests and 573 Python tests passed. Formatting and strict Clippy
+for the changed AI library/example/integration targets passed. Independent review
+covered runtime safety and the source/native evidence joins before freezing.
