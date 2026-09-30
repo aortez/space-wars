@@ -112,6 +112,12 @@ impl FlagSurveyRun {
         if !consuming_seats.is_empty() {
             report["consuming_seats"] = json!(consuming_seats);
         }
+        if super::arg("--admit-flag-costs", "none") != "none" {
+            report["observational"] = json!(false);
+            report["scope"] = json!(
+                "17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; opt-in v13 seats and v14 may use published certificates as conditional destination costs"
+            );
+        }
         if let Some(shadow) = &mut self.shadow {
             report["shadow"] = shadow.report();
         }

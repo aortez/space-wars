@@ -75,17 +75,20 @@ impl MissionEvaluator {
                 return None;
             }
             if flag_evidence::is_flag(sample)
-                && o.planets
-                    .iter()
-                    .find(|v| v.index == sample.key.planet)
-                    .is_none_or(|planet| {
-                        let key = PlanetKey::read(planet);
-                        !sample.key.reference_matches(&key)
-                            || !key.flag_identity_matches(
-                                sample.route_objective.unwrap(),
-                                planet.radius,
-                            )
-                    })
+                && ((!flag_evidence::enabled(mission.policy)
+                    && !(self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy)))
+                    || o.planets
+                        .iter()
+                        .find(|v| v.index == sample.key.planet)
+                        .is_none_or(|planet| {
+                            let key = PlanetKey::read(planet);
+                            !sample.key.reference_matches(&key)
+                                || (flag_evidence::enabled(mission.policy)
+                                    && !key.flag_identity_matches(
+                                        sample.route_objective.unwrap(),
+                                        planet.radius,
+                                    ))
+                        }))
             {
                 return None;
             }
