@@ -38,6 +38,15 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MarqueeEvent, layout: Layo
             playback.seconds,
             playback.progress,
         );
+        super::glow::quad(
+            frame,
+            quad.map(|p| RenderPoint::new(p.x, p.y)),
+            RenderColor {
+                a: playback.strength * brightness,
+                ..palette.fill
+            },
+            Some(bounds),
+        );
         // Filled polygons only: clipping a stroked polygon would draw a false
         // outline along the viewport edge and let half a stroke escape the clip.
         frame.push_primitive(

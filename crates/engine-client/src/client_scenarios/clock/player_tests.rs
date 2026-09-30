@@ -209,11 +209,33 @@ fn visual_events_leave_the_player_and_course_visible_in_all_layouts() {
                 viewport,
             );
             let lower = (pixels.width() * (pixels.height() * 3 / 4)) as usize;
-            assert_eq!(
-                &pixels.as_slice()[lower..],
-                &reference.as_slice()[lower..],
-                "player/course changed under {event:?} on {name}"
-            );
+            for (offset, (actual, expected)) in pixels.as_slice()[lower..]
+                .iter()
+                .zip(&reference.as_slice()[lower..])
+                .enumerate()
+            {
+                // A moving marquee may illuminate the previously dark area
+                // above the course. Solid scenery and the duck stay identical.
+                if *expected == slint::Rgb8Pixel::new(5, 6, 14) {
+                    assert!(
+                        actual
+                            .r
+                            .abs_diff(expected.r)
+                            .max(actual.g.abs_diff(expected.g))
+                            .max(actual.b.abs_diff(expected.b))
+                            <= 24,
+                        "unexpected foreground at pixel {} under {event:?} on {name}",
+                        lower + offset
+                    );
+                } else {
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "player/course changed at pixel {} under {event:?} on {name}",
+                        lower + offset
+                    );
+                }
+            }
             if let Some(output) = &output {
                 write_png(
                     &output.join(format!("player-duck-{name}-{event:?}.png")),

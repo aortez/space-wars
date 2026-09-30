@@ -613,6 +613,109 @@ impl Platform for TestPlatform {
     }
 }
 
+#[test]
+fn clock_fonts_picker_and_faces_render_and_select_across_device_layouts() {
+    use crate::render::Viewport;
+    use engine_common::{ClockEventProfile, ClockFont, ClockFontSettings, Scenario};
+    use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    crate::clock_fonts::install(&ui, crate::host::new_scenario_controls());
+    let output = std::env::var_os("SPACEWARS_FONT_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(path) = &output {
+        std::fs::create_dir_all(path).unwrap();
+    }
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        reset_panels(&ui);
+        ui.set_launcher_visible(true);
+        ui.set_launcher_settings_visible(true);
+        crate::clock_fonts::publish(&ui, ClockFontSettings::default());
+        assert!(crate::ui_activation::activate(
+            &ui,
+            "launcher.settings.clock.fonts"
+        ));
+        assert!(ui.get_clock_fonts_visible());
+        assert!(crate::ui_activation::activate(
+            &ui,
+            "clock.fonts.select.serif"
+        ));
+        assert_eq!(
+            crate::clock_fonts::settings(&ui).unwrap().selected,
+            ClockFont::Serif
+        );
+        assert!(crate::ui_activation::activate(
+            &ui,
+            "clock.fonts.pool.classic"
+        ));
+        assert!(
+            !crate::clock_fonts::settings(&ui)
+                .unwrap()
+                .pool
+                .contains(ClockFont::Classic)
+        );
+        assert!(crate::ui_activation::activate(&ui, "clock.fonts.rotate"));
+        assert!(crate::clock_fonts::settings(&ui).unwrap().rotate);
+        let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+        windows.borrow()[0].request_redraw();
+        windows.borrow()[0].draw_if_needed(|renderer| {
+            renderer.render(pixels.make_mut_slice(), width as usize);
+        });
+        if let Some(path) = &output {
+            crate::thruster_visual_tests::write_png(
+                &path.join(format!("picker-{width}x{height}.png")),
+                &pixels,
+            );
+        }
+        assert!(crate::ui_activation::activate(&ui, "clock.fonts.back"));
+        assert!(!ui.get_clock_fonts_visible());
+        let mut faces = Vec::new();
+        for font in ClockFont::ALL {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: width as f32 / height as f32,
+                    fonts: ClockFontSettings {
+                        selected: font,
+                        ..Default::default()
+                    },
+                    event_profile: ClockEventProfile::Off,
+                    ..Default::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(23, 58, 0).unwrap(),
+                )],
+                std::time::Duration::ZERO,
+            );
+            let frame = ClockScenario::render_frame(&state);
+            let viewport = Viewport::new(width as f32, height as f32);
+            let pixels = crate::thruster_visual_tests::raster(&frame, viewport);
+            assert!(
+                faces
+                    .iter()
+                    .all(|old: &SharedPixelBuffer<Rgb8Pixel>| old.as_slice() != pixels.as_slice())
+            );
+            let svg = crate::thruster_visual_tests::svg(&frame, viewport);
+            assert!(!svg.contains("NaN") && !svg.contains("inf"));
+            if let Some(path) = &output {
+                crate::thruster_visual_tests::write_png(
+                    &path.join(format!(
+                        "{}-{width}x{height}.png",
+                        font.label().to_ascii_lowercase()
+                    )),
+                    &pixels,
+                );
+            }
+            faces.push(pixels);
+        }
+    }
+}
+
 fn reset_panels(ui: &MainWindow) {
     ui.set_launcher_visible(false);
     ui.set_launcher_settings_visible(false);
@@ -620,6 +723,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_ingame_menu_visible(false);
     ui.set_ingame_controls_visible(false);
     ui.set_ingame_clock_visible(false);
+    ui.set_clock_fonts_visible(false);
     ui.set_game_over_visible(false);
     ui.set_autostart_settings_visible(false);
     ui.set_autostart_running(false);

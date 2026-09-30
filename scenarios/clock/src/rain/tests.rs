@@ -305,44 +305,52 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
 
 #[test]
 fn wet_face_retirement_preserves_delivery_and_bounds_transient_backpressure() {
-    for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
-        for seed in [0, 7, 19] {
-            let initial = display();
-            let next = crate::digits::snapshot(
-                ClockReading::new(11, 11, 0).unwrap(),
-                ClockTimeFormat::TwentyFourHour,
-            );
-            let mut visible = crate::digits::create_segments();
-            crate::digits::apply_snapshot(&mut visible, initial);
-            let mut event =
-                RainEvent::new(Layout::new(aspect), seed, ClockRainAmount::Heavy, initial);
-            let mut pending = 0.0_f64;
-            for tick in 1..=RAINING_TICKS {
-                if tick == 600 {
-                    assert!(event.diagnostics().surface_water_microunits > 0);
-                    event.synchronize(next, &mut visible);
-                    assert!(!event.surfaces.pending);
-                    assert_eq!(event.surfaces.digits, next.digits);
-                }
-                event.step();
-                let stats = event.water.stats();
-                assert!(stats.parcels <= PARCELS);
-                assert!(
-                    (stats.injected
-                        - stats.pooled
-                        - stats.in_flight
-                        - stats.drained
-                        - stats.reclaimed)
-                        .abs()
-                        < 1e-6
+    for font in engine_common::ClockFont::ALL {
+        for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
+            for seed in [0, 7, 19] {
+                let mut initial = display();
+                initial.font = font;
+                let mut next = crate::digits::snapshot(
+                    ClockReading::new(11, 11, 0).unwrap(),
+                    ClockTimeFormat::TwentyFourHour,
                 );
-                pending = pending.max(event.scheduled - stats.injected);
+                next.font = font;
+                let mut visible = crate::digits::create_segments();
+                crate::digits::apply_snapshot(&mut visible, initial);
+                let mut event =
+                    RainEvent::new(Layout::new(aspect), seed, ClockRainAmount::Heavy, initial);
+                let mut pending = 0.0_f64;
+                for tick in 1..=RAINING_TICKS {
+                    if tick == 600 {
+                        assert!(event.diagnostics().surface_water_microunits > 0);
+                        event.synchronize(next, &mut visible);
+                        assert!(!event.surfaces.pending);
+                        assert_eq!(event.surfaces.digits, next.digits);
+                    }
+                    event.step();
+                    let stats = event.water.stats();
+                    assert!(stats.parcels <= PARCELS);
+                    assert!(
+                        (stats.injected
+                            - stats.pooled
+                            - stats.in_flight
+                            - stats.drained
+                            - stats.reclaimed)
+                            .abs()
+                            < 1e-6
+                    );
+                    pending = pending.max(event.scheduled - stats.injected);
+                }
+                // At most one second's peak scheduled rate waits through the large
+                // four-digit correction. All of it arrives by the rain deadline.
+                assert!(
+                    pending <= event.budget * 1.5 / (RAINING_TICKS as f64 * DT),
+                    "{font:?}, aspect {aspect}, seed {seed}: pending {pending} / budget {}",
+                    event.budget
+                );
+                assert!((event.water.stats().injected - event.budget).abs() < 1e-6);
+                assert_eq!(event.surfaces.deferrals, 0);
             }
-            // At most one second's peak scheduled rate waits through the large
-            // four-digit correction. All of it arrives by the rain deadline.
-            assert!(pending <= event.budget * 1.5 / (RAINING_TICKS as f64 * DT));
-            assert!((event.water.stats().injected - event.budget).abs() < 1e-6);
-            assert_eq!(event.surfaces.deferrals, 0);
         }
     }
 }

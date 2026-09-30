@@ -1,7 +1,7 @@
 use engine_core::Vec2;
 
 use super::{Bounds, font};
-use crate::{DisplaySnapshot, SegmentKind, digits};
+use crate::{DisplaySnapshot, SegmentKind};
 
 use engine_common::ClockMarqueeMessage;
 pub(crate) use engine_common::{
@@ -28,7 +28,7 @@ pub(crate) struct Content {
 impl Content {
     pub fn clock(display: DisplaySnapshot) -> Self {
         let mut result = Self {
-            cells: Vec::with_capacity(128),
+            cells: Vec::with_capacity(crate::fonts::MAX_DIGIT_CELLS + 32),
             bounds: Bounds {
                 min: Vec2::new(0.0, -1.2),
                 max: Vec2::new(30.0, 10.2),
@@ -46,10 +46,11 @@ impl Content {
                 continue;
             };
             for kind in SegmentKind::ALL {
-                if digits::digit_mask(digit) & (1 << kind as u8) == 0 {
-                    continue;
-                }
-                for cell in digits::cells(kind) {
+                let cells = crate::fonts::CellMask(
+                    crate::fonts::glyph(display.font, Some(digit)).0
+                        & crate::fonts::region(display.font, kind).0,
+                );
+                for cell in cells.cells() {
                     self.cells.push(Cell {
                         center: Vec2::new(
                             origin + f32::from(cell.x) + 0.5,
@@ -58,7 +59,11 @@ impl Content {
                         size: 1.0,
                         glyph_pivot: Vec2::new(origin + 3.0, 4.5),
                         group: slot as u8,
-                        path: clock_path(kind, cell.x, cell.y),
+                        path: if display.font == engine_common::ClockFont::Classic {
+                            clock_path(kind, cell.x, cell.y)
+                        } else {
+                            f32::from(cell.y * 6 + cell.x) / 54.0
+                        },
                     });
                 }
             }
@@ -90,7 +95,7 @@ impl Content {
             }
         }
         self.groups = if display.meridiem.is_some() { 6 } else { 5 };
-        debug_assert!(self.cells.len() <= 128);
+        debug_assert!(self.cells.len() <= crate::fonts::MAX_DIGIT_CELLS + 32);
     }
 
     pub fn text(message: &str) -> Result<Self, TextError> {

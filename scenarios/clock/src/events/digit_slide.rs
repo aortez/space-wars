@@ -8,6 +8,8 @@ use crate::{DIGIT_SLOT_COUNT, DisplaySnapshot};
 pub const DIGIT_SLIDE_TICKS: u64 = 48;
 
 pub(crate) struct DigitSlideEvent {
+    pub from_font: engine_common::ClockFont,
+    pub to_font: engine_common::ClockFont,
     pub from: [Option<u8>; DIGIT_SLOT_COUNT],
     pub to: [Option<u8>; DIGIT_SLOT_COUNT],
     pub changed: [bool; DIGIT_SLOT_COUNT],
@@ -18,13 +20,17 @@ pub(crate) struct DigitSlideEvent {
 impl DigitSlideEvent {
     pub fn new(from: Option<DisplaySnapshot>, to: DisplaySnapshot) -> Self {
         let preview = from.is_none();
+        let from_font = from.unwrap_or(to).font;
+        let to_font = to.font;
         let from = from.unwrap_or(to).digits;
         let to = to.digits;
         Self {
+            from_font,
+            to_font,
             from,
             to,
             changed: std::array::from_fn(|slot| {
-                from[slot] != to[slot] || (preview && to[slot].is_some())
+                from[slot] != to[slot] || from_font != to_font || (preview && to[slot].is_some())
             }),
             tick: 0,
             preview,

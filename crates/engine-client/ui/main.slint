@@ -551,6 +551,17 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-pizza-desired-balls-text: "24";
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in-out property <string> launcher-clock-time-format: "24-hour";
+    in-out property <bool> clock-fonts-visible: false;
+    in-out property <int> clock-font-focus: 0;
+    in-out property <int> clock-font-selected: 0;
+    in-out property <bool> clock-font-rotate: false;
+    in-out property <int> clock-font-pool-count: 4;
+    in-out property <[bool]> clock-font-included: [true, true, true, true];
+    in property <[string]> clock-font-labels;
+    in property <[string]> clock-font-sources;
+    in property <[image]> clock-font-previews;
+    callback clock-fonts-open();
+    callback clock-font-activate(int);
     in-out property <bool> launcher-clock-show-date: false;
     in-out property <string> launcher-clock-event-profile: "Calm";
     in-out property <bool> launcher-clock-falling-enabled: true;
@@ -1191,7 +1202,7 @@ export component MainWindow inherits Window {
                 MenuButton {
                     x: 0px;
                     y: 0px;
-                    width: 128px;
+                    width: 104px;
                     height: 48px;
                     text: "Time\n" + root.launcher-clock-time-format;
                     selected: root.ingame-clock-focus-index == 0;
@@ -1199,17 +1210,27 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(0, 1); }
                 }
                 ChoiceRow {
-                    x: 136px;
+                    x: 112px;
                     y: 0px;
-                    width: parent.width - 136px;
+                    width: parent.width - 224px;
                     height: 48px;
-                    label: "Profile";
-                    label-fraction: 0.25;
+                    label: parent.width < 500px ? "" : "Profile";
+                    label-fraction: parent.width < 500px ? 0 : 0.25;
                     value: root.launcher-clock-event-profile;
                     selected: root.ingame-clock-focus-index == 1;
                     enabled: !root.clock-controls-pending;
                     previous => { root.ingame-clock-adjust(1, -1); }
                     next => { root.ingame-clock-adjust(1, 1); }
+                }
+                MenuButton {
+                    x: parent.width - 104px;
+                    y: 0px;
+                    width: 104px;
+                    height: 48px;
+                    text: "Fonts";
+                    selected: root.ingame-clock-focus-index == 16;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.clock-fonts-open(); }
                 }
                 ChoiceRow {
                     x: 0px;
@@ -2047,16 +2068,23 @@ export component MainWindow inherits Window {
                             }
                         }
 
-                        ChoiceRow {
+                        MenuButton {
                             x: parent.width / 2 + 6px;
                             y: 52px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 36px) / 4;
                             height: 48px;
-                            label: "Show Date";
-                            value: root.launcher-clock-show-date ? "On" : "Off";
+                            text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 12;
-                            previous => { root.launcher-settings-focus-index = 12; root.ui-action(2); }
-                            next => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
+                            activated => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: parent.width * 3 / 4 + 9px;
+                            y: 52px;
+                            width: (parent.width - 36px) / 4;
+                            height: 48px;
+                            text: "Fonts";
+                            selected: root.launcher-settings-focus-index == 15;
+                            activated => { root.clock-fonts-open(); }
                         }
 
                         MenuButton {
@@ -2280,7 +2308,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 9 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 11 : root.launcher-material-combat ? 7 : root.launcher-material-travel ? 4 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 9 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 16 : root.launcher-material-combat ? 7 : root.launcher-material-travel ? 4 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -3028,6 +3056,65 @@ export component MainWindow inherits Window {
             text: parent.compact-caption ? "Autoplay · Start/Esc for menu" : root.autostart-caption;
             color: #ffffff; font-size: parent.compact-caption ? 10px : 12px;
             horizontal-alignment: center;
+        }
+    }
+
+    if root.clock-fonts-visible: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #030711e8;
+        TouchArea { }
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: min(parent.width - 24px, 720px);
+            height: min(parent.height - 24px, 432px);
+            background: #101b30;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: #385d79;
+            Text { x: 20px; y: 10px; height: 30px; text: "Clock Fonts"; color: #ecf8ff; font-size: 24px; }
+            for label[index] in root.clock-font-labels: Rectangle {
+                x: 16px + mod(index, 2) * (parent.width - 24px) / 2;
+                y: 48px + floor(index / 2) * 128px;
+                width: (parent.width - 40px) / 2;
+                height: 120px;
+                background: root.clock-font-selected == index ? #19364a : #0b1324;
+                border-width: 2px;
+                border-color: root.clock-font-focus == index ? #8feaff : root.clock-font-selected == index ? #467b8d : #24374b;
+                border-radius: 6px;
+                Text { x: 10px; y: 4px; height: 22px; text: label + (root.clock-font-selected == index ? " · Selected" : ""); color: #d7efff; font-size: 16px; }
+                Image { x: 8px; y: 29px; width: parent.width - 16px; height: 50px; source: root.clock-font-previews[index]; image-fit: contain; }
+                Text { x: 10px; y: 86px; width: parent.width - 114px; height: 26px; text: root.clock-font-sources[index]; color: #8fb0c4; font-size: 12px; overflow: elide; vertical-alignment: center; }
+                TouchArea { enabled: !root.clock-controls-pending; clicked => { root.clock-font-activate(index); } }
+                MenuButton {
+                    x: parent.width - 100px; y: 84px; width: 92px; height: 30px;
+                    text: root.clock-font-included[index] ? "Included" : "Include";
+                    text-padding: 4px;
+                    selected: root.clock-font-focus == index + 4;
+                    enabled: !root.clock-controls-pending && (!root.clock-font-included[index] || root.clock-font-pool-count > 1);
+                    activated => { root.clock-font-activate(index + 4); }
+                }
+            }
+            MenuButton {
+                x: 16px; y: 308px; width: parent.width - 32px; height: 40px;
+                text: "Rotate each minute: " + (root.clock-font-rotate ? "On" : "Off");
+                selected: root.clock-font-focus == 8;
+                enabled: !root.clock-controls-pending;
+                activated => { root.clock-font-activate(8); }
+            }
+            Text {
+                x: 16px; y: 350px; width: parent.width - 32px; height: 26px;
+                text: root.clock-controls-pending ? "Applying…" : root.clock-settings-error != "" ? root.clock-settings-error : root.launcher-visible ? "Choose a face and rotation pool. Saved when you play." : "Changes appear after the current effect.";
+                color: #91b7ca; font-size: 12px; overflow: elide;
+            }
+            MenuButton {
+                x: 16px; y: parent.height - 50px; width: parent.width - 32px; height: 40px;
+                text: "Done";
+                selected: root.clock-font-focus == 9;
+                enabled: !root.clock-controls-pending;
+                activated => { root.clock-font-activate(9); }
+            }
         }
     }
 

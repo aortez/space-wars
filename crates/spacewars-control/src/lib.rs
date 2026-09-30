@@ -44,6 +44,8 @@ pub enum UiScreen {
     LauncherNetwork,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
+    #[serde(rename = "launcher.clock-fonts")]
+    LauncherClockFonts,
     #[serde(rename = "launcher.controls")]
     LauncherControls,
     #[serde(rename = "launcher.touch-test")]
@@ -66,6 +68,8 @@ pub enum UiScreen {
     PauseControls,
     #[serde(rename = "pause.clock")]
     PauseClock,
+    #[serde(rename = "pause.clock-fonts")]
+    PauseClockFonts,
     #[serde(rename = "game-over")]
     GameOver,
 }
@@ -81,6 +85,7 @@ impl UiScreen {
             Self::LauncherControllers => "launcher.controllers",
             Self::LauncherNetwork => "launcher.network",
             Self::LauncherSettings => "launcher.settings",
+            Self::LauncherClockFonts => "launcher.clock-fonts",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
             Self::Gameplay => "gameplay",
@@ -92,6 +97,7 @@ impl UiScreen {
             Self::PauseNetwork => "pause.network",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
+            Self::PauseClockFonts => "pause.clock-fonts",
             Self::GameOver => "game-over",
         }
     }
@@ -105,6 +111,7 @@ impl UiScreen {
                 | Self::LauncherInfo
                 | Self::LauncherAutostart
                 | Self::LauncherControllers
+                | Self::LauncherClockFonts
                 | Self::LauncherNetwork
                 | Self::LauncherSettings
                 | Self::LauncherControls

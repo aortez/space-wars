@@ -51,18 +51,20 @@ fn meltdown_shares_player_blocks_water_and_floor_in_production_adapters() {
                     let pixels = raster(&frames[0], viewport);
                     let vector = svg(&frames[0], viewport);
                     assert!(!vector.contains("NaN") && !vector.contains("inf"));
-                    assert!(
-                        pixels
-                            .as_slice()
-                            .iter()
-                            .any(|p| p.r > 240 && p.g > 220 && p.b < 50),
-                        "visible duck: {arena} {name} tick {elapsed}"
-                    );
                     if let Some(output) = &output {
                         let name = format!("player-meltdown-{arena}-{name}-{elapsed}");
                         write_png(&output.join(format!("{name}.png")), &pixels);
                         std::fs::write(output.join(format!("{name}.svg")), vector).unwrap();
                     }
+                    assert!(
+                        pixels
+                            .as_slice()
+                            .iter()
+                            // The inner wall shadow dims a duck at the edge.
+                            // Its yellow remains distinct from wood and water.
+                            .any(|p| p.r > 180 && p.g > 150 && p.b < 50),
+                        "visible duck: {arena} {name} tick {elapsed}"
+                    );
                 }
                 if elapsed < 510 {
                     scene.step(&[], Duration::from_nanos(16_666_667));

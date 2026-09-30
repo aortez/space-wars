@@ -84,7 +84,8 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
                             .sum::<usize>()
                             // Sloped water uses two pieces per column, each
                             // highlighted: 256 additional bounded primitives.
-                            <= if kind == ClockEventKind::Meltdown { 1106 } else { 850 }
+                            // Allow the surround and digit/label glow shells.
+                            <= if kind == ClockEventKind::Meltdown { 1706 } else { 1450 }
                     );
                     let pixels = renderer
                         .image_from_frames_with_layout(

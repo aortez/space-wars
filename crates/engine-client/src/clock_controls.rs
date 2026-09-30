@@ -11,6 +11,7 @@ use spacewars_control::UiAction;
 use crate::{MainWindow, host, ui_navigation};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
+    crate::clock_fonts::publish(window, settings.fonts);
     window.set_launcher_clock_show_date(settings.show_date);
     window.set_launcher_clock_time_format(
         crate::clock_time_format_label(settings.time_format).into(),
@@ -38,6 +39,7 @@ pub(crate) fn install(
     settings: Arc<RwLock<Settings>>,
     writer: crate::settings_writer::SettingsWriter,
 ) {
+    crate::clock_fonts::install(window, Rc::clone(&controls));
     window.set_clock_event_labels(slint::ModelRc::new(slint::VecModel::from(
         ClockEventKind::ALL
             .into_iter()
@@ -128,6 +130,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
     }
     // Only settings changes, never ticks. Do not include user-supplied text.
     tracing::info!(source,
+        old_fonts = ?previous.fonts, new_fonts = ?next.fonts,
         old_profile = ?previous.event_profile, new_profile = ?next.event_profile,
         old_events = ?previous.events, new_events = ?next.events,
         old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
@@ -208,6 +211,10 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         return;
     }
     let index = window.get_ingame_clock_focus_index();
+    if index == 16 && matches!(action, UiAction::Confirm | UiAction::Left | UiAction::Right) {
+        window.invoke_clock_fonts_open();
+        return;
+    }
     match action {
         UiAction::Up | UiAction::Down => {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))

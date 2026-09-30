@@ -18,7 +18,11 @@ use crate::{
 use physics::{DT, FloatWorld};
 #[cfg(test)]
 use surfaces::FLOOR_POOLS;
-use surfaces::{DigitSurfaces, PARCELS, RELEASE_SLOTS};
+#[cfg(test)]
+use surfaces::RELEASE_SLOTS;
+use surfaces::{DigitSurfaces, PARCELS};
+#[cfg(test)]
+const SOURCE_LIMIT: usize = PARCELS - RELEASE_SLOTS - 2;
 
 pub const RAINING_TICKS: u64 = 20 * 60;
 pub const DRAIN_TICKS: u64 = 20 * 60;
@@ -26,7 +30,7 @@ pub const CLEAR_TICKS: u64 = 120;
 pub const RAIN_TICKS: u64 = RAINING_TICKS + DRAIN_TICKS + CLEAR_TICKS;
 // Floor pools step first. Leave their two new outfalls room even when a wet
 // digit change temporarily crowds the ordinary source/outlet parcel budget.
-const SOURCE_LIMIT: usize = PARCELS - RELEASE_SLOTS - 2;
+
 const OPEN_TICKS: u64 = 36;
 const CLOSE_TICKS: u64 = 24;
 const DEPTH_TICKS: u64 = 30;
@@ -346,9 +350,9 @@ impl RainEvent {
         // Course slabs may have more than the ordinary floor's two outlets.
         // Reserve their first slices too, without enlarging the global budget.
         let source_limit = if self.course().is_some() {
-            PARCELS - RELEASE_SLOTS - self.surfaces.floor_pools * 2
+            PARCELS - self.surfaces.release_slots - self.surfaces.floor_pools * 2
         } else {
-            SOURCE_LIMIT
+            PARCELS - self.surfaces.release_slots - 2
         };
         if self.water.parcels().len() + count > source_limit {
             self.source_limited += 1;

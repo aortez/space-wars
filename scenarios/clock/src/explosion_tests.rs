@@ -62,9 +62,9 @@ fn fully_lit_face_respects_the_cell_cap_including_meridiem() {
     state.display.digits = [Some(8); 4];
     state.display.meridiem = Some("AM");
     state.preview_event(ClockEventKind::Explosion);
-    assert_eq!(cells(&state).len(), MAX_EXPLOSION_CELLS);
+    assert_eq!(cells(&state).len(), 96 + crate::meridiem::MAX_CELLS);
     ticks(&mut state, WARNING_TICKS);
-    assert_eq!(state.body_count(), MAX_EXPLOSION_CELLS + 4);
+    assert_eq!(state.body_count(), cells(&state).len() + 4);
     ticks(&mut state, EXPLOSION_TICKS - WARNING_TICKS);
     assert_eq!((state.body_count(), state.collider_count()), (0, 0));
 }
@@ -153,7 +153,8 @@ fn seeded_bursts_replay_and_finish_with_bounded_physics_at_every_aspect() {
                                 .iter()
                                 .map(|l| l.primitives.len())
                                 .sum::<usize>()
-                                < 400
+                                // Includes the surround and cell glow shells.
+                                < 1000
                         );
                         assert_eq!(frame, ClockScenario::render_frame(&b));
                     }

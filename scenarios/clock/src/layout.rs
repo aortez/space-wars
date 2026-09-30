@@ -16,6 +16,7 @@ pub(crate) struct Layout {
     pub bounds_max: RenderPoint,
     pub pitch: f32,
     pub face_origin: RenderPoint,
+    pub frame_width: f32,
     pub floor_y: f32,
     /// Underside of the decorative rain canopy; this is not a collider.
     pub canopy_y: f32,
@@ -26,6 +27,7 @@ impl Layout {
         let world_width = CAMERA_HEIGHT * aspect_ratio;
         let bounds_min = RenderPoint::new(-world_width * 0.5, -CAMERA_HEIGHT * 0.5);
         let bounds_max = RenderPoint::new(world_width * 0.5, CAMERA_HEIGHT * 0.5);
+        let frame_width = world_width.min(CAMERA_HEIGHT) * 0.022;
         let floor_y = bounds_min.y + CAMERA_HEIGHT * FRAME_HEIGHT_FRACTION;
         let canopy_y = bounds_max.y - CAMERA_HEIGHT * FRAME_HEIGHT_FRACTION;
         let horizontal_margin = (world_width * 0.06).max(16.0);
@@ -44,6 +46,7 @@ impl Layout {
             bounds_max,
             pitch,
             face_origin,
+            frame_width,
             floor_y,
             canopy_y,
         }

@@ -8,6 +8,7 @@ mod autostart;
 mod bluetooth;
 mod client_scenarios;
 mod clock_controls;
+mod clock_fonts;
 mod controller_assignments;
 mod controller_controls;
 mod controller_profile;
@@ -788,6 +789,7 @@ fn show_launcher(
     window.set_launcher_clock_time_format(SharedString::from(clock_time_format_label(
         settings.clock.time_format,
     )));
+    clock_fonts::publish(window, settings.clock.fonts);
     window.set_launcher_clock_show_date(settings.clock.show_date);
     window.set_launcher_clock_event_profile(SharedString::from(clock_event_profile_label(
         settings.clock.event_profile,
@@ -1216,7 +1218,9 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_network_visible() && window.get_sound_visible() {
+    if window.get_clock_fonts_visible() {
+        clock_fonts::handle_action(window, action);
+    } else if window.get_network_visible() && window.get_sound_visible() {
         network_controls::handle_action(window, action);
     } else if window.get_controllers_visible() && window.get_sound_visible() {
         controller_controls::handle_action(window, action);
@@ -1468,7 +1472,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 5,
-        "clock" => 16,
+        "clock" => 17,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1712,6 +1716,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 15 {
+        window.invoke_clock_fonts_open();
+        return;
+    }
     if focus == 14 {
         window.set_launcher_clock_explosion_enabled(!window.get_launcher_clock_explosion_enabled());
         return;
@@ -2319,6 +2327,7 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
 
 fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String> {
     Ok(ClockSettings {
+        fonts: clock_fonts::settings(window)?,
         show_date: window.get_launcher_clock_show_date(),
         time_format: clock_time_format_from_label(
             window.get_launcher_clock_time_format().as_str(),
@@ -3180,6 +3189,7 @@ mod tests {
             },
             nes_rom_id: Some("abc123".into()),
             clock: ClockSettings {
+                fonts: Default::default(),
                 time_format: ClockTimeFormat::TwelveHour,
                 show_date: true,
                 event_profile: ClockEventProfile::Demo,

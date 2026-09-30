@@ -1,4 +1,4 @@
-use engine_common::ClockTimeFormat;
+use engine_common::{ClockFont, ClockTimeFormat};
 use engine_core::Vec2;
 
 use crate::ClockReading;
@@ -60,6 +60,21 @@ pub struct SegmentState {
     pub id: SegmentId,
     pub lit: bool,
     pub representation: SegmentRepresentation,
+    pub(crate) font: ClockFont,
+    pub(crate) shape: crate::fonts::CellMask,
+    pub(crate) previous_shape: crate::fonts::CellMask,
+}
+
+impl SegmentState {
+    pub fn cells(&self) -> impl Iterator<Item = GridCell> + Clone {
+        self.shape.cells()
+    }
+    pub(crate) fn guides(&self) -> impl Iterator<Item = GridCell> + Clone {
+        crate::fonts::CellMask(
+            crate::fonts::guides(self.font).0 & crate::fonts::region(self.font, self.id.kind).0,
+        )
+        .cells()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +122,7 @@ pub fn cells(kind: SegmentKind) -> &'static [GridCell] {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DisplaySnapshot {
+    pub font: ClockFont,
     pub digits: [Option<u8>; DIGIT_SLOT_COUNT],
     pub colon_lit: bool,
     pub meridiem: Option<&'static str>,
@@ -115,6 +131,7 @@ pub struct DisplaySnapshot {
 impl DisplaySnapshot {
     pub const fn unsynchronized() -> Self {
         Self {
+            font: ClockFont::Classic,
             digits: [None; DIGIT_SLOT_COUNT],
             colon_lit: false,
             meridiem: None,
@@ -137,6 +154,7 @@ pub fn snapshot(reading: ClockReading, format: ClockTimeFormat) -> DisplaySnapsh
     let leading_hour = display_hour / 10;
 
     DisplaySnapshot {
+        font: ClockFont::Classic,
         digits: [
             (leading_zero || leading_hour != 0).then_some(leading_hour),
             Some(display_hour % 10),
@@ -158,6 +176,9 @@ pub fn create_segments() -> Vec<SegmentState> {
                 },
                 lit: false,
                 representation: SegmentRepresentation::Anchored,
+                font: ClockFont::Classic,
+                shape: crate::fonts::region(ClockFont::Classic, kind),
+                previous_shape: crate::fonts::region(ClockFont::Classic, kind),
             })
         })
         .collect()
@@ -166,7 +187,16 @@ pub fn create_segments() -> Vec<SegmentState> {
 pub fn apply_snapshot(segments: &mut [SegmentState], snapshot: DisplaySnapshot) {
     for segment in segments {
         let digit = snapshot.digits[usize::from(segment.id.digit_slot)];
-        segment.lit = digit.is_some_and(|digit| digit_mask(digit) & segment.id.kind.bit() != 0);
+        segment.previous_shape = segment.shape;
+        segment.font = snapshot.font;
+        let region = crate::fonts::region(snapshot.font, segment.id.kind);
+        let lit = crate::fonts::glyph(snapshot.font, digit);
+        segment.shape = if snapshot.font == ClockFont::Classic {
+            region
+        } else {
+            crate::fonts::CellMask(region.0 & lit.0)
+        };
+        segment.lit = region.0 & lit.0 != 0;
     }
 }
 
@@ -230,6 +260,7 @@ mod tests {
         assert_eq!(
             snapshot(reading(4, 7, 2), ClockTimeFormat::TwentyFourHour),
             DisplaySnapshot {
+                font: engine_common::ClockFont::Classic,
                 digits: [Some(0), Some(4), Some(0), Some(7)],
                 colon_lit: true,
                 meridiem: None,
@@ -242,6 +273,7 @@ mod tests {
         assert_eq!(
             snapshot(reading(0, 5, 1), ClockTimeFormat::TwelveHour),
             DisplaySnapshot {
+                font: engine_common::ClockFont::Classic,
                 digits: [Some(1), Some(2), Some(0), Some(5)],
                 colon_lit: false,
                 meridiem: Some("AM"),
@@ -250,6 +282,7 @@ mod tests {
         assert_eq!(
             snapshot(reading(12, 5, 2), ClockTimeFormat::TwelveHour),
             DisplaySnapshot {
+                font: engine_common::ClockFont::Classic,
                 digits: [Some(1), Some(2), Some(0), Some(5)],
                 colon_lit: true,
                 meridiem: Some("PM"),

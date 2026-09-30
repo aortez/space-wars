@@ -182,6 +182,8 @@ enum UiScreenArg {
     LauncherNetwork,
     #[value(name = "launcher.settings")]
     LauncherSettings,
+    #[value(name = "launcher.clock-fonts")]
+    LauncherClockFonts,
     #[value(name = "launcher.controls")]
     LauncherControls,
     #[value(name = "launcher.touch-test")]
@@ -204,6 +206,8 @@ enum UiScreenArg {
     PauseControls,
     #[value(name = "pause.clock")]
     PauseClock,
+    #[value(name = "pause.clock-fonts")]
+    PauseClockFonts,
     #[value(name = "game-over")]
     GameOver,
 }
@@ -219,6 +223,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::LauncherControllers => Self::LauncherControllers,
             UiScreenArg::LauncherNetwork => Self::LauncherNetwork,
             UiScreenArg::LauncherSettings => Self::LauncherSettings,
+            UiScreenArg::LauncherClockFonts => Self::LauncherClockFonts,
             UiScreenArg::LauncherControls => Self::LauncherControls,
             UiScreenArg::LauncherTouchTest => Self::LauncherTouchTest,
             UiScreenArg::Gameplay => Self::Gameplay,
@@ -230,6 +235,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::PauseNetwork => Self::PauseNetwork,
             UiScreenArg::PauseControls => Self::PauseControls,
             UiScreenArg::PauseClock => Self::PauseClock,
+            UiScreenArg::PauseClockFonts => Self::PauseClockFonts,
             UiScreenArg::GameOver => Self::GameOver,
         }
     }

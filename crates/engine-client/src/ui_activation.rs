@@ -17,6 +17,7 @@ enum ActivationFocus {
     DeviceInfo,
     PauseControls,
     PauseClock(i32),
+    ClockFonts(i32),
     GameOver(i32),
     Gameplay,
 }
@@ -79,6 +80,7 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
         ActivationFocus::Autostart(index) => window.set_autostart_focus_index(index),
         ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
+        ActivationFocus::ClockFonts(index) => window.set_clock_font_focus(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
     handle_ui_action(window, target.action);
@@ -95,6 +97,26 @@ fn activation_target(
     benchmark_available: bool,
     material_match: bool,
 ) -> Option<ActivationTarget> {
+    if let Some(index) = [
+        "clock.fonts.select.classic",
+        "clock.fonts.select.matrix",
+        "clock.fonts.select.sans",
+        "clock.fonts.select.serif",
+        "clock.fonts.pool.classic",
+        "clock.fonts.pool.matrix",
+        "clock.fonts.pool.sans",
+        "clock.fonts.pool.serif",
+        "clock.fonts.rotate",
+        "clock.fonts.back",
+    ]
+    .iter()
+    .position(|id| *id == control_id)
+    {
+        return Some(ActivationTarget {
+            focus: ActivationFocus::ClockFonts(index as i32),
+            action: UiAction::Confirm,
+        });
+    }
     let target = match control_id {
         "gameplay.clock-controls" => ActivationTarget {
             focus: ActivationFocus::Gameplay,
@@ -172,6 +194,8 @@ fn activation_target(
         "pause.new-match" => pause_main(4),
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
+        "launcher.settings.clock.fonts" => launcher_settings(Some(15), UiAction::Confirm),
+        "pause.clock.fonts" => pause_clock(16, UiAction::Confirm),
         "pause.clock" => pause_main(4),
         "pause.clock.time-format.previous" => pause_clock(0, UiAction::Left),
         "pause.clock.time-format.next" => pause_clock(0, UiAction::Right),

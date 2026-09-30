@@ -21,8 +21,10 @@ pub use spill::{SpillRibbon, SpillSource};
 
 // Many small separated ledges share the SAME column/parcel budgets; this is not
 // 128 full-sized water grids. Scratch is sized to actual pools at construction.
-pub const MAX_POOLS: usize = 128;
-pub const MAX_COLUMNS: usize = 512;
+// A sampled Clock face can expose 216 small ledges plus its floor. Allocation
+// still follows actual specs; these are validation ceilings, not preallocation.
+pub const MAX_POOLS: usize = 256;
+pub const MAX_COLUMNS: usize = 1024;
 pub const MAX_PARCELS: usize = 512;
 pub const MAX_STEP: f64 = 1.0 / 30.0;
 const SUBSTEP: f64 = 1.0 / 240.0;

@@ -6,7 +6,7 @@ use engine_rapier::world::{
 use rand::{Rng, rngs::StdRng};
 
 use crate::{
-    SegmentId, SegmentRepresentation, SegmentState, digits,
+    SegmentId, SegmentRepresentation, SegmentState,
     floor::DrainGeometry,
     layout::Layout,
     meridiem::{LetterState, PIXEL_SIZE},
@@ -128,10 +128,7 @@ impl FallingBodies {
     ) -> Self {
         let mut entities = Vec::with_capacity(30);
         let lit = segments.iter().filter(|s| s.lit);
-        let collider_count = lit
-            .clone()
-            .map(|s| digits::cells(s.id.kind).len())
-            .sum::<usize>()
+        let collider_count = lit.clone().map(|s| s.cells().count()).sum::<usize>()
             + letters
                 .iter()
                 .map(|l| l.glyph.cells().count())
@@ -143,8 +140,8 @@ impl FallingBodies {
         for segment in segments.iter_mut().filter(|segment| segment.lit) {
             let id = body_id(segment.id);
             let position = layout.segment_center(segment.id);
-            let colliders = digits::cells(segment.id.kind)
-                .iter()
+            let colliders = segment
+                .cells()
                 .enumerate()
                 .map(|(part, cell)| {
                     let mut collider = ColliderSpec::cuboid(
@@ -152,7 +149,7 @@ impl FallingBodies {
                         layout.pitch * 0.4,
                         layout.pitch * 0.4,
                     );
-                    collider.local_position = layout.cell_center(segment.id, *cell) - position;
+                    collider.local_position = layout.cell_center(segment.id, cell) - position;
                     collider.friction = 0.65;
                     collider.restitution = 0.35;
                     collider
@@ -264,7 +261,7 @@ mod handoff_tests {
         for aspect in [4.0 / 3.0, 0.6] {
             let layout = Layout::new(aspect);
             let drain = crate::floor::test_drain(layout);
-            let mut segments = digits::create_segments();
+            let mut segments = crate::digits::create_segments();
             for segment in &mut segments {
                 segment.lit = true;
             }

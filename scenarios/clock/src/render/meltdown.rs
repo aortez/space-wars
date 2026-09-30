@@ -119,10 +119,10 @@ pub(super) fn reform_progress(phase_tick: u64, row: i8) -> f32 {
 pub(super) fn render_reforming_face(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let palette = state.palette();
     for segment in state.segments() {
-        for cell in digits::cells(segment.id.kind) {
-            let center = layout.cell_center(segment.id, *cell);
+        for cell in segment.guides() {
+            let center = layout.cell_center(segment.id, cell);
             render_square(frame, center, layout.pitch, 0.0, 0.0, palette);
-            if !segment.lit {
+            if !segment.lit || !segment.shape.contains(cell) {
                 continue;
             }
             let progress = reform_progress(state.phase_tick(), cell.y);
@@ -130,6 +130,22 @@ pub(super) fn render_reforming_face(frame: &mut RenderFrame, state: &ClockState,
                 continue;
             }
             let half = layout.pitch * 0.4;
+            let min = RenderPoint::new(center.x - half, center.y - half);
+            let max = RenderPoint::new(center.x + half, center.y - half + 2.0 * half * progress);
+            super::glow::quad(
+                frame,
+                [
+                    min,
+                    RenderPoint::new(max.x, min.y),
+                    max,
+                    RenderPoint::new(min.x, max.y),
+                ],
+                RenderColor {
+                    a: progress,
+                    ..palette.fill
+                },
+                None,
+            );
             frame.push_primitive(
                 ACTIVE_CELL_LAYER,
                 rectangle(

@@ -14,6 +14,8 @@ mod digit_slide;
 mod duck;
 mod explosion;
 mod floor;
+mod frame;
+mod glow;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -21,14 +23,15 @@ mod rain;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
-const INACTIVE_CELL_LAYER: i32 = 2;
-const ACTIVE_CELL_LAYER: i32 = 3;
-const LABEL_LAYER: i32 = 4;
+pub(crate) const GLOW_LAYER: i32 = 2;
+const INACTIVE_CELL_LAYER: i32 = 3;
+pub(crate) const ACTIVE_CELL_LAYER: i32 = 4;
+const LABEL_LAYER: i32 = 5;
 
 const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
-const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.075, 0.105, 0.145);
-const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.19, 0.40, 0.52);
-const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.045, 0.105, 0.135);
+const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.22, 0.14, 0.078);
+const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.32, 0.21, 0.12);
+const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.032, 0.068, 0.083);
 const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 
 const COLON_X_UNITS: f32 = 14.5;
@@ -83,6 +86,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
+    frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
     if let Some(event) = shared_mechanics_arena(state) {
         let opacity = if state.duck_visit.is_some() {
@@ -158,7 +162,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             // Fade only newly generated face primitives, never physical state
             // or arena/background. No offscreen image or extra frame allocation.
             for layer in &mut frame.layers {
-                if layer.z < INACTIVE_CELL_LAYER {
+                if !(GLOW_LAYER..=LABEL_LAYER).contains(&layer.z) {
                     continue;
                 }
                 for primitive in &mut layer.primitives {
@@ -235,32 +239,8 @@ fn render_floor(
     if opacity <= 0.0 {
         return;
     }
-    let edge_height = (pitch * 0.10).clamp(1.5, 3.0);
     for (min, max) in floor.slabs() {
-        frame.push_primitive(
-            ARENA_LAYER,
-            rectangle(
-                RenderPoint::new(min.x, min.y),
-                RenderPoint::new(max.x, max.y),
-                RenderColor {
-                    a: opacity,
-                    ..FLOOR_COLOR
-                },
-                None,
-            ),
-        );
-        frame.push_primitive(
-            ARENA_LAYER,
-            rectangle(
-                RenderPoint::new(min.x, max.y - edge_height),
-                RenderPoint::new(max.x, max.y),
-                RenderColor {
-                    a: opacity,
-                    ..FLOOR_EDGE_COLOR
-                },
-                None,
-            ),
-        );
+        floor::slab(frame, min, max, pitch, opacity);
     }
 }
 
@@ -272,7 +252,7 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
         rectangle(
             RenderPoint::new(layout.bounds_min.x, layout.canopy_y),
             layout.bounds_max,
-            FLOOR_COLOR,
+            RenderColor::rgb(0.063, 0.053, 0.041),
             None,
         ),
     );
@@ -284,7 +264,7 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
                 layout.bounds_max.x,
                 layout.canopy_y + (layout.pitch * 0.10).clamp(1.5, 3.0),
             ),
-            FLOOR_EDGE_COLOR,
+            RenderColor::rgb(0.17, 0.13, 0.085),
             None,
         ),
     );
@@ -310,10 +290,27 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     let progress = t * t * (3.0 - 2.0 * t);
     for segment in state.segments() {
         let anchor = layout.segment_center(segment.id);
-        let (position, angle, brightness) = match segment.representation {
-            SegmentRepresentation::Anchored => (anchor, 0.0, f32::from(segment.lit)),
-            SegmentRepresentation::Disintegrated => (anchor, 0.0, 0.0),
-            SegmentRepresentation::Rigid { position, angle } => (position, angle, 1.0),
+        for cell in segment.guides() {
+            let brightness = if segment.representation == SegmentRepresentation::Anchored
+                && segment.lit
+                && segment.shape.contains(cell)
+            {
+                1.0
+            } else {
+                0.0
+            };
+            render_square(
+                frame,
+                layout.cell_center(segment.id, cell),
+                layout.pitch,
+                0.0,
+                brightness,
+                palette,
+            );
+        }
+        let (position, angle, was_lit, mix) = match segment.representation {
+            SegmentRepresentation::Anchored | SegmentRepresentation::Disintegrated => continue,
+            SegmentRepresentation::Rigid { position, angle } => (position, angle, true, 0.0),
             SegmentRepresentation::Reforming {
                 position,
                 angle,
@@ -321,26 +318,31 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
             } => (
                 position + (anchor - position) * progress,
                 angle * (1.0 - progress),
-                f32::from(was_lit) * (1.0 - progress) + f32::from(segment.lit) * progress,
+                was_lit,
+                progress,
             ),
         };
-        for cell in digits::cells(segment.id.kind) {
-            let center = layout.cell_center(segment.id, *cell);
-            if segment.representation == SegmentRepresentation::Anchored {
-                render_square(frame, center, layout.pitch, 0.0, brightness, palette);
-            } else {
-                // Keep a faint clock outline while the illuminated bars move.
-                render_square(frame, center, layout.pitch, 0.0, 0.0, palette);
-                if brightness > 0.0 {
-                    render_square(
-                        frame,
-                        position + (center - anchor).rotate_radians(angle),
-                        layout.pitch,
-                        angle,
-                        brightness,
-                        palette,
-                    );
-                }
+        let previous = if matches!(
+            segment.representation,
+            SegmentRepresentation::Reforming { .. }
+        ) {
+            segment.previous_shape
+        } else {
+            segment.shape
+        };
+        for cell in crate::fonts::CellMask(previous.0 | segment.shape.0).cells() {
+            let brightness = f32::from(was_lit && previous.contains(cell)) * (1.0 - mix)
+                + f32::from(segment.lit && segment.shape.contains(cell)) * mix;
+            if brightness > 0.0 {
+                let center = layout.cell_center(segment.id, cell);
+                render_square(
+                    frame,
+                    position + (center - anchor).rotate_radians(angle),
+                    layout.pitch,
+                    angle,
+                    brightness,
+                    palette,
+                );
             }
         }
     }
@@ -422,12 +424,14 @@ fn render_square(
     .map(|offset| {
         let point = center + offset.rotate_radians(angle);
         RenderPoint::new(point.x, point.y)
-    })
-    .to_vec();
+    });
+    if brightness > 0.0 {
+        glow::quad(frame, points, color, None);
+    }
     frame.push_primitive(
         layer,
         RenderPrimitive::Polygon(RenderPolygon {
-            points,
+            points: points.to_vec(),
             fill: Some(Fill::new(color)),
             stroke,
         }),
@@ -505,8 +509,8 @@ mod tests {
             .iter()
             .map(|layer| layer.primitives.len())
             .sum::<usize>();
-        // One background, floor/canopy slabs and edges, 96 cells, two dots.
-        assert_eq!(primitive_count, 103);
+        // The face, wooden surround and lighting remain a bounded draw list.
+        assert!(primitive_count < 600, "{primitive_count} primitives");
     }
 
     #[test]

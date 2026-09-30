@@ -232,7 +232,8 @@ fn previews_replacements_resize_and_repeats_are_bounded_and_deterministic() {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        < 300
+                        // Includes clipped glow on incoming/outgoing cells.
+                        < 900
                 );
                 let bounds = frame.camera.world_bounds(aspect);
                 for primitive in frame.layers.iter().flat_map(|l| &l.primitives) {

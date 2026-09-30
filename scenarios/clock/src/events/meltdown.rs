@@ -12,7 +12,7 @@ use crate::{
     layout::Layout,
 };
 
-pub const MAX_MELTDOWN_CELLS: usize = 96 + crate::meridiem::MAX_CELLS;
+pub const MAX_MELTDOWN_CELLS: usize = crate::fonts::MAX_DIGIT_CELLS + crate::meridiem::MAX_CELLS;
 pub const WATER_COLUMNS: usize = 128;
 // Moving banks release uncovered strips as well as ordinary overflow. Keep a
 // fixed ceiling with room for both; stationary development labs stay at 128.
@@ -68,10 +68,10 @@ impl MeltdownEvent {
         if !lab {
             for segment in context.segments.iter_mut() {
                 if segment.lit {
-                    for cell in digits::cells(segment.id.kind) {
+                    for cell in segment.cells() {
                         assert!(cells.len() < MAX_MELTDOWN_CELLS);
                         cells.push(MeltCell {
-                            position: context.layout.cell_center(segment.id, *cell),
+                            position: context.layout.cell_center(segment.id, cell),
                             meridiem: false,
                             velocity: Vec2::new(rng.random_range(-0.25..0.25), 0.0)
                                 * context.layout.pitch,

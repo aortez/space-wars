@@ -313,6 +313,36 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn clock_fonts_migrate_and_preserve_the_selected_pool() {
+        use engine_common::{ClockFont, ClockFontPool};
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        std::fs::write(
+            &path,
+            "[clock]\ntime_format='12-hour'\nshow_date=true\n[clock.events]\nrain=false\n",
+        )
+        .unwrap();
+        let mut settings = load_settings(&path).unwrap().settings;
+        assert_eq!(settings.clock.fonts.selected, ClockFont::Classic);
+        assert!(!settings.clock.fonts.rotate);
+        settings.clock.fonts.selected = ClockFont::Serif;
+        settings.clock.fonts.rotate = true;
+        settings.clock.fonts.pool =
+            ClockFontPool::try_from(vec![ClockFont::Sans, ClockFont::Serif]).unwrap();
+        save_settings(&settings, &path).unwrap();
+        let loaded = load_settings(&path).unwrap().settings;
+        assert_eq!(
+            serde_json::to_value(&settings).unwrap(),
+            serde_json::to_value(&loaded).unwrap()
+        );
+        assert_eq!(loaded.clock.time_format, ClockTimeFormat::TwelveHour);
+        assert!(loaded.clock.show_date && !loaded.clock.events.rain);
+        let mut one = ClockFontPool::try_from(vec![ClockFont::Serif]).unwrap();
+        one.toggle(ClockFont::Serif);
+        assert!(one.contains(ClockFont::Serif));
+    }
+
+    #[test]
     fn unsupported_bot_defaults_only_that_field() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");

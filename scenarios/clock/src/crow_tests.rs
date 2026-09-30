@@ -49,7 +49,8 @@ fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() 
                                 .iter()
                                 .map(|l| l.primitives.len())
                                 .sum::<usize>()
-                                < 400
+                                // Includes the surround and cell glow shells.
+                                < 1000
                         );
                     }
                 }

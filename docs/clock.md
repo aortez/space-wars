@@ -10,7 +10,7 @@ the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
 Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slide.
 The Duck upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
 Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
-flashlight/glow polish and multiple concurrent timed animations remain future work.
+flashlight effects and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
 Explosion (#76) scatters individual lit cells as bouncing rigid-body debris.
@@ -22,9 +22,9 @@ hour slots keep their position in 12-hour mode, so a reading change does not
 recenter the clock. AM/PM remains just below the face's right edge. Digit cell
 sizes and horizontal spacing retain the previous responsive size budget.
 
-Matching dark bands occupy the top and bottom **8%** of the display. The floor
-was previously 16% high; its actual surface, colliders, course anchors and water
-beds now move down together. The upper band is a decorative **rain canopy**, not
+A shaded header and wooden base occupy the top and bottom **8%** of the display.
+The floor was previously 16% high; its actual surface, colliders, course anchors
+and water beds moved down together. The upper band is a decorative **rain canopy**, not
 a solid ceiling or another water pool. Finite rain parcels start beneath its
 underside, with room for their initial streak/drop extent; amount, cadence and
 parcel limits are unchanged. Marquee content clips inside the two bands, while
@@ -39,13 +39,14 @@ Rain, Falling, Meltdown and Marquee:
 ```sh
 SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-layout \
   cargo test --locked -p engine-client --bin engine-client --profile ci \
-  centered_clock_and_symmetric_framing
+  centered_clock_and_wooden_floor
 ```
 
-Tests check centered face pixels, matching band bounds, AM/PM clearance,
-unchanged cell sizes, rain emission below the canopy, and event framing in both
-render adapters. This changes the arena geometry, so identical seeds can have
-different duck/hazard encounters; see the centered-arena checkpoint below.
+Tests check centered face pixels, equal band heights, wooden floor openings,
+AM/PM clearance, unchanged cell sizes, rain emission below the canopy, and event
+framing in both render adapters. The earlier floor-height change altered the
+arena geometry, so identical seeds can have different duck/hazard encounters;
+see the centered-arena checkpoint below.
 
 Real-device captures from **sw-picade-2** (1024×768, release build):
 
@@ -56,6 +57,174 @@ Real-device captures from **sw-picade-2** (1024×768, release build):
 Additional fixed-reading production-renderer fixtures: [HyperPixel, 800×480](screenshots/clock/hyperpixel-centered-clock-fixture.png)
 and [portrait, 480×800](screenshots/clock/portrait-centered-clock-fixture.png).
 These two are headless layout captures, not deployments to additional devices.
+
+### Wooden frame and soft lighting
+
+Thin wooden rails surround the sides and top, joining a wooden base at the
+existing walking surface. Flat floors, duck platforms and moving drain panels
+share the frame's warm color, bevel and grain. The physical floor supplies the
+base, so drain gaps remain open all the way through; no second decorative rail
+covers them. Floor heights, colliders and duck courses retain their geometry.
+
+Two small amber lights sit just inside the junctions of the top and side rails,
+illuminating the upper corners. Lit digit cells, the colon
+and AM/PM cast a dim halo in their current color, while inactive cells stay
+subdued. The header uses a dark warm finish, and narrow shadows inside the side
+and top rails give the room depth. The frame scales with the shorter display
+dimension. Duck doorways are sections of the side rails: the wood, bevel and
+grain lift together on a top hinge, then return flush with the wall. Both sides
+swing inward and upward, revealing a darker opening and a faint moving shadow.
+
+Cell halos follow falling bars, exploding blocks, melting/reforming cells and
+marquee transformations. They fade with their source cells, and moving content
+keeps its existing digit-slide and marquee clipping. The wooden frame and corner
+lights remain visible throughout events, including when the normal face fades
+away for a marquee.
+
+Both render adapters use the same bounded geometry: four translucent shells per
+emitting cell, plus a fixed surround and two corner lights. There is no blur
+buffer, lighting simulation or new collider for the lighting. Classic retains
+the original seven-segment geometry; additional faces are described below.
+
+**Corner placement (2026-09-29):** The lamp centers now sit 1.3 rail widths from
+the top and side edges, down from 1.8—about five pixels closer to each corner
+at 800×480. Render checks passed at 800×480, 1024×768 and 480×800; pixels outside
+the two corner light areas matched the previous fixtures exactly. Release
+`acd5c08` was fast-deployed to `spacewars.local`, where the running client matched
+the bundle and reported 60.1 FPS / UPS with zero unexpected service restarts.
+Saved settings, including the selected Serif face, were preserved.
+[Updated corner lights on the device](screenshots/clock/hyperpixel-corner-lights-device.png).
+
+These are display-free captures through the production renderer and native text
+overlay, not device screenshots:
+
+| HyperPixel layout, 800×480 | Picade layout, 1024×768 |
+| --- | --- |
+| ![Wooden frame and lighting on HyperPixel layout](screenshots/clock/hyperpixel-framed-clock-fixture.png) | ![Wooden frame and lighting on Picade layout](screenshots/clock/picade-framed-clock-fixture.png) |
+
+The [portrait fixture](screenshots/clock/portrait-framed-clock-fixture.png) covers
+480×800. Regenerate date-visible captures with `SPACEWARS_CALENDAR_ARTIFACTS` and
+the `clock_calendar_date_renders_in_band_through_native_text_overlay` test below.
+
+The shared wooden material also follows the moving floor during Rain:
+
+![Wooden drain panels during Rain, rendered fixture](screenshots/clock/hyperpixel-wooden-panels-fixture.png)
+
+The refinement passed 275 scenario tests (four ignored) and all 63 client clock
+tests, including both render adapters, portrait layouts, door motion, shared
+water and floor recovery.
+
+**Refinement device validation (2026-09-28):** Release `b2e525f` was built with
+Yocto and fast-deployed to `spacewars.local`. The installed client, running
+executable and CLI matched the exported bundle; the client SHA-256 begins
+`dca8d69fdea8b837`. The service remained on PID 22365 with zero unexpected
+restarts and reported 60.1 FPS / 60.1 UPS. All saved preferences were unchanged.
+Live captures verified the unified floor and course material, lifting flap and
+flush closure. Both outer 10-pixel side rails in the
+[closed-entrance capture](screenshots/clock/hyperpixel-refined-door-closed.png)
+match the normal clock capture exactly. Clock was left running in Demo mode
+with the date visible.
+
+| Refined clock on device | Matching course and open flap on device |
+| --- | --- |
+| ![Refined wooden clock on HyperPixel](screenshots/clock/hyperpixel-refined-clock-device.png) | ![Matching wooden course and open wall flap](screenshots/clock/hyperpixel-refined-door-open.png) |
+
+**Initial device validation (2026-09-28):** Release `fc9da2e` was built with Yocto and
+fast-deployed to `spacewars.local` (800×480, raster 2×). The installed client,
+running executable and matching CLI hashes matched the exported bundle. The
+service stayed on PID 21998 with zero unexpected restarts; a later live Duck
+sample reported 60.1 FPS / 60.1 UPS. The client SHA-256 begins
+`47e710a9c3b1cec0`, and the CLI SHA-256 begins `64fcae9a1decd1a0`.
+
+Live captures verified the entrance swing, flush closure and mirrored exit,
+including the exit during overlapping Rain. Both outer 10-pixel side rails in
+the closed-entrance capture match the normal clock capture pixel-for-pixel.
+Every existing saved preference was preserved. The newer settings format added
+default Crow/Explosion switches and the controller-profile field. Clock was
+left running in its original Demo mode with the date visible.
+
+The [normal clock capture](screenshots/clock/hyperpixel-framed-clock-device.png)
+and these doorway captures come from the device:
+
+| Entrance lifted | Entrance closed flush |
+| --- | --- |
+| ![Hinged wall lifted on HyperPixel](screenshots/clock/hyperpixel-hinged-door-open.png) | ![Wall closed flush on HyperPixel](screenshots/clock/hyperpixel-hinged-door-closed.png) |
+
+## Clock fonts
+
+Open **Fonts** from Clock settings or the live Clock controls. The picker has
+rendered previews for **Classic** (the original seven-segment face), **Matrix**
+(pixel digits), **Sans** and **Serif**. The latter two sample bundled DejaVu
+outline fonts into the same 6×9 cell grid at build time. The device renders the
+resulting masks without decoding fonts at runtime. Font sources and license
+are in [scenarios/clock/fonts](../scenarios/clock/fonts/README.md).
+
+Choose a face for a fixed display. **Include** chooses the faces eligible for
+**Rotate each minute**; the last included face cannot be removed. Rotation
+avoids repeating the current face when multiple choices remain. It uses a
+separate seeded random stream, so changing the font pool does not change the
+automatic event sequence. Changes wait until any active timed effect finishes.
+The preview shows each face immediately, even while an effect is paused.
+
+Launcher choices save when starting Clock. Live choices save as they apply and
+survive restart. Existing settings default to Classic with rotation off. The
+saved `[clock.fonts]` table contains `selected`, `rotate` and a nonempty list
+`pool`, using the names `classic`, `matrix`, `sans`, and `serif`. This catalog
+does not yet include importing user-supplied font files.
+
+All digit effects, collision shapes, collecting rain ledges and marquee time
+content consume the same glyph masks. Falling retains seven stable pieces per
+digit; Explosion and Meltdown have room for all 216 grid cells plus AM/PM.
+Denser rain faces reserve space for their maximum lit-cell release and batch
+runoff proportionally, retaining the 512-parcel ceiling. Heavy-rain tests cover
+all faces, three layouts and three seeds through a wet time change, checking
+full delivery, water conservation and bounded source backpressure.
+
+| Font picker, 800×480 | Serif face, 800×480 |
+| --- | --- |
+| ![Clock font picker fixture](screenshots/clock/hyperpixel-font-picker-fixture.png) | ![Sampled Serif clock fixture](screenshots/clock/hyperpixel-serif-clock-fixture.png) |
+
+These are production-renderer fixtures. Regenerate all four faces and the
+picker at 800×480, 1024×768 and 480×800 with:
+
+```sh
+SPACEWARS_FONT_ARTIFACTS=/tmp/clock-fonts \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  clock_fonts_picker_and_faces_render_and_select_across_device_layouts
+```
+
+The display-backed functional test
+`clock_fonts_save_live_choices_and_survive_restart` exercises the picker from
+both entry points, pool editing, rotation, live application and saved restart.
+Public UI screens are `launcher.clock-fonts` and `pause.clock-fonts`, with
+`clock.fonts.select.{name}`, `clock.fonts.pool.{name}`, `clock.fonts.rotate`, and
+`clock.fonts.back` controls. Clock state reports `active_font` separately from
+the configured `settings.fonts`, since a timed effect can delay application.
+
+**Font validation (2026-09-28):** The affected common, water, Clock, client,
+control and CLI suites passed 892 tests. Four display-backed workflows also
+passed: font selection/persistence, general live controls, Marquee and Duck.
+The production-renderer fixtures cover all four faces in three layouts.
+
+Release `b25e8a7` was built with Yocto and fast-deployed to `spacewars.local`
+(800×480, raster 2×). The installed client, running executable and CLI matched
+the bundle; the client SHA-256 begins `42f9a3acfa08d901`, and the CLI SHA-256
+begins `a1f792edd6bef229`. The service remained on PID 22697 with zero unexpected
+restarts. The live picker and Serif face were captured, and Matrix ran Heavy
+Rain at approximately 60 FPS / 60 UPS (59.8 during the shower, 60.1 during
+drainage). Selecting Classic while Rain was active preserved Matrix until the
+effect completed, then restored Classic. The final idle sample reported 60.1
+FPS / 60.1 UPS. These are device smoke checks, not a sustained benchmark.
+
+Every pre-existing saved setting matched the backup after verification. Only
+the default `clock.fonts` table was added. Clock was left running with Classic,
+rotation off, Demo events and the date visible.
+
+| Font picker on the device | Sampled Serif on the device |
+| --- | --- |
+| ![Font picker on HyperPixel](screenshots/clock/hyperpixel-font-picker-device.png) | ![Serif clock on HyperPixel](screenshots/clock/hyperpixel-serif-clock-device.png) |
+
+[Matrix with Heavy Rain on the device](screenshots/clock/hyperpixel-matrix-rain-device.png).
 
 ## Optional weekday and date
 
@@ -167,7 +336,8 @@ not a generalized blast/damage field, water conversion, or chain reaction.
 The canopy stays decorative: upward launch speed is limited for headroom,
 without adding an invisible ceiling collider.
 
-At most **119 cells** exist (96 digit cells plus 23 label pixels). Standalone
+At most **239 cells** exist (216 digit-grid cells plus 23 label pixels); Classic
+uses at most 119. Standalone
 events use four fixed floor/wall bodies and the existing center drain. With a
 duck, the cells instead enter its **existing mechanics world**, which advances
 once per tick. Debris can hit the duck; controller ownership and motion continue.
@@ -371,7 +541,7 @@ This is one-way coupling: the duck does not displace water yet, and falling
 parcels do not directly push it. Future player/bot forces can be applied at the
 same physical-body boundary without replacing the flotation model.
 
-The event uses **320 columns, at most 512 water parcels, and one dynamic body**:
+With Classic, the event uses **320 columns, at most 512 water parcels, and one dynamic body**:
 128 floor columns plus 192 digit columns; 192 parcel slots are protected for
 atomic digit retirement. With a duck there are four bodies/five colliders: one
 duck, two persistent moving panels and a fixed pair of side walls. The rigid
@@ -437,7 +607,7 @@ Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
 out and back in. They never fabricate a different clock reading. This preview
 works even with the switch/profile Off and is reported as `preview: true`.
 
-Falling releases the illuminated seven-segment bars as compound rigid
+Falling releases the illuminated digit pieces as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
 with the arena floor, side walls, and each other. The floor's center drain opens
 for the event and closes after reforming. Dim anchor cells remain visible behind the action.
@@ -479,8 +649,8 @@ an event take effect at recovery too: 12→24 fades/removes the old label, while
 24→12 introduces the new label as the face reforms. The water-lab previews keep
 their live, anchored face and fixed source volume.
 
-The standalone Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
-AM/PM pixels), **128 columns and 192 spill parcels**, with no Rapier bodies.
+The standalone Meltdown ceiling is **239 cells** (216 digit-grid cells plus at most 23
+AM/PM pixels; Classic uses at most 119), **128 columns and 192 spill parcels**, with no Rapier bodies.
 The additional 64 parcel slots accommodate water released by retracting floor
 edges as well as ordinary overflow. Optional impact spray is reduced once 32
 parcels are live; its volume goes to the bank/gap rather than being deleted.
@@ -566,8 +736,9 @@ colliders and 128 columns in total. These are still environment-only Meltdown
 previews, not new scenarios; normal Clock startup is unchanged. See
 [spilling displacement and verification](design/water.md#displacement-driven-spills).
 
-Duck opens a side door and spawns a yellow pixel duck. The entrance door closes
-behind it, then disappears for the rest of the visit. The duck makes two vertical
+Duck lifts a hinged section of the wooden wall and spawns a yellow pixel duck.
+The entrance flap closes flush behind it and stays closed for the rest of the
+visit. The duck makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently
 selects a seeded course pattern and movement personality. The patterns are:
@@ -695,8 +866,28 @@ switch the personality to `careful` to watch the adjacent route on the same cour
 These overrides are independent and do not change event scheduling.
 The seeded physics comparison below
 exercises both profiles.
-The upright pixel sprite and sliding doors are presentation, not articulated
+The upright pixel sprite and hinged wooden doors are presentation, not articulated
 physics. Doors are logical backstage entry/exit markers, not trapping colliders.
+Both flaps use the existing entry/exit timing, ease at each end of the swing and
+close into a continuous frame. A small pin at the top and the exposed cut edge
+make the hinge visible while the flap moves.
+
+This close-up uses the production renderer at half speed, with the camera moved
+to the entrance of the 800×480 layout:
+
+![Hinged wooden wall flap opening and closing](screenshots/clock/hinged-wall-entry.gif)
+
+Regenerate full frames and entrance close-ups for all four fixture layouts:
+
+```sh
+SPACEWARS_CLOCK_DOOR_ARTIFACTS=/tmp/clock-doors \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  duck_course_reaches_both_render_paths -- --quiet
+ffmpeg -y -framerate 15 -pattern_type glob \
+  -i '/tmp/clock-doors/hinge-800x480-*-detail.png' \
+  -filter_complex '[0:v]split[a][b];[a]palettegen[p];[b][p]paletteuse' \
+  -loop 0 /tmp/clock-doors/hinged-wall-entry.gif
+```
 
 Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
 still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.
@@ -755,7 +946,7 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 10; `NextEvent`
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 11; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -859,7 +1050,7 @@ forces and steps. Coupling is **one-way buoyancy/drag**, not displacement,
 pressure, parcel/duck collision, or a second fluid simulation. Water and rendering
 derive from the same immutable course slabs; geometry is copied only at visit/event
 boundaries. No per-tick geometry allocations or second Rapier world are added.
-At most seven course pools plus 96 digit pools use at most 327 water columns and
+At most seven course pools plus 216 digit pools use at most 567 water columns and
 the existing 512-parcel budget. Starting/replacing/ending Rain preserves a live
 duck; dismissing/falling/exiting preserves Rain and its course. A new visit can
 reuse that wet course. Rain finishing with no player releases the last floor claim.
@@ -901,8 +1092,9 @@ or invincibility rules are introduced. A knock into a gap can still end the visi
 The shared world steps **once** per fixed tick, including entry, reset and the
 event's first/final ticks. The duck keeps its calibrated gravity and jump; a
 per-body gravity scale preserves Falling's existing 400-unit acceleration across
-display sizes. The batch adds at most **30 bodies / 119 colliders**, for a total
-of at most **39 / 128** with the largest course. IDs occupy separate bounded
+display sizes. The batch adds at most **30 bodies / 239 colliders**, for a total
+of at most **39 / 248** with the largest course. Classic retains its 119-collider
+batch limit. IDs occupy separate bounded
 namespaces; geometry and the body-ID list are allocated at event boundaries,
 not rebuilt each tick. Rendering reads the same body poses used for contacts.
 
@@ -955,8 +1147,9 @@ conversion. Pooled water supplies the player's existing buoyancy/current drag
 and joystick paddling. The coupling remains one-way, with no fluid displacement
 or liquid/block collision model.
 
-The event adds at most **119 bodies/colliders**, for a shared maximum of
-**128 / 128** on a course, or **123 / 123** on responsive panels. Water uses
+The event adds at most **239 bodies/colliders**, for a shared maximum of
+**248 / 248** on a course, or **243 / 243** on responsive panels. Classic retains
+its 119-cell limit. Water uses
 at most **135 course columns** (128 on panels) and **192 parcels**. Metadata is
 bounded and compacted in place; local contact queries allocate no history or
 world-wide contact list. Each world steps once per fixed tick, including entry,
@@ -1508,7 +1701,7 @@ latest face and drop temporary content.
 
 The Clock-local `presentation/` module separates content generation from effects.
 Cells have immutable positions, glyph pivots, and stable lighting-route positions.
-Seven-segment clock content and the code-native 5×7 font feed the same recipe
+The selected clock-face glyphs and the code-native 5×7 text font feed the same recipe
 sampler. The font accepts up to **32 ASCII bytes / 1,120 cells**, supports letters,
 digits and basic punctuation, folds lowercase, and rejects empty, oversized, or
 unsupported text. The default message is **SPACE WARS**. The shared
@@ -1620,11 +1813,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **19** and reports scenario-instance revision,
+`clock state` uses schema version **20** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
-reading/target digits, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
+reading/target digits, active font, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -1702,18 +1895,19 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 18 and
-older requests are rejected. The internal Clock action payload is version 10;
+after completion or cancellation. Use matching client/CLI builds: schema 19 and
+older requests are rejected. The internal Clock action payload is version 11;
 event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
 little-endian u16 switch mask (bits 0–8, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
-and 1–32 message bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–9
+font ID, rotation (0/1) and nonempty four-bit font-pool bytes, and 1–32 message
+bytes. Reading actions contain either three time bytes or those
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–10
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 19, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 20, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1730,7 +1924,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 19, `event`
+tick. A raw `clock trigger` request must include schema version 20, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, or `explosion`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

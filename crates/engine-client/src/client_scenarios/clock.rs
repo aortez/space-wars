@@ -76,6 +76,7 @@ fn create(
     }
     let mut state = ClockScenario::init(
         ClockConfig {
+            fonts: settings.clock.fonts,
             aspect_ratio: viewport.aspect_ratio(),
             water_lab: scenario_clock::ClockWaterLab::from_override(
                 std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
@@ -198,6 +199,7 @@ impl ClientScenario for ClockClientScenario {
             scenario_revision: 0, // Stamped by the host, not the scenario.
             paused: false,
             settings: self.state.settings(),
+            active_font: self.state.active_font(),
             profile: match self.state.event_profile() {
                 engine_common::ClockEventProfile::Off => "off",
                 engine_common::ClockEventProfile::Calm => "calm",
@@ -707,6 +709,11 @@ mod tests {
 
     #[test]
     fn duck_course_reaches_both_render_paths_and_resets_to_the_normal_arena() {
+        let door_output =
+            std::env::var_os("SPACEWARS_CLOCK_DOOR_ARTIFACTS").map(std::path::PathBuf::from);
+        if let Some(directory) = &door_output {
+            std::fs::create_dir_all(directory).unwrap();
+        }
         for (profile, pattern) in [
             engine_common::ClockDuckJumpProfile::Careful,
             engine_common::ClockDuckJumpProfile::Flowing,
@@ -762,21 +769,27 @@ mod tests {
                     if tick > 0 {
                         scenario.step(&[], Duration::from_nanos(16_666_667));
                     }
-                    if ![
-                        0,
-                        18,
-                        60,
-                        170,
-                        395,
-                        600,
-                        900,
-                        1235,
-                        1260,
-                        1650,
-                        1800,
-                        scenario_clock::DUCK_TICKS,
-                    ]
-                    .contains(&tick)
+                    let capture_door = door_output.is_some()
+                        && profile == engine_common::ClockDuckJumpProfile::Careful
+                        && pattern == engine_common::ClockDuckCoursePattern::Platforms
+                        && tick <= 90
+                        && tick % 2 == 0;
+                    if !capture_door
+                        && ![
+                            0,
+                            18,
+                            60,
+                            170,
+                            395,
+                            600,
+                            900,
+                            1235,
+                            1260,
+                            1650,
+                            1800,
+                            scenario_clock::DUCK_TICKS,
+                        ]
+                        .contains(&tick)
                     {
                         continue;
                     }
@@ -791,7 +804,8 @@ mod tests {
                             .iter()
                             .map(|l| l.primitives.len())
                             .sum::<usize>()
-                            < 300
+                            // Includes the wooden surround and cell halos.
+                            < 900
                     );
                     let presentation = crate::render::scene_presentation_from_frames_with_layout(
                         &frames,
@@ -813,24 +827,28 @@ mod tests {
                         .duck_state()
                         .is_some_and(|duck| duck.outcome.is_none());
                     if [1235, 1260].contains(&tick) && active_duck {
-                        // Inspect the exit frame itself, not just telemetry or its
-                        // closed panel: it must be absent before the spawn timer.
+                        // The raised flap must be visible inside the scene;
+                        // its wood stays flush with the wall before opening.
                         let duck = scenario.state.duck_state().unwrap();
                         let world_width = 480.0 * viewport.aspect_ratio();
                         let radius = duck.navigation.unwrap().body_radius_milli as f32 / 1000.0;
                         let side = if duck.left_to_right { 1.0 } else { -1.0 };
                         let scale = viewport.height / 480.0;
+                        let panel_height = radius * 4.25;
+                        let rail_width = world_width.min(480.0) * 0.022;
                         let x = (viewport.width * 0.5
-                            + (world_width * 0.5 - 2.0 * radius) * side * scale)
+                            + (world_width * 0.5 - panel_height * 0.6) * side * scale)
                             as usize;
-                        let y = (viewport.height * 0.92 - 4.1 * radius * scale) as usize;
+                        let y = (viewport.height * 0.92 - (panel_height + rail_width * 0.5) * scale)
+                            as usize;
                         let frame_pixel = pixels.as_slice()[y * pixels.width() as usize + x];
-                        let visible =
-                            frame_pixel.r > 40 && frame_pixel.g > 80 && frame_pixel.b > 100;
+                        let visible = frame_pixel.r > 40
+                            && frame_pixel.r > frame_pixel.g
+                            && frame_pixel.g > frame_pixel.b;
                         assert_eq!(
                             visible,
                             tick == 1260,
-                            "exit frame at {tick} in {viewport:?} {pattern:?} {profile:?}"
+                            "raised wooden exit at {tick} in {viewport:?} {pattern:?} {profile:?}"
                         );
                     }
                     let yellow = pixels
@@ -844,6 +862,35 @@ mod tests {
                     if tick == 0 || tick == scenario_clock::DUCK_TICKS {
                         assert_eq!(yellow, 0);
                         assert_eq!(frames[0], normal);
+                    }
+                    if capture_door {
+                        let directory = door_output.as_ref().unwrap();
+                        let stem =
+                            format!("hinge-{}x{}-{tick:03}", viewport.width, viewport.height);
+                        crate::thruster_visual_tests::write_png(
+                            &directory.join(format!("{stem}.png")),
+                            &pixels,
+                        );
+                        let side = if scenario.state.duck_state().unwrap().left_to_right {
+                            -1.0
+                        } else {
+                            1.0
+                        };
+                        let mut detail = frames[0].clone();
+                        detail.camera = engine_common::Camera2::new(
+                            engine_common::RenderPoint::new(
+                                (240.0 * viewport.aspect_ratio() - 72.0) * side,
+                                -181.6,
+                            ),
+                            96.0,
+                        );
+                        crate::thruster_visual_tests::write_png(
+                            &directory.join(format!("{stem}-detail.png")),
+                            &crate::thruster_visual_tests::raster(
+                                &detail,
+                                Viewport::new(480.0, 320.0),
+                            ),
+                        );
                     }
                     if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
                         let directory = std::path::PathBuf::from(directory);
@@ -1106,7 +1153,8 @@ mod tests {
                         .sum::<usize>()
                         // Inclined columns need two area-preserving pieces,
                         // each with a highlight: 256 more than flat columns.
-                        <= if water_lab == scenario_clock::ClockWaterLab::Off { 1056 } else { 800 },
+                        // The surround and bounded cell halos add up to 600.
+                        <= if water_lab == scenario_clock::ClockWaterLab::Off { 1656 } else { 1400 },
                     "bounded cells, columns, spill parcels and reforming face at tick {tick} {viewport:?}"
                 );
                 let presentation = crate::render::scene_presentation_from_frames_with_layout(
