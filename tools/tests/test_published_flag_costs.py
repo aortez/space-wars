@@ -25,6 +25,11 @@ class FlagCostAuditTests(unittest.TestCase):
                 (root/'flag-survey-work.jsonl').write_text(json.dumps(flag)+'\n')
             save()
             self.assertEqual(F.allocation_audit(root)['maximum'], dict(graph=4, physics_queries=350))
+            # A generated world's tick 0 still makes queue dispatch 1.
+            (root/'live-planning.csv').write_text('tick,graph,queries,graph_budget,query_budget\n0,1,100,4,384\n')
+            evaluation['tick'] = flag['tick'] = 0
+            save()
+            self.assertEqual(F.allocation_audit(root)['maximum'], dict(graph=4, physics_queries=350))
             # Each planner's own allowance could pass while their sum exceeds
             # the shared quota; the recorded residual must also agree.
             flag['allocation']['charged']['graph'] = 2

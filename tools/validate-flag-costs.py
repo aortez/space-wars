@@ -78,7 +78,7 @@ def allocation_audit(root):
     flags = {r['tick']:r for r in rows(root/'flag-survey-work.jsonl')}
     assert evaluation.keys() == flags.keys() and live.keys() <= evaluation.keys()
     totals, maximum = Counter(), [0, 0]
-    for tick, r in evaluation.items():
+    for dispatch, (tick, r) in enumerate(evaluation.items(), 1):
         l = live.get(tick, [0, 0])
         for i, (key, quota) in enumerate([('graph', 4), ('physics_queries', 384)]):
             assert r['remaining_before_evaluation'][key] == quota - l[i]
@@ -87,7 +87,9 @@ def allocation_audit(root):
             f = flags[tick]
             assert f['remaining_after_evaluation'][key] == quota - l[i] - e
             a = f['allocation']
-            assert a['tick'] == tick
+            # This is the queue's dispatch ordinal, not the world epoch.
+            # Generated worlds start at 0; directed fixtures start at 1.
+            assert a['tick'] == dispatch
             charge = sum(j['charged'][key] for j in a['jobs'])
             assert charge == a['charged'][key] <= a['allowance'][key] <= quota - l[i] - e
             total = l[i] + e + charge

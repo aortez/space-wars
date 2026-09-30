@@ -111,4 +111,13 @@ python3 tools/validate-flag-costs.py --binary target/release/examples/surface_mi
 
 ## Results
 
-Pending the frozen run.
+The first run (`target/published-flag-costs/v1`) completed all 32 directed trials
+and the first generated predecessor match, then its audit rejected that match.
+The audit incorrectly equated the planning queue's dispatch ordinal with the
+world tick: directed fixtures begin at world tick 1, generated worlds at 0.
+The corrected audit checks dispatch ordinals and joins costs by the separately
+recorded world tick. The regression test exercises both epochs.
+
+All v1 artifacts remain intact. Validation replays the same plan and identical
+frozen binary in `target/published-flag-costs/v2`; this is an audit correction,
+not a new candidate or new held-out seeds. Results pending that replay.
