@@ -153,7 +153,11 @@ All **541 Python analysis tests** pass, including 21 focused acquisition-audit
 tests. Tests exercise stale native telemetry, deferred versus empty scans,
 changed objective domains, missing/duplicate ticks, wrong actors, earlier
 choices and interruptions, an artificially retimed handoff, unwitnessed stop
-events and unobserved match/runner censors. No Rust or device code changes.
+events and unobserved match/runner censors. Playing and device behavior are
+unchanged. The settings fallback test also uses an explicitly unsupported
+controller name now that `value-bot` is a supported choice; the existing positive
+round-trip test continues to cover ValueBot.
+All 24 settings tests pass with that fixture correction.
 
 Independent review identified missing links between the probe clock and its
 actual transfer arrival, plus missing interruption witnesses. The audit now
