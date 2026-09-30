@@ -30,6 +30,8 @@ struct Actor {
     source: Option<Source>,
     attached: Option<RemoteSurveySnapshot>,
     before: Option<MaterialMissionPilot>,
+    latest: Option<ArrivalSurveyAttempt>,
+    collection_rejected: Option<&'static str>,
 }
 
 pub(super) struct ArrivalComparisonRun {
@@ -38,13 +40,14 @@ pub(super) struct ArrivalComparisonRun {
     measured: bool,
     local_reference: bool,
     site_preference: bool,
+    neighbors: bool,
     work: BufWriter<File>,
     observation_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
 }
 
 impl ArrivalComparisonRun {
-    pub fn from_args(out: &Path, seed: u64) -> Option<Self> {
+    pub fn from_args(out: &Path, seed: u64, neighbors: bool) -> Option<Self> {
         let local_reference = match crate::arg("--arrival-local-reference", "off").as_str() {
             "off" => false,
             "on" => true,
@@ -74,6 +77,7 @@ impl ArrivalComparisonRun {
         let mut run = Self::new(out, seed, measured);
         run.local_reference = local_reference;
         run.site_preference = site_preference;
+        run.neighbors = neighbors;
         Some(run)
     }
 
@@ -92,11 +96,14 @@ impl ArrivalComparisonRun {
                     source: None,
                     attached: None,
                     before: None,
+                    latest: None,
+                    collection_rejected: None,
                 }
             }),
             measured,
             local_reference: false,
             site_preference: false,
+            neighbors: false,
             work: BufWriter::new(
                 File::create(out.join("surveyed-arrival-comparison.jsonl")).unwrap(),
             ),
@@ -110,9 +117,32 @@ impl ArrivalComparisonRun {
             // Charged failures and missing evidence are events too. A later
             // positive result cannot replace the first event or retry a source.
             if actor.trigger.is_none() {
-                actor.trigger = attempt;
+                actor.trigger = attempt.clone();
+            }
+            if self.neighbors && actor.source.is_none() {
+                if actor.latest.is_some() {
+                    actor
+                        .collection_rejected
+                        .get_or_insert("arrival sample was not consumed before the next dispatch");
+                }
+                actor.latest = attempt;
             }
         }
+    }
+
+    pub fn reject_collections(&mut self, reasons: [Option<&'static str>; 2]) {
+        for (actor, reason) in self.actors.iter_mut().zip(reasons) {
+            if self.neighbors
+                && actor.source.is_none()
+                && let Some(reason) = reason
+            {
+                actor.collection_rejected.get_or_insert(reason);
+            }
+        }
+    }
+
+    pub fn collection_refusals(&self) -> [Option<&'static str>; 2] {
+        std::array::from_fn(|seat| self.actors[seat].collection_rejected)
     }
 
     pub fn before_intent(
@@ -129,15 +159,57 @@ impl ArrivalComparisonRun {
         let tick = o.local.combat.recovery.flight.pilot.tick;
         let trigger = actor.trigger.as_ref();
         let timely = trigger.is_some_and(|t| t.tick.checked_add(1) == Some(tick));
+        let latest = actor.latest.take();
+        if self.neighbors
+            && let Some(trigger) = trigger
+        {
+            if trigger.plan.token.actor != seat as u64 {
+                actor
+                    .collection_rejected
+                    .get_or_insert("survey attempt actor changed");
+            }
+            if !actor
+                .memory
+                .continues_neutral_material(o, trigger.plan.site.planet)
+            {
+                actor
+                    .collection_rejected
+                    .get_or_insert("arrival collection identity or observation continuity changed");
+            }
+            if latest.as_ref().is_some_and(|sample| {
+                sample.tick.checked_add(1) != Some(tick) || sample.plan != trigger.plan
+            }) {
+                actor
+                    .collection_rejected
+                    .get_or_insert("arrival collection sample identity or epoch changed");
+            }
+        }
         // Exactly one memory observation: the same-tick barrier would reject a
         // second call that tried to add evidence after observing an empty frame.
         actor.memory.observe(
             o,
-            trigger.filter(|_| timely).and_then(|t| t.evidence.as_ref()),
+            if self.neighbors {
+                latest
+                    .as_ref()
+                    .filter(|sample| {
+                        sample.tick.checked_add(1) == Some(tick)
+                            && actor.collection_rejected.is_none()
+                    })
+                    .and_then(|t| t.evidence.as_ref())
+            } else {
+                trigger.filter(|_| timely).and_then(|t| t.evidence.as_ref())
+            },
         );
-        if let Some(trigger) = trigger {
+        if let Some(trigger) = trigger.filter(|t| {
+            !self.neighbors
+                || tick
+                    >= t.tick
+                        .saturating_add(crate::arrival_survey::COLLECTION_TICKS + 1)
+        }) {
             let retained = actor.memory.snapshot(o);
-            let rejected = if !timely {
+            let rejected = if self.neighbors && actor.collection_rejected.is_some() {
+                actor.collection_rejected
+            } else if !self.neighbors && !timely {
                 Some("survey attempt was not observed on the next tick")
             } else if trigger.plan.token.actor != seat as u64 {
                 Some("survey attempt actor changed")
@@ -314,6 +386,12 @@ impl ArrivalComparisonRun {
         if self.site_preference {
             report["arrival_site_preference"] = json!(true);
         }
+        if self.neighbors {
+            report["arrival_collection"] = json!({"model":"neighbors3_window_v1","ticks":crate::arrival_survey::COLLECTION_TICKS});
+            report["scope"] = json!(
+                "First charged event fixes the three-site request and collection deadline. Observe each sample on its next real tick, preserving epochs, negative and missing slots. Freeze once at first attempt+61, after ingesting the final possible sample. Interrupted identity/continuity refuses the source; no retry. Fixed deadline is independent of outcomes; native acquisition and full-trip time remain unknown."
+            );
+        }
         report
     }
 }
@@ -432,6 +510,169 @@ mod tests {
                     }),
                 }],
             }),
+        }
+    }
+
+    fn collection_event(
+        o: &MissionObservationV1,
+        plan: &ArrivalSurveyPlan,
+        slot: usize,
+        absent: bool,
+    ) -> ArrivalSurveyAttempt {
+        let mut event = attempt(o, CoverFinding::NoLanding);
+        let mut candidate = event.evidence.take().unwrap().candidates.remove(0);
+        candidate.id = plan.request.unwrap().candidates[slot].unwrap();
+        let mut evidence = DestinationCoverObservation::pending(plan.request.unwrap());
+        evidence.candidates[slot] = candidate;
+        event.plan = plan.clone();
+        event.evidence = (!absent).then_some(evidence);
+        event
+    }
+
+    fn collection_plan(o: &MissionObservationV1) -> ArrivalSurveyPlan {
+        let mut plan = attempt(o, CoverFinding::NoLanding).plan;
+        let site = plan.site;
+        plan.request = Some(
+            scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest {
+                generation: o.local.combat.recovery.flight.pilot.tick,
+                candidates: [
+                    Some(site),
+                    Some(LandingSiteId {
+                        bearing: 63,
+                        ..site
+                    }),
+                    Some(LandingSiteId { bearing: 1, ..site }),
+                    None,
+                ],
+                sample_climb: true,
+            },
+        );
+        plan
+    }
+
+    #[test]
+    fn neighbor_collection_ingests_boundary_sample_before_freezing_without_rewriting_epochs() {
+        // 4 retires the producer before the third dispatch entirely; 1 sends a
+        // charged attempt without evidence. Both must retain a pending slot.
+        for missing in [0, 1, 3, 4] {
+            let (mut run, state, bot, path) = fixture(&format!("neighbors-{missing}"), true);
+            run.neighbors = true;
+            let mut o = state.mission_observation(0, None);
+            let first = o.local.combat.recovery.flight.pilot.tick;
+            let plan = collection_plan(&o);
+            run.before_intent(&bot, 0, &o);
+            let first_event = collection_event(&o, &plan, 0, missing == 3);
+            run.receive([Some(first_event.clone()), None]);
+            for offset in 1..=61 {
+                o.local.combat.recovery.flight.pilot.tick = first + offset;
+                run.before_intent(&bot, 0, &o);
+                if offset < 61 {
+                    assert!(run.actors[0].source.is_none());
+                }
+                if offset == 30 || (offset == 60 && missing != 4) {
+                    run.receive([
+                        Some(collection_event(
+                            &o,
+                            &plan,
+                            (offset / 30) as usize,
+                            missing == 3 || (missing == 1 && offset == 60),
+                        )),
+                        None,
+                    ]);
+                }
+            }
+            let source = run.actors[0].source.as_ref().unwrap();
+            assert_eq!(source.tick, first + 61);
+            assert!(source.rejected.is_none());
+            assert_eq!(json!(run.actors[0].trigger), json!(Some(first_event)));
+            let retained = json!(source.retained);
+            if missing == 3 {
+                assert_eq!(retained["groups"], json!([]));
+            } else {
+                let candidates = retained["groups"][0]["survey"]["candidates"]
+                    .as_array()
+                    .unwrap();
+                assert_eq!(candidates.len(), 3);
+                assert_eq!(candidates[0]["measurement"]["tick"], first);
+                assert_eq!(candidates[1]["measurement"]["tick"], first + 30);
+                if missing == 1 || missing == 4 {
+                    assert!(candidates[2]["measurement"].is_null());
+                    assert_eq!(candidates[2]["status"], "pending");
+                    assert_eq!(
+                        candidates[2]["reason"],
+                        "sample not observed at measurement tick"
+                    );
+                } else {
+                    assert_eq!(candidates[2]["measurement"]["tick"], first + 60);
+                }
+            }
+            std::fs::remove_dir_all(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn neighbor_collection_latches_interruption_even_if_context_recovers_before_deadline() {
+        for change in [
+            "material",
+            "vehicle",
+            "gap",
+            "deadline",
+            "plan",
+            "epoch",
+            "host_refusal",
+        ] {
+            let (mut run, state, bot, path) =
+                fixture(&format!("neighbor-interrupt-{change}"), true);
+            run.neighbors = true;
+            let base = state.mission_observation(0, None);
+            let mut o = base.clone();
+            let first = o.local.combat.recovery.flight.pilot.tick;
+            let plan = collection_plan(&o);
+            run.before_intent(&bot, 0, &o);
+            run.receive([Some(collection_event(&o, &plan, 0, false)), None]);
+            for offset in 1..=62 {
+                if change == "deadline" && offset == 61 {
+                    continue;
+                }
+                o = base.clone();
+                o.local.combat.recovery.flight.pilot.tick = first + offset;
+                if offset == 20 {
+                    match change {
+                        "material" => {
+                            o.planets
+                                .iter_mut()
+                                .find(|p| p.index == plan.site.planet)
+                                .unwrap()
+                                .revision += 1
+                        }
+                        "vehicle" => o.local.combat.recovery.flight.pilot.vehicle.0 += 1,
+                        "gap" => continue,
+                        "host_refusal" => run
+                            .reject_collections([Some("arrival shortlist request changed"), None]),
+                        _ => (),
+                    }
+                }
+                run.before_intent(&bot, 0, &o);
+                if offset == 30 {
+                    let mut event = collection_event(&o, &plan, 1, false);
+                    if change == "plan" {
+                        event.plan.token.generation += 1;
+                    }
+                    if change == "epoch" {
+                        event.tick -= 1;
+                    }
+                    run.receive([Some(event), None]);
+                }
+            }
+            let source = run.actors[0].source.as_ref().unwrap();
+            assert_eq!(
+                source.tick,
+                first + if change == "deadline" { 62 } else { 61 }
+            );
+            assert!(source.rejected.is_some() && source.token.is_none());
+            assert!(run.actors[0].attached.is_none() && run.actors[0].before.is_none());
+            assert!(run.collection_refusals()[0].is_some());
+            std::fs::remove_dir_all(path).unwrap();
         }
     }
 

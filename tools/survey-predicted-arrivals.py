@@ -23,7 +23,35 @@ D = module('destination_comparison', 'compare-transfer-destinations.py')
 A, F, C, T, Q = B.A, B.F, B.C, B.T, B.Q
 
 
-def audit_row(row, state, forecast, pilot, remaining, busy, last):
+def collection_disruptions(observed, survey, row, tick):
+    seat, dest = row['seat'], row['plan']['site']['planet']
+    freeze = min((t for t,s in observed if s == seat and t >= row['tick']+61),default=tick)
+    tick = min(tick,freeze)
+    frames = [observed[t,s] for t,s in sorted((t,s) for t,s in observed if s == seat and row['tick'] <= t <= tick)]
+    reasons = []
+    def identity(frame):
+        p = A.P.pilot(frame)
+        planet = next((v for v in frame['observation']['planets'] if v['index'] == dest),None)
+        context = frame['observation'].get('match_context')
+        alive = context is None or (not context['finished'] and context['pilots_alive'][seat])
+        valid = p['owner'] == f'player_{seat+1}' and p['ship_available'] and p['ship_form'] == 'ship' and alive
+        material = A.R.neutral_identity(planet) if planet else None
+        return ([p[k] for k in ['owner','vehicle','spaceling']],T.f32_identity(material)) if valid and material else None
+    for previous,current in zip(frames,frames[1:]):
+        if current['tick'] != previous['tick']+1 or identity(previous) is None or identity(previous) != identity(current):
+            reasons.append(dict(tick=current['tick'],reason='arrival collection identity or observation continuity changed'))
+    if row['plan']['token']['actor'] != seat:
+        reasons.append(dict(tick=row['tick']+1,reason='survey attempt actor changed'))
+    for event in survey:
+        if event['seat'] != seat or not row['tick'] <= event['tick'] < tick: continue
+        if event['plan']['request'] is not None and event['plan'] != row['plan']:
+            charged = event['allocation'] and event['allocation']['charged']['physics_queries']
+            reasons.append(dict(tick=event['tick']+int(bool(charged)),reason=
+                'arrival collection sample identity or epoch changed' if charged else 'arrival shortlist request changed'))
+    return sorted(reasons,key=lambda r:r['tick'])
+
+
+def audit_row(row, state, forecast, pilot, remaining, busy, last, shortlists=None):
     tick, seat, plan = row['tick'], row['seat'], row['plan']
     assert state['phase'] == 'ready' and state['validated_tick'] == tick
     assert plan['token'] == state['token'] and plan['token']['actor'] == seat
@@ -44,10 +72,25 @@ def audit_row(row, state, forecast, pilot, remaining, busy, last):
     if request:
         assert blocked is None
         assert plan['completed_tick'] < request['generation'] <= tick
-        assert request['candidates'] == [expected,None,None,None] and request['sample_climb']
+        ids = [expected,dict(expected,bearing=(expected['bearing']-1)%64),dict(expected,bearing=(expected['bearing']+1)%64),None] if shortlists is not None else [expected,None,None,None]
+        assert request['candidates'] == ids and request['sample_climb']
     else:
         assert blocked
-    reason = (blocked or ('earlier physical work' if seat in busy else
+    shortlist_reason = None
+    index = 0
+    if shortlists is not None:
+        cursor = shortlists.get(seat)
+        if request:
+            if cursor is None: cursor = shortlists.setdefault(seat,dict(first=None,count=0,plan=plan,refusal=None))
+            if cursor['first'] is None: cursor['plan'] = plan
+            index = cursor['count']
+            assert row['sampling_site'] == (ids[index] if index < 3 else None)
+            if cursor['plan'] != plan: cursor['refusal'] = 'arrival shortlist request changed'
+            shortlist_reason = cursor['refusal'] or (
+                'collection window closed' if cursor['first'] is not None and tick > cursor['first']+60 else
+                'shortlist sampled' if index == 3 else None)
+        else: assert row['sampling_site'] is None
+    reason = (blocked or shortlist_reason or ('earlier physical work' if seat in busy else
         'refresh interval' if seat in last and tick < last[seat]+30 else
         'query budget' if remaining < 192 else None))
     assert row['deferred'] == reason
@@ -60,21 +103,29 @@ def audit_row(row, state, forecast, pilot, remaining, busy, last):
     assert allocation['charged']['graph'] == 0 and 0 <= used <= min(192, remaining)
     assert sum(j['charged']['physics_queries'] for j in allocation['jobs']) == used
     assert all(j['request']['actor'] == seat and j['charged']['graph'] == 0 for j in allocation['jobs'])
+    if used:
+        last[seat] = tick
+        if shortlists is not None:
+            cursor['first'] = tick if cursor['first'] is None else cursor['first']
+            cursor['count'] += 1
+    if not row['evidence']:
+        return None, used
     assert len(row['evidence']) == 1 and row['evidence'][0][0] == seat
     evidence = row['evidence'][0][1]
-    assert evidence['generation'] == request['generation'] and len(evidence['candidates']) == 1
-    candidate = evidence['candidates'][0]
-    assert candidate['id'] == expected
+    assert evidence['generation'] == request['generation'] and len(evidence['candidates']) == (3 if shortlists is not None else 1)
+    assert [c['id'] for c in evidence['candidates']] == [v for v in request['candidates'] if v]
+    candidate = evidence['candidates'][index]
+    assert candidate['id'] == request['candidates'][index]
+    assert all(c['measurement'] is None and c['status'] == 'pending' and c['reason'] is None for i,c in enumerate(evidence['candidates']) if i != index)
     measurement = candidate['measurement']
-    if used:
-        assert measurement and measurement['tick'] == tick and measurement['queries'] == used
+    if measurement:
+        assert used and measurement['tick'] == tick and measurement['queries'] == used
         assert request['generation'] <= measurement['tick']
         assert candidate['status'] == measurement['finding'] in ['measured','no_landing','incomplete']
         if measurement['site']:
-            assert measurement['site']['id'] == expected
-        last[seat] = tick
+            assert measurement['site']['id'] == candidate['id']
     else:
-        assert measurement is None
+        assert candidate['status'] == 'pending'
     return measurement, used
 
 
@@ -116,6 +167,7 @@ def audit_survey(root, report, case, controlled):
         busy[tick].update(j['request']['actor'] for j in row['allocation']['jobs'] if j['charged']['physics_queries'])
     observed = {(r['tick'],r['seat']):r for r in C.read_trace(root)}
     last, spent, measurements, reasons, requests = {}, Counter(), [], Counter(), {}
+    shortlists = {} if schedule['arrival_survey'].get('pattern') == 'neighbors3' else None
     seen = set()
     for row in rows:
         tick, seat = row['tick'],row['seat']
@@ -133,7 +185,13 @@ def audit_survey(root, report, case, controlled):
                 eligible.append(candidate)
         candidate = min(eligible,key=lambda c:(not c['current'],c['destination']))
         leftover = 384-live_queries.get(tick,0)-flags[tick]['allocation']['charged']['physics_queries']-spent[tick]
-        measurement, used = audit_row(row,state,candidate['forecast'],A.P.pilot(current),leftover,busy[tick],last)
+        if shortlists is not None and 'surveyed_arrival_comparison' in schedule:
+            cursor = shortlists.get(seat)
+            if cursor and cursor['first'] is not None and cursor['refusal'] is None:
+                first = next(r for r in rows if (r['tick'],r['seat']) == (cursor['first'],seat))
+                disruptions = collection_disruptions(observed,rows,first,tick)
+                if disruptions: cursor['refusal'] = disruptions[0]['reason']
+        measurement, used = audit_row(row,state,candidate['forecast'],A.P.pilot(current),leftover,busy[tick],last,shortlists)
         audit_request_generation(row, requests)
         spent[tick] += used
         reasons[row['deferred'] or 'attempt'] += 1
@@ -141,24 +199,27 @@ def audit_survey(root, report, case, controlled):
             planet = next(p for p in current['observation']['planets'] if p['index'] == row['plan']['site']['planet'])
             assert measurement['revision'] == planet['revision']
             assert T.f32_identity(measurement['planet']) == T.f32_identity(planet['motion'])
+            measured_site = row.get('sampling_site',row['plan']['site'])
             entry = dict(seat=seat,plan=row['plan'],measurement=measurement)
+            if shortlists is not None: entry['sampling_site'] = measured_site
             if controlled:
                 probe = report['transfer_probe']
                 choice_tick = probe['acquisition']['outcome']['tick']
                 choice = observed[choice_tick,seat]
-                fresh = next((s for s in A.P.pilot(choice)['sites'] if s['id'] == row['plan']['site']),None)
+                fresh = next((s for s in A.P.pilot(choice)['sites'] if s['id'] == measured_site),None)
                 controls = [observed[t,seat] for t in range(tick,choice_tick+1)]
                 changes = A.identity_changes(controls,row['plan']['site']['planet'])
                 selected = probe['landing_choice']['report']['selected']['site']
                 valid = A.age_and_identity_valid(tick,choice_tick,changes)
                 entry['retrospective'] = dict(choice_tick=choice_tick,selected=selected,
-                    covers_selected=selected==row['plan']['site'],age_ticks=choice_tick-tick,identity=changes,
+                    covers_selected=selected==measured_site,age_ticks=choice_tick-tick,identity=changes,
                     age_and_identity_valid=valid,
                     geometry=A.geometry_residual(A.project(measurement,A.P.pilot(choice)['planet']['motion']),fresh)
                         if valid and measurement['site'] is not None else None)
             measurements.append(entry)
     assert sum(spent.values()) == schedule['arrival_survey']['physics_queries']
-    assert len(measurements) == schedule['arrival_survey']['attempts']
+    attempts = sum(bool(r['allocation'] and r['allocation']['charged']['physics_queries']) for r in rows)
+    assert attempts == schedule['arrival_survey']['attempts']
     # Log coverage itself must be dense throughout each eligible Ready window,
     # including local/budget/refresh deferrals and ending on invalidation.
     for source in schedule['sources']:
@@ -167,6 +228,7 @@ def audit_survey(root, report, case, controlled):
             end = source['final_state']['cancelled_tick']
             assert [t for t,s in sorted(seen) if s == source['seat']] == list(range(start,end))
     return dict(rows=len(rows),reasons=dict(reasons),queries=sum(spent.values()),measurements=measurements,
+        charged_attempts=attempts,attempts_without_measurements=attempts-len(measurements),
         maximum_combined_queries=max((spent[t]+live_queries.get(t,0)+flags[t]['allocation']['charged']['physics_queries'] for t in flags),default=0))
 
 
