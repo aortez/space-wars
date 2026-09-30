@@ -120,14 +120,18 @@ fn create_with_seats(
         surveys: LiveObjectivePlanner::new(2, OBSERVATION_WORK),
         pilots: std::array::from_fn(|seat| {
             MissionBot::new(
-                if registration.id == MATCH_REGISTRATION.id
-                    && [
+                if registration.id == MATCH_REGISTRATION.id {
+                    match [
                         settings.spacewars.player_1_controller,
                         settings.spacewars.player_2_controller,
                     ][seat]
-                        == engine_common::SpacewarsController::PlannerBot
-                {
-                    MissionPolicy::Planner
+                    {
+                        engine_common::SpacewarsController::PlannerBot => MissionPolicy::Planner,
+                        engine_common::SpacewarsController::DestinationBot => {
+                            MissionPolicy::DestinationPlanner
+                        }
+                        _ => MissionPolicy::Legacy,
+                    }
                 } else {
                     MissionPolicy::Legacy
                 },
@@ -222,7 +226,7 @@ impl ClientScenario for MaterialMissionClientScenario {
             let clock = Instant::now();
             actions.extend(
                 self.pilots[seat]
-                    .intent(&o)
+                    .intent_with_evaluation(&o, &self.evaluation)
                     .encode(PlayerId::from_index(seat).unwrap()),
             );
             sample.policies[seat] = clock.elapsed();
@@ -332,7 +336,7 @@ impl ClientScenario for MaterialMissionClientScenario {
 mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
-    use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
+    use engine_common::SpacewarsController::{DestinationBot, Human, PlannerBot, RuleBot};
     use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
 
@@ -480,6 +484,11 @@ mod tests {
             [PlannerBot, PlannerBot],
             [PlannerBot, RuleBot],
             [RuleBot, PlannerBot],
+            [DestinationBot, Human],
+            [Human, DestinationBot],
+            [DestinationBot, DestinationBot],
+            [DestinationBot, PlannerBot],
+            [PlannerBot, DestinationBot],
         ] {
             let mut settings = Settings::default();
             settings.spacewars.player_1_controller = controllers[0];
@@ -510,10 +519,10 @@ mod tests {
                 3
             );
             for (seat, controller) in controllers.iter().enumerate() {
-                let policy = if *controller == PlannerBot {
-                    MissionPolicy::Planner
-                } else {
-                    MissionPolicy::Legacy
+                let policy = match controller {
+                    PlannerBot => MissionPolicy::Planner,
+                    DestinationBot => MissionPolicy::DestinationPlanner,
+                    _ => MissionPolicy::Legacy,
                 };
                 assert_eq!(client.pilots[seat].telemetry().policy, policy.id());
                 assert_eq!(
