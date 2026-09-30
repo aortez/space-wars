@@ -359,7 +359,7 @@ seed = 12616578969279246616
 raster_scale = 2.0
 [spacewars]
 player_1_controller = "planner-bot"
-player_2_controller = "unsupported-test-bot"
+player_2_controller = "unsupported-bot-test-fixture"
 player_health_percent = 200
 "#;
         fs::write(&path, original).unwrap();
