@@ -217,6 +217,10 @@ def progress(records):
 def compare_controls(out, a, b, reports):
     switches = [s['tick'] for r in reports for seat in range(2) for s in D.finished_player(r, seat)['switches']]
     cutoff = min(switches, default=math.inf)
+    if switches:
+        for report in reports:
+            start = report['initial_world']['local']['combat']['recovery']['flight']['pilot']['tick']
+            assert start+report['elapsed_ticks'] > cutoff, 'run ended before the first switch'
     left, right = [validated_trace(rows(out/name/'destination-behavior.jsonl.gz'), report)
         for name, report in zip([a,b],reports)]
     count = 0

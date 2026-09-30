@@ -142,9 +142,13 @@ class SurveyValueBehaviorTests(unittest.TestCase):
                 (root/name).mkdir()
                 with gzip.open(root/name/'destination-behavior.jsonl.gz','wt') as f:
                     for row in records: f.write(json.dumps(row)+'\n')
-            with patch.object(T.D,'finished_player',return_value=dict(switches=[dict(tick=9)])), \
-                    patch.object(T.D,'same_physical_outcomes',return_value=True),self.assertRaises(AssertionError):
-                T.compare_controls(root,'a','b',[report,report])
+            for length in [10,8]:
+                # Reject both a truncated trace and a complete shorter run
+                # that already diverged before the other arm's later switch.
+                other=dict(report,elapsed_ticks=length)
+                with patch.object(T.D,'finished_player',return_value=dict(switches=[dict(tick=9)])), \
+                        patch.object(T.D,'same_physical_outcomes',return_value=True),self.assertRaises(AssertionError):
+                    T.compare_controls(root,'a','b',[report,other])
 
 
 if __name__=='__main__': unittest.main()
