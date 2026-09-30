@@ -1,0 +1,1086 @@
+{
+  "schema": 1,
+  "source_commit": "a0e0a9304f78966059b810a8f6448d305d96adf2",
+  "binary_sha256": "3df2dbd7c4f4e7d104ee2c049f5f149d588f1616daedc6d530e8226a1e65bdc0",
+  "runner_sha256": "2c872227524c536f1e9f4d30b2470becba5eeb49b16c6e15598bea1513c5de07",
+  "replay_summary_sha256": "f06e6b0bc4424f356e3223b192d92f201c6b134958d2d73a055ca9720a0df22d",
+  "scope": "All four changed directed neutral fixtures, v14/v15/v16. Dense native observations share the same ship and planet motion at first site selection. Phases use controller epochs, not the world-step trace label. Surface begins final landing control; it does not mean touchdown. No causal counterfactual or general match-strength claim.",
+  "cases": [
+    {
+      "name": "destination-p1-bearing0.8-v14",
+      "version": 14,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "e8d2bfd56094a600b6cd290b92ddf745f2a8e484d4f3da8a8ce3915e3a56f539",
+      "dense_ticks": 1552,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 40,
+          "planet": 0
+        },
+        "signed_angle": -0.027846897869435085,
+        "tangent_speed": -19.480476127397683,
+        "orbital_bearing_rate": -0.1248738155150026,
+        "radial_speed": 3.5286641144695485,
+        "altitude": 96.00128855722568,
+        "height": 91.16799933771472,
+        "side_error": 4.343509445465315
+      },
+      "approach_entry": {
+        "tick": 501,
+        "site": {
+          "bearing": 40,
+          "planet": 0
+        },
+        "signed_angle": -0.02199262940986047,
+        "tangent_speed": -17.65208155568722,
+        "orbital_bearing_rate": -0.11302722034284876,
+        "radial_speed": 3.488303281965913,
+        "altitude": 96.17549031235706,
+        "height": 91.36492974668727,
+        "side_error": 3.4343420357436116
+      },
+      "surface_entry": {
+        "tick": 1126,
+        "site": {
+          "bearing": 40,
+          "planet": 0
+        },
+        "signed_angle": -0.0002296058766914391,
+        "tangent_speed": -0.5034047981661238,
+        "orbital_bearing_rate": -0.0063109712135565104,
+        "radial_speed": -1.904519827876406,
+        "altitude": 19.766612955667867,
+        "height": 14.9937706443543,
+        "side_error": 0.018282016841112636
+      },
+      "landed_tick": 1587,
+      "departed_tick": 1998,
+      "phase_ticks": {
+        "circling": 3,
+        "approach": 625,
+        "landing": 461,
+        "capture_and_departure": 411
+      },
+      "maximum_approach_side_error": 17.831782603116153,
+      "approach_ticks_outside_8_units": 153,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.9048166275024414,
+          "position": {
+            "x": 372.29266357421875,
+            "y": 625.771484375
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.906739234924316,
+            "y": -7.295764923095703
+          }
+        },
+        "planet": {
+          "angle": 1.6952873468399048,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p1-bearing0.8-v15",
+      "version": 15,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "cc2c99eb172ea57560a276c4f8bc20bc66367a08965b444dd68c58496941b70c",
+      "dense_ticks": 1765,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": 0.7575517419755988,
+        "tangent_speed": -19.480476127397683,
+        "orbital_bearing_rate": -0.1248738155150026,
+        "radial_speed": 3.5286641144695485,
+        "altitude": 96.00128855722568,
+        "height": 48.563176377032505,
+        "side_error": -107.19580501705786
+      },
+      "approach_entry": {
+        "tick": 858,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": 0.05546530957032448,
+        "tangent_speed": 17.513872599508332,
+        "orbital_bearing_rate": 0.11956965804933879,
+        "radial_speed": 2.3309715192044203,
+        "altitude": 86.4742216815697,
+        "height": 81.47471183365724,
+        "side_error": -8.120625144729274
+      },
+      "surface_entry": {
+        "tick": 1360,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": 0.005708465029157905,
+        "tangent_speed": 0.8425843371962226,
+        "orbital_bearing_rate": 0.01056669609538434,
+        "radial_speed": -2.516588043263194,
+        "altitude": 19.739620557865138,
+        "height": 14.964178667104534,
+        "side_error": -0.4552266397076892
+      },
+      "landed_tick": 1801,
+      "departed_tick": 2211,
+      "phase_ticks": {
+        "circling": 360,
+        "approach": 502,
+        "landing": 441,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 8.678215937045024,
+      "approach_ticks_outside_8_units": 48,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.9048166275024414,
+          "position": {
+            "x": 372.29266357421875,
+            "y": 625.771484375
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.906739234924316,
+            "y": -7.295764923095703
+          }
+        },
+        "planet": {
+          "angle": 1.6952873468399048,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p1-bearing0.8-v16",
+      "version": 16,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "f0b6f430613979b9b91dc7655d2e356d194352ef0c4bf90fae2f6eb6b7deb84d",
+      "dense_ticks": 1713,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 44,
+          "planet": 0
+        },
+        "signed_angle": 0.36481965945493117,
+        "tangent_speed": -19.480476127397683,
+        "orbital_bearing_rate": -0.1248738155150026,
+        "radial_speed": 3.5286641144695485,
+        "altitude": 96.00128855722568,
+        "height": 80.98157705028461,
+        "side_error": -55.62989630416814
+      },
+      "approach_entry": {
+        "tick": 773,
+        "site": {
+          "bearing": 44,
+          "planet": 0
+        },
+        "signed_angle": 0.054034226211787724,
+        "tangent_speed": 17.611467195928977,
+        "orbital_bearing_rate": 0.12015604743088447,
+        "radial_speed": 0.06415498051666813,
+        "altitude": 86.5716255859644,
+        "height": 81.58808568354289,
+        "side_error": -7.886791689608799
+      },
+      "surface_entry": {
+        "tick": 1277,
+        "site": {
+          "bearing": 44,
+          "planet": 0
+        },
+        "signed_angle": 0.012601388857059777,
+        "tangent_speed": 0.33921204894273793,
+        "orbital_bearing_rate": 0.004262438161223356,
+        "radial_speed": -2.1107204900713903,
+        "altitude": 19.58169388324478,
+        "height": 14.803229562295883,
+        "side_error": -0.9977110054337572
+      },
+      "landed_tick": 1749,
+      "departed_tick": 2159,
+      "phase_ticks": {
+        "circling": 275,
+        "approach": 504,
+        "landing": 472,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 7.886791689608799,
+      "approach_ticks_outside_8_units": 0,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.9048166275024414,
+          "position": {
+            "x": 372.29266357421875,
+            "y": 625.771484375
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.906739234924316,
+            "y": -7.295764923095703
+          }
+        },
+        "planet": {
+          "angle": 1.6952873468399048,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise",
+      "evaluation_geometry": {
+        "measurement_tick": 429,
+        "evaluation_source_tick": 445,
+        "signed_angle": 0.1501424999596005,
+        "neutral_inputs_sha256": "849bea335f42d800d365ebdb49dde6096d22446f01c2a6536813a6874f052a2b",
+        "evaluation_stream_sha256": "45d0bff423b52d386d52d7f84c5e49663f608d275bad3cf570582377c29d74a5",
+        "scope": "Historical measured vehicle position reprojected into the planet pose at evaluation; no future motion used."
+      }
+    },
+    {
+      "name": "destination-p1-bearing1.2-v14",
+      "version": 14,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "a8cd804b3a792fd2146060ffc862980a76c0be1642240aa4e7254adafcf150dc",
+      "dense_ticks": 1421,
+      "first_choice": {
+        "tick": 460,
+        "site": {
+          "bearing": 43,
+          "planet": 0
+        },
+        "signed_angle": 0.04844614516949022,
+        "tangent_speed": -20.197213268394872,
+        "orbital_bearing_rate": -0.13403890864131882,
+        "radial_speed": 0.9152555656185672,
+        "altitude": 90.68171975677282,
+        "height": 85.73232308479237,
+        "side_error": -7.303681883571699
+      },
+      "approach_entry": {
+        "tick": 463,
+        "site": {
+          "bearing": 43,
+          "planet": 0
+        },
+        "signed_angle": 0.054622637152443726,
+        "tangent_speed": -17.814023456596033,
+        "orbital_bearing_rate": -0.11819230194343242,
+        "radial_speed": 0.7807339282964607,
+        "altitude": 90.72067438979181,
+        "height": 85.7232806855327,
+        "side_error": -8.235630151164514
+      },
+      "surface_entry": {
+        "tick": 982,
+        "site": {
+          "bearing": 43,
+          "planet": 0
+        },
+        "signed_angle": -0.008827079631924714,
+        "tangent_speed": -0.8953386686113718,
+        "orbital_bearing_rate": -0.011224007119567801,
+        "radial_speed": -2.458914505166584,
+        "altitude": 19.769966204890295,
+        "height": 14.994862029311662,
+        "side_error": 0.703006102821746
+      },
+      "landed_tick": 1425,
+      "departed_tick": 1835,
+      "phase_ticks": {
+        "circling": 3,
+        "approach": 519,
+        "landing": 443,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 29.20794306123571,
+      "approach_ticks_outside_8_units": 255,
+      "arrival_motion": {
+        "ship": {
+          "angle": -3.127825975418091,
+          "position": {
+            "x": 342.0358581542969,
+            "y": 637.319091796875
+          },
+          "spin": -1.4749999046325684,
+          "velocity": {
+            "x": 16.723276138305664,
+            "y": -6.550658702850342
+          }
+        },
+        "planet": {
+          "angle": 1.6857880353927612,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998911879956722,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p1-bearing1.2-v15",
+      "version": 15,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "df0fbd07183ba7fa77bd920de0b0404dbb4a6582ea8e7dd90be9aefb358f6159",
+      "dense_ticks": 1639,
+      "first_choice": {
+        "tick": 460,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": 0.5393120042607665,
+        "tangent_speed": -20.197213268394872,
+        "orbital_bearing_rate": -0.13403890864131882,
+        "radial_speed": 0.9152555656185672,
+        "altitude": 90.68171975677282,
+        "height": 64.52035453761164,
+        "side_error": -77.3817684678852
+      },
+      "approach_entry": {
+        "tick": 746,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": 0.07316753868768275,
+        "tangent_speed": 17.79405025992355,
+        "orbital_bearing_rate": 0.13284792987180405,
+        "radial_speed": 0.34116284779716843,
+        "altitude": 73.94299991798522,
+        "height": 68.81030661731347,
+        "side_error": -9.791954162741604
+      },
+      "surface_entry": {
+        "tick": 1183,
+        "site": {
+          "bearing": 48,
+          "planet": 0
+        },
+        "signed_angle": -0.009584697006298257,
+        "tangent_speed": 0.07759004457371244,
+        "orbital_bearing_rate": 0.0009726212147604619,
+        "radial_speed": -2.155670840089844,
+        "altitude": 19.774164285344526,
+        "height": 14.996257634958965,
+        "side_error": 0.7645495464239502
+      },
+      "landed_tick": 1643,
+      "departed_tick": 2053,
+      "phase_ticks": {
+        "circling": 286,
+        "approach": 437,
+        "landing": 460,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 9.791954162741604,
+      "approach_ticks_outside_8_units": 7,
+      "arrival_motion": {
+        "ship": {
+          "angle": -3.127825975418091,
+          "position": {
+            "x": 342.0358581542969,
+            "y": 637.319091796875
+          },
+          "spin": -1.4749999046325684,
+          "velocity": {
+            "x": 16.723276138305664,
+            "y": -6.550658702850342
+          }
+        },
+        "planet": {
+          "angle": 1.6857880353927612,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998911879956722,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p1-bearing1.2-v16",
+      "version": 16,
+      "seat": 0,
+      "target": 0,
+      "trace_sha256": "2cdc8757287a219b4fd59b842a264aefbd2e73707813aef63df17a47700e9dfc",
+      "dense_ticks": 1692,
+      "first_choice": {
+        "tick": 460,
+        "site": {
+          "bearing": 45,
+          "planet": 0
+        },
+        "signed_angle": 0.24480543100845117,
+        "tangent_speed": -20.197213268394872,
+        "orbital_bearing_rate": -0.13403890864131882,
+        "radial_speed": 0.9152555656185672,
+        "altitude": 90.68171975677282,
+        "height": 81.4090287941849,
+        "side_error": -36.53662829411314
+      },
+      "approach_entry": {
+        "tick": 683,
+        "site": {
+          "bearing": 45,
+          "planet": 0
+        },
+        "signed_angle": 0.04997773818780913,
+        "tangent_speed": 17.5233187731526,
+        "orbital_bearing_rate": 0.13516350335769978,
+        "radial_speed": -9.32515458401228,
+        "altitude": 69.64534314250855,
+        "height": 64.70950097542936,
+        "side_error": -6.489240422447438
+      },
+      "surface_entry": {
+        "tick": 1282,
+        "site": {
+          "bearing": 45,
+          "planet": 0
+        },
+        "signed_angle": -0.012997802925974349,
+        "tangent_speed": -1.2484972729486077,
+        "orbital_bearing_rate": -0.016284955963067563,
+        "radial_speed": -1.9333782361231764,
+        "altitude": 16.665683086896777,
+        "height": 11.886768640088121,
+        "side_error": 0.9941175813492009
+      },
+      "landed_tick": 1696,
+      "departed_tick": 2106,
+      "phase_ticks": {
+        "circling": 223,
+        "approach": 599,
+        "landing": 414,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 21.709877571989637,
+      "approach_ticks_outside_8_units": 205,
+      "arrival_motion": {
+        "ship": {
+          "angle": -3.127825975418091,
+          "position": {
+            "x": 342.0358581542969,
+            "y": 637.319091796875
+          },
+          "spin": -1.4749999046325684,
+          "velocity": {
+            "x": 16.723276138305664,
+            "y": -6.550658702850342
+          }
+        },
+        "planet": {
+          "angle": 1.6857880353927612,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": 0.014998911879956722,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise",
+      "evaluation_geometry": {
+        "measurement_tick": 399,
+        "evaluation_source_tick": 413,
+        "signed_angle": 0.06052619914583441,
+        "neutral_inputs_sha256": "280aac4d300fbbbae0592403efe1bc73251fdfce4b803000af29a9f1580ec9aa",
+        "evaluation_stream_sha256": "34d39da603d6e396b92e53a36ec1238064a2d72d5a91763dd86f37fd4024f35b",
+        "scope": "Historical measured vehicle position reprojected into the planet pose at evaluation; no future motion used."
+      }
+    },
+    {
+      "name": "destination-p2-bearing0.8-v14",
+      "version": 14,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "c0c8497c3f5f4ab30ffa187b7dca557fa5f57ae07f0e48c58d21526924fa0fba",
+      "dense_ticks": 1617,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 42,
+          "planet": 1
+        },
+        "signed_angle": -0.028822394024155516,
+        "tangent_speed": -14.834586464114338,
+        "orbital_bearing_rate": -0.09337671983392296,
+        "radial_speed": 3.8442434830917787,
+        "altitude": 98.86814711952499,
+        "height": 94.02922108625353,
+        "side_error": 4.6053489541081944
+      },
+      "approach_entry": {
+        "tick": 498,
+        "site": {
+          "bearing": 42,
+          "planet": 1
+        },
+        "signed_angle": -0.028822394024155516,
+        "tangent_speed": -14.834586464114338,
+        "orbital_bearing_rate": -0.09337671983392296,
+        "radial_speed": 3.8442434830917787,
+        "altitude": 98.86814711952499,
+        "height": 94.02922108625353,
+        "side_error": 4.6053489541081944
+      },
+      "surface_entry": {
+        "tick": 1159,
+        "site": {
+          "bearing": 42,
+          "planet": 1
+        },
+        "signed_angle": 0.009626268298899858,
+        "tangent_speed": -0.8826859182857898,
+        "orbital_bearing_rate": -0.011070703455016269,
+        "radial_speed": -2.920836217100004,
+        "altitude": 19.73169201690017,
+        "height": 14.956576688391579,
+        "side_error": -0.763155907368855
+      },
+      "landed_tick": 1651,
+      "departed_tick": 2063,
+      "phase_ticks": {
+        "circling": 0,
+        "approach": 661,
+        "landing": 492,
+        "capture_and_departure": 412
+      },
+      "maximum_approach_side_error": 15.61534329843198,
+      "approach_ticks_outside_8_units": 135,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.861990451812744,
+          "position": {
+            "x": 380.47998046875,
+            "y": 623.0563354492188
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.767692565917969,
+            "y": -7.911901473999023
+          }
+        },
+        "planet": {
+          "angle": 1.4463053941726685,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p2-bearing0.8-v15",
+      "version": 15,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "261e30ac0a3e50ca210fe73f5cd699460fba8e80362b2c38752efc1d5f017975",
+      "dense_ticks": 1736,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": 0.560252423800484,
+        "tangent_speed": -14.834586464114338,
+        "orbital_bearing_rate": -0.09337671983392296,
+        "radial_speed": 3.8442434830917787,
+        "altitude": 98.86814711952499,
+        "height": 69.8060978721187,
+        "side_error": -84.4227628432709
+      },
+      "approach_entry": {
+        "tick": 802,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": 0.05573337144647089,
+        "tangent_speed": 17.680952757510944,
+        "orbital_bearing_rate": 0.12002417603226459,
+        "radial_speed": -0.49660827007835495,
+        "altitude": 87.31159456373189,
+        "height": 82.30865380722753,
+        "side_error": -8.205735243089293
+      },
+      "surface_entry": {
+        "tick": 1293,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": 0.005784177323100972,
+        "tangent_speed": -0.9314591156814592,
+        "orbital_bearing_rate": -0.011678548162714828,
+        "radial_speed": -2.564874674372198,
+        "altitude": 19.75812598480816,
+        "height": 14.982577006006977,
+        "side_error": -0.461320125603379
+      },
+      "landed_tick": 1772,
+      "departed_tick": 2182,
+      "phase_ticks": {
+        "circling": 304,
+        "approach": 491,
+        "landing": 479,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 8.205735243089293,
+      "approach_ticks_outside_8_units": 1,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.861990451812744,
+          "position": {
+            "x": 380.47998046875,
+            "y": 623.0563354492188
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.767692565917969,
+            "y": -7.911901473999023
+          }
+        },
+        "planet": {
+          "angle": 1.4463053941726685,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p2-bearing0.8-v16",
+      "version": 16,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "23d73446e47e42f1aebfd9907d4bd420bd039ac1434ca50874679b67a4e75383",
+      "dense_ticks": 1604,
+      "first_choice": {
+        "tick": 498,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": 0.1675209261717216,
+        "tangent_speed": -14.834586464114338,
+        "orbital_bearing_rate": -0.09337671983392296,
+        "radial_speed": 3.8442434830917787,
+        "altitude": 98.86814711952499,
+        "height": 91.88110370600043,
+        "side_error": -26.45676506172822
+      },
+      "approach_entry": {
+        "tick": 498,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": 0.1675209261717216,
+        "tangent_speed": -14.834586464114338,
+        "orbital_bearing_rate": -0.09337671983392296,
+        "radial_speed": 3.8442434830917787,
+        "altitude": 98.86814711952499,
+        "height": 91.88110370600043,
+        "side_error": -26.45676506172822
+      },
+      "surface_entry": {
+        "tick": 1233,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": 0.013106057983413539,
+        "tangent_speed": 0.9854392869322235,
+        "orbital_bearing_rate": 0.012905131616203033,
+        "radial_speed": -1.7243383639634084,
+        "altitude": 16.360266306385853,
+        "height": 11.581550586295634,
+        "side_error": -0.9966973992122803
+      },
+      "landed_tick": 1639,
+      "departed_tick": 2050,
+      "phase_ticks": {
+        "circling": 0,
+        "approach": 735,
+        "landing": 406,
+        "capture_and_departure": 411
+      },
+      "maximum_approach_side_error": 46.384622352648876,
+      "approach_ticks_outside_8_units": 377,
+      "arrival_motion": {
+        "ship": {
+          "angle": -2.861990451812744,
+          "position": {
+            "x": 380.47998046875,
+            "y": 623.0563354492188
+          },
+          "spin": -1.774999976158142,
+          "velocity": {
+            "x": 15.767692565917969,
+            "y": -7.911901473999023
+          }
+        },
+        "planet": {
+          "angle": 1.4463053941726685,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise",
+      "evaluation_geometry": {
+        "measurement_tick": 441,
+        "evaluation_source_tick": 445,
+        "signed_angle": -0.017370609378206666,
+        "neutral_inputs_sha256": "bbdba73118e233e84cda9d89849af57502d6f25fcb9689bb65bbf6440e7c5c44",
+        "evaluation_stream_sha256": "1634678fdec975f3867bda5196bb77a110de88de742ac6807b3de82a54d2fd6c",
+        "scope": "Historical measured vehicle position reprojected into the planet pose at evaluation; no future motion used."
+      }
+    },
+    {
+      "name": "destination-p2-bearing1.2-v14",
+      "version": 14,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "6a1f2da3a92acb080d919421c9cca26a764ff6f5ffe8c74f478fe62b34ba1f88",
+      "dense_ticks": 1550,
+      "first_choice": {
+        "tick": 461,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": -0.02713360977815904,
+        "tangent_speed": -15.123061652317311,
+        "orbital_bearing_rate": -0.09946611424332814,
+        "radial_speed": 1.7029796854783426,
+        "altitude": 92.04234896842482,
+        "height": 87.2123637317818,
+        "side_error": 4.155892289647454
+      },
+      "approach_entry": {
+        "tick": 461,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": -0.02713360977815904,
+        "tangent_speed": -15.123061652317311,
+        "orbital_bearing_rate": -0.09946611424332814,
+        "radial_speed": 1.7029796854783426,
+        "altitude": 92.04234896842482,
+        "height": 87.2123637317818,
+        "side_error": 4.155892289647454
+      },
+      "surface_entry": {
+        "tick": 1067,
+        "site": {
+          "bearing": 44,
+          "planet": 1
+        },
+        "signed_angle": 0.0052039250778268984,
+        "tangent_speed": -0.9870509306800879,
+        "orbital_bearing_rate": -0.01237641207355324,
+        "radial_speed": -2.777752927604646,
+        "altitude": 19.75259104286657,
+        "height": 14.979111907661718,
+        "side_error": -0.4097171296743909
+      },
+      "landed_tick": 1552,
+      "departed_tick": 1963,
+      "phase_ticks": {
+        "circling": 0,
+        "approach": 606,
+        "landing": 485,
+        "capture_and_departure": 411
+      },
+      "maximum_approach_side_error": 14.30810677253612,
+      "approach_ticks_outside_8_units": 122,
+      "arrival_motion": {
+        "ship": {
+          "angle": 3.103135347366333,
+          "position": {
+            "x": 350.3231506347656,
+            "y": 634.8018188476562
+          },
+          "spin": -1.4489519596099854,
+          "velocity": {
+            "x": 16.217761993408203,
+            "y": -6.53966760635376
+          }
+        },
+        "planet": {
+          "angle": 1.455554723739624,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p2-bearing1.2-v15",
+      "version": 15,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "2bc8b76f651b1a03325dfc04325164ab4881eeece4f92181bda4a22709122b85",
+      "dense_ticks": 1648,
+      "first_choice": {
+        "tick": 461,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": 0.36559749262888297,
+        "tangent_speed": -15.123061652317311,
+        "orbital_bearing_rate": -0.09946611424332814,
+        "radial_speed": 1.7029796854783426,
+        "altitude": 92.04234896842482,
+        "height": 77.21990962220593,
+        "side_error": -54.35600656356473
+      },
+      "approach_entry": {
+        "tick": 689,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": 0.04703404963650387,
+        "tangent_speed": 17.950468603560278,
+        "orbital_bearing_rate": 0.13752778408440663,
+        "radial_speed": -9.327420208508432,
+        "altitude": 70.52248840527608,
+        "height": 65.60393825050414,
+        "side_error": -6.136715657827153
+      },
+      "surface_entry": {
+        "tick": 1203,
+        "site": {
+          "bearing": 48,
+          "planet": 1
+        },
+        "signed_angle": -0.012720029984494638,
+        "tangent_speed": -0.26633291115619073,
+        "orbital_bearing_rate": -0.0033917378412335925,
+        "radial_speed": -1.9684166890438863,
+        "altitude": 18.524026214043744,
+        "height": 13.743473127688048,
+        "side_error": 0.9988908804098173
+      },
+      "landed_tick": 1651,
+      "departed_tick": 2061,
+      "phase_ticks": {
+        "circling": 228,
+        "approach": 514,
+        "landing": 448,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 19.356527676978658,
+      "approach_ticks_outside_8_units": 181,
+      "arrival_motion": {
+        "ship": {
+          "angle": 3.103135347366333,
+          "position": {
+            "x": 350.3231506347656,
+            "y": 634.8018188476562
+          },
+          "spin": -1.4489519596099854,
+          "velocity": {
+            "x": 16.217761993408203,
+            "y": -6.53966760635376
+          }
+        },
+        "planet": {
+          "angle": 1.455554723739624,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise"
+    },
+    {
+      "name": "destination-p2-bearing1.2-v16",
+      "version": 16,
+      "seat": 1,
+      "target": 1,
+      "trace_sha256": "1107d6600e656e5e7796060d3eea244258e11ef4128ceb2769beef1a1155dcc3",
+      "dense_ticks": 1510,
+      "first_choice": {
+        "tick": 461,
+        "site": {
+          "bearing": 46,
+          "planet": 1
+        },
+        "signed_angle": 0.16924358389481328,
+        "tangent_speed": -15.123061652317311,
+        "orbital_bearing_rate": -0.09946611424332814,
+        "radial_speed": 1.7029796854783426,
+        "altitude": 92.04234896842482,
+        "height": 85.09915830509453,
+        "side_error": -25.605765304786473
+      },
+      "approach_entry": {
+        "tick": 461,
+        "site": {
+          "bearing": 46,
+          "planet": 1
+        },
+        "signed_angle": 0.16924358389481328,
+        "tangent_speed": -15.123061652317311,
+        "orbital_bearing_rate": -0.09946611424332814,
+        "radial_speed": 1.7029796854783426,
+        "altitude": 92.04234896842482,
+        "height": 85.09915830509453,
+        "side_error": -25.605765304786473
+      },
+      "surface_entry": {
+        "tick": 1031,
+        "site": {
+          "bearing": 46,
+          "planet": 1
+        },
+        "signed_angle": 0.011113704471915987,
+        "tangent_speed": -0.4616386744158347,
+        "orbital_bearing_rate": -0.005787780471438256,
+        "radial_speed": -2.384300648385966,
+        "altitude": 19.760916415877503,
+        "height": 14.984017596785634,
+        "side_error": -0.8857448748822208
+      },
+      "landed_tick": 1513,
+      "departed_tick": 1923,
+      "phase_ticks": {
+        "circling": 0,
+        "approach": 570,
+        "landing": 482,
+        "capture_and_departure": 410
+      },
+      "maximum_approach_side_error": 42.073400399804086,
+      "approach_ticks_outside_8_units": 340,
+      "arrival_motion": {
+        "ship": {
+          "angle": 3.103135347366333,
+          "position": {
+            "x": 350.3231506347656,
+            "y": 634.8018188476562
+          },
+          "spin": -1.4489519596099854,
+          "velocity": {
+            "x": 16.217761993408203,
+            "y": -6.53966760635376
+          }
+        },
+        "planet": {
+          "angle": 1.455554723739624,
+          "position": {
+            "x": 280.0,
+            "y": 500.0
+          },
+          "spin": -0.014998913742601871,
+          "velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        }
+      },
+      "orbital_bearing_rate_scope": "rate of ship radial bearing around the rotating planet (not body spin); radians per second; positive is counterclockwise",
+      "evaluation_geometry": {
+        "measurement_tick": 411,
+        "evaluation_source_tick": 412,
+        "signed_angle": 0.00148032961936295,
+        "neutral_inputs_sha256": "a73573cd42e9851cade55d9ab3aaa4bf0ae1b8835969fe5718ff684b22dac5d3",
+        "evaluation_stream_sha256": "ce058cf3cc0d085ab99e1116b7fca079f531dd048fb73399b6546fcbfda3881a",
+        "scope": "Historical measured vehicle position reprojected into the planet pose at evaluation; no future motion used."
+      }
+    }
+  ]
+}

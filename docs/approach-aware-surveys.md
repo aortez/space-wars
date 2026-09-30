@@ -281,3 +281,104 @@ passed for the changed AI library/example/integration targets. Independent
 runtime and audit review completed before the freeze.
 Independent results review also verified the raw artifacts, all 18 recorded
 switch/native-handoff joins, work ledgers and complete fresh trace comparisons.
+
+### Integration with the published-flag-cost experiment
+
+On 2026-09-30, reconciled main's #144 with the #145 → #147 → #149 stack.
+The opt-in v13 admission model remains separate from v14–v16, including its
+report fields, native evidence precedence and current-target demand. A test
+checks that configuring the v13 option cannot override another policy's model
+or evidence. Both paths retain original measurement epochs. Independent review
+also checked once-per-tick observation, handoff invalidation and pre-dispatch
+v16 input recording.
+
+The integrated tree at `a0e0a93` reproduced **94 archived runs** exactly:
+all 46 frozen v15/v16 cases above, 24 #144 cases, and 24 v13/v14 cases.
+The latter two subsets contain both seats at bearings 0.8/1.2 in both directed
+worlds, generated world 0 with and without asteroids, and the v13/v14 regression
+pair. Physical outcomes, full mission telemetry, evaluator/work/survey streams,
+and complete behavior traces where present matched for 1,388,219 simulation
+ticks. Raw manifests and hashes are in `target/stack-integration/a0e0a93/parity.json`
+(46 v15/v16 cases) and its `predecessors/parity.json` (48 v13/v14 cases),
+both using the same final binary. An earlier preliminary run at `b27b831` is
+not included in these 94 runs.
+All six CI jobs passed on each integrated PR tree. The later squash-ancestry
+updates changed no files; final merged main `af2be2e` has the same tree as
+`a0e0a93` (`06f84ff827030a1eb6698aa273496f7922760936`).
+294 AI unit tests, six physical destination tests, 37 harness tests and 584
+Python tests passed, as did formatting and strict AI library/harness Clippy
+with `--no-deps`. A mixed v13-opt-in/v16 smoke run reports both consuming seats
+and their distinct models correctly.
+
+### Arrival-motion follow-up: 12 dense native replays
+
+Used the existing `--trace true --trace-start-tick … --trace-end-tick …`
+options to record the first switched neutral visit in **all four changed
+fixtures, for v14, v15 and v16**. No policy, sensor request or physics changes.
+Each replay reproduced its archived physical outcomes, mission telemetry and
+evaluator/work/cover streams. The analysis checks 19,447 consecutive controller
+ticks, original trace hashes, phase ordering, and identical ship/planet motion
+at the first site selection across the three versions of each fixture.
+
+The [machine-readable analysis](data/arrival-motion-v1.json) retains source and
+binary identity, geometry, original milestone ticks and phase durations.
+Raw traces and the replay plan/commands are in
+`target/arrival-motion/investigation-v1/summary.json`. Recompute with:
+
+```sh
+python3 tools/analyze-arrival-motion.py \
+  --root target/arrival-motion/investigation-v1 \
+  --out target/arrival-motion/investigation-v1/analysis.json
+python3 -m unittest discover -s tools/tests -p test_arrival_motion.py
+```
+
+The first native site is selected from **identical arrival motion** in each
+v14/v15/v16 group. V16's earlier source geometry nevertheless differs from
+its geometry when native acquisition actually happens:
+
+| V16 case | Source signed angle | Acquisition signed angle | Acquisition tangent speed | Circling seconds, v14 / v15 / v16 |
+| --- | ---: | ---: | ---: | ---: |
+| P1, 0.8 | 0.1501 | 0.3648 | -19.48 | 0.05 / 6.00 / 4.58 |
+| P1, 1.2 | 0.0605 | 0.2448 | -20.20 | 0.05 / 4.77 / 3.72 |
+| P2, 0.8 | -0.0174 | 0.1675 | -14.84 | 0.00 / 5.07 / 0.00 |
+| P2, 1.2 | 0.0015 | 0.1692 | -15.12 | 0.00 / 3.80 / 0.00 |
+
+Angles are radians, signed counterclockwise from ship radius to site radius.
+Tangent speed is in the rotating planet frame. Source geometry reprojects the
+historical measured vehicle position into the planet's original evaluation
+pose; it does not import later physics.
+
+The existing native `SeekCover → Approach` gate requires `abs(angle) < 0.2`,
+`abs(tangent_speed) < 18`, and cover or lack of exposure. These cases are
+unexposed, with no sun. Both P2 v16 choices enter Approach immediately; the P1
+choices first circle, reversing their initial negative tangential motion to
+roughly +17.5 before descending. This explains the phase boundary and the seat
+asymmetry; it does not establish that changing the threshold would help.
+
+**The remaining P1 1.2 regression is downstream of faster circling.** In ticks:
+
+| P1 1.2 phase | V14 | V15 | V16 | V16 minus v15 |
+| --- | ---: | ---: | ---: | ---: |
+| First site → Approach | 3 | 286 | 223 | -63 |
+| Approach → Surface control | 519 | 437 | 599 | +162 |
+| Surface control → touchdown | 443 | 460 | 414 | -46 |
+| Touchdown → completed departure | 410 | 410 | 410 | 0 |
+
+Here `Surface` means entry to the final landing controller, not physical
+contact. The net is **+53 ticks (0.883 seconds)**. V16 enters Approach with
+radial velocity -9.33, versus +0.34 for v15, and subsequently reaches lateral
+error 21.71 versus 9.79. It spends 205 versus seven Approach ticks outside
+8 units of lateral error, where the native guide asks for a height of 30
+instead of 12. Those observations identify a concrete descent mechanism to
+inspect, not a proven isolated cause. P2's faster v16 runs also have substantial
+lateral excursions, so that count alone must not become a ranking metric.
+
+The next bounded behavior experiment should test **when the historical neutral
+site preference yields to ordinary native arrival selection**, using the
+existing angle/motion/cover gates and fresh measured geometry. Rejection must
+invalidate the old handoff/cost basis through the existing path; native landing,
+hatch, route and solar checks still own execution. Compare complete
+claim/board/depart outcomes, preserve v14–v16 controls, keep the two-seat shared
+work ledger, and retain failures. A source-nearest site and a shorter circling
+phase are both insufficient proxies for completing a capture sooner. The enemy
+cover/walking problem and any future arrival predictor remain separate.
