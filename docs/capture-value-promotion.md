@@ -68,3 +68,15 @@ Use a fresh output directory. Publish a promotion-or-retain decision after
 the run. Any zero-switch matches establish fallback behavior, not improved
 destination selection; unknown enemy-route support or broad timing error
 must remain visible in that decision.
+
+## Audit correction before the completed study
+
+The initial `v1` execution at `2d44819` retained the v10 regression and stopped
+while auditing the v12 regression. Both matches completed, but exact Python
+decimal equality rejected two representations of the same Rust `f32`:
+`33.385185` in direct evaluation JSON and `33.38518524169922` in the report's
+`serde_json::Value`. The audit now requires identical IEEE-754 f32 bits;
+it does not introduce an error tolerance. A mutation test checks this boundary.
+The failed summary and raw runs remain under `target/capture-value-promotion/v1`.
+Rerun the entire unchanged plan in a fresh `v2` directory after committing
+this audit fix. No policy, fixture, seed, outcome or duration was changed.

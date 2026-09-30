@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import struct
 import subprocess
 
 
@@ -19,6 +20,12 @@ def module(name, filename):
 D = module('destinations', 'compare-capture-destinations.py')
 E = module('evaluations', 'compare-capture-evaluation.py')
 V = module('value', 'compare-capture-value.py')
+
+
+def same_f32(a, b):
+    # Direct serde output uses the shortest f32 round trip; report.json goes
+    # through serde_json::Value and prints that same f32 after widening to f64.
+    return struct.pack('!f', a) == struct.pack('!f', b)
 
 
 def plan():
@@ -79,8 +86,8 @@ def switch_predictions(report, evaluations):
             assert forecast['completed_tick'] <= switch['tick']
             current = next(c for c in forecast['candidates'] if c['planet'] == switch['from'])
             target = next(c for c in forecast['candidates'] if c['planet'] == switch['to'])
-            assert current['total_seconds'] == switch['current_seconds']
-            assert target['total_seconds'] == switch['destination_seconds']
+            assert same_f32(current['total_seconds'], switch['current_seconds'])
+            assert same_f32(target['total_seconds'], switch['destination_seconds'])
             visits = [v for v in player['visits'] if v['planet'] == switch['to'] and v['selected_tick'] == switch['tick']]
             if len(visits) != 1:
                 raise ValueError('switch does not identify exactly one actual visit')

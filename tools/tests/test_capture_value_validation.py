@@ -24,6 +24,11 @@ def fixture():
 
 
 class ValueValidationTests(unittest.TestCase):
+    def test_direct_and_widened_serde_decimals_must_encode_the_exact_same_f32(self):
+        self.assertTrue(T.same_f32(33.385185, 33.38518524169922))
+        self.assertTrue(T.same_f32(25.229713, 25.229713439941406))
+        self.assertFalse(T.same_f32(33.38518, 33.38518524169922))
+
     def test_forecast_stays_at_its_source_and_is_joined_to_exact_switched_visit(self):
         report, evaluation = fixture()
         result = T.switch_predictions(report, [evaluation, copy.deepcopy(evaluation)])
