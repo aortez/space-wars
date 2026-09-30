@@ -15,6 +15,7 @@ pub(crate) struct CaptureSelection {
     pub destination: usize,
     pub current_seconds: f32,
     pub destination_seconds: f32,
+    pub value: Option<ValueDecision>,
 }
 
 impl MissionEvaluator {
@@ -45,6 +46,13 @@ impl MissionEvaluator {
             || dependencies.selected_site != mission.capture.as_ref().and_then(|c| c.site)
             || dependencies.location != p.location
             || dependencies.form != p.ship_form
+            || report
+                .transfer_source
+                .as_ref()
+                .is_some_and(|source| !source.is_current(o))
+            || (report.value_comparison.is_some()
+                && report.match_context.as_ref().map(|m| m.owned_planets)
+                    != o.match_context.as_ref().map(|m| m.owned_planets))
             || !p.ship_available
             || p.ship_form != ShipForm::Ship
             || !matches!(p.location, PilotLocation::Aboard(_))
@@ -100,7 +108,11 @@ impl MissionEvaluator {
                 }
             }
         }
-        let destination = report.preferred_by_time?;
+        let destination = if let Some(value) = &report.value_comparison {
+            value.preferred?
+        } else {
+            report.preferred_by_time?
+        };
         let current = report.current_target?;
         if destination == current {
             return None;
@@ -116,9 +128,19 @@ impl MissionEvaluator {
         };
         let current_seconds = cost(current)?;
         let destination_seconds = cost(destination)?;
+        let value = if report.value_comparison.is_some() {
+            Some(value::decision(
+                report.candidates.iter().find(|c| c.planet == current)?,
+                report.candidates.iter().find(|c| c.planet == destination)?,
+            )?)
+        } else {
+            None
+        };
         // Deliberately coarse references need a meaningful improvement, not a
         // tick-by-tick race. The margin is a policy guard, not fitted accuracy.
-        if current_seconds - destination_seconds < 5.0_f32.max(current_seconds * 0.2)
+        if value.map_or(current_seconds - destination_seconds, |v| {
+            v.equivalent_seconds_saved
+        }) < 5.0_f32.max(current_seconds * 0.2)
             || o.match_context
                 .as_ref()
                 .and_then(|m| m.remaining_seconds)
@@ -135,6 +157,7 @@ impl MissionEvaluator {
             destination,
             current_seconds,
             destination_seconds,
+            value,
         })
     }
 }

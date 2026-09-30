@@ -1,5 +1,5 @@
 //! Bounded capture comparisons. No controller or mutable world is held.
-//! v12 can consume a validated report; retained policies remain observational.
+//! v12/v13 can consume validated reports; earlier policies remain observational.
 //! One charged step evaluates one candidate; a final step compares at most three.
 use crate::mission_pilot::MissionTelemetry;
 use engine_core::{
@@ -20,14 +20,25 @@ use std::collections::BTreeMap;
 mod model;
 mod selection;
 mod survey;
+mod transfer;
+mod value;
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use selection::CaptureSelection;
+pub use transfer::{TransferReference, TransferSource};
+pub use value::{CaptureValue, ValueComparison, ValueDecision};
 #[cfg(test)]
 mod survey_tests;
 #[cfg(test)]
 mod tests;
 
 pub const MODEL: &str = "capture_mission_reference_v1";
+pub fn model_for_policy(policy: &str) -> &'static str {
+    if value::enabled(policy) {
+        value::MODEL
+    } else {
+        MODEL
+    }
+}
 pub const MAX_PLANETS: usize = 8;
 pub const MAX_OPTIONS: usize = 3;
 pub const REFRESH_TICKS: u64 = 60;
@@ -63,8 +74,12 @@ pub struct CaptureCandidate {
     pub adds_ownership: bool,
     pub first_rebuild_foothold: bool,
     pub distance: f32,
-    /// Nominal flight reference, excluding detours, acceleration and opposition.
+    /// Nominal v12 travel or staged v13 reference; neither models opposition.
     pub travel_seconds: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer: Option<TransferReference>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<CaptureValue>,
     pub site: Option<LandingSiteId>,
     pub evidence_tick: Option<u64>,
     pub evidence_age_ticks: Option<u64>,
@@ -100,6 +115,10 @@ pub struct MissionEvaluation {
     /// Only a time-reference comparison with full shortlist coverage.
     /// This is not a survival/utility recommendation or execution permission.
     pub preferred_by_time: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_comparison: Option<ValueComparison>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_source: Option<TransferSource>,
     pub comparison_reason: &'static str,
     pub charged_work: u32,
 }
@@ -121,6 +140,20 @@ impl PlanningJob for EvaluationJob {
         }
         self.report.charged_work += 1;
         if let Some(candidate) = self.report.candidates.get_mut(self.cursor) {
+            if let Some(source) = &self.report.transfer_source
+                && candidate.unknown_reason.is_none()
+            {
+                let estimate = candidate
+                    .transfer
+                    .map_or_else(|| source.estimate(candidate.planet), Ok);
+                match estimate {
+                    Ok(transfer) => {
+                        candidate.travel_seconds = transfer.total();
+                        candidate.transfer = Some(transfer);
+                    }
+                    Err(reason) => candidate.unknown_reason = Some(reason),
+                }
+            }
             candidate.total_seconds = candidate
                 .local
                 .as_ref()
@@ -135,6 +168,12 @@ impl PlanningJob for EvaluationJob {
                         .and_then(|m| m.remaining_seconds),
                 )
                 .map(|(cost, remaining)| f64::from(cost) > remaining);
+            if let Some(value) = &mut candidate.value {
+                value.seconds_per_unit = candidate
+                    .total_seconds
+                    .filter(|_| value.priority_units != 0)
+                    .map(|seconds| seconds / f32::from(value.priority_units));
+            }
             self.cursor += 1;
             return;
         }
@@ -172,6 +211,7 @@ impl PlanningJob for EvaluationJob {
             self.report.preferred_by_time = self.report.fastest_supported;
             "lowest supported completion-time reference; combat risk unmodelled"
         };
+        value::finish(&mut self.report);
         self.complete = true;
     }
     fn output(&self) -> Option<&Self::Output> {
@@ -190,6 +230,8 @@ struct EvidenceIdentity {
 
 #[derive(Clone, PartialEq)]
 struct Dependencies {
+    policy: &'static str,
+    transfer: Option<TransferSource>,
     planets: Vec<PlanetKey>,
     target: Option<usize>,
     location: PilotLocation,
@@ -288,6 +330,8 @@ impl MissionEvaluator {
         }
         state.last_tick = Some(p.tick);
         let mut dependencies = Dependencies {
+            policy: mission.policy,
+            transfer: value::enabled(mission.policy).then(|| TransferSource::read(o)),
             planets: o
                 .planets
                 .iter()
@@ -377,7 +421,12 @@ impl MissionEvaluator {
             dependencies.gravity = 0.0;
         }
         let changed = state.dependencies.as_ref().is_none_or(|old| {
-            old.target != dependencies.target
+            old.policy != dependencies.policy
+                || old
+                    .transfer
+                    .as_ref()
+                    .is_some_and(|source| !source.is_current(o))
+                || old.target != dependencies.target
                 || old.location != dependencies.location
                 || old.form != dependencies.form
                 || old.available != dependencies.available
@@ -600,6 +649,26 @@ fn snapshot(
                 } else {
                     (distance - planet.radius - 85.0).max(0.0) / 38.0
                 },
+                transfer: (value::enabled(mission.policy) && active_choice).then_some(
+                    TransferReference {
+                        continuing_approach: true,
+                        ..Default::default()
+                    },
+                ),
+                value: value::enabled(mission.policy).then(|| {
+                    let swing = if planet.claim.is_none() || owner == Some(p.owner) {
+                        0
+                    } else if owner.is_some() {
+                        2
+                    } else {
+                        1
+                    };
+                    CaptureValue {
+                        ownership_swing: swing,
+                        priority_units: if own_count == 0 { swing.min(1) } else { swing },
+                        seconds_per_unit: None,
+                    }
+                }),
                 site: sample.map(|s| s.site),
                 evidence_tick: sample.map(|s| s.tick),
                 evidence_age_ticks: sample.map(|s| p.tick - s.tick),
@@ -620,7 +689,7 @@ fn snapshot(
         })
         .collect();
     MissionEvaluation {
-        model: MODEL,
+        model: model_for_policy(mission.policy),
         policy: mission.policy,
         actor: p.owner,
         source_tick: p.tick,
@@ -642,6 +711,15 @@ fn snapshot(
         candidates,
         fastest_supported: None,
         preferred_by_time: None,
+        value_comparison: value::enabled(mission.policy).then_some(ValueComparison {
+            objective: if own_count == 0 {
+                "first rebuild foothold"
+            } else {
+                "ownership swing per completion second"
+            },
+            preferred: None,
+        }),
+        transfer_source: value::enabled(mission.policy).then(|| TransferSource::read(o)),
         comparison_reason: "pending",
         charged_work: 0,
     }
