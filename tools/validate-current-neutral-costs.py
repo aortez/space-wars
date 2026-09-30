@@ -64,7 +64,7 @@ def main():
     result = dict(schema=1, plan=plan(), runs={}, comparisons=[], complete=False,
         source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
         binary_sha256=F.E.digest(binary), runner_sha256=F.E.digest(Path(__file__)),
-        tools={Path(m.__file__).name:F.E.digest(Path(m.__file__)) for m in [F, F.P, F.D, F.E, A]},
+        tools={Path(m.__file__).name:F.E.digest(Path(m.__file__)) for m in [F, F.P, F.D, F.E, F.M, A]},
         scope='32 recorded directed trials and 32 new finished matches in four correlated generated worlds. Both arms admit published flag costs; only the candidate surveys its current neutral alongside one neutral alternative. Same native controls, thresholds and shared 4/384 quota; defaults remain unchanged.')
     save = lambda: F.D.write(opts.out/'summary.json', result)
     save()

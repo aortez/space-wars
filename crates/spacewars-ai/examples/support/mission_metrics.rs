@@ -98,7 +98,13 @@ impl MissionMetrics {
                     abandoned_tick: None,
                     reason: None,
                 });
-            } else if let Some(visit) = self.visits.last_mut() {
+            } else if let Some(visit) = self.visits.last_mut()
+                && visit.departed_tick.is_none()
+                && visit.abandoned_tick.is_none()
+                && event.planet == Some(visit.planet)
+            {
+                // The first terminal event closes this visit. Later pursuit or
+                // recovery replans belong to no visit until another selection.
                 match event.kind {
                     "arrived" => {
                         visit.arrived_tick.get_or_insert(event.tick);
@@ -116,6 +122,8 @@ impl MissionMetrics {
             self.last_event = Some((event.tick, event.kind, event.planet));
         }
         if let Some(visit) = self.visits.last_mut()
+            && visit.departed_tick.is_none()
+            && visit.abandoned_tick.is_none()
             && m.target == Some(visit.planet)
             && let Some(capture) = &m.capture
         {
@@ -189,6 +197,129 @@ mod tests {
         metrics.observe(&o, &mission);
         assert_eq!(metrics.visits.len(), 2);
         assert_eq!(metrics.phase_ticks.values().sum::<u64>(), 3);
+    }
+
+    #[test]
+    fn terminal_visit_keeps_its_first_reason_and_rejects_later_events_and_milestones() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        for (kind, reason) in [
+            (
+                "replan",
+                Some("capture approach exhausted its time or retry budget"),
+            ),
+            ("replan", None),
+            ("departed", None),
+        ] {
+            let brain = MaterialMissionPilot::new(context, Default::default());
+            let mut mission = brain.telemetry().clone();
+            let mut metrics = MissionMetrics::default();
+            mission.target = Some(1);
+            mission.events.extend([
+                MissionEvent {
+                    tick: 1,
+                    planet: Some(1),
+                    kind: "selected",
+                    reason: None,
+                },
+                MissionEvent {
+                    tick: 2,
+                    planet: Some(1),
+                    kind: "arrived",
+                    reason: None,
+                },
+                MissionEvent {
+                    tick: 3,
+                    planet: Some(1),
+                    kind,
+                    reason,
+                },
+            ]);
+            o.local.combat.recovery.flight.pilot.tick = 3;
+            metrics.observe(&o, &mission);
+            let original = serde_json::to_value(&metrics.visits).unwrap();
+            assert_eq!(metrics.visits[0].reason, reason);
+            assert_eq!(
+                metrics.visits[0].abandoned_tick,
+                (kind == "replan").then_some(3)
+            );
+            assert_eq!(
+                metrics.visits[0].departed_tick,
+                (kind == "departed").then_some(3)
+            );
+
+            // Reproduce a pursuit immediately after capture failure. Even an
+            // event naming the old planet cannot reopen a completed attempt.
+            for planet in [None, Some(1)] {
+                mission.events.push(MissionEvent {
+                    tick: 4,
+                    planet,
+                    kind: "replan",
+                    reason: Some("pausing travel for nearby opponent"),
+                });
+            }
+            mission.events.push(MissionEvent {
+                tick: 5,
+                planet: Some(1),
+                kind: "departed",
+                reason: None,
+            });
+            let capture = spacewars_ai::tactical_capture::TacticalCapturePilot::new(
+                context,
+                Default::default(),
+            );
+            let mut capture = capture.telemetry().clone();
+            capture.sortie.landing.landed_tick = Some(4);
+            capture.sortie.landing.claimed_tick = Some(4);
+            capture.sortie.landing.boarded_tick = Some(5);
+            mission.capture = Some(capture);
+            o.local.combat.recovery.flight.pilot.tick = 5;
+            metrics.observe(&o, &mission);
+            assert_eq!(serde_json::to_value(&metrics.visits).unwrap(), original);
+        }
+    }
+
+    #[test]
+    fn unrelated_planets_and_targetless_replans_do_not_end_an_active_visit() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            Default::default(),
+        );
+        let mut mission = brain.telemetry().clone();
+        mission.events.push(MissionEvent {
+            tick: 1,
+            planet: Some(1),
+            kind: "selected",
+            reason: None,
+        });
+        for planet in [None, Some(0)] {
+            for kind in ["arrived", "replan", "departed"] {
+                mission.events.push(MissionEvent {
+                    tick: 1,
+                    planet,
+                    kind,
+                    reason: Some("unrelated event"),
+                });
+            }
+        }
+        let mut metrics = MissionMetrics::default();
+        metrics.observe(&o, &mission);
+        let visit = &metrics.visits[0];
+        assert!(visit.arrived_tick.is_none());
+        assert!(visit.abandoned_tick.is_none());
+        assert!(visit.departed_tick.is_none());
+        assert!(visit.reason.is_none());
     }
 
     #[test]

@@ -105,6 +105,9 @@ binary is `target/current-neutral-costs/surface_mission_soak-8832a5c`, SHA-256
 `5c9d6e4b5cd0a1d82e0bf24f8f63d14186655faa2fd14cde20c4a1ba3a55b2e4`.
 The [complete evidence](data/current-neutral-costs-v1.json) retains all runs,
 predictions, milestones, failures, timing joins, work audits and raw hashes.
+The [visit-ending correction](capture-visit-endings.md) supersedes that archive's
+failure reasons and post-departure abandonment markers. The original raw files
+remain frozen; the corrected attribution below comes from their mission events.
 Development artifacts are in `target/current-neutral-costs/development-v1`;
 the frozen main study is in `target/current-neutral-costs/v1`.
 
@@ -141,7 +144,9 @@ The 1.2 switch's departure error was +0.30 seconds.
 
 At bearing -0.8, the candidate switched to the enemy at ticks 2,863 and 7,264.
 Both attempts arrived but were abandoned before landing, at ticks 4,953 and
-9,003, with the native reason `pausing travel for nearby opponent`. The
+9,003, with the native reason `capture approach exhausted its time or retry budget`.
+Both exhausted eight cover retries. Pursuit began one tick after each failure;
+it did not interrupt these capture attempts. The
 candidate completed no claim/boarding/departure within the declared 180-second
 window; its predecessor completed one neutral sortie. These interruptions have
 no invented completion error. Across directed trials, completed sorties fell
@@ -173,8 +178,10 @@ Two numeric options alone still do not satisfy a three-option selection gate.
 
 The new world 0 quiet/P1 switch at tick 6,653 completed capture, boarding and
 departure, with a -5.04-second departure-reference error. The new world 3
-asteroid/P2 switch at tick 9,220 was abandoned before landing at tick 10,912 to
-pursue a nearby opponent. That pair also went from one to two ship losses for
+asteroid/P2 switch at tick 9,220 was abandoned before landing at tick 10,912 with
+the native reason `left destination approach frame`.
+Pursuit began at tick 10,913, after the approach had ended. That pair also went
+from one to two ship losses for
 the tested seat. The record establishes the paired differences; it does not
 isolate an individual collision or combat decision as their cause.
 
@@ -213,9 +220,9 @@ exposed interrupted trips, a lost directed completion and an additional ship
 loss without a win advantage. This does not justify promotion.
 
 The next decision-model gap is the mismatch between a conditional capture
-estimate and the native controller's opportunity to finish it. In particular,
-enemy approaches can yield to pursuit before landing, and the native site/return
-task need not match the historical surveyed route. Preserve these failures as
-regressions; investigate an explicit interruption/remaining-task eligibility
-condition before another candidate. Do not fit a smaller switch margin to
-these outcomes or turn unknown exposure into a zero cost.
+estimate and the native controller's opportunity to finish it. The corrected
+failure attribution identifies repeated cover rejection and loss of the approach
+frame, followed by pursuit. The native site/return task need not match the
+historical surveyed route. Preserve these failures as regressions and investigate
+usable cover and native landing progress before another candidate. Do not fit
+a smaller switch margin to these outcomes or turn unknown exposure into a zero cost.
