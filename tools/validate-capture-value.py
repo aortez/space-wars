@@ -54,6 +54,24 @@ def plan():
     return rows
 
 
+def arguments(item):
+    seat = item['seat']
+    policies = [10, 10]
+    if seat is not None:
+        policies[seat] = item['version']
+    directed = item['kind'] == 'directed'
+    # In a duel both bots already run. Keep the report's observer fixed so
+    # initial/final observation comparisons describe the same player's view.
+    observer = seat if directed else 0
+    command = ['--world', item['world'] if directed else 'generated', '--seed', str(item['seed']),
+        '--mode', 'quiet' if directed else 'duel', '--match', 'true', '--seat', str(observer),
+        '--asteroid-interval', str(item['interval']),
+        '--p1-policy', f'material_mission_v{policies[0]}', '--p2-policy', f'material_mission_v{policies[1]}']
+    if directed:
+        command += ['--mirror', str(seat == 1).lower(), '--flag-bearing', str(item['bearing'])]
+    return command, policies
+
+
 def switch_predictions(report, evaluations):
     """Join the report used at each accepted switch to that exact actual visit."""
     players = [D.finished_player(report, seat) for seat in range(2)]
@@ -154,15 +172,8 @@ def main():
     save()
     for item in result['plan']:
         name, seat = item['name'], item['seat']
-        policies = [10, 10]
-        if seat is not None: policies[seat] = item['version']
+        command, policies = arguments(item)
         directed = item['kind'] == 'directed'
-        command = ['--world', item['world'] if directed else 'generated', '--seed', str(item['seed']),
-            '--mode', 'quiet' if directed else 'duel', '--match', 'true', '--seat', str(seat or 0),
-            '--asteroid-interval', str(item['interval']),
-            '--p1-policy', f'material_mission_v{policies[0]}', '--p2-policy', f'material_mission_v{policies[1]}']
-        if directed:
-            command += ['--mirror', str(seat == 1).lower(), '--flag-bearing', str(item['bearing'])]
         try:
             run = D.run(binary, args.out, name, command, seat or 0,
                 seconds=180 if directed else 600, require_finish=not directed)

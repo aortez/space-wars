@@ -80,3 +80,13 @@ it does not introduce an error tolerance. A mutation test checks this boundary.
 The failed summary and raw runs remain under `target/capture-value-promotion/v1`.
 Rerun the entire unchanged plan in a fresh `v2` directory after committing
 this audit fix. No policy, fixture, seed, outcome or duration was changed.
+
+While reviewing `v2`, the duel command also incorrectly tied `--seat` to the
+candidate policy seat. In duel mode both bots run; this flag selects the
+observer used to serialize initial/final world observations. Pairing a seat-one
+observation with a seat-two observation correctly fails the exact world check.
+The corrected runner fixes the observer at seat one for all generated duels,
+while the explicit P1/P2 policy arguments still swap the candidate. Directed
+quiet fixtures retain their active seat. A command test covers every plan row.
+Keep `v2` as failed pairing evidence, then rerun all 91 cases in `v3`; none of
+its outcomes selects, removes or changes a case, threshold or coefficient.

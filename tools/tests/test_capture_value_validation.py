@@ -94,5 +94,20 @@ class ValueValidationTests(unittest.TestCase):
                     {(10,None),(12,0),(12,1),(13,0),(13,1)})
         self.assertEqual(len([r for r in plan if r['kind']=='directed']), 48)
 
+    def test_paired_duels_keep_observer_fixed_while_swapping_actual_policy_seats(self):
+        for item in T.plan():
+            args, policies = T.arguments(item)
+            args = dict(zip(args[::2], args[1::2]))
+            if item['kind'] == 'directed':
+                self.assertEqual(args['--seat'], str(item['seat']))
+                self.assertEqual(args['--mode'], 'quiet')
+            else:
+                self.assertEqual(args['--seat'], '0')
+                self.assertEqual(args['--mode'], 'duel')
+            for seat in range(2):
+                expected = item['version'] if item['seat'] == seat else 10
+                self.assertEqual(policies[seat], expected)
+                self.assertEqual(args[f'--p{seat+1}-policy'], f'material_mission_v{expected}')
+
 
 if __name__ == '__main__': unittest.main()
