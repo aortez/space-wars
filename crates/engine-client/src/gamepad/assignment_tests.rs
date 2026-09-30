@@ -195,6 +195,45 @@ fn player_assignment_callbacks_clear_held_input_swap_nes_ports_and_survive_reloa
 }
 
 #[test]
+fn network_password_erase_shortcut_is_scoped_to_entry() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let ui = MainWindow::new().unwrap();
+    for launcher in [true, false] {
+        ui.set_launcher_visible(launcher);
+        ui.set_ingame_menu_visible(!launcher);
+        ui.set_sound_visible(true);
+        for password in [false, true] {
+            ui.set_network_visible(true);
+            ui.set_network_password_visible(password);
+            assert_eq!(
+                button_route(&ui, Button::West, "Space-Wars Picade", false, false),
+                if password {
+                    ButtonRoute::Menu(UiAction::Controls)
+                } else {
+                    ButtonRoute::Scenario
+                },
+            );
+            for (button, action) in [
+                (Button::South, UiAction::Confirm),
+                (Button::East, UiAction::Back),
+                (Button::Start, UiAction::Start),
+                (Button::Select, UiAction::Controls),
+            ] {
+                assert_eq!(
+                    button_route(&ui, button, "8BitDo Micro", false, false),
+                    ButtonRoute::Menu(action)
+                );
+            }
+        }
+        ui.set_network_visible(false);
+        assert_eq!(
+            button_route(&ui, Button::West, "8BitDo Micro", false, false),
+            ButtonRoute::Scenario
+        );
+    }
+}
+
+#[test]
 fn unassigned_physical_controllers_can_navigate_but_never_feed_a_player() {
     let mut handoff = ModeHandoff::default();
     let mut gamepads = input::GamepadInput::default();

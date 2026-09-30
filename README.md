@@ -194,8 +194,8 @@ A failed save leaves the controls usable and offers **Retry Save**.
 addresses, CPU/memory/storage information, and connected controller assignments.
 D-pad/arrow keys scroll; A/Enter or B/Esc returns one level to App Settings.
 It is read-only and samples in the background only while open. See
-[Device Info and menu navigation](docs/device-info.md), including the boundary
-for future Wi-Fi setup and controller assignment screens.
+[Device Info and menu navigation](docs/device-info.md) for the boundary between
+read-only information and Network/Controllers configuration.
 
 **App Settings → Auto-start** can run Clock or repeated two-bot Spacewars
 matches whenever the launcher is idle. Choose a delay; the preference stays
@@ -210,6 +210,12 @@ occupied slots and remembers distinguishable device models. Button mappings use
 a timed trial before saving, with automatic rollback and a restore-defaults
 option. Profiles are local to each machine and shared by identical controller
 models. See [controller setup and cabinet layouts](docs/controller-profiles.md).
+
+**App Settings → Network** selects nearby Wi-Fi networks on Linux with
+NetworkManager. Use saved settings or the controller/touch-friendly password
+keyboard, then explicitly keep the trial connection. Cancel or timeout restores
+the previous configuration. Credentials stay with NetworkManager, not app
+settings. See [Wi-Fi setup and safety checks](docs/network-setup.md).
 
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames

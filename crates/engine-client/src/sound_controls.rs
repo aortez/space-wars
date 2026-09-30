@@ -131,9 +131,9 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         UiAction::Up | UiAction::Down => {
             // Preserve the existing Back/Retry indices and stable CLI IDs.
             let order: &[i32] = if count == 7 {
-                &[0, 1, 2, 3, 4, 7, 5, 6]
+                &[0, 1, 2, 3, 4, 7, 8, 5, 6]
             } else {
-                &[0, 1, 2, 3, 4, 7, 5]
+                &[0, 1, 2, 3, 4, 7, 8, 5]
             };
             let position = order
                 .iter()
@@ -156,6 +156,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         UiAction::Confirm if index == 3 => window.invoke_device_info_open(),
         UiAction::Confirm if index == 4 => window.invoke_autostart_open(),
         UiAction::Confirm if index == 7 => window.invoke_controllers_open(),
+        UiAction::Confirm if index == 8 => window.invoke_network_open(),
         UiAction::Confirm if index == 6 && count == 7 => window.invoke_sound_retry(),
         UiAction::Back | UiAction::Controls | UiAction::Confirm
             if action != UiAction::Confirm || index == 5 =>

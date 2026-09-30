@@ -29,6 +29,14 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if window.get_network_visible()
+        && crate::network_controls::inventory(window)
+            .iter()
+            .any(|control| control.id == control_id && control.enabled)
+    {
+        window.invoke_network_command(control_id.into());
+        return true;
+    }
     if window.get_controllers_visible()
         && crate::controller_controls::inventory(window)
             .iter()
@@ -133,6 +141,7 @@ fn activation_target(
         "settings.device-info" => sound(3, UiAction::Confirm),
         "settings.autostart" => sound(4, UiAction::Confirm),
         "settings.controllers" => sound(7, UiAction::Confirm),
+        "settings.network" => sound(8, UiAction::Confirm),
         "sound.back" => sound(5, UiAction::Confirm),
         "sound.retry" => sound(6, UiAction::Confirm),
         "autostart.activity.previous" => ActivationTarget {

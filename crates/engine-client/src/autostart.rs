@@ -124,6 +124,7 @@ pub(crate) fn install(
         state.idle.reset();
         if let Some(window) = weak.upgrade() {
             window.global::<UserActivity>().set_pointer_held(false);
+            window.invoke_network_conceal();
         }
     });
 

@@ -79,17 +79,16 @@ to reject stale data as usual.
 
 The launcher chooses/configures scenarios. Pause handles the active session.
 **App Settings** is the shared home for application/device-wide concerns:
-current audio/FPS preferences, Device Info, Auto-start, and
-[Controllers](controller-profiles.md), with **Network** as a future sibling
-screen. Controllers configures the shared logical layout and P1/P2 assignments;
+current audio/FPS preferences, Device Info, Auto-start,
+[Controllers](controller-profiles.md), and [Network](network-setup.md) as sibling
+screens. Controllers configures the shared logical layout and P1/P2 assignments;
 scenario-specific action bindings remain separate work.
 
-Wi-Fi setup belongs in Network, not inside read-only Info. Its implementation
-will need network selection, credential entry usable without a physical keyboard,
-clear connecting/success/failure feedback, and a way back if the new connection
-fails. Network mutations and credential storage need an explicit privileged
-boundary on kiosks; this Info implementation does not grant one. Do not add
-non-working Network buttons until that workflow exists.
+Wi-Fi setup belongs in Network, not inside read-only Info. It uses
+NetworkManager's existing authorization and credential storage, a
+controller/touch password keyboard, and a checkpoint-backed trial connection.
+Info stays read-only and does not grant network permissions. See the Network
+document for supported security types, rollback boundaries and hardware checks.
 
 Tests cover resource parsers, sampling throttling/stale visits, parent navigation,
 paused-scenario preservation, scrolling, and partial versus full UI repaints at
