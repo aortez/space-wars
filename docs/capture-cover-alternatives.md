@@ -85,3 +85,108 @@ python3 tools/probe-cover-alternatives.py \
 Use the results to choose a separately declared next experiment. Do not retune
 the rejected cooldown or claim a landing-policy improvement from diagnostic
 route availability alone.
+
+## Results
+
+All ten replays and twenty requested snapshots completed in
+`target/cover-alternatives/v1`, using frozen source `98f9831` and preserved binary
+`target/cover-alternatives/surface_mission_soak-98f9831`, SHA-256
+`dde8c8233b0eb12704dcf2deac70424a33a44a84809524f439d47411a00cfe89`.
+The [results archive](data/capture-cover-alternatives-v1.json) contains commands,
+hashes, parity checks and per-site findings. Its linked compressed input archive
+retains every complete probe observation, native assessment and route batch for
+reanalysis without repeating physics. All raw hashes were rechecked at export.
+
+Physical reports, mission/visit records and every previously retained trace and
+planner stream match their source runs exactly. Sensor parity covers 473,846
+player observations. The unchanged main planner executes 258,523 dispatch ticks,
+with a maximum of four graph operations and 161 physics queries in one tick.
+No visit audit has an unverified or inconsistent ending.
+
+There are 17 valid fresh-choice comparisons and 17 full route probes. The latter
+perform 938 site-route measurements in 125 batches, counting repeated sites and
+snapshots. Three route probes have no hostile flag objective; three native
+comparisons have no selected site. These are retained as unavailable, not zero
+available routes. Every native route represented in a full probe matches exactly.
+
+### Directed failure: more sites do not provide shelter
+
+At all three frozen clocks in both arms, all 37 ground-and-approach-covered sites
+have disconnected outbound routes in the existing JointRoundTrip model. Only
+sites 41–45 provide modeled round trips, and none has ground, approach or
+departure cover. The native shortlist already measures 41–43; expanding it adds
+44 and 45 without solving exposure. This result applies to the observed sites
+and current model, not every possible physical path or future opponent position.
+
+The +0.8 successful control is different: 53 of 59 observed sites have modeled
+round trips, including all 37 approach-covered sites. Four covered routes are
+already native-eligible, and the controller chooses site 0 in both arms. A wider
+survey is not needed to explain or preserve this successful choice.
+
+### Recorded asteroid case: ranking and incomplete evidence
+
+At world tick 2,475, 22 of 29 approach-covered sites have modeled round trips.
+One is already native-eligible; the other 21 are absent from the eight-site
+route shortlist. The native ranker nevertheless chooses exposed site 49:
+
+| Best direction at tick 2,475 | Approach score | Cover penalty | Round-trip score | Total |
+| --- | ---: | ---: | ---: | ---: |
+| Selected exposed site 49 | 240.29 | 4,000.00 | 0.00 | 4,240.29 |
+| Sheltered site 4 | 148.93 | 0.00 | 4,158.98 | 4,307.91 |
+
+These are native controller score units, not seconds. The covered site's long
+walk outweighs the finite exposure penalty. Yet the execution gate cannot start
+the exposed descent while the threat persists. Merely remembering a rejected
+site does not reconcile ranking with that execution constraint.
+
+At tick 2,895, the opponent's changed position leaves 24 approach-covered sites.
+Seventeen have diagnostic round trips, but **none is in the native shortlist**:
+the four shortlisted sheltered sites all report disconnected routes. Therefore,
+zero native-eligible covered routes does not generally mean all covered routes
+are unavailable. Both arms show this distinction at these clocks. The expanded
+diagnostic is not admitted to play and supplies no completed-capture evidence.
+
+The original later failed trip introduces another constraint. At tick 9,383,
+the destination is neutral, so no hostile-flag route probe applies. All 11
+approach-covered sites are rejected for solar safety in both directions. At
+tick 10,875, the destination has a hostile flag and all 18 approach-covered
+sites have disconnected modeled outbound routes. The cooldown arm has no native
+selected site at these two clocks; it did not replay that original attempt.
+
+### Changed fresh matches: no covered round trip at first exclusion
+
+For P1 at tick 9,750, seven of 44 observed sites have approach cover; all seven
+have disconnected outbound routes. Only exposed site 50 has a modeled round
+trip. The predecessor selects it; the cooldown arm has no selected site at that
+tick, while its independent route diagnostic still completes.
+
+For P2 at tick 13,365, all 23 approach-covered sites among 47 observed candidates
+have disconnected outbound routes. Seven exposed sites have modeled round trips.
+Both arms therefore face an exposure problem that rotating among usable ground
+routes does not solve. These snapshots explain constraints at the first exclusion;
+they do not assign all later win/loss or recovery differences to one decision.
+
+## Validation and next boundary
+
+Four scenario objective tests (including two new tests), 288 AI unit tests,
+four physical destination tests, 39 harness tests and 592 Python tests pass.
+Formatting, strict AI Clippy with `--no-deps`, and a normal harness build without
+sensor profiling pass. Strict scenario Clippy reports seven existing findings
+in unchanged `pilot.rs`, `render.rs`, `surface_sortie.rs` and `lib.rs`; the log
+hash and affected paths are retained in the archive. No unrelated lint changes
+were made.
+
+The native comparison takes at most 0.157 ms in this run. Full route probing,
+including world cloning, reaches 45.070 ms on this host and performs extra
+physical work outside live quotas. It must remain a diagnostic, not a replacement
+for the bounded playing survey or a claim about Pi performance.
+
+**Decision:** retain defaults. The next policy experiment should act on a
+witnessed cover failure while still exposed: distinguish a known eligible
+covered route, missing route evidence, and a currently blocked approach.
+Test requiring usable cover at that point, with bounded evidence acquisition
+for unknown alternatives and an explicit exit when the approach cannot progress.
+Preserve unexposed first selections, successful covered retries, native solar and
+route gates, original deadlines and shared work allowances. The evidence does
+not justify a blanket early abort from an empty shortlist, a larger exposure
+weight, or deploying the diagnostic's exhaustive work as a live sensor.

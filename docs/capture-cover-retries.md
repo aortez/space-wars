@@ -174,3 +174,9 @@ investigate whether any reachable alternative has usable cover under current
 exposure, including an explicit outcome when none does. Rotating through
 rejected sites alone does not supply that evidence. No duration or eligibility
 tuning was performed on these results.
+
+The follow-up [cover-alternative diagnostic](capture-cover-alternatives.md)
+measures all observed sites without changing the recorded gameplay. It separates
+disconnected sheltered routes, sheltered routes that lose on score, missing
+shortlist evidence and solar exclusions, providing the boundary for the next
+behavior experiment.
