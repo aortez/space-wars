@@ -57,7 +57,9 @@ class CoverRetryTests(unittest.TestCase):
                 self.assertNotIn(item['seed'], previous_seeds)
 
     def test_prefix_parity_ignores_only_option_telemetry_and_stops_at_activation(self):
-        a = [dict(tick=t, actions=[1], mission={}) for t in range(4)]
+        a = [dict(tick=t, actions=[1], mission={}, observation={
+            'local': {'combat': {'recovery': {'flight': {'pilot': {'tick': t+1}}}}}})
+            for t in range(4)]
         b = [dict(r, mission=dict(cover_retry_cooldown={})) for r in a]
         b[3]['actions'] = [2]
         with tempfile.TemporaryDirectory() as directory:
@@ -66,13 +68,13 @@ class CoverRetryTests(unittest.TestCase):
                 for path, rows in zip(paths, [a, b]):
                     path.write_text(''.join(json.dumps(row)+'\n' for row in rows))
             write()
-            self.assertEqual(R.prefix_parity(*paths, 3)['rows'], 3)
+            self.assertEqual(R.prefix_parity(*paths, 4)['rows'], 3)
             with self.assertRaises(AssertionError):
                 R.prefix_parity(*paths, None)
             b[1]['actions'] = [2]
             write()
             with self.assertRaises(AssertionError):
-                R.prefix_parity(*paths, 3)
+                R.prefix_parity(*paths, 4)
 
 
 if __name__ == '__main__':

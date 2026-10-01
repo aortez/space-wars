@@ -81,3 +81,11 @@ python3 tools/validate-cover-retries.py \
 Reduced repeated-site selection alone does not justify promotion. Require useful
 completion without unexplained survival/progress regressions; retain defaults
 unless the evidence supports a separate promotion and target-device validation.
+
+The first validation attempt retained in `target/cover-retry-cooldown/v1`
+exposed a runner clock mismatch: directed fixtures start at world tick 1, but
+the trace's outer tick is a zero-based loop ordinal. The first exclusion is
+world tick 3,930 / trace tick 3,929. Prefix comparison now uses the observation's
+world tick, like native cooldown telemetry. A regression covers the offset.
+The candidate code, duration, cases and seed plan remain frozen at `058d761`;
+this correction changes only the verification join.

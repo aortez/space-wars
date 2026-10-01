@@ -95,7 +95,10 @@ def without_cooldown(value):
 def prefix_parity(before, after, first_blocked):
     def rows(path):
         for row in F.rows(path):
-            if first_blocked is not None and row['tick'] >= first_blocked:
+            # Directed fixtures begin at world tick 1; the trace's outer tick
+            # is a zero-based loop ordinal. Native cooldown uses world time.
+            tick = row['observation']['local']['combat']['recovery']['flight']['pilot']['tick']
+            if first_blocked is not None and tick >= first_blocked:
                 break
             yield without_cooldown(row)
     count, digest = 0, hashlib.sha256()
