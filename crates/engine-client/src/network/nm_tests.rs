@@ -418,3 +418,6 @@ fn access_point_identity_uses_raw_bytes_and_security_not_display_name() {
 fn transport_errors_do_not_echo_daemon_supplied_secrets() {
     assert!(!explain(zbus::Error::Failure("secret123".into())).contains("secret123"));
 }
+
+#[path = "nm_profile_tests.rs"]
+mod profile_management;

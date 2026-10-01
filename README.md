@@ -215,7 +215,9 @@ models. See [controller setup and cabinet layouts](docs/controller-profiles.md).
 NetworkManager. Use saved settings or the controller/touch-friendly password
 keyboard, then explicitly keep the trial connection. Cancel or timeout restores
 the previous configuration. Credentials stay with NetworkManager, not app
-settings. See [Wi-Fi setup and safety checks](docs/network-setup.md).
+settings. **Saved networks** also manages out-of-range profiles, automatic
+connection, preferred-network fallback, and confirmed removal. Preferences do
+not switch the current connection. See [Wi-Fi setup and safety checks](docs/network-setup.md).
 
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames

@@ -9,13 +9,19 @@ use spacewars_control::{UiAction, UiControl};
 
 use crate::{
     MainWindow, NetworkRow,
-    network::{Command, Network, Phase, Security, Session, View},
+    network::{Command, Network, Phase, ProfileChange, SavedNetwork, Security, Session, View},
 };
 
 #[derive(Default, PartialEq, Eq)]
 enum Page {
     #[default]
     List,
+    Saved,
+    Profile(String),
+    Forget {
+        id: String,
+        allow_active: bool,
+    },
     Selected(String),
     Password(String),
 }
@@ -50,9 +56,17 @@ impl Panel {
     fn network<'a>(&self, view: &'a View) -> Option<&'a Network> {
         let id = match &self.page {
             Page::Selected(id) | Page::Password(id) => id,
-            Page::List => return None,
+            _ => return None,
         };
         view.inventory.networks.iter().find(|n| &n.id == id)
+    }
+
+    fn profile<'a>(&self, view: &'a View) -> Option<&'a SavedNetwork> {
+        let id = match &self.page {
+            Page::Profile(id) | Page::Forget { id, .. } => id,
+            _ => return None,
+        };
+        view.inventory.profiles.iter().find(|p| &p.id == id)
     }
 
     fn rows(&self, view: &View) -> Vec<NetworkRow> {
@@ -82,6 +96,7 @@ impl Panel {
                         },
                         view.phase == Phase::Idle,
                     );
+                    add("network.saved", "Saved networks…", true);
                     for network in &view.inventory.networks {
                         add(
                             &format!("network.select.{}", network.id),
@@ -89,6 +104,71 @@ impl Panel {
                             true,
                         );
                     }
+                }
+                Page::Saved => {
+                    add(
+                        "network.refresh",
+                        "Refresh saved networks",
+                        view.phase == Phase::Idle,
+                    );
+                    for profile in &view.inventory.profiles {
+                        add(
+                            &format!("network.profile.{}", profile.id),
+                            &profile.ssid_name,
+                            true,
+                        );
+                    }
+                }
+                Page::Profile(_) => {
+                    if let Some(profile) = self.profile(view) {
+                        let idle = view.phase == Phase::Idle;
+                        add(
+                            "network.profile-connect",
+                            "Connect using this profile",
+                            idle && view.inventory.can_connect
+                                && !profile.connected
+                                && profile
+                                    .network
+                                    .as_ref()
+                                    .is_some_and(|n| n.security != Security::Unsupported),
+                        );
+                        add(
+                            "network.autoconnect",
+                            if profile.autoconnect {
+                                "Connect automatically: On"
+                            } else {
+                                "Connect automatically: Off"
+                            },
+                            idle && view.inventory.can_manage,
+                        );
+                        add(
+                            "network.prefer",
+                            if view.inventory.preferred(profile) {
+                                "Preferred network"
+                            } else {
+                                "Prefer this network"
+                            },
+                            idle && view.inventory.can_manage
+                                && profile.autoconnect
+                                && !view.inventory.preferred(profile),
+                        );
+                        add(
+                            "network.forget",
+                            "Forget network…",
+                            idle && view.inventory.can_manage,
+                        );
+                    }
+                }
+                Page::Forget { .. } => {
+                    add("network.back", "Cancel", true);
+                    add(
+                        "network.forget-confirm",
+                        "Forget this saved profile",
+                        view.phase == Phase::Idle
+                            && view.inventory.can_manage
+                            && self.profile(view).is_some(),
+                    );
+                    return rows;
                 }
                 Page::Selected(_) => {
                     if let Some(network) = self.network(view) {
@@ -127,6 +207,32 @@ impl Panel {
         }
         add("network.back", "Back", true);
         for row in &mut rows {
+            if let Some(id) = row.id.strip_prefix("network.profile.")
+                && let Some(profile) = view.inventory.profiles.iter().find(|p| p.id == id)
+            {
+                row.detail = format!(
+                    "{} · {}",
+                    profile.id,
+                    if profile.network.is_some() {
+                        "In range"
+                    } else {
+                        "Out of range"
+                    }
+                )
+                .into();
+                row.badge = match (
+                    profile.connected,
+                    view.inventory.preferred(profile),
+                    profile.autoconnect,
+                ) {
+                    (true, true, _) => "Preferred",
+                    (true, false, _) => "Active",
+                    (false, true, _) => "Preferred",
+                    (_, _, false) => "Manual only",
+                    _ => "Automatic",
+                }
+                .into();
+            }
             if let Some(id) = row.id.strip_prefix("network.select.")
                 && let Some(network) = view.inventory.networks.iter().find(|n| n.id == id)
             {
@@ -155,12 +261,32 @@ impl Panel {
         if view.phase.is_trial() {
             self.password.clear();
             self.page = Page::List;
-        } else if !matches!(self.page, Page::List) && self.network(&view).is_none() {
+        } else if matches!(self.page, Page::Selected(_) | Page::Password(_))
+            && self.network(&view).is_none()
+        {
             self.password.clear();
             self.page = Page::List;
             self.message =
                 "Selected network is no longer visible. Scan and select it again.".into();
         }
+        if matches!(self.page, Page::Profile(_) | Page::Forget { .. })
+            && self.profile(&view).is_none()
+        {
+            self.page = Page::Saved;
+            self.message =
+                "Saved profile is no longer available. Refresh to check the list.".into();
+        }
+        let active = self.profile(&view).is_some_and(|p| p.connected);
+        if let Page::Forget { allow_active, .. } = &mut self.page
+            && active
+            && !*allow_active
+        {
+            *allow_active = true;
+            // A new active-network warning requires a deliberate second choice.
+            window.set_network_focus_index(0);
+        }
+        window.set_network_forget_confirmation(matches!(self.page, Page::Forget { .. }));
+        window.set_network_profile_visible(matches!(self.page, Page::Profile(_)));
         let password_page = matches!(self.page, Page::Password(_));
         if !password_page {
             window.set_network_password_revealed(false);
@@ -183,20 +309,44 @@ impl Panel {
         window.set_network_title(
             if password_page {
                 "Wi-Fi Password"
+            } else if matches!(self.page, Page::Forget { .. }) {
+                "Forget Network?"
+            } else if matches!(self.page, Page::Saved | Page::Profile(_)) {
+                "Saved Networks"
             } else {
                 "Network"
             }
             .into(),
         );
-        let subtitle = self.network(&view).map_or_else(
-            || view.inventory.summary.clone(),
-            |n| format!("{} · {} · {}", n.name, n.interface, n.security.label()),
-        );
+        let subtitle = if let Some(profile) = self.profile(&view) {
+            format!(
+                "{} · {}",
+                profile.ssid_name,
+                if profile.connected {
+                    "Active connection"
+                } else if profile.network.is_some() {
+                    "In range"
+                } else {
+                    "Out of range"
+                }
+            )
+        } else if self.page == Page::Saved {
+            format!(
+                "{} saved profiles · including networks out of range",
+                view.inventory.profiles.len()
+            )
+        } else {
+            self.network(&view).map_or_else(
+                || view.inventory.summary.clone(),
+                |n| format!("{} · {} · {}", n.name, n.interface, n.security.label()),
+            )
+        };
         window.set_network_subtitle(match view.phase {
             Phase::Confirm => "Temporary connection · waiting for confirmation".into(),
             Phase::Connecting => "Trying a connection · previous network protected".into(),
             Phase::Saving => "Saving your confirmed connection".into(),
             Phase::Restoring => "Restoring the previous network".into(),
+            Phase::Managing => "Saving network preferences".into(),
             Phase::Idle | Phase::Discovering => subtitle.into(),
         });
         let detail = if password_page {
@@ -207,6 +357,18 @@ impl Panel {
                 self.password.len(),
                 self.message
             )
+        } else if let Page::Forget { allow_active, .. } = self.page {
+            let profile = self.profile(&view).unwrap();
+            format!(
+                "Profile: {}\nID: {}\n{}",
+                profile.name.chars().take(48).collect::<String>(),
+                profile.id,
+                if allow_active {
+                    "This profile is active. Forgetting it may disconnect Wi-Fi and end remote access. Reconnecting may need its password."
+                } else {
+                    "Remove this saved profile and its credentials? You can add the network again later."
+                }
+            )
         } else if let Some(error) = &view.inventory_error {
             if view.status.is_empty() {
                 error.clone()
@@ -215,6 +377,26 @@ impl Panel {
             }
         } else if !self.message.is_empty() {
             self.message.clone()
+        } else if let Some(profile) = self.profile(&view) {
+            format!(
+                "Profile: {} · ID: {}\n{}",
+                profile.name.chars().take(48).collect::<String>(),
+                profile.id,
+                if view.phase == Phase::Managing || !view.status.is_empty() {
+                    view.status.as_str()
+                } else if !view.inventory.can_manage {
+                    "Saved-network changes are unavailable. Refresh and check system permissions."
+                } else {
+                    "Preferences apply to future automatic connections. Connect now is separate."
+                }
+            )
+        } else if self.page == Page::Saved && view.status.is_empty() {
+            if view.inventory.can_manage {
+                "Choose a saved profile to connect, change automatic connection, or forget it."
+            } else {
+                "Saved-network changes are unavailable. Refresh and check system permissions."
+            }
+            .into()
         } else if view.status.is_empty() {
             "Choose a nearby network. New connections are tried temporarily until you choose Keep. Open networks are not encrypted.".into()
         } else {
@@ -255,12 +437,25 @@ impl Panel {
             self.password.clear();
             self.page = match &self.page {
                 Page::Password(id) => Page::Selected(id.clone()),
-                Page::Selected(_) => Page::List,
+                Page::Selected(_) | Page::Saved => Page::List,
+                Page::Profile(_) => Page::Saved,
+                Page::Forget { id, .. } => Page::Profile(id.clone()),
                 Page::List => {
                     window.set_network_visible(false);
                     return;
                 }
             };
+        } else if id == "network.saved" {
+            self.page = Page::Saved;
+        } else if let Some(id) = id.strip_prefix("network.profile.") {
+            self.page = Page::Profile(id.into());
+        } else if id == "network.forget" {
+            if let Some(profile) = self.profile(&view) {
+                self.page = Page::Forget {
+                    id: profile.id.clone(),
+                    allow_active: profile.connected,
+                };
+            }
         } else if let Some(id) = id.strip_prefix("network.select.") {
             self.page = Page::Selected(id.into());
         } else if id == "network.password" {
@@ -289,6 +484,34 @@ impl Panel {
         } else {
             let command = match id {
                 "network.scan" => Command::Scan,
+                "network.refresh" => Command::Refresh,
+                "network.profile-connect" => {
+                    let Some(profile) = self.profile(&view) else {
+                        return;
+                    };
+                    Command::ConnectProfile {
+                        id: profile.id.clone(),
+                    }
+                }
+                "network.autoconnect" | "network.prefer" | "network.forget-confirm" => {
+                    let Some(profile) = self.profile(&view) else {
+                        return;
+                    };
+                    let change = match id {
+                        "network.autoconnect" => ProfileChange::Autoconnect(!profile.autoconnect),
+                        "network.prefer" => ProfileChange::Prefer,
+                        _ => {
+                            let Page::Forget { allow_active, .. } = self.page else {
+                                return;
+                            };
+                            ProfileChange::Forget { allow_active }
+                        }
+                    };
+                    Command::Manage {
+                        id: profile.id.clone(),
+                        change,
+                    }
+                }
                 "network.keep" => Command::Keep,
                 "network.cancel" => Command::Cancel,
                 "network.connect-saved" | "network.connect-open" | "network.connect-password" => {
@@ -325,8 +548,19 @@ impl Panel {
                 }
                 _ => return,
             };
+            let next = match &command {
+                Command::Manage { id, change } => {
+                    if matches!(change, ProfileChange::Forget { .. }) {
+                        Page::Saved
+                    } else {
+                        Page::Profile(id.clone())
+                    }
+                }
+                Command::Refresh => Page::Saved,
+                _ => Page::List,
+            };
             self.session.send(command);
-            self.page = Page::List;
+            self.page = next;
         }
         self.publish(window);
     }
@@ -419,6 +653,8 @@ fn install_with(
             window.set_network_rows(ModelRc::default());
             window.set_network_detail("".into());
             window.set_network_password_visible(false);
+            window.set_network_forget_confirmation(false);
+            window.set_network_profile_visible(false);
             window.set_network_password_revealed(false);
             window.set_network_password_text("".into());
             window.set_network_password_mask("".into());
