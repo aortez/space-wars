@@ -86,6 +86,35 @@ class CoverResponseTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 Q.prefix_parity(*paths, 4)
 
+class SupplementalTraceTests(unittest.TestCase):
+    def test_short_lived_effect_missing_from_report_is_recovered_without_double_counting(self):
+        c = capture()
+        c['cover_response']['first_effect_tick'] = None
+        c['cover_response']['filtered_directions'] = 0
+        c['cover_response']['requested_sites'] = c['cover_response']['measured_sites'] = 0
+        report = dict(missions=[dict(capture=None)], events=[dict(seat=0, telemetry=dict(capture=c))], samples=[])
+        self.assertEqual(Q.response_stats(report, [0])['affected_captures'], 0)
+        witnessed = copy.deepcopy(c)
+        witnessed['cover_response']['first_effect_tick'] = 12
+        witnessed['cover_response']['filtered_directions'] = 36
+        witnessed['cover_response']['requested_sites'] = 1
+        result = Q.response_stats(report, [0], [(0, dict(capture=witnessed))] * 3)
+        self.assertEqual(result['affected_captures'], 1)
+        self.assertEqual(result['first_effect_tick'], 12)
+        self.assertEqual(result['totals']['requested_sites'], 1)
+        self.assertEqual(result['totals']['filtered_directions'], 36)
+
+    def test_replay_comparison_allows_only_output_and_trace_options_to_differ(self):
+        spec = importlib.util.spec_from_file_location('audit', Path(__file__).parents[1]/'audit-cover-response.py')
+        audit = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(audit)
+        original = ['frozen-binary', '--seed', '42', '--out', 'old', '--cover-response-seats', '0']
+        replay = ['frozen-binary', '--seed', '42', '--out', 'new', '--cover-response-seats', '0',
+                  '--trace', 'true', '--trace-start-tick', '10', '--trace-end-tick', '20']
+        self.assertEqual(audit.replay_arguments(original), audit.replay_arguments(replay))
+        replay[2] = '43'
+        self.assertNotEqual(audit.replay_arguments(original), audit.replay_arguments(replay))
+
 
 if __name__ == '__main__':
     unittest.main()

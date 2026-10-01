@@ -65,10 +65,11 @@ def check_state(capture, state):
         assert s['seeded'] and not s['pending'] and s['omitted'] > 0 and s['probes'] == 8
 
 
-def response_stats(report, enabled):
+def response_stats(report, enabled, extra=()):
     history = [(s, m) for s, m in enumerate(report['missions'])]
     history += [(e['seat'], e['telemetry']) for e in report['events']]
     history += [(s, m) for sample in report['samples'] for s, m in enumerate(sample['missions'])]
+    history.extend(extra)
     captures = {}
     for seat, mission in history:
         c = mission['capture']
@@ -90,7 +91,7 @@ def response_stats(report, enabled):
     return dict(captures=list(captures.values()), totals={k: sum(c[k] for c in captures.values()) for k in COUNTERS},
         affected_captures=sum(c['first_effect_tick'] is not None for c in captures.values()),
         first_effect_tick=min((c['first_effect_tick'] for c in captures.values() if c['first_effect_tick'] is not None), default=None),
-        scope='Maxima per capture from retained snapshots; counts are events and searches, not independent success probabilities.')
+        scope='Maxima per capture from retained report snapshots and any supplied trace rows; counts are observed lower bounds, not independent success probabilities.')
 
 
 def without_option(value):

@@ -82,3 +82,28 @@ python3 tools/validate-cover-response.py \
   --binary target/cover-response/surface_mission_soak-COMMIT \
   --out target/cover-response/v1
 ```
+
+## Audit correction
+
+The first validator completed all 74 gameplay runs but rejected the final
+comparison for `world2-asteroids3-p1`: physical results changed while retained
+report snapshots contained no `first_effect_tick`. The failed
+`target/cover-response/v1/summary.json` remains intact. Sparse report snapshots
+can miss a short response immediately before recovery clears the capture task.
+Absence from that sampling is not evidence that the response never ran.
+
+A separate plan in `target/cover-response/activation-replay/plan.json` replays
+both arms with the same frozen binary and commands, adding only trace output
+and a dense window at loop ticks 21,500–23,500. The new audit requires exact
+original physical/mission/progress reports, non-trace controller/planner streams
+and sensor calls/counters before admitting the supplementary capture telemetry.
+It also requires identical retained trace behavior up to the newly witnessed
+first effect. No controller, seed, deadline or score changes accompany this
+correction. Counters from other sparse snapshots remain observed lower bounds.
+
+```sh
+python3 tools/audit-cover-response.py \
+  --study target/cover-response/v1 \
+  --replay target/cover-response/activation-replay \
+  --out target/cover-response/v2
+```
