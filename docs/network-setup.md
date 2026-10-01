@@ -212,12 +212,29 @@ Open networks, WPA3-only access points, and physical HyperPixel touch entry have
 not yet been hardware-verified. The portrait layout is covered by render tests;
 that is not a substitute for testing a real touch device/access point.
 
-The saved-profile management extension has automated coverage above. Its
-two-network automatic selection/fallback, reboot/A/B persistence, and physical
-controller/touch acceptance checks must be recorded separately from the
-September 28 connection-trial tests. Preference/deletion persistence uses the
-same existing NetworkManager data directory; an application test alone does
-not prove a reboot or an A/B update.
+On 2026-09-30, the saved-profile extension was deployed to `sw-picade` with a
+matching application-only release build and NetworkManager 1.46.6. Cabinet
+checks used the public UI-control API and two temporary, out-of-range profiles
+with identical names/SSIDs:
+
+- Both UUIDs appeared separately; explicit Connect was disabled out of range.
+- Autoconnect and preference edits took effect without switching Wi-Fi. Choosing
+  the other profile raised its priority; disabling it restored the first
+  profile's Preferred badge.
+- The synthetic test password survived preference edits. No existing network's
+  password was retrieved.
+- Cancel preserved the selected profile; confirmed Forget removed only that
+  UUID. The real active profile showed the remote-access warning, with Cancel
+  selected, and was not deleted.
+- Preferences and deletion remained visible after restarting the application.
+- Original profiles' autoconnect settings/priorities, the active Wi-Fi
+  connection, and the app settings checksum were unchanged. The temporary
+  profiles were removed afterwards.
+
+Actual two-access-point automatic selection/fallback, reboot/A/B persistence,
+and physical controller/touch acceptance remain separate hands-on checks.
+Preference/deletion persistence uses the same existing NetworkManager data
+directory; an application restart does not prove a reboot or an A/B update.
 
 For future recovery tests, keep a wired connection or local console available
 before deliberately interrupting Wi-Fi. Do not test a remote-only network

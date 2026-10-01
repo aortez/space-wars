@@ -569,6 +569,27 @@ fn saved_network_controller_touch_confirmation_and_stale_profile_flows() {
     assert_eq!(latest.lock().unwrap().phase, Phase::Managing);
     window.invoke_network_command("network.autoconnect".into());
     assert!(receiver.is_empty());
+    // A completed deletion must not label another existing profile "forgotten".
+    *latest.lock().unwrap() = saved_view();
+    latest.lock().unwrap().status = "Saved network forgotten.".into();
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[0].clone());
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(!window.get_network_detail().contains("forgotten"));
+    assert!(
+        window
+            .get_network_detail()
+            .contains("future automatic connections")
+    );
+    window.invoke_network_command("network.autoconnect".into());
+    assert!(matches!(receiver.try_recv().unwrap(), Command::Manage { id, .. } if id == ids[0]));
+    latest.lock().unwrap().phase = Phase::Idle;
+    latest.lock().unwrap().status = "Could not save preference.".into();
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(
+        window
+            .get_network_detail()
+            .contains("Could not save preference")
+    );
     // Manual connection is still available for an autoconnect-disabled profile.
     *latest.lock().unwrap() = saved_view();
     state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[1].clone());

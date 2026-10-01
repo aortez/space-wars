@@ -32,6 +32,7 @@ struct Panel {
     password: String,
     alphabet: usize,
     message: String,
+    status_profile: Option<String>,
 }
 
 fn alphabet(index: usize) -> &'static str {
@@ -50,6 +51,7 @@ impl Panel {
             password: String::new(),
             alphabet: 0,
             message: String::new(),
+            status_profile: None,
         }
     }
 
@@ -349,6 +351,18 @@ impl Panel {
             Phase::Managing => "Saving network preferences".into(),
             Phase::Idle | Phase::Discovering => subtitle.into(),
         });
+        // A result from another profile is useful on the list, but misleading
+        // in this profile's details (especially after forgetting a duplicate).
+        let status = if matches!(self.page, Page::Profile(_))
+            && view.phase != Phase::Managing
+            && self
+                .profile(&view)
+                .is_some_and(|p| self.status_profile.as_deref() != Some(p.id.as_str()))
+        {
+            ""
+        } else {
+            view.status.as_str()
+        };
         let detail = if password_page {
             let mask = "•".repeat(self.password.len().min(24));
             format!(
@@ -370,10 +384,10 @@ impl Panel {
                 }
             )
         } else if let Some(error) = &view.inventory_error {
-            if view.status.is_empty() {
+            if status.is_empty() {
                 error.clone()
             } else {
-                format!("{}\n{error}", view.status)
+                format!("{status}\n{error}")
             }
         } else if !self.message.is_empty() {
             self.message.clone()
@@ -382,25 +396,25 @@ impl Panel {
                 "Profile: {} · ID: {}\n{}",
                 profile.name.chars().take(48).collect::<String>(),
                 profile.id,
-                if view.phase == Phase::Managing || !view.status.is_empty() {
-                    view.status.as_str()
+                if !status.is_empty() {
+                    status
                 } else if !view.inventory.can_manage {
                     "Saved-network changes are unavailable. Refresh and check system permissions."
                 } else {
                     "Preferences apply to future automatic connections. Connect now is separate."
                 }
             )
-        } else if self.page == Page::Saved && view.status.is_empty() {
+        } else if self.page == Page::Saved && status.is_empty() {
             if view.inventory.can_manage {
                 "Choose a saved profile to connect, change automatic connection, or forget it."
             } else {
                 "Saved-network changes are unavailable. Refresh and check system permissions."
             }
             .into()
-        } else if view.status.is_empty() {
+        } else if status.is_empty() {
             "Choose a nearby network. New connections are tried temporarily until you choose Keep. Open networks are not encrypted.".into()
         } else {
-            view.status.clone()
+            status.into()
         };
         window.set_network_detail(detail.into());
         let mut rows = self.rows(&view);
@@ -547,6 +561,10 @@ impl Panel {
                     }
                 }
                 _ => return,
+            };
+            self.status_profile = match &command {
+                Command::Manage { id, .. } => Some(id.clone()),
+                _ => None,
             };
             let next = match &command {
                 Command::Manage { id, change } => {
