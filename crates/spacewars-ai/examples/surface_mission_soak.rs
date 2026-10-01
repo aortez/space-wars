@@ -5,6 +5,8 @@ mod acquisition_probe;
 mod arrival_survey;
 #[path = "support/capture_probe.rs"]
 mod capture_probe;
+#[path = "support/cover_probe.rs"]
+mod cover_probe;
 #[path = "support/flag_survey.rs"]
 mod flag_survey;
 #[path = "support/flag_value_shadow.rs"]
@@ -185,6 +187,7 @@ fn main() {
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
+    let mut cover_routes_probe = cover_probe::CoverProbe::from_args();
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -693,6 +696,9 @@ fn main() {
                     serde_json::to_writer(&mut *trace, &record).unwrap();
                     writeln!(trace).unwrap();
                 }
+                if let Some(probe) = &mut cover_routes_probe {
+                    probe.observe(&state, i, tick, &pilots[i], &o);
+                }
                 last_posture[i] = posture_key;
                 if label != last[i] {
                     events.push(json!({"tick":tick,"seat":i,"label":label,"telemetry":pilots[i].telemetry()}));
@@ -910,6 +916,9 @@ fn main() {
     #[cfg(feature = "sensor-profile")]
     sensor_profiles.flush().unwrap();
     if let Some(probe) = planning_probe {
+        probe.finish(&out);
+    }
+    if let Some(probe) = cover_routes_probe {
         probe.finish(&out);
     }
     let final_audit = state.terrain_diagnostics();

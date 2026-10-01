@@ -6,6 +6,8 @@ use ground_navigation::{
 };
 use pilot::{LandingSiteId, PilotObservationV1};
 
+mod diagnostics;
+
 pub const MAX_OBJECTIVE_SITES: usize = 8;
 
 /// Versioned sensor semantics, selected by the policy rather than by the world.
