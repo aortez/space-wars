@@ -139,6 +139,7 @@ impl TransferComparisonJob {
             || before.policy != actual.policy
             || before.breaks != actual.breaks
             || before.bounded_acquisition != actual.bounded_acquisition
+            || before.cover_response != actual.cover_response
             || config(before) != config(actual)
             || before.previous_tick.is_some_and(|tick| tick >= p.tick)
             || actual.previous_tick != Some(p.tick)

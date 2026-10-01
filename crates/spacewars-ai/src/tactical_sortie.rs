@@ -23,10 +23,14 @@ use serde::Serialize;
 
 mod acquisition;
 mod acquisition_wait;
+mod cover_response;
 mod cover_retry;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+pub use cover_response::{
+    COVER_RESPONSE_PROFILE, COVER_SEARCH_TICKS, CoverResponse, MAX_COVER_PROBES,
+};
 pub use cover_retry::{COVER_RETRY_PROFILE, COVER_RETRY_TICKS, CoverRetryCooldown};
 #[cfg(test)]
 pub(crate) use selection::select as select_for_test;
@@ -91,6 +95,8 @@ pub struct TacticalTelemetry {
     pub acquisition_wait: Option<AcquisitionWait>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cover_retry_cooldown: Option<CoverRetryCooldown>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_response: Option<CoverResponse>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -162,6 +168,7 @@ impl TacticalSortiePilot {
                 acquisition: None,
                 acquisition_wait: None,
                 cover_retry_cooldown: None,
+                cover_response: None,
             },
             landing,
             site: None,
@@ -196,11 +203,13 @@ impl TacticalSortiePilot {
         let required = self.required_site;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.telemetry.cover_retry_cooldown.is_some();
+        let cover_response = self.telemetry.cover_response.is_some();
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
         self.required_site = required;
         self.bounded_acquisition = bounded_acquisition;
         self.enable_cover_retry_cooldown(cover_retry_cooldown);
+        self.enable_cover_response(cover_response);
     }
     /// Explicit continuation trials may constrain selection, but still need
     /// current material, solar and objective-route evidence for this ID.
@@ -232,7 +241,10 @@ impl TacticalSortiePilot {
         if self.telemetry.failed_tick.is_some() || self.telemetry.completed_tick.is_some() {
             self.combat.site_request()
         } else {
-            self.site.map(|s| s.id).or(self.required_site)
+            self.site
+                .map(|s| s.id)
+                .or(self.required_site)
+                .or_else(|| self.cover_probe_request())
         }
     }
     fn goal(&mut self, goal: TacticalGoal, tick: u64) {
@@ -289,11 +301,13 @@ impl TacticalSortiePilot {
         self.begin_acquisition(o);
         self.acquisition_reason(reason);
         self.check_acquisition_deadline(o);
+        self.check_cover_search_deadline(o);
     }
 
     /// A composing mission may abort its added work while retaining V1's
     /// existing combat/recovery fallback. Historical V1 never calls this hook.
     pub(crate) fn abort(&mut self, tick: u64, reason: &'static str) {
+        self.finish_cover_search(tick, "capture_aborted");
         self.telemetry.failed_tick.get_or_insert(tick);
         self.telemetry.failure = Some(reason);
         self.goal(TacticalGoal::Blocked, tick);
@@ -325,6 +339,7 @@ impl TacticalSortiePilot {
     }
     fn replan_for_cover(&mut self, tick: u64) {
         self.remember_cover_rejection(tick);
+        self.arm_cover_response(tick);
         self.replan(tick);
         if self.commit_descent {
             self.telemetry.cover_replans += 1;
@@ -351,6 +366,7 @@ impl TacticalSortiePilot {
             return self.combat.intent(c);
         }
         if !p.ship_available || p.ship_form != ShipForm::Ship {
+            self.finish_cover_search(p.tick, "ship_unavailable");
             self.acquisition_reason("ship_unavailable");
             self.telemetry.failed_tick.get_or_insert(p.tick);
             self.telemetry.failure = Some("ship lost during capture sortie");
@@ -365,7 +381,7 @@ impl TacticalSortiePilot {
             self.acquisition_reason("controls_unarmed");
             return CombatIntent::default();
         }
-        if self.check_acquisition_deadline(o) {
+        if self.check_acquisition_deadline(o) || self.check_cover_search_deadline(o) {
             return self.combat.intent(c);
         }
         if !p.queries_ready {
@@ -392,6 +408,7 @@ impl TacticalSortiePilot {
             || self.telemetry.solar_replans >= 8
         {
             self.acquisition_reason("capture_limit");
+            self.finish_cover_search(p.tick, "capture_limit");
             self.telemetry.failed_tick = Some(p.tick);
             self.telemetry.failure = Some("capture approach exhausted its time or retry budget");
             self.goal(TacticalGoal::Blocked, p.tick);
@@ -409,6 +426,7 @@ impl TacticalSortiePilot {
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
         let altitude = radius - p.planet.radius;
         if p.location == PilotLocation::OnFoot {
+            self.finish_cover_search(p.tick, "on_foot");
             self.acquisition_reason("on_foot");
             self.goal(TacticalGoal::Surface, p.tick);
             return CombatIntent {
@@ -486,6 +504,9 @@ impl TacticalSortiePilot {
             .commit_descent
             .then(|| LandingObjective::read(p))
             .flatten();
+        if self.prepare_cover_search(o, objective) {
+            return self.wait_for_site(o, 12.0);
+        }
         let survey = o.landing_objective.as_ref().filter(|survey| {
             let reason = selection::survey_rejection(o, objective, survey);
             if let Some(acquisition) = &mut self.telemetry.acquisition {
@@ -593,6 +614,7 @@ impl TacticalSortiePilot {
             // different valid point from the planner's proposed site.
             self.acquisition_reason("physically_landed");
             self.finish_acquisition(p.tick, "landed");
+            self.finish_cover_search(p.tick, "physically_landed");
             self.goal(TacticalGoal::Surface, p.tick);
             return CombatIntent {
                 flight: FlightIntent {
@@ -635,12 +657,23 @@ impl TacticalSortiePilot {
         }
         if self.site.is_none() {
             self.solar_rejected.retain(|(_, until)| p.tick < *until);
-            let (selected, checks) = selection::select(self, o, objective, survey, exposed, |_| {});
+            let mut unknown = Vec::new();
+            let (selected, checks) =
+                selection::select(self, o, objective, survey, exposed, |row| {
+                    if self.cover_required(o, exposed)
+                        && matches!(row.rejection, Some("route_absent" | "survey_unavailable"))
+                        && !unknown.contains(&row.site)
+                    {
+                        unknown.push(row.site);
+                    }
+                });
             self.record_cover_exclusions(p.tick, checks.cover_cooldown);
+            self.record_cover_filter(p.tick, checks.cover_required);
             if let Some(acquisition) = &mut self.telemetry.acquisition {
                 acquisition.checks = checks;
             }
             if let Some((site, side, solar, _)) = selected {
+                self.finish_selected_cover_search(o, site, survey);
                 self.acquisition_reason("selected_site");
                 self.site = Some(site);
                 self.objective = objective;
@@ -662,6 +695,9 @@ impl TacticalSortiePilot {
                     solar.is_some() && short.abs() >= 0.2 && short.signum() != side;
                 self.goal(TacticalGoal::SeekCover, p.tick);
             } else {
+                if let Some(intent) = self.search_cover_routes(o, objective, survey, &unknown) {
+                    return intent;
+                }
                 self.acquisition_reason(if p.sites.is_empty() {
                     if matches!(
                         p.site_query,

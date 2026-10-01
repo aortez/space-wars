@@ -65,6 +65,7 @@ struct Source {
     policy: crate::mission_policy::MissionPolicy,
     breaks: CombatBreakSettings,
     bounded_acquisition: bool,
+    cover_response: bool,
     disengagement: Option<(bool, bool, bool)>,
     selected_tick: u64,
     destination_switched: bool,
@@ -106,6 +107,7 @@ impl Source {
             policy: bot.policy,
             breaks: bot.breaks,
             bounded_acquisition: bot.bounded_acquisition,
+            cover_response: bot.cover_response,
             disengagement: Self::disengagement_config(bot),
             selected_tick: bot.selected_tick,
             destination_switched: bot.destination_switched,
@@ -142,6 +144,7 @@ impl Source {
         }
         if bot.breaks != self.breaks
             || bot.bounded_acquisition != self.bounded_acquisition
+            || bot.cover_response != self.cover_response
             || Self::disengagement_config(bot) != self.disengagement
         {
             return Err("controller configuration changed");
@@ -926,6 +929,7 @@ mod tests {
             |b, _| b.policy = crate::mission_policy::MissionPolicy::Legacy,
             |b, _| b.breaks.interval_seconds += 1,
             |b, _| b.bounded_acquisition = !b.bounded_acquisition,
+            |b, _| b.cover_response = !b.cover_response,
             |b, _| b.enable_pursuit_disengagement(true),
             |b, _| b.selected_tick += 1,
             |b, _| b.telemetry.target = None,

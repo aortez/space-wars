@@ -184,6 +184,7 @@ pub struct MaterialMissionPilot {
     last_survey: Option<LandingSurveyStamp>,
     pub(crate) bounded_acquisition: bool,
     pub(crate) cover_retry_cooldown: bool,
+    pub(crate) cover_response: bool,
     destination_switched: bool,
 }
 
@@ -246,12 +247,14 @@ impl MaterialMissionPilot {
             last_survey: None,
             bounded_acquisition: false,
             cover_retry_cooldown: false,
+            cover_response: false,
             destination_switched: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
+        let cover_response = self.cover_response;
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
             .telemetry
@@ -261,6 +264,7 @@ impl MaterialMissionPilot {
         *self = Self::with_policy(context, self.breaks, self.policy);
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
+        self.cover_response = cover_response;
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
             self.configure_handoff_probe(probe);
@@ -326,7 +330,8 @@ impl MaterialMissionPilot {
             self.policy.objective_planning(),
         )
         .with_bounded_acquisition(self.bounded_acquisition)
-        .with_cover_retry_cooldown(self.cover_retry_cooldown);
+        .with_cover_retry_cooldown(self.cover_retry_cooldown)
+        .with_cover_response(self.cover_response);
         capture.start_acquisition(&o.local);
         capture
     }
@@ -1297,6 +1302,32 @@ mod acquisition_tests {
                     let memory = capture.telemetry().cover_retry_cooldown.as_ref().unwrap();
                     assert!(memory.rejected.is_empty());
                     assert_eq!(memory.blocked_selections, 0);
+                }
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    fn cover_response_option_reaches_new_capture_tasks_and_survives_mission_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_cover_response(enabled);
+            for _ in 0..2 {
+                let capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().cover_response.is_some(), enabled);
+                if enabled {
+                    let memory = capture.telemetry().cover_response.as_ref().unwrap();
+                    assert!(memory.search.is_none());
+                    assert_eq!(memory.failures, 0);
                 }
                 bot.reset(context);
             }

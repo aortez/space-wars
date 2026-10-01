@@ -14,6 +14,8 @@ pub struct CandidateCheckCounts {
     pub cover_cooldown: usize,
     /// The following count directions; each surviving site has at most two.
     pub directions: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub cover_required: usize,
     pub unsafe_solar: usize,
     /// These overlap when several solar clearances fail for one direction.
     pub unsafe_approach: usize,

@@ -98,6 +98,12 @@ impl MissionBot {
         self.0.bounded_acquisition = enabled;
         self
     }
+    /// Opt-in response to confirmed cover failures; standard defaults omit it.
+    pub fn with_cover_response(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.cover_response = enabled;
+        self
+    }
     /// Opt-in v13 capture retry experiment; policy defaults leave it disabled.
     pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

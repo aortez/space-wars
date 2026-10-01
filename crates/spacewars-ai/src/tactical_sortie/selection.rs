@@ -176,6 +176,12 @@ pub(crate) fn select(
                 continue;
             }
             let cover = o.cover.iter().find(|s| s.site == site.id);
+            if pilot.cover_required(o, exposed) && !super::cover_response::usable_cover(o, site) {
+                checks.cover_required += 1;
+                assessment.rejection = Some("cover_required");
+                record(assessment);
+                continue;
+            }
             let ground_cost = if objective.is_some() {
                 let Some(survey) = survey else {
                     checks.survey_unavailable += 1;

@@ -276,6 +276,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--cover-retry-seats must be none, 0, 1 or both"),
     };
+    let cover_response_seats = match arg("--cover-response-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--cover-response-seats must be none, 0, 1 or both"),
+    };
     let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -351,6 +358,7 @@ fn main() {
         )
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
+        .with_cover_response(cover_response_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
@@ -967,6 +975,20 @@ fn main() {
             "profile": spacewars_ai::tactical_sortie::COVER_RETRY_PROFILE,
             "enabled_seats": cover_retry_seats,
             "cooldown_ticks": spacewars_ai::tactical_sortie::COVER_RETRY_TICKS,
+        });
+    }
+    for (seat, enabled) in cover_response_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["cover_response_model"] =
+                json!(spacewars_ai::tactical_sortie::COVER_RESPONSE_PROFILE);
+        }
+    }
+    if cover_response_seats.contains(&true) {
+        report["cover_response"] = json!({
+            "profile": spacewars_ai::tactical_sortie::COVER_RESPONSE_PROFILE,
+            "enabled_seats": cover_response_seats,
+            "deadline_ticks": spacewars_ai::tactical_sortie::COVER_SEARCH_TICKS,
+            "max_probes": spacewars_ai::tactical_sortie::MAX_COVER_PROBES,
         });
     }
     if let Some(progress) = progress {
