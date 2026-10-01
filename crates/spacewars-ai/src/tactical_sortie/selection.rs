@@ -109,7 +109,8 @@ pub(super) fn survey_rejection(
 
 /// Keep site order, preferred/opposite direction order, check precedence and
 /// f32 arithmetic identical for the playing selector and its diagnostic. The
-/// native call has a no-op sink, with no retained ledger or allocation.
+/// default call retains no ledger. The opt-in cover response collects only
+/// currently qualified IDs whose objective-route evidence is missing.
 pub(crate) fn select(
     pilot: &TacticalSortiePilot,
     o: &TacticalSortieObservationV1,

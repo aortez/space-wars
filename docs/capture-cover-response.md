@@ -107,3 +107,86 @@ python3 tools/audit-cover-response.py \
   --replay target/cover-response/activation-replay \
   --out target/cover-response/v2
 ```
+
+## Results and decision
+
+**Do not promote this response.** It preserves the successful control and can
+end blocked attempts earlier, but the fresh matches regress. Defaults remain
+unchanged; the opt-in is retained for reproduction.
+
+The frozen gameplay implementation is `757efb5`, with preserved binary
+`target/cover-response/surface_mission_soak-757efb5`, SHA-256
+`07955d51846d790797ef9a7c24cf1d792da5922d2536f674c74001efa82fd9ae`.
+All 74 original runs completed. The corrected audit from `9ca9bda` completes in
+`target/cover-response/v2`; it does not rerun or retune the 74 trials. The
+[results archive](data/capture-cover-response-v1.json) binds the original failed
+validation, corrected audit, all commands/raw hashes and two supplementary
+activation replays. A compressed companion retains the two witnessed covered
+selection observations from the recorded candidate traces.
+
+| Measure | Predecessor | Cover response |
+| --- | ---: | ---: |
+| Directed completed capture sorties, 16 runs | 20 | 20 |
+| Fresh wins, 16 runs | 8 | 6 |
+| Fresh losses | 8 | 10 |
+| Fresh completed capture sorties | 45 | 43 |
+| Fresh ships lost | 9 | 11 |
+| Fresh completed recoveries | 4 | 4 |
+
+Four of 16 directed pairs and three of 16 fresh pairs change physical outcomes.
+Fresh time accumulated after 20 seconds without progress increases from 73,767
+to 83,317 ticks (1,229.5 to 1,388.6 seconds), while eligible transfer/capture time
+falls from 297,299 to 290,102 ticks. Different match endings also change total
+observation time; these are paired aggregate outcomes, not independent samples
+or a calibrated estimate of win probability.
+
+### Recorded controls and failures
+
+The +0.8 control has the same physical results and exact claim/departure timing:
+the existing covered site remains selected at tick 3,510, with no extra probes.
+The directed -0.8 failure requests eight omitted covered sites before reporting
+that its probe budget ended with other candidates unmeasured. Its first visit
+ends at tick 4,171 instead of 4,953, but later returns repeat the blocked attempt.
+Neither arm completes a capture there.
+
+In the recorded asteroid/P2 case, the new selector chooses covered site 4 at
+tick 2,475 and physically lands at tick 3,675. The actual hatch round trip is
+valid at landing, on material revision 5. Subsequent revisions reach 9; fresh
+ground surveys then report a disconnected route and the visit is abandoned at
+4,187. Later captures happen earlier, but this original attempt still fails,
+and the overall match changes from a win to a loss.
+
+The preceding study's fresh P1 regression remains a loss and loses one completed
+capture sortie (three to two); P2 retains its win and three sorties, with fewer
+ships lost. Those recorded trajectories are regression cases, not part of the
+four new strength-test worlds. No capture using a newly probed omitted route is
+witnessed in this study. Unit tests establish that evidence-acquisition path;
+the gameplay evidence does not establish a benefit from it.
+
+### Verification and limits
+
+All five disabled replays preserve the original physical, mission, progress and
+controller/planner streams. Sensor parity covers 236,246 player observations.
+Candidate retained traces match until each first recorded response effect.
+The supplemental replay independently finds the formerly omitted activation at
+tick 22,620 and verifies 3,669 identical retained rows before it. Both replay
+arms reproduce their original reports, non-trace streams, sensor calls/counters
+and planner allocations exactly. The sparse report snapshot had missed a
+response shortly before recovery cleared the capture task; there is no evidence
+of an unexplained pre-activation behavior change.
+
+The original 74 runs audit 1,254,074 main dispatch ticks, never exceeding four
+graph operations or 161 physics queries in one tick. These are dispatch counts;
+native synchronous sensing remains outside that allowance. Desktop timings are
+retained separately and do not establish Raspberry Pi performance.
+
+302 AI unit tests, four physical destination tests, 39 harness tests and 599
+Python tests pass (944 total). Formatting, strict AI Clippy with `--no-deps`,
+and both profiled and normal release harness builds pass. A read-only trace audit
+also verifies current cover and usable route evidence for the two witnessed
+covered choices. Other sparse per-capture counts remain observed lower bounds.
+
+The next useful investigation is destination reconsideration after a blocked
+approach: the bounded search can end an attempt earlier without making the next
+objective achievable. Inspect the repeated returns and failure context before
+changing another retry limit, score or default.
