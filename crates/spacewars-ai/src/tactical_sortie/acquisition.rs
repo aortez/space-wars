@@ -10,6 +10,8 @@ pub struct CandidateCheckCounts {
     pub required_site: usize,
     pub previously_rejected: usize,
     pub solar_cooldown: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub cover_cooldown: usize,
     /// The following count directions; each surviving site has at most two.
     pub directions: usize,
     pub unsafe_solar: usize,
@@ -21,6 +23,10 @@ pub struct CandidateCheckCounts {
     pub route_absent: usize,
     pub route_unusable: usize,
     pub eligible: usize,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]

@@ -266,6 +266,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--bounded-acquisition-seats must be none, 0, 1 or both"),
     };
+    let cover_retry_seats = match arg("--cover-retry-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--cover-retry-seats must be none, 0, 1 or both"),
+    };
     let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -340,6 +347,7 @@ fn main() {
             breaks,
         )
         .with_bounded_acquisition(acquisition_seats[i])
+        .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
@@ -939,6 +947,19 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    for (seat, enabled) in cover_retry_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["cover_retry_model"] =
+                json!(spacewars_ai::tactical_sortie::COVER_RETRY_PROFILE);
+        }
+    }
+    if cover_retry_seats.contains(&true) {
+        report["cover_retry_cooldown"] = json!({
+            "profile": spacewars_ai::tactical_sortie::COVER_RETRY_PROFILE,
+            "enabled_seats": cover_retry_seats,
+            "cooldown_ticks": spacewars_ai::tactical_sortie::COVER_RETRY_TICKS,
+        });
+    }
     if let Some(progress) = progress {
         report["mission_progress"] = json!({"players":progress,"scope":mission_progress::SCOPE});
     }

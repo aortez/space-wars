@@ -98,6 +98,12 @@ impl MissionBot {
         self.0.bounded_acquisition = enabled;
         self
     }
+    /// Opt-in v13 capture retry experiment; policy defaults leave it disabled.
+    pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.cover_retry_cooldown = enabled;
+        self
+    }
     /// Opt-in headless experiment; standard policy selection leaves it disabled.
     pub fn with_pursuit_disengagement(mut self, enabled: bool) -> Self {
         self.0.enable_pursuit_disengagement(enabled);

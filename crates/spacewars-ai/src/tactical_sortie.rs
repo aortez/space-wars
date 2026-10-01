@@ -23,9 +23,11 @@ use serde::Serialize;
 
 mod acquisition;
 mod acquisition_wait;
+mod cover_retry;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+pub use cover_retry::{COVER_RETRY_PROFILE, COVER_RETRY_TICKS, CoverRetryCooldown};
 #[cfg(test)]
 pub(crate) use selection::select as select_for_test;
 pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};
@@ -87,6 +89,8 @@ pub struct TacticalTelemetry {
     pub acquisition: Option<AcquisitionTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acquisition_wait: Option<AcquisitionWait>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_retry_cooldown: Option<CoverRetryCooldown>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -157,6 +161,7 @@ impl TacticalSortiePilot {
                 landing: landing.telemetry().clone(),
                 acquisition: None,
                 acquisition_wait: None,
+                cover_retry_cooldown: None,
             },
             landing,
             site: None,
@@ -190,10 +195,12 @@ impl TacticalSortiePilot {
         let commit = self.commit_descent;
         let required = self.required_site;
         let bounded_acquisition = self.bounded_acquisition;
+        let cover_retry_cooldown = self.telemetry.cover_retry_cooldown.is_some();
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
         self.required_site = required;
         self.bounded_acquisition = bounded_acquisition;
+        self.enable_cover_retry_cooldown(cover_retry_cooldown);
     }
     /// Explicit continuation trials may constrain selection, but still need
     /// current material, solar and objective-route evidence for this ID.
@@ -317,6 +324,7 @@ impl TacticalSortiePilot {
         self.replan(tick);
     }
     fn replan_for_cover(&mut self, tick: u64) {
+        self.remember_cover_rejection(tick);
         self.replan(tick);
         if self.commit_descent {
             self.telemetry.cover_replans += 1;
@@ -628,6 +636,7 @@ impl TacticalSortiePilot {
         if self.site.is_none() {
             self.solar_rejected.retain(|(_, until)| p.tick < *until);
             let (selected, checks) = selection::select(self, o, objective, survey, exposed, |_| {});
+            self.record_cover_exclusions(p.tick, checks.cover_cooldown);
             if let Some(acquisition) = &mut self.telemetry.acquisition {
                 acquisition.checks = checks;
             }

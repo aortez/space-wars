@@ -136,6 +136,9 @@ pub(crate) fn select(
         } else if pilot.solar_rejected.iter().any(|(id, _)| *id == site.id) {
             checks.solar_cooldown += 1;
             Some("solar_cooldown")
+        } else if pilot.cover_retry_blocked(o, site, exposed) {
+            checks.cover_cooldown += 1;
+            Some("cover_cooldown")
         } else {
             None
         };

@@ -85,6 +85,13 @@ impl TacticalCapturePilot {
         self.base.enable_bounded_acquisition(enabled);
         self
     }
+    /// Opt-in memory of cover-rejected sites for headless comparisons.
+    pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
+        self.base.enable_cover_retry_cooldown(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
     pub(crate) fn start_acquisition(&mut self, o: &TacticalSortieObservationV1) {
         self.base.start_acquisition(o);
         self.telemetry.sortie = self.base.telemetry().clone();
