@@ -131,3 +131,8 @@ archive; the successful run used the completed build without source changes.
 cover retries and usable landing alternatives. These cases provide regression
 coverage, not a calibrated prospective completion probability or evidence for
 changing combat priority.
+
+The follow-up [cover-retry cooldown experiment](capture-cover-retries.md) is
+complete. It preserves disabled replay behavior and the successful control,
+but prolongs uncovered attempts and introduces progress regressions. It remains
+opt-in; the evidence does not support promotion.
