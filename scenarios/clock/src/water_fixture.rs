@@ -7,6 +7,8 @@ use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld};
 
 mod digit_rain;
 pub use digit_rain::DigitRainFixture;
+mod drain;
+pub use drain::DrainFixture;
 mod impact;
 pub use impact::ImpactFixture;
 mod responsive;

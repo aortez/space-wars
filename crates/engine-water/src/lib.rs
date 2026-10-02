@@ -13,7 +13,9 @@ mod impact;
 mod mixing;
 mod moving_bed;
 mod slopes;
+mod solids;
 pub use moving_bed::PoolGeometry;
+pub use solids::{MAX_SOLID_BOXES, SolidBox};
 mod spill;
 mod supports;
 use spill::{Section, Spill};
@@ -399,6 +401,7 @@ pub struct WaterStats {
 pub struct WaterWorld {
     config: WaterConfig,
     pools: Vec<Pool>,
+    solids: Vec<SolidBox>,
     parcels: Vec<Parcel>,
     /// Parallel, preallocated presentation history. Explicit rain/splash sources
     /// have no attached stream, and retain the ordinary parcel representation.
@@ -479,6 +482,7 @@ impl WaterWorld {
             }
         }
         Ok(Self {
+            solids: Vec::with_capacity(MAX_SOLID_BOXES),
             heads: vec![[None; 2]; specs.len()],
             origins: vec![[Vec2::ZERO; 2]; specs.len()],
             pools: specs
@@ -642,7 +646,10 @@ impl WaterWorld {
                     parcel.velocity.x = 0.0;
                 }
             }
-            if let Some((pool, column)) = self.catch(from, parcel.position, None) {
+            let motion = self.collide(from, parcel.position, parcel.velocity, None, true);
+            parcel.position = motion.position;
+            parcel.velocity = motion.velocity;
+            if let Some((pool, column)) = motion.caught {
                 self.deposit(pool, column, parcel);
                 self.parcels.swap_remove(i);
                 self.spills.swap_remove(i);
@@ -652,13 +659,19 @@ impl WaterWorld {
                 self.spills.swap_remove(i);
             } else {
                 self.parcels[i] = parcel;
-                if let Some(spill) = &mut self.spills[i] {
-                    spill.advance(dt, self.config, parcel.horizontal_bounds);
+                if let Some(mut spill) = self.spills[i] {
+                    if self.solids.is_empty() {
+                        spill.advance(dt, self.config, parcel.horizontal_bounds);
+                    } else {
+                        self.advance_section(&mut spill.tail, dt, parcel.horizontal_bounds);
+                        self.advance_section(&mut spill.head, dt, parcel.horizontal_bounds);
+                    }
                     if spill.tick == previous_tick
                         && let SpillSource::Outlet { pool, edge } = spill.source
                     {
                         self.heads[pool][edge] = Some(spill.tail);
                     }
+                    self.spills[i] = Some(spill);
                 }
                 i += 1;
             }
@@ -771,8 +784,8 @@ impl WaterWorld {
         // later motion, or a narrow/nearby collector could be skipped at birth.
         // Reverse order keeps swap_remove aligned with unprocessed new parcels.
         for i in (first_emitted..self.parcels.len()).rev() {
-            let spill = self.spills[i].expect("newly emitted outfall");
-            let parcel = self.parcels[i];
+            let mut spill = self.spills[i].expect("newly emitted outfall");
+            let mut parcel = self.parcels[i];
             let (source_pool, edge) = match spill.source {
                 SpillSource::Outlet { pool, edge } | SpillSource::Drip { pool, edge } => {
                     (pool, edge)
@@ -780,7 +793,16 @@ impl WaterWorld {
                 SpillSource::Junction { .. } => unreachable!(),
             };
             let origin = self.origins[source_pool][edge];
-            if let Some((pool, column)) = self.catch(origin, parcel.position, Some(source_pool)) {
+            let motion = self.collide(
+                origin,
+                parcel.position,
+                parcel.velocity,
+                Some(source_pool),
+                true,
+            );
+            parcel.position = motion.position;
+            parcel.velocity = motion.velocity;
+            if let Some((pool, column)) = motion.caught {
                 self.deposit(pool, column, parcel);
                 self.pools[pool].refresh_displacement();
                 self.parcels.swap_remove(i);
@@ -789,6 +811,18 @@ impl WaterWorld {
                 self.drained += parcel.volume;
                 self.parcels.swap_remove(i);
                 self.spills.swap_remove(i);
+            } else {
+                self.parcels[i] = parcel;
+                let head = self.collide(
+                    spill.tail.position,
+                    spill.head.position,
+                    spill.head.velocity,
+                    None,
+                    false,
+                );
+                spill.head.position = head.position;
+                spill.head.velocity = head.velocity;
+                self.spills[i] = Some(spill);
             }
         }
         self.capacity_limited_ticks += u64::from(limited);

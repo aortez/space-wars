@@ -45,10 +45,10 @@ emissions (`None` means free flight). A channel must contain its outlet: it cann
 teleport newborn runoff across the world. Changing it detaches old ribbon history
 without moving existing parcels or replacing their bounds. Explicit
 `add_falling` sources must supply their own bounds (or `None` for free flight).
-Normal Meltdown uses the central drain channel for outflow and the outer screen
-walls for its impact spray; the open collecting-pool fixture is unconfined.
-The channel is not a general solid
-collision system. Independent rain/splash parcels still pass through one another.
+The moving Clock floor leaves its outfalls unconfined by vertical channels;
+instead it registers the two actual tilted, finite panels as solid boxes. Impact
+spray retains the outer screen bounds. Independent rain/splash parcels still
+pass through one another.
 
 The accounting contract is:
 
@@ -60,8 +60,8 @@ passed through the outlet. Unlike the old forced drain current, a flat basin
 does not necessarily empty in the Clock's seven-second material window.
 
 Pools reserve all column/face scratch storage at construction; stepping allocates
-no additional buffers. Limits are 128 pools, 512 columns total, and at most
-512 parcels (128 in Clock Meltdown; 512 in Rain, including release reserves).
+no additional buffers. Limits are 256 pools, 1024 columns total, and at most
+512 parcels (192 in ordinary Clock Meltdown; 512 in Rain, including release reserves).
 Each caller step accepts `(0, 1/30]` seconds and is
 split into substeps no larger than 1/240 second. Speeds and donor withdrawals
 are limited; these are stability/work bounds, not an accuracy guarantee at
@@ -79,6 +79,51 @@ retain unlimited height (not finite-height walls).
 Parcel deposition transfers volume. By default it does not impart impact
 motion; the optional local surface-response approximation below is not full
 momentum coupling. These remain explicit limitations for future body/wave work.
+
+### Drain-wall collision
+
+`WaterWorld::set_solid_boxes` supplies at most eight explicit, finite rectangles.
+Pool beds alone remain receiving surfaces, so rain can still fall underneath
+elevated digit ledges. Falling parcels sweep their center paths against the boxes,
+including the half-step advance at birth. A wall removes inward normal motion;
+tangent motion and all water volume remain. Collection stops at the first wall,
+so a receiving pool behind it cannot collect water through the panel. Coincident
+pool tops still receive water instead of suspending it at the collision skin.
+The remaining displacement is swept again, with a four-contact limit per path.
+If that limit is reached, the unchecked remainder is not applied.
+
+Rain and Meltdown update these boxes from `FloorShape::panel_pose` only after an
+accepted floor movement. A capacity deferral retains the previous pools, solids,
+rendering and rigid-body poses together. Water overlapped by a moving panel is
+projected onto its nearest face on the next water step. Attached stream faces
+receive the same wall response; rendering subtracts the finite boxes from the
+ribbons and highlights for both production adapters. This is center-path collision
+plus visual width clipping, not a finite-volume pressure solver or splash model.
+
+The one-sided `DrainFixture` reproduces opposite-wall penetration without relying
+on stream-to-stream mixing. Tests cover both directions, three apertures, three
+depths, and 30/60/120 Hz, plus fast thin-wall crossings, upward impacts, birth
+steps, moving walls, conservation and stable storage. Full Rain/Meltdown sweeps
+also check panel interiors while preserving their existing delivery, duck exit,
+cleanup and replay assertions. To export the focused production-renderer captures:
+
+```sh
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/spacewars-drain \
+  cargo test --locked --profile ci -p engine-client --bin engine-client \
+  drain_wall_lab_keeps_rendered_water_outside_the_panels
+```
+
+Captured through the production raster renderer. The first pair shows the same
+fixture at tick 12; the second pair shows flow in both directions at tick 60.
+These are deterministic lab captures, not device screenshots.
+
+| Before: water enters the opposite panel | After: water stops at the wall |
+| --- | --- |
+| ![Before wall collision](../screenshots/water/drain-wall-before.png) | ![After wall collision](../screenshots/water/drain-wall-after.png) |
+
+| Flow from the left, sliding down the right panel | Mirrored flow |
+| --- | --- |
+| ![Flow down the right panel](../screenshots/water/drain-wall-flow-right.png) | ![Flow down the left panel](../screenshots/water/drain-wall-flow-left.png) |
 
 ### Optional wet-surface impact response
 
