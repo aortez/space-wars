@@ -65,3 +65,9 @@ python3 tools/probe-capture-topology.py \
   --binary target/capture-topology/surface_mission_soak-COMMIT \
   --out target/capture-topology/v1
 ```
+
+The first audit stopped after the second replay because it incorrectly required
+the optional `cover_response` report field when that option was disabled. The
+failed `v1` output is preserved. The corrected audit checks both field presence
+and value; rerun the same plan and frozen binary into `v2`. No gameplay, clocks,
+source cases or diagnostic measurements change for this correction.

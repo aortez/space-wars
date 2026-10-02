@@ -188,7 +188,7 @@ def main():
             assert after['physics_ok']
             fields = V.EXACT_REPORT_FIELDS+['metrics', 'policy_configuration', 'cover_response', 'destination_retry']
             for field in fields:
-                assert before[field] == after[field], (label, field)
+                assert (field in before) == (field in after) and before.get(field) == after.get(field), (label, field)
             streams = {}
             for filename in V.EXACT_STREAMS:
                 digest = F.E.digest(root/filename)
