@@ -71,3 +71,9 @@ the optional `cover_response` report field when that option was disabled. The
 failed `v1` output is preserved. The corrected audit checks both field presence
 and value; rerun the same plan and frozen binary into `v2`. No gameplay, clocks,
 source cases or diagnostic measurements change for this correction.
+
+The `v2` replays pass physical parity. Review found that the search-history
+extractor also labeled later ordinary selected-site refreshes as probes after
+the successful control's search had finished. `v3` excludes post-finish rows;
+both prior outputs remain preserved. The same seven-clock plan and binary are
+unchanged. Tests cover omitted metadata and retained finished search records.

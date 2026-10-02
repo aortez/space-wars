@@ -1,7 +1,9 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import unittest
+import tempfile
 
 from test_cover_alternatives import fixture as cover_fixture
 
@@ -83,6 +85,27 @@ class CaptureTopologyTests(unittest.TestCase):
         result = T.audit_topology(row)
         self.assertEqual(result['topology_unknown'], row['topology_unknown'])
         self.assertNotIn('base_graph', result)
+
+    def test_optional_report_fields_require_matching_presence(self):
+        T.report_parity({}, {}, ['cover_response'])
+        T.report_parity(dict(cover_response=None), dict(cover_response=None), ['cover_response'])
+        with self.assertRaises(AssertionError):
+            T.report_parity({}, dict(cover_response=None), ['cover_response'])
+
+    def test_retained_finished_search_does_not_count_later_selected_site_samples(self):
+        row = fixture()
+        route = row['route_batches'][0]['sites'][0]
+        p = row['observation']['local']['combat']['recovery']['flight']['pilot']
+        p['site_query'] = dict(selected=route['site'])
+        row['mission']['capture'].update(failure=None, cover_response=dict(search=dict(
+            started_tick=10, finished_tick=31, seeded=True)))
+        later = copy.deepcopy(row)
+        later['observation']['local']['combat']['recovery']['flight']['pilot']['tick'] = 61
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'trace.jsonl').write_text('\n'.join(json.dumps(r) for r in [row, later]))
+            history = T.search_history(root, 0)
+        self.assertEqual([p['world_tick'] for p in history[0]['probes']], [31])
 
 
 if __name__ == '__main__':

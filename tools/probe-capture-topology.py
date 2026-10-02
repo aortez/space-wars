@@ -139,13 +139,19 @@ def search_history(root, seat):
         record['failure'] = c['failure']
         p = row['observation']['local']['combat']['recovery']['flight']['pilot']
         survey = row['observation']['local']['landing_objective']
-        if isinstance(p['site_query'], dict) and 'selected' in p['site_query'] and survey:
+        active = search['finished_tick'] is None or p['tick'] <= search['finished_tick']
+        if active and search['seeded'] and isinstance(p['site_query'], dict) and 'selected' in p['site_query'] and survey:
             for route in survey['sites']:
                 if route['site'] == p['site_query']['selected']:
                     entry = dict(world_tick=p['tick'], route=route)
                     if entry not in record['probes']:
                         record['probes'].append(entry)
     return list(searches.values())
+
+
+def report_parity(before, after, fields):
+    for field in fields:
+        assert (field in before) == (field in after) and before.get(field) == after.get(field), field
 
 
 def main():
@@ -187,8 +193,7 @@ def main():
             before, after = [json.loads((r/'report.json').read_text()) for r in [old_root, root]]
             assert after['physics_ok']
             fields = V.EXACT_REPORT_FIELDS+['metrics', 'policy_configuration', 'cover_response', 'destination_retry']
-            for field in fields:
-                assert (field in before) == (field in after) and before.get(field) == after.get(field), (label, field)
+            report_parity(before, after, fields)
             streams = {}
             for filename in V.EXACT_STREAMS:
                 digest = F.E.digest(root/filename)
