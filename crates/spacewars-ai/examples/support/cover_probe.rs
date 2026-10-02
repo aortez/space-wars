@@ -1,5 +1,7 @@
 //! Fixed-clock offline route and native-choice diagnostics on a cloned world.
-use scenario_spacewars::surface_sortie::{SurfaceSortieState, mission::MissionObservationV1};
+use scenario_spacewars::surface_sortie::{
+    SurfaceSortieState, landing_objective::ObjectivePlanning, mission::MissionObservationV1,
+};
 use serde_json::{Value, json};
 use spacewars_ai::mission_policy::MissionBot;
 use std::{collections::BTreeSet, path::Path, time::Instant};
@@ -7,13 +9,18 @@ use std::{collections::BTreeSet, path::Path, time::Instant};
 pub struct CoverProbe {
     seat: usize,
     ticks: BTreeSet<u64>,
+    topology: bool,
     rows: Vec<Value>,
 }
 
 impl CoverProbe {
     pub fn from_args() -> Option<Self> {
+        let topology: bool = crate::arg("--probe-cover-topology", "false")
+            .parse()
+            .unwrap();
         let requested = crate::arg("--probe-cover-ticks", "none");
         if requested == "none" {
+            assert!(!topology, "topology probe requires cover probe ticks");
             return None;
         }
         let values: Vec<u64> = requested
@@ -32,6 +39,7 @@ impl CoverProbe {
         Some(Self {
             seat,
             ticks,
+            topology,
             rows: Vec::new(),
         })
     }
@@ -78,14 +86,33 @@ impl CoverProbe {
             .flat_map(|s| &s.sites)
             .map(|route| json!({"site":route.site, "cost":route.cost()}))
             .collect();
-        self.rows.push(json!({
+        let mut row = json!({
             "world_tick":p.tick, "loop_tick":loop_tick, "seat":seat,
             "observation":o, "mission":bot.telemetry(),
             "choice":choice.as_ref().ok(), "choice_unknown":choice.as_ref().err(),
             "choice_ms":choice_ms, "route_batches":routes.as_ref().ok(),
             "routes_unknown":routes.as_ref().err(), "route_costs":costs,
             "routes_ms":routes_ms, "route_profile":profile,
-        }));
+        });
+        if self.topology {
+            let clock = Instant::now();
+            let measure = || {
+                if bot.policy().objective_planning() != ObjectivePlanning::JointRoundTrip {
+                    return Err("diagnostic requires joint round-trip planning");
+                }
+                cloned.diagnose_landing_topology(seat, p)
+            };
+            #[cfg(feature = "sensor-profile")]
+            let (topology, profile) =
+                scenario_spacewars::surface_sortie::sensor_profile::measure(measure);
+            #[cfg(not(feature = "sensor-profile"))]
+            let (topology, profile) = (measure(), None::<Value>);
+            row["topology_ms"] = json!(clock.elapsed().as_secs_f64() * 1000.0);
+            row["topology"] = json!(topology.as_ref().ok());
+            row["topology_unknown"] = json!(topology.as_ref().err());
+            row["topology_profile"] = json!(profile);
+        }
+        self.rows.push(row);
     }
 
     pub fn finish(self, out: &Path) {
@@ -94,10 +121,21 @@ impl CoverProbe {
             .iter()
             .filter(|&&tick| !self.rows.iter().any(|r| r["world_tick"] == tick))
             .collect();
-        std::fs::write(out.join("cover-probe.json"), serde_json::to_vec_pretty(&json!({
+        let mut result = json!({
             "schema":1, "model":"observed_cover_routes_v1", "seat":self.seat,
             "requested_world_ticks":self.ticks, "unreached_world_ticks":unreached, "rows":self.rows,
             "scope":"Read-only native ranker plus all observed sites measured in native bounded batches on a cloned world. Extra diagnostic physics queries and timings are outside live quotas. No new observations enter controls. No full-planet, future-cover, arrival or capture guarantee.",
-        })).unwrap()).unwrap();
+        });
+        if self.topology {
+            result["topology_model"] = json!("native_landing_graph_v1");
+            result["topology_scope"] = json!(
+                "Native outer-contour graph, proposed hull exclusions and path witnesses. Without-ship routes omit only the proposed observing ship and never enter gameplay. Extra diagnostic work is outside live quotas."
+            );
+        }
+        std::fs::write(
+            out.join("cover-probe.json"),
+            serde_json::to_vec_pretty(&result).unwrap(),
+        )
+        .unwrap();
     }
 }

@@ -1,6 +1,9 @@
 //! Offline measurements of the observed site set, never a controller survey.
 use super::*;
 
+mod topology;
+pub use topology::{LandingSiteTopology, LandingTopology, TopologyRoute};
+
 impl SurfaceSortieState {
     /// Measure every site in the supplied current full observation, in batches
     /// that retain the native eight-site limit and JointRoundTrip semantics.
@@ -13,6 +16,28 @@ impl SurfaceSortieState {
         p: &PilotObservationV1,
         planning: ObjectivePlanning,
     ) -> Result<Vec<LandingObjectiveSurvey>, &'static str> {
+        self.validate_landing_diagnostic(player, p, planning)?;
+        let mut reports = Vec::new();
+        for batch in p.sites.chunks(MAX_OBJECTIVE_SITES) {
+            let mut subset = p.clone();
+            subset.sites = batch.to_vec();
+            let survey = self
+                .landing_objective_survey(player, &subset, &[], planning)
+                .ok_or("objective sensor unavailable at this tick")?;
+            if survey.sites.len() != batch.len() {
+                return Err("incomplete diagnostic batch");
+            }
+            reports.push(survey);
+        }
+        Ok(reports)
+    }
+
+    fn validate_landing_diagnostic(
+        &self,
+        player: usize,
+        p: &PilotObservationV1,
+        planning: ObjectivePlanning,
+    ) -> Result<(), &'static str> {
         if player >= self.pilots.len()
             || p.owner != self.pilots[player].owner
             || p.tick != self.tick()
@@ -38,19 +63,7 @@ impl SurfaceSortieState {
         {
             return Err("invalid bounded site set");
         }
-        let mut reports = Vec::new();
-        for batch in p.sites.chunks(MAX_OBJECTIVE_SITES) {
-            let mut subset = p.clone();
-            subset.sites = batch.to_vec();
-            let survey = self
-                .landing_objective_survey(player, &subset, &[], planning)
-                .ok_or("objective sensor unavailable at this tick")?;
-            if survey.sites.len() != batch.len() {
-                return Err("incomplete diagnostic batch");
-            }
-            reports.push(survey);
-        }
-        Ok(reports)
+        Ok(())
     }
 }
 
@@ -60,7 +73,7 @@ mod tests {
     use engine_common::Scenario;
     use std::time::Duration;
 
-    fn fixture() -> (SurfaceSortieState, PilotObservationV1) {
+    pub(super) fn fixture() -> (SurfaceSortieState, PilotObservationV1) {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         for _ in 0..GROUND_REFRESH_TICKS {
             SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
