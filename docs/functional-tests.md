@@ -51,6 +51,16 @@ Each test owns:
 - readiness and transition polling with explicit deadlines; and
 - a child guard that always terminates and reaps the process.
 
+Fresh-process readiness allows up to 30 seconds, polling immediately and returning
+as soon as the app answers. The first femtovg launcher in
+[PR #151's Linux CI run](https://github.com/aortez/space-wars/actions/runs/36953178886/job/110670352447)
+answered during failure capture at 10.56 seconds, just after the former 10-second
+limit. Readiness attempts and the selected Slint backend are recorded in command
+history; an exited process or non-retryable protocol error still fails immediately.
+Individual readiness requests remain bounded to 250 ms, and normal UI transitions
+retain their separate 10-second deadline. This startup allowance does not change
+the attached-device runner's budgets.
+
 The initial workflows verify:
 
 - launcher state, inventory, accepted actions, and reachability of every menu
