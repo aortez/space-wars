@@ -302,6 +302,33 @@ remain explicitly unavailable/failed when they cannot be collected. PNG checkpoi
 must decode to nonempty, opaque, multicolor RGBA frames. No pixel timing/FPS threshold
 is part of these workflows.
 
+### Device validation checkpoint — 2026-10-01
+
+The matching app/CLI pair from `e9d66ed6a2e2` was built with the device's Yocto
+runtime configuration and installed on `sw-picade.local` using the checked fast
+update. On this Raspberry Pi 4, the packaged runner passed:
+
+| Workflow | Starting state | Result |
+|---|---|---|
+| `settings` | Automatic Spacewars gameplay | Same match resumed; automatic identity retained |
+| `settings` | Launcher | Returned to launcher |
+| `settings` | Paused Clock | Remained paused |
+| `clock-pause` | Running Clock | Simulation froze while paused and advanced after resume |
+| `clock-pause` | Paused Clock | Remained paused; simulation tick stayed unchanged across both paused workflows |
+
+All five runs verified unchanged saved settings and session identity, captured
+valid PNG checkpoints and kiosk logs, and completed successful menu cleanup.
+Invoking `clock-pause` during Spacewars produced the expected nonzero result,
+preserved the match, and reported cleanup success separately from the failure.
+Device Info and resumed Clock screenshots were also inspected visually.
+
+Changing scenarios to prepare the Clock checks was a separate, intentional test
+setup step. Restoring the saved launch choice required manually starting Spacewars
+once: launcher selection and automatic launch do not save that preference. After
+the checks, the cabinet's original settings file was byte-identical, automatic
+Spacewars was running again, and the kiosk PID was unchanged throughout testing.
+These checks did not test service recovery or physical input.
+
 ### Remaining #31 boundaries
 
 This is the first packaged device slice. The other desktop workflows still own a
