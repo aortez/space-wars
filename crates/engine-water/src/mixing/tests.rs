@@ -29,6 +29,14 @@ fn metadata(p: Parcel, pool: usize) -> Option<Spill> {
 }
 
 fn mix(input: &[Parcel], sources: &[Option<Spill>]) -> (Vec<Parcel>, Vec<Option<Spill>>, Stats) {
+    mix_with_solids(input, sources, &[])
+}
+
+fn mix_with_solids(
+    input: &[Parcel],
+    sources: &[Option<Spill>],
+    solids: &[SolidBox],
+) -> (Vec<Parcel>, Vec<Option<Spill>>, Stats) {
     let mut parcels = Vec::with_capacity(8);
     parcels.extend_from_slice(input);
     let mut spills = Vec::with_capacity(8);
@@ -46,6 +54,7 @@ fn mix(input: &[Parcel], sources: &[Option<Spill>]) -> (Vec<Parcel>, Vec<Option<
         &mut spills,
         &mut scratch,
         &mut stats,
+        solids,
         WaterConfig::default(),
         1.0 / 60.0,
         10,
@@ -60,6 +69,59 @@ fn mix(input: &[Parcel], sources: &[Option<Spill>]) -> (Vec<Parcel>, Vec<Option<
         )
     );
     (parcels, spills, stats)
+}
+
+#[test]
+fn finite_solid_blocks_cross_wall_mixing_but_allows_clear_pairs() {
+    let wall = SolidBox::new(Vec2::ZERO, Vec2::new(0.1, 2.0), 0.0).unwrap();
+    for y in [0.0, -5.0, 5.0] {
+        for volumes in [[1.0, 1.0], [3.0, 1.0]] {
+            let input = [
+                parcel(-0.5, y, 60.0, volumes[0]),
+                parcel(0.5, y, -60.0, volumes[1]),
+            ];
+            let sources = [metadata(input[0], 0), metadata(input[1], 1)];
+            let (output, _, stats) = mix_with_solids(&input, &sources, &[wall]);
+            assert_eq!(stats.pairs, u64::from(y != 0.0));
+            assert_eq!(output.len(), if y == 0.0 { 2 } else { 1 });
+            assert_eq!(
+                output.iter().map(|p| p.volume).sum::<f64>(),
+                volumes.iter().sum()
+            );
+            if y == 0.0 {
+                assert_eq!(output, input);
+            }
+        }
+    }
+}
+
+#[test]
+fn clear_pairs_do_not_aggregate_across_a_solid() {
+    let input = [
+        parcel(-0.5, 2.0, 60.0, 10.0),
+        parcel(0.5, 2.0, -60.0, 10.0),
+        parcel(-0.5, -2.0, 60.0, 10.0),
+        parcel(0.5, -2.0, -60.0, 10.0),
+    ];
+    let sources = [
+        metadata(input[0], 0),
+        metadata(input[1], 1),
+        metadata(input[2], 0),
+        metadata(input[3], 1),
+    ];
+    let wall = SolidBox::new(Vec2::ZERO, Vec2::new(2.0, 0.1), 0.0).unwrap();
+    let (output, _, stats) = mix_with_solids(&input, &sources, &[wall]);
+    assert_eq!(stats.pairs, 2);
+    assert_eq!(
+        output.len(),
+        2,
+        "two clear contact patches stay on their own sides"
+    );
+    assert!(
+        output
+            .iter()
+            .all(|p| p.volume == 20.0 && p.position.y.abs() == 2.0)
+    );
 }
 
 #[test]
@@ -145,6 +207,7 @@ fn junction_links_material_continuity_not_collision_frame_numbers() {
             &mut spills,
             &mut Scratch::new(3),
             &mut Stats::default(),
+            &[],
             WaterConfig::default(),
             1.0 / 60.0,
             12,

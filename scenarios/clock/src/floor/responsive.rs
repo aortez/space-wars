@@ -5,7 +5,7 @@ use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
     PhysicsWorld,
 };
-use engine_water::{Boundary, PoolGeometry, PoolSpec, WaterError, WaterWorld};
+use engine_water::{Boundary, PoolGeometry, PoolSpec, SolidBox, WaterError, WaterWorld};
 
 use crate::layout::Layout;
 
@@ -73,6 +73,15 @@ impl FloorShape {
             // every tick would detach material history and open seams.
             water.set_outlet_channel(side, 1 - side, None).unwrap();
         }
+        self.configure_solids(water, opening);
+    }
+
+    fn configure_solids(self, water: &mut WaterWorld, opening: f64) {
+        let panels = std::array::from_fn::<_, 2, _>(|side| {
+            let (center, angle) = self.panel_pose(side, opening);
+            SolidBox::new(center, self.panel_half_extents(), angle).unwrap()
+        });
+        water.set_solid_boxes(&panels).unwrap();
     }
 
     fn bed_edges(self, side: usize, opening: f64) -> [[f64; 2]; MAX_COLUMNS] {
@@ -161,7 +170,10 @@ impl FloorShape {
                 },
             ],
             dt,
-        )
+        )?;
+        // A capacity deferral must retain both the old pools and old solids.
+        self.configure_solids(water, opening);
+        Ok(())
     }
 }
 

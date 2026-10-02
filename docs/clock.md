@@ -509,6 +509,10 @@ clearance to get out. Thin residual drips cannot latch the hatch at its peak
 opening. The same panel geometry drives the water bed, visible banks and two
 persistent kinematic colliders while Rain's duck exists. Meltdown instead tests
 its ballistic blocks against the panel tops without creating any rigid bodies.
+Both events also give falling water the panels' finite solid shapes: an outfall
+hitting the opposite drain wall loses inward motion and slides along it. Shared
+water rendering clips the stream's width at those walls. This prevents drain
+penetration; it does not yet add the outward splash effect proposed in #102.
 No attraction force pulls water or the duck to the drain. During event recovery,
 remaining water is explicitly reclaimed and the responsive floor blends back
 to the ordinary closed floor; that visual recovery is not physical drainage.

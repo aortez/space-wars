@@ -91,6 +91,7 @@ fn responsive_floor_ignores_digit_weight_and_defers_atomically_when_full() {
     }
     let before = water.stats();
     let pools = water.pools().to_vec();
+    let solids = water.solid_boxes().to_vec();
     let floor_points = shape.panel_points(0, floor.opening);
     let mut floats = FloatWorld::responsive(layout, &floor);
     floor.step(&mut water, DT, None);
@@ -99,6 +100,7 @@ fn responsive_floor_ignores_digit_weight_and_defers_atomically_when_full() {
     assert_eq!(floor.opening, 0.0);
     assert_eq!(water.stats(), before);
     assert_eq!(water.pools(), pools);
+    assert_eq!(water.solid_boxes(), solids);
     assert_eq!(shape.panel_points(0, floor.opening), floor_points);
 }
 
@@ -219,6 +221,17 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     }
                     assert!(event.spawns <= 1);
                     let floor = event.responsive_floor().unwrap();
+                    for side in 0..2 {
+                        let (center, angle) = floor.shape.panel_pose(side, floor.opening);
+                        let half = floor.shape.panel_half_extents();
+                        for p in event.water.parcels() {
+                            let local = (p.position - center).rotate_radians(-angle);
+                            assert!(
+                                local.x.abs() >= half.x - 0.001 || local.y.abs() >= half.y - 0.001,
+                                "water inside Rain panel: aspect={aspect} seed={seed} tick={tick} {p:?}"
+                            );
+                        }
+                    }
                     max_open = max_open.max(floor.opening);
                     if tick == RAINING_TICKS + DRAIN_TICKS - 1 {
                         drain_open = floor.opening;

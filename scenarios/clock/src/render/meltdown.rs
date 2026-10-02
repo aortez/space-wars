@@ -4,6 +4,7 @@ use crate::events::meltdown::{MeltdownEvent, soften};
 use engine_water::{Column, Parcel};
 
 mod slopes;
+mod solids;
 
 const WATER_COLOR: RenderColor = RenderColor::rgb(0.08, 0.55, 0.85);
 const WATER_EDGE: RenderColor = RenderColor::rgb(0.36, 0.91, 1.0);
@@ -230,12 +231,7 @@ pub(super) fn render_water(
         if let Some(spill) = water.spill_ribbon(index) {
             for quad in spill.quads {
                 let points = clip_channel(quad, parcel.horizontal_bounds);
-                if points.len() >= 3 {
-                    frame.push_primitive(
-                        layer,
-                        RenderPrimitive::Polygon(RenderPolygon::filled(points, color)),
-                    );
-                }
+                solids::render(frame, points, water.solid_boxes(), layer, color);
                 // Continue the pool's bright surface down the same shared
                 // faces; keep the highlight inside the represented water.
                 let (a, b, c, d) = if spill.surface_side == 1 {
@@ -248,12 +244,7 @@ pub(super) fn render_water(
                 };
                 let points =
                     clip_channel([inset(a, d), inset(b, c), b, a], parcel.horizontal_bounds);
-                if points.len() >= 3 {
-                    frame.push_primitive(
-                        layer,
-                        RenderPrimitive::Polygon(RenderPolygon::filled(points, edge_color)),
-                    );
-                }
+                solids::render(frame, points, water.solid_boxes(), layer, edge_color);
             }
             continue;
         }
@@ -271,17 +262,7 @@ pub(super) fn render_water(
         } else {
             clip_channel(ribbon(*parcel), parcel.horizontal_bounds)
         };
-        if points.len() < 3 {
-            continue;
-        }
-        frame.push_primitive(
-            layer,
-            RenderPrimitive::Polygon(RenderPolygon {
-                points,
-                fill: Some(Fill::new(color)),
-                stroke: None,
-            }),
-        );
+        solids::render(frame, points, water.solid_boxes(), layer, color);
     }
 }
 

@@ -4,6 +4,12 @@ Use the existing engine-client headless runner for repeatable CPU measurements,
 then use live host timings to find work outside that runner. Neither is a GPU
 profiler. In particular, headless throughput is **not displayed FPS**.
 
+The [drain-wall collision profile](water-drain-collision-profile.md) records the
+2026-10-02 paired Pi 4 comparison for full Heavy Rain and Meltdown cycles. It
+also documents why pausing a game alone does not remove background raster work
+when collecting headless measurements alongside the kiosk. Those binaries
+predate the rendering optimizations below; their timings retain that scope.
+
 The historical managed-floor captures below drew 101 primitives in the ordinary
 24-hour face. The current wooden surround, corner lamps and per-cell digit glow
 add several hundred primitives; counts also depend on the time and selected

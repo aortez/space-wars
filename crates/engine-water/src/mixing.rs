@@ -2,7 +2,7 @@
 //! and oriented-footprint tests join local slices, not whole distant streams. Rain,
 //! splashes and already mixed jets are deliberately outside this first model.
 use crate::{
-    MAX_PARCELS, Parcel, WaterConfig,
+    MAX_PARCELS, Parcel, SolidBox, WaterConfig,
     spill::{Section, Spill, SpillSource},
 };
 use engine_core::Vec2;
@@ -43,6 +43,13 @@ struct Group {
 }
 
 impl Group {
+    fn center(&self) -> Vec2 {
+        Vec2::new(
+            (self.position[0] / self.volume) as f32,
+            (self.position[1] / self.volume) as f32,
+        )
+    }
+
     fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64) {
         self.volume += parcel.volume;
         self.position[0] += parcel.position.x as f64 * parcel.volume;
@@ -143,11 +150,13 @@ fn swept_overlap(a: Candidate, b: Candidate, pa: Parcel, pb: Parcel, dt: f64) ->
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn step(
     parcels: &mut Vec<Parcel>,
     spills: &mut Vec<Option<Spill>>,
     scratch: &mut Scratch,
     stats: &mut Stats,
+    solids: &[SolidBox],
     config: WaterConfig,
     dt: f64,
     tick: u64,
@@ -203,11 +212,26 @@ pub(crate) fn step(
             if !swept_overlap(a, b, pa, pb, dt) {
                 continue;
             }
+            // Mixing replaces the two centers with their weighted mean before
+            // advection. Do not move that volume through intervening scenery;
+            // the later wall sweep cannot recover each source's side of a wall.
+            if solids
+                .iter()
+                .any(|solid| solid.blocks_segment(pa.position, pb.position))
+            {
+                continue;
+            }
             consumed[a.index] = true;
             consumed[b.index] = true;
             let outlets = [a.outlet.min(b.outlet), a.outlet.max(b.outlet)];
             let contact_min = Vec2::new(a.min.x.max(b.min.x), a.min.y.max(b.min.y));
             let contact_max = Vec2::new(a.max.x.min(b.max.x), a.max.y.min(b.max.y));
+            let pair_center = Vec2::new(
+                ((pa.position.x as f64 * pa.volume + pb.position.x as f64 * pb.volume)
+                    / (pa.volume + pb.volume)) as f32,
+                ((pa.position.y as f64 * pa.volume + pb.position.y as f64 * pb.volume)
+                    / (pa.volume + pb.volume)) as f32,
+            );
             // Only a shared local contact patch may aggregate several slices.
             // Two remote intersections of the same outlets stay separate.
             let group = if let Some(i) = scratch.groups.iter().position(|g| {
@@ -217,6 +241,11 @@ pub(crate) fn step(
                     && contact_max.x >= g.contact_min.x
                     && contact_min.y <= g.contact_max.y
                     && contact_max.y >= g.contact_min.y
+                    // Several individually clear pairs must not aggregate
+                    // around a corner into a center inside the same solid.
+                    && !solids
+                        .iter()
+                        .any(|solid| solid.blocks_segment(g.center(), pair_center))
             }) {
                 &mut scratch.groups[i]
             } else {
@@ -274,10 +303,7 @@ pub(crate) fn step(
             (group.momentum[0] / group.volume) as f32,
             (group.momentum[1] / group.volume) as f32,
         );
-        let position = Vec2::new(
-            (group.position[0] / group.volume) as f32,
-            (group.position[1] / group.volume) as f32,
-        );
+        let position = group.center();
         // Inelastic center-of-mass replacement preserves volume and momentum,
         // dissipating relative motion. The common ballistic step follows. A
         // predicted contact may therefore be resolved up to one tick early.
