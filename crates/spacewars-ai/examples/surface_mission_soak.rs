@@ -3,6 +3,8 @@
 mod acquisition_probe;
 #[path = "support/arrival_survey.rs"]
 mod arrival_survey;
+#[path = "support/capture_evidence.rs"]
+mod capture_evidence;
 #[path = "support/capture_execution.rs"]
 mod capture_execution;
 #[path = "support/capture_probe.rs"]
@@ -190,6 +192,7 @@ fn main() {
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
     let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
+    let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -264,6 +267,13 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    let powered_capture_seats = match arg("--powered-capture-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--powered-capture-seats must be none, 0, 1 or both"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -365,6 +375,7 @@ fn main() {
             },
             breaks,
         )
+        .with_powered_capture(powered_capture_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
@@ -456,8 +467,7 @@ fn main() {
                 let clock = Instant::now();
                 let mut observe = || {
                     if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i)
-                            && !selected_policies[i].objective_planning().is_legacy()
+                        live.enabled_for(i) && !request.objective_planning.is_legacy()
                     }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
@@ -674,6 +684,9 @@ fn main() {
                     }
                 }
                 actions.extend(intent.encode(owner));
+                if let Some(evidence) = &mut capture_evidence {
+                    evidence.observe(i, &o, pilots[i].telemetry(), intent);
+                }
                 let label = pilots[i].label();
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
                 let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
@@ -987,7 +1000,17 @@ fn main() {
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
-    report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if let Some(evidence) = capture_evidence {
+        evidence.finish();
+    }
+    report["policy_configuration"] = json!(pilots.each_ref().map(|p| p.descriptor()));
+    if powered_capture_seats.contains(&true) {
+        report["powered_capture"] = json!({
+            "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,
+            "enabled_seats": powered_capture_seats,
+            "scope": "Opt-in v13 native powered landing routes and on-foot controller. The configured live planner allowance and all forecast validity gates remain in force; other sensors retain their synchronous work.",
+        });
+    }
     for (seat, enabled) in cover_retry_seats.into_iter().enumerate() {
         if enabled {
             report["policy_configuration"][seat]["cover_retry_model"] =

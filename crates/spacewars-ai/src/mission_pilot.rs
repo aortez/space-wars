@@ -13,6 +13,7 @@ use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
         PilotLocation, SurfaceSortieAction,
+        landing_objective::ObjectivePlanning,
         mission::{LandingSurveyStamp, MissionObservationV1, MissionSensorRequest},
         pilot::{LANDING_SITE_COUNT, LandingSiteId, LandingSiteQuery, PilotPlanetObservation},
     },
@@ -125,6 +126,8 @@ pub struct MissionEvent {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionTelemetry {
     pub policy: &'static str,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub powered_capture: bool,
     pub goal: MissionGoal,
     pub goal_since: u64,
     pub target: Option<usize>,
@@ -217,6 +220,7 @@ impl MaterialMissionPilot {
             breaks,
             telemetry: MissionTelemetry {
                 policy: policy.id(),
+                powered_capture: false,
                 goal: MissionGoal::Select,
                 goal_since: 0,
                 target: None,
@@ -266,6 +270,7 @@ impl MaterialMissionPilot {
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
         let cover_response = self.cover_response;
+        let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
@@ -277,6 +282,7 @@ impl MaterialMissionPilot {
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
+        self.configure_powered_capture(powered_capture);
         self.enable_destination_retry(destination_retry);
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
@@ -290,6 +296,29 @@ impl MaterialMissionPilot {
     }
     pub fn policy(&self) -> crate::mission_policy::MissionPolicy {
         self.policy
+    }
+    pub(crate) fn configure_powered_capture(&mut self, enabled: bool) {
+        assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(
+            self.previous_tick.is_none() && self.capture.is_none(),
+            "configure powered capture before the first intent"
+        );
+        self.telemetry.powered_capture = enabled;
+    }
+    /// The instance owns both its sensor semantics and its local controller.
+    pub fn objective_planning(&self) -> ObjectivePlanning {
+        if self.telemetry.powered_capture {
+            ObjectivePlanning::JetpackRoundTrip
+        } else {
+            self.policy.objective_planning()
+        }
+    }
+    pub fn descriptor(&self) -> crate::mission_policy::PolicyDescriptor {
+        let mut descriptor = self.policy.descriptor();
+        if self.telemetry.powered_capture {
+            descriptor.sensor_profile = "mission_cadenced_jetpack_routes_capture_value_v1";
+        }
+        descriptor
     }
     pub fn label(&self) -> String {
         let task = if self.telemetry.goal == MissionGoal::Capture {
@@ -331,7 +360,7 @@ impl MaterialMissionPilot {
                 .disengaging()
                 .then(|| self.telemetry.disengagement.as_ref().unwrap().cover_request)
                 .flatten(),
-            objective_planning: self.policy.objective_planning(),
+            objective_planning: self.objective_planning(),
             site: self.site_request(),
             last_survey: self.last_survey,
         }
@@ -340,7 +369,7 @@ impl MaterialMissionPilot {
         let mut capture = TacticalCapturePilot::with_planning(
             self.context,
             self.breaks,
-            self.policy.objective_planning(),
+            self.objective_planning(),
         )
         .with_bounded_acquisition(self.bounded_acquisition)
         .with_cover_retry_cooldown(self.cover_retry_cooldown)
@@ -1330,6 +1359,73 @@ mod acquisition_tests {
     use engine_common::Scenario;
     use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
     use std::time::Duration;
+
+    #[test]
+    fn powered_capture_binds_sensor_and_controller_through_clone_and_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_powered_capture(enabled);
+            for _ in 0..2 {
+                let planning = if enabled {
+                    ObjectivePlanning::JetpackRoundTrip
+                } else {
+                    ObjectivePlanning::JointRoundTrip
+                };
+                assert_eq!(bot.sensor_request().objective_planning, planning);
+                let o = state.mission_observation_with_cadence(
+                    0,
+                    bot.sensor_request(),
+                    Default::default(),
+                );
+                let capture = bot.new_capture_task(&o);
+                assert_eq!(
+                    capture.telemetry().policy,
+                    if enabled {
+                        "tactical_sortie_v12"
+                    } else {
+                        "tactical_sortie_v11"
+                    }
+                );
+                let mut copy = bot.clone();
+                assert_eq!(copy.intent(&o), bot.intent(&o));
+                assert_eq!(copy.telemetry(), bot.telemetry());
+                assert_eq!(bot.telemetry().powered_capture, enabled);
+                assert_eq!(
+                    serde_json::to_value(bot.telemetry())
+                        .unwrap()
+                        .get("powered_capture")
+                        .is_some(),
+                    enabled
+                );
+                assert_eq!(bot.descriptor().sensor_profile.contains("jetpack"), enabled);
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "configure powered capture before the first intent")]
+    fn powered_capture_cannot_change_an_active_controller() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let state = SurfaceSortieScenario::init_material_travel(42, false);
+        let mut bot = MissionBot::new(
+            MissionPolicy::ValuePlanner,
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            Default::default(),
+        );
+        bot.intent(&state.mission_observation(0, None));
+        let _ = bot.with_powered_capture(true);
+    }
 
     #[test]
     fn cover_retry_option_reaches_new_capture_tasks_and_survives_mission_reset() {

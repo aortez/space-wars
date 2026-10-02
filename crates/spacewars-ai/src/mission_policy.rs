@@ -4,6 +4,8 @@ use engine_common::CombatBreakSettings;
 use scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning;
 use serde::Serialize;
 
+pub const POWERED_CAPTURE_PROFILE: &str = "mission_powered_capture_v1";
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub enum MissionPolicy {
     #[default]
@@ -92,6 +94,11 @@ pub struct MissionBot(MaterialMissionPilot);
 impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
+    }
+    /// Opt-in v13 route/controller comparison, configured before the first intent.
+    pub fn with_powered_capture(mut self, enabled: bool) -> Self {
+        self.0.configure_powered_capture(enabled);
+        self
     }
     /// Opt-in first-site deadline and local waiting guidance for comparison.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {

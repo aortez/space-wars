@@ -92,7 +92,7 @@ impl CoverProbe {
         let choice_ms = clock.elapsed().as_secs_f64() * 1000.0;
         let clock = Instant::now();
         let cloned = state.clone();
-        let measure = || cloned.diagnose_landing_routes(seat, p, bot.policy().objective_planning());
+        let measure = || cloned.diagnose_landing_routes(seat, p, bot.objective_planning());
         #[cfg(feature = "sensor-profile")]
         let (routes, profile) = {
             let (routes, profile) =
@@ -120,7 +120,7 @@ impl CoverProbe {
         if self.topology {
             let clock = Instant::now();
             let measure = || {
-                if bot.policy().objective_planning() != ObjectivePlanning::JointRoundTrip {
+                if bot.objective_planning() != ObjectivePlanning::JointRoundTrip {
                     return Err("diagnostic requires joint round-trip planning");
                 }
                 cloned.diagnose_landing_topology(seat, p)

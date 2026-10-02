@@ -137,6 +137,7 @@ impl TransferComparisonJob {
         if before.context.actor != actual.context.actor
             || before.context.episode_seed != actual.context.episode_seed
             || before.policy != actual.policy
+            || before.objective_planning() != actual.objective_planning()
             || before.breaks != actual.breaks
             || before.bounded_acquisition != actual.bounded_acquisition
             || before.cover_response != actual.cover_response

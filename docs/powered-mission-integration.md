@@ -1,0 +1,83 @@
+# Powered capture in the v13 mission controller
+
+The [local execution study](capture-jetpack-approaches.md) completed all six
+blocked approaches using the existing jetpack model. This experiment connects
+that model to the actual mission controller, preserving its destination
+selection, capture handoffs, recovery and retry memory.
+
+`--powered-capture-seats none|0|1|both` enables the headless v13 experiment.
+The instance selects `JetpackRoundTrip` for both sensor requests and new local
+capture tasks. Configuration is allowed before the first intent and survives
+clone/reset. Other policy versions reject enablement. Mission telemetry and
+the instance sensor descriptor identify the option; disabled serialization
+and policy defaults retain their prior behavior. Historical transfer work is
+invalidated when its source's route model changes.
+
+## Budget distinction
+
+The preceding v13 experiments used `--live-objective-seats none`. Their shared
+4 graph / 384 query allowance covered queued mission, neutral and flag work;
+native landing-objective surveys remained synchronous. The previous success
+does not show that a whole landing survey fits that dispatch allowance.
+
+Measure both configurations explicitly. The native control retains synchronous
+landing surveys. The shared configuration routes landing work through the
+same 4/384 allowance, with the existing ground reuse, route dependency checks
+and early positive publications enabled. Mission and flag jobs use the
+remaining allowance. Keep the 120-tick measurement lifetime and all geometric,
+equipment, launch-window and fuel checks. On-foot sensors, snapshot creation
+and publication validation retain their existing synchronous work in both
+configurations. Operation counts are not a total frame-time limit.
+
+Do not raise allowances or extend lifetimes in response to these outcomes.
+Failed delivery is distinct from a negative route measurement, controller
+rejection, physical failure and a lost match. A walking control that also
+cannot finish its survey identifies a broader delivery problem.
+
+## Frozen trial plan
+
+Freeze implementation, analysis and this plan before measuring outcomes:
+
+1. Replay all three `target/capture-jetpack/v1` source commands with the option
+   disabled. Require the original reports, all 18 controller/planner streams
+   and 32,400 ordinary sensor records to match. Preserve diagnostic source
+   files and hashes.
+2. Run six paired 180-second directed missions: native/shared delivery crossed
+   with flag -0.8 and cover response on/off, plus flag +0.8 with cover response
+   on. All use seed 42, seat 0 and the same value-destination fixture. Each
+   pair differs only in the powered-capture option. Keep destination retry,
+   published flag costs and current-neutral sensing enabled in both arms.
+3. Run eight paired armed matches: native/shared delivery, two generated worlds,
+   and v13 in both seats against v10. Seeds are the first eight SHA-256 bytes,
+   little endian, of `powered-mission-integration-v1:0` and `:1`. Both pilots
+   use the live adapter in shared mode. Use normal 600-second match rules,
+   no asteroids and the same options for v13 as the directed cover-on case.
+   Alternate arm order by world/seat. Do not omit armed cases if bounded
+   delivery fails; report that limitation separately.
+
+This is 3 retention replays plus 28 new missions/matches. Keep every loss,
+unfinished visit and unavailable route. Two independent runs may execute
+concurrently; their desktop timings are not Pi benchmarks or speed comparisons.
+
+`--trace-capture-evidence true` records each consumed observation's physical
+pilot/planet state, mission/capture state, actions, route evidence and jetpack
+equipment without extra sensors or controls. Audit contiguous clocks, model
+identity, original measurement age, validation date and powered launch windows.
+Check claim ownership and counters, exit/boarding transfers and departure in
+the original target's frame. Retain milestone and flight witness rows. Record
+the first control difference in each pair and distinguish physical claims
+from completed sorties and final ownership.
+
+Require every tick's combined dispatch charge to remain at or below 4/384 and
+preserve physics conservation checks. Report completed measurements,
+publications, expiry/restart reasons, powered selections/launches, physical
+claims/returns/departures, combat activity and match results. These correlated
+directed cases and two generated worlds cannot establish a broad win rate or
+justify changing bot defaults.
+
+```sh
+python3 tools/validate-powered-mission.py \
+  --source target/capture-jetpack/v1 \
+  --binary target/powered-mission/surface_mission_soak-COMMIT \
+  --out target/powered-mission/v1
+```
