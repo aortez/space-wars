@@ -42,6 +42,7 @@ pub(crate) struct ObjectiveSurveyJob {
     preview: HullPreview,
     result: LandingObjectiveSurvey,
     focused: Option<Box<ObjectiveSurveyJob>>,
+    focused_reused: ReusedGroundWork,
     direct_hull_queries: bool,
 }
 impl SurfaceSortieState {
@@ -204,6 +205,7 @@ impl SurfaceSortieState {
                 actual: None,
             },
             focused: None,
+            focused_reused: ReusedGroundWork::default(),
             direct_hull_queries: false,
         })
     }
@@ -316,9 +318,18 @@ impl ObjectiveSurveyJob {
         })
     }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
-        match &self.phase {
+        let full = match &self.phase {
             Phase::Ground(job) => job.reused(),
             _ => self.reused,
+        };
+        let focused = self
+            .focused
+            .as_ref()
+            .map_or(self.focused_reused, |j| j.reused());
+        ReusedGroundWork {
+            nodes: full.nodes + focused.nodes,
+            walks: full.walks + focused.walks,
+            physics_queries: full.physics_queries + focused.physics_queries,
         }
     }
     pub(crate) fn into_measurements(self) -> Box<GroundMeasurements> {
@@ -424,6 +435,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                 focused.step();
             } else {
                 let focused = self.focused.take().unwrap();
+                self.focused_reused = focused.reused();
                 self.measurement_work.focused_completed += 1;
                 if let Some(survey) = focused.positive_candidates() {
                     self.measurement_work.focused_successes += 1;

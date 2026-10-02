@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Frozen focused-route delivery trials against the powered mission corpus."""
 import argparse
+import csv
 from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
@@ -75,14 +76,42 @@ def root_of(run):
     return Path(command[command.index('--out')+1])
 
 
+def replay_parity(old,new):
+    roots=[root_of(r)for r in [old,new]]
+    reports=[json.loads((p/'report.json').read_text())for p in roots]
+    fields=M.V.EXACT_REPORT_FIELDS+['metrics','policy_configuration','cover_response','destination_retry']
+    M.T.report_parity(*reports,fields)
+    streams=M.V.EXACT_STREAMS+['capture-evidence.jsonl']
+    assert all(F.E.digest(roots[0]/f)==F.E.digest(roots[1]/f)for f in streams)
+    assert old['allocation']==new['allocation']
+    ledgers=[]
+    for root in roots:
+        with (root/'live-planning.csv').open()as f:
+            ledgers.append([{k:v for k,v in row.items()if k!='dispatch_ms'}for row in csv.DictReader(f)])
+    assert ledgers[0]==ledgers[1]
+    ignored={'reused_ground','snapshot_total_ms','snapshot_max_ms','validation_total_ms','validation_max_ms'}
+    telemetry=[{k:v for k,v in r['live_objective_planning']['telemetry'].items()if k not in ignored}for r in reports]
+    assert telemetry[0]==telemetry[1]
+    sensor_parity=M.C.audit_sensors(*roots)
+    return dict(exact_streams=streams,sensor_parity=sensor_parity,exact_allocation_ledger=True,
+        reused_ground_before=reports[0]['live_objective_planning']['telemetry']['reused_ground'],
+        reused_ground_after=reports[1]['live_objective_planning']['telemetry']['reused_ground'])
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--prior',type=Path,required=True)
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--replay',type=Path,help='require gameplay parity with an earlier focused study')
     args=parser.parse_args()
     assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip(), 'freeze code, tests and plan first'
     prior=json.loads(args.prior.read_text());assert prior['complete']
+    replay=json.loads(args.replay.read_text())if args.replay else None
+    if replay:
+        assert replay['complete'] and replay['plan']==plan()
+        for old in replay['runs'].values():
+            for filename,digest in old['hashes'].items():assert F.E.digest(root_of(old)/filename)==digest
     binary=args.binary.resolve(strict=True);args.out.mkdir(parents=True,exist_ok=False)
     items=plan()
     for item in items:
@@ -93,6 +122,7 @@ def main():
         binary_sha256=F.E.digest(binary),prior_summary=dict(path=str(args.prior),sha256=F.E.digest(args.prior)),
         tools={Path(m.__file__).name:F.E.digest(Path(m.__file__)) for m in [M,M.E,M.J,M.T,M.V,M.C,F,F.M,F.E,F.D]},
         runner_sha256=F.E.digest(Path(__file__)),plan=items,retention={},runs={},comparisons={})
+    if replay:result['replay_summary']=dict(path=str(args.replay),sha256=F.E.digest(args.replay))
     save=lambda:F.D.write(args.out/'summary.json',result)
     save()
     try:
@@ -114,12 +144,19 @@ def main():
                         assert all(sha==old['hashes'][f]for f,sha in new['exact_streams'].items())
                         new['sensor_parity']=M.C.audit_sensors(root_of(old),root_of(new))
                         assert new['allocation']==old['allocation']
-                    else:result['comparisons'][name]=M.compare(root_of(old),root_of(new))
+                    else:
+                        result['comparisons'][name]=M.compare(root_of(old),root_of(new))
+                        if replay:new['replay_parity']=replay_parity(replay['runs'][name],new)
                     print(name+(': focused audited'if focused else ': retained exactly'),flush=True);save()
         for item in items:
             old=prior['runs'][item['name']]
             for filename,digest in old['hashes'].items():assert F.E.digest(root_of(old)/filename)==digest
         assert F.E.digest(binary)==result['binary_sha256']
+        if replay:
+            assert result['comparisons']==replay['comparisons']
+            assert F.E.digest(args.replay)==result['replay_summary']['sha256']
+            for old in replay['runs'].values():
+                for filename,digest in old['hashes'].items():assert F.E.digest(root_of(old)/filename)==digest
         result['complete']=True
     except BaseException as error:
         result['error']=repr(error);raise

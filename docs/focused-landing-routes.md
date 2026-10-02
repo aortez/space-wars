@@ -177,3 +177,26 @@ pre-existing findings in unchanged files. No Pi performance claim is made.
 The preserved binary is
 `target/focused-routes/surface_mission_soak-aeb1174`, SHA-256
 `cd085dace65e9ab6163f42edd2e5e5c320f30179edc1e884c5aa00dc42d73298`.
+
+## Cache-counter correction
+
+Post-trial review found that `reused_ground` counted reuse in the full survey
+but omitted reuse inside the focused pass. The new warm-cache regression fails
+against `aeb1174`. Preserve the complete v1 study and archive. Correct the
+counter by accumulating focused reuse while it runs and retaining that subtotal
+after the full-survey handoff. This changes diagnostics only; charged graph and
+query operations still come from the same queue.
+
+Freeze the correction before rerunning the identical 20 cases into `v2`.
+Require all 14 focused games to retain their physical/mission fields, seven
+controller/evidence streams each, ordinary sensor counters, every allocation
+ledger row and all non-timing planner counters except `reused_ground`. Require
+the same 14 comparisons against the original baseline. Keep both studies.
+
+```sh
+python3 tools/validate-focused-routes.py \
+  --prior target/powered-mission/v3/summary.json \
+  --binary target/focused-routes/surface_mission_soak-CORRECTION \
+  --replay target/focused-routes/v1/summary.json \
+  --out target/focused-routes/v2
+```

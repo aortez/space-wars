@@ -6,6 +6,59 @@ const WORK: Work = Work {
 };
 
 #[test]
+fn focused_cache_reuse_is_counted_and_never_disappears_at_handoff() {
+    let state = state();
+    let o = target(&state, 0);
+    let p = &o.combat.recovery.flight.pilot;
+    let snapshot = Arc::new(state.world.physics.world.query_snapshot());
+    let mut ground = state
+        .ground_survey_job(
+            0,
+            p.planet.index,
+            state.objective_gravity(p),
+            Arc::clone(&snapshot),
+        )
+        .unwrap();
+    while ground.next_work().is_some() {
+        ground.step();
+    }
+    let mut job = state
+        .objective_job(
+            0,
+            p,
+            &o.cover,
+            snapshot,
+            Some(ground.into_measurements()),
+            true,
+        )
+        .unwrap()
+        .with_focused_candidate(0);
+    let mut previous = ReusedGroundWork::default();
+    while job.measurement_work().focused_completed == 0 {
+        assert!(job.next_work().is_some());
+        job.step();
+        let current = job.reused();
+        assert!(
+            current.nodes >= previous.nodes
+                && current.walks >= previous.walks
+                && current.physics_queries >= previous.physics_queries
+        );
+        previous = current;
+    }
+    assert!(previous.nodes > 0 && previous.walks > 0 && previous.physics_queries > 0);
+    while job.next_work().is_some() {
+        job.step();
+        let current = job.reused();
+        assert!(
+            current.nodes >= previous.nodes
+                && current.walks >= previous.walks
+                && current.physics_queries >= previous.physics_queries
+        );
+        previous = current;
+    }
+}
+
+#[test]
 fn focused_routes_deliver_for_two_actors_before_expiry_under_the_shared_allowance() {
     for planning in [
         ObjectivePlanning::JointRoundTrip,
