@@ -5,6 +5,7 @@ mod destinations;
 mod diagnostics;
 mod early_candidates;
 mod flight_dependencies;
+mod focused;
 mod gravity_dependencies;
 mod measurement_work;
 mod route_dependencies;

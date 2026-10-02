@@ -83,6 +83,15 @@ pub struct ObjectiveMeasurementWork {
     pub successful_candidates: u64,
     pub powered_candidates: u64,
     pub failures: BTreeMap<&'static str, u64>,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_successes: u64,
+}
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 impl ObjectiveMeasurementWork {
     fn record(&mut self, route: &LandingObjectiveRoute) {
@@ -102,6 +111,9 @@ impl ObjectiveMeasurementWork {
         }
     }
     fn add_since(&mut self, new: &Self, old: &Self) {
+        self.focused_started += new.focused_started - old.focused_started;
+        self.focused_completed += new.focused_completed - old.focused_completed;
+        self.focused_successes += new.focused_successes - old.focused_successes;
         self.finished_surveys += new.finished_surveys - old.finished_surveys;
         self.finished_candidates += new.finished_candidates - old.finished_candidates;
         self.successful_candidates += new.successful_candidates - old.successful_candidates;
@@ -234,6 +246,8 @@ pub struct LiveObjectivePlanner {
     reuse_ground: bool,
     local_dependencies: bool,
     early_candidates: Option<EarlyCandidates>,
+    focused_candidates: bool,
+    focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
     last_observed: Option<u64>,
@@ -252,6 +266,8 @@ impl LiveObjectivePlanner {
             reuse_ground: false,
             local_dependencies: false,
             early_candidates: None,
+            focused_candidates: false,
+            focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
             last_observed: None,
@@ -294,6 +310,20 @@ impl LiveObjectivePlanner {
     pub fn uses_early_candidates(&self) -> bool {
         self.early_candidates.is_some()
     }
+    /// Measure one nearby walking corridor before building the whole map.
+    /// Successes use ordinary route validation and early delivery; failures
+    /// remain unknown. Rotate candidates on fresh requests to avoid starvation.
+    pub fn with_focused_candidates(mut self) -> Self {
+        assert!(
+            self.uses_early_candidates(),
+            "focused candidates require early delivery"
+        );
+        self.focused_candidates = true;
+        self
+    }
+    pub fn uses_focused_candidates(&self) -> bool {
+        self.focused_candidates
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -304,6 +334,7 @@ impl LiveObjectivePlanner {
         self.queue.reset();
         self.requests.clear();
         self.parked.clear();
+        self.focused_cursor.clear();
         self.shared = None;
         self.last_observed = None;
         self.last_advanced = None;
@@ -315,6 +346,7 @@ impl LiveObjectivePlanner {
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
+        self.focused_cursor.remove(&player);
         self.destinations.remove(player);
         self.remove_objective(player);
     }
@@ -329,7 +361,10 @@ impl LiveObjectivePlanner {
                 self.telemetry.retired_unpublished_queries += request.physics_queries;
             }
             let job = self.queue.take(request.token)?;
-            if job.output().is_none() && job.measurement_work().successful_candidates > 0 {
+            if job.output().is_none()
+                && (job.measurement_work().successful_candidates > 0
+                    || job.measurement_work().focused_successes > 0)
+            {
                 *self
                     .telemetry
                     .retired_partial_successes_by_actor
@@ -992,6 +1027,23 @@ impl LiveObjectivePlanner {
             self.local_dependencies,
             planning,
         ) {
+            let job = if self.focused_candidates {
+                let (_, cursor) = self
+                    .focused_cursor
+                    .entry(player)
+                    .and_modify(|(old, cursor)| {
+                        if !Self::same_objective(*old, objective) {
+                            *old = objective;
+                            *cursor = 0;
+                        }
+                    })
+                    .or_insert((objective, 0));
+                let job = job.with_focused_candidate(*cursor);
+                *cursor = (*cursor + 1) % landing_objective::MAX_OBJECTIVE_SITES;
+                job
+            } else {
+                job
+            };
             let token = self
                 .queue
                 .submit(player as u64, p.tick, JobLimits::default(), job)

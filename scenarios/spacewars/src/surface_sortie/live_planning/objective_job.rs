@@ -41,6 +41,8 @@ pub(crate) struct ObjectiveSurveyJob {
     clearance_radius: f32,
     preview: HullPreview,
     result: LandingObjectiveSurvey,
+    focused: Option<Box<ObjectiveSurveyJob>>,
+    direct_hull_queries: bool,
 }
 impl SurfaceSortieState {
     #[cfg(test)]
@@ -201,6 +203,8 @@ impl SurfaceSortieState {
                 sites: Vec::new(),
                 actual: None,
             },
+            focused: None,
+            direct_hull_queries: false,
         })
     }
 
@@ -221,6 +225,41 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    /// Try one small walking corridor before the complete survey. A failed
+    /// patch says nothing about the full graph, jumps or powered alternatives.
+    /// The ordinary job and its original measurement clock remain intact.
+    pub(super) fn with_focused_candidate(mut self, cursor: usize) -> Self {
+        assert!(self.local_dependencies && self.focused.is_none());
+        let candidate = self
+            .candidates
+            .iter()
+            .find(|c| c.site.is_none())
+            .copied()
+            .unwrap_or(self.candidates[cursor % self.candidates.len()]);
+        let bearing = |point: Vec2| (-point.x).atan2(point.y);
+        let start = bearing(candidate.hatch);
+        let delta = (bearing(self.result.objective.position) - start + std::f32::consts::PI)
+            .rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        let samples = ground_navigation::GROUND_SAMPLES as f32 / std::f32::consts::TAU;
+        // Two sample margins allow actual footing near each endpoint. Farther
+        // routes go directly to the unchanged full survey, without a verdict.
+        let half_width = (delta.abs() * samples * 0.5).ceil() as u16 + 2;
+        if half_width > 8 {
+            return self;
+        }
+        let center = ((start + delta * 0.5).rem_euclid(std::f32::consts::TAU) * samples).round()
+            as u16
+            % ground_navigation::GROUND_SAMPLES as u16;
+        let mut focused = self.clone().with_walk_patch(center, half_width);
+        focused.candidates = vec![candidate];
+        focused.flight_scene = None;
+        focused.direct_hull_queries = true;
+        focused.result.validated_routes_only = true;
+        self.measurement_work.focused_started = 1;
+        self.focused = Some(Box::new(focused));
+        self
+    }
     pub(super) fn with_walk_patch(mut self, center: u16, half_width: u16) -> Self {
         let Phase::Ground(job) = std::mem::replace(&mut self.phase, Phase::Done) else {
             panic!("restrict a survey before dispatch");
@@ -289,7 +328,7 @@ impl ObjectiveSurveyJob {
         }
     }
     fn avoid(&self) -> Phase {
-        Phase::Avoid(Box::new(AvoidingJob::new(
+        let job = AvoidingJob::new(
             Arc::clone(self.base.as_ref().unwrap()),
             self.candidates[self.index],
             self.position,
@@ -297,11 +336,17 @@ impl ObjectiveSurveyJob {
             self.clearance_radius,
             self.gravity,
             Arc::clone(&self.preview),
-        )))
+        );
+        Phase::Avoid(Box::new(if self.direct_hull_queries {
+            job.with_direct_queries()
+        } else {
+            job
+        }))
     }
     fn finish_route(&mut self, route: LandingObjectiveRoute) {
         self.measurement_work.record(&route);
         if route.site.is_some() {
+            self.result.sites.retain(|old| old.site != route.site);
             self.result.sites.push(route);
         } else {
             self.result.actual = Some(route);
@@ -357,6 +402,9 @@ impl ObjectiveSurveyJob {
 impl PlanningJob for ObjectiveSurveyJob {
     type Output = LandingObjectiveSurvey;
     fn next_work(&self) -> Option<WorkKind> {
+        if let Some(focused) = &self.focused {
+            return focused.next_work().or(Some(WorkKind::Graph));
+        }
         match &self.phase {
             Phase::Ground(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Avoid(j) => j.next_work().or(Some(WorkKind::Graph)),
@@ -371,6 +419,21 @@ impl PlanningJob for ObjectiveSurveyJob {
         matches!(self.phase, Phase::Done).then_some(&self.result)
     }
     fn step(&mut self) {
+        if let Some(focused) = &mut self.focused {
+            if focused.next_work().is_some() {
+                focused.step();
+            } else {
+                let focused = self.focused.take().unwrap();
+                self.measurement_work.focused_completed += 1;
+                if let Some(survey) = focused.positive_candidates() {
+                    self.measurement_work.focused_successes += 1;
+                    self.result.sites = survey.sites;
+                    self.result.actual = survey.actual;
+                    self.dependencies = focused.dependencies;
+                }
+            }
+            return;
+        }
         match &mut self.phase {
             Phase::Ground(j) => {
                 if j.next_work().is_some() {
@@ -486,6 +549,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                     let mut areas = j.take_areas();
                     areas.extend(self.entrance_dependencies());
                     areas.extend(self.flight_area);
+                    self.dependencies.retain(|(site, _)| *site != route.site);
                     self.dependencies.push((route.site, areas));
                     self.finish_route(route);
                 }

@@ -66,6 +66,11 @@ impl LivePlanningRun {
             "true" => planner.with_early_candidates(),
             _ => panic!("--early-objective-routes must be true or false"),
         };
+        let planner = match super::arg("--focused-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_focused_candidates(),
+            _ => panic!("--focused-objective-routes must be true or false"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
@@ -208,13 +213,17 @@ impl LivePlanningRun {
                 "max_ms":values.last()})
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
-            if self.planner.uses_early_candidates() {
+            if self.planner.uses_focused_candidates() {
+                "live_jetpack_objective_v7"
+            } else if self.planner.uses_early_candidates() {
                 "live_jetpack_objective_v6"
             } else if self.planner.uses_route_dependencies() {
                 "live_jetpack_objective_v5"
             } else {
                 "live_jetpack_objective_v3"
             }
+        } else if self.planner.uses_focused_candidates() {
+            "live_joint_objective_v7"
         } else if self.planner.uses_early_candidates() {
             "live_joint_objective_v6"
         } else if self.planner.uses_route_dependencies() {
@@ -224,7 +233,7 @@ impl LivePlanningRun {
         } else {
             "live_joint_objective_v1"
         };
-        json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
+        let mut report = json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
             "objective_dependencies":if self.planner.uses_route_dependencies() { "routes" } else { "region" },
             "reuse_objective_ground":self.planner.reuses_ground(),
             "early_objective_routes":self.planner.uses_early_candidates(),
@@ -233,6 +242,10 @@ impl LivePlanningRun {
             "destination_cover":self.planner.destination_cover_telemetry(),
             "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),
             "dispatch":timing(&self.dispatch),"active_dispatch":timing(&self.active_dispatch),
-            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"})
+            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"});
+        if self.planner.uses_focused_candidates() {
+            report["focused_objective_routes"] = json!(true);
+        }
+        report
     }
 }
