@@ -186,7 +186,9 @@ and both profiled and normal release harness builds pass. A read-only trace audi
 also verifies current cover and usable route evidence for the two witnessed
 covered choices. Other sparse per-capture counts remain observed lower bounds.
 
-The next useful investigation is destination reconsideration after a blocked
-approach: the bounded search can end an attempt earlier without making the next
-objective achievable. Inspect the repeated returns and failure context before
-changing another retry limit, score or default.
+The completed [destination reconsideration audit](capture-destination-revisits.md)
+traces those repeated returns through both initial selection and value switching.
+The cooldown is enforced, but neither path uses the previous failure context
+after expiry. Some retries succeed, so the next experiment must distinguish
+incomplete evidence from a measured obstruction. No retry limit, score or default
+changes accompany that investigation.
