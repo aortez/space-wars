@@ -200,3 +200,27 @@ python3 tools/validate-focused-routes.py \
   --replay target/focused-routes/v1/summary.json \
   --out target/focused-routes/v2
 ```
+
+The `7d3faca` correction completes all 20 replays. All 98 focused
+controller/evidence streams, 450,376 ordinary sensor rows, 14 complete allocation
+ledgers, physical outcomes and original comparisons match v1. The six disabled
+replays also retain their earlier exact matches. All 28 physical/delivery
+witness files are byte-identical and reuse the original evidence archive.
+
+Six armed runs now correctly report 571 previously omitted reused footing nodes
+and 1,142 avoided ground queries in total. No walking-edge reuse count changes,
+and no actual charged work changes. The warm-cache regression now passes,
+including monotonic accounting through the focused/full-survey handoff.
+
+Final validation passes 977 Rust tests, 646 Python tests, strict AI Clippy,
+formatting and both release builds. The scenario Clippy check still reports only
+the same seven findings in unchanged files. The [correction manifest](data/focused-landing-routes-v2.json)
+and [compressed validation evidence](data/focused-landing-routes-v2.json.gz)
+preserve the replay comparisons, corrected counters, hashes and test logs.
+The original outcomes and experimental/default decision above are unchanged.
+
+The current verified binary is
+`target/focused-routes/surface_mission_soak-7d3faca`, SHA-256
+`8be0a7949cc52a9d4bf758fecad008644d20f824a079e867a44984c975f93bf6`.
+Final replay summary SHA-256:
+`17372b382b09c8155ee1636482ab96f49b5e8d18359a85ecc0b91f1f78b690ec`.
