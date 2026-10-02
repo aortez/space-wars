@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 mod client;
 mod clock;
 mod input;
+#[cfg(unix)]
+pub mod workflows;
 pub use clock::{
     CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND,
     ClockEventInfo, ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState,
