@@ -171,21 +171,78 @@ fn draw<P: TargetPixel>(
         TextureMode::Rgb => Stage::DrawRgb,
         TextureMode::Compare => unreachable!("comparison mode is resolved before drawing"),
     });
-    renderer.render_into_buffer(&mut TimedPixelBuffer { pixels, stride, texture_mode })
+    let mut buffer = TimedPixelBuffer { pixels, stride, texture_mode, background: None };
+    let region = renderer.render_into_buffer(&mut buffer);
+    // Background-only frames may never request a line or draw an image.
+    buffer.flush_background();
+    region
 }
 
 /// Keep unsupported scene operations on Slint's fallback. Background fill and
-/// eligible RGB image blits are timed within the outer Draw measurement.
+/// eligible RGB image blits are timed within the outer Draw measurement. Delay
+/// a solid background until the first write: a covering opaque RGB image can
+/// replace it without touching display memory twice. Nothing survives a draw.
 struct TimedPixelBuffer<'a, P> {
     pixels: &'a mut [P],
     stride: usize,
     texture_mode: TextureMode,
+    background: Option<(P, PhysicalRegion)>,
+}
+
+impl<P: TargetPixel> TimedPixelBuffer<'_, P> {
+    fn flush_background(&mut self) {
+        let Some((color, region)) = self.background.take() else {
+            return;
+        };
+        let _background = Scope::new(Stage::Background);
+        for (position, size) in region.iter() {
+            let left = (i64::from(position.x)).clamp(0, self.stride as i64) as usize;
+            let right = (i64::from(position.x) + i64::from(size.width)).clamp(0, self.stride as i64)
+                as usize;
+            let top = (i64::from(position.y)).clamp(0, self.num_lines() as i64) as usize;
+            let bottom = (i64::from(position.y) + i64::from(size.height))
+                .clamp(0, self.num_lines() as i64) as usize;
+            for line in top..bottom {
+                self.pixels[line * self.stride + left..line * self.stride + right].fill(color);
+            }
+        }
+    }
+
+    fn texture_covers_background(&self, args: &DrawTextureArgs, clip: &PhysicalRegion) -> bool {
+        let Some((_, region)) = &self.background else {
+            return false;
+        };
+        let Some(right) = args.dst_x.checked_add_unsigned(args.dst_width) else {
+            return false;
+        };
+        let Some(bottom) = args.dst_y.checked_add_unsigned(args.dst_height) else {
+            return false;
+        };
+        // Equality is intentionally conservative. Bounding boxes alone cannot
+        // prove coverage of a dirty region containing holes or disjoint pieces.
+        clip.iter().eq(region.iter())
+            && region.iter().all(|(position, size)| {
+                let x = i64::from(position.x);
+                let y = i64::from(position.y);
+                x >= 0
+                    && y >= 0
+                    && x >= args.dst_x as i64
+                    && y >= args.dst_y as i64
+                    && x + i64::from(size.width) <= right as i64
+                    && y + i64::from(size.height) <= bottom as i64
+                    && x + i64::from(size.width) <= self.stride as i64
+                    && y + i64::from(size.height) <= self.num_lines() as i64
+            })
+    }
 }
 
 impl<P: TargetPixel> TargetPixelBuffer for TimedPixelBuffer<'_, P> {
     type TargetPixel = P;
 
     fn line_slice(&mut self, line: usize) -> &mut [P] {
+        // All unhandled operations (text, rectangles, gradients, rotated or
+        // translucent textures) access pixels through here before drawing.
+        self.flush_background();
         &mut self.pixels[line * self.stride..(line + 1) * self.stride]
     }
 
@@ -201,28 +258,33 @@ impl<P: TargetPixel> TargetPixelBuffer for TimedPixelBuffer<'_, P> {
 
     fn draw_texture(&mut self, args: &DrawTextureArgs, clip: &PhysicalRegion) -> bool {
         if self.texture_mode == TextureMode::Generic {
+            self.flush_background();
             return false;
         }
-        texture::draw_rgb(args, clip, self.pixels, self.stride)
+        if !self.texture_covers_background(args, clip) {
+            self.flush_background();
+        }
+        // draw_rgb rejects unsupported inputs before writing any pixels. Only
+        // a successful, fully opaque RGB draw may discard the pending clear.
+        if texture::draw_rgb(args, clip, self.pixels, self.stride) {
+            self.background = None;
+            true
+        } else {
+            self.flush_background();
+            false
+        }
     }
 
     fn fill_background(&mut self, brush: &Brush, region: &PhysicalRegion) -> bool {
+        self.flush_background();
         if !matches!(brush, Brush::SolidColor(_)) {
             return false;
         }
-        let _background = Scope::new(Stage::Background);
         let mut color = P::background();
         color.blend(brush.color().into());
-        for (position, size) in region.iter() {
-            let left = (i64::from(position.x)).clamp(0, self.stride as i64) as usize;
-            let right = (i64::from(position.x) + i64::from(size.width)).clamp(0, self.stride as i64)
-                as usize;
-            let top = (i64::from(position.y)).clamp(0, self.num_lines() as i64) as usize;
-            let bottom = (i64::from(position.y) + i64::from(size.height))
-                .clamp(0, self.num_lines() as i64) as usize;
-            for line in top..bottom {
-                self.line_slice(line)[left..right].fill(color);
-            }
+        self.background = Some((color, region.clone()));
+        if self.texture_mode == TextureMode::Generic {
+            self.flush_background();
         }
         true
     }

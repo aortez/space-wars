@@ -7,13 +7,342 @@ profiler. In particular, headless throughput is **not displayed FPS**.
 The [drain-wall collision profile](water-drain-collision-profile.md) records the
 2026-10-02 paired Pi 4 comparison for full Heavy Rain and Meltdown cycles. It
 also documents why pausing a game alone does not remove background raster work
-when collecting headless measurements alongside the kiosk.
+when collecting headless measurements alongside the kiosk. Those binaries
+predate the rendering optimizations below; their timings retain that scope.
 
-The historical managed-floor checkpoint drew one closed slab and edge in its
-ordinary 24-hour face: 101 primitives, down from 103 in earlier measurements.
-That manager change retained the physical drain geometry and time envelopes,
-adding no per-tick physics or water work. Timings below describe their recorded
-builds and fixtures; they have not been relabeled as current measurements.
+The historical managed-floor captures below drew 101 primitives in the ordinary
+24-hour face. The current wooden surround, corner lamps and per-cell digit glow
+add several hundred primitives; counts also depend on the time and selected
+font. Do not use those old timings as a baseline for the current scene. Compare
+matching binaries with the fixed fixtures below and retain their metadata.
+
+## Exact ARM alpha spans (2026-09-29)
+
+The current lights are real raster work: four translucent shells per lit cell
+and twelve circles per corner lamp. A fixed 08:08 Classic-face ablation at 2×
+on the workstation took 5.32 ms to rasterize, 2.02 ms without digit glow, and
+0.85 ms without either glow or lamps. These intentionally different images
+identify cost; they are not proposed visual changes or Pi timings.
+
+Constant-color translucent spans now use AArch64 NEON, when enabled by the
+target, to blend sixteen packed RGB pixels at once. Short spans, tails and
+other architectures retain scalar blending. The path keeps the same integer
+rounding, clipping, layer order, image format and three reusable frame buffers.
+It allocates no caches or temporary images and does not change scenario code,
+rendering scale, lighting geometry, opacity or update cadence.
+
+Paired **Pi 4 / sw-picade-2** measurements used the release Yocto builds, fixed
+24-hour 08:08, seed 7, Classic, 1024×768 logical pixels, two warm-up seconds and
+five measured simulated seconds per process. Three independent runs per
+case/scale/binary alternated old/new order; the kiosk was paused. The table
+shows median per-run mean **CPU raster preparation milliseconds per frame**, not
+displayed FPS. These short samples exercise the beginning of each event, not
+complete rain/marquee cycles.
+
+| Fixture | 1× before | 1× after | 2× before | 2× after |
+| --- | ---: | ---: | ---: | ---: |
+| Idle | 8.072 | 6.555 | 27.926 | 21.381 |
+| Heavy Rain | 8.521 | 6.988 | 28.557 | 22.069 |
+| Marquee (Clock Wave) | 8.701 | 6.969 | 30.000 | 22.816 |
+| Digit Slide | 8.125 | 6.615 | 28.096 | 21.667 |
+
+Preparation falls **18–24%** in these fixtures. Buffer clearing remains about
+3.4 ms at 2×; this change accelerates blending, not memory fills or Slint/KMS
+presentation. The `ondemand` governor was unchanged, frequency endpoints were
+1.5 GHz, and temperature endpoints ranged from 72.1°C to 76.9°C. Endpoints are
+not continuous throttling telemetry.
+
+Before client SHA-256 (main `26e9d69`):
+`bbf04b88a75ce0833ae6c87df0e0ecdad37f52c64bf97b745da293ec726b727f`.
+After client SHA-256:
+`dbab752dded8c1e620a5bc03df8901b81919d7a0d0c369cdf9a8a462287ab912`.
+Raw per-process CSV and environment records are retained locally in
+`target/clock-benchmarks/alpha-span.5raEf8Sk/`.
+
+To repeat with retained before/after binaries, run the existing wrapper against
+each binary with `--cases idle,rain,marquee,digit-slide --seconds 5 --warmup 2
+--scales 1,2 --repeats 3`; alternate binary order for paired comparisons. Neither
+binary should share an active rendering workload with the benchmark.
+
+Validation includes exhaustive narrow-rounding checks, every alpha value with
+unaligned spans and tails, and the existing raster/Clock suites. The actual
+NEON tests were also run on the Pi. A disposable comparator linked the old and
+new production rasterizers and checked **540 whole frames byte-for-byte** on
+both workstation and Pi: four fonts, nine events, five lifecycle samples, and
+1024×768, 2048×1536 and 1600×960 buffers. It found no pixel differences.
+
+After deployment, the Pi 4 reported 43.0 FPS / 60.6 UPS in an idle sample and
+39.2 FPS / 59.7 UPS during Heavy Rain, still at 2×. Raster preparation averaged
+16.56 ms and 17.83 ms respectively; KMS rendering remained about 6.3 ms.
+The HyperPixel Pi 5 reported 60.1 FPS / 60.1 UPS in both idle and rain samples.
+These are live rolling-window observations at changing wall times, not matched
+before/after scenes or a sustained-frame-rate guarantee. The paired table above
+is the controlled comparison. Device screenshots were inspected after updating;
+the HyperPixel retained its existing manual-launch preference and rotation.
+
+This is a bounded active-rendering improvement, not a sustained-60-FPS claim
+for the Pi 4 at 2×. Unchanged-frame reuse remains a separate opportunity for
+idle CPU savings. Caching translucent lighting must respect the changing
+pixels underneath it and the existing per-layer integer rounding; flattening
+the glow onto an opaque background is not generally equivalent during events.
+
+## Pixel-work and CPU samples (2026-09-29)
+
+Follow-up diagnostics used the same deployed binary above on `sw-picade-2`.
+An unprivileged helper sampled the main kiosk thread through Linux
+`perf_event_open` at a requested 1 kHz, excluding kernel/hypervisor execution.
+No `perf` package, root access, kernel-setting changes, or app deployment was
+needed. The ten-second live sample collected **9,445 instruction pointers with
+zero lost records**. Symbols came from the matching unstripped Yocto executable
+(build ID `098ac89c79778d79a492f7ae6fe8e5a103e87832`). This was an ordinary
+changing Clock session, not a fixed-event comparison.
+
+About **49.5%** of live samples were inside `fill_span`, including inlined blend
+and fill operations; **39.9%** were specifically attributable to the packed-RGB
+blend path. Polygon scan conversion accounted for about **7.8%**, libc `memcpy`
+for **15.1%**, and the Slint image-texture path for **13.5%**. The blend percentage
+is nested inside the span percentage, not additional. These are user-CPU sample
+shares, not independent wall timers or measurements of DRAM bandwidth.
+Symbolization recovers inline frames, not full runtime call stacks; in
+particular, `memcpy` samples cannot all be assigned to a particular caller.
+
+A disposable release/LTO executable imported the production renderer and
+linked the existing Yocto Clock/Slint libraries. It held Classic **08:08:00**
+fixed, with events/date disabled, seed 7 and a 4:3 camera. Counts were gathered
+in a separate instrumented executable, not in the timing/sampling executable
+or production app. Counted and uncounted images had identical whole-frame
+pixel hashes at both resolutions.
+
+At 2×, one frame performs:
+
+| Work | Pixel operations per frame |
+| --- | ---: |
+| Background initialization | 3,145,728 opaque writes |
+| Remaining opaque geometry | 1,054,213 opaque writes |
+| Digit glow (360 polygons) | 2,778,110 blends |
+| Corner lamps | 1,061,269 blends |
+| Frame shadows | 138,606 blends |
+| **Total translucent work** | **3,977,985 blends** |
+
+These are operations, not unique pixels: overlapping shapes count repeatedly.
+The corresponding logical RGB reads/writes total about **36.5 MB/frame** before
+Slint presentation; this is not a count of actual cache/DRAM transactions.
+There are 46,428 blend spans, with 419,537 pixels (10.5% of blended pixels)
+handled by the scalar short-span/tail path. At 1×, there are 1,019,202 blends;
+17.9% are scalar tail pixels.
+
+With the kiosk paused, three runs per configuration each warmed up 20 frames
+and timed 150 frames. The middle repeat reversed variant order. Median per-run
+mean raster time, excluding simulation, scene construction and display:
+
+| Fixed-face diagnostic | 1× ms/frame | 2× ms/frame |
+| --- | ---: | ---: |
+| Full scene | 6.645 | 21.974 |
+| Without digit glow | 3.517 | 12.637 |
+| Without digit glow or lamps | 2.705 | 9.831 |
+| Background only | 0.829 | 3.365 |
+
+Thus, removing both lighting effects cuts this Pi raster workload by about
+**55%**, not the 84% seen in the earlier workstation ablation. Do not transfer
+one machine's percentage to another. These are deliberately altered diagnostic
+images, not proposed appearance changes. A further 900-frame fixed-face CPU
+sample collected 19,459 samples, zero lost: about **57.7%** in blending,
+**19.1%** in `memcpy`, and **10.4%** in polygon scan conversion. Scalar blend
+loop/channel source lines alone accounted for about **19.2%**. Source-line
+attribution is approximate, not an instruction-latency or cache-miss profile.
+
+A separate fill-only control rotated three buffers, matching the rasterizer's
+working-set pattern, with 240 fills per run and three order-alternating runs:
+
+| Fill control | Bytes written per frame | Median ms/frame |
+| --- | ---: | ---: |
+| Current 256-pixel RGB block fill | 9 MiB | 3.433 |
+| Zero-fill (`memset`-style) | 9 MiB | 3.430 |
+| Copy a complete RGB source buffer | 9 MiB | 4.265 |
+| Scalar three-byte RGB slice fill | 9 MiB | 4.978 |
+| Packed `u32` slice fill | 12 MiB | 4.555 |
+
+The current large clear is already close to the zero-fill control. This points
+to the cost of writing the full working set on this device, rather than an
+especially bad clear loop. Simply switching to four-byte pixels is not an
+established win: its larger clear was slower here, though blending and display
+conversion would need separate measurements before judging the whole format.
+
+The fixed runs started/ended at 72.1/74.0°C and 1.5 GHz with `ondemand` unchanged;
+these are endpoint observations, not continuous throttle monitoring. The
+existing Clock session was resumed after each paused batch, with no persisted
+settings or production rendering changes. Raw reports, sampled addresses,
+symbolization and diagnostic sources are retained under
+`target/clock-benchmarks/raster-profile.Qk8S6Tit/`.
+
+Next experiments should target the blend loops (including short/tail spans),
+overlapping lighting work, and the separate presentation pass. Unchanged-frame
+caching would still help idle power use, but is not an explanation or a fix for
+the cost of rendering an actively changing frame.
+
+## Live native-resolution comparison (2026-09-29)
+
+The same deployed Pi 4 binary was tested at **1× → 2× → 1×**, then left at 1×.
+The 1024×768 display uses a 1024×768 RGB scene buffer at 1×, versus 2048×1536 at
+2×. The LinuxKMS RGB presentation path samples every second source row/column
+at 2×; it does not average a 2×2 block into an antialiased output pixel. UI text
+is rendered separately at display resolution.
+
+Automatic events were temporarily set to Off. Each launch retained Classic,
+12-hour time, date display, Heavy rain, seed 0 and the existing event toggles.
+Four live idle snapshots were taken three seconds apart, followed by a manual
+rain preview sampled at raining-phase ticks 600, 780, 960 and 1140. Screenshots
+were taken after each measured phase, not during its timing windows. Medians
+of the four snapshots per phase:
+
+| Measurement | 1× first | 2× | 1× repeat |
+| --- | ---: | ---: | ---: |
+| Idle submitted FPS | 60.0 | 41.4 | 60.0 |
+| Heavy Rain submitted FPS | 60.0 | 34.3 | 60.0 |
+| Idle host preparation, ms/frame | 6.14 | 17.16 | 6.45 |
+| Heavy Rain host preparation, ms/frame | 8.01 | 21.11 | 8.32 |
+| Idle main-loop CPU / elapsed time | 72.8% | 99.0% | 74.4% |
+| Heavy Rain main-loop CPU / elapsed time | 85.8% | 99.0% | 88.2% |
+
+All phases retained about 60 UPS. KMS completed-flip rates corroborate the frame
+counts: about 60.0 at 1×, and 41.6/34.3 for idle/rain at 2×. At 1×, idle frames
+spend about 4.2–4.5 ms waiting for a display flip, versus essentially no wait
+at 2×. CPU percentages describe the measured main-loop thread, not whole-device
+CPU utilization. Native resolution restores frame-budget headroom here, but
+does not make the renderer low-power during idle.
+
+These are sequential live observations, not pixel-identical benchmarks: the
+wall clock advanced from 9:34 through 9:36 PM, changing digit geometry and rain
+surfaces. Use the fixed-face/headless comparisons above for controlled cost
+comparisons. The governor remained `ondemand`; start-of-run frequencies were
+1.1/1.5/1.3 GHz respectively, not a fixed-frequency experiment. Temperature
+endpoints ranged from 67.7 to 70.6°C. Visual inspection of the native-size idle and rain captures found
+no clipping/layout regressions; some fine outlines are slightly heavier at 1×.
+No major visual benefit from 2× was apparent in these captures.
+
+Demo mode and the other Clock preferences were restored. The 1× setting is
+persisted, the Clock is unpaused, and the service did not restart. Manual test
+launches also changed the launcher's last-selected scenario from NES to Clock;
+autostart remains enabled for Clock. The first settings save took 24.1 seconds
+(later scale-save observations were fast); that launch delay is excluded from
+all rendering measurements and remains a separate observation.
+
+Raw status/state snapshots, original/final settings, scripts and screenshots
+are under `target/clock-benchmarks/scale-comparison.k3yaspF4/`. No new production
+rendering code or device binary was deployed for this comparison.
+
+## Native-resolution follow-up: short blends and covered clears (2026-09-29)
+
+Keep 1× rendering. This follow-up makes two bounded changes, with no rectangle
+fast path, polygon/lighting changes, extra image caches, or GPU implementation:
+
+- After sixteen-pixel NEON batches, blend an optional eight-pixel batch before
+  the scalar tail. Integer rounding, RGB layout and clipping remain identical.
+- In LinuxKMS's existing RGB image path, defer a solid window-background clear.
+  Discard it only if the first eligible opaque RGB image covers **every** dirty
+  region pixel. Otherwise clear before any image write or fallback line access;
+  finish a background-only frame by clearing before returning. This retains
+  buffer-age policy, row padding, ordering and generic/rotated rendering. The
+  pending color and bounded region live only within one render call.
+
+The application scene-buffer clear is unchanged. This removes a different
+clear: the Slint output buffer beneath an opaque image. In diagnostics,
+`kms_background_*` now measures actual fills when they occur, potentially
+inside a later item operation; `kms_core_background_*` measures the initial
+callback, which can defer work. Neither should be added to its enclosing draw
+timer. Zero background calls in full-image frames means the fill was omitted,
+not that the profiler lost its timing.
+
+### Fixed-workload Pi 4 comparisons
+
+The same fixed Classic 08:08, seed-7 raster fixture used above, with twenty warm
+frames and 150 measured frames per run, compared before/after in three paired
+repeats (reverse order in repeat two). Median per-run mean raster wall times:
+
+| Scale | Sixteen-pixel batches | Plus eight-pixel batches |
+| --- | ---: | ---: |
+| 1× | 6.506 ms | 6.090 ms |
+| 2× diagnostic only | 20.659 ms | 19.622 ms |
+
+The native fixture is about **6.4% faster**, on top of the earlier sixteen-pixel
+improvement. Pixel hashes agree. The kiosk was paused, the governor remained
+`ondemand`, and the endpoints were 1.5 GHz and 67.7–70.6°C; endpoints do not
+establish continuous frequency or thermal behavior.
+
+The backend's ignored `benchmark_opaque_rgb_presentation` test also ran on the
+Pi with the old and new production buffer wrappers, in before/after/before/after
+process order. Each process used four alternating generic/RGB blocks of 100
+draws after ten warmups, at 1024×768. The fixed native-size image's RGB-path
+median fell from **2.866 ms to 1.794 ms**. Background-only controls remained
+about 1.01 ms; the unchanged generic native-image control was 5.56/5.68 ms.
+These are frozen-image wall times in ordinary RAM, not mapped DRM memory,
+complete application frames, or displayed FPS. Frequency was not held fixed.
+
+### Live Picade 2 check
+
+The installed Yocto release client changed from `dbab752d…` to
+`0674730128a0351001f3d7df3542fe942ec0884a1f5638b88e27e2fc07b7d5f0`.
+Before and after each used 1×, Classic, 12-hour time/date and Heavy Rain, with
+automatic events temporarily Off. Four idle snapshots three seconds apart and
+four raining-phase snapshots at ticks 600/780/960/1140 gave these medians:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Idle KMS presentation CPU | 5.589 ms | 4.559 ms |
+| Heavy Rain KMS presentation CPU | 5.067 ms | 4.214 ms |
+| Idle main-loop CPU / elapsed time | 74.4% | 68.6% |
+| Heavy Rain main-loop CPU / elapsed time | 88.0% | 82.0% |
+| Idle submitted FPS / UPS | 60 / 60 | 60 / 60 |
+| Heavy Rain submitted FPS / UPS | 60 / 60 | 60 / 60 |
+
+Completed KMS flip counts confirm about 60 displays/s in every phase. These are
+sequential live scenes, not identical geometry: readings changed from 10:04 to
+10:06–10:07 PM. Native raster preparation was about 6.46/6.52 ms idle and
+8.36/8.34 ms raining; use the fixed fixture to isolate the blend improvement.
+Both live captures began at 1.2 GHz, with temperature samples of 67.2–68.7°C.
+
+Background fills disappear from full-image draws, but **do not claim the entire
+old clear time as a net saving**: its approximately 2 ms is partly offset by a
+slower following RGB blit (idle 2.10 → 3.30 ms, rain 1.83 → 2.91 ms). The net
+presentation saving is about 0.85–1.03 ms. These measurements do not identify
+the reason for the blit's increase; mapped-memory/cache effects and frequency
+need controlled attribution before changing the copy implementation.
+
+Validation: 464 client tests, 288 Clock tests, four headless benchmark tests and
+six presentation integration tests passed. The backend's 23 non-benchmark tests
+passed on both workstation and Pi, including new coverage/clear-call checks,
+background-only screens, transparency, gradients, prior drawing, resizing,
+padding, all rotations, partial/disjoint damage and one/two/three-buffer scene
+transitions. Actual ARM blend tests passed, and all **540 complete Clock frames**
+matched the original scalar renderer byte-for-byte across fonts, events and
+resolutions. The ignored timing test remains opt-in with no timing assertion.
+Formatting and diff checks pass. Strict standalone backend Clippy is blocked
+by 31 warnings in unchanged vendor files; normal Clippy completes and reports
+none in this follow-up's changed renderer code.
+
+Idle, rain, launcher and Clock-settings captures were visually checked. Demo
+mode was restored and the 1× Clock resumed; the saved settings are byte-for-byte
+unchanged from before this follow-up. The service has zero crash restarts and
+no reboot was needed. Only Picade 2 was updated in this follow-up. Reports,
+collectors, source/build helpers and captures are retained locally in
+`target/clock-benchmarks/render-tweaks.R0HfI1ay/`.
+
+### Rotated HyperPixel compatibility check (2026-09-30)
+
+The same release bundle (`0674730128a0351001f3d7df3542fe942ec0884a1f5638b88e27e2fc07b7d5f0`)
+was subsequently fast-deployed to `spacewars.local`, without rebooting. This
+Pi 5's existing 2× setting was preserved for the regression check: an 800×480
+logical viewport, 1600×960 scene image and 480×800 physical output with rotation.
+Clock, spinning marquee, rain, pause and Clock Controls captures were visually
+checked, as was returning to the launcher and starting Clock again.
+
+Live samples reported about 60 FPS/UPS and 2.85–2.90 ms KMS render CPU. This is
+not a fixed-workload before/after performance comparison. As expected, the
+rotated path used generic texture drawing (zero RGB fast blits) and retained
+the background fill. The service remained active with zero crash restarts,
+saved settings matched byte-for-byte, and Clock was left running with its
+original Demo profile. Local captures and state are retained in
+`target/clock-benchmarks/hyperpixel-smoke.lW3NDxT0/`.
 
 ## Fixed-workload benchmarks
 

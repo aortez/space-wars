@@ -364,6 +364,18 @@ player_health_percent = 200
 "#;
         fs::write(&path, original).unwrap();
         let loaded = load_settings(&path).unwrap();
+        let LoadStatus::RecoveredFields {
+            backup_path,
+            fields,
+        } = &loaded.status
+        else {
+            panic!(
+                "unknown controller should be recovered: {:?}",
+                loaded.status
+            );
+        };
+        assert_eq!(fields, &["spacewars.player_2_controller"]);
+        assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
         assert_eq!(loaded.settings.audio.master_volume, 0.05);
         assert!(loaded.settings.audio.muted);
         assert!(loaded.settings.autostart.enabled);
