@@ -96,6 +96,12 @@ pool tops still receive water instead of suspending it at the collision skin.
 The remaining displacement is swept again, with a four-contact limit per path.
 If that limit is reached, the unchecked remainder is not applied.
 
+Opposing outfalls only mix when the segment between their centers is clear of
+solid scenery. Aggregating several pairs requires the same check between their
+weighted centers. Otherwise early center-of-mass replacement could transfer
+water through a wall before the ordinary collision step sees it. Unobstructed
+mixing retains its existing volume/momentum rules and bounded scratch storage.
+
 Rain and Meltdown update these boxes from `FloorShape::panel_pose` only after an
 accepted floor movement. A capacity deferral retains the previous pools, solids,
 rendering and rigid-body poses together. Water overlapped by a moving panel is

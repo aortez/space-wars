@@ -25,6 +25,11 @@ runtime compatibility fingerprint. The baseline was the exact parent of the fix:
 The after binary is the deployed build. Rebuilding it after collecting the parent
 produced the identical SHA-256. The installed client was never replaced by the baseline.
 
+After this collection, the branch incorporated the rendering optimizations from
+PR #146 and a review fix preventing stream mixing across solids. The tables
+retain the original binary comparison; they are not measurements of that later
+combined build.
+
 The existing `benchmark-clock.sh` drove the production simulation, scene construction
 and CPU raster preparation at 1024×768, seed 7, fixed 08:08, with changing
 seconds/colon. Each process warmed up for five simulated seconds, then reset the

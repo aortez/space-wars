@@ -156,6 +156,37 @@ fn newborn_outfall_half_step_and_material_faces_also_hit_the_wall() {
 }
 
 #[test]
+fn opposing_outfalls_cannot_mix_through_a_solid_divider() {
+    let mut w = WaterWorld::new(
+        WaterConfig::default(),
+        vec![
+            spec(
+                -5.5,
+                5.0,
+                vec![0.0],
+                [Boundary::Closed, Boundary::Spill { lip: 0.0 }],
+            ),
+            spec(
+                0.5,
+                5.0,
+                vec![0.0],
+                [Boundary::Spill { lip: 0.0 }, Boundary::Closed],
+            ),
+        ],
+    )
+    .unwrap();
+    w.set_solid_boxes(&[SolidBox::new(Vec2::new(0.0, -10.0), Vec2::new(0.1, 20.0), 0.0).unwrap()])
+        .unwrap();
+    w.add_to_pool(0, -1.0, 10.0).unwrap();
+    w.add_to_pool(1, 1.0, 10.0).unwrap();
+    for _ in 0..10 {
+        w.step(DT).unwrap();
+        assert_accounting(&w);
+        assert_eq!(w.stats().spill_merges, 0, "a divider separates the jets");
+    }
+}
+
+#[test]
 fn moving_rotated_panels_eject_existing_water_and_replay_conservatively() {
     let run = || {
         let mut w = world();

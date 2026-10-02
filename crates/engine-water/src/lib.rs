@@ -625,6 +625,7 @@ impl WaterWorld {
                 &mut self.spills,
                 &mut self.mixing,
                 &mut self.mix_stats,
+                &self.solids,
                 self.config,
                 dt,
                 previous_tick,

@@ -49,6 +49,10 @@ impl SolidBox {
         ]
     }
 
+    pub(crate) fn blocks_segment(self, from: Vec2, to: Vec2) -> bool {
+        self.sweep(from, to).is_some()
+    }
+
     fn sweep(self, from: Vec2, to: Vec2) -> Option<Contact> {
         let motion = to - from;
         let mut entry = 0.0_f64;
