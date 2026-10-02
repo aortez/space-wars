@@ -1,12 +1,29 @@
 # Functional UI tests
 
-Normal PR CI runs 38 of these full-application workflows using nextest's `ui-pr`
-profile. Only four long-running scenarios (two full matches, automatic Clock demo,
-rain, and duck traversal) are deferred. The separate **UI functional tests**
-workflow runs all 42 nightly/on demand using the `ui` profile. Normal CI also
+Normal PR CI runs 44 of these full-application workflows using nextest's `ui-pr`
+profile. Only four long-running workflows (the two-match Spacewars case, automatic
+Clock demo, rain, and duck traversal) are deferred. The separate **UI functional tests**
+workflow runs all 48 nightly/on demand using the `ui` profile. Normal CI also
 compiles every test and runs the display-free unit, simulation, rendering and
 control-protocol tests. See the [selection rationale and guard](ci-performance.md#deferred-ui-scenarios)
 and [manual dispatch instructions](ci-performance.md#running-the-full-ui-suite-on-github).
+
+The inventory after #150 is:
+
+| Area | Workflows | Main coverage |
+|---|---:|---|
+| Launcher and basic lifecycle | 3 | Navigation, controls, Clock and classic Spacewars lifecycle |
+| Shared settings and diagnostics | 5 | Sound, controllers, network, Device Info and FPS display |
+| Clock | 13 | Events, previews, cleanup, fonts/messages and persistence |
+| Autostart | 2 | Idle scheduling, interruption, repeated matches and saved preferences |
+| Spacewars matches and HUD | 5 | Player/bot choices, results, scoreboard, rematches and rendering |
+| Labs, terrain and expeditions | 20 | Lifecycle/rendering across presets, including two-player setups |
+
+Several workflows apply the same lifecycle to different scenario presets. These
+48 display-dependent tests share their test binary with three display-free HUD
+region tests, which run in the ordinary workspace suite. The CI selection guard
+reports the discovered counts and ensures new workflows join the PR set unless
+explicitly deferred; the documentation's inventory is a checkpoint, not a filter.
 
 The `autostart_` workflows exercise persistent launcher-idle Clock and bot
 activities, settings suspension, input reset, client restart, Off, pause/resume,
@@ -216,6 +233,44 @@ non-overlap, eligible-repeat avoidance, and deterministic mixed-event replay.
 
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
+
+## Deployed-device runner boundary (#31)
+
+The reusable control protocol and the desktop harness already exist. The remaining
+device-runner work is ownership of a live kiosk session, reusable workflow entry
+points, and device diagnostics/recovery:
+
+- `spacewars-control` supplies typed state, guarded actions and deadline-based
+  requests. `spacewars-cli` exposes that API over the existing local socket;
+  deployment tools already reach the CLI over SSH.
+- `FunctionalHarness` currently couples every workflow to a newly spawned child,
+  temporary settings and a temporary socket, and kills that owned child on cleanup.
+  It cannot simply attach to the kiosk. Shared workflow operations should be
+  separated from this process ownership before adding a second execution target.
+- Start with shared settings/Device Info/saved-network inspection and Clock
+  pause/resume, reusing the existing public actions and assertions. Device cases
+  must preserve the current scenario instance and saved preferences. Some desktop
+  fixtures reset controller assignments, change settings, or deliberately break
+  their temporary settings path; those require disposable state and cannot be
+  applied to the live cabinet unchanged.
+- Launch/restart/return-to-launcher cases replace the current simulation. Restoring
+  its scenario selection is not restoration of an in-progress match or an automatic
+  session. Give those lifecycle cases a separate, explicit session-ownership
+  contract before using them on a cabinet.
+- Each device case needs a whole-case deadline in addition to request/transition
+  deadlines, plus a versioned report containing the build/device identity, initial
+  and final state, command history, screenshots and bounded kiosk logs. The current
+  desktop suite has operation deadlines and a CI job timeout, but no independent
+  whole-case watchdog.
+- Kiosk service recovery is separate from UI navigation. The image currently
+  exposes restricted log and update helpers and uses `Restart=on-failure`; it does
+  not grant the kiosk user a general service-restart command. Add and test a narrow
+  recovery path before claiming unattended recovery from an unresponsive app.
+  Report the original test failure and any recovery result separately.
+
+These are the implementation boundaries for the next #31 slice, not a claim that
+the packaged Pi runner or service recovery has shipped. Hardware input, network
+switching and A/B persistence remain separate validation workflows.
 
 Each successful screenshot is decoded as an eight-bit RGBA PNG and checked for
 nonzero dimensions, fully opaque pixels, and more than one RGB color. Checking

@@ -2,9 +2,9 @@
 
 The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
 workspace job builds all test targets and runs the non-ignored headless tests,
-38 display-driven UI workflows, and vendored LinuxKMS tests. Only four explicitly
+44 display-driven UI workflows, and vendored LinuxKMS tests. Only four explicitly
 named long-running UI scenarios are deferred from PR execution. The complete
-42-workflow suite runs in `UI functional tests` (`ui-functional.yml`), nightly
+48-workflow suite runs in `UI functional tests` (`ui-functional.yml`), nightly
 and on manual dispatch. All tests still compile on every PR.
 
 Both workflows use Cargo's `ci` profile:
@@ -42,7 +42,7 @@ budget has been reduced. Fail-fast and retries are disabled so results include
 every selected case without concealing a failure behind a retry. Nextest schedules
 headless tests in separate processes; shared-display UI tests remain serial.
 LinuxKMS checks still run after a workspace-test failure if compilation succeeded.
-Any failed command still fails its job. Failures in the 38 retained UI workflows
+Any failed command still fails its job. Failures in the 44 retained UI workflows
 still fail normal PR CI; the four deferred cases are checked nightly/on demand.
 
 ### Deferred UI scenarios

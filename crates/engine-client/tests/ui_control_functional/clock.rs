@@ -437,7 +437,14 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         let initial = harness.clock_state();
         assert_eq!(initial.settings.rain_amount, ClockRainAmount::Heavy);
         assert_eq!(initial.floor, ClockFloorMode::Closed);
-        assert_eq!(initial.events.len(), 7);
+        assert_eq!(
+            initial
+                .events
+                .iter()
+                .map(|event| event.kind)
+                .collect::<Vec<_>>(),
+            ClockEventKind::ALL
+        );
         harness.clock_trigger_event(&initial, ClockEventKind::Rain);
         let raining = harness.clock_wait(&initial, "raining", 1, 300);
         assert_eq!(raining.floor, ClockFloorMode::EventOwned);
