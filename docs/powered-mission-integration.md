@@ -114,3 +114,23 @@ python3 tools/audit-powered-mission.py \
   --manifest target/powered-mission/frozen-v1-files.json \
   --out target/powered-mission/v2
 ```
+
+That correction (`ff4abf7`) audits both actual legacy launches, then encounters
+a second logging assumption at tick 23,790 in the same run. The ground task
+pauses for a new terrain survey at tick 23,772, while its crossing remains in
+`Lift`. It resumes that same crossing with 84.44% charge; its actual launch
+was tick 23,681 with 100% charge. A ground-goal transition alone was incorrectly
+counting another takeoff. Preserve the v2 rejected summary, SHA-256
+`56fb70746352fa1b79acd95d19b62d4d68a17bba155c5cff5b98d2931cfec9f3`.
+
+Freeze a second audit correction: identify each takeoff by actor, ground-task
+start and crossing-task start; retain subsequent Lift resumptions separately.
+Require the original charge threshold at every takeoff and matching, fresh
+corridor evidence at resumptions. Reuse the same pinned games and comparisons.
+
+```sh
+python3 tools/audit-powered-mission.py \
+  --manifest target/powered-mission/frozen-v1-files.json \
+  --previous-audit target/powered-mission/v2/summary.json \
+  --out target/powered-mission/v3
+```

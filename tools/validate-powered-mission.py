@@ -109,20 +109,40 @@ def same_corridor(a,b):
         for key,other in [('start','destination'),('destination','start')])
 
 
-def audit_launch(launch,latest_survey):
+def audit_corridor(launch,latest_survey):
     if launch['ground']['policy']=='ground_navigation_v12':
-        E.audit_launch(launch)
+        forecast=launch['latest_forecast']
+        assert forecast and forecast['version']==2
+        assert forecast['measured_tick']<=launch['tick']<=forecast['launch_until_tick']
+        assert 0<=forecast['launch_until_tick']-forecast['measured_tick']<=120
+        assert same_corridor(launch['ground']['crossing']['plan'],forecast['plan'])
         return 'forecast_vehicle'
     # Existing v10/v11 return traversal can hop measured terrain gaps without
     # the separate, newer bidirectional vehicle-flight forecast.
     assert launch['ground']['policy'] in ['ground_navigation_v10','ground_navigation_v11']
-    assert launch['equipment']['charge']>=0.98
     assert latest_survey and 0<=launch['tick']-latest_survey['tick']<30
     equipment=latest_survey['equipment']
     candidates=equipment['terrain_crossings']+([equipment['crossing']] if equipment['crossing'] else [])
     corridor=launch['ground']['crossing']['plan']
     assert any(same_corridor(corridor,c) for c in candidates)
     return 'existing_ground_gap' if 'GroundGap' in corridor['anchor'] else 'existing_vehicle_corridor'
+
+
+def audit_launch(launch,latest_survey):
+    assert launch['equipment']['charge']>=0.98
+    if launch['ground']['policy']=='ground_navigation_v12': E.audit_launch(launch)
+    return audit_corridor(launch,latest_survey)
+
+
+def first_launch(seat,ground,seen):
+    # A terrain revision can pause a flight for its next corridor survey.
+    # Resuming the same crossing's Lift phase is not another charged takeoff.
+    crossing=ground['crossing']
+    assert crossing['goal']=='Lift' and crossing['started_tick'] is not None
+    key=(seat,ground['started_tick'],crossing['started_tick'])
+    if key in seen: return False
+    seen.add(key)
+    return True
 
 
 def observe_visit(visit, row):
@@ -172,6 +192,7 @@ def analyze(root, item, audit_out=None):
         physical=dict.fromkeys(['landed','exited','claimed','boarded','departed'])) for v in report['metrics'][s]['visits']] for s in [0,1]}
     last={};counts=Counter();first={};publications=Counter();invalidations=Counter();launches=[];completions=set();lowest=1.0
     forecasts={};ground_surveys={};previous_goal={};max_age=0;visits_index={0:0,1:0};witnesses=[]
+    launched=set();resumed=[]
     for row in F.rows(root/'capture-evidence.jsonl'):
         seat=row['seat'];p=row['pilot'];tick=p['tick'];counts[seat]+=1
         assert p['owner']==f'player_{seat+1}' and row['schema']==1
@@ -196,9 +217,10 @@ def analyze(root, item, audit_out=None):
         goal=ground['goal'] if ground else None
         if goal=='jetpack_lift' and previous_goal.get(seat)!='jetpack_lift':
             launch=dict(seat=seat,tick=tick,equipment=j,latest_forecast=forecasts.get(seat),ground=ground)
-            launch['kind']=audit_launch(launch,ground_surveys.get(seat))
+            takeoff=first_launch(seat,ground,launched)
+            launch['kind']=(audit_launch if takeoff else audit_corridor)(launch,ground_surveys.get(seat))
             if launch['kind']!='forecast_vehicle': launch['source_survey']=ground_surveys[seat]
-            launches.append(launch);witnesses.append(row)
+            (launches if takeoff else resumed).append(launch);witnesses.append(row)
         previous_goal[seat]=goal
         if ground and ground.get('crossing') and ground['crossing']['completed_tick'] is not None:
             key=(seat,ground['crossing']['completed_tick'])
@@ -222,7 +244,7 @@ def analyze(root, item, audit_out=None):
     F.D.write(witness_path,dict(schema=1,rows=witnesses))
     return dict(allocation=F.allocation_audit(root),visits=visits,visit_audit=audit['counts'],
         evidence=dict(rows=dict(counts),first_ticks=first,last_ticks=last,publications=dict(publications),
-            invalidations=dict(invalidations),max_published_age=max_age,launches=launches,
+            invalidations=dict(invalidations),max_published_age=max_age,launches=launches,resumed_flights=resumed,
             completed_crossings=sorted(completions),lowest_charge=lowest),
         live_telemetry=live['telemetry'],round=report['round'],combat=report['final_combat'],
         completed_sorties=[m['completed_sorties'] for m in report['missions']],

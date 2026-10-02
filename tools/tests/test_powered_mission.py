@@ -98,11 +98,26 @@ class PoweredMissionTests(unittest.TestCase):
         launch['ground']['policy']='ground_navigation_v12'
         with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
         launch['ground']['policy']='ground_navigation_v10'
+        launch['equipment']['charge']=0.84
+        self.assertEqual(M.audit_corridor(launch,survey),'existing_ground_gap')
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['equipment']['charge']=1.0
         launch['tick']=120
         with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
         launch['tick']=101
         launch['ground']['crossing']['plan']['start']['x']+=2
         with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+
+    def test_resuming_lift_keeps_the_original_takeoff_identity(self):
+        seen=set()
+        ground=dict(started_tick=100,crossing=dict(started_tick=120,goal='Lift'))
+        self.assertTrue(M.first_launch(0,ground,seen))
+        # The same crossing resumes after a fresh terrain survey. Its fuel
+        # has already been spent by the original flight, not by a new takeoff.
+        self.assertFalse(M.first_launch(0,ground,seen))
+        self.assertTrue(M.first_launch(1,ground,seen))
+        ground['crossing']['started_tick']=200
+        self.assertTrue(M.first_launch(0,ground,seen))
 
 
 if __name__=='__main__': unittest.main()

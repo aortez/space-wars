@@ -25,6 +25,7 @@ def verify_files(manifest):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest',type=Path,required=True)
+    parser.add_argument('--previous-audit',type=Path)
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args()
     assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip(), 'freeze audit correction first'
@@ -44,6 +45,10 @@ def main():
         rejected_summary=dict(path=str(root/'summary.json'),sha256=F.E.digest(root/'summary.json')),
         tools={Path(m.__file__).name:F.E.digest(Path(m.__file__)) for m in [M,M.E,M.J,M.T,M.V,M.C,F,F.M,F.E,F.D]},
         runner_sha256=F.E.digest(Path(__file__)),plan=prior['plan'],regressions=prior['regressions'],runs={},comparisons={})
+    if args.previous_audit:
+        previous=json.loads(args.previous_audit.read_text())
+        assert not previous['complete'] and previous['input_manifest']==result['input_manifest']
+        result['previous_rejected_audit']=dict(path=str(args.previous_audit),sha256=F.E.digest(args.previous_audit))
     save=lambda:F.D.write(args.out/'summary.json',result)
     save()
     try:
