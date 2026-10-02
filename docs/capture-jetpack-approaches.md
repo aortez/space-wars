@@ -205,3 +205,9 @@ validate evidence delivery and expiry, and exercise actual mission transitions
 before evaluating armed opponents. Keep the walking control and record every
 unfinished or rejected request. Defaults and runtime policy behavior remain
 unchanged by this investigation.
+
+The subsequent [v13 mission integration](powered-mission-integration.md) now
+completes both directed blocked captures with native surveys. Its shared-budget
+trials expose a base-ground-survey delivery limit before any flight forecast,
+and its armed results keep powered capture opt-in. That study preserves real
+mission state and documents all 31 replays/trials.
