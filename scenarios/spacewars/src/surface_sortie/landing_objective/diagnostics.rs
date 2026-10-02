@@ -3,6 +3,8 @@ use super::*;
 
 mod topology;
 pub use topology::{LandingSiteTopology, LandingTopology, TopologyRoute};
+mod jetpack;
+pub use jetpack::{JetpackLandingDiagnostic, LandingModelMeasurement, LandingModelPair};
 
 impl SurfaceSortieState {
     /// Measure every site in the supplied current full observation, in batches

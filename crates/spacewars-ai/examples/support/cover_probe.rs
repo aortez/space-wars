@@ -10,17 +10,22 @@ pub struct CoverProbe {
     seat: usize,
     ticks: BTreeSet<u64>,
     topology: bool,
+    jetpack: bool,
     rows: Vec<Value>,
 }
 
 impl CoverProbe {
     pub fn from_args() -> Option<Self> {
+        let jetpack: bool = crate::arg("--probe-cover-jetpack", "false")
+            .parse()
+            .unwrap();
         let topology: bool = crate::arg("--probe-cover-topology", "false")
             .parse()
             .unwrap();
         let requested = crate::arg("--probe-cover-ticks", "none");
         if requested == "none" {
             assert!(!topology, "topology probe requires cover probe ticks");
+            assert!(!jetpack, "jetpack probe requires cover probe ticks");
             return None;
         }
         let values: Vec<u64> = requested
@@ -40,6 +45,7 @@ impl CoverProbe {
             seat,
             ticks,
             topology,
+            jetpack,
             rows: Vec::new(),
         })
     }
@@ -112,6 +118,19 @@ impl CoverProbe {
             row["topology_unknown"] = json!(topology.as_ref().err());
             row["topology_profile"] = json!(profile);
         }
+        if self.jetpack {
+            let clock = Instant::now();
+            let measure = || cloned.diagnose_jetpack_landing_routes(seat, p);
+            #[cfg(feature = "sensor-profile")]
+            let (jetpack, profile) =
+                scenario_spacewars::surface_sortie::sensor_profile::measure(measure);
+            #[cfg(not(feature = "sensor-profile"))]
+            let (jetpack, profile) = (measure(), None::<Value>);
+            row["jetpack_ms"] = json!(clock.elapsed().as_secs_f64() * 1000.0);
+            row["jetpack"] = json!(jetpack.as_ref().ok());
+            row["jetpack_unknown"] = json!(jetpack.as_ref().err());
+            row["jetpack_profile"] = json!(profile);
+        }
         self.rows.push(row);
     }
 
@@ -130,6 +149,12 @@ impl CoverProbe {
             result["topology_model"] = json!("native_landing_graph_v1");
             result["topology_scope"] = json!(
                 "Native outer-contour graph, proposed hull exclusions and path witnesses. Without-ship routes omit only the proposed observing ship and never enter gameplay. Extra diagnostic work is outside live quotas."
+            );
+        }
+        if self.jetpack {
+            result["jetpack_model"] = json!("existing_powered_landing_probe_v1");
+            result["jetpack_scope"] = json!(
+                "Native walk/jump versus existing jetpack round trips on the same observation, preserving the proposed hull. Independent native batches and single-site work/rejection records are diagnostic only. No control, equipment, model threshold or live-budget changes."
             );
         }
         std::fs::write(
