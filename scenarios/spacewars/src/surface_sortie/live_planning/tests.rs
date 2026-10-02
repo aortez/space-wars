@@ -4,6 +4,7 @@ use pilot::LandingSiteQuery;
 mod destinations;
 mod diagnostics;
 mod early_candidates;
+mod extended_corridors;
 mod flight_dependencies;
 mod focused;
 mod gravity_dependencies;

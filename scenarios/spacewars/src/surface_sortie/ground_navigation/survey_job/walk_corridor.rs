@@ -4,6 +4,9 @@ use super::*;
 use engine_rapier::world::QueryArea;
 
 const MAX_STEPS: u16 = 96;
+// At most one inspection per edge plus six start/transition operations. Two
+// longest corridors leave room within 120 dispatches of four graph operations.
+const EXTENDED_MAX_STEPS: u16 = 224;
 type HullCheck = Arc<dyn Fn(Vec2) -> bool + Send + Sync>;
 
 #[derive(Clone, Copy)]
@@ -20,7 +23,7 @@ enum Phase {
     Done,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct WalkCorridorResult {
     pub outbound: GroundRouteDiagnostics,
     pub returning: GroundRouteDiagnostics,
@@ -32,7 +35,8 @@ pub(crate) struct WalkCorridorResult {
 /// One real physics query, node inspection or constant-size transition per
 /// operation. Both directed walks use the ordinary nine capsule/three floor
 /// samples. Hull checks are separate, charged queries. No graph scan is hidden
-/// in a query operation. The five-node start window and 96-edge limit are fixed.
+/// in a query operation. The start window is five nodes. The opt-in longer
+/// pass commits each edge at its last support query, retaining every query.
 #[derive(Clone)]
 pub(crate) struct WalkCorridorJob {
     ground: GroundSurveyJob,
@@ -58,6 +62,8 @@ pub(crate) struct WalkCorridorJob {
     max_rise: f32,
     areas: Vec<QueryArea>,
     result: Option<WalkCorridorResult>,
+    streamed: bool,
+    max_steps: u16,
     #[cfg(test)]
     path: Vec<GroundNode>,
 }
@@ -70,6 +76,7 @@ impl GroundSurveyJob {
         range: f32,
         hatches: [Option<Vec2>; 2],
         hull: HullCheck,
+        extended: bool,
     ) -> Option<WalkCorridorJob> {
         let id = |point: Vec2| {
             ((-point.x).atan2(point.y).rem_euclid(std::f32::consts::TAU) * GROUND_SAMPLES as f32
@@ -81,7 +88,8 @@ impl GroundSurveyJob {
         let delta = signed_span(start_id, id(target));
         // Include the start-window displacement and two samples past the flag
         // bearing. Longer arcs remain the full survey's responsibility.
-        if delta.unsigned_abs() + 4 > u32::from(MAX_STEPS) {
+        let streamed = delta.unsigned_abs() + 4 > u32::from(MAX_STEPS);
+        if streamed && (!extended || delta.unsigned_abs() + 4 > u32::from(EXTENDED_MAX_STEPS)) {
             return None;
         }
         let mut ground = self.clone();
@@ -113,6 +121,12 @@ impl GroundSurveyJob {
             max_rise: 0.0,
             areas: Vec::new(),
             result: None,
+            streamed,
+            max_steps: if streamed {
+                EXTENDED_MAX_STEPS
+            } else {
+                MAX_STEPS
+            },
             #[cfg(test)]
             path: Vec::new(),
         })
@@ -128,6 +142,9 @@ fn signed_span(from: u16, to: u16) -> i32 {
 }
 
 impl WalkCorridorJob {
+    pub(crate) fn is_extended(&self) -> bool {
+        self.max_steps == EXTENDED_MAX_STEPS
+    }
     pub(crate) fn take_result(&mut self) -> Option<WalkCorridorResult> {
         assert!(matches!(self.phase, Phase::Done));
         self.result.take()
@@ -208,6 +225,15 @@ impl WalkCorridorJob {
             self.remaining -= 1;
             self.phase = Phase::Ray(offset(node.id, self.direction));
         }
+    }
+    fn advance(&mut self) {
+        if !self.take_footprint() {
+            self.phase = Phase::Done;
+            return;
+        }
+        let node = self.next.take().unwrap();
+        self.length += self.previous.unwrap().position.distance_to(node.position);
+        self.visit(node);
     }
 }
 
@@ -314,7 +340,7 @@ impl PlanningJob for WalkCorridorJob {
                 let delta = signed_span(first.id, target_id);
                 self.direction = delta.signum();
                 self.remaining = delta.unsigned_abs() as u16 + 2;
-                assert!(self.remaining <= MAX_STEPS);
+                assert!(self.remaining <= self.max_steps);
                 self.visit(first);
             }
             Phase::WalkCapsule(returning, sample) => {
@@ -348,21 +374,20 @@ impl PlanningJob for WalkCorridorJob {
                     Phase::Done
                 } else if sample < 3 {
                     Phase::Floor(returning, sample + 1)
+                } else if returning && self.streamed {
+                    // The final support query has certified this edge in both
+                    // directions. Commit its fixed-size result here, just as
+                    // the ordinary ground survey commits an edge after its
+                    // final query. No additional query or node scan occurs.
+                    self.advance();
+                    return;
                 } else if returning {
                     Phase::Advance
                 } else {
                     Phase::WalkCapsule(true, 0)
                 };
             }
-            Phase::Advance => {
-                if !self.take_footprint() {
-                    self.phase = Phase::Done;
-                    return;
-                }
-                let node = self.next.take().unwrap();
-                self.length += self.previous.unwrap().position.distance_to(node.position);
-                self.visit(node);
-            }
+            Phase::Advance => self.advance(),
             Phase::Done => {}
         }
     }

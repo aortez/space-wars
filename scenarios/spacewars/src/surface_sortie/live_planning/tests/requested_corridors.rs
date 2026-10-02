@@ -5,7 +5,7 @@ const WORK: Work = Work {
     physics_queries: 384,
 };
 
-fn smooth_state() -> SurfaceSortieState {
+pub(super) fn smooth_state() -> SurfaceSortieState {
     let mut state = SurfaceSortieScenario::init_capture_destination_trial(42, 0, false, 0.8);
     for _ in 0..179 {
         SurfaceSortieScenario::step(&mut state, &[], DT);
@@ -14,6 +14,15 @@ fn smooth_state() -> SurfaceSortieState {
 }
 
 fn long_target(state: &SurfaceSortieState, seat: usize) -> combat::TacticalSortieObservationV1 {
+    target_at_angle(state, seat, 0.65, false)
+}
+
+pub(super) fn target_at_angle(
+    state: &SurfaceSortieState,
+    seat: usize,
+    angle: f32,
+    extended: bool,
+) -> combat::TacticalSortieObservationV1 {
     let source = target(state, seat);
     let p = &source.combat.recovery.flight.pilot;
     let mut ground = state
@@ -28,13 +37,13 @@ fn long_target(state: &SurfaceSortieState, seat: usize) -> combat::TacticalSorti
         ground.step();
     }
     let map = ground.take_map();
-    // Use a real selected site and retained footing 0.65 radians away. This
+    // Use a real selected site and retained footing at the requested angle. This
     // sensor fixture changes only the target; mission trials use real flags.
     for site in &p.sites {
         for direction in [-1.0, 1.0] {
             let local = (site.hatch_position - p.planet.motion.position)
                 .rotate_radians(-p.planet.motion.angle);
-            let aim = local.rotate_radians(0.65 * direction);
+            let aim = local.rotate_radians(angle * direction);
             let node = *map
                 .nodes
                 .iter()
@@ -60,7 +69,7 @@ fn long_target(state: &SurfaceSortieState, seat: usize) -> combat::TacticalSorti
                 + (node.position
                     + node.position.normalized() * SurfaceSortieState::spec().half_height())
                 .rotate_radians(p.planet.motion.angle);
-            let mut job = make_job(state, seat, &o);
+            let mut job = make_job_mode(state, seat, &o, extended);
             while job.measurement_work().corridor_started > 0
                 && job.measurement_work().corridor_completed == 0
             {
@@ -79,8 +88,17 @@ fn make_job(
     seat: usize,
     o: &combat::TacticalSortieObservationV1,
 ) -> ObjectiveSurveyJob {
+    make_job_mode(state, seat, o, false)
+}
+
+pub(super) fn make_job_mode(
+    state: &SurfaceSortieState,
+    seat: usize,
+    o: &combat::TacticalSortieObservationV1,
+    extended: bool,
+) -> ObjectiveSurveyJob {
     let p = &o.combat.recovery.flight.pilot;
-    state
+    let job = state
         .objective_job(
             seat,
             p,
@@ -90,8 +108,12 @@ fn make_job(
             true,
         )
         .unwrap()
-        .with_focused_candidate(0)
-        .with_requested_corridor(p.site_query)
+        .with_focused_candidate(0);
+    if extended {
+        job.with_extended_corridor(p.site_query)
+    } else {
+        job.with_requested_corridor(p.site_query)
+    }
 }
 
 fn planner(work: Work) -> LiveObjectivePlanner {

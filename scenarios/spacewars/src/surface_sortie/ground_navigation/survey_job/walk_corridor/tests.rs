@@ -90,6 +90,7 @@ fn corridor_queries_are_charged_and_every_directed_step_exists_in_the_native_map
                     count.fetch_add(1, Ordering::Relaxed);
                     true
                 }),
+                false,
             )
             .unwrap();
         let work = run(&mut job, &calls);
@@ -149,6 +150,7 @@ fn obstructed_return_hull_or_missing_boarding_envelope_stays_unknown() {
                     let call = count.fetch_add(1, Ordering::Relaxed);
                     reject_call != 0 && call != reject_call
                 }),
+                false,
             )
             .unwrap();
         run(&mut job, &calls);
@@ -160,7 +162,14 @@ fn obstructed_return_hull_or_missing_boarding_envelope_stays_unknown() {
     let far = Vec2::Y.rotate_radians(200.0 * std::f32::consts::TAU / 512.0) * 60.0;
     assert!(
         ground
-            .walk_corridor(start.position, far, 0.4, [None; 2], Arc::new(|_| true))
+            .walk_corridor(
+                start.position,
+                far,
+                0.4,
+                [None; 2],
+                Arc::new(|_| true),
+                false
+            )
             .is_none()
     );
 }
@@ -196,8 +205,117 @@ fn a_gap_in_ordinary_stepped_terrain_is_not_reported_as_a_negative_route() {
                 count.fetch_add(1, Ordering::Relaxed);
                 true
             }),
+            false,
         )
         .unwrap();
     run(&mut job, &calls);
     assert!(job.output().unwrap().is_none());
+}
+
+#[test]
+fn extended_pass_retains_every_query_and_result_without_the_edge_handoff() {
+    let (_, ground, map) = fixture();
+    let from = (0..512u16)
+        .find(|from| {
+            (0..220).all(|i| {
+                let a = offset(*from, i);
+                let b = offset(a, 1);
+                [(a, b), (b, a)].into_iter().all(|(a, b)| {
+                    map.edges
+                        .iter()
+                        .any(|e| e.from == a && e.to == b && e.kind == GroundEdgeKind::Walk)
+                })
+            })
+        })
+        .expect("long native walking arc");
+    for (from, span) in [(from, 220), (offset(from, 220), -220)] {
+        let start = *map.nodes.iter().find(|n| n.id == from).unwrap();
+        let end = *map
+            .nodes
+            .iter()
+            .find(|n| n.id == offset(from, span))
+            .unwrap();
+        for blocked_call in [0, 19, 1000, u64::MAX] {
+            let mut runs = Vec::new();
+            for streamed in [false, true] {
+                let calls = Arc::new(AtomicU64::new(0));
+                let count = Arc::clone(&calls);
+                let mut job = ground
+                    .walk_corridor(
+                        start.position,
+                        WalkCorridorJob::center(end),
+                        0.4,
+                        [Some(WalkCorridorJob::center(start)), None],
+                        Arc::new(move |_| {
+                            let call = count.fetch_add(1, Ordering::Relaxed);
+                            blocked_call != 0 && call != blocked_call
+                        }),
+                        true,
+                    )
+                    .unwrap();
+                assert!(job.is_extended());
+                job.streamed = streamed;
+                let work = run(&mut job, &calls);
+                if blocked_call == u64::MAX {
+                    assert!(job.output().unwrap().is_some());
+                    assert_eq!(job.path.len(), 221);
+                    for pair in job.path.windows(2) {
+                        for (a, b) in [(pair[0], pair[1]), (pair[1], pair[0])] {
+                            assert!(map.edges.iter().any(|e| e.from == a.id
+                                && e.to == b.id
+                                && e.kind == GroundEdgeKind::Walk));
+                        }
+                    }
+                } else {
+                    assert!(job.output().unwrap().is_none());
+                }
+                runs.push((work, job.result, job.path));
+            }
+            assert_eq!(runs[0].1, runs[1].1);
+            assert_eq!(runs[0].2, runs[1].2);
+            assert_eq!(runs[0].0.physics_queries, runs[1].0.physics_queries);
+            assert_eq!(
+                runs[0].0.graph - runs[1].0.graph,
+                runs[0].2.len().saturating_sub(1) as u32
+            );
+            assert!(runs[1].0.graph <= 226);
+        }
+    }
+}
+
+#[test]
+fn shorter_corridors_keep_their_original_sequence_and_longest_bound_remains_explicit() {
+    let (_, ground, map) = fixture();
+    let start = *map.nodes.iter().find(|n| n.id == 0).unwrap();
+    for span in [64, 92, 221, 255] {
+        let end = Vec2::Y.rotate_radians(span as f32 * std::f32::consts::TAU / 512.0)
+            * start.position.length();
+        let mut runs = Vec::new();
+        for extended in [false, true] {
+            let calls = Arc::new(AtomicU64::new(0));
+            let count = Arc::clone(&calls);
+            let job = ground.walk_corridor(
+                start.position,
+                end,
+                0.4,
+                [Some(WalkCorridorJob::center(start)), None],
+                Arc::new(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                    true
+                }),
+                extended,
+            );
+            if span > 220 {
+                assert!(job.is_none());
+                continue;
+            }
+            let mut job = job.unwrap();
+            assert!(!job.is_extended());
+            let work = run(&mut job, &calls);
+            runs.push((work, job.result, job.path));
+        }
+        if !runs.is_empty() {
+            assert_eq!(runs[0], runs[1]);
+        }
+    }
 }

@@ -95,6 +95,12 @@ pub struct ObjectiveMeasurementWork {
     pub corridor_completed: u64,
     #[serde(skip_serializing_if = "is_zero")]
     pub corridor_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_successes: u64,
 }
 fn is_zero(value: &u64) -> bool {
     *value == 0
@@ -117,6 +123,9 @@ impl ObjectiveMeasurementWork {
         }
     }
     fn add_since(&mut self, new: &Self, old: &Self) {
+        self.extended_started += new.extended_started - old.extended_started;
+        self.extended_completed += new.extended_completed - old.extended_completed;
+        self.extended_successes += new.extended_successes - old.extended_successes;
         self.corridor_started += new.corridor_started - old.corridor_started;
         self.corridor_completed += new.corridor_completed - old.corridor_completed;
         self.corridor_successes += new.corridor_successes - old.corridor_successes;
@@ -257,6 +266,7 @@ pub struct LiveObjectivePlanner {
     early_candidates: Option<EarlyCandidates>,
     focused_candidates: bool,
     requested_corridors: bool,
+    extended_corridors: bool,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -278,6 +288,7 @@ impl LiveObjectivePlanner {
             early_candidates: None,
             focused_candidates: false,
             requested_corridors: false,
+            extended_corridors: false,
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -347,6 +358,19 @@ impl LiveObjectivePlanner {
     }
     pub fn uses_requested_corridors(&self) -> bool {
         self.requested_corridors
+    }
+    /// Extend selected/actual walking corridors without changing the original
+    /// short-route dispatch sequence or any query and validation thresholds.
+    pub fn with_extended_corridors(mut self) -> Self {
+        assert!(
+            self.uses_requested_corridors(),
+            "extended corridors require requested corridors"
+        );
+        self.extended_corridors = true;
+        self
+    }
+    pub fn uses_extended_corridors(&self) -> bool {
+        self.extended_corridors
     }
     pub fn allowance(&self) -> Work {
         self.allowance
@@ -1075,7 +1099,9 @@ impl LiveObjectivePlanner {
             } else {
                 job
             };
-            let job = if self.requested_corridors {
+            let job = if self.extended_corridors {
+                job.with_extended_corridor(p.site_query)
+            } else if self.requested_corridors {
                 job.with_requested_corridor(p.site_query)
             } else {
                 job

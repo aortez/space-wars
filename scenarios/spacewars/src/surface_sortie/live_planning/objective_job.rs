@@ -277,7 +277,13 @@ impl ObjectiveSurveyJob {
     }
     /// Extend the opt-in short patch only for an explicitly requested site or
     /// the actual hatch. Keep the full job, snapshot and source clock unchanged.
-    pub(super) fn with_requested_corridor(mut self, query: LandingSiteQuery) -> Self {
+    pub(super) fn with_requested_corridor(self, query: LandingSiteQuery) -> Self {
+        self.requested_corridor(query, false)
+    }
+    pub(super) fn with_extended_corridor(self, query: LandingSiteQuery) -> Self {
+        self.requested_corridor(query, true)
+    }
+    fn requested_corridor(mut self, query: LandingSiteQuery, extended: bool) -> Self {
         assert!(self.local_dependencies && self.corridor.is_none());
         if self.focused.is_some() {
             return self;
@@ -314,8 +320,10 @@ impl ObjectiveSurveyJob {
             self.result.objective.range,
             c.boarding_hatches,
             hull,
+            extended,
         ) {
             self.measurement_work.corridor_started = 1;
+            self.measurement_work.extended_started = u64::from(job.is_extended());
             self.corridor = Some((c, Box::new(job)));
         }
         self
@@ -506,6 +514,8 @@ impl PlanningJob for ObjectiveSurveyJob {
             } else {
                 let (candidate, mut corridor) = self.corridor.take().unwrap();
                 self.measurement_work.corridor_completed += 1;
+                let extended = u64::from(corridor.is_extended());
+                self.measurement_work.extended_completed += extended;
                 if let Some(WalkCorridorResult {
                     outbound,
                     returning,
@@ -515,6 +525,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                 }) = corridor.take_result()
                 {
                     self.measurement_work.corridor_successes += 1;
+                    self.measurement_work.extended_successes += extended;
                     self.corridor_rise = Some((candidate.site, max_rise));
                     areas.extend(self.entrance_dependencies(candidate));
                     self.dependencies.push((candidate.site, areas));
