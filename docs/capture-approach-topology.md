@@ -77,3 +77,94 @@ extractor also labeled later ordinary selected-site refreshes as probes after
 the successful control's search had finished. `v3` excludes post-finish rows;
 both prior outputs remain preserved. The same seven-clock plan and binary are
 unchanged. Tests cover omitted metadata and retained finished search records.
+
+## Results
+
+**The proposed parked ship disconnects the sheltered approach.** All six
+failure snapshots, including the return after the neutral capture, give the
+same result. The base ground graph has one strongly connected component of
+503 footings and 1,004 directed edges. Its other nine sampled bearings
+(380–388) fail capsule clearance, alongside the opponent's parked ship. There
+are no missing-floor or steep-floor rejections in these base measurements.
+
+| Observation | Sites | Covered sites | Native covered round trips | Covered round trips without proposed hull |
+| --- | ---: | ---: | ---: | ---: |
+| Each failed-approach snapshot, six clocks | 59 | 37 | 0 | 37 |
+| Successful +0.8 control, tick 3,510 | 59 | 37 | 37 | 37 |
+
+All 59 observed sites have a modeled round trip on the base graph. Adding the
+proposed parked hull removes access at 54 sites in each failure snapshot;
+all 37 sheltered sites then report disconnected outbound routes. Only exposed
+sites 41–45 retain complete trips. In the successful control, 53 sites retain
+complete trips with the hull present, including all 37 sheltered sites.
+
+![Measured ground reachable from the same sheltered landing in the failed and successful cases](data/capture-approach-topology-v1.svg)
+
+For sheltered site 0, the parked hull removes nine more footings and 20 edges,
+splitting the graph into components of 119 and 375 footings. The exit's start
+node is 501. The failed target's chosen footing without the hull is node 316,
+in the other component. The control's flag footing is node 452, in the exit's
+component. Its native route reaches the flag and a boarding entrance without
+crossing the hull. The diagram uses actual measured positions; its ship
+markers illustrate location, not collision shape.
+
+Thus repeating the same eight probes is real, but rotating them or measuring
+all remaining sites would not provide a sheltered **walk/jump** route at these
+observations. Both cover-response searches request sites 0–7, measure eight
+disconnected routes and leave 25 candidates unmeasured. The offline full-site
+probe resolves those omissions for diagnosis only. The successful control
+selects a covered route from its ordinary shortlist without extra probes.
+
+### Verification and retained evidence
+
+The complete run is `target/capture-topology/v3`, using frozen diagnostic
+implementation `b925912` and corrected auditor `28ffaa9`. The preserved binary
+`target/capture-topology/surface_mission_soak-b925912` has SHA-256
+`a8b2c4c9ea4ceb4e9c7cd004d4e0c1f58f4296b4ebbf7b79df72ef8b66518456`.
+The final summary hash is
+`46a1384a7cbf2ad954c935ff505be0c76b0ded62555a4d8dd590d4ad8e1a6918`.
+
+The [manifest](data/capture-approach-topology-v1.json) records counts, provenance,
+checks and the decision. The linked [compressed inputs](data/capture-approach-topology-v1.json.gz)
+preserve the exact final summary and diagnostic JSON documents, plus the two
+prior audit summaries. Native trace and work files remain under the recorded
+local run paths, with hashes and replay commands retained in the summary.
+
+All three physical/mission/progress reports and all 18 native controller/planner
+streams match their source runs. Sensor parity covers 32,400 player observations.
+The unchanged planner audits 32,400 ticks, with maxima of three graph operations
+and 97 physics queries under the original 4/384 dispatch allowances. Every
+diagnostic observation and mission record matches its exact trace row.
+All 413 per-site topology routes match the separate native sensor measurements
+in 56 bounded batches. Graph edges, path lengths and joint endpoints also pass.
+
+Five scenario objective tests, 39 harness tests and 623 Python tests pass
+(667 total). Formatting, strict AI Clippy with `--no-deps`, and profiled/normal
+release builds pass. Scenario Clippy reports the same seven findings in
+unchanged files, with none in the added diagnostic. The maximum added topology
+measurement is 19.255 ms on this host; exhaustive route batches reach 41.099 ms.
+These are additional offline measurements outside live quotas, not Pi budgets.
+
+### Next intervention
+
+Test the existing [prospective jetpack crossing](bot-jetpack-landing.md) against
+these exact observations before changing the newer mission policy. That model
+can propose one measured crossing of the bot's own parked ship, which directly
+addresses the disconnected components. `material_mission_v11` already uses
+`JetpackRoundTrip`; v12 and v13 explicitly use `JointRoundTrip`, so their landing
+forecast cannot currently admit this powered alternative. Two-sided boarding
+does not change the initial exit footing.
+
+The counterfactual without a hull is not proof that a jetpack route will pass
+fuel, geometry, moving-frame and launch-window checks, or physically complete
+the capture. Measure that next, then validate any policy integration with its
+original work allowance, fresh on-foot evidence, actual claims/boarding and
+armed opponents. Keep the successful walkable control and failed forecasts.
+Do not reinterpret removing the hull in the diagnostic as permission to walk
+through it, remove objects or change equipment.
+
+These three source runs use `--mode quiet`: the harness suppresses weapon fire
+while the controller retains its exposure checks. They isolate landing and
+route selection; they do not establish whether armed combat can clear the
+blockage. No default, gameplay policy, sensor demand or retry limit changes in
+this investigation.

@@ -199,3 +199,6 @@ reset behavior and forecast invalidation.
 The next useful work is the remaining enemy approach. This preference can
 protect another objective from an unnecessary return, but once every other
 planet is secured, the controller still needs to complete that blocked approach.
+The completed [route-topology investigation](capture-approach-topology.md) traces
+that failure to the proposed parked hull disconnecting sheltered walk/jump
+routes, and identifies the existing jetpack crossing as the next model to test.
