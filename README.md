@@ -427,6 +427,10 @@ xvfb-run -a cargo test --profile ci -p engine-client --test ui_control_functiona
 The dedicated CI step runs these tests under the software renderer. See
 [Functional UI tests](docs/functional-tests.md) for local display options,
 current workflow coverage, and failure artifacts.
+To check an already-running cabinet, use `spacewars-cli functional settings
+--settings-file /var/lib/spacewars/settings.toml --artifacts /tmp/device-check-01`.
+The shared `settings` and `clock-pause` workflows retain reports/screenshots and
+verify session/settings preservation; see [device workflow usage and limits](docs/functional-tests.md#run-against-the-current-app-or-a-picade).
 The [CI performance guide](docs/ci-performance.md) covers the optimized test
 profile, matching headless/UI commands, caching, and per-test timing reports.
 

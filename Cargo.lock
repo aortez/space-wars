@@ -5153,8 +5153,12 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "engine-common",
+ "png 0.17.16",
+ "serde",
  "serde_json",
+ "sha2",
  "spacewars-control",
+ "tempfile",
 ]
 
 [[package]]

@@ -1,6 +1,7 @@
 #[cfg(test)]
 use std::path::Path;
 mod clock;
+mod functional;
 mod input;
 mod logs;
 use std::path::PathBuf;
@@ -30,6 +31,10 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Run a bounded workflow against the current app and retain a JSON report.
+    Functional(functional::Options),
+    #[command(hide = true)]
+    FunctionalWorker(functional::WorkerOptions),
     /// Simulate bounded, named controller input through the running app.
     Input {
         #[command(subcommand)]
@@ -297,6 +302,10 @@ fn run() -> Result<(), CliError> {
     let client = ControlClient::new(socket);
 
     match args.command {
+        Command::Functional(options) => functional::run(&client, options).map_err(human_error),
+        Command::FunctionalWorker(options) => {
+            functional::worker(&client, options).map_err(human_error)
+        }
         Command::Input { command } => input::run(&client, command),
         Command::Logs(options) => logs::run(&options).map_err(human_error),
         Command::Clock { command } => clock::run(&client, command),

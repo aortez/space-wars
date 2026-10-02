@@ -1,12 +1,30 @@
 # Functional UI tests
 
-Normal PR CI runs 38 of these full-application workflows using nextest's `ui-pr`
-profile. Only four long-running scenarios (two full matches, automatic Clock demo,
-rain, and duck traversal) are deferred. The separate **UI functional tests**
-workflow runs all 42 nightly/on demand using the `ui` profile. Normal CI also
+Normal PR CI runs 46 of these full-application workflows using nextest's `ui-pr`
+profile. Only four long-running workflows (the two-match Spacewars case, automatic
+Clock demo, rain, and duck traversal) are deferred. The separate **UI functional tests**
+workflow runs all 50 nightly/on demand using the `ui` profile. Normal CI also
 compiles every test and runs the display-free unit, simulation, rendering and
 control-protocol tests. See the [selection rationale and guard](ci-performance.md#deferred-ui-scenarios)
 and [manual dispatch instructions](ci-performance.md#running-the-full-ui-suite-on-github).
+
+The inventory including the first attached-device workflows is:
+
+| Area | Workflows | Main coverage |
+|---|---:|---|
+| Launcher and basic lifecycle | 3 | Navigation, controls, Clock and classic Spacewars lifecycle |
+| Shared settings and diagnostics | 5 | Sound, controllers, network, Device Info and FPS display |
+| Clock | 13 | Events, previews, cleanup, fonts/messages and persistence |
+| Autostart | 2 | Idle scheduling, interruption, repeated matches and saved preferences |
+| Spacewars matches and HUD | 5 | Player/bot choices, results, scoreboard, rematches and rendering |
+| Labs, terrain and expeditions | 20 | Lifecycle/rendering across presets, including two-player setups |
+| Attached-device workflows | 2 | Shared live-session checks, automatic/paused sessions and failed-check cleanup |
+
+Several workflows apply the same lifecycle to different scenario presets. These
+50 display-dependent tests share their test binary with three display-free HUD
+region tests, which run in the ordinary workspace suite. The CI selection guard
+reports the discovered counts and ensures new workflows join the PR set unless
+explicitly deferred; the documentation's inventory is a checkpoint, not a filter.
 
 The `autostart_` workflows exercise persistent launcher-idle Clock and bot
 activities, settings suspension, input reset, client restart, Off, pause/resume,
@@ -32,6 +50,16 @@ Each test owns:
 - the Winit software renderer;
 - readiness and transition polling with explicit deadlines; and
 - a child guard that always terminates and reaps the process.
+
+Fresh-process readiness allows up to 30 seconds, polling immediately and returning
+as soon as the app answers. The first femtovg launcher in
+[PR #151's Linux CI run](https://github.com/aortez/space-wars/actions/runs/36953178886/job/110670352447)
+answered during failure capture at 10.56 seconds, just after the former 10-second
+limit. Readiness attempts and the selected Slint backend are recorded in command
+history; an exited process or non-retryable protocol error still fails immediately.
+Individual readiness requests remain bounded to 250 ms, and normal UI transitions
+retain their separate 10-second deadline. This startup allowance does not change
+the attached-device runner's budgets.
 
 The initial workflows verify:
 
@@ -216,6 +244,115 @@ non-overlap, eligible-repeat avoidance, and deterministic mixed-event replay.
 
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
+
+## Run against the current app or a Picade
+
+`spacewars-cli functional` attaches to an existing app through its public control
+socket. The two workflows live in `spacewars-control::workflows` and run unchanged
+in the desktop functional suite and on a device:
+
+| Workflow | Preconditions | Checks |
+|---|---|---|
+| `settings` | Launcher, gameplay, or main pause menu; no benchmark | App Settings, completed Device Info sample, saved-network inventory, return to the original screen/pause state |
+| `clock-pause` | Clock already running or at its main pause menu | Device identity, frozen simulation while paused, unchanged Clock preferences, advancing simulation after resume |
+
+An already-paused Clock stays paused throughout `clock-pause`. An automatic session
+remains automatic. Settings checks during gameplay temporarily pause the existing
+instance, then resume it. Neither workflow starts/restarts a scenario or changes a
+saved preference. Saved-network inspection also works with no NetworkManager;
+its captured status distinguishes that case from a device with available profiles.
+
+Use a new artifact-directory name for each run, supply the actual settings file
+used by that app, and leave cabinet controls idle while the workflow operates:
+
+```sh
+ssh spacewars@sw-picade.local 'spacewars-cli functional settings \
+  --settings-file /var/lib/spacewars/settings.toml \
+  --artifacts /tmp/spacewars-settings-01 --timeout 60s'
+
+# With Clock already active:
+ssh spacewars@sw-picade.local 'spacewars-cli functional clock-pause \
+  --settings-file /var/lib/spacewars/settings.toml \
+  --artifacts /tmp/spacewars-clock-01'
+
+scp -r spacewars@sw-picade.local:/tmp/spacewars-settings-01 ./
+```
+
+For a desktop client, use the same command locally with `--socket PATH` before
+`functional`, and point `--settings-file` at its existing `settings.toml`.
+The runner verifies the file by SHA-256 and never rewrites it. It rejects reused
+artifact directories. Files are collected inside a mode-0700 directory and may
+include network names in UI snapshots/screenshots; credentials are not queried.
+
+The supervisor enforces a whole-workflow deadline in a child process (default
+60 seconds, configurable from 100 ms to 300 seconds). Menu cleanup has its own
+10-second supervised budget; optional kiosk-log collection allows another three
+seconds. Requests also have deadlines. A hung request therefore cannot bypass
+the outer watchdog. Cleanup checks the original socket identity, selected/active
+scenario and scenario revision before acting. If the app/session changes, it
+refuses to control the replacement. An unexpected preference change is reported
+without overwriting the file. Selection focus and launcher idle-countdown timing
+can change during navigation; simulation instances, pause state, saved preferences
+and automatic/manual session identity are checked.
+
+`summary.json` (schema version 1) is also printed to stdout. It records the test
+result separately from cleanup, initial/final state, settings/session preservation,
+and the app version and hostname sampled through Device Info. A failed test always
+exits nonzero even when cleanup succeeds. Other artifacts include:
+
+- `command-history.jsonl`, with phase, elapsed time and observed UI states;
+- `baseline.json` (session anchor and settings digest), `last-state.json`, and
+  before/after runtime status;
+- named JSON/PNG checkpoints, plus a best-effort failure capture before cleanup;
+- separate worker logs and, when the installed restricted helper is available,
+  the latest 120 kiosk journal entries.
+
+Preflight failures may have no baseline or device identity. Optional diagnostics
+remain explicitly unavailable/failed when they cannot be collected. PNG checkpoints
+must decode to nonempty, opaque, multicolor RGBA frames. No pixel timing/FPS threshold
+is part of these workflows.
+
+### Device validation checkpoint — 2026-10-01
+
+The matching app/CLI pair from `e9d66ed6a2e2` was built with the device's Yocto
+runtime configuration and installed on `sw-picade.local` using the checked fast
+update. On this Raspberry Pi 4, the packaged runner passed:
+
+| Workflow | Starting state | Result |
+|---|---|---|
+| `settings` | Automatic Spacewars gameplay | Same match resumed; automatic identity retained |
+| `settings` | Launcher | Returned to launcher |
+| `settings` | Paused Clock | Remained paused |
+| `clock-pause` | Running Clock | Simulation froze while paused and advanced after resume |
+| `clock-pause` | Paused Clock | Remained paused; simulation tick stayed unchanged across both paused workflows |
+
+All five runs verified unchanged saved settings and session identity, captured
+valid PNG checkpoints and kiosk logs, and completed successful menu cleanup.
+Invoking `clock-pause` during Spacewars produced the expected nonzero result,
+preserved the match, and reported cleanup success separately from the failure.
+Device Info and resumed Clock screenshots were also inspected visually.
+
+Changing scenarios to prepare the Clock checks was a separate, intentional test
+setup step. Restoring the saved launch choice required manually starting Spacewars
+once: launcher selection and automatic launch do not save that preference. After
+the checks, the cabinet's original settings file was byte-identical, automatic
+Spacewars was running again, and the kiosk PID was unchanged throughout testing.
+These checks did not test service recovery or physical input.
+
+### Remaining #31 boundaries
+
+This is the first packaged device slice. The other desktop workflows still own a
+fresh process and disposable settings. Cases that reset controllers or deliberately
+break a settings destination cannot be attached to a real cabinet unchanged.
+Launch/restart/return-to-launcher coverage needs an explicit session-ownership
+contract: selecting the previous scenario cannot restore a replaced match.
+
+Service recovery is still separate. These workflows clean up menus but never
+restart the kiosk service, which is recorded as `service_recovery: not-attempted`.
+The image exposes restricted log/update helpers and `Restart=on-failure`; a narrow
+service-recovery helper and its hardware tests remain future work. The existing
+desktop harness also still needs a whole-case watchdog. Physical inputs, network
+switching and A/B persistence retain their separate validation requirements.
 
 Each successful screenshot is decoded as an eight-bit RGBA PNG and checked for
 nonzero dimensions, fully opaque pixels, and more than one RGB color. Checking
