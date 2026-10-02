@@ -253,3 +253,8 @@ measurement or default change is claimed. Binary SHA-256:
 `9fd02615d61b6554722783429254a3a82872a02280395519a4f5e98a4ac95207`.
 Final audit summary SHA-256:
 `e537ffbb45058d71c3711f4e31378eb7d2bcf6f59fa97bee78a4c8d71e4a2200`.
+
+The subsequent [focused-route experiment](focused-landing-routes.md) delivers
+nearby walking routes under the same allowance and enables additional captures.
+Cover-search routes and powered forecasts remain limited, and armed results
+keep the new planner mode opt-in.

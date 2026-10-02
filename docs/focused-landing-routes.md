@@ -1,5 +1,9 @@
 # Focused landing routes within the shared allowance
 
+The opt-in focused pass delivers walking routes within the existing allowance
+and enables additional physical captures. Sheltered directed approaches still
+time out, and v13 loses all eight armed trials. Keep this mode experimental.
+
 The [powered mission study](powered-mission-integration.md) found that a full
 ground survey cannot finish within 120 ticks at four graph steps per dispatch.
 This experiment measures a small walking corridor before the full survey.
@@ -80,3 +84,96 @@ python3 tools/validate-focused-routes.py \
   --binary target/focused-routes/surface_mission_soak-COMMIT \
   --out target/focused-routes/v1
 ```
+
+## Delivery and physical results
+
+The frozen `aeb1174` binary completes all 20 runs, and the original audit passes
+without correction. All six disabled replays match their earlier physical and
+mission fields, 42 controller/evidence streams, 64,800 ordinary sensor rows and
+shared allocations. The earlier corpus remains unchanged.
+
+Every directed run now receives positive route evidence. Walking and powered
+arms have the same directed outcomes:
+
+| Case | Age at first delivery per request | Requests delivering routes | Old completed sorties | Focused completed sorties |
+| --- | ---: | ---: | ---: | ---: |
+| Blocked, cover on | 39 ticks | 9 | 0 | 1 |
+| Blocked, cover off | 39 ticks | 23 | 0 | 1 |
+| Walkable control, cover on | 50–56 ticks | 9 | 0 | 1 |
+
+Counts are per run. Each completed directed sortie captures the neutral
+planet, boards the original ship and departs. The enemy-directed visits do not
+earn a claim or departure. With cover enabled they fail at the cover-route
+evidence deadline; the cover-off case exhausts its approach budget and retains
+another unfinished visit at the horizon.
+
+Across the 14 new runs, 1,210 focused attempts start, 601 finish and 593 produce
+positive walking measurements. The eight completed patches without a usable
+route remain unknown; no negative patch result is published. There are 35,461
+deliveries, including repeated validation of the same measurement. First
+delivery ages in armed runs range from 32 to 113 ticks; no published evidence
+exceeds 120 ticks. The complete fallback survey still finishes zero candidates,
+and no flight forecast or jetpack launch occurs.
+
+## Armed results
+
+Both active planners use focused routes in these eight matches. Counts and
+outcomes below are for the v13 seat, so this compares games where both bots
+gain route delivery. All physical claims in this table also complete boarding
+and departure.
+
+| World | v13 seat | Capture model | Old sorties | Focused sorties | Old result | Focused result |
+| --- | --- | --- | ---: | ---: | --- | --- |
+| 0 | P1 | Walking | 1 | 4 | Loss | Loss |
+| 0 | P1 | Powered | 1 | 4 | Loss | Loss |
+| 0 | P2 | Walking | 2 | 4 | Win | Loss |
+| 0 | P2 | Powered | 2 | 5 | Win | Loss |
+| 1 | P1 | Walking | 1 | 1 | Loss | Loss |
+| 1 | P1 | Powered | 1 | 1 | Loss | Loss |
+| 1 | P2 | Walking | 1 | 3 | Win | Loss |
+| 1 | P2 | Powered | 1 | 3 | Win | Loss |
+
+Six of eight runs earn more completed sorties, including enemy captures. For
+example, world-0 P1 captures enemy-held planets 0 and 1 and departs at ticks
+10,224 and 18,421. Nevertheless, the original four v13 wins become losses.
+The two generated worlds and seat swaps are a small correlated sample, and the
+powered controller also retains its existing walking behavior differences.
+These results support timely route delivery, not a default change or a claim
+of stronger combat performance.
+
+## Remaining cover-search limit
+
+The walkable directed control provides a concrete next case. At tick 3,230,
+the planner delivers and the capture controller selects site 58, using a
+50-tick-old positive route. Its current cover list is empty and the controller
+enters `seek_cover`. At tick 3,565 it starts requiring cover-route evidence.
+By tick 4,165, cover search has one probe, zero measured sites and sites 0–7
+still pending; it reaches its evidence deadline. The mission abandons the visit
+at 4,166. The archive retains these four observation/controller rows.
+
+Thus a timely nearby walking route does not supply the different routes needed
+by cover search. This pass is limited to a short arc near the flag; longer
+approaches still enter the full survey. The next experiment should measure the
+requested cover-site corridors within the same allowance and preserve their
+original age, then check the resulting landing/capture handoff. Powered
+crossings still require a separate delivery solution. No timing or geometric
+acceptance threshold changed in this study.
+
+## Evidence and checks
+
+The [result manifest](data/focused-landing-routes-v1.json) records each original
+comparison, physical visit outcome, combat counter, delivery age and charged
+work. Its [compressed evidence](data/focused-landing-routes-v1.json.gz) includes
+the exact current/prior summaries, raw file manifest, physical milestones,
+route-delivery witnesses and the failed cover-search handoff. Full per-tick
+streams remain at the hashed local paths.
+
+All 450,376 new pilot observation rows and 257,588 new dispatch ticks pass the
+auditor. Combined work never exceeds 4 graph / 384 queries per tick. Validation
+passes 976 Rust tests, 646 Python tests, strict AI library/harness Clippy,
+formatting, and profiled/ordinary release builds. Scenario Clippy retains seven
+pre-existing findings in unchanged files. No Pi performance claim is made.
+
+The preserved binary is
+`target/focused-routes/surface_mission_soak-aeb1174`, SHA-256
+`cd085dace65e9ab6163f42edd2e5e5c320f30179edc1e884c5aa00dc42d73298`.
