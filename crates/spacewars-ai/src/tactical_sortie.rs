@@ -29,7 +29,7 @@ mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
 pub use cover_response::{
-    COVER_RESPONSE_PROFILE, COVER_SEARCH_TICKS, CoverResponse, MAX_COVER_PROBES,
+    COVER_RESPONSE_PROFILE, COVER_SEARCH_TICKS, CoverResponse, CoverSearch, MAX_COVER_PROBES,
 };
 pub use cover_retry::{COVER_RETRY_PROFILE, COVER_RETRY_TICKS, CoverRetryCooldown};
 #[cfg(test)]

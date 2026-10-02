@@ -140,6 +140,8 @@ impl TransferComparisonJob {
             || before.breaks != actual.breaks
             || before.bounded_acquisition != actual.bounded_acquisition
             || before.cover_response != actual.cover_response
+            || before.telemetry.destination_retry.is_some()
+                != actual.telemetry.destination_retry.is_some()
             || config(before) != config(actual)
             || before.previous_tick.is_some_and(|tick| tick >= p.tick)
             || actual.previous_tick != Some(p.tick)

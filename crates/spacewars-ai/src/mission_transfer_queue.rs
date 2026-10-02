@@ -66,6 +66,7 @@ struct Source {
     breaks: CombatBreakSettings,
     bounded_acquisition: bool,
     cover_response: bool,
+    destination_failures: Option<Vec<DestinationFailure>>,
     disengagement: Option<(bool, bool, bool)>,
     selected_tick: u64,
     destination_switched: bool,
@@ -108,6 +109,11 @@ impl Source {
             breaks: bot.breaks,
             bounded_acquisition: bot.bounded_acquisition,
             cover_response: bot.cover_response,
+            destination_failures: bot
+                .telemetry
+                .destination_retry
+                .as_ref()
+                .map(|r| r.failures.clone()),
             disengagement: Self::disengagement_config(bot),
             selected_tick: bot.selected_tick,
             destination_switched: bot.destination_switched,
@@ -148,6 +154,15 @@ impl Source {
             || Self::disengagement_config(bot) != self.disengagement
         {
             return Err("controller configuration changed");
+        }
+        if bot
+            .telemetry
+            .destination_retry
+            .as_ref()
+            .map(|r| &r.failures)
+            != self.destination_failures.as_ref()
+        {
+            return Err("destination failure context changed");
         }
         if p.tick < self.environment.tick {
             return Err("clock regressed");
@@ -930,6 +945,7 @@ mod tests {
             |b, _| b.breaks.interval_seconds += 1,
             |b, _| b.bounded_acquisition = !b.bounded_acquisition,
             |b, _| b.cover_response = !b.cover_response,
+            |b, _| b.enable_destination_retry(true),
             |b, _| b.enable_pursuit_disengagement(true),
             |b, _| b.selected_tick += 1,
             |b, _| b.telemetry.target = None,

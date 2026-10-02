@@ -104,6 +104,12 @@ impl MissionBot {
         self.0.cover_response = enabled;
         self
     }
+    /// Opt-in capture-failure context for initial and switched destinations.
+    pub fn with_destination_retry(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.enable_destination_retry(enabled);
+        self
+    }
     /// Opt-in v13 capture retry experiment; policy defaults leave it disabled.
     pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

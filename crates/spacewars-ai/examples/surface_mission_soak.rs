@@ -283,6 +283,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--cover-response-seats must be none, 0, 1 or both"),
     };
+    let destination_retry_seats = match arg("--destination-retry-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--destination-retry-seats must be none, 0, 1 or both"),
+    };
     let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -359,6 +366,7 @@ fn main() {
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
+        .with_destination_retry(destination_retry_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
@@ -989,6 +997,19 @@ fn main() {
             "enabled_seats": cover_response_seats,
             "deadline_ticks": spacewars_ai::tactical_sortie::COVER_SEARCH_TICKS,
             "max_probes": spacewars_ai::tactical_sortie::MAX_COVER_PROBES,
+        });
+    }
+    for (seat, enabled) in destination_retry_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["destination_retry_model"] =
+                json!(spacewars_ai::mission_pilot::DESTINATION_RETRY_PROFILE);
+        }
+    }
+    if destination_retry_seats.contains(&true) {
+        report["destination_retry"] = json!({
+            "profile": spacewars_ai::mission_pilot::DESTINATION_RETRY_PROFILE,
+            "enabled_seats": destination_retry_seats,
+            "scope": "Prefer destinations without unchanged capture failure; if all eligible targets failed, retry incomplete evidence before observed constraints, oldest first. Native cooldowns and attempt limits remain unchanged.",
         });
     }
     if let Some(progress) = progress {

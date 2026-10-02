@@ -23,6 +23,14 @@ use serde::Serialize;
 mod destination;
 pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, DestinationSwitch};
 
+#[path = "mission_destination_retry.rs"]
+mod destination_retry;
+pub use destination_retry::{
+    DESTINATION_RETRY_PROFILE, DestinationFailure, DestinationFailureContext,
+    DestinationFailureKind, DestinationRetryAdmission, DestinationRetryDecision,
+    DestinationRetryTelemetry, DestinationSelectionPath,
+};
+
 #[path = "mission_transfer_forecast.rs"]
 mod transfer_forecast;
 pub use transfer_forecast::{
@@ -136,6 +144,8 @@ pub struct MissionTelemetry {
     pub disengagement: Option<MissionDisengagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_planning: Option<DestinationPlanningTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_retry: Option<DestinationRetryTelemetry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -226,6 +236,7 @@ impl MaterialMissionPilot {
                 destination_planning: policy
                     .selects_destination()
                     .then(DestinationPlanningTelemetry::default),
+                destination_retry: None,
             },
             capture: None,
             recovery: None,
@@ -255,6 +266,7 @@ impl MaterialMissionPilot {
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
         let cover_response = self.cover_response;
+        let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
             .telemetry
@@ -265,6 +277,7 @@ impl MaterialMissionPilot {
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
+        self.enable_destination_retry(destination_retry);
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
             self.configure_handoff_probe(probe);
@@ -525,6 +538,7 @@ impl MaterialMissionPilot {
             }
             return self.previous_intent;
         }
+        self.refresh_destination_failures(o);
         if self.last_frame.is_some_and(|index| index != p.planet.index) {
             self.telemetry.frame_changes += 1;
         }
@@ -699,21 +713,50 @@ impl MaterialMissionPilot {
                             .any(|(index, _)| *index == planet.index)
                 })
                 .collect();
-            let other = candidates
-                .iter()
-                .any(|planet| planet.index != p.planet.index);
-            let selected = candidates
-                .into_iter()
-                .filter(|planet| !other || planet.index != p.planet.index)
-                .min_by(|a, b| {
-                    a.motion
-                        .position
-                        .distance_to(p.ship.position)
-                        .total_cmp(&b.motion.position.distance_to(p.ship.position))
-                });
+            let nearest = |candidates: &[&PilotPlanetObservation]| {
+                let other = candidates
+                    .iter()
+                    .any(|planet| planet.index != p.planet.index);
+                candidates
+                    .iter()
+                    .copied()
+                    .filter(|planet| !other || planet.index != p.planet.index)
+                    .min_by(|a, b| {
+                        a.motion
+                            .position
+                            .distance_to(p.ship.position)
+                            .total_cmp(&b.motion.position.distance_to(p.ship.position))
+                    })
+                    .map(|planet| planet.index)
+            };
+            let original = nearest(&candidates);
+            let selected = if self.telemetry.destination_retry.is_some() {
+                let admitted: Vec<_> = candidates
+                    .into_iter()
+                    .filter(|planet| self.destination_retry_admitted(o, planet.index))
+                    .collect();
+                nearest(&admitted)
+            } else {
+                original
+            };
+            if original != selected
+                && let Some(rejected) = original
+            {
+                self.record_destination_retry_rejection(
+                    o,
+                    DestinationSelectionPath::Initial,
+                    rejected,
+                    selected,
+                );
+            }
             if let Some(planet) = selected {
+                self.record_destination_retry_admission(
+                    o,
+                    DestinationSelectionPath::Initial,
+                    planet,
+                );
                 self.destination_switched = false;
-                self.telemetry.target = Some(planet.index);
+                self.telemetry.target = Some(planet);
                 self.selected_tick = p.tick;
                 self.progress_tick = p.tick;
                 self.best_distance = f32::INFINITY;
@@ -814,6 +857,12 @@ impl MaterialMissionPilot {
                 return CombatIntent::default();
             }
             let intent = capture.intent(&o.local);
+            if self.telemetry.destination_retry.is_some()
+                && capture.telemetry().failed_tick == Some(p.tick)
+            {
+                let failure = capture.telemetry().clone();
+                self.remember_capture_failure(o, &failure);
+            }
             self.goal(MissionGoal::Capture, p.tick);
             return intent;
         }
