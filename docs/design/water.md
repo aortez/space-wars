@@ -82,6 +82,10 @@ momentum coupling. These remain explicit limitations for future body/wave work.
 
 ### Drain-wall collision
 
+See the [paired Picade profile](../water-drain-collision-profile.md) for the
+before/after cost of this collision and rendering change, including full Rain
+and Meltdown cycles and retained raw measurements.
+
 `WaterWorld::set_solid_boxes` supplies at most eight explicit, finite rectangles.
 Pool beds alone remain receiving surfaces, so rain can still fall underneath
 elevated digit ledges. Falling parcels sweep their center paths against the boxes,

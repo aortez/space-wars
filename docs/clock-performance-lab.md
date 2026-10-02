@@ -4,11 +4,16 @@ Use the existing engine-client headless runner for repeatable CPU measurements,
 then use live host timings to find work outside that runner. Neither is a GPU
 profiler. In particular, headless throughput is **not displayed FPS**.
 
-The managed-floor version draws one closed slab and edge in the ordinary
-24-hour face: 101 primitives, down from the 103 in historical measurements below.
-Physical drain events retain their existing geometry and time envelopes; the
-floor manager adds no per-tick physics or water work. Historical timings have not
-been relabeled as measurements of this version.
+The [drain-wall collision profile](water-drain-collision-profile.md) records the
+2026-10-02 paired Pi 4 comparison for full Heavy Rain and Meltdown cycles. It
+also documents why pausing a game alone does not remove background raster work
+when collecting headless measurements alongside the kiosk.
+
+The historical managed-floor checkpoint drew one closed slab and edge in its
+ordinary 24-hour face: 101 primitives, down from 103 in earlier measurements.
+That manager change retained the physical drain geometry and time envelopes,
+adding no per-tick physics or water work. Timings below describe their recorded
+builds and fixtures; they have not been relabeled as current measurements.
 
 ## Fixed-workload benchmarks
 
