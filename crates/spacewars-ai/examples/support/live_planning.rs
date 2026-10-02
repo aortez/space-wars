@@ -81,6 +81,11 @@ impl LivePlanningRun {
             "true" => planner.with_extended_corridors(),
             _ => panic!("--extended-objective-routes must be true or false"),
         };
+        let planner = match super::arg("--cover-walk-feedback", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_walk_feedback(),
+            _ => panic!("--cover-walk-feedback must be true or false"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
@@ -223,7 +228,9 @@ impl LivePlanningRun {
                 "max_ms":values.last()})
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
-            if self.planner.uses_extended_corridors() {
+            if self.planner.uses_walk_feedback() {
+                "live_jetpack_objective_v10"
+            } else if self.planner.uses_extended_corridors() {
                 "live_jetpack_objective_v9"
             } else if self.planner.uses_requested_corridors() {
                 "live_jetpack_objective_v8"
@@ -236,6 +243,8 @@ impl LivePlanningRun {
             } else {
                 "live_jetpack_objective_v3"
             }
+        } else if self.planner.uses_walk_feedback() {
+            "live_joint_objective_v10"
         } else if self.planner.uses_extended_corridors() {
             "live_joint_objective_v9"
         } else if self.planner.uses_requested_corridors() {
@@ -269,6 +278,9 @@ impl LivePlanningRun {
         }
         if self.planner.uses_extended_corridors() {
             report["extended_objective_routes"] = json!(true);
+        }
+        if self.planner.uses_walk_feedback() {
+            report["cover_walk_feedback"] = json!(true);
         }
         report
     }

@@ -19,6 +19,10 @@ pub struct CoverSearch {
     pub hold_altitude: f32,
     pub seeded: bool,
     pub pending: Vec<LandingSiteId>,
+    /// Tried walking hypotheses remain unknown and eligible for any later
+    /// positive route. They are not added to the rejected-site list.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub walk_deferred: Vec<LandingSiteId>,
     pub probes: usize,
     pub omitted: usize,
     pub finished_tick: Option<u64>,
@@ -91,7 +95,13 @@ impl TacticalSortiePilot {
         search
             .finished_tick
             .is_none()
-            .then(|| search.pending.first().copied())
+            .then(|| {
+                search
+                    .pending
+                    .first()
+                    .or(search.walk_deferred.last())
+                    .copied()
+            })
             .flatten()
     }
 
@@ -235,6 +245,7 @@ impl TacticalSortiePilot {
                     .clamp(60.0, 85.0),
                 seeded: false,
                 pending: Vec::new(),
+                walk_deferred: Vec::new(),
                 probes: 0,
                 omitted: 0,
                 finished_tick: None,
@@ -257,6 +268,7 @@ impl TacticalSortiePilot {
             search.objective = objective;
             search.seeded = false;
             search.pending.clear();
+            search.walk_deferred.clear();
             search.omitted = 0;
             return pending;
         }
@@ -298,7 +310,10 @@ impl TacticalSortiePilot {
                 state.requested_sites += 1;
             }
         } else if let Some(id) = search.pending.first().copied() {
-            if p.site_query != LandingSiteQuery::Selected(id) || unknown.contains(&id) {
+            let exhausted_walk = unknown.contains(&id) && walking_attempt_finished(o, search, id);
+            if p.site_query != LandingSiteQuery::Selected(id)
+                || (unknown.contains(&id) && !exhausted_walk)
+            {
                 self.acquisition_reason("cover_evidence_pending");
                 return Some(self.wait_for_site(o, 12.0));
             }
@@ -306,6 +321,9 @@ impl TacticalSortiePilot {
             // its route arrives. Missing or rejected survey data stays unknown.
             state.measured_sites +=
                 u64::from(survey.is_some_and(|s| s.sites.iter().any(|r| r.site == Some(id))));
+            if exhausted_walk {
+                search.walk_deferred.push(id);
+            }
             search.pending.remove(0);
             if !search.pending.is_empty() {
                 search.probes += 1;
@@ -313,6 +331,13 @@ impl TacticalSortiePilot {
             }
         }
         if search.pending.is_empty() {
+            if !search.walk_deferred.is_empty() {
+                // Leave the last requested site's full fallback running while
+                // waiting for other route types. Do not spend another probe,
+                // renew the deadline, or turn these unknowns into rejections.
+                self.acquisition_reason("cover_walks_exhausted_waiting");
+                return Some(self.wait_for_site(o, 12.0));
+            }
             let (outcome, failure) = if search.omitted > 0 {
                 (
                     "evidence_budget_exhausted",
@@ -352,6 +377,50 @@ impl TacticalSortiePilot {
         search.guidance = Some(guidance);
         Some(self.guide(o, desired, Vec2::ZERO))
     }
+}
+
+fn walking_attempt_finished(
+    o: &TacticalSortieObservationV1,
+    search: &CoverSearch,
+    site: LandingSiteId,
+) -> bool {
+    use scenario_spacewars::surface_sortie::live_planning::{
+        MAX_SURVEY_AGE_TICKS, ObjectiveWorkState,
+    };
+    let p = &o.combat.recovery.flight.pilot;
+    let Some(e) = o.objective_evidence else {
+        return false;
+    };
+    e.tick == p.tick
+        && e.invalidated_by.is_none()
+        && e.submission_deferred_by.is_none()
+        && e.generation.is_some()
+        && e.request_tick
+            .is_some_and(|t| t >= search.started_tick && t <= p.tick)
+        && e.measurement_tick.is_some_and(|t| {
+            t >= search.started_tick
+                && t <= p.tick
+                && p.tick - t <= MAX_SURVEY_AGE_TICKS
+                && e.request_tick.is_some_and(|requested| t <= requested)
+        })
+        && matches!(
+            o.objective_work,
+            Some(ObjectiveWorkState::Pending | ObjectiveWorkState::Ready)
+        )
+        && e.exhausted_walk
+            .is_some_and(|a| a.actor == p.owner && a.site == site)
+        && search.planet == p.planet.index
+        && site.planet == search.planet
+        && search.revision == p.planet.revision
+        && search.objective.is_some_and(|target| {
+            target.matches(e.objective)
+                && e.source_objective.is_some_and(|old| target.matches(old))
+                && LandingObjective::read(p).is_some_and(|now| target.matches(now))
+        })
+        && p.queries_ready
+        && p.sites
+            .iter()
+            .any(|s| s.id == site && s.revision == p.planet.revision)
 }
 
 #[cfg(test)]

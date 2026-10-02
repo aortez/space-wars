@@ -56,6 +56,12 @@ pub struct PublicationEvidence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ExhaustedWalkingAttempt {
+    pub actor: PlayerId,
+    pub site: LandingSiteId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ObjectiveWorkEvidence {
     pub tick: u64,
     pub objective: LandingObjective,
@@ -67,6 +73,10 @@ pub struct ObjectiveWorkEvidence {
     pub invalidated_by: Option<&'static str>,
     pub submission_deferred_by: Option<&'static str>,
     pub publication: Option<PublicationEvidence>,
+    /// Historical completion of one unsuccessful walking hypothesis, bound to
+    /// this request and source clock. Never a negative route certificate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exhausted_walk: Option<ExhaustedWalkingAttempt>,
 }
 impl ObjectiveWorkEvidence {
     pub(super) fn new(tick: u64, objective: LandingObjective) -> Self {
@@ -80,6 +90,7 @@ impl ObjectiveWorkEvidence {
             invalidated_by: None,
             submission_deferred_by: None,
             publication: None,
+            exhausted_walk: None,
         }
     }
     pub(super) fn request(&mut self, request: &Request) {

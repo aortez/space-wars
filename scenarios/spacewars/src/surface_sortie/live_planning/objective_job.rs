@@ -47,6 +47,7 @@ pub(crate) struct ObjectiveSurveyJob {
     direct_hull_queries: bool,
     corridor: Option<(Candidate, Box<WalkCorridorJob>)>,
     corridor_rise: Option<(Option<LandingSiteId>, f32)>,
+    exhausted_walk: Option<LandingSiteId>,
 }
 impl SurfaceSortieState {
     #[cfg(test)]
@@ -212,6 +213,7 @@ impl SurfaceSortieState {
             direct_hull_queries: false,
             corridor: None,
             corridor_rise: None,
+            exhausted_walk: None,
         })
     }
 
@@ -232,6 +234,15 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn exhausted_walk(&self) -> Option<LandingSiteId> {
+        self.exhausted_walk.filter(|site| {
+            !self
+                .result
+                .sites
+                .iter()
+                .any(|r| r.site == Some(*site) && r.cost().is_some())
+        })
+    }
     /// Try one small walking corridor before the complete survey. A failed
     /// patch says nothing about the full graph, jumps or powered alternatives.
     /// The ordinary job and its original measurement clock remain intact.
@@ -541,6 +552,8 @@ impl PlanningJob for ObjectiveSurveyJob {
                     } else {
                         self.result.actual = Some(route);
                     }
+                } else {
+                    self.exhausted_walk = candidate.site;
                 }
             }
             return;
@@ -557,6 +570,8 @@ impl PlanningJob for ObjectiveSurveyJob {
                     self.result.sites = survey.sites;
                     self.result.actual = survey.actual;
                     self.dependencies = focused.dependencies;
+                } else {
+                    self.exhausted_walk = focused.candidates[0].site;
                 }
             }
             return;

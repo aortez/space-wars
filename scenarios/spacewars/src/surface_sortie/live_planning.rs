@@ -21,7 +21,8 @@ mod avoiding;
 mod destinations;
 mod diagnostics;
 pub use diagnostics::{
-    ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence, RouteResultCounts,
+    ExhaustedWalkingAttempt, ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence,
+    RouteResultCounts,
 };
 mod early_candidates;
 mod flag_survey;
@@ -145,6 +146,8 @@ impl ObjectiveMeasurementWork {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct LivePlanningTelemetry {
+    #[serde(skip_serializing_if = "is_zero")]
+    pub walk_probe_restarts: u64,
     pub submitted: u64,
     /// Completed surveys that passed publication-time validation at least once.
     pub completed: u64,
@@ -267,6 +270,7 @@ pub struct LiveObjectivePlanner {
     focused_candidates: bool,
     requested_corridors: bool,
     extended_corridors: bool,
+    walk_feedback: bool,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -289,6 +293,7 @@ impl LiveObjectivePlanner {
             focused_candidates: false,
             requested_corridors: false,
             extended_corridors: false,
+            walk_feedback: false,
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -371,6 +376,19 @@ impl LiveObjectivePlanner {
     }
     pub fn uses_extended_corridors(&self) -> bool {
         self.extended_corridors
+    }
+    /// Publish completed walking hypotheses for bounded cover scheduling.
+    /// No unsuccessful hypothesis becomes a route verdict or a permission.
+    pub fn with_walk_feedback(mut self) -> Self {
+        assert!(
+            self.uses_extended_corridors(),
+            "walk feedback requires extended corridors"
+        );
+        self.walk_feedback = true;
+        self
+    }
+    pub fn uses_walk_feedback(&self) -> bool {
+        self.walk_feedback
     }
     pub fn allowance(&self) -> Work {
         self.allowance
@@ -852,6 +870,26 @@ impl LiveObjectivePlanner {
                 *self.telemetry.invalidations.entry(reason).or_default() += 1;
             }
         }
+        // A new, currently scanned candidate can replace a finished walking
+        // probe's fallback. Preserve its charged work; the replacement takes a
+        // fresh snapshot instead of relabeling the old measurements as fresh.
+        if self.walk_feedback
+            && self.requests.get(&player).is_some_and(|request| {
+                request.actual.is_none()
+                    && Self::actual(p).is_none()
+                    && Self::valid(state, player, p, request, objective, true).is_ok()
+                    && self.queue.job(request.token).is_some_and(|job| {
+                        job.output().is_none()
+                            && job.exhausted_walk().is_some_and(|old| {
+                                matches!(p.site_query, LandingSiteQuery::Selected(id)
+                            if id != old && p.sites.iter().any(|s| s.id == id))
+                            })
+                    })
+            })
+        {
+            self.retire(player);
+            self.telemetry.walk_probe_restarts += 1;
+        }
         if let Some(request) = self.requests.get_mut(&player) {
             o.objective_evidence.as_mut().unwrap().request(request);
             request.seen = p.tick;
@@ -967,6 +1005,21 @@ impl LiveObjectivePlanner {
                         }
                     }
                     JobPoll::Pending => {
+                        if self.walk_feedback {
+                            o.objective_evidence.as_mut().unwrap().exhausted_walk = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .exhausted_walk()
+                                .filter(|&site| {
+                                    p.site_query == LandingSiteQuery::Selected(site)
+                                        && p.sites.iter().any(|s| s.id == site)
+                                })
+                                .map(|site| ExhaustedWalkingAttempt {
+                                    actor: p.owner,
+                                    site,
+                                });
+                        }
                         if let Some(early) = &mut self.early_candidates {
                             early.observe(
                                 state,

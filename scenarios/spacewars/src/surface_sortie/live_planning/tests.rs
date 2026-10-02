@@ -11,6 +11,7 @@ mod gravity_dependencies;
 mod measurement_work;
 mod requested_corridors;
 mod route_dependencies;
+mod walk_feedback;
 
 const DT: Duration = Duration::from_nanos(16_666_667);
 fn state() -> SurfaceSortieState {

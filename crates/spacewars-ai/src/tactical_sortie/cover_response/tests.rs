@@ -5,6 +5,9 @@ use scenario_spacewars::surface_sortie::{
     ground_navigation::GroundRouteDiagnostics, landing_objective::ObjectivePlanning,
 };
 
+#[path = "walk_feedback_tests.rs"]
+mod walk_feedback;
+
 fn fixture() -> (TacticalSortiePilot, TacticalSortieObservationV1) {
     let mut o = observation();
     o.sun = None;
