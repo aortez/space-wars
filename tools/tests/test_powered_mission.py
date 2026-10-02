@@ -86,5 +86,23 @@ class PoweredMissionTests(unittest.TestCase):
         for row in rows: M.observe_visit(visit,row)
         self.assertEqual(visit['physical']['claimed'],104)
 
+    def test_existing_terrain_hop_is_not_a_forecasted_vehicle_flight(self):
+        plan=dict(planet=0,revision=2,direction='Right',start=dict(x=38,y=39),destination=dict(x=43,y=41),
+            cruise_radius=62,anchor=dict(GroundGap=dict(from_=446,to=449)))
+        plan['anchor']['GroundGap']['from']=plan['anchor']['GroundGap'].pop('from_')
+        equipment=dict(charge=1.0,terrain_crossings=[copy.deepcopy(plan)],crossing=None)
+        launch=dict(tick=101,equipment=equipment,latest_forecast=None,
+            ground=dict(policy='ground_navigation_v10',crossing=dict(plan=plan)))
+        survey=dict(tick=90,equipment=equipment)
+        self.assertEqual(M.audit_launch(launch,survey),'existing_ground_gap')
+        launch['ground']['policy']='ground_navigation_v12'
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['ground']['policy']='ground_navigation_v10'
+        launch['tick']=120
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['tick']=101
+        launch['ground']['crossing']['plan']['start']['x']+=2
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+
 
 if __name__=='__main__': unittest.main()

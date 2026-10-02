@@ -87,6 +87,44 @@ def audit_publication(row, planning):
     return dict(age=p['tick']-survey['tick'],powered=powered)
 
 
+def same_corridor(a,b):
+    """The existing CrossingPlan comparison, including its reversible endpoints."""
+    if a['planet']!=b['planet'] or a['revision']!=b['revision']: return False
+    if abs(a['cruise_radius']-b['cruise_radius'])>0.25: return False
+    aa,ba=a['anchor'],b['anchor']
+    if aa.keys()!=ba.keys(): return False
+    if 'GroundGap' in aa:
+        tolerance=1.0
+        for key in ['from','to']:
+            x,y=aa['GroundGap'][key],ba['GroundGap'][key]
+            if not (0<=x<512 and 0<=y<512 and (abs(x-y)<=1 or abs(x-y)==511)): return False
+    elif 'Vehicle' in aa:
+        tolerance=0.5;x,y=aa['Vehicle'],ba['Vehicle']
+        if x['index']!=y['index'] or x['form']!=y['form']: return False
+        if math.dist(J.vector(x['position']),J.vector(y['position']))>0.5: return False
+        if abs((x['angle']-y['angle']+math.pi)%math.tau-math.pi)>0.1: return False
+    else: return False
+    reverse=a['direction']!=b['direction']
+    return all(math.dist(J.vector(a[key]),J.vector(b[other if reverse else key]))<=tolerance
+        for key,other in [('start','destination'),('destination','start')])
+
+
+def audit_launch(launch,latest_survey):
+    if launch['ground']['policy']=='ground_navigation_v12':
+        E.audit_launch(launch)
+        return 'forecast_vehicle'
+    # Existing v10/v11 return traversal can hop measured terrain gaps without
+    # the separate, newer bidirectional vehicle-flight forecast.
+    assert launch['ground']['policy'] in ['ground_navigation_v10','ground_navigation_v11']
+    assert launch['equipment']['charge']>=0.98
+    assert latest_survey and 0<=launch['tick']-latest_survey['tick']<30
+    equipment=latest_survey['equipment']
+    candidates=equipment['terrain_crossings']+([equipment['crossing']] if equipment['crossing'] else [])
+    corridor=launch['ground']['crossing']['plan']
+    assert any(same_corridor(corridor,c) for c in candidates)
+    return 'existing_ground_gap' if 'GroundGap' in corridor['anchor'] else 'existing_vehicle_corridor'
+
+
 def observe_visit(visit, row):
     p, tick = row['pilot'], row['pilot']['tick']
     planet = row['planets'][visit['planet']]
@@ -117,7 +155,7 @@ def observe_visit(visit, row):
         milestones['departed']=tick
 
 
-def analyze(root, item):
+def analyze(root, item, audit_out=None):
     report=json.loads((root/'report.json').read_text())
     assert report['physics_ok'] and not report['audit_failures']
     shared=item['delivery']=='shared'
@@ -133,7 +171,7 @@ def analyze(root, item):
     visits={s:[dict(planet=v['planet'],selected_tick=v['selected_tick'],recorded=v,
         physical=dict.fromkeys(['landed','exited','claimed','boarded','departed'])) for v in report['metrics'][s]['visits']] for s in [0,1]}
     last={};counts=Counter();first={};publications=Counter();invalidations=Counter();launches=[];completions=set();lowest=1.0
-    forecasts={};previous_goal={};max_age=0;visits_index={0:0,1:0};witnesses=[]
+    forecasts={};ground_surveys={};previous_goal={};max_age=0;visits_index={0:0,1:0};witnesses=[]
     for row in F.rows(root/'capture-evidence.jsonl'):
         seat=row['seat'];p=row['pilot'];tick=p['tick'];counts[seat]+=1
         assert p['owner']==f'player_{seat+1}' and row['schema']==1
@@ -154,10 +192,13 @@ def analyze(root, item):
             assert math.isfinite(j['charge']) and 0<=j['charge']<=1
             lowest=min(lowest,j['charge'])
             if j.get('vehicle_forecast'): forecasts[seat]=j['vehicle_forecast']
+            if j['surveyed']: ground_surveys[seat]=dict(tick=tick,equipment=j)
         goal=ground['goal'] if ground else None
         if goal=='jetpack_lift' and previous_goal.get(seat)!='jetpack_lift':
             launch=dict(seat=seat,tick=tick,equipment=j,latest_forecast=forecasts.get(seat),ground=ground)
-            E.audit_launch(launch);launches.append(launch);witnesses.append(row)
+            launch['kind']=audit_launch(launch,ground_surveys.get(seat))
+            if launch['kind']!='forecast_vehicle': launch['source_survey']=ground_surveys[seat]
+            launches.append(launch);witnesses.append(row)
         previous_goal[seat]=goal
         if ground and ground.get('crossing') and ground['crossing']['completed_tick'] is not None:
             key=(seat,ground['crossing']['completed_tick'])
@@ -177,14 +218,16 @@ def analyze(root, item):
         for visit in visits[seat]:
             if visit['recorded']['departed_tick'] is not None:
                 assert visit['physical']['departed']==visit['recorded']['departed_tick']
-    F.D.write(root/'powered-mission-witnesses.json',dict(schema=1,rows=witnesses))
+    witness_path=(root if audit_out is None else audit_out)/'powered-mission-witnesses.json'
+    F.D.write(witness_path,dict(schema=1,rows=witnesses))
     return dict(allocation=F.allocation_audit(root),visits=visits,visit_audit=audit['counts'],
         evidence=dict(rows=dict(counts),first_ticks=first,last_ticks=last,publications=dict(publications),
             invalidations=dict(invalidations),max_published_age=max_age,launches=launches,
             completed_crossings=sorted(completions),lowest_charge=lowest),
         live_telemetry=live['telemetry'],round=report['round'],combat=report['final_combat'],
         completed_sorties=[m['completed_sorties'] for m in report['missions']],
-        hashes={p.name:F.E.digest(p) for p in sorted(root.iterdir()) if p.is_file()})
+        witness=dict(path=str(witness_path),sha256=F.E.digest(witness_path)),
+        hashes={p.name:F.E.digest(p) for p in sorted(root.iterdir()) if p.is_file() and p.name!='powered-mission-witnesses.json'})
 
 
 def run(binary,out,item):

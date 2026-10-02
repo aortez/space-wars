@@ -81,3 +81,36 @@ python3 tools/validate-powered-mission.py \
   --binary target/powered-mission/surface_mission_soak-COMMIT \
   --out target/powered-mission/v1
 ```
+
+## Audit correction
+
+The frozen `3742b98` implementation completed all 31 planned replays/trials.
+The first audit rejected one armed run because it required a bidirectional
+vehicle forecast for every jetpack launch. The recorded launch was the existing
+v10 opponent's return trip across a measured terrain gap (seat 0, tick 22,871,
+`native-armed-world1-p2-powered`). That path uses the older corridor sensor,
+not the new vehicle forecast. No gameplay failure is inferred from this audit
+assumption.
+
+Preserve all original files and the rejected summary. Before re-auditing, pin
+their hashes and freeze a correction that distinguishes `ground_navigation_v12`
+forecasted flights from existing v10/v11 corridor flights. Keep forecast age,
+identity and charge checks for the former; require a matching native corridor
+from the latest 30-tick ground survey and launch charge for the latter. Keep
+both categories in the results, identified by actor and controller. Re-audit
+the exact saved games into a separate directory without rerunning or changing
+any gameplay configuration.
+
+The immutable input manifest pins all 369 original files (including the failed
+summary and its unclassified run) at
+`target/powered-mission/frozen-v1-files.json`, SHA-256
+`b5b87eb5c02c18f3b7db0ec3eab33ea8f6c789ff3bb06b40ce7ae48ba38e762e`.
+The re-auditor verifies that complete file set before and after analysis, retains
+the original three retention results, and requires all 14 paired comparisons
+to remain identical. It writes new witnesses only under its new output path.
+
+```sh
+python3 tools/audit-powered-mission.py \
+  --manifest target/powered-mission/frozen-v1-files.json \
+  --out target/powered-mission/v2
+```
