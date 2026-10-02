@@ -147,19 +147,26 @@ These are additional offline measurements outside live quotas, not Pi budgets.
 
 ### Next intervention
 
-Test the existing [prospective jetpack crossing](bot-jetpack-landing.md) against
-these exact observations before changing the newer mission policy. That model
+The subsequent [powered forecast and physical execution study](capture-jetpack-approaches.md)
+tested these exact observations. The existing powered model restores all 37
+sheltered routes at each failed snapshot, and fresh local powered controllers
+complete all six blocked captures and departures. The paired walking
+controllers fail before landing; both models complete the walkable control.
+Mission integration and delivery under live work allowances remain untested.
+
+The existing [prospective jetpack crossing](bot-jetpack-landing.md) model
 can propose one measured crossing of the bot's own parked ship, which directly
 addresses the disconnected components. `material_mission_v11` already uses
 `JetpackRoundTrip`; v12 and v13 explicitly use `JointRoundTrip`, so their landing
 forecast cannot currently admit this powered alternative. Two-sided boarding
 does not change the initial exit footing.
 
-The counterfactual without a hull is not proof that a jetpack route will pass
-fuel, geometry, moving-frame and launch-window checks, or physically complete
-the capture. Measure that next, then validate any policy integration with its
-original work allowance, fresh on-foot evidence, actual claims/boarding and
-armed opponents. Keep the successful walkable control and failed forecasts.
+The counterfactual without a hull did not itself prove a jetpack route would
+pass fuel, geometry, moving-frame and launch-window checks, or physically
+complete the capture. Those checks and local physical attempts are now recorded
+in the follow-up study. Validate policy integration with its original work
+allowance, fresh on-foot evidence, actual claims/boarding and armed opponents.
+Keep the successful walkable control and failed forecasts.
 Do not reinterpret removing the hull in the diagnostic as permission to walk
 through it, remove objects or change equipment.
 

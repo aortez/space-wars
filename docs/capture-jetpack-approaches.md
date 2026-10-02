@@ -91,6 +91,13 @@ call took 1,216 ms on the desktop. Single-site attribution repeats ground survey
 it adds roughly 621,000 graph steps and 306,000 physics queries per failed
 snapshot, not a viable per-tick scan or a measurement of Pi performance.
 
+The [forecast manifest](data/capture-jetpack-approaches-v1.json) records the
+per-clock work and provenance. Its [compressed inputs](data/capture-jetpack-approaches-v1.json.gz)
+preserve the exact summary and probe documents. The binary SHA-256 is
+`7f1bdc5ad7829298cf7d6674f47a9ae457fce5399c448dfc7db382555511726d`;
+the summary SHA-256 is
+`955069dac0e6e2612ff3faf89bb7fdcb92c3a94a8f890c71e91cfc4482083f8a`.
+
 ## Frozen physical execution plan
 
 Before observing these execution outcomes, freeze the additional probe,
@@ -139,3 +146,62 @@ counter deltas, record resets, and audit resets against body removal. Freeze
 that correction and rerun the identical seven pairs in a new `v2` directory;
 compare all eight existing physical traces byte-for-byte. No controller,
 sensor, trial horizon or acceptance threshold changes with this correction.
+
+## Physical execution result
+
+All six blocked snapshots complete a physical enemy capture, boarding and
+departure with powered planning. All six paired walking controllers fail
+before landing. Both controllers complete the successful control. These are
+seven correlated pairs from one seed and seat, not independent match wins.
+
+| Source clock | Cover response | Walking result | Powered departure after start | Lowest charge |
+| --- | --- | --- | ---: | ---: |
+| 3,270 | On | Cover probe budget exhausted | 70.10 s | 13.89% |
+| 3,930 | On | Cover probe budget exhausted | 59.08 s | 13.89% |
+| 8,580 | On | Cover probe budget exhausted | 69.27 s | 16.67% |
+| 9,030 | On | Cover probe budget exhausted | 62.00 s | 16.67% |
+| 9,270 | Off | Approach retry budget exhausted | 69.30 s | 17.78% |
+| 9,720 | Off | Approach retry budget exhausted | 61.80 s | 17.78% |
+| 3,510, successful control | On | Complete in 66.77 s | 50.07 s | 100% |
+
+Each rescued approach selects sheltered site 32 through the ordinary shortlist,
+lands, exits, executes one measured jetpack crossing, neutralizes and claims the
+enemy flag, walks back, boards the original ship and departs. Actual jetpack
+burn is 2.47–2.58 seconds. All six launches have at least 98% charge and match
+recent native forecasts for the same physical corridor. None exhausts fuel.
+The positive control uses site 0 in both arms and never launches the jetpack.
+Its landing and exit clocks match, but later ground behavior and completion
+times differ; this is not a claim of identical walking-controller behavior.
+
+The completed study is `target/capture-execution/v2`, frozen at `211d467`.
+All 35,531 physical trace rows and 613 physics audits pass. Milestone audits
+require actual ownership/capture-count changes, two transfers back into the
+original ship, and airborne departure with physical clearance and speed. The
+three original mission replays retain all 18 controller/planner streams,
+32,400 ordinary sensor records, reports, dispatch counts and earlier
+diagnostics. All eight physical traces from the first attempted study are
+byte-identical after correcting fuel accounting. Only the diagnostic fuel
+totals/reset records change.
+
+The [execution manifest](data/capture-jetpack-execution-v1.json) records exact
+clocks, outcomes, hashes, commands and verification. Its
+[compressed evidence](data/capture-jetpack-execution-v1.json.gz) includes both
+audit summaries, exact diagnostic documents and original physical witness
+rows around each milestone, launch, crossing completion, counter reset and
+start/end. Full per-tick traces remain at the hashed local paths. The preserved
+binary SHA-256 is
+`7c381211ca8b7e95defdf1e583ec78bf7ac9d2415c1ed31eeb38c70f9e0ad081`.
+
+Seven scenario objective tests, three existing physical jetpack tests,
+40 harness tests and 636 Python tests pass (686 total). Formatting, strict
+harness Clippy, and profiled/normal release builds pass. The earlier scenario
+Clippy check retains seven pre-existing findings outside the diagnostic.
+
+The result supports testing powered routes in the newer mission controller.
+It does not yet establish delivery under live work allowances: these local
+attempts use native synchronous surveys and fresh controllers. The next
+integration experiment must preserve the shared 4/384 dispatch allowances,
+validate evidence delivery and expiry, and exercise actual mission transitions
+before evaluating armed opponents. Keep the walking control and record every
+unfinished or rejected request. Defaults and runtime policy behavior remain
+unchanged by this investigation.
