@@ -3,6 +3,8 @@
 mod acquisition_probe;
 #[path = "support/arrival_survey.rs"]
 mod arrival_survey;
+#[path = "support/capture_execution.rs"]
+mod capture_execution;
 #[path = "support/capture_probe.rs"]
 mod capture_probe;
 #[path = "support/cover_probe.rs"]
@@ -187,7 +189,7 @@ fn main() {
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
-    let mut cover_routes_probe = cover_probe::CoverProbe::from_args();
+    let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -713,7 +715,21 @@ fn main() {
                     writeln!(trace).unwrap();
                 }
                 if let Some(probe) = &mut cover_routes_probe {
-                    probe.observe(&state, i, tick, &pilots[i], &o);
+                    probe.observe(
+                        &state,
+                        i,
+                        tick,
+                        &pilots[i],
+                        &o,
+                        capture_execution::Settings {
+                            seed,
+                            breaks,
+                            cadence,
+                            bounded_acquisition: acquisition_seats[i],
+                            cover_retry: cover_retry_seats[i],
+                            cover_response: cover_response_seats[i],
+                        },
+                    );
                 }
                 last_posture[i] = posture_key;
                 if label != last[i] {

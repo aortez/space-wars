@@ -4,18 +4,31 @@ use scenario_spacewars::surface_sortie::{
 };
 use serde_json::{Value, json};
 use spacewars_ai::mission_policy::MissionBot;
-use std::{collections::BTreeSet, path::Path, time::Instant};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 pub struct CoverProbe {
     seat: usize,
     ticks: BTreeSet<u64>,
     topology: bool,
     jetpack: bool,
+    execution: bool,
+    out: PathBuf,
     rows: Vec<Value>,
 }
 
 impl CoverProbe {
-    pub fn from_args() -> Option<Self> {
+    pub fn from_args(out: &Path) -> Option<Self> {
+        let execution: bool = crate::arg("--probe-cover-execution", "false")
+            .parse()
+            .unwrap();
+        assert!(
+            !execution || crate::arg("--mode", "quiet") == "quiet",
+            "capture execution requires quiet mode"
+        );
         let jetpack: bool = crate::arg("--probe-cover-jetpack", "false")
             .parse()
             .unwrap();
@@ -26,6 +39,7 @@ impl CoverProbe {
         if requested == "none" {
             assert!(!topology, "topology probe requires cover probe ticks");
             assert!(!jetpack, "jetpack probe requires cover probe ticks");
+            assert!(!execution, "capture execution requires cover probe ticks");
             return None;
         }
         let values: Vec<u64> = requested
@@ -46,6 +60,8 @@ impl CoverProbe {
             ticks,
             topology,
             jetpack,
+            execution,
+            out: out.to_owned(),
             rows: Vec::new(),
         })
     }
@@ -57,6 +73,7 @@ impl CoverProbe {
         loop_tick: u64,
         bot: &MissionBot,
         o: &MissionObservationV1,
+        execution_settings: crate::capture_execution::Settings,
     ) {
         let p = &o.local.combat.recovery.flight.pilot;
         if seat != self.seat || !self.ticks.contains(&p.tick) {
@@ -131,6 +148,20 @@ impl CoverProbe {
             row["jetpack_unknown"] = json!(jetpack.as_ref().err());
             row["jetpack_profile"] = json!(profile);
         }
+        if self.execution {
+            let clock = Instant::now();
+            let measure =
+                || crate::capture_execution::pair(&cloned, seat, p, execution_settings, &self.out);
+            #[cfg(feature = "sensor-profile")]
+            let (execution, profile) =
+                scenario_spacewars::surface_sortie::sensor_profile::measure(measure);
+            #[cfg(not(feature = "sensor-profile"))]
+            let (execution, profile) = (measure(), None::<Value>);
+            row["execution_ms"] = json!(clock.elapsed().as_secs_f64() * 1000.0);
+            row["execution"] = json!(execution.as_ref().ok());
+            row["execution_unknown"] = json!(execution.as_ref().err());
+            row["execution_profile"] = json!(profile);
+        }
         self.rows.push(row);
     }
 
@@ -155,6 +186,12 @@ impl CoverProbe {
             result["jetpack_model"] = json!("existing_powered_landing_probe_v1");
             result["jetpack_scope"] = json!(
                 "Native walk/jump versus existing jetpack round trips on the same observation, preserving the proposed hull. Independent native batches and single-site work/rejection records are diagnostic only. No control, equipment, model threshold or live-budget changes."
+            );
+        }
+        if self.execution {
+            result["execution_model"] = json!("fresh_local_capture_pair_v1");
+            result["execution_scope"] = json!(
+                "Independent physical clones, fresh local controllers and native synchronous cadenced sensors. Only the walk/jetpack planning model differs within a pair. Quiet weapons, idle opponent, 180-second horizon. No source controller memory, site override, injected forecast, live-budget or mission-strength claim."
             );
         }
         std::fs::write(
