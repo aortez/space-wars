@@ -189,7 +189,7 @@ impl CoverProbe {
             );
         }
         if self.execution {
-            result["execution_model"] = json!("fresh_local_capture_pair_v1");
+            result["execution_model"] = json!("fresh_local_capture_pair_v2");
             result["execution_scope"] = json!(
                 "Independent physical clones, fresh local controllers and native synchronous cadenced sensors. Only the walk/jetpack planning model differs within a pair. Quiet weapons, idle opponent, 180-second horizon. No source controller memory, site override, injected forecast, live-budget or mission-strength claim."
             );

@@ -44,7 +44,7 @@ def audit_arm(arm, rows, initial, horizon):
     assert arm['stop'] == rows[-1]['stop'] and rows[-1]['actions'] is None
     milestones = dict.fromkeys(['landed', 'exited', 'neutralized', 'claimed', 'boarded'])
     base_claim = initial['planet']['claim']
-    launch_ticks, completion_ticks, charges, burns = [], [], [], []
+    launch_ticks, completion_ticks, charges, burns, resets = [], [], [], [], []
     previous_goal = None
     seat = ['player_1','player_2'].index(initial['owner'])
     for i, r in enumerate(rows):
@@ -84,14 +84,19 @@ def audit_arm(arm, rows, initial, horizon):
         if r['charge'] is not None:
             assert math.isfinite(r['charge']) and 0 <= r['charge'] <= 1
             charges.append(r['charge'])
+            if burns and r['burn_seconds'] < burns[-1]:
+                # Boarding removes the body whose motor owns the burn counter.
+                assert r['burn_seconds'] == 0 and (r['location'] != 'on_foot' or r['actor'] is None)
+                resets.append(r['tick'])
             burns.append(r['burn_seconds'])
     assert arm['milestones'] == milestones
     assert [s['tick'] for s in arm['launches']] == launch_ticks
     assert arm['crossing_completions'] == completion_ticks
     assert arm['lowest_charge'] == min(charges, default=1.0)
+    assert arm['fuel_counter_resets'] == resets
     if burns:
-        assert all(math.isfinite(v) for v in burns) and burns == sorted(burns)
-        assert math.isclose(arm['burn_seconds'], burns[-1]-burns[0], abs_tol=1e-5)
+        assert all(math.isfinite(v) and v >= 0 for v in burns)
+        assert math.isclose(arm['burn_seconds'], sum(max(b-a,0) for a,b in zip(burns,burns[1:])), abs_tol=1e-5)
     else: assert arm['burn_seconds'] is None
     for launch in arm['launches']:
         audit_launch(launch)
@@ -110,6 +115,13 @@ def audit_arm(arm, rows, initial, horizon):
         assert all(milestones[k] is not None for k in ['landed','exited','claimed','boarded'])
         assert milestones['landed'] <= milestones['exited'] < milestones['claimed'] <= milestones['boarded'] < arm['end_tick']
         assert last['landing']['phase'] != 'landed' and last['landing']['supported_feet'] == 0
+        p = last['observation']['combat']['recovery']['flight']['pilot']
+        frame = p['planet']['motion']
+        dx, dy = (p['ship']['position'][k]-frame['position'][k] for k in ['x','y'])
+        vx, vy = (p['ship']['velocity'][k]-frame['velocity'][k] for k in ['x','y'])
+        assert math.hypot(dx,dy)-p['planet']['radius'] > 60
+        assert math.hypot(vx+dy*frame['spin'],vy-dx*frame['spin']) > 18
+        assert last['location'] == {'aboard':initial['vehicle']} and last['claim']['owner'] == initial['owner']
     elif stop == 'controller_failed': assert arm['telemetry']['failed_tick'] == arm['end_tick']
     elif stop == 'horizon': assert arm['end_tick']-arm['start_tick'] == horizon
     elif stop == 'local_frame_changed': assert last['planet'] != initial['planet']['index']
@@ -172,7 +184,7 @@ def main():
             allocation = F.allocation_audit(root)
             assert allocation == F.allocation_audit(old_root)
             prior, probe = [json.loads((r/'cover-probe.json').read_text()) for r in [old_root,root]]
-            assert probe['execution_model'] == 'fresh_local_capture_pair_v1'
+            assert probe['execution_model'] == 'fresh_local_capture_pair_v2'
             assert probe['requested_world_ticks'] == ticks and not probe['unreached_world_ticks']
             assert [r['world_tick'] for r in probe['rows']] == ticks
             samples = []

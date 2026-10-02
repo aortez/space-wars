@@ -118,8 +118,9 @@ fn run(
     let mut launches = Vec::new();
     let mut crossing_completions = Vec::new();
     let mut lowest_charge = 1.0_f32;
-    let mut initial_burn = None;
-    let mut final_burn = None;
+    let mut previous_burn: Option<f32> = None;
+    let mut burned = 0.0_f64;
+    let mut fuel_counter_resets = Vec::new();
     let mut audits = Vec::new();
     let mut physics_ok = true;
     loop {
@@ -168,8 +169,15 @@ fn run(
         let ground_goal = t.ground.as_ref().map(|g| g.goal);
         if let Some(j) = &local.combat.recovery.jetpack {
             lowest_charge = lowest_charge.min(j.charge);
-            initial_burn.get_or_insert(j.burn_seconds);
-            final_burn = Some(j.burn_seconds);
+            if let Some(previous) = previous_burn {
+                // The body's counter disappears on boarding; equipment charge survives.
+                if j.burn_seconds < previous {
+                    fuel_counter_resets.push(p.tick);
+                } else {
+                    burned += f64::from(j.burn_seconds - previous);
+                }
+            }
+            previous_burn = Some(j.burn_seconds);
             if let Some(f) = j.vehicle_forecast {
                 latest_forecast = Some(f);
             }
@@ -246,7 +254,7 @@ fn run(
             return json!({"name":name,"planning":planning,"trace":filename,"start_tick":initial.tick,"end_tick":p.tick,
                 "stop":stop,"milestones":milestones,"telemetry":t,"physics_ok":physics_ok,"audits":audits,
                 "launches":launches,"crossing_completions":crossing_completions,"lowest_charge":lowest_charge,
-                "burn_seconds":final_burn.zip(initial_burn).map(|(end,start)|end-start)});
+                "burn_seconds":previous_burn.map(|_|burned),"fuel_counter_resets":fuel_counter_resets});
         }
         previous_key = key;
         SurfaceSortieScenario::step(&mut state, &intent.encode(initial.owner), DT);

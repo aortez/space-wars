@@ -10,9 +10,10 @@ spec.loader.exec_module(E)
 
 def fixture():
     initial = dict(tick=100,owner='player_1',location={'aboard':0},vehicle=0,transfers=0,
-        ship_form='ship',ship_available=True,ship={},actor=None,
+        ship_form='ship',ship_available=True,ship=dict(position=dict(x=0,y=20),velocity=dict(x=0,y=0)),actor=None,
         landing=dict(phase='flying',planet=1,supported_feet=0),
-        planet=dict(index=1,claim=dict(owner='player_2',captures=0,neutralizations=0)))
+        planet=dict(index=1,radius=10,motion=dict(position=dict(x=0,y=0),velocity=dict(x=0,y=0),spin=0),
+            claim=dict(owner='player_2',captures=0,neutralizations=0)))
     milestones = dict.fromkeys(['landed','exited','neutralized','claimed','boarded'])
     rows = []
     for i in range(7):
@@ -24,6 +25,7 @@ def fixture():
         if i >= 3: p['planet']['claim'].update(owner=None,neutralizations=1)
         if i >= 4: p['planet']['claim'].update(owner='player_1',captures=1)
         if i >= 5: p['transfers'] = 2
+        if i == 6: p['ship'] = dict(position=dict(x=0,y=100),velocity=dict(x=0,y=30))
         if 1 <= i <= 5: milestones[['landed','exited','neutralized','claimed','boarded'][i-1]] = p['tick']
         telemetry = dict(goal='complete' if i == 6 else 'surface',completed_tick=106 if i == 6 else None,
             failed_tick=None,failure=None,site=None)
@@ -36,7 +38,7 @@ def fixture():
         rows.append(r)
     arm = dict(name='walking',planning='joint_round_trip',start_tick=100,end_tick=106,
         stop='controller_completed',telemetry=rows[-1]['telemetry'],milestones=copy.deepcopy(milestones),
-        launches=[],crossing_completions=[],lowest_charge=1.0,burn_seconds=None,physics_ok=True,
+        launches=[],crossing_completions=[],lowest_charge=1.0,burn_seconds=None,fuel_counter_resets=[],physics_ok=True,
         audits=[dict(tick=t,audit=dict(occupied_cells=100,removed_cells=0,max_speed=20,issues=[])) for t in [100,106]])
     return arm,rows,initial
 
@@ -80,6 +82,15 @@ class CaptureExecutionTests(unittest.TestCase):
         arm['stop'] = rows[-1]['stop'] = 'horizon'
         arm['telemetry']['completed_tick'] = None
         self.assertEqual(E.audit_arm(arm,rows,initial,6)['stop'],'horizon')
+
+    def test_boarding_counter_reset_preserves_fuel_already_burned(self):
+        arm,rows,initial = fixture()
+        for r,b in zip(rows,[0,0,0,0.8,1.5,0,0]):
+            r.update(charge=1.0,burn_seconds=b)
+        arm.update(burn_seconds=1.5,fuel_counter_resets=[105])
+        self.assertEqual(E.audit_arm(arm,rows,initial,10800)['burn_seconds'],1.5)
+        arm['burn_seconds'] = 0
+        with self.assertRaises(AssertionError): E.audit_arm(arm,rows,initial,10800)
 
     def test_launch_requires_charge_recent_forecast_and_same_physical_corridor(self):
         plan = dict(planet=1,revision=0,direction='Left',start=dict(x=0,y=60),destination=dict(x=10,y=60),cruise_radius=65,

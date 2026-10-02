@@ -129,3 +129,13 @@ python3 tools/probe-capture-execution.py \
   --binary target/capture-execution/surface_mission_soak-COMMIT \
   --out target/capture-execution/v1
 ```
+
+The first execution run (`e78198e`, `target/capture-execution/v1`) stopped its
+audit after the four cover-on pairs. All four powered controllers completed,
+but the probe incorrectly subtracted the initial fuel counter from the final
+counter. Boarding removes the physical body and resets that counter to zero.
+Keep the original run. Version 2 changes only fuel accounting: sum positive
+counter deltas, record resets, and audit resets against body removal. Freeze
+that correction and rerun the identical seven pairs in a new `v2` directory;
+compare all eight existing physical traces byte-for-byte. No controller,
+sensor, trial horizon or acceptance threshold changes with this correction.
