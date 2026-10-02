@@ -71,6 +71,11 @@ impl LivePlanningRun {
             "true" => planner.with_focused_candidates(),
             _ => panic!("--focused-objective-routes must be true or false"),
         };
+        let planner = match super::arg("--requested-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_requested_corridors(),
+            _ => panic!("--requested-objective-routes must be true or false"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
@@ -213,7 +218,9 @@ impl LivePlanningRun {
                 "max_ms":values.last()})
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
-            if self.planner.uses_focused_candidates() {
+            if self.planner.uses_requested_corridors() {
+                "live_jetpack_objective_v8"
+            } else if self.planner.uses_focused_candidates() {
                 "live_jetpack_objective_v7"
             } else if self.planner.uses_early_candidates() {
                 "live_jetpack_objective_v6"
@@ -222,6 +229,8 @@ impl LivePlanningRun {
             } else {
                 "live_jetpack_objective_v3"
             }
+        } else if self.planner.uses_requested_corridors() {
+            "live_joint_objective_v8"
         } else if self.planner.uses_focused_candidates() {
             "live_joint_objective_v7"
         } else if self.planner.uses_early_candidates() {
@@ -245,6 +254,9 @@ impl LivePlanningRun {
             "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"});
         if self.planner.uses_focused_candidates() {
             report["focused_objective_routes"] = json!(true);
+        }
+        if self.planner.uses_requested_corridors() {
+            report["requested_objective_routes"] = json!(true);
         }
         report
     }

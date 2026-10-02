@@ -89,6 +89,12 @@ pub struct ObjectiveMeasurementWork {
     pub focused_completed: u64,
     #[serde(skip_serializing_if = "is_zero")]
     pub focused_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_successes: u64,
 }
 fn is_zero(value: &u64) -> bool {
     *value == 0
@@ -111,6 +117,9 @@ impl ObjectiveMeasurementWork {
         }
     }
     fn add_since(&mut self, new: &Self, old: &Self) {
+        self.corridor_started += new.corridor_started - old.corridor_started;
+        self.corridor_completed += new.corridor_completed - old.corridor_completed;
+        self.corridor_successes += new.corridor_successes - old.corridor_successes;
         self.focused_started += new.focused_started - old.focused_started;
         self.focused_completed += new.focused_completed - old.focused_completed;
         self.focused_successes += new.focused_successes - old.focused_successes;
@@ -247,6 +256,7 @@ pub struct LiveObjectivePlanner {
     local_dependencies: bool,
     early_candidates: Option<EarlyCandidates>,
     focused_candidates: bool,
+    requested_corridors: bool,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -267,6 +277,7 @@ impl LiveObjectivePlanner {
             local_dependencies: false,
             early_candidates: None,
             focused_candidates: false,
+            requested_corridors: false,
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -324,6 +335,19 @@ impl LiveObjectivePlanner {
     pub fn uses_focused_candidates(&self) -> bool {
         self.focused_candidates
     }
+    /// Try longer, bidirectionally measured walks for selected sites and the
+    /// actual touchdown pose. Failure never publishes a negative route result.
+    pub fn with_requested_corridors(mut self) -> Self {
+        assert!(
+            self.uses_focused_candidates(),
+            "requested corridors require focused candidates"
+        );
+        self.requested_corridors = true;
+        self
+    }
+    pub fn uses_requested_corridors(&self) -> bool {
+        self.requested_corridors
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -363,7 +387,8 @@ impl LiveObjectivePlanner {
             let job = self.queue.take(request.token)?;
             if job.output().is_none()
                 && (job.measurement_work().successful_candidates > 0
-                    || job.measurement_work().focused_successes > 0)
+                    || job.measurement_work().focused_successes > 0
+                    || job.measurement_work().corridor_successes > 0)
             {
                 *self
                     .telemetry
@@ -596,6 +621,9 @@ impl LiveObjectivePlanner {
             r.crossing
                 .is_none_or(|c| flight_valid && c.valid_at(p.tick))
         };
+        let corridor_valid = |r: &LandingObjectiveRoute| {
+            job.corridor_rise_valid(r.site, || state.objective_gravity(p))
+        };
         telemetry.flight_environment_checks += u64::from(request.flight_dependent);
         telemetry.flight_environment_mismatches += u64::from(!flight_valid);
         let excluded = [
@@ -653,7 +681,7 @@ impl LiveObjectivePlanner {
                 .sites
                 .iter()
                 .chain(survey.actual.iter())
-                .all(crossing_valid)
+                .all(|r| crossing_valid(r) && corridor_valid(r))
         {
             evidence.decision = PublicationDecision::WholeSurvey;
             evidence.retained_routes = evidence.source.entries;
@@ -670,7 +698,10 @@ impl LiveObjectivePlanner {
                 .chain(survey.actual.iter())
                 .find(|r| r.site == *site);
             if !route.is_some_and(|r| {
-                r.cost().is_some() && (gravity_valid || !uses_jump(r)) && crossing_valid(r)
+                r.cost().is_some()
+                    && (gravity_valid || !uses_jump(r))
+                    && crossing_valid(r)
+                    && corridor_valid(r)
             }) {
                 continue;
             }
@@ -1041,6 +1072,11 @@ impl LiveObjectivePlanner {
                 let job = job.with_focused_candidate(*cursor);
                 *cursor = (*cursor + 1) % landing_objective::MAX_OBJECTIVE_SITES;
                 job
+            } else {
+                job
+            };
+            let job = if self.requested_corridors {
+                job.with_requested_corridor(p.site_query)
             } else {
                 job
             };

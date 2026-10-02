@@ -6,6 +6,9 @@ use query_footprint::QueryFootprint;
 use std::cell::RefCell;
 use std::sync::Arc;
 
+mod walk_corridor;
+pub(crate) use walk_corridor::{WalkCorridorJob, WalkCorridorResult};
+
 #[derive(Clone, Copy)]
 struct Cursor {
     node: usize,
@@ -94,6 +97,8 @@ pub(crate) struct GroundSurveyJob {
     phase: Phase,
     walk_patch: Option<(u16, u16)>,
     node_cursor: u16,
+    #[cfg(test)]
+    query_calls: std::cell::Cell<u64>,
 }
 impl SurfaceSortieState {
     pub(crate) fn ground_survey_job(
@@ -157,6 +162,8 @@ impl GroundSurveyJob {
             phase: Phase::NodeRay(0),
             walk_patch: None,
             node_cursor: 0,
+            #[cfg(test)]
+            query_calls: std::cell::Cell::new(0),
         }
     }
     /// A sparse outer-contour hypothesis, never evidence that routes outside
@@ -216,6 +223,8 @@ impl GroundSurveyJob {
         self.measurements.position + point.rotate_radians(self.measurements.angle)
     }
     fn clear(&self, point: Vec2) -> bool {
+        #[cfg(test)]
+        self.query_calls.set(self.query_calls.get() + 1);
         if let Some(footprint) = &self.measurements.footprint {
             let spec = SurfaceSortieState::spec();
             footprint.borrow_mut().capsule(
@@ -232,6 +241,8 @@ impl GroundSurveyJob {
         )
     }
     fn ray(&self, origin: Vec2, direction: Vec2, distance: f32) -> Option<RayHit> {
+        #[cfg(test)]
+        self.query_calls.set(self.query_calls.get() + 1);
         if let Some(footprint) = &self.measurements.footprint {
             footprint.borrow_mut().ray(origin, direction, distance);
         }

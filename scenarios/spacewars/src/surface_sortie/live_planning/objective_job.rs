@@ -1,4 +1,5 @@
 use super::*;
+use ground_navigation::{WalkCorridorJob, WalkCorridorResult};
 use jetpack::forecast::{
     FlightForecastJob, FlightScene, Proposal, ProposalJob, VehicleCrossingForecast,
 };
@@ -44,6 +45,8 @@ pub(crate) struct ObjectiveSurveyJob {
     focused: Option<Box<ObjectiveSurveyJob>>,
     focused_reused: ReusedGroundWork,
     direct_hull_queries: bool,
+    corridor: Option<(Candidate, Box<WalkCorridorJob>)>,
+    corridor_rise: Option<(Option<LandingSiteId>, f32)>,
 }
 impl SurfaceSortieState {
     #[cfg(test)]
@@ -207,6 +210,8 @@ impl SurfaceSortieState {
             focused: None,
             focused_reused: ReusedGroundWork::default(),
             direct_hull_queries: false,
+            corridor: None,
+            corridor_rise: None,
         })
     }
 
@@ -270,6 +275,51 @@ impl ObjectiveSurveyJob {
         self.walk_patch = true;
         self
     }
+    /// Extend the opt-in short patch only for an explicitly requested site or
+    /// the actual hatch. Keep the full job, snapshot and source clock unchanged.
+    pub(super) fn with_requested_corridor(mut self, query: LandingSiteQuery) -> Self {
+        assert!(self.local_dependencies && self.corridor.is_none());
+        if self.focused.is_some() {
+            return self;
+        }
+        let candidate = self
+            .candidates
+            .iter()
+            .find(|c| c.site.is_none())
+            .or_else(|| {
+                self.candidates
+                    .iter()
+                    .find(|c| matches!(query, LandingSiteQuery::Selected(id) if c.site == Some(id)))
+            })
+            .copied();
+        let Some(c) = candidate else {
+            return self;
+        };
+        let Phase::Ground(ground) = &self.phase else {
+            panic!("start a corridor before dispatch");
+        };
+        let (position, angle) = (self.position, self.angle);
+        let preview = Arc::clone(&self.preview);
+        let hull = Arc::new(move |point: Vec2| {
+            preview(
+                position + point.rotate_radians(angle),
+                rotation_for_direction(point) + angle,
+                c.vehicle,
+                c.angle,
+            )
+        });
+        if let Some(job) = ground.walk_corridor(
+            c.hatch,
+            self.result.objective.position,
+            self.result.objective.range,
+            c.boarding_hatches,
+            hull,
+        ) {
+            self.measurement_work.corridor_started = 1;
+            self.corridor = Some((c, Box::new(job)));
+        }
+        self
+    }
     /// Only finished positive candidates have complete path dependencies.
     /// Omitted alternatives remain unknown until the full job completes.
     pub(crate) fn positive_candidates(&self) -> Option<LandingObjectiveSurvey> {
@@ -291,6 +341,18 @@ impl ObjectiveSurveyJob {
     }
     pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
         &self.dependencies
+    }
+    pub(super) fn corridor_rise_valid(
+        &self,
+        site: Option<LandingSiteId>,
+        gravity: impl FnOnce() -> f32,
+    ) -> bool {
+        self.corridor_rise.is_none_or(|(id, rise)| {
+            id != site
+                || rise
+                    <= SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * gravity().max(1.0))
+                        * 0.75
+        })
     }
     pub(super) fn walking_footprint(&self) -> Option<query_footprint::QueryFootprint> {
         self.measurements
@@ -355,6 +417,12 @@ impl ObjectiveSurveyJob {
         }))
     }
     fn finish_route(&mut self, route: LandingObjectiveRoute) {
+        if self
+            .corridor_rise
+            .is_some_and(|(site, _)| site == route.site)
+        {
+            self.corridor_rise = None;
+        }
         self.measurement_work.record(&route);
         if route.site.is_some() {
             self.result.sites.retain(|old| old.site != route.site);
@@ -380,8 +448,7 @@ impl ObjectiveSurveyJob {
     // Boarding floor/clearance probes are distinct from the last path node:
     // a route may stop within boarding range rather than at the probe itself.
     // Include both bounded probe corridors in positive-result validation.
-    fn entrance_dependencies(&self) -> [QueryArea; 2] {
-        let c = self.candidates[self.index];
+    fn entrance_dependencies(&self, c: Candidate) -> [QueryArea; 2] {
         let local = |point: Vec2| (point - self.position).rotate_radians(-self.angle);
         let up = (c.vehicle - self.position).normalized();
         let right = Vec2::new(up.y, -up.x);
@@ -413,6 +480,9 @@ impl ObjectiveSurveyJob {
 impl PlanningJob for ObjectiveSurveyJob {
     type Output = LandingObjectiveSurvey;
     fn next_work(&self) -> Option<WorkKind> {
+        if let Some((_, corridor)) = &self.corridor {
+            return corridor.next_work().or(Some(WorkKind::Graph));
+        }
         if let Some(focused) = &self.focused {
             return focused.next_work().or(Some(WorkKind::Graph));
         }
@@ -430,6 +500,40 @@ impl PlanningJob for ObjectiveSurveyJob {
         matches!(self.phase, Phase::Done).then_some(&self.result)
     }
     fn step(&mut self) {
+        if let Some((_, corridor)) = &mut self.corridor {
+            if corridor.next_work().is_some() {
+                corridor.step();
+            } else {
+                let (candidate, mut corridor) = self.corridor.take().unwrap();
+                self.measurement_work.corridor_completed += 1;
+                if let Some(WalkCorridorResult {
+                    outbound,
+                    returning,
+                    endpoint,
+                    mut areas,
+                    max_rise,
+                }) = corridor.take_result()
+                {
+                    self.measurement_work.corridor_successes += 1;
+                    self.corridor_rise = Some((candidate.site, max_rise));
+                    areas.extend(self.entrance_dependencies(candidate));
+                    self.dependencies.push((candidate.site, areas));
+                    let route = LandingObjectiveRoute {
+                        site: candidate.site,
+                        outbound,
+                        returning: Some(returning),
+                        endpoint: Some(endpoint),
+                        crossing: None,
+                    };
+                    if candidate.site.is_some() {
+                        self.result.sites.push(route);
+                    } else {
+                        self.result.actual = Some(route);
+                    }
+                }
+            }
+            return;
+        }
         if let Some(focused) = &mut self.focused {
             if focused.next_work().is_some() {
                 focused.step();
@@ -559,7 +663,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                         endpoint: result.endpoint,
                     };
                     let mut areas = j.take_areas();
-                    areas.extend(self.entrance_dependencies());
+                    areas.extend(self.entrance_dependencies(self.candidates[self.index]));
                     areas.extend(self.flight_area);
                     self.dependencies.retain(|(site, _)| *site != route.site);
                     self.dependencies.push((route.site, areas));
