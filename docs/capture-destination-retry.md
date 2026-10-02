@@ -89,3 +89,113 @@ python3 tools/validate-destination-retry.py \
   --binary target/destination-retry/surface_mission_soak-COMMIT \
   --out target/destination-retry/v1
 ```
+
+## Results and decision
+
+**Retain the opt-in; leave defaults unchanged.** The preference prevents the
+demonstrated value-switch loop from abandoning a useful neutral capture. It
+does not solve the blocked enemy approach, and no broader strength gain is
+established by the fresh matches.
+
+Implementation, tests, runner and plan were frozen at `0bafeb5`. The preserved
+binary is `target/destination-retry/surface_mission_soak-0bafeb5`, SHA-256
+`7e93de98e6ded36ac1fe85326c52b967b8a8b2522c09a5468d50fa88cb819a00`.
+All 64 runs completed in `target/destination-retry/v1`. The
+[results manifest](data/capture-destination-retry-v1.json) contains aggregate
+results, checks and two successful-retry context observations. The linked
+[compressed full study](data/capture-destination-retry-v1.json.gz) preserves
+commands, raw hashes, accepted forecasts, visits, memory and desktop timings.
+No policy or trial parameters changed after viewing gameplay results.
+
+| Measure, tested seat | Predecessor | Failure context |
+| --- | ---: | ---: |
+| Recorded completed capture sorties, 16 runs | 35 | 37 |
+| Recorded ships lost | 11 | 11 |
+| Recorded completed recoveries | 12 | 12 |
+| Fresh wins, 16 runs | 8 | 8 |
+| Fresh losses | 8 | 8 |
+| Fresh completed capture sorties | 42 | 42 |
+| Fresh ships lost | 12 | 12 |
+| Fresh completed recoveries | 5 | 5 |
+
+The recorded trajectories include reused worlds and both prior cover settings.
+Only two of those 16 pairs change physical outcomes: the same directed value
+fixture with cover response disabled and enabled. Each gains one completed
+neutral capture. The other 14 recorded pairs are physically identical. Recorded
+match outcomes remain six wins, four losses and six unfinished directed runs
+per arm; the extra captures do not establish extra wins.
+
+### The directed loop makes progress
+
+| Event with failure context enabled | Cover response off | Cover response on |
+| --- | ---: | ---: |
+| First rejected value switch back to planet 1 | 7,264 | 6,482 |
+| Planet 0 flag claimed | 8,596 | 7,880 |
+| Planet 0 sortie departed | 8,824 | 8,108 |
+| Initial picker returns to remaining planet 1 | 8,825 | 8,109 |
+| That enemy approach still fails | 10,743 | 9,271 |
+
+Both predecessors abandon planet 0 for planet 1 and complete no capture. The
+candidate retains planet 0 through its native landing and departure, then
+allows a fallback retry of planet 1 when no other unowned destination remains.
+The enemy attempt still fails in both cover settings. The improvement is a
+completed alternative objective, not a newly feasible enemy route.
+
+The two changed runs record 69 and 84 rejected switch proposals, respectively.
+These include repeated evaluations on neighboring control ticks; they are not
+153 independent strategic decisions. Their retained traces match the
+predecessors until the first rejection. No initial-picker choice changes in
+any of the 64 gameplay runs; that shared path is exercised by unit tests.
+
+### Successful retries are preserved
+
+Both previously identified successful retries retain their exact selection,
+claim and departure clocks. Material changes are observed before each return:
+
+- In the recorded asteroid/cover-response case, planet 1's failed context is
+  revision 9. At the first retained sample showing cleared memory, tick 4,545,
+  the planet is revision 10. The return is selected at 12,155, claims at 14,631
+  and departs at 14,884.
+- In `world2-asteroids0-p1` with cover response, the incomplete-search failure
+  is on revision 0 at 19,380. The first retained cleared-memory sample, 19,860,
+  shows revision 1. The return is selected at 21,182, claims at 24,162 and departs
+  at 24,383.
+
+Those sample clocks are not exact invalidation clocks, and changed material
+does not prove why the later captures succeed. The archived observations show
+why unchanged-context failure should not be inferred from a same-planet return.
+The fallback for a sole remaining target is also exercised in the directed
+replays and by a unit test at the native cooldown boundary.
+
+### Fresh matches and verification limits
+
+All 16 fresh pairs are physically identical and their normalized retained
+controller traces match for the whole run. The enabled arms record only two
+unclaimed capture failures; both records are later invalidated. No initial
+choice, switch or fallback admission changes in these fresh worlds. Thus the
+unchanged eight wins and eight losses validate preservation on this sample,
+not improved playing strength. The four worlds are reused across seats and
+asteroid settings and remain correlated.
+
+Fresh eligible travel/capture time is 258,971 ticks per arm; time accumulated
+after 20 seconds without progress is 47,390 ticks in each. Recorded eligible
+time increases from 265,066 to 267,556 ticks, and time without progress from
+210,136 to 212,174; time after 20 seconds without progress stays at 29,423.
+There is no demonstrated broad reduction in stalled time.
+
+All 16 disabled recorded replays reproduce their original physical, mission,
+progress and controller/planner records. Sensor parity covers 640,776 player
+observations. The 64 runs audit 1,399,024 main dispatch ticks, with maxima of four
+graph operations and 192 physics queries. Synchronous native sensing remains
+outside that quota; these desktop results do not establish Pi frame time.
+
+314 AI unit tests, four physical destination tests, 39 harness tests and 615
+Python tests pass (972 total). Formatting, strict AI Clippy with `--no-deps`, and
+both profiled and normal release harness builds pass. The new tests cover
+native failure recording before task disposal, both selection paths, stale and
+post-claim evidence, cooldown boundaries, fallback ordering, context changes,
+reset behavior and forecast invalidation.
+
+The next useful work is the remaining enemy approach. This preference can
+protect another objective from an unnecessary return, but once every other
+planet is secured, the controller still needs to complete that blocked approach.

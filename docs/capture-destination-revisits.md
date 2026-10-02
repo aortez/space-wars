@@ -185,3 +185,9 @@ new strength or hardware-performance claim. The read-only auditor has ten
 focused tests covering failure/visit identity, cooldown boundaries, censored
 history, pursuit pairing and accepted-forecast matching. All 609 Python tests
 pass; the archive records the test log hash. No physics reruns were needed.
+
+The subsequent [destination failure context experiment](capture-destination-retry.md)
+implements this shared preference as an opt-in. Its directed value loop gains a
+neutral capture while the previous successful retries remain unchanged. The
+fresh matches contain no preference intervention or demonstrated strength gain;
+the remaining enemy approach still fails and defaults remain unchanged.
