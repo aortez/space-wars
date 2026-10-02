@@ -63,12 +63,47 @@ pub(crate) struct Network {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct SavedNetwork {
+    /// NetworkManager UUID, independent of the SSID and transient D-Bus path.
+    pub id: String,
+    pub path: String,
+    pub name: String,
+    pub ssid_name: String,
+    pub autoconnect: bool,
+    pub priority: i32,
+    pub connected: bool,
+    pub network: Option<Network>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Inventory {
     pub devices: Vec<String>,
     pub networks: Vec<Network>,
+    pub profiles: Vec<SavedNetwork>,
+    pub can_manage: bool,
     pub can_connect: bool,
     pub can_scan: bool,
     pub summary: String,
+}
+
+impl Inventory {
+    pub fn preferred(&self, profile: &SavedNetwork) -> bool {
+        let mut alternatives = self
+            .profiles
+            .iter()
+            .filter(|p| p.id != profile.id && p.autoconnect)
+            .peekable();
+        profile.autoconnect
+            && (profile.priority > 0 || alternatives.peek().is_some())
+            && alternatives.all(|p| p.priority < profile.priority)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProfileChange {
+    Autoconnect(bool),
+    Prefer,
+    Forget { allow_active: bool },
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -80,6 +115,7 @@ pub(crate) enum Phase {
     Confirm,
     Saving,
     Restoring,
+    Managing,
 }
 
 impl Phase {
@@ -111,6 +147,13 @@ pub(crate) enum Command {
     Connect {
         id: String,
         password: Option<String>,
+    },
+    ConnectProfile {
+        id: String,
+    },
+    Manage {
+        id: String,
+        change: ProfileChange,
     },
     Keep,
     Cancel,
@@ -182,7 +225,7 @@ impl Session {
     }
 
     pub fn send(&mut self, command: Command) {
-        if self.commands.is_closed() && matches!(command, Command::Scan) {
+        if self.commands.is_closed() && matches!(command, Command::Scan | Command::Refresh) {
             *self = Self::new();
             return;
         }
@@ -196,7 +239,7 @@ impl Session {
             return;
         }
         let (phase, status) = match command {
-            Command::Connect { .. } => (
+            Command::Connect { .. } | Command::ConnectProfile { .. } => (
                 Phase::Connecting,
                 "Connecting… The previous network will be restored unless you keep this connection.",
             ),
@@ -204,6 +247,7 @@ impl Session {
             Command::Cancel => (Phase::Restoring, "Restoring previous connection…"),
             Command::Scan => (Phase::Discovering, "Requesting a Wi-Fi scan…"),
             Command::Refresh => (Phase::Discovering, "Reading Wi-Fi networks…"),
+            Command::Manage { .. } => (Phase::Managing, "Updating saved network…"),
         };
         if self.commands.try_send(command).is_ok() {
             view.phase = phase;

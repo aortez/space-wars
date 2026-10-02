@@ -527,6 +527,8 @@ export component MainWindow inherits Window {
     in property <string> network-subtitle;
     in property <string> network-detail;
     in property <bool> network-password-visible: false;
+    in property <bool> network-forget-confirmation: false;
+    in property <bool> network-profile-visible: false;
     in-out property <bool> network-password-revealed: false;
     in property <string> network-password-text;
     in property <string> network-password-mask;
@@ -2806,10 +2808,11 @@ export component MainWindow inherits Window {
             heading: root.network-title;
             subtitle: root.network-subtitle;
             property <length> password-height: root.width >= 640px ? 48px : 64px;
+            property <length> detail-height: root.network-forget-confirmation ? 144px : root.network-profile-visible ? 96px : 64px;
             hint: root.network-password-visible ? "D-pad/A type · B back · Select erase · Start connect" : "D-pad selects · A confirms · B back";
             if !root.network-password-visible: Text {
                 x: 24px; y: 82px; width: parent.width - 48px;
-                height: 64px;
+                height: parent.detail-height;
                 text: root.network-detail; color: #d8e8f8; font-size: 15px;
                 wrap: word-wrap; overflow: elide;
             }
@@ -2842,7 +2845,7 @@ export component MainWindow inherits Window {
                 }
             }
             if !root.network-password-visible: Flickable {
-                x: 24px; y: 154px; width: parent.width - 48px; height: parent.height - 192px;
+                x: 24px; y: 90px + parent.detail-height; width: parent.width - 48px; height: parent.height - 128px - parent.detail-height;
                 viewport-width: self.width;
                 viewport-height: root.network-rows.length * 60px;
                 property <int> focus-index: root.network-focus-index;

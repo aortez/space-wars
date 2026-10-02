@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use async_channel::Receiver;
 use futures_lite::future;
 
-use super::{Command, Inventory, Network, Phase, View};
+use super::{Command, Inventory, Network, Phase, ProfileChange, View};
 
 pub(super) const CALL_TIME: Duration = Duration::from_secs(5);
 const CONNECT_TIME: Duration = Duration::from_secs(40);
@@ -35,6 +35,7 @@ pub(super) trait Backend {
     async fn ready(&self, trial: &Trial) -> Result<bool, String>;
     async fn keep(&self, trial: &Trial) -> Result<(), String>;
     async fn rollback(&self, trial: &Trial) -> Result<(), String>;
+    async fn manage(&self, id: &str, change: ProfileChange) -> Result<(), String>;
 }
 
 pub(super) async fn bounded<T>(
@@ -71,6 +72,7 @@ async fn refresh(backend: &impl Backend, view: &mut View) {
             // but never start a mutation using an unverified inventory.
             view.inventory.can_connect = false;
             view.inventory.can_scan = false;
+            view.inventory.can_manage = false;
             view.inventory_error = Some(status);
         }
     }
@@ -127,12 +129,17 @@ struct Timing {
     confirm: Duration,
 }
 
+enum ConnectionTarget<'a> {
+    Nearby(&'a str),
+    Saved(&'a str),
+}
+
 async fn connect(
     backend: &impl Backend,
     commands: &Receiver<Command>,
     shared: &Mutex<View>,
     view: &mut View,
-    id: &str,
+    target: ConnectionTarget<'_>,
     password: Option<String>,
     timing: Timing,
 ) -> Result<(), String> {
@@ -144,11 +151,21 @@ async fn connect(
     if !inventory.can_connect {
         return Err("Wi-Fi changes are not permitted by the operating system.".into());
     }
-    let network = inventory
-        .networks
-        .iter()
-        .find(|n| n.id == id)
-        .ok_or("Network is no longer visible. Scan and select it again.")?;
+    let network = match target {
+        ConnectionTarget::Nearby(id) => inventory
+            .networks
+            .iter()
+            .find(|n| n.id == id)
+            .ok_or("Network is no longer visible. Scan and select it again.")?,
+        ConnectionTarget::Saved(id) => inventory
+            .profiles
+            .iter()
+            .find(|p| p.id == id)
+            .ok_or("Saved network no longer exists. Refresh and select it again.")?
+            .network
+            .as_ref()
+            .ok_or("Saved network is not currently available. Scan and try again.")?,
+    };
     if network.connected {
         return Err("Already connected to this network.".into());
     }
@@ -303,7 +320,12 @@ pub(super) async fn run_with_timing(
                 refresh(backend, &mut view).await;
                 scan(backend, &commands, &shared, &mut view, &mut last_scan).await;
             }
-            Command::Connect { id, password } => {
+            command @ (Command::Connect { .. } | Command::ConnectProfile { .. }) => {
+                let (id, password, saved) = match command {
+                    Command::Connect { id, password } => (id, password, false),
+                    Command::ConnectProfile { id } => (id, None, true),
+                    _ => unreachable!(),
+                };
                 let started = Instant::now();
                 tracing::info!(
                     operation = "wifi-connect",
@@ -314,7 +336,11 @@ pub(super) async fn run_with_timing(
                     &commands,
                     &shared,
                     &mut view,
-                    &id,
+                    if saved {
+                        ConnectionTarget::Saved(&id)
+                    } else {
+                        ConnectionTarget::Nearby(&id)
+                    },
                     password,
                     Timing {
                         connect: connect_time,
@@ -324,7 +350,8 @@ pub(super) async fn run_with_timing(
                 .await
                 {
                     Ok(()) => {
-                        "Connection kept. NetworkManager will reconnect automatically.".into()
+                        "Connection kept. Saved automatic-connection preferences still apply."
+                            .into()
                     }
                     Err(error) => error,
                 };
@@ -335,6 +362,38 @@ pub(super) async fn run_with_timing(
                     "Wi-Fi trial finished"
                 );
                 // Drop stale button presses; they cannot commit another attempt.
+                while commands.try_recv().is_ok() {}
+                refresh(backend, &mut view).await;
+            }
+            Command::Manage { id, change } => {
+                view.phase = Phase::Managing;
+                view.status = "Updating saved network…".into();
+                publish(&shared, &view, &commands);
+                view.status = match bounded(CALL_TIME * 3, async {
+                    let inventory = backend.inventory().await?;
+                    if commands.is_closed() {
+                        return Err("Wi-Fi setup closed before the change started.".into());
+                    }
+                    if !inventory.can_manage {
+                        return Err("Saved network changes are unavailable. Refresh and check permissions.".into());
+                    }
+                    let profile = inventory.profiles.iter().find(|p| p.id == id)
+                        .ok_or("Saved network no longer exists. Refresh and select it again.")?;
+                    if matches!(change, ProfileChange::Forget { allow_active: false }) && profile.connected {
+                        return Err("This network is now active. Review the connection warning and confirm Forget again.".into());
+                    }
+                    if change == ProfileChange::Prefer && !profile.autoconnect {
+                        return Err("Enable Connect automatically before preferring this network.".into());
+                    }
+                    backend.manage(&id, change).await
+                }).await {
+                    Ok(()) => match change {
+                        ProfileChange::Forget { .. } => "Saved network forgotten.".into(),
+                        ProfileChange::Autoconnect(_) => "Automatic connection setting saved. Your current connection has not been switched.".into(),
+                        ProfileChange::Prefer => "Preferred network saved for future automatic connections. Your current connection has not been switched.".into(),
+                    },
+                    Err(error) => format!("{error} Check the refreshed saved-network settings before retrying."),
+                };
                 while commands.try_recv().is_ok() {}
                 refresh(backend, &mut view).await;
             }
@@ -354,6 +413,11 @@ fn publishing_inventory_preserves_queued_operation_phase_and_status() {
         Command::Connect {
             id: "id".into(),
             password: None,
+        },
+        Command::ConnectProfile { id: "id".into() },
+        Command::Manage {
+            id: "id".into(),
+            change: ProfileChange::Prefer,
         },
     ] {
         let (mut session, latest, receiver) = Session::simulated(View::default());
