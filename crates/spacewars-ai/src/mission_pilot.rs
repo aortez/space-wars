@@ -20,8 +20,11 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_capture_escape.rs"]
+mod capture_escape;
 #[path = "mission_pursuit_health.rs"]
 mod pursuit_health;
+pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
 pub use pursuit_health::{
     PURSUIT_HEALTH_PROFILE, PursuitHealthCheck, PursuitHealthDecision, PursuitHealthTelemetry,
 };
@@ -157,6 +160,8 @@ pub struct MissionTelemetry {
     pub destination_planning: Option<DestinationPlanningTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_retry: Option<DestinationRetryTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_escape: Option<CaptureEscape>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -254,6 +259,7 @@ impl MaterialMissionPilot {
                     .selects_destination()
                     .then(DestinationPlanningTelemetry::default),
                 destination_retry: None,
+                capture_escape: None,
             },
             capture: None,
             recovery: None,
@@ -289,6 +295,7 @@ impl MaterialMissionPilot {
         let cover_response = self.cover_response;
         let initial_cover = self.initial_cover;
         let actual_route_recovery = self.actual_route_recovery;
+        let capture_escape = self.telemetry.capture_escape.is_some();
         let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
@@ -304,6 +311,7 @@ impl MaterialMissionPilot {
         self.cover_response = cover_response;
         self.configure_initial_cover(initial_cover);
         self.configure_actual_route_recovery(actual_route_recovery);
+        self.configure_capture_escape(capture_escape);
         self.configure_powered_capture(powered_capture);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
@@ -415,6 +423,7 @@ impl MaterialMissionPilot {
             "configure before the first intent"
         );
         assert!(!enabled || self.policy() == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(enabled || self.telemetry.capture_escape.is_none());
         self.actual_route_recovery = enabled;
     }
     fn new_capture_task(&self, o: &MissionObservationV1) -> TacticalCapturePilot {
@@ -667,6 +676,7 @@ impl MaterialMissionPilot {
         self.telemetry.reason = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
+        self.update_capture_escape(o);
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
         let replacing = self.recovery.as_ref().is_some_and(|task| {
             task.telemetry().goal == crate::recovery_task::RecoveryGoal::Scuttle
@@ -753,6 +763,9 @@ impl MaterialMissionPilot {
         }
         if !p.controls_armed {
             return CombatIntent::default();
+        }
+        if let Some(intent) = self.capture_escape_intent(o) {
+            return intent;
         }
         if self.pursuit_opportunity(o, defer_new_pursuit) {
             return self.hunt(o);
@@ -879,7 +892,18 @@ impl MaterialMissionPilot {
                 return CombatIntent::default();
             }
             if let Some(reason) = t.failure {
+                let abort = t
+                    .actual_route_recovery
+                    .as_ref()
+                    .and_then(|r| r.abort)
+                    .filter(|a| {
+                        t.failed_tick == Some(a.tick)
+                            && reason == crate::tactical_sortie::ACTUAL_ROUTE_ABORT_REASON
+                    });
                 self.reconsider(p.tick, reason, true);
+                if let Some(abort) = abort {
+                    self.start_capture_escape(o, abort);
+                }
                 return CombatIntent::default();
             }
             if (p.planet.index != target.index || self.departure_obstacle.is_some())

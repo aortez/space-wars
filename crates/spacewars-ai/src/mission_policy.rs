@@ -131,6 +131,11 @@ impl MissionBot {
         self.0.configure_actual_route_recovery(enabled);
         self
     }
+    /// Opt-in escape after a witnessed local actual-hatch capture abort.
+    pub fn with_capture_escape(mut self, enabled: bool) -> Self {
+        self.0.configure_capture_escape(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

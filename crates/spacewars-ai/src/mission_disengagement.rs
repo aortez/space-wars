@@ -11,6 +11,7 @@ pub use handoff::{
 #[path = "mission_boundary.rs"]
 mod boundary;
 pub use boundary::BoundaryGuidance;
+pub(super) use boundary::stopping_clearance;
 #[path = "mission_destination_cover.rs"]
 mod destination_cover;
 use scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest;
@@ -19,9 +20,9 @@ fn disabled(value: &bool) -> bool {
     !value
 }
 
-const DISENGAGEMENT_TICKS: u64 = 12 * 60;
-const CLEAR_TICKS: u64 = 60;
-const CLEAR_RANGE: f32 = 350.0;
+pub(super) const DISENGAGEMENT_TICKS: u64 = 12 * 60;
+pub(super) const CLEAR_TICKS: u64 = 60;
+pub(super) const CLEAR_RANGE: f32 = 350.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MissionDisengagement {
@@ -62,7 +63,7 @@ pub struct DisengagementAttempt {
 // boundary experiment, evaluated only at the handoff. This is a
 // coarse inertial forecast using observed motion and control limits, not a
 // collision oracle or a prediction of the opponent's future choices.
-fn escape_direction(o: &MissionObservationV1, boundary_aware: bool) -> (Vec2, f32, f32) {
+pub(super) fn escape_direction(o: &MissionObservationV1, boundary_aware: bool) -> (Vec2, f32, f32) {
     let c = &o.local.combat;
     let p = &c.recovery.flight.pilot;
     let target = c.target.unwrap();
@@ -310,7 +311,11 @@ impl MaterialMissionPilot {
 
     // The bounded successor probe uses the same motor action, while retaining
     // the original attempt's deadline instead of restarting an escape timer.
-    fn escape_flight(&mut self, o: &MissionObservationV1, direction: Vec2) -> CombatIntent {
+    pub(super) fn escape_flight(
+        &mut self,
+        o: &MissionObservationV1,
+        direction: Vec2,
+    ) -> CombatIntent {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         self.goal(MissionGoal::Disengage, p.tick);
