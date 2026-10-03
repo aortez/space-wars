@@ -142,3 +142,8 @@ compares with ship turning/braking authority. Only then freeze a bounded dodge
 hypothesis, preserving planet clearance, arrival gates and the original transfer
 deadline. A proximity-only opponent constraint or extra post-damage retreat is
 not yet supported as a fix for this specific loss.
+
+The [bounded projectile diagnostic](projectile-diagnostics.md) now retains exact
+replays and identifies a continuous warning episode beginning 0.917 seconds
+before this hit. The earlier baseline path does not trigger that screen. The
+next experiment can test a short physical avoidance response from that state.
