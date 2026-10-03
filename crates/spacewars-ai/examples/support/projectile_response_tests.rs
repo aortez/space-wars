@@ -2,6 +2,87 @@ use super::*;
 use engine_core::Vec2;
 
 #[test]
+fn native_transfers_require_explicit_scope_and_retain_physical_priorities() {
+    use scenario_spacewars::surface_sortie::SurfaceSortieScenario;
+    use spacewars_ai::{BrainReset, mission_pilot::MaterialMissionPilot};
+    let state = SurfaceSortieScenario::init_material_combat(42);
+    let mut o = state.mission_observation(1, None);
+    o.match_rules = true;
+    o.local.combat.recovery.flight.flight.enabled = true;
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.controls_armed = true;
+    p.queries_ready = true;
+    p.landing.phase = LandingPhase::Flying;
+    p.landing.supported_feet = 0;
+    let mut m = MaterialMissionPilot::new(
+        BrainReset {
+            actor: p.owner,
+            episode_seed: 42,
+        },
+        Default::default(),
+    )
+    .telemetry()
+    .clone();
+    m.goal = MissionGoal::Transfer;
+    m.goal_since = 10;
+    m.target = Some(0);
+    assert_eq!(response_key(Scope::Escape, &o, &m), None);
+    assert_eq!(
+        response_key(Scope::Transfer, &o, &m),
+        Some(ResponseKey::Native {
+            goal_since: 10,
+            vehicle: VehicleId(1),
+            destination: 0,
+        })
+    );
+    for goal in [
+        MissionGoal::Launch,
+        MissionGoal::AvoidSun,
+        MissionGoal::Capture,
+        MissionGoal::Recover,
+    ] {
+        m.goal = goal;
+        assert_eq!(response_key(Scope::Transfer, &o, &m), None);
+    }
+    m.goal = MissionGoal::Transfer;
+    o.local.combat.recovery.flight.flight.enabled = false;
+    assert_eq!(response_key(Scope::Transfer, &o, &m), None);
+    o.local.combat.recovery.flight.flight.enabled = true;
+    o.local.combat.recovery.flight.pilot.landing.supported_feet = 1;
+    assert_eq!(response_key(Scope::Transfer, &o, &m), None);
+    assert_eq!(response_scope("escape"), Scope::Escape);
+    assert_eq!(response_scope("transfer"), Scope::Transfer);
+}
+
+#[test]
+fn a_new_native_transfer_episode_cancels_without_rearming() {
+    let original = ResponseKey::Native {
+        goal_since: 10,
+        vehicle: VehicleId(1),
+        destination: 0,
+    };
+    let next = ResponseKey::Native {
+        goal_since: 21,
+        vehicle: VehicleId(1),
+        destination: 0,
+    };
+    let mut p = pulse(Mode::Left);
+    let mut intent = CombatIntent::default();
+    assert!(p.step(20, Some(original), Some(threat()), &mut intent));
+    assert!(!p.step(21, Some(next), Some(threat()), &mut intent));
+    assert!(!p.step(22, Some(original), Some(threat()), &mut intent));
+    assert_eq!(p.attempt.unwrap().applied_ticks, 1);
+}
+
+#[test]
+fn escape_identity_keeps_its_existing_serialization() {
+    assert_eq!(
+        serde_json::to_value(ResponseKey::Escape(key())).unwrap(),
+        serde_json::to_value(key()).unwrap()
+    );
+}
+
+#[test]
 fn response_seat_can_target_p2_without_changing_the_reporting_seat() {
     assert_eq!(response_seat("reporting", 0), 0);
     assert_eq!(response_seat("reporting", 1), 1);
@@ -66,13 +147,18 @@ fn observe_mode_leaves_actions_exact_and_still_closes_fixed_window() {
     intent.weapons.cannon = true;
     let original = intent;
     for tick in 200..=230 {
-        assert!(!p.step(tick, Some(key()), Some(threat()), &mut intent));
+        assert!(!p.step(
+            tick,
+            Some(ResponseKey::Escape(key())),
+            Some(threat()),
+            &mut intent
+        ));
         assert_eq!(intent, original);
     }
     let a = p.attempt.unwrap();
     assert_eq!(a.applied_ticks, 0);
     assert_eq!(a.finished_tick, Some(230));
-    assert_eq!(a.source.deadline_tick, 3700);
+    assert_eq!(a.source, ResponseKey::Escape(key()));
 }
 
 #[test]
@@ -83,7 +169,12 @@ fn pulses_are_thirty_wall_ticks_and_cannot_rearm_from_repeated_threats() {
             let mut intent = CombatIntent::default();
             let original = intent;
             assert_eq!(
-                p.step(tick, Some(key()), Some(threat()), &mut intent),
+                p.step(
+                    tick,
+                    Some(ResponseKey::Escape(key())),
+                    Some(threat()),
+                    &mut intent
+                ),
                 tick < 230
             );
             if tick >= 230 {
@@ -122,11 +213,26 @@ fn native_priority_and_identity_changes_cancel_permanently() {
     ] {
         let mut p = pulse(Mode::Left);
         let mut intent = CombatIntent::default();
-        assert!(p.step(200, Some(key()), Some(threat()), &mut intent));
+        assert!(p.step(
+            200,
+            Some(ResponseKey::Escape(key())),
+            Some(threat()),
+            &mut intent
+        ));
         let mut original = CombatIntent::default();
-        assert!(!p.step(201, changed, Some(threat()), &mut original));
+        assert!(!p.step(
+            201,
+            changed.map(ResponseKey::Escape),
+            Some(threat()),
+            &mut original
+        ));
         assert_eq!(original, CombatIntent::default());
-        assert!(!p.step(202, Some(key()), Some(threat()), &mut original));
+        assert!(!p.step(
+            202,
+            Some(ResponseKey::Escape(key())),
+            Some(threat()),
+            &mut original
+        ));
         assert_eq!(p.attempt.unwrap().applied_ticks, 1);
     }
 }
@@ -161,7 +267,7 @@ fn no_eligible_transfer_or_threat_cannot_arm() {
     let mut p = pulse(Mode::Brake);
     let mut intent = CombatIntent::default();
     assert!(!p.step(200, None, Some(threat()), &mut intent));
-    assert!(!p.step(201, Some(key()), None, &mut intent));
+    assert!(!p.step(201, Some(ResponseKey::Escape(key())), None, &mut intent));
     assert!(p.attempt.is_none());
 }
 
@@ -170,6 +276,16 @@ fn no_eligible_transfer_or_threat_cannot_arm() {
 fn duplicate_ticks_cannot_extend_or_double_count_a_pulse() {
     let mut p = pulse(Mode::Brake);
     let mut intent = CombatIntent::default();
-    p.step(200, Some(key()), Some(threat()), &mut intent);
-    p.step(200, Some(key()), Some(threat()), &mut intent);
+    p.step(
+        200,
+        Some(ResponseKey::Escape(key())),
+        Some(threat()),
+        &mut intent,
+    );
+    p.step(
+        200,
+        Some(ResponseKey::Escape(key())),
+        Some(threat()),
+        &mut intent,
+    );
 }

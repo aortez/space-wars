@@ -79,6 +79,7 @@ def survey(case,run):
             first=dict(tick=tick,threat=selected,evidence=e,diagnostic=d,probe=pr)
     final=next(probe);assert next(probe,None) is None and next(evidence,None) is None
     damage=final['damage']
+    if previous_contact_count is not None:maximum_contact_increment=max(maximum_contact_increment,damage['debris_contacts']-previous_contact_count)
     if damage['last_contact_tick'] is not None and damage['last_contact_tick']!=last_contact:
         contacts.append(dict(tick=damage['last_contact_tick'],source=damage['last_contact_source'],
                              spawn_tick=damage['last_contact_spawn_tick'],damage=damage,pilot=None))

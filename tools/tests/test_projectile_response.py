@@ -16,6 +16,16 @@ def actions(brake=False):
 
 
 class ProjectileResponseTests(unittest.TestCase):
+    def test_expanded_scope_uses_native_episode_and_still_requires_enabled_flight(self):
+        e,_=fixture();e.pop('escape_travel')
+        e['mission']['goal_since']=920
+        row=dict(goal='transfer',target=e['mission']['target'],goal_since=e['mission']['goal_since'],
+                 capture_active=False,recovery_active=False,flight_enabled=True,match_rules=True)
+        self.assertIsNone(R.ready(row,e))
+        row['scope']='transfer';key=R.ready(row,e)
+        self.assertEqual(key,dict(goal_since=e['mission']['goal_since'],destination=e['mission']['target'],vehicle=e['pilot']['vehicle']))
+        row['flight_enabled']=False;self.assertIsNone(R.ready(row,e))
+
     def test_destroyed_unoccupied_ship_does_not_need_to_turn_into_a_pod(self):
         pilot=dict(ship_available=True,ship_form='ship',vehicle=0,location='on_foot')
         self.assertFalse(R.source_ship_missing(pilot,0))

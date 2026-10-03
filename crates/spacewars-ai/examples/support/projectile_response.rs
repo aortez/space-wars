@@ -47,6 +47,31 @@ struct TransferKey {
     destination: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+enum ResponseKey {
+    Escape(TransferKey),
+    Native {
+        goal_since: u64,
+        vehicle: VehicleId,
+        destination: usize,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Scope {
+    Escape,
+    Transfer,
+}
+
+fn response_scope(value: &str) -> Scope {
+    match value {
+        "escape" => Scope::Escape,
+        "transfer" => Scope::Transfer,
+        _ => panic!("--probe-projectile-response-scope must be escape or transfer"),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct Threat {
     id: DebrisId,
@@ -56,7 +81,7 @@ struct Threat {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct Attempt {
-    source: TransferKey,
+    source: ResponseKey,
     started_tick: u64,
     end_tick: u64,
     threat: Threat,
@@ -95,6 +120,38 @@ fn ready(o: &MissionObservationV1, m: &MissionTelemetry) -> Option<TransferKey> 
         && p.landing.phase == LandingPhase::Flying
         && p.landing.supported_feet == 0)
         .then_some(key)
+}
+
+fn response_key(
+    scope: Scope,
+    o: &MissionObservationV1,
+    m: &MissionTelemetry,
+) -> Option<ResponseKey> {
+    if let Some(key) = ready(o, m) {
+        return Some(ResponseKey::Escape(key));
+    }
+    let f = &o.local.combat.recovery.flight;
+    let p = &f.pilot;
+    let destination = m.target?;
+    (scope == Scope::Transfer
+        && o.match_rules
+        && !o.match_context.as_ref().is_some_and(|c| c.finished)
+        && m.goal == MissionGoal::Transfer
+        && m.capture.is_none()
+        && m.recovery.is_none()
+        && p.controls_armed
+        && p.queries_ready
+        && f.flight.enabled
+        && p.ship_available
+        && p.ship_form == ShipForm::Ship
+        && matches!(p.location, PilotLocation::Aboard(_))
+        && p.landing.phase == LandingPhase::Flying
+        && p.landing.supported_feet == 0)
+        .then_some(ResponseKey::Native {
+            goal_since: m.goal_since,
+            vehicle: p.vehicle,
+            destination,
+        })
 }
 
 // Same two-second, constant-relative-velocity circle screen as the frozen
@@ -168,7 +225,7 @@ impl Pulse {
     fn step(
         &mut self,
         tick: u64,
-        key: Option<TransferKey>,
+        key: Option<ResponseKey>,
         threat: Option<Threat>,
         intent: &mut CombatIntent,
     ) -> bool {
@@ -216,6 +273,7 @@ impl Pulse {
 
 pub struct ResponseProbe {
     seat: usize,
+    scope: Scope,
     pulse: Pulse,
     log: BufWriter<File>,
 }
@@ -235,6 +293,7 @@ impl ResponseProbe {
         assert_eq!(crate::arg("--trace-impact", "false"), "false");
         assert_eq!(crate::arg("--continue-successor", "none"), "none");
         Some(Self {
+            scope: response_scope(&crate::arg("--probe-projectile-response-scope", "escape")),
             seat: response_seat(
                 &crate::arg("--probe-projectile-response-seat", "reporting"),
                 seat,
@@ -266,7 +325,7 @@ impl ResponseProbe {
             return;
         }
         let p = &o.local.combat.recovery.flight.pilot;
-        let key = ready(o, m);
+        let key = response_key(self.scope, o, m);
         let diagnostic = if key.is_some() && self.pulse.attempt.is_none() {
             let d = state
                 .projectile_diagnostics(seat)
@@ -285,13 +344,20 @@ impl ResponseProbe {
         let original = *intent;
         let applied = self.pulse.step(p.tick, key, threat, intent);
         let context = active || diagnostic.is_some();
-        serde_json::to_writer(&mut self.log, &json!({"schema":1,"tick":p.tick,"seat":seat,
+        let mut record = json!({"schema":1,"tick":p.tick,"seat":seat,
             "mode":self.pulse.mode,"ready":key,"attempt":self.pulse.attempt,"applied":applied,
             "original_actions":original.encode(p.owner),"actions":intent.encode(p.owner),
             "observation":context.then_some(o),"goal":m.goal,
             "capture_active":m.capture.is_some(),"recovery_active":m.recovery.is_some(),"target":m.target,
             "travel":context.then_some(m.escape_travel.as_ref().and_then(|s|s.last)),
-            "diagnostic":diagnostic,"damage":state.damage_observation(seat)})).unwrap();
+            "diagnostic":diagnostic,"damage":state.damage_observation(seat)});
+        if self.scope == Scope::Transfer {
+            record["scope"] = json!("transfer");
+            record["goal_since"] = json!(m.goal_since);
+            record["flight_enabled"] = json!(o.local.combat.recovery.flight.flight.enabled);
+            record["match_rules"] = json!(o.match_rules);
+        }
+        serde_json::to_writer(&mut self.log, &record).unwrap();
         writeln!(self.log).unwrap();
     }
 

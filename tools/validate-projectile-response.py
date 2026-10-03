@@ -40,7 +40,7 @@ def override(actions, mode):
     return result
 
 
-def ready(row, evidence):
+def escape_ready(row, evidence):
     witness = evidence.get('escape_travel')
     if witness is None:
         return None
@@ -56,6 +56,21 @@ def ready(row, evidence):
             and p['landing']['phase'] == 'flying' and p['landing']['supported_feet'] == 0):
         return None
     return {k:a[k] for k in ['started_tick', 'deadline_tick', 'selected_tick', 'vehicle', 'destination']}
+
+
+def ready(row,evidence):
+    key=escape_ready(row,evidence)
+    if key is not None or row.get('scope','escape')!='transfer':return key
+    p=evidence['pilot'];m=evidence['mission']
+    assert row['goal_since']==m['goal_since']
+    if not (row['match_rules'] and not (evidence['match_context'] or {}).get('finished',False)
+            and row['goal']=='transfer' and row['target'] is not None
+            and not row['capture_active'] and not row['recovery_active']
+            and p['controls_armed'] and p['queries_ready'] and row['flight_enabled']
+            and p['ship_available'] and p['ship_form']=='ship'
+            and isinstance(p['location'],dict) and 'aboard' in p['location']
+            and p['landing']['phase']=='flying' and p['landing']['supported_feet']==0):return None
+    return dict(goal_since=m['goal_since'],vehicle=p['vehicle'],destination=m['target'])
 
 
 def threat(d):
@@ -111,7 +126,13 @@ def audit_response(root, old_root, mode, seat, report):
         assert (row['diagnostic'] is not None) == should_sample
         if should_sample:
             assert row['diagnostic'] == d['diagnostic']
-            assert row['observation'] == e['escape_travel']['observation']
+            if 'started_tick' in key:
+                assert row['observation'] == e['escape_travel']['observation']
+            else:
+                o=row['observation'];f=o['local']['combat']['recovery']['flight']
+                assert {k:v for k,v in f['pilot'].items() if k!='sites'}==e['pilot']
+                assert o['planets']==e['planets'] and o['match_context']==e['match_context']
+                assert row['flight_enabled']==f['flight']['enabled'] and row['match_rules']==o['match_rules']
         selected = threat(row['diagnostic'])
         expected, applied = advance(previous, tick, key, selected, mode)
         actual = row['attempt']
