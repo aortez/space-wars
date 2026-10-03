@@ -77,10 +77,10 @@ fn seeded_bursts_replay_vary_and_ignore_rejected_attempts() {
 }
 
 #[test]
-fn varied_fans_stay_in_free_space_and_inside_water_energy_and_speed_budgets() {
+fn fixed_and_varied_fans_stay_in_free_space_and_inside_water_energy_and_speed_budgets() {
     for max_speed in [80.0, 1000.0] {
-        for seed in [0, 7, 19, u64::MAX] {
-            for tilt in [-0.5_f32, 0.0, 0.5] {
+        for seed in [None, Some(0), Some(7), Some(19), Some(u64::MAX)] {
+            for tilt in [-0.5_f32, -0.25, 0.0, 0.25, 0.5] {
                 for sign in [-1.0, 1.0] {
                     let normal = Vec2::new(sign * tilt.cos(), tilt.sin());
                     let mut state = State::default();
@@ -88,7 +88,13 @@ fn varied_fans_stay_in_free_space_and_inside_water_energy_and_speed_budgets() {
                         let mut p = source();
                         let config = WaterConfig {
                             max_speed,
-                            ..varied(seed)
+                            ..seed.map_or(
+                                WaterConfig {
+                                    splash: Some(SplashConfig::default()),
+                                    ..WaterConfig::default()
+                                },
+                                varied,
+                            )
                         };
                         assert!(state.split(
                             &mut p,
@@ -105,10 +111,13 @@ fn varied_fans_stay_in_free_space_and_inside_water_energy_and_speed_budgets() {
                             (p.volume + drops.iter().map(|p| p.volume).sum::<f64>() - 12.0).abs()
                                 < 1e-12
                         );
-                        assert!(drops.iter().all(|p| p.volume > 0.0
-                            && p.velocity.y > 0.0
-                            && p.velocity.dot(normal) >= 0.0
-                            && p.velocity.length() <= max_speed as f32 + 0.0001));
+                        assert!(
+                            drops.iter().all(|p| p.volume > 0.0
+                                && p.velocity.y > 0.0
+                                && p.velocity.dot(normal) >= 0.0
+                                && p.velocity.length() <= max_speed as f32 + 0.0001),
+                            "seed={seed:?} normal={normal:?} max_speed={max_speed}: {drops:?}"
+                        );
                         let energy: f64 = drops
                             .iter()
                             .map(|p| p.volume * f64::from(p.velocity.length_squared()) * 0.5)
@@ -123,24 +132,18 @@ fn varied_fans_stay_in_free_space_and_inside_water_energy_and_speed_budgets() {
 }
 
 #[test]
-fn varied_wall_fans_mirror_with_the_same_seed() {
-    for burst in 0..32 {
-        let a = Pattern::new(
-            varied(19).splash.unwrap(),
-            Vec2::new(-0.98, -0.2).normalized(),
-            burst,
-        );
-        let b = Pattern::new(
-            varied(19).splash.unwrap(),
-            Vec2::new(0.98, -0.2).normalized(),
-            burst,
-        );
-        assert_eq!(a.interval, b.interval);
-        assert_eq!(a.weights, b.weights);
-        assert_eq!(a.speed_factors, b.speed_factors);
-        for (a, b) in a.directions.iter().zip(b.directions) {
-            assert_eq!(a.x, -b.x);
-            assert_eq!(a.y, b.y);
+fn fixed_and_varied_wall_fans_mirror() {
+    for config in [SplashConfig::default(), varied(19).splash.unwrap()] {
+        for burst in 0..32 {
+            let a = Pattern::new(config, Vec2::new(-0.25_f32.cos(), -0.25_f32.sin()), burst);
+            let b = Pattern::new(config, Vec2::new(0.25_f32.cos(), -0.25_f32.sin()), burst);
+            assert_eq!(a.interval, b.interval);
+            assert_eq!(a.weights, b.weights);
+            assert_eq!(a.speed_factors, b.speed_factors);
+            for (a, b) in a.directions.iter().zip(b.directions) {
+                assert_eq!(a.x, -b.x);
+                assert_eq!(a.y, b.y);
+            }
         }
     }
 }

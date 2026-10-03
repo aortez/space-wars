@@ -274,9 +274,15 @@ Two limits still bound this integration:
 #### Seeded timing and fan variation
 
 The optional `SplashVariation { seed, max_interval }` makes the repeated fan less
-regular. The original preset remains available with `variation: None`; all
-5,692 original PNG/SVG captures were checked byte-for-byte against the first
-gallery after adding this option.
+regular. The fixed preset remains available with `variation: None`. When this
+option was first added, all 5,692 original PNG/SVG captures matched the first
+gallery byte-for-byte. Review subsequently found that fixed rays could point
+into tilted panels: the clearance clamp ran only for varied fans. Both patterns
+now share that clamp. Earlier fixed-pattern captures and lab timing datasets
+predate this correction; regenerated fixed captures include it. The selected
+varied Clock treatment and its random sequence are unchanged. All 36 regenerated
+live Clock PNG/SVG captures and their cycle diagnostics matched the pre-fix
+versions byte-for-byte across the three cabinet layouts.
 
 Only a **successful burst** generates a pattern. It uses the engine's existing
 seeded RNG, with a seed derived from the configured seed and accepted burst
@@ -305,7 +311,8 @@ prefetch window. The same export command above regenerates the updated gallery.
 Replay and accounting sweeps cover each seed at 30/60/120 Hz. Tests also check
 that rejected attempts leave later patterns unchanged, different seeds diverge,
 cooldowns remain bounded, wall directions stay clear, and volume/energy/speed
-caps hold for tilted walls and capped or uncapped launch speeds. Unequal flows
+caps hold for fixed and varied fans on tilted walls with capped or uncapped
+launch speeds. Mirroring checks cover both patterns. Unequal flows
 still use the same centered base fan; adding a bias from the incoming flow is a
 separate experiment. The existing slice-size dependence on timestep also remains.
 

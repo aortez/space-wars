@@ -33,8 +33,8 @@ pub struct SplashConfig {
     pub energy_fraction: f64,
     /// Minimum simulated seconds between bursts across the whole water world.
     pub interval: f64,
-    /// Optional irregular timing, angles and droplet shares. None retains the
-    /// original fixed fan and interval for comparison.
+    /// Optional irregular timing, angles and droplet shares. None uses the
+    /// fixed fan and interval, with the same wall-clearance constraint.
     pub variation: Option<SplashVariation>,
 }
 
@@ -92,6 +92,17 @@ impl Pattern {
             interval: config.interval,
         };
         let Some(variation) = config.variation else {
+            if wall {
+                for direction in &mut pattern.directions {
+                    let base = direction.x.atan2(direction.y);
+                    let angle = Self::clamp_wall_angle(base.abs(), normal);
+                    // Keep the original ray when it already clears the wall.
+                    if angle != base {
+                        let (x, y) = angle.sin_cos();
+                        *direction = Vec2::new(x, y).normalized();
+                    }
+                }
+            }
             return pattern;
         };
         let mut rng = seeded_rng(
@@ -111,10 +122,7 @@ impl Pattern {
             let base = pattern.directions[i].x.atan2(pattern.directions[i].y);
             let jitter = (random_unit_f32(&mut rng) * 20.0 - 10.0).to_radians();
             let angle = if wall {
-                // Mirror the same seeded pattern for the opposite wall. Keep
-                // every ray on the free side, including tilted panel faces.
-                let minimum = (-normal.y).atan2(normal.x.abs()).max(0.0) + 0.001;
-                (base.abs() + jitter).clamp(minimum, 55.0_f32.to_radians()) * normal.x.signum()
+                Self::clamp_wall_angle(base.abs() + jitter, normal)
             } else {
                 base + jitter
             };
@@ -123,6 +131,13 @@ impl Pattern {
             pattern.speed_factors[i] = 0.75 + 0.25 * random_unit_f32(&mut rng);
         }
         pattern
+    }
+
+    fn clamp_wall_angle(angle: f32, normal: Vec2) -> f32 {
+        // Both patterns must clear tilted faces. Clamp the outward angle before
+        // mirroring it so opposite walls produce reflected fans.
+        let minimum = (-normal.y).atan2(normal.x.abs()).max(0.0) + 0.001;
+        angle.clamp(minimum, 55.0_f32.to_radians()) * normal.x.signum()
     }
 }
 
