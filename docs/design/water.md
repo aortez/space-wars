@@ -322,8 +322,9 @@ cases is 73 of 256 parcels, with zero capacity-limited ticks.
 This comparison includes the changed droplet paths and burst frequency: heavy
 flow produces 18 varied bursts versus 23 fixed bursts over the eight-second
 measurement. It does not isolate RNG cost. The small desktop differences show
-no material regression in this testbed; device presentation and full Clock
-performance still need separate measurement.
+no material regression in this testbed. The separate
+[full Clock Pi profile](../water-drain-splash-profile.md) measures complete
+events; native display presentation remains outside both comparisons.
 
 ![Varied heavy-flow splash, seed 7](../screenshots/water/drain-splash-varied.png)
 
@@ -373,10 +374,14 @@ CLI hashes were verified, the kiosk stayed healthy, and saved settings were
 preserved. A live Meltdown sample recorded five splash bursts with no capacity
 suppression and an exactly conserved material ledger.
 
-Before opening a PR, measure complete Clock events on the Pi with splashes on
-and off in otherwise-identical builds. The older installed executable also
-differs in rendering changes, so it is not an isolated splash-cost baseline.
-The desktop lab timings above do not establish full-event Pi performance.
+The [full-event Pi comparison](../water-drain-splash-profile.md) subsequently
+completed 36 runs and 76,320 measured frames against the same code with the
+Clock preset disabled. Median paired whole-frame changes across Rain and
+Meltdown were -0.5% to +0.3%, with similarly sized idle variation. At the saved
+2× scale, Rain changed by +0.025 ms/frame (+0.1%). This supports keeping the
+effect without an optimization detour; it is CPU frame-work evidence rather
+than displayed FPS or a speedup claim. The report retains exact builds, raw
+measurements and reproduction steps.
 
 ### Optional wet-surface impact response
 
