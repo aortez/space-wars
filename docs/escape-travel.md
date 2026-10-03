@@ -209,3 +209,10 @@ capture-route and arrival guards. Use the retained mismatch as a diagnostic,
 then freeze any proposed approach change before measuring complete outcomes
 and regressions. The current commitment addresses pursuit cancellation, but
 does not establish a successful physical trip or stronger play.
+
+The [clear-entry follow-up](transfer-approach.md) now tests an alternate approach
+bearing with clearance from neighboring bodies. It still fails to reach capture
+and loses both affected ships earlier. The ship enters the neighbor's local
+frame with more inward speed than its current clearance permits under the native
+climb rule. That evidence narrows the next investigation to the moving approach
+leg and relative closing speed; endpoint clearance alone is insufficient.
