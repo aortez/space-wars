@@ -171,3 +171,9 @@ binaries remain under `target/pod-braking`.
   `956f90667b2951c3e197eb5dddb4c50b876bf42efd9d3f5a4ad0c884c7e39f07`
 - Evidence archive SHA-256:
   `a63d6c9c90d50cf3bae59d345346d087f4e0c665766dc5e1a067ab41c4aff0f2`
+
+The subsequent [pursuit-health comparison](pursuit-health-gate.md) implements and
+tests the proposed entry gate. It preserves the earlier capture but loses the
+damaged-pilot match sooner, and changes one other former win to a loss. The
+option remains disabled; the next gap is safety during the alternative transfer
+and capture approach.
