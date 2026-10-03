@@ -653,6 +653,25 @@ enabled = true
     }
 
     #[test]
+    fn crow_tolerance_defaults_for_old_settings_and_round_trips_all_choices() {
+        use engine_common::ClockCrowWaterTolerance;
+        let mut settings: Settings =
+            toml::from_str("[clock]\nevent_profile = 'off'\n[clock.events]\ncrow = false\n")
+                .unwrap();
+        assert_eq!(
+            settings.clock.crow_water_tolerance,
+            ClockCrowWaterTolerance::Varied
+        );
+        assert!(!settings.clock.events.crow);
+        for tolerance in ClockCrowWaterTolerance::ALL {
+            settings.clock.crow_water_tolerance = tolerance;
+            let saved = toml::to_string(&settings).unwrap();
+            let loaded: Settings = toml::from_str(&saved).unwrap();
+            assert_eq!(loaded.clock, settings.clock);
+        }
+    }
+
+    #[test]
     fn pre_crow_settings_enable_the_visitor_without_changing_saved_choices() {
         let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\n").unwrap();
         assert!(settings.clock.events.crow);

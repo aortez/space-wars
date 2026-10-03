@@ -172,7 +172,7 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
-        let page = harness.change_clock_setting("pause.clock.crow", "On", &page);
+        let page = harness.change_clock_setting("pause.clock.crow", "Varied", &page);
         let configured = harness.clock_state();
         assert!(configured.settings.events.crow);
         assert_eq!(configured.crow, paused.crow);

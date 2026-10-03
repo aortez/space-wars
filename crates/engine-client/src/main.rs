@@ -803,6 +803,9 @@ fn show_launcher(
     window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
     window.set_launcher_clock_crow_enabled(settings.clock.events.crow);
+    window.set_launcher_clock_crow_water_tolerance(
+        settings.clock.crow_water_tolerance.label().into(),
+    );
     window.set_launcher_clock_explosion_enabled(settings.clock.events.explosion);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
@@ -1741,7 +1744,16 @@ fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         return;
     }
     if focus == 13 {
-        window.set_launcher_clock_crow_enabled(!window.get_launcher_clock_crow_enabled());
+        let current = if window.get_launcher_clock_crow_enabled() {
+            window.get_launcher_clock_crow_water_tolerance()
+        } else {
+            "Off".into()
+        };
+        let next = cycle_label(current.as_str(), &["Off", "Varied", "Shy", "Hardy"], delta);
+        window.set_launcher_clock_crow_enabled(next != "Off");
+        if next != "Off" {
+            window.set_launcher_clock_crow_water_tolerance(next.into());
+        }
         return;
     }
     if focus == 12 {
@@ -2366,6 +2378,12 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             .into_iter()
             .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
             .ok_or("Unknown Clock marquee recipe")?,
+        crow_water_tolerance: engine_common::ClockCrowWaterTolerance::ALL
+            .into_iter()
+            .find(|choice| {
+                choice.label() == window.get_launcher_clock_crow_water_tolerance().as_str()
+            })
+            .ok_or("Unknown Clock crow water tolerance")?,
         rain_amount: engine_common::ClockRainAmount::ALL
             .into_iter()
             .find(|amount| amount.label() == window.get_launcher_clock_rain_amount().as_str())
@@ -3227,6 +3245,7 @@ mod tests {
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),
                 rain_amount: engine_common::ClockRainAmount::Heavy,
+                crow_water_tolerance: engine_common::ClockCrowWaterTolerance::Hardy,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

@@ -855,11 +855,17 @@ mod tests {
         state.crow = Some(engine_common::ClockCrowState {
             visit_id: state.event_id,
             phase: engine_common::ClockCrowPhase::Entering,
+            water_tolerance: engine_common::ClockCrowWaterTolerance::Shy,
             phase_tick: 0,
             age_ticks: 0,
             position_milli: [10_000, 120_000],
             facing_right: true,
             target: Some([2, 1, 0]),
+            ground_target_milli: None,
+            ground_visits: 0,
+            pecks: 0,
+            wetness_milli: 0,
+            wet_departures: 0,
             hops: 0,
             escapes: 0,
         });
@@ -904,6 +910,19 @@ mod tests {
             state
         );
         assert_eq!(ClockEventKind::Crow as u8, 7);
+        let mut older = serde_json::to_value(&state).unwrap();
+        older["crow"]
+            .as_object_mut()
+            .unwrap()
+            .remove("water_tolerance");
+        assert_eq!(
+            ClockState::from_json(&older.to_string())
+                .unwrap()
+                .crow
+                .unwrap()
+                .water_tolerance,
+            engine_common::ClockCrowWaterTolerance::Shy
+        );
         state.crow = None;
         assert!(!predicate.matches(&state));
         let mut value = serde_json::to_value(&state).unwrap();

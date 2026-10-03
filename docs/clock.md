@@ -424,11 +424,16 @@ Additional actual-device frames: [warning](screenshots/clock/picade-explosion-wa
 
 ### Crow visitor
 
-Enable **Crow** in Clock settings, or select **Crow → Preview & Resume** in
+Set **Crow** to **Varied**, **Shy**, or **Hardy** in Clock settings, or select **Crow → Preview & Resume** in
 Clock Controls. Next Event includes it in the normal enabled-event cycle.
 Previewing a crow adds one visitor without cancelling an active animation;
 previewing it again leaves the existing visit and its deadline unchanged.
-Disabling the switch prevents future automatic admissions, not the current visit.
+Choosing **Off** prevents future automatic admissions, not the current visit.
+**Varied** is the default: 90% of visitors are rain-shy and 10% are hardy. **Shy**
+forces the familiar water avoidance; **Hardy** forces the occasional tolerant
+visitor. This is saved as `clock.crow_water_tolerance` independently of the
+on/off switch. Each bird's seeded temperament lasts for its entire visit;
+changing the setting affects the next visitor.
 
 The crow flies in above the face, lands on an exposed lit block, pauses, and
 occasionally hops along its row or flies to another digit. Only the topmost lit
@@ -445,7 +450,24 @@ strokes. Strong strokes have a larger wing sweep; landing uses softer strokes.
 It climbs above the face,
 crosses, then brakes onto its chosen digit. Landing depends on position and speed;
 travel no longer takes a fixed 100 ticks. Cruising height follows the digit size,
-with room for the wings in wide layouts. Hops and perch selection are unchanged.
+with room for the wings in wide layouts. Nearby hops retain their existing motion.
+
+After a short look around, a crow can make one ground excursion: descend through
+a clear lane beside the digits, peck three times, then head back to a nearby dry
+perch. A time/clearance check skips unsuitable trips, especially in narrow layouts.
+The normal departure deadline still wins over a late return. Custom duck courses
+and moving floor panels are excluded; losing level support interrupts the trip.
+
+Landing choices reject water deeper than the bird tolerates. Shy visitors avoid
+puddles at their feet and ground landings in spray. Hardy visitors accept puddles
+up to 0.85 cell pitches deep, so they can land and hop through water pooled on
+digit tops. They also accept spray, with ten times the spray tolerance (roughly
+three seconds of full contact rather than 0.3 seconds). Deep water still prompts immediate
+departure; sustained local spray eventually makes either visitor leave,
+while a brief splash can dry away. These queries read the existing pools and
+falling water without consuming it or adding collisions. Rain's presence alone
+does not make the bird flee. See the [ground and water study](design/crow-ground-water.md)
+for the behavior rules, paired simulation checks, and native preview.
 
 The crow adds no Rapier bodies, general collision shapes, fluid displacement or
 duck collisions. Swept foot contact checks the intended perch and surviving digit
@@ -458,8 +480,10 @@ remain future work. See the [flight study](design/crow-flight.md) for the motion
 model, comparison gallery and reproduction steps.
 
 `clock state` exposes `crow` separately from the timed `event_kind`: visit ID,
-phase (`entering`, `perched`, `hopping`, `flying`, `leaving`), phase/age ticks,
+phase (`entering`, `perched`, `pecking`, `hopping`, `flying`, `leaving`), phase/age ticks,
 position, facing, target `[digit slot, column, row]`, hop and support-loss counts.
+It also reports the resolved `water_tolerance`, ground target/visits, pecks,
+wet departures and `wetness_milli` (the fraction of that bird's spray tolerance used).
 The catalog's `blocked_by_crow` identifies a duplicate admission. From idle:
 
 ```sh
@@ -991,7 +1015,7 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 11; `NextEvent`
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 12; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1941,13 +1965,14 @@ non-null if those settings could not be persisted. Outside Marquee its diagnosti
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
 after completion or cancellation. Use matching client/CLI builds: schema 19 and
-older requests are rejected. The internal Clock action payload is version 11;
+older requests are rejected. The internal Clock action payload is version 12;
 event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
 little-endian u16 switch mask (bits 0–8, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
-font ID, rotation (0/1) and nonempty four-bit font-pool bytes, and 1–32 message
+font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
+byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message
 bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–10
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–11
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
