@@ -198,3 +198,10 @@ continuing it. The health variant already defers the discretionary chase, but
 incoming fire later cancels its transfer too. Test any bounded commitment rule
 against the complete retained suite; extending this escape deadline to fit the
 known near-success would not establish a general improvement.
+
+The [post-escape travel experiment](escape-travel.md) now tests that bounded
+commitment. It prevents the new chase but produces no new capture or completed
+departure in either affected case. The ship approaches planet 2 while using
+planet 1's local frame, so the native arrival guard never hands control to
+capture. The evidence points to approach geometry and local-frame handoff as
+the next investigation. Both options remain opt-in.
