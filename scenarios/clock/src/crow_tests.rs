@@ -1,10 +1,18 @@
 use super::*;
 
 fn fixture(aspect: f32, seed: u64) -> ClockState {
+    fixture_with_font(aspect, seed, ClockFont::Classic)
+}
+
+fn fixture_with_font(aspect: f32, seed: u64, font: ClockFont) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Off,
+            fonts: ClockFontSettings {
+                selected: font,
+                ..Default::default()
+            },
             ..Default::default()
         },
         seed,
@@ -24,9 +32,23 @@ fn tick(state: &mut ClockState) {
     ClockScenario::step(state, &[], Duration::from_millis(16));
 }
 
+fn wait_perched(state: &mut ClockState) {
+    for _ in 0..8 * 60 {
+        if state
+            .crow_state()
+            .is_some_and(|c| c.phase == crow::Phase::Perched)
+        {
+            return;
+        }
+        tick(state);
+    }
+    panic!("crow did not land: {:?}", state.crow_state());
+}
+
 #[test]
 fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() {
     for aspect in [0.25, 0.6, 0.75, 1024.0 / 768.0, 800.0 / 480.0, 4.0] {
+        let mut visits_with_hops = 0;
         for seed in 0..8 {
             let mut a = fixture(aspect, seed);
             let mut b = fixture(aspect, seed);
@@ -34,6 +56,10 @@ fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() 
             let mut saw_hop = false;
             for t in 0..=crow::CROW_TICKS {
                 assert_eq!(a.crow_state(), b.crow_state());
+                assert_eq!(
+                    a.crow_visit.as_ref().map(|c| c.flight),
+                    b.crow_visit.as_ref().map(|c| c.flight)
+                );
                 assert_eq!((a.body_count(), a.collider_count()), (0, 0));
                 assert_eq!(a.floor_mode(), engine_common::ClockFloorMode::Closed);
                 if let Some(crow) = a.crow_state() {
@@ -57,9 +83,13 @@ fn crow_visits_replay_hop_and_depart_with_no_physics_at_all_supported_aspects() 
                 tick(&mut a);
                 tick(&mut b);
             }
-            assert!(saw_perch && saw_hop, "aspect={aspect} seed={seed}");
+            assert!(saw_perch, "aspect={aspect} seed={seed}");
+            visits_with_hops += usize::from(saw_hop);
             assert!(a.crow_state().is_none());
         }
+        // Travel now takes as long as acceleration and landing need. An
+        // isolated-perch visit can spend its lifetime flying rather than hop.
+        assert!(visits_with_hops > 0, "no hopping at aspect={aspect}");
     }
 }
 
@@ -141,9 +171,7 @@ fn color_cycle_and_format_changes_preserve_or_retarget_real_perches() {
 #[test]
 fn crow_perch_tracks_real_cells_and_reacts_to_reading_changes_without_advancing_time() {
     let mut state = fixture(800.0 / 480.0, 42);
-    for _ in 0..105 {
-        tick(&mut state);
-    }
+    wait_perched(&mut state);
     let before = state.crow_state().unwrap();
     assert_eq!(before.phase, crow::Phase::Perched);
     let key = before.target.unwrap();
@@ -259,10 +287,12 @@ fn crow_pause_resize_disable_and_readmission_remain_bounded() {
         tick(&mut state);
     }
     let before = state.crow_state();
+    let flight_before = state.crow_visit.as_ref().unwrap().flight;
     for _ in 0..100 {
         ClockScenario::step(&mut state, &[], Duration::ZERO);
     }
     assert_eq!(state.crow_state(), before);
+    assert_eq!(state.crow_visit.as_ref().unwrap().flight, flight_before);
     let mut settings = state.settings();
     settings.events.crow = false;
     let action = ClockAction::configure(settings);
@@ -284,4 +314,89 @@ fn crow_pause_resize_disable_and_readmission_remain_bounded() {
         tick(&mut state);
     }
     assert!(state.crow_state().is_none());
+}
+
+#[test]
+fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
+    let mut first_landings = Vec::new();
+    for aspect in [0.25, 0.6, 0.75, 1024.0 / 768.0, 800.0 / 480.0, 4.0] {
+        for font in ClockFont::ALL {
+            for seed in 0..8 {
+                let mut state = fixture_with_font(aspect, seed, font);
+                let layout = Layout::new(aspect);
+                let mut first_landing = None;
+                let mut last_position = state.crow_visit.as_ref().unwrap().position;
+                let mut entered = false;
+                for _ in 0..crow::CROW_TICKS {
+                    if let Some(visit) = &state.crow_visit {
+                        let p = visit.position;
+                        entered |= p.x > layout.bounds_min.x && p.x < layout.bounds_max.x;
+                        if matches!(
+                            visit.phase,
+                            crow::Phase::Entering | crow::Phase::Flying | crow::Phase::Leaving
+                        ) {
+                            let top =
+                                11.0_f32.max(7.0 + visit.flight.wing * 6.0) * layout.pitch * 0.105;
+                            // The canopy is decorative. A departure can inherit
+                            // the old hop's apex, but must stay inside the frame.
+                            assert!(
+                                p.y + top < layout.bounds_max.y - layout.frame_width,
+                                "roof: aspect={aspect} font={font:?} seed={seed} p={p:?} {:?} {:?}",
+                                visit.phase,
+                                visit.flight
+                            );
+                        }
+                        assert!(p.y > layout.floor_y);
+                        for segment in state.segments().iter().filter(|s| s.lit) {
+                            for cell in segment.cells() {
+                                let center = layout.cell_center(segment.id, cell);
+                                let half = layout.pitch * 0.4 - 0.001;
+                                assert!(
+                                    (p.x - center.x).abs() >= half
+                                        || (p.y - center.y).abs() >= half,
+                                    "foot inside digit: {aspect} {font:?} {seed} {p:?} {center:?} {:?} {:?}",
+                                    visit.diagnostics(),
+                                    visit.flight
+                                );
+                            }
+                        }
+                        if visit.phase == crow::Phase::Perched {
+                            first_landing.get_or_insert(visit.diagnostics().age_ticks);
+                        }
+                        if visit.phase == crow::Phase::Leaving {
+                            assert!(
+                                first_landing.is_some(),
+                                "flight timed out before landing: {aspect} {font:?} {seed}"
+                            );
+                            assert!(
+                                visit.diagnostics().age_ticks >= 17 * 60,
+                                "approach timed out during an ordinary visit: {aspect} {font:?} {seed}"
+                            );
+                        }
+                        last_position = p;
+                    } else {
+                        break;
+                    }
+                    tick(&mut state);
+                }
+                assert!(
+                    first_landing.is_some() && entered,
+                    "{aspect} {font:?} {seed}"
+                );
+                first_landings.push(first_landing.unwrap());
+                assert!(state.crow_state().is_none());
+                assert!(
+                    last_position.x < layout.bounds_min.x || last_position.x > layout.bounds_max.x,
+                    "departure timed out on screen: {aspect} {font:?} {seed} {last_position:?}"
+                );
+                assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+            }
+        }
+    }
+    eprintln!(
+        "{} visits, first landing range {}–{} ticks",
+        first_landings.len(),
+        first_landings.iter().min().unwrap(),
+        first_landings.iter().max().unwrap()
+    );
 }
