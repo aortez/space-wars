@@ -70,3 +70,113 @@ python3 tools/validate-powered-routes.py \
   --binary target/powered-routes/surface_mission_soak-COMMIT \
   --out target/powered-routes/v1
 ```
+
+## Frozen results
+
+Keep this opt-in. Powered evidence now reaches both site selection and the actual
+hatch before expiry, and one armed run launches a jetpack flight. That flight is
+interrupted by a later unavailable forecast and does not complete its flag
+visit. The scheduling change also delivers walking evidence sooner in the
+powered policy, changing several physical outcomes. Defaults remain unchanged.
+
+Implementation and plan were frozen at `d2e3f69` before collecting outcomes.
+All 20 runs pass the existing physical, publication, work-allocation and walking
+notice audits. The six disabled directed replays retain exact prior streams;
+all seven enabled walking-policy runs also retain exact prior streams. Eight of
+the fourteen enabled runs keep identical action sequences. All six directed
+runs retain their completed-sortie counts: one neutral sortie in each blocked
+case and two sorties in each successful control.
+
+The four powered-policy armed comparisons are below. Counts belong to the
+evaluated seat and require physical claim, original-ship boarding and departure.
+
+| World / seat | Completed sorties, before → after | Outcome, before → after | Powered requests published | Jetpack launches |
+| --- | --- | --- | --- | --- |
+| 0 / P1 | 4 → 5 | Loss → win at time limit | 0 | 0 |
+| 0 / P2 | 5 → 3 | Loss → win after opponent death | 0 | 0 |
+| 1 / P1 | 1 → 2 | Loss → loss | 7 | 1 |
+| 1 / P2 | 3 → 3 | Loss → loss at time limit | 0 | 0 |
+
+The four walking-policy armed comparisons remain losses, giving two wins out of
+eight fixed armed comparisons versus zero before. The two wins involve no
+powered forecasts or launches. Their first changed actions follow earlier
+walking-route publication: an actual-hatch route at tick 9472 in world 0/P1,
+and a proposed walking route delivered to the opponent at tick 8246 in world
+0/P2, which shares the work allowance. These are scheduling observations in a
+small correlated corpus, not evidence that powered flight caused the wins.
+World 0/P2 also completes fewer sorties, and the match ends earlier.
+
+## Powered delivery and the remaining flight failure
+
+In world 1/P1, bearing 34 becomes usable during the original cover search.
+The first positive arrives at tick 6414 from source tick 6337, age 77. The prior
+run has already exhausted its walking candidates and is still waiting. Six
+requests publish this proposed crossing; a seventh validates the actual hatch:
+
+| Source tick | First publication | Age | Route |
+| --- | --- | --- | --- |
+| 6337 | 6414 | 77 | Proposed site 34 |
+| 7305 | 7382 | 77 | Proposed site 34 |
+| 7426 | 7503 | 77 | Proposed site 34 |
+| 7547 | 7623 | 76 | Proposed site 34 |
+| 7668 | 7744 | 76 | Proposed site 34 |
+| 7789 | 7865 | 76 | Proposed site 34 |
+| 8197 | 8272 | 75 | Actual hatch |
+
+All seven retain matching geometry/flight source clocks and the original
+120-tick launch window. Repeated validation produces 268 powered route entries;
+these are seven requests for one visit, not 268 independent successes.
+
+The pilot exits at tick 8273 and launches at 8282 with full charge, using the
+ordinary current forecast measured at 8280. Subsequent ordinary surveys at
+8310, 8340, 8370 and 8400 still provide forecasts. The pilot enters the crossing
+phase at 8412. At 8430 a completed survey contains neither a vehicle forecast
+nor its crossing. `GroundNavigationTask::follow_crossing` consequently
+interrupts the maneuver and switches to settling; charge remains about 0.778.
+No completed crossing is recorded. The ground task gives up at 8821 with
+`no complete flag round trip in fresh surveys`, and the visit is abandoned at
+8822 without a claim or completed sortie. Later recovery boards the original
+ship at 8973. A different subsequent visit supplies the extra completed sortie.
+
+The ordinary on-foot sensor does not report why that forecast became
+unavailable. The next investigation is to preserve its rejection reason and
+the relevant physics at tick 8430, then determine whether the interruption
+reflects a real clearance/flight failure or an inappropriate new-launch check
+during an already active flight. Existing validation must remain enforced.
+
+Across the corpus, 218 local passes start and 207 finish: 183 direct walks,
+seven powered routes and seventeen unsuccessful passes. Failures comprise
+five missing crossing-to-flag walks, six walking spans outside the cap, and six
+flight fuel-reserve failures. Of seventeen flight forecasts started, seven
+approve, six reject and four remain unfinished in the recorded runs. No
+unsuccessful or unfinished pass grants a route.
+
+## Validation and retained evidence
+
+The final source passes 1,013 Rust tests and 655 Python tests. Differential
+forecast tests preserve the original query sequence, physics samples, results,
+rejections and clocks across sixteen fixture combinations. With two jobs sharing
+the allowance, complete local powered routes arrive at age 36 in both parked
+fixtures and ages 113/108 in moving fixtures. Live tests also advance real
+physics through publication and verify expiry, missing boarding support, exact
+walk/flight endpoints and fresh snapshots after cached geometry.
+
+Formatting, strict AI-crate Clippy with `--no-deps`, and profiled/ordinary release
+builds pass. Strict scenario Clippy still reports seven existing findings in
+unchanged code. The trial audits cover 477,498 pilot rows and 271,149 dispatch
+ticks; maximum charged work remains 4 graph / 384 queries, with maximum
+publication age 120. Total live work increases by 28,285 graph operations and
+1,082,490 physics queries across the changed match trajectories and durations.
+This is not a performance or Raspberry Pi speedup claim.
+
+The [result manifest](data/local-powered-routes-v1.json) records every outcome,
+comparison and failure. The [compressed evidence archive](data/local-powered-routes-v1.json.gz)
+contains 48 exact documents: both frozen summaries, raw hashes, physical and
+route witnesses, first changed actions, the flight interruption, and validation
+logs. Its entries were rehashed against their original files. All 261 raw files
+remain under `target/powered-routes/v1`; the prior corpus was verified before
+and after the trials.
+
+- Binary SHA-256: `8285b5248883cfc978a3ae5f2190fa1f70a222a30ec0ac8443570746e15d9759`
+- Summary SHA-256: `6cb04c9e216013b6eb9761b4810c13b6501225e49bc15e0412134c8a89089e69`
+- Evidence SHA-256: `304ff46572b52bd1ffe65e9bd2e7c7b60f9371cb21bf7874d9230ed8046710b1`
