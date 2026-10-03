@@ -1,5 +1,5 @@
 use super::*;
-use ground_navigation::{WalkCorridorJob, WalkCorridorResult};
+use ground_navigation::{WalkCorridorBounds, WalkCorridorJob, WalkCorridorResult};
 use jetpack::forecast::{
     FlightForecastJob, FlightScene, Proposal, ProposalJob, VehicleCrossingForecast,
 };
@@ -48,6 +48,7 @@ pub(crate) struct ObjectiveSurveyJob {
     corridor: Option<(Candidate, Box<WalkCorridorJob>)>,
     corridor_rise: Option<(Option<LandingSiteId>, f32)>,
     exhausted_walk: Option<LandingSiteId>,
+    unsupported_walk: Option<(LandingSiteId, WalkCorridorBounds)>,
 }
 impl SurfaceSortieState {
     #[cfg(test)]
@@ -214,6 +215,7 @@ impl SurfaceSortieState {
             corridor: None,
             corridor_rise: None,
             exhausted_walk: None,
+            unsupported_walk: None,
         })
     }
 
@@ -234,6 +236,15 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn unsupported_walk(&self) -> Option<(LandingSiteId, WalkCorridorBounds)> {
+        self.unsupported_walk.filter(|(site, _)| {
+            !self
+                .result
+                .sites
+                .iter()
+                .any(|r| r.site == Some(*site) && r.cost().is_some())
+        })
+    }
     pub(super) fn exhausted_walk(&self) -> Option<LandingSiteId> {
         self.exhausted_walk.filter(|site| {
             !self
@@ -325,7 +336,7 @@ impl ObjectiveSurveyJob {
                 c.angle,
             )
         });
-        if let Some(job) = ground.walk_corridor(
+        match ground.walk_corridor(
             c.hatch,
             self.result.objective.position,
             self.result.objective.range,
@@ -333,9 +344,12 @@ impl ObjectiveSurveyJob {
             hull,
             extended,
         ) {
-            self.measurement_work.corridor_started = 1;
-            self.measurement_work.extended_started = u64::from(job.is_extended());
-            self.corridor = Some((c, Box::new(job)));
+            Ok(job) => {
+                self.measurement_work.corridor_started = 1;
+                self.measurement_work.extended_started = u64::from(job.is_extended());
+                self.corridor = Some((c, Box::new(job)));
+            }
+            Err(bounds) => self.unsupported_walk = c.site.map(|site| (site, bounds)),
         }
         self
     }

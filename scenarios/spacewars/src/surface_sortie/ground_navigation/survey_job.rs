@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 mod walk_corridor;
-pub(crate) use walk_corridor::{WalkCorridorJob, WalkCorridorResult};
+pub(crate) use walk_corridor::{WalkCorridorBounds, WalkCorridorJob, WalkCorridorResult};
 
 #[derive(Clone, Copy)]
 struct Cursor {

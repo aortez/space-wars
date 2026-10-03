@@ -170,7 +170,7 @@ fn obstructed_return_hull_or_missing_boarding_envelope_stays_unknown() {
                 Arc::new(|_| true),
                 false
             )
-            .is_none()
+            .is_err()
     );
 }
 
@@ -306,7 +306,7 @@ fn shorter_corridors_keep_their_original_sequence_and_longest_bound_remains_expl
                 extended,
             );
             if span > 220 {
-                assert!(job.is_none());
+                assert!(job.is_err());
                 continue;
             }
             let mut job = job.unwrap();
@@ -318,4 +318,42 @@ fn shorter_corridors_keep_their_original_sequence_and_longest_bound_remains_expl
             assert_eq!(runs[0], runs[1]);
         }
     }
+}
+
+#[test]
+fn unsupported_bounds_use_the_constructor_geometry_without_measuring_a_walk() {
+    let (_, ground, _) = fixture();
+    let before = ground.query_calls.get();
+    let point = |id: u16| Vec2::Y.rotate_radians(id as f32 * std::f32::consts::TAU / 512.0) * 60.0;
+    for start in [0, 127, 511] {
+        for direction in [-1, 1] {
+            for span in [92, 93, 220, 221, 256] {
+                for extended in [false, true] {
+                    let max_steps = if extended { 224 } else { 96 };
+                    let job = ground.walk_corridor(
+                        point(start),
+                        point(offset(start, direction * span)),
+                        2.8,
+                        [None; 2],
+                        Arc::new(|_| panic!("constructor must not query the hull")),
+                        extended,
+                    );
+                    match job {
+                        Ok(_) => assert!(span + 4 <= max_steps),
+                        Err(bounds) => {
+                            assert!(span + 4 > max_steps);
+                            assert_eq!(
+                                bounds,
+                                WalkCorridorBounds {
+                                    required_steps: (span + 4) as u16,
+                                    max_steps: max_steps as u16,
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(ground.query_calls.get(), before);
 }

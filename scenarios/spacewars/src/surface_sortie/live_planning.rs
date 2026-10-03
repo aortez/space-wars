@@ -22,7 +22,7 @@ mod destinations;
 mod diagnostics;
 pub use diagnostics::{
     ExhaustedWalkingAttempt, ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence,
-    RouteResultCounts,
+    RouteResultCounts, UnsupportedWalkingCorridor,
 };
 mod early_candidates;
 mod flag_survey;
@@ -148,6 +148,8 @@ impl ObjectiveMeasurementWork {
 pub struct LivePlanningTelemetry {
     #[serde(skip_serializing_if = "is_zero")]
     pub walk_probe_restarts: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub unsupported_walk_probe_restarts: u64,
     pub submitted: u64,
     /// Completed surveys that passed publication-time validation at least once.
     pub completed: u64,
@@ -271,6 +273,7 @@ pub struct LiveObjectivePlanner {
     requested_corridors: bool,
     extended_corridors: bool,
     walk_feedback: bool,
+    walk_bounds_feedback: bool,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -294,6 +297,7 @@ impl LiveObjectivePlanner {
             requested_corridors: false,
             extended_corridors: false,
             walk_feedback: false,
+            walk_bounds_feedback: false,
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -389,6 +393,19 @@ impl LiveObjectivePlanner {
     }
     pub fn uses_walk_feedback(&self) -> bool {
         self.walk_feedback
+    }
+    /// Let cover scheduling skip a walking method outside its angular bound.
+    /// This is separate from completing an unsuccessful measured attempt.
+    pub fn with_walk_bounds_feedback(mut self) -> Self {
+        assert!(
+            self.uses_walk_feedback(),
+            "walk bounds require walk feedback"
+        );
+        self.walk_bounds_feedback = true;
+        self
+    }
+    pub fn uses_walk_bounds_feedback(&self) -> bool {
+        self.walk_bounds_feedback
     }
     pub fn allowance(&self) -> Work {
         self.allowance
@@ -873,22 +890,36 @@ impl LiveObjectivePlanner {
         // A new, currently scanned candidate can replace a finished walking
         // probe's fallback. Preserve its charged work; the replacement takes a
         // fresh snapshot instead of relabeling the old measurements as fresh.
-        if self.walk_feedback
-            && self.requests.get(&player).is_some_and(|request| {
-                request.actual.is_none()
-                    && Self::actual(p).is_none()
-                    && Self::valid(state, player, p, request, objective, true).is_ok()
-                    && self.queue.job(request.token).is_some_and(|job| {
-                        job.output().is_none()
-                            && job.exhausted_walk().is_some_and(|old| {
-                                matches!(p.site_query, LandingSiteQuery::Selected(id)
-                            if id != old && p.sites.iter().any(|s| s.id == id))
-                            })
-                    })
-            })
-        {
+        let replace_probe = self.requests.get(&player).and_then(|request| {
+            if !self.walk_feedback
+                || request.actual.is_some()
+                || Self::actual(p).is_some()
+                || Self::valid(state, player, p, request, objective, true).is_err()
+            {
+                return None;
+            }
+            let job = self.queue.job(request.token)?;
+            if job.output().is_some() {
+                return None;
+            }
+            let (old, unsupported) =
+                job.exhausted_walk().map(|site| (site, false)).or_else(|| {
+                    self.walk_bounds_feedback
+                        .then(|| job.unsupported_walk())
+                        .flatten()
+                        .map(|(site, _)| (site, true))
+                })?;
+            matches!(p.site_query, LandingSiteQuery::Selected(id)
+                if id != old && p.sites.iter().any(|s| s.id == id))
+            .then_some(unsupported)
+        });
+        if let Some(unsupported) = replace_probe {
             self.retire(player);
-            self.telemetry.walk_probe_restarts += 1;
+            if unsupported {
+                self.telemetry.unsupported_walk_probe_restarts += 1;
+            } else {
+                self.telemetry.walk_probe_restarts += 1;
+            }
         }
         if let Some(request) = self.requests.get_mut(&player) {
             o.objective_evidence.as_mut().unwrap().request(request);
@@ -1005,6 +1036,23 @@ impl LiveObjectivePlanner {
                         }
                     }
                     JobPoll::Pending => {
+                        if self.walk_bounds_feedback {
+                            o.objective_evidence.as_mut().unwrap().unsupported_walk = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .unsupported_walk()
+                                .filter(|(site, _)| {
+                                    p.site_query == LandingSiteQuery::Selected(*site)
+                                        && p.sites.iter().any(|s| s.id == *site)
+                                })
+                                .map(|(site, bounds)| UnsupportedWalkingCorridor {
+                                    actor: p.owner,
+                                    site,
+                                    required_steps: bounds.required_steps,
+                                    max_steps: bounds.max_steps,
+                                });
+                        }
                         if self.walk_feedback {
                             o.objective_evidence.as_mut().unwrap().exhausted_walk = self
                                 .queue

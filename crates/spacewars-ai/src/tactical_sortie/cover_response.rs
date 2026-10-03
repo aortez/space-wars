@@ -19,8 +19,8 @@ pub struct CoverSearch {
     pub hold_altitude: f32,
     pub seeded: bool,
     pub pending: Vec<LandingSiteId>,
-    /// Tried walking hypotheses remain unknown and eligible for any later
-    /// positive route. They are not added to the rejected-site list.
+    /// Unsuccessful or unsupported walking hypotheses remain unknown and
+    /// eligible for later positive routes. They are not rejected sites.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub walk_deferred: Vec<LandingSiteId>,
     pub probes: usize,
@@ -310,9 +310,9 @@ impl TacticalSortiePilot {
                 state.requested_sites += 1;
             }
         } else if let Some(id) = search.pending.first().copied() {
-            let exhausted_walk = unknown.contains(&id) && walking_attempt_finished(o, search, id);
+            let deferred_walk = unknown.contains(&id) && walking_method_deferred(o, search, id);
             if p.site_query != LandingSiteQuery::Selected(id)
-                || (unknown.contains(&id) && !exhausted_walk)
+                || (unknown.contains(&id) && !deferred_walk)
             {
                 self.acquisition_reason("cover_evidence_pending");
                 return Some(self.wait_for_site(o, 12.0));
@@ -321,7 +321,7 @@ impl TacticalSortiePilot {
             // its route arrives. Missing or rejected survey data stays unknown.
             state.measured_sites +=
                 u64::from(survey.is_some_and(|s| s.sites.iter().any(|r| r.site == Some(id))));
-            if exhausted_walk {
+            if deferred_walk {
                 search.walk_deferred.push(id);
             }
             search.pending.remove(0);
@@ -379,7 +379,7 @@ impl TacticalSortiePilot {
     }
 }
 
-fn walking_attempt_finished(
+fn walking_method_deferred(
     o: &TacticalSortieObservationV1,
     search: &CoverSearch,
     site: LandingSiteId,
@@ -407,8 +407,13 @@ fn walking_attempt_finished(
             o.objective_work,
             Some(ObjectiveWorkState::Pending | ObjectiveWorkState::Ready)
         )
-        && e.exhausted_walk
-            .is_some_and(|a| a.actor == p.owner && a.site == site)
+        && match (e.exhausted_walk, e.unsupported_walk) {
+            (Some(a), None) => a.actor == p.owner && a.site == site,
+            (None, Some(a)) => {
+                a.actor == p.owner && a.site == site && a.required_steps > a.max_steps
+            }
+            _ => false,
+        }
         && search.planet == p.planet.index
         && site.planet == search.planet
         && search.revision == p.planet.revision

@@ -196,3 +196,129 @@ fn unsuccessful_prefix_retains_native_fallback_and_actual_return_is_never_a_prob
     }
     assert!(job.exhausted_walk().is_none() && job.positive_candidates().is_none());
 }
+
+fn unsupported_source(
+    state: &SurfaceSortieState,
+    seat: usize,
+) -> combat::TacticalSortieObservationV1 {
+    let mut o = target(state, seat);
+    let p = &mut o.combat.recovery.flight.pilot;
+    p.landing.phase = LandingPhase::Flying;
+    p.sites.truncate(1);
+    p.site_query = LandingSiteQuery::Selected(p.sites[0].id);
+    p.planet
+        .claim
+        .as_mut()
+        .unwrap()
+        .flag
+        .as_mut()
+        .unwrap()
+        .position = p.planet.motion.position * 2.0 - p.sites[0].hatch_position;
+    o
+}
+
+#[test]
+fn unsupported_walks_are_distinct_and_opt_in_even_without_dispatch() {
+    let mut state = smooth_state();
+    for enabled in [false, true] {
+        let mut o = unsupported_source(&state, 0);
+        let mut live = planner(true, Work::default());
+        if enabled {
+            live = live.with_walk_bounds_feedback();
+        }
+        live.observe(&state, 0, &mut o);
+        let request = live.requests[&0].clone();
+        let job = live.queue.job(request.token).unwrap();
+        let (site, bounds) = job.unsupported_walk().unwrap();
+        assert_eq!(bounds.required_steps, 260);
+        assert_eq!(bounds.max_steps, 224);
+        assert_eq!(job.measurement_work().corridor_started, 0);
+        assert_eq!(job.measurement_work().corridor_completed, 0);
+        state.world.tick += 1;
+        o.combat.recovery.flight.pilot.tick = state.world.tick;
+        live.observe(&state, 0, &mut o);
+        let e = o.objective_evidence.unwrap();
+        assert_eq!(e.unsupported_walk.is_some(), enabled);
+        if let Some(notice) = e.unsupported_walk {
+            assert_eq!(notice.site, site);
+            assert_eq!(notice.actor, o.combat.recovery.flight.pilot.owner);
+            assert_eq!((notice.required_steps, notice.max_steps), (260, 224));
+        }
+        assert!(e.exhausted_walk.is_none() && e.publication.is_none());
+        assert!(o.landing_objective.is_none());
+        assert_eq!(e.measurement_tick, Some(request.measurement_tick));
+        assert_eq!(live.telemetry.graph, 0);
+        assert_eq!(live.telemetry.physics_queries, 0);
+        live.reset();
+        assert_eq!(live.uses_walk_bounds_feedback(), enabled);
+    }
+}
+
+#[test]
+fn unsupported_probes_replace_only_for_a_current_new_scan_and_expire_normally() {
+    let mut state = smooth_state();
+    let mut o = unsupported_source(&state, 0);
+    let sites = target(&state, 0).combat.recovery.flight.pilot.sites;
+    let mut live = planner(true, WORK).with_walk_bounds_feedback();
+    live.observe(&state, 0, &mut o);
+    live.advance(state.world.tick);
+    let old = live.requests[&0].clone();
+    let next = *sites
+        .iter()
+        .find(|s| s.id != o.combat.recovery.flight.pilot.sites[0].id)
+        .unwrap();
+    state.world.tick += 1;
+    let p = &mut o.combat.recovery.flight.pilot;
+    p.tick = state.world.tick;
+    p.site_query = LandingSiteQuery::Selected(next.id);
+    p.sites.clear();
+    live.observe(&state, 0, &mut o);
+    assert!(o.objective_evidence.unwrap().unsupported_walk.is_none());
+    assert_eq!(live.requests[&0].token, old.token);
+    o.combat.recovery.flight.pilot.sites = vec![next];
+    live.observe(&state, 0, &mut o);
+    let new = &live.requests[&0];
+    assert_ne!(new.token, old.token);
+    assert!(!Arc::ptr_eq(&new.snapshot, &old.snapshot));
+    assert_eq!(new.measurement_tick, state.world.tick);
+    assert_eq!(live.telemetry.unsupported_walk_probe_restarts, 1);
+    assert_eq!(live.telemetry.walk_probe_restarts, 0);
+    assert_eq!(live.telemetry.retired_unpublished_graph, old.graph);
+    assert_eq!(
+        live.telemetry.retired_unpublished_queries,
+        old.physics_queries
+    );
+    state.world.tick += MAX_SURVEY_AGE_TICKS + 1;
+    o.combat.recovery.flight.pilot.tick = state.world.tick;
+    live.observe(&state, 0, &mut o);
+    let e = o.objective_evidence.unwrap();
+    assert_eq!(e.invalidated_by, Some("expired"));
+    assert!(e.unsupported_walk.is_none() && e.exhausted_walk.is_none());
+}
+
+#[test]
+fn unsupported_walks_retain_the_native_fallback_but_do_not_label_actual_hatches() {
+    let state = smooth_state();
+    let mut o = unsupported_source(&state, 0);
+    let p = &o.combat.recovery.flight.pilot;
+    let expected = state
+        .landing_objective_survey(0, p, &o.cover, ObjectivePlanning::JointRoundTrip)
+        .unwrap();
+    let mut job = make_job_mode(&state, 0, &o, true);
+    assert!(job.unsupported_walk().is_some() && job.exhausted_walk().is_none());
+    while job.next_work().is_some() {
+        job.step();
+    }
+    assert_eq!(job.output(), Some(&expected));
+    assert_eq!(job.measurement_work().corridor_started, 0);
+    let p = &mut o.combat.recovery.flight.pilot;
+    let site = p.sites[0];
+    p.landing.phase = LandingPhase::Landed;
+    p.ship.position = site.vehicle_position;
+    p.ship.angle = rotation_for_direction(site.normal);
+    p.hatch = Some(site.hatch_position);
+    p.sites.clear();
+    let job = make_job_mode(&state, 0, &o, true);
+    assert!(job.unsupported_walk().is_none() && job.exhausted_walk().is_none());
+    assert_eq!(job.measurement_work().corridor_started, 0);
+}

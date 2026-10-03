@@ -9,6 +9,13 @@ const MAX_STEPS: u16 = 96;
 const EXTENDED_MAX_STEPS: u16 = 224;
 type HullCheck = Arc<dyn Fn(Vec2) -> bool + Send + Sync>;
 
+/// Constructor geometry only: no walking measurement has been attempted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct WalkCorridorBounds {
+    pub required_steps: u16,
+    pub max_steps: u16,
+}
+
 #[derive(Clone, Copy)]
 enum Phase {
     Ray(u16),
@@ -77,7 +84,7 @@ impl GroundSurveyJob {
         hatches: [Option<Vec2>; 2],
         hull: HullCheck,
         extended: bool,
-    ) -> Option<WalkCorridorJob> {
+    ) -> Result<WalkCorridorJob, WalkCorridorBounds> {
         let id = |point: Vec2| {
             ((-point.x).atan2(point.y).rem_euclid(std::f32::consts::TAU) * GROUND_SAMPLES as f32
                 / std::f32::consts::TAU)
@@ -88,16 +95,25 @@ impl GroundSurveyJob {
         let delta = signed_span(start_id, id(target));
         // Include the start-window displacement and two samples past the flag
         // bearing. Longer arcs remain the full survey's responsibility.
-        let streamed = delta.unsigned_abs() + 4 > u32::from(MAX_STEPS);
-        if streamed && (!extended || delta.unsigned_abs() + 4 > u32::from(EXTENDED_MAX_STEPS)) {
-            return None;
+        let required_steps = delta.unsigned_abs() as u16 + 4;
+        let max_steps = if extended {
+            EXTENDED_MAX_STEPS
+        } else {
+            MAX_STEPS
+        };
+        let streamed = required_steps > MAX_STEPS;
+        if required_steps > max_steps {
+            return Err(WalkCorridorBounds {
+                required_steps,
+                max_steps,
+            });
         }
         let mut ground = self.clone();
         ground.measurements.footprint = Some(RefCell::new(QueryFootprint::new(
             ground.measurements.position,
             ground.measurements.angle,
         )));
-        Some(WalkCorridorJob {
+        Ok(WalkCorridorJob {
             ground,
             hull,
             phase: Phase::Ray(offset(start_id, -2)),

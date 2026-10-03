@@ -62,6 +62,14 @@ pub struct ExhaustedWalkingAttempt {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct UnsupportedWalkingCorridor {
+    pub actor: PlayerId,
+    pub site: LandingSiteId,
+    pub required_steps: u16,
+    pub max_steps: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ObjectiveWorkEvidence {
     pub tick: u64,
     pub objective: LandingObjective,
@@ -77,6 +85,10 @@ pub struct ObjectiveWorkEvidence {
     /// this request and source clock. Never a negative route certificate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exhausted_walk: Option<ExhaustedWalkingAttempt>,
+    /// The requested corridor exceeds its constructor bound. No walk was
+    /// attempted; other routes and the complete fallback remain unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsupported_walk: Option<UnsupportedWalkingCorridor>,
 }
 impl ObjectiveWorkEvidence {
     pub(super) fn new(tick: u64, objective: LandingObjective) -> Self {
@@ -91,6 +103,7 @@ impl ObjectiveWorkEvidence {
             submission_deferred_by: None,
             publication: None,
             exhausted_walk: None,
+            unsupported_walk: None,
         }
     }
     pub(super) fn request(&mut self, request: &Request) {
