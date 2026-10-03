@@ -65,3 +65,14 @@ final result. Report all eight primary armed matches and the health cases,
 including regressions. Suppressed pursuit is not evidence of successful escape.
 These correlated development cases do not establish independent playing
 strength or Raspberry Pi performance. Work remains local.
+
+## Audit correction
+
+The initial Python audit swapped the interaction and brake byte positions and
+rejected a valid braking packet at tick 8040. Native `SurfaceSortieAction`
+encodes turn, thrust, interaction, brake and seat in that order. The correction
+uses named decoded controls and adds a regression with the actual native packet,
+checking that braking passes and interaction fails. The bot implementation and
+frozen binary from `24929ed` are unchanged. Re-audit all 34 saved matches, hashing
+the gameplay inputs before and after; preserve the failed summary and original
+checker alongside the corrected audit rather than rerunning or tuning physics.

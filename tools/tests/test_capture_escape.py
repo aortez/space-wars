@@ -87,8 +87,19 @@ class CaptureEscapeTests(unittest.TestCase):
             elif change == 1: a['direction']['x'] = .1
             elif change == 2: a['controlled_ticks'] += 1
             elif change == 3: bad['capture_escape']['pursuit'] = dict(started_tick=202)
-            else: bad['actions'][0]['Scenario']['payload'][6] = 1
+            else: bad['actions'][0]['Scenario']['payload'][5] = 1
             with self.assertRaises(AssertionError): E.audit_step(bad,previous,abort)
+
+    def test_native_braking_packet_is_allowed_but_interaction_is_rejected(self):
+        arm,abort=fixture(); previous=copy.deepcopy(arm['capture_escape']['telemetry']['last'])
+        row=flying(arm)
+        row['actions'][0] = dict(Scenario=dict(kind=0x53550002,payload=[0,0,128,63,0,0,1,0]))
+        self.assertEqual(E.flight_controls(row),dict(horizontal=1.,thrust=False,interact=False,brake=True,seat=0))
+        E.audit_step(row,previous,abort)
+        a=row['capture_escape']['telemetry']['last']; a['guidance']='boundary'; a['boundary']['active']=True
+        E.audit_step(row,previous,abort)
+        row['actions'][0]['Scenario']['payload'][5] = 1
+        with self.assertRaises(AssertionError): E.audit_step(row,previous,abort)
 
     def test_separation_needs_sixty_ticks_and_current_cover_or_opening_range(self):
         row,abort=fixture()

@@ -10,6 +10,7 @@ import json
 import math
 from pathlib import Path
 import subprocess
+import struct
 import traceback
 
 spec = importlib.util.spec_from_file_location('recovery', Path(__file__).with_name('validate-actual-recovery.py'))
@@ -106,6 +107,14 @@ def audit_weapons(row, local, p):
     return laser,cannon
 
 
+def flight_controls(row):
+    # SurfaceSortieAction::encode: float turn, thrust, interact, brake, seat.
+    payload = row['actions'][0]['Scenario']['payload']
+    assert len(payload) == 8 and all(v in [0,1] for v in payload[4:7])
+    return dict(horizontal=struct.unpack('<f',bytes(payload[:4]))[0],
+        thrust=bool(payload[4]),interact=bool(payload[5]),brake=bool(payload[6]),seat=payload[7])
+
+
 def audit_step(row, previous, abort_row):
     local,p = I.witness_observation(dict(row,initial_cover=row['capture_escape']))
     w = row['capture_escape']; a = w['telemetry']['last']; o = w['observation']; tick = p['tick']
@@ -113,7 +122,7 @@ def audit_step(row, previous, abort_row):
     assert a['deadline_tick'] == a['abort']['tick']+720
     assert a['abort'] == abort_row['capture']['actual_route_recovery']['abort']
     assert a['abort']['attempt']['actor'] == p['owner']
-    controls = row['actions'][0]['Scenario']['payload']
+    payload = row['actions'][0]['Scenario']['payload']; controls = flight_controls(row)
     if previous is None:
         assert tick == a['started_tick'] and a['guidance'] == 'arming' and a['finished_tick'] is None
         assert p['vehicle'] == a['vehicle'] and p['controls_armed'] and p['queries_ready']
@@ -136,7 +145,7 @@ def audit_step(row, previous, abort_row):
         assert math.dist(vector(objective['position']),R.native_local(p,claim['flag']['position'])) < .50001
         assert abs(objective['range']-(claim['flag_interaction_range']-.2)) < .01001
         assert abs(math.hypot(*vector(a['direction']))-1.) < .00001
-        assert controls[:7] == [0]*7 and a['clear_since'] is None
+        assert payload[:7] == [0]*7 and a['clear_since'] is None
         assert [a[k] for k in ['controlled_ticks','laser_ticks','cannon_ticks']] == [0,0,0]
     else:
         assert previous['finished_tick'] is None and tick == previous['observed_tick']+1
@@ -157,15 +166,15 @@ def audit_step(row, previous, abort_row):
             assert p['vehicle'] == a['vehicle'] and p['ship_available'] and p['ship_form'] == 'ship'
             assert p['controls_armed'] and p['queries_ready'] and local['combat']['recovery']['flight']['flight']['enabled']
             assert isinstance(p['location'],dict) and 'aboard' in p['location']
-            assert controls[6] == 0
+            assert not controls['interact']
             if a['guidance'] == 'lift': assert p['landing']['supported_feet'] > 0
-            if a['guidance'] == 'boundary': assert a['boundary']['active'] and controls[5] == 1
+            if a['guidance'] == 'boundary': assert a['boundary']['active'] and controls['brake']
             if a['guidance'] in ['boundary','lift']: assert row['actions'][1]['Scenario']['payload'][1] == 0
             laser,cannon = audit_weapons(row,local,p)
         else:
             laser = cannon = 0
             if a['guidance'] in ['queries_unavailable','flight_disabled']:
-                assert controls[:7] == [0]*7 and row['actions'][2]['Scenario']['payload'][1:] == [0,0]
+                assert payload[:7] == [0]*7 and row['actions'][2]['Scenario']['payload'][1:] == [0,0]
         for k,increment in [('controlled_ticks',controlled),('laser_ticks',laser),('cannon_ticks',cannon)]:
             assert a[k] == previous[k]+int(increment), k
     if a['finished_tick'] is None:
@@ -218,6 +227,30 @@ def audit_escape(root, item, enabled):
         first_started_tick=min((a['started_tick'] for a in attempts.values()),default=None),witness_sha256=F.E.digest(path))
 
 
+def analyze_run(entry, old, root, candidate, active, result):
+    result.update(C.analyze(root,entry['item']))
+    result['initial_cover'] = I.audit_initial(root,entry['item'],entry['enabled'])
+    result['handoff'] = H.audit_handoffs(root,entry['item'],entry['enabled'])
+    result['actual_recovery'] = R.audit_recovery(root,entry['item'],entry['enabled'])
+    result['capture_escape'] = audit_escape(root,entry['item'],active)
+    if entry['source'] == 'health': result['pursuit_health'] = I.H.audit_health(root,entry['item'])
+    if candidate:
+        result['comparison'] = C.M.compare(C.P.root_of(old),root)
+        difference = result['comparison']['first_control_difference']
+        first = result['capture_escape']['first_started_tick']
+        if first is None: result['unchanged_state'] = unchanged_state(old,result)
+        if difference: assert first is not None and difference['tick'] > first
+        if not active: result['disabled_control_parity'] = C.P.replay_parity(old,result)
+    else:
+        result['replay_parity'] = C.P.replay_parity(old,result)
+        assert result['initial_cover'] == old['initial_cover']
+        R.A.assert_handoff_parity(result['handoff'],old['handoff'])
+        assert result['actual_recovery'] == old['actual_recovery']
+        if entry['source'] == 'health': assert result['pursuit_health'] == old['pursuit_health']
+    result['hashes'] = {p.name:F.E.digest(p) for p in sorted(root.iterdir()) if p.is_file()}
+    return result
+
+
 def run(entry, old, binary, out, candidate):
     root = out/(entry['name']+('-escape' if candidate else '-retained'))
     active = candidate and entry['enabled']; cmd = command(old,binary,root,active)
@@ -225,26 +258,7 @@ def run(entry, old, binary, out, candidate):
     try:
         with (out/(root.name+'.log')).open('x') as log:
             subprocess.run(cmd,check=True,stdout=log,stderr=log,timeout=1800)
-        result.update(C.analyze(root,entry['item']))
-        result['initial_cover'] = I.audit_initial(root,entry['item'],entry['enabled'])
-        result['handoff'] = H.audit_handoffs(root,entry['item'],entry['enabled'])
-        result['actual_recovery'] = R.audit_recovery(root,entry['item'],entry['enabled'])
-        result['capture_escape'] = audit_escape(root,entry['item'],active)
-        if entry['source'] == 'health': result['pursuit_health'] = I.H.audit_health(root,entry['item'])
-        if candidate:
-            result['comparison'] = C.M.compare(C.P.root_of(old),root)
-            difference = result['comparison']['first_control_difference']
-            first = result['capture_escape']['first_started_tick']
-            if first is None: result['unchanged_state'] = unchanged_state(old,result)
-            if difference: assert first is not None and difference['tick'] > first
-            if not active: result['disabled_control_parity'] = C.P.replay_parity(old,result)
-        else:
-            result['replay_parity'] = C.P.replay_parity(old,result)
-            assert result['initial_cover'] == old['initial_cover']
-            R.A.assert_handoff_parity(result['handoff'],old['handoff'])
-            assert result['actual_recovery'] == old['actual_recovery']
-            if entry['source'] == 'health': assert result['pursuit_health'] == old['pursuit_health']
-        result['hashes'] = {p.name:F.E.digest(p) for p in sorted(root.iterdir()) if p.is_file()}
+        analyze_run(entry,old,root,candidate,active,result)
     except Exception: result['error'] = traceback.format_exc()
     return result
 
