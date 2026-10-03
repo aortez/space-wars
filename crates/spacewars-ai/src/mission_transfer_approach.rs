@@ -44,6 +44,7 @@ fn clear_entry(o: &MissionObservationV1, target: usize, entry: Vec2) -> bool {
 
 impl MaterialMissionPilot {
     pub(crate) fn configure_transfer_approach(&mut self, enabled: bool) {
+        assert!(enabled || self.telemetry.transfer_speed.is_none());
         assert!(
             self.previous_tick.is_none(),
             "configure before the first intent"

@@ -28,6 +28,11 @@ pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt
 #[path = "mission_transfer_approach.rs"]
 mod transfer_approach;
 pub use transfer_approach::{TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample};
+#[path = "mission_transfer_speed.rs"]
+mod transfer_speed;
+pub use transfer_speed::{
+    TRANSFER_SPEED_PROFILE, TransferSpeed, TransferSpeedLimit, TransferSpeedSample,
+};
 #[path = "mission_pursuit_health.rs"]
 mod pursuit_health;
 pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
@@ -172,6 +177,8 @@ pub struct MissionTelemetry {
     pub escape_travel: Option<EscapeTravel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer_approach: Option<TransferApproach>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_speed: Option<TransferSpeed>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -272,6 +279,7 @@ impl MaterialMissionPilot {
                 capture_escape: None,
                 escape_travel: None,
                 transfer_approach: None,
+                transfer_speed: None,
             },
             capture: None,
             recovery: None,
@@ -310,6 +318,7 @@ impl MaterialMissionPilot {
         let capture_escape = self.telemetry.capture_escape.is_some();
         let escape_travel = self.telemetry.escape_travel.is_some();
         let transfer_approach = self.telemetry.transfer_approach.is_some();
+        let transfer_speed = self.telemetry.transfer_speed.is_some();
         let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
@@ -328,6 +337,7 @@ impl MaterialMissionPilot {
         self.configure_capture_escape(capture_escape);
         self.configure_escape_travel(escape_travel);
         self.configure_transfer_approach(transfer_approach);
+        self.configure_transfer_speed(transfer_speed);
         self.configure_powered_capture(powered_capture);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
@@ -1021,6 +1031,7 @@ impl MaterialMissionPilot {
         let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
+        let mut speed_brake = false;
         let desired = if altitude < 70.0 + falling * falling / 50.0 {
             self.goal(MissionGoal::Launch, p.tick);
             self.progress_tick = p.tick;
@@ -1030,10 +1041,13 @@ impl MaterialMissionPilot {
             self.record_transfer_approach_guidance(p.tick);
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
-            self.detour_velocity(o, target.motion.velocity)
-                + delta.normalized() * (delta.length() * 0.7).min(55.0)
+            let ordinary = self.detour_velocity(o, target.motion.velocity)
+                + delta.normalized() * (delta.length() * 0.7).min(55.0);
+            let (velocity, brake) = self.transfer_velocity(o, ordinary);
+            speed_brake = brake;
+            velocity
         };
-        self.guide(o, desired)
+        self.guide_with_brake(o, desired, speed_brake)
     }
     fn end_pursuit(&mut self, tick: u64, reason: &'static str) {
         if self.telemetry.pursuit.take().is_some() {
@@ -1405,11 +1419,20 @@ impl MaterialMissionPilot {
         (waypoint, None)
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
+        self.guide_with_brake(o, desired_world, false)
+    }
+    fn guide_with_brake(
+        &mut self,
+        o: &MissionObservationV1,
+        desired_world: Vec2,
+        force_brake: bool,
+    ) -> CombatIntent {
         let (desired_world, boundary_brake) = self.boundary_guidance(o, desired_world);
         let f = &o.local.combat.recovery.flight;
         let p = &f.pilot;
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-        let brake = boundary_brake
+        let brake = force_brake
+            || boundary_brake
             || desired_world.length() < 10.0
             || p.ship.velocity.length() > desired_world.length() + 4.0;
         let acceleration = (desired_world - p.ship.velocity) * 2.0

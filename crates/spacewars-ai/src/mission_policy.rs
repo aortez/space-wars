@@ -146,6 +146,11 @@ impl MissionBot {
         self.0.configure_transfer_approach(enabled);
         self
     }
+    /// Opt-in relative closing-speed limits during committed transfer.
+    pub fn with_transfer_speed(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_speed(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
