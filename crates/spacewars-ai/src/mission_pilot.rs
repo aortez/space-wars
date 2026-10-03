@@ -22,6 +22,9 @@ use serde::Serialize;
 
 #[path = "mission_capture_escape.rs"]
 mod capture_escape;
+#[path = "mission_escape_travel.rs"]
+mod escape_travel;
+pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
 #[path = "mission_pursuit_health.rs"]
 mod pursuit_health;
 pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
@@ -162,6 +165,8 @@ pub struct MissionTelemetry {
     pub destination_retry: Option<DestinationRetryTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capture_escape: Option<CaptureEscape>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escape_travel: Option<EscapeTravel>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -260,6 +265,7 @@ impl MaterialMissionPilot {
                     .then(DestinationPlanningTelemetry::default),
                 destination_retry: None,
                 capture_escape: None,
+                escape_travel: None,
             },
             capture: None,
             recovery: None,
@@ -296,6 +302,7 @@ impl MaterialMissionPilot {
         let initial_cover = self.initial_cover;
         let actual_route_recovery = self.actual_route_recovery;
         let capture_escape = self.telemetry.capture_escape.is_some();
+        let escape_travel = self.telemetry.escape_travel.is_some();
         let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
@@ -312,6 +319,7 @@ impl MaterialMissionPilot {
         self.configure_initial_cover(initial_cover);
         self.configure_actual_route_recovery(actual_route_recovery);
         self.configure_capture_escape(capture_escape);
+        self.configure_escape_travel(escape_travel);
         self.configure_powered_capture(powered_capture);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
@@ -499,6 +507,7 @@ impl MaterialMissionPilot {
         });
     }
     fn reconsider(&mut self, tick: u64, reason: &'static str, defer: bool) {
+        self.end_escape_travel(tick, reason);
         self.event(tick, "replan", Some(reason));
         if defer && let Some(planet) = self.telemetry.target {
             self.deferred.retain(|(p, _)| *p != planet);
@@ -643,13 +652,14 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose_with_continuation(
+        let mut result = self.choose_with_continuation(
             o,
             continuation.as_deref_mut(),
             selection,
             probe,
             defer_new_pursuit,
         );
+        self.finish_escape_travel_frame(o, &mut result);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
@@ -677,6 +687,7 @@ impl MaterialMissionPilot {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         self.update_capture_escape(o);
+        self.observe_escape_travel(o);
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
         let replacing = self.recovery.as_ref().is_some_and(|task| {
             task.telemetry().goal == crate::recovery_task::RecoveryGoal::Scuttle
@@ -767,6 +778,7 @@ impl MaterialMissionPilot {
         if let Some(intent) = self.capture_escape_intent(o) {
             return intent;
         }
+        self.prepare_escape_travel(o);
         if self.pursuit_opportunity(o, defer_new_pursuit) {
             return self.hunt(o);
         }
@@ -974,8 +986,8 @@ impl MaterialMissionPilot {
             self.goal(MissionGoal::Capture, p.tick);
             return intent;
         }
-        if p.tick.saturating_sub(self.selected_tick) > 60 * 60
-            || p.tick.saturating_sub(self.progress_tick) > 20 * 60
+        if p.tick.saturating_sub(self.selected_tick) > escape_travel::TRANSFER_TICKS
+            || p.tick.saturating_sub(self.progress_tick) > escape_travel::TRANSFER_PROGRESS_TICKS
         {
             self.reconsider(p.tick, "transfer exhausted its progress budget", true);
             return CombatIntent::default();
@@ -1094,6 +1106,9 @@ impl MaterialMissionPilot {
         // Offline calibration changes only this new-mission decision. All
         // ordinary eligibility, pursuit maintenance and safety ran above.
         if defer_new {
+            return false;
+        }
+        if self.defer_escape_travel_pursuit(o, reason) {
             return false;
         }
         if discretionary && !self.admit_discretionary_pursuit(o) {

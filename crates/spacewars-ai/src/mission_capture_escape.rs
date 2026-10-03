@@ -43,6 +43,7 @@ pub struct CaptureEscapeAttempt {
 
 impl MaterialMissionPilot {
     pub(crate) fn configure_capture_escape(&mut self, enabled: bool) {
+        assert!(enabled || self.telemetry.escape_travel.is_none());
         assert!(
             self.previous_tick.is_none(),
             "configure before the first intent"
@@ -299,4 +300,4 @@ impl MaterialMissionPilot {
 
 #[cfg(test)]
 #[path = "mission_capture_escape_tests.rs"]
-mod tests;
+pub(super) mod tests;

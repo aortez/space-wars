@@ -112,7 +112,7 @@ fn fixture(enabled: bool) -> (MaterialMissionPilot, MissionObservationV1, Actual
     (bot, o, abort)
 }
 
-fn armed() -> (MaterialMissionPilot, MissionObservationV1) {
+pub(in crate::mission_pilot) fn armed() -> (MaterialMissionPilot, MissionObservationV1) {
     let (mut bot, mut o, abort) = fixture(true);
     o.local.combat.recovery.flight.pilot.tick += 1;
     bot.start_capture_escape(&o, abort);

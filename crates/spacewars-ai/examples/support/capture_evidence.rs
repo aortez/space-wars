@@ -82,6 +82,12 @@ impl CaptureEvidence {
             record["capture_escape"] = json!({"telemetry":escape,"observation":o,
                 "pursuit":m.pursuit,"combat":m.combat});
         }
+        if let Some(travel) = &m.escape_travel
+            && travel.last.is_some_and(|a| a.observed_tick == p.tick)
+        {
+            record["escape_travel"] = json!({"telemetry":travel,"observation":o,
+                "pursuit":m.pursuit,"combat":m.combat});
+        }
         serde_json::to_writer(&mut self.0, &record).unwrap();
         writeln!(self.0).unwrap();
     }

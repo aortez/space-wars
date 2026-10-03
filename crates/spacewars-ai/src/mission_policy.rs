@@ -136,6 +136,11 @@ impl MissionBot {
         self.0.configure_capture_escape(enabled);
         self
     }
+    /// Opt-in bounded transfer commitment following actual-hatch escape.
+    pub fn with_escape_travel(mut self, enabled: bool) -> Self {
+        self.0.configure_escape_travel(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
