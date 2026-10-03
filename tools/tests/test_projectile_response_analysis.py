@@ -12,6 +12,11 @@ def damage(contact_tick=8, damage_tick=8, source='cannon', spawn=1, lost=False):
 
 
 class ResponseAnalysisTests(unittest.TestCase):
+    def test_simultaneous_launches_cannot_be_assigned_to_one_projectile(self):
+        contacts=[dict(tick=20,source='cannon',spawn_tick=10)]
+        self.assertEqual(A.attributed_contacts(contacts,10,{1},1),contacts)
+        self.assertIsNone(A.attributed_contacts(contacts,10,{1,2},1))
+
     def test_destruction_on_foot_is_a_loss_even_when_form_and_vehicle_do_not_change(self):
         def pilot(tick,count):
             return dict(tick=tick,vehicle=0,ship_form='ship',location='on_foot',recovery=dict(ships_lost=count))

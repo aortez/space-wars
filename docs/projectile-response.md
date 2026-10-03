@@ -244,3 +244,8 @@ No one fixed direction wins across both trajectories. Before any policy
 integration, test the unchanged candidates across additional worlds and seats
 with matched controls, including short-warning cases and full physical recovery.
 Defaults and deployment remain unchanged; all work stays local.
+
+The [broader 49-match comparison](projectile-response-sweep.md) now reproduces
+these results across the retained suite and adds two new worlds in both seats.
+Only the original trajectory activates; all fresh cases remain outside the
+post-escape gate. It adds parity coverage, but no new active-avoidance example.

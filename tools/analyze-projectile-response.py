@@ -40,6 +40,12 @@ def ship_losses(pilots, damage_by_tick):
     return losses
 
 
+def attributed_contacts(contacts, spawn, identities, selected):
+    if identities != {selected}:
+        return None
+    return [c for c in contacts if c['source']=='cannon' and c['spawn_tick']==spawn]
+
+
 def analyze(entry, run):
     root = R.root_of(run)
     report = json.loads((root/'report.json').read_text())
@@ -51,15 +57,20 @@ def analyze(entry, run):
                    physical=physical, round=report['round'],
                    escape_travel=report['missions'][seat]['escape_travel'],
                    allocation=run['allocation'], diagnostics=run['projectiles'],
-                   parity=run.get('parity'))
+                   parity=run.get('parity'), final_recovery=report['final_pilots'][seat]['recovery'],
+                   attempt=None, first_action_change=None)
     evidence = dict(report_without_samples_or_events={k:v for k,v in report.items() if k not in ('samples','events')},
                     report_checkpoints=report['samples'][-1:], visits=run['visits'], visit_audit=run['visit_audit'])
     if entry['mode'] == 'none':
         return summary, evidence
     response = run['response']; a = response['attempt']
-    assert a is not None
-    start = a['started_tick']; spawn = a['threat']['spawn_tick']; identity = a['threat']['id']
     witness = json.loads((root/'projectile-response-witnesses.json').read_text())
+    if a is None:
+        assert response['first_action_change'] is None and run['parity']
+        summary['exact_prefix_rows']=response['exact_prefix_rows']
+        evidence['response_witnesses']=witness
+        return summary,evidence
+    start = a['started_tick']; spawn = a['threat']['spawn_tick']; identity = a['threat']['id']
     damage_by_tick = {r['tick']:r['damage'] for r in response['damage_changes']}
     damage_by_tick[report['elapsed_ticks']] = witness['final']['damage']
     pilots = (r['pilot'] for r in R.rows(root/'capture-evidence.jsonl')
@@ -88,13 +99,14 @@ def analyze(entry, run):
                 assert p['spawn_tick'] == spawn
                 track.append(dict(tick=row['tick'], seat=row['seat'], projectile=p,
                                   observer=d['observer'], vehicle=d['vehicle'], ship_form=d['ship_form']))
-    assert same_launch_ids == {identity}, 'ambiguous observed launch metadata'
+    assert identity in same_launch_ids
     after_visits = [v for v in visits if v['selected_tick'] >= a['source']['started_tick']]
     summary.update(attempt=a, first_action_change=response['first_action_change'],
                    exact_prefix_rows=response['exact_prefix_rows'], first_ship_loss=first_loss,
                    ship_losses=losses, final_recovery=report['final_pilots'][seat]['recovery'],
                    contact_receipts=contacts, damage_receipts=damage,
-                   triggered_projectile_contacts=[c for c in contacts if c['source']=='cannon' and c['spawn_tick']==spawn],
+                   triggered_projectile_contacts=attributed_contacts(contacts,spawn,same_launch_ids,identity),
+                   launch_identity_unambiguous=same_launch_ids=={identity},
                    triggered_projectile_observed_ids=sorted(same_launch_ids),
                    post_transfer_visits=after_visits,
                    post_transfer_claims=sum(v['physical']['claimed'] is not None for v in after_visits),
