@@ -135,7 +135,7 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
             );
         }
     }
-    let stride = if event.grounded() {
+    let stride = if event.feet_moving() {
         ((event.tick / 6) % 2) as f32 * pixel
     } else {
         0.0

@@ -57,8 +57,10 @@ fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
             let water = deep_pool(&duck);
             let ledger = water.stats();
             let jumps = duck.jumps;
+            let mut animated_paddle = false;
             for _ in 0..480 {
                 duck.step_with_water(Some(&water));
+                animated_paddle |= !duck.grounded() && duck.feet_moving();
                 let stats = duck.diagnostics();
                 let nav = stats.navigation.unwrap();
                 assert_eq!(stats.outcome, None, "{stats:?}");
@@ -79,6 +81,10 @@ fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
             );
             assert_eq!(floating.navigation.unwrap().water.interruptions, 1);
             assert!(floating.navigation.unwrap().water.paddling_ticks > 400);
+            assert!(
+                animated_paddle,
+                "the automatic duck also animates its paddling"
+            );
             assert_eq!(
                 water.stats(),
                 ledger,
@@ -127,6 +133,7 @@ fn player_floats_and_paddles_in_screen_coordinates_without_input_creating_water(
         duck.set_player_input(1000, false, false, false);
         for _ in 0..45 {
             duck.step_with_water(Some(&water));
+            assert!(duck.feet_moving());
         }
         let current = duck.player_diagnostics().unwrap();
         assert_eq!(current.duck.jumps, 0, "paddling does not jump");
@@ -137,6 +144,7 @@ fn player_floats_and_paddles_in_screen_coordinates_without_input_creating_water(
         duck.set_player_input(-1000, false, false, false);
         for _ in 0..90 {
             duck.step_with_water(Some(&water));
+            assert!(duck.feet_moving());
         }
         assert!(duck.player_diagnostics().unwrap().velocity_milli.unwrap()[0] < -1000);
         assert_eq!(water.stats(), ledger, "one-way forces never create water");
@@ -182,6 +190,7 @@ fn neutral_player_moves_with_real_water_flow_instead_of_braking_it_away() {
     }
     let current = duck.player_diagnostics().unwrap();
     assert_eq!(current.move_milli, 0);
+    assert!(!duck.feet_moving(), "passive drift does not paddle");
     assert!(force > 1.0);
     let end = current.duck.position_milli.unwrap()[0] as f32 / 1000.0;
     assert!(
