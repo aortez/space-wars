@@ -220,3 +220,8 @@ job is pending, and whether it can publish before the site's current eligibility
 changes. Retain the earlier successful capture and return-to-ship failures as
 regressions. Do not relax solar/cover checks, raise quotas, or promote this option
 on the basis of the aggregate win count.
+
+The follow-up [covered-request handoff experiment](covered-request-handoff.md)
+now exercises that scheduling change. It delivers the powered 5490 request in
+time, but does not restore the earlier planet-0 capture. Complete match outcomes
+remain mixed, and both options stay disabled by default.
