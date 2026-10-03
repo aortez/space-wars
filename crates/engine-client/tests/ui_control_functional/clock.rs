@@ -976,7 +976,6 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
-            "launcher.settings.clock.crow.next",
             "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
@@ -985,6 +984,15 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             state = harness.activate_guarded(id, &state);
             assert_eq!(control_value(&state, id), Some("Off"));
         }
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Varied")
+        );
+        state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Off")
+        );
         state = harness.activate_guarded("launcher.settings.clock.rain.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.rain.next"),
