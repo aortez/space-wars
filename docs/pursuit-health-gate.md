@@ -187,3 +187,9 @@ and binaries remain under `target/pursuit-health` and the prior corpus path.
   `937a17093cd0754b95a49b1447eafbf37f2320bd1608563da78bd24b715123d7`
 - Evidence archive SHA-256:
   `78aea01f0407961cfee1d89a5878e10732be70ae0a5113b70f32dd2e4168cb0e`
+
+The subsequent [threatened-approach diagnosis](threatened-capture-approach.md)
+finds thirteen covered modeled walking round trips at the new destination, but
+none is published when the pilot chooses the first exposed route. The replay
+preserves the loss exactly and motivates testing earlier covered-route evidence
+and initial commitment qualification, rather than changing the hull threshold.
