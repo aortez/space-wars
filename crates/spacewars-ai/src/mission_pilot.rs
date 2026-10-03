@@ -173,6 +173,7 @@ pub struct MissionAvoidance {
 
 #[derive(Debug, Clone)]
 pub struct MaterialMissionPilot {
+    active_flight_checks: bool,
     policy: crate::mission_policy::MissionPolicy,
     context: BrainReset,
     breaks: CombatBreakSettings,
@@ -215,6 +216,7 @@ impl MaterialMissionPilot {
         policy: crate::mission_policy::MissionPolicy,
     ) -> Self {
         Self {
+            active_flight_checks: false,
             policy,
             context,
             breaks,
@@ -267,6 +269,7 @@ impl MaterialMissionPilot {
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
         let cover_response = self.cover_response;
@@ -283,6 +286,7 @@ impl MaterialMissionPilot {
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
         self.configure_powered_capture(powered_capture);
+        self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
@@ -304,6 +308,11 @@ impl MaterialMissionPilot {
             "configure powered capture before the first intent"
         );
         self.telemetry.powered_capture = enabled;
+    }
+    pub(crate) fn configure_active_flight_checks(&mut self, enabled: bool) {
+        assert!(!enabled || self.telemetry.powered_capture);
+        assert!(self.previous_tick.is_none() && self.capture.is_none());
+        self.active_flight_checks = enabled;
     }
     /// The instance owns both its sensor semantics and its local controller.
     pub fn objective_planning(&self) -> ObjectivePlanning {
@@ -356,6 +365,10 @@ impl MaterialMissionPilot {
 
     pub fn sensor_request(&self) -> MissionSensorRequest {
         MissionSensorRequest {
+            vehicle_flight: self
+                .capture
+                .as_ref()
+                .and_then(|c| c.vehicle_flight_request()),
             destination_cover: self
                 .disengaging()
                 .then(|| self.telemetry.disengagement.as_ref().unwrap().cover_request)
@@ -372,6 +385,7 @@ impl MaterialMissionPilot {
             self.objective_planning(),
         )
         .with_bounded_acquisition(self.bounded_acquisition)
+        .with_active_flight_checks(self.active_flight_checks)
         .with_cover_retry_cooldown(self.cover_retry_cooldown)
         .with_cover_response(self.cover_response);
         capture.start_acquisition(&o.local);
@@ -1359,6 +1373,24 @@ mod acquisition_tests {
     use engine_common::Scenario;
     use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
     use std::time::Duration;
+
+    #[test]
+    fn active_flight_checks_are_opt_in_and_survive_clone_and_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let baseline = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+            .with_powered_capture(true);
+        assert!(!baseline.active_flight_checks);
+        let mut bot = baseline.with_active_flight_checks(true);
+        for _ in 0..2 {
+            assert!(bot.active_flight_checks && bot.clone().active_flight_checks);
+            assert!(bot.sensor_request().vehicle_flight.is_none());
+            bot.reset(context);
+        }
+    }
 
     #[test]
     fn powered_capture_binds_sensor_and_controller_through_clone_and_reset() {

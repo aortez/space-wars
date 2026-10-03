@@ -127,6 +127,7 @@ fn run(
         let o = state.mission_observation_with_cadence(
             seat,
             MissionSensorRequest {
+                vehicle_flight: None,
                 destination_cover: None,
                 site: bot.site_request(),
                 last_survey,

@@ -274,6 +274,11 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--powered-capture-seats must be none, 0, 1 or both"),
     };
+    let active_flight_checks = match arg("--active-flight-checks", "false").as_str() {
+        "false" => false,
+        "true" => true,
+        _ => panic!("--active-flight-checks must be true or false"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -376,6 +381,7 @@ fn main() {
             breaks,
         )
         .with_powered_capture(powered_capture_seats[i])
+        .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
@@ -1009,6 +1015,13 @@ fn main() {
             "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,
             "enabled_seats": powered_capture_seats,
             "scope": "Opt-in v13 native powered landing routes and on-foot controller. The configured live planner allowance and all forecast validity gates remain in force; other sensors retain their synchronous work.",
+        });
+    }
+    if active_flight_checks {
+        report["active_flight_checks"] = json!({
+            "profile": "vehicle_flight_continuation_v1",
+            "enabled_seats": powered_capture_seats,
+            "scope": "Current-state continuation forecasts for an already launched flight. Original launch certificate and 12-second maneuver deadline are retained; current clearance, arrival and remaining-fuel checks are required at each completed survey. Synchronous prediction work remains outside live planner quotas.",
         });
     }
     for (seat, enabled) in cover_retry_seats.into_iter().enumerate() {

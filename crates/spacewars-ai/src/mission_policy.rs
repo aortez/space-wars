@@ -100,6 +100,10 @@ impl MissionBot {
         self.0.configure_powered_capture(enabled);
         self
     }
+    pub fn with_active_flight_checks(mut self, enabled: bool) -> Self {
+        self.0.configure_active_flight_checks(enabled);
+        self
+    }
     /// Opt-in first-site deadline and local waiting guidance for comparison.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
         self.0.bounded_acquisition = enabled;

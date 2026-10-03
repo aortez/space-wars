@@ -12,6 +12,9 @@ const DT: f32 = 1.0 / 60.0;
 // cruise; the remaining margin encloses the capsule and transform tolerance.
 pub(crate) const FORECAST_REGION_HEIGHT: f32 = 40.0;
 const MAX_STEPS: usize = 12 * 60;
+mod continuation;
+use continuation::ContinuationLimits;
+pub use continuation::{VehicleFlightContinuation, VehicleFlightRequest};
 mod environment;
 pub(crate) use environment::FlightEnvironment;
 type Preview = Arc<dyn Fn(Vec2, f32, Vec2, f32) -> bool + Send + Sync>;
@@ -258,6 +261,8 @@ pub(crate) struct FlightForecastJob {
     maximum: Vec2,
     result: Option<VehicleCrossingForecast>,
     rejection: Option<&'static str>,
+    continuation: Option<ContinuationLimits>,
+    continuation_result: Option<FlightEstimate>,
 }
 #[derive(Clone)]
 pub(crate) struct FlightScene {
@@ -381,6 +386,8 @@ impl FlightForecastJob {
             maximum: proposal.plan.start,
             result: None,
             rejection: None,
+            continuation: None,
+            continuation_result: None,
         };
         job.launch();
         job
@@ -398,7 +405,7 @@ impl FlightForecastJob {
         let time = self.launch_delay() + elapsed;
         let offset = self.position - self.environment.center();
         let gravity = self.environment.gravity(self.position);
-        if self.step >= MAX_STEPS {
+        if self.step >= self.continuation.map_or(MAX_STEPS, |c| c.steps) {
             self.reject("time_limit");
             return;
         }
@@ -431,6 +438,11 @@ impl FlightForecastJob {
                     burn_seconds: self.burn,
                     arrival_speed: relative.length(),
                 };
+                if self.continuation.is_some() {
+                    self.continuation_result = Some(estimate);
+                    self.stop();
+                    return;
+                }
                 if self.estimates.len() <= self.direction {
                     self.estimates.push(estimate);
                 } else {
@@ -478,14 +490,19 @@ impl FlightForecastJob {
             - (self.velocity - self.reference).dot(right))
         .clamp(-motor::AIR_ACCELERATION * DT, motor::AIR_ACCELERATION * DT);
         self.velocity += right * side_delta;
-        if command.primary_held && self.step > 0 {
+        if command.primary_held && (self.step > 0 || self.continuation.is_some()) {
             let impulse = (motor::RISE_SPEED + gravity.length() * DT
                 - (self.velocity - self.reference).dot(up))
             .clamp(0.0, motor::THRUST * DT);
             self.burn += impulse / motor::THRUST;
             self.velocity += up * impulse;
         }
-        if self.burn > (LAUNCH_CHARGE - LANDING_RESERVE) * motor::BURN_SECONDS {
+        if self.burn
+            > self.continuation.map_or(
+                (LAUNCH_CHARGE - LANDING_RESERVE) * motor::BURN_SECONDS,
+                |c| c.burn_seconds,
+            )
+        {
             self.reject("fuel_reserve");
             return;
         }
