@@ -71,11 +71,42 @@ pub(crate) struct WalkCorridorJob {
     result: Option<WalkCorridorResult>,
     streamed: bool,
     max_steps: u16,
+    exact_start: Option<GroundNode>,
+    exact_target: Option<GroundNode>,
+    streamed_nodes: bool,
     #[cfg(test)]
     path: Vec<GroundNode>,
 }
 
 impl GroundSurveyJob {
+    pub(crate) fn corridor_geometry(
+        start: Vec2,
+        target: Vec2,
+        extended: bool,
+    ) -> Result<(u16, i32), WalkCorridorBounds> {
+        let id = |point: Vec2| {
+            ((-point.x).atan2(point.y).rem_euclid(std::f32::consts::TAU) * GROUND_SAMPLES as f32
+                / std::f32::consts::TAU)
+                .round() as u16
+                % GROUND_SAMPLES as u16
+        };
+        let start_id = id(start);
+        let delta = signed_span(start_id, id(target));
+        let required_steps = delta.unsigned_abs() as u16 + 4;
+        let max_steps = if extended {
+            EXTENDED_MAX_STEPS
+        } else {
+            MAX_STEPS
+        };
+        if required_steps > max_steps {
+            Err(WalkCorridorBounds {
+                required_steps,
+                max_steps,
+            })
+        } else {
+            Ok((start_id, delta))
+        }
+    }
     pub(crate) fn walk_corridor(
         &self,
         start: Vec2,
@@ -85,29 +116,11 @@ impl GroundSurveyJob {
         hull: HullCheck,
         extended: bool,
     ) -> Result<WalkCorridorJob, WalkCorridorBounds> {
-        let id = |point: Vec2| {
-            ((-point.x).atan2(point.y).rem_euclid(std::f32::consts::TAU) * GROUND_SAMPLES as f32
-                / std::f32::consts::TAU)
-                .round() as u16
-                % GROUND_SAMPLES as u16
-        };
-        let start_id = id(start);
-        let delta = signed_span(start_id, id(target));
+        let (start_id, delta) = Self::corridor_geometry(start, target, extended)?;
         // Include the start-window displacement and two samples past the flag
         // bearing. Longer arcs remain the full survey's responsibility.
         let required_steps = delta.unsigned_abs() as u16 + 4;
-        let max_steps = if extended {
-            EXTENDED_MAX_STEPS
-        } else {
-            MAX_STEPS
-        };
         let streamed = required_steps > MAX_STEPS;
-        if required_steps > max_steps {
-            return Err(WalkCorridorBounds {
-                required_steps,
-                max_steps,
-            });
-        }
         let mut ground = self.clone();
         ground.measurements.footprint = Some(RefCell::new(QueryFootprint::new(
             ground.measurements.position,
@@ -143,6 +156,9 @@ impl GroundSurveyJob {
             } else {
                 MAX_STEPS
             },
+            exact_start: None,
+            exact_target: None,
+            streamed_nodes: false,
             #[cfg(test)]
             path: Vec::new(),
         })
@@ -158,6 +174,20 @@ fn signed_span(from: u16, to: u16) -> i32 {
 }
 
 impl WalkCorridorJob {
+    /// Exact sampled endpoints join a separately measured flight without a
+    /// nearest-node snap. Stream only fixed node/edge bookkeeping; keep every
+    /// support, capsule and hull query in both directions.
+    pub(crate) fn with_exact_endpoints(
+        mut self,
+        start: Option<GroundNode>,
+        target: Option<GroundNode>,
+    ) -> Self {
+        self.exact_start = start;
+        self.exact_target = target;
+        self.streamed = true;
+        self.streamed_nodes = true;
+        self
+    }
     pub(crate) fn is_extended(&self) -> bool {
         self.max_steps == EXTENDED_MAX_STEPS
     }
@@ -201,7 +231,10 @@ impl WalkCorridorJob {
         #[cfg(test)]
         self.path.push(node);
         self.previous = Some(node);
-        if Self::center(node).distance_to(self.target) < self.range {
+        if self.exact_target.map_or_else(
+            || Self::center(node).distance_to(self.target) < self.range,
+            |goal| node.id == goal.id && node.position.distance_to(goal.position) < 0.002,
+        ) {
             let first = self.first.unwrap();
             self.result = Some(WalkCorridorResult {
                 outbound: GroundRouteDiagnostics {
@@ -240,6 +273,45 @@ impl WalkCorridorJob {
         } else {
             self.remaining -= 1;
             self.phase = Phase::Ray(offset(node.id, self.direction));
+        }
+    }
+    fn inspect(&mut self, node: Option<GroundNode>) {
+        let spec = SurfaceSortieState::spec();
+        if self.first.is_none() {
+            if !self.take_footprint() {
+                self.phase = Phase::Done;
+                return;
+            }
+            if let Some(node) = node.filter(|n| {
+                self.exact_start.is_none_or(|start| {
+                    n.id == start.id && n.position.distance_to(start.position) < 0.002
+                })
+            }) && self.nearest.is_none_or(|old| {
+                node.position.distance_to(self.start) < old.position.distance_to(self.start)
+            }) {
+                self.nearest = Some(node);
+            }
+            self.start_cursor += 1;
+            self.phase = if self.start_cursor == 5 {
+                Phase::Begin
+            } else {
+                Phase::Ray(offset(self.start_id, i32::from(self.start_cursor) - 2))
+            };
+        } else if let Some(node) = node {
+            let previous = self.previous.unwrap();
+            let rise = (node.position - previous.position)
+                .dot((node.position + previous.position).normalized())
+                .abs();
+            let height = spec.jump_speed.powi(2) / (2.0 * self.ground.gravity);
+            if rise >= 0.3 || rise > height * 0.75 {
+                self.phase = Phase::Done;
+            } else {
+                self.max_rise = self.max_rise.max(rise);
+                self.next = Some(node);
+                self.phase = Phase::WalkCapsule(false, 0);
+            }
+        } else {
+            self.phase = Phase::Done;
         }
     }
     fn advance(&mut self) {
@@ -299,47 +371,12 @@ impl PlanningJob for WalkCorridorJob {
             Phase::Hull(node, center) => {
                 self.phase = Phase::Inspect((self.hull)(center).then_some(node));
             }
-            Phase::Inspect(node) => {
-                if self.first.is_none() {
-                    if !self.take_footprint() {
-                        self.phase = Phase::Done;
-                        return;
-                    }
-                    if let Some(node) = node
-                        && self.nearest.is_none_or(|old| {
-                            node.position.distance_to(self.start)
-                                < old.position.distance_to(self.start)
-                        })
-                    {
-                        self.nearest = Some(node);
-                    }
-                    self.start_cursor += 1;
-                    self.phase = if self.start_cursor == 5 {
-                        Phase::Begin
-                    } else {
-                        Phase::Ray(offset(self.start_id, i32::from(self.start_cursor) - 2))
-                    };
-                } else if let Some(node) = node {
-                    let previous = self.previous.unwrap();
-                    let rise = (node.position - previous.position)
-                        .dot((node.position + previous.position).normalized())
-                        .abs();
-                    let height = spec.jump_speed.powi(2) / (2.0 * self.ground.gravity);
-                    if rise >= 0.3 || rise > height * 0.75 {
-                        self.phase = Phase::Done;
-                    } else {
-                        self.max_rise = self.max_rise.max(rise);
-                        self.next = Some(node);
-                        self.phase = Phase::WalkCapsule(false, 0);
-                    }
-                } else {
-                    self.phase = Phase::Done;
-                }
-            }
+            Phase::Inspect(node) => self.inspect(node),
             Phase::Begin => {
                 let Some(first) = self.nearest.filter(|n| {
                     n.position.distance_to(self.start) < 3.0
-                        && self.hatch_distance(*n) < HATCH_APPROACH_RANGE
+                        && (self.exact_start.is_some()
+                            || self.hatch_distance(*n) < HATCH_APPROACH_RANGE)
                 }) else {
                     self.phase = Phase::Done;
                     return;
@@ -405,6 +442,11 @@ impl PlanningJob for WalkCorridorJob {
             }
             Phase::Advance => self.advance(),
             Phase::Done => {}
+        }
+        if self.streamed_nodes
+            && let Phase::Inspect(node) = self.phase
+        {
+            self.inspect(node);
         }
     }
 }

@@ -102,6 +102,14 @@ pub struct ObjectiveMeasurementWork {
     pub extended_completed: u64,
     #[serde(skip_serializing_if = "is_zero")]
     pub extended_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_successes: u64,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub powered_corridor_failures: BTreeMap<&'static str, u64>,
 }
 fn is_zero(value: &u64) -> bool {
     *value == 0
@@ -124,6 +132,20 @@ impl ObjectiveMeasurementWork {
         }
     }
     fn add_since(&mut self, new: &Self, old: &Self) {
+        for (&reason, &count) in &new.powered_corridor_failures {
+            *self.powered_corridor_failures.entry(reason).or_default() += count
+                - old
+                    .powered_corridor_failures
+                    .get(reason)
+                    .copied()
+                    .unwrap_or(0);
+        }
+        self.powered_corridor_started +=
+            new.powered_corridor_started - old.powered_corridor_started;
+        self.powered_corridor_completed +=
+            new.powered_corridor_completed - old.powered_corridor_completed;
+        self.powered_corridor_successes +=
+            new.powered_corridor_successes - old.powered_corridor_successes;
         self.extended_started += new.extended_started - old.extended_started;
         self.extended_completed += new.extended_completed - old.extended_completed;
         self.extended_successes += new.extended_successes - old.extended_successes;
@@ -274,6 +296,7 @@ pub struct LiveObjectivePlanner {
     extended_corridors: bool,
     walk_feedback: bool,
     walk_bounds_feedback: bool,
+    powered_corridors: bool,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -298,6 +321,7 @@ impl LiveObjectivePlanner {
             extended_corridors: false,
             walk_feedback: false,
             walk_bounds_feedback: false,
+            powered_corridors: false,
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -406,6 +430,18 @@ impl LiveObjectivePlanner {
     }
     pub fn uses_walk_bounds_feedback(&self) -> bool {
         self.walk_bounds_feedback
+    }
+    /// Measure one selected/actual powered route with the original source age.
+    pub fn with_powered_corridors(mut self) -> Self {
+        assert!(
+            self.uses_walk_bounds_feedback(),
+            "powered corridors require walking feedback and bounds"
+        );
+        self.powered_corridors = true;
+        self
+    }
+    pub fn uses_powered_corridors(&self) -> bool {
+        self.powered_corridors
     }
     pub fn allowance(&self) -> Work {
         self.allowance
@@ -1143,6 +1179,13 @@ impl LiveObjectivePlanner {
             }
             return;
         }
+        // A forecast's kinematic environment and geometry must share one source
+        // epoch. Discard warm geometry for this opt-in powered planner, including
+        // its full fallback when no selected/actual local pass is available;
+        // never relabel old measurements with the current environment's clock.
+        if self.powered_corridors && planning == ObjectivePlanning::JetpackRoundTrip {
+            measurements = None;
+        }
         let snapshot = measurements
             .as_ref()
             .map(|m| Arc::clone(&m.snapshot))
@@ -1209,7 +1252,16 @@ impl LiveObjectivePlanner {
             };
             let token = self
                 .queue
-                .submit(player as u64, p.tick, JobLimits::default(), job)
+                .submit(
+                    player as u64,
+                    p.tick,
+                    JobLimits::default(),
+                    if self.powered_corridors {
+                        job.with_powered_corridor(p.site_query)
+                    } else {
+                        job
+                    },
+                )
                 .unwrap();
             self.requests.insert(
                 player,

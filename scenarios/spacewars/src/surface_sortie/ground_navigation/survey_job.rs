@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 mod walk_corridor;
 pub(crate) use walk_corridor::{WalkCorridorBounds, WalkCorridorJob, WalkCorridorResult};
+mod node_window;
+pub(crate) use node_window::GroundNodeWindowJob;
 
 #[derive(Clone, Copy)]
 struct Cursor {

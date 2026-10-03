@@ -9,6 +9,7 @@ mod flight_dependencies;
 mod focused;
 mod gravity_dependencies;
 mod measurement_work;
+mod powered_corridors;
 mod requested_corridors;
 mod route_dependencies;
 mod walk_feedback;

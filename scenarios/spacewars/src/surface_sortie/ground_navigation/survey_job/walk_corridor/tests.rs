@@ -357,3 +357,78 @@ fn unsupported_bounds_use_the_constructor_geometry_without_measuring_a_walk() {
     }
     assert_eq!(ground.query_calls.get(), before);
 }
+
+#[test]
+fn streamed_node_bookkeeping_keeps_queries_paths_and_exact_flight_endpoints() {
+    let (_, ground, map) = fixture();
+    let from = *map.nodes.iter().find(|n| n.id == 0).unwrap();
+    let to = *map.nodes.iter().find(|n| n.id == 64).unwrap();
+    let mut outcomes = Vec::new();
+    for streamed in [false, true] {
+        let calls = Arc::new(AtomicU64::new(0));
+        let count = Arc::clone(&calls);
+        let mut j = ground
+            .walk_corridor(
+                from.position,
+                WalkCorridorJob::center(to),
+                0.4,
+                [Some(WalkCorridorJob::center(from)), None],
+                Arc::new(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                    true
+                }),
+                true,
+            )
+            .unwrap();
+        if streamed {
+            j = j.with_exact_endpoints(None, None);
+        }
+        let work = run(&mut j, &calls);
+        assert!(j.result.is_some());
+        if streamed {
+            assert_eq!(work.graph, 1);
+        }
+        outcomes.push((work, j.result, j.path));
+    }
+    assert_eq!(outcomes[0].1, outcomes[1].1);
+    assert_eq!(outcomes[0].2, outcomes[1].2);
+    assert_eq!(outcomes[0].0.physics_queries, outcomes[1].0.physics_queries);
+    for changed in 0..3 {
+        let mut start = from;
+        let mut end = to;
+        if changed == 1 {
+            start.position += start.position.normalized() * 0.02;
+        }
+        if changed == 2 {
+            end.position += end.position.normalized() * 0.02;
+        }
+        let mut j = ground
+            .walk_corridor(
+                start.position,
+                WalkCorridorJob::center(end),
+                0.4,
+                [None; 2],
+                Arc::new(|_| true),
+                true,
+            )
+            .unwrap()
+            .with_exact_endpoints(Some(start), Some(end));
+        while j.next_work().is_some() {
+            j.step();
+        }
+        assert_eq!(j.result.is_some(), changed == 0);
+        if let Some(r) = j.result {
+            assert_eq!(r.outbound.start_node, Some(from.id));
+            assert_eq!(r.endpoint, to);
+            for nodes in j.path.windows(2) {
+                for (a, b) in [(nodes[0], nodes[1]), (nodes[1], nodes[0])] {
+                    assert!(
+                        map.edges.iter().any(|e| e.from == a.id
+                            && e.to == b.id
+                            && e.kind == GroundEdgeKind::Walk)
+                    );
+                }
+            }
+        }
+    }
+}
