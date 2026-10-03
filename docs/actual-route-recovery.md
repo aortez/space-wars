@@ -63,5 +63,110 @@ evidence, not independent playing strength or Raspberry Pi performance.
 
 ## Results
 
-Pending frozen comparison. No default promotion or remote publication is part
-of this experiment.
+The bounded decision works, but does not yet secure a safe escape. Both copies
+of the retained stalled visit receive the native `arrival_window` receipt at
+**7656**, abort capture once, and lift off at **7662**. The mission immediately
+chooses its incoming-fire combat response and loses the ship to laser fire at
+**8071**, 46 ticks earlier than the waiting baseline. Later recovery produces
+one additional claim and departure in each copy. Neither match becomes a win.
+Keep this policy opt-in; the evidence supports a waiting fix, not a general
+strength improvement.
+
+All **17 disabled replays** are exact. In the **17 comparisons**, 15 matches
+have no receipt or abort and remain exact apart from the added option telemetry:
+seven streams, physical outcomes, ordinary sensor work, non-timing native
+planner telemetry and allocation ledgers. The remaining two are world 1 P1
+powered and its separate health-enabled duplicate. Each has exactly one receipt
+and one abort, with first control difference at **7658**. These are correlated
+observations of the same landing, not two independent successes.
+
+### The stalled visit reaches a decision and physically lifts off
+
+| Tick | Native/physical observation |
+| ---: | --- |
+| 7635 | Actual landing; source generation 29 begins at 31.862 hull. |
+| 7656 | Completed local walk/powered attempt reports `arrival_window`; capture aborts with neutral controls. |
+| 7657 | Mission records capture failure and invokes its existing reconsider/deferral path. |
+| 7658 | First changed controls; mission starts a pursuit in response to incoming fire. |
+| 7662 | Ship is flying with no supported feet, still at 31.862 hull. |
+| 7770 | Observed landing altitude exceeds 25, still at 31.862 hull. |
+| 8071 | Ship is lost; current native combat evidence records laser damage. |
+
+There is no hatch exit, claim or boarding on this abandoned visit. Before losing
+the ship, the mission never selects a different destination or leaves planet 0's
+nearest frame. The health option does not prevent this incoming-fire response;
+its discretionary-pursuit rule intentionally leaves that response eligible.
+The local failure remains a historical result from source tick 7635, with no
+refreshed clock and no negative full-graph certificate.
+
+In the primary match, recovery finishes at **11794**. The bot later claims and
+departs planet 1 at **17904**, then planet 2 at **20431**, for three completed
+departures including the original early planet-1 capture. It loses at **22016**
+to a missile while recovering in a pod. The prior match had two completed
+departures and ended at 20910. The improvement in later completions does not
+change the immediate failed escape or the final loss.
+
+### Complete retained outcomes
+
+The eight primary armed cases have **2 wins / 28 claims / 27 completed
+departures**, compared with **2 / 27 / 26** before this change. The other seven
+primary armed control sequences are unchanged.
+
+| Primary case | Result before → after | Claims before → after | Departures before → after | End tick before → after |
+| --- | --- | --- | --- | --- |
+| World 0 P1 walking | loss → loss | 4 → 4 | 4 → 4 | 21907 → 21907 |
+| World 0 P1 powered | win → win | 5 → 5 | 5 → 5 | 36000 → 36000 |
+| World 0 P2 walking | loss → loss | 4 → 4 | 4 → 4 | 26591 → 26591 |
+| World 0 P2 powered | loss → loss | 4 → 4 | 3 → 3 | 30536 → 30536 |
+| World 1 P1 walking | loss → loss | 1 → 1 | 1 → 1 | 36000 → 36000 |
+| World 1 P1 powered | loss → loss | 2 → 3 | 2 → 3 | 20910 → 22016 |
+| World 1 P2 walking | win → win | 4 → 4 | 4 → 4 | 36000 → 36000 |
+| World 1 P2 powered | loss → loss | 3 → 3 | 3 → 3 | 36000 → 36000 |
+
+The successful-exit comparison, world 0 P2 powered, remains exact for all
+61,072 pilot observations. It still publishes the positive actual route at
+18288 and exits at 18289 despite five preceding hatch resets. Its later failure
+to return, board and depart remains unresolved.
+
+The health regressions stay separate: both world-0 cases are unchanged, losing
+at 16190 and 15014 with three departures each. World 1 P1 powered repeats the
+same abort/liftoff/first-loss sequence, finishes with three departures instead
+of two, and loses at **21354** instead of 20910. Its later trajectory differs
+from the primary match. No health default is changed.
+
+### Verification and evidence
+
+Source, tests and the plan were frozen in **`8f72401`**. All **1,047 Rust tests**
+and **702 Python tests** pass. Tests cover native completion versus unknown
+work, unchanged queue work/physics, source pose/age/actor/objective gates,
+positive-route priority, neutral one-time abort and configuration propagation
+through capture creation, clone and reset. Formatting, strict AI Clippy with
+`--no-deps`, and profiled/ordinary release builds pass. Scenario Clippy retains
+the same seven pre-existing findings. All 34 complete replay/comparison audits
+pass, including the unchanged maximum **4 graph operations / 384 queries** and
+maximum publication age **120 ticks**.
+
+The frozen profiled binary is
+`target/actual-recovery/surface_mission_soak-8f72401`, SHA-256
+`c0b838d8cdaed842dfdf5fa4833643721d53565ba732ef11bfea57279be90933`.
+The complete summary at `target/actual-recovery/v1/summary.json` has SHA-256
+`e1810fbe8fbd22d9d488381bee62ed8f5e62ba38dc93988d5fa78065b378e186`.
+
+[The manifest](data/actual-route-recovery-v1.json) records all outcomes and checks.
+[The archive](data/actual-route-recovery-v1.json.gz) retains the frozen plan,
+complete summaries, original receipt/abort observations, physical/route/flight
+witnesses, first changed controls, post-abort physical transitions and native
+loss evidence, validation logs, reproduction scripts and raw-file hashes.
+All 125 embedded documents, 585 raw files, the retained source inputs and both
+frozen binaries passed hash verification.
+Defaults, live budgets and transfer permissions remain unchanged. No remote
+publication, deployment or Raspberry Pi performance claim is made.
+
+### Next investigation
+
+The immediate gap is the mission transition after abort: a damaged ship becomes
+eligible for a new incoming-fire pursuit two ticks later. Investigate a bounded
+departure or disengagement response that preserves defensive weapons and
+physical safety priorities while measuring whether it actually gains separation.
+Do not treat suppressing pursuit as proof of escape, or tune that next policy
+against only this already-known match.
