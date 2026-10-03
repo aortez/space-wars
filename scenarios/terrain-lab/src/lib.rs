@@ -20,6 +20,7 @@ use engine_terrain::{
     TerrainGeometry,
 };
 
+pub mod blast_lab;
 mod fragments;
 mod impacts;
 mod mining;
