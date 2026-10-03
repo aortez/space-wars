@@ -37,6 +37,8 @@ mod native_capture_probe;
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
 mod planning_probe;
+#[path = "support/projectile_diagnostics.rs"]
+mod projectile_diagnostics;
 #[path = "support/successor_continuation.rs"]
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
@@ -199,6 +201,7 @@ fn main() {
     let mut actual_landing_probe = actual_landing_probe::ActualLandingProbe::from_args();
     assert!(actual_landing_probe.is_none() || live_planning.is_some());
     let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
+    let mut projectile_trace = projectile_diagnostics::ProjectileTrace::from_args(&out);
     let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
     assert!(
         !native_capture_probe::timing_enabled()
@@ -935,6 +938,9 @@ fn main() {
                 planning_ms += comparison.survey_arrival(&state, remaining, &busy);
             }
         }
+        if let Some(trace) = &mut projectile_trace {
+            trace.observe(&state);
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -1047,6 +1053,9 @@ fn main() {
     }
     if let Some(probe) = actual_landing_probe {
         probe.finish(&out);
+    }
+    if let Some(trace) = projectile_trace {
+        trace.finish();
     }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
