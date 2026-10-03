@@ -319,7 +319,7 @@ the Off profile still disables every automatic event.
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
-| `crow` | One kinematic visitor, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
+| `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
 
 ### Exploding digits
@@ -439,11 +439,23 @@ perches and make it depart. Rain and Color Cycle can coexist, as can a player or
 automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
 one-resident admission limit prevent lingering or accumulating birds.
 
-This is a **kinematic visual actor**, not a rigid body: it adds no Rapier bodies,
-colliders, fluid displacement or duck collisions. At most 24 candidate perches
-are inspected per update. Seeded choices and fixed-tick motion replay exactly.
-Flight lifts above the face before crossing and descending; moving-obstacle
-avoidance, physical reactions and player control remain future work.
+Flight uses a small Clock-local motion controller: gravity, drag, bounded lateral
+steering and lift during visible wing downstrokes, with gliding gaps between
+strokes. Strong strokes have a larger wing sweep; landing uses softer strokes.
+It climbs above the face,
+crosses, then brakes onto its chosen digit. Landing depends on position and speed;
+travel no longer takes a fixed 100 ticks. Cruising height follows the digit size,
+with room for the wings in wide layouts. Hops and perch selection are unchanged.
+
+The crow adds no Rapier bodies, general collision shapes, fluid displacement or
+duck collisions. Swept foot contact checks the intended perch and surviving digit
+tops, including interrupted approaches. It works with at most 24 exposed perches.
+Seeded choices and fixed-tick motion
+replay exactly, including wing phase. The 22-second visit includes up to five
+seconds for departure; a failed eight-second approach also prompts departure.
+Moving-obstacle avoidance, physical reactions to other actors and player control
+remain future work. See the [flight study](design/crow-flight.md) for the motion
+model, comparison gallery and reproduction steps.
 
 `clock state` exposes `crow` separately from the timed `event_kind`: visit ID,
 phase (`entering`, `perched`, `hopping`, `flying`, `leaving`), phase/age ticks,

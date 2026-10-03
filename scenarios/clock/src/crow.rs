@@ -1,15 +1,17 @@
 //! One cheap resident visitor. No wall-clock sampling or separate physics world.
-//! Perch feet use the same lit-cell geometry as rendering; flight is kinematic.
+//! Perch feet use the same lit-cell geometry as rendering.
+mod flight;
 pub(crate) use engine_common::ClockCrowPhase as Phase;
 use engine_common::{ClockCrowState, ClockEventKind};
 use engine_core::Vec2;
+use flight::Flight;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{SegmentRepresentation, SegmentState, layout::Layout};
 
 pub const CROW_TICKS: u64 = 22 * 60;
-const FLIGHT_TICKS: u64 = 100;
-const EXIT_TICKS: u64 = 100;
+const MAX_FLIGHT_TICKS: u64 = 8 * 60;
+const EXIT_TICKS: u64 = 5 * 60;
 
 #[derive(Debug, Clone, Copy)]
 struct Perch {
@@ -70,6 +72,7 @@ pub(crate) struct CrowVisit {
     rng: StdRng,
     hops: u32,
     escapes: u32,
+    pub flight: Flight,
 }
 
 impl CrowVisit {
@@ -101,10 +104,11 @@ impl CrowVisit {
             target: None,
             from: position,
             to: position,
-            duration: FLIGHT_TICKS,
+            duration: MAX_FLIGHT_TICKS,
             rng,
             hops: 0,
             escapes: 0,
+            flight: Flight::default(),
         };
         let candidates = perches(layout, segments, event);
         let target = visit.choose(&candidates, false);
@@ -117,7 +121,9 @@ impl CrowVisit {
     }
 
     fn cruise_height(layout: Layout) -> f32 {
-        layout.canopy_y - layout.pitch * 1.4 - 4.0
+        // Fly above the tallest possible digit, with room for raised wings.
+        // Keeping this relative to the face avoids enormous portrait detours.
+        (layout.pitch * 5.2).min(layout.canopy_y - layout.pitch * 1.6 - 8.0)
     }
 
     fn choose(&mut self, candidates: &[Option<Perch>; 24], nearby: bool) -> Option<Perch> {
@@ -141,6 +147,7 @@ impl CrowVisit {
     }
 
     fn travel(&mut self, target: Perch, phase: Phase) {
+        let grounded = self.phase == Phase::Perched;
         self.target = Some(target);
         self.from = self.position;
         self.to = target.feet;
@@ -150,11 +157,15 @@ impl CrowVisit {
         self.duration = if phase == Phase::Hopping {
             28
         } else {
-            FLIGHT_TICKS
+            MAX_FLIGHT_TICKS
         };
+        if phase != Phase::Hopping {
+            self.flight.retarget(self.position, grounded, self.layout);
+        }
     }
 
     fn leave(&mut self) {
+        let grounded = self.phase == Phase::Perched;
         self.target = None;
         self.from = self.position;
         self.to = Vec2::new(
@@ -168,6 +179,7 @@ impl CrowVisit {
         self.phase = Phase::Leaving;
         self.phase_tick = 0;
         self.duration = EXIT_TICKS;
+        self.flight.retarget(self.position, grounded, self.layout);
     }
 
     /// React to support changes even in a zero-dt control/read synchronization.
@@ -215,36 +227,56 @@ impl CrowVisit {
             }
             return false;
         }
-        let t = (self.phase_tick as f32 / self.duration as f32).min(1.0);
         if self.phase == Phase::Hopping {
+            let t = (self.phase_tick as f32 / self.duration as f32).min(1.0);
             self.position = self.from * (1.0 - t)
                 + self.to * t
                 + Vec2::new(0.0, self.layout.pitch * 0.9 * 4.0 * t * (1.0 - t));
         } else {
-            // Lift, cross above the face, then descend onto exposed support.
-            // Each eased leg is continuous and avoids sweeping through digits.
-            let cruise = Self::cruise_height(self.layout)
-                .max(self.from.y)
-                .max(self.to.y);
-            let (a, b, p) = if t < 0.25 {
-                (self.from, Vec2::new(self.from.x, cruise), t * 4.0)
-            } else if t < 0.8 {
-                (
-                    Vec2::new(self.from.x, cruise),
-                    Vec2::new(self.to.x, cruise),
-                    (t - 0.25) / 0.55,
-                )
-            } else {
-                (Vec2::new(self.to.x, cruise), self.to, (t - 0.8) * 5.0)
-            };
-            let eased = p * p * (3.0 - 2.0 * p);
-            self.position = a * (1.0 - eased) + b * eased;
-        }
-        if self.phase_tick >= self.duration {
-            if self.phase == Phase::Leaving {
-                return true;
+            let leaving = self.phase == Phase::Leaving;
+            let previous = self.position;
+            let mut landed = self.flight.step(
+                &mut self.position,
+                self.to,
+                Self::cruise_height(self.layout),
+                self.layout,
+                leaving,
+            );
+            // Retargeting or departure can interrupt a descending approach.
+            // Its old support still catches the feet if that digit survives.
+            let contact = perches(self.layout, segments, event)
+                .into_iter()
+                .flatten()
+                .filter(|p| previous.y >= p.feet.y && self.position.y < p.feet.y)
+                .filter(|p| {
+                    let fraction = (previous.y - p.feet.y) / (previous.y - self.position.y);
+                    let x = previous.x + (self.position.x - previous.x) * fraction;
+                    (x - p.feet.x).abs() <= self.layout.pitch * 0.4
+                })
+                .max_by(|a, b| a.feet.y.total_cmp(&b.feet.y));
+            if let Some(contact) = contact {
+                self.position.y = contact.feet.y;
+                self.flight.retarget(self.position, true, self.layout);
+                landed = false;
             }
+            if self.flight.velocity.x.abs() > self.layout.pitch * 0.2 {
+                self.facing_right = self.flight.velocity.x > 0.0;
+            }
+            if leaving {
+                return self.position.x < self.layout.bounds_min.x - self.layout.pitch * 1.5
+                    || self.position.x > self.layout.bounds_max.x + self.layout.pitch * 1.5
+                    || self.phase_tick >= self.duration;
+            }
+            if !landed {
+                if self.phase_tick >= self.duration {
+                    self.leave();
+                }
+                return false;
+            }
+        }
+        if self.phase != Phase::Hopping || self.phase_tick >= self.duration {
             self.position = self.to;
+            self.flight = Flight::default();
             self.phase = Phase::Perched;
             self.phase_tick = 0;
             self.duration = self.rng.random_range(50..=120);

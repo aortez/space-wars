@@ -26,7 +26,7 @@ pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) 
     };
     let outline = RenderColor::rgb(0.35, 0.40, 0.51);
     if matches!(crow.phase, Phase::Entering | Phase::Flying | Phase::Leaving) {
-        let flap = (crow.phase_tick as f32 * 0.34).sin();
+        let flap = crow.flight.wing;
         frame.push_primitive(
             8,
             RenderPrimitive::Polygon(RenderPolygon {

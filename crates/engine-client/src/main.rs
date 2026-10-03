@@ -12,6 +12,8 @@ mod clock_fonts;
 mod controller_assignments;
 mod controller_controls;
 mod controller_profile;
+#[cfg(test)]
+mod crow_visual_tests;
 mod device_info;
 mod gamepad;
 mod host;

@@ -656,7 +656,7 @@ pub struct ClockExplosionState {
     pub shared_arena: bool,
 }
 
-/// Bounded kinematic visitor diagnostics, independent of the timed animation.
+/// Bounded Crow visitor diagnostics, independent of the timed animation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCrowState {
     pub visit_id: u64,

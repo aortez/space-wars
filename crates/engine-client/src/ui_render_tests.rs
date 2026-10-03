@@ -494,8 +494,14 @@ fn clock_crow_renders_visible_perches_hops_and_shared_events_on_device_layouts()
                 &[ClockAction::preview_event(ClockEventKind::Crow)],
                 Duration::ZERO,
             );
-            let ticks = if name == "entering" { 65 } else { 105 };
-            for _ in 0..ticks {
+            for _ in 0..if name == "entering" { 65 } else { 480 } {
+                if name != "entering"
+                    && state
+                        .crow_state()
+                        .is_some_and(|c| c.phase.as_str() == "perched")
+                {
+                    break;
+                }
                 ClockScenario::step(&mut state, &[], Duration::from_millis(16));
             }
             if name == "hopping" {
