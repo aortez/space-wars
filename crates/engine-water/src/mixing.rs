@@ -35,6 +35,7 @@ struct Group {
     volume: f64,
     position: [f64; 2],
     momentum: [f64; 2],
+    horizontal_energy: f64,
     durations: [f64; 2],
     upstream_first: [u64; 2],
     upstream_last: [u64; 2],
@@ -50,12 +51,15 @@ impl Group {
         )
     }
 
-    fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64) {
+    fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64, splash: bool) {
         self.volume += parcel.volume;
         self.position[0] += parcel.position.x as f64 * parcel.volume;
         self.position[1] += parcel.position.y as f64 * parcel.volume;
         self.momentum[0] += parcel.velocity.x as f64 * parcel.volume;
         self.momentum[1] += parcel.velocity.y as f64 * parcel.volume;
+        if splash {
+            self.horizontal_energy += f64::from(parcel.velocity.x).powi(2) * parcel.volume;
+        }
         let side = usize::from(outlet == self.outlets[1]);
         self.durations[side] += parcel.duration;
         self.upstream_first[side] = self.upstream_first[side].min(emission_tick);
@@ -156,6 +160,7 @@ pub(crate) fn step(
     spills: &mut Vec<Option<Spill>>,
     scratch: &mut Scratch,
     stats: &mut Stats,
+    splash: &mut crate::splash::State,
     solids: &[SolidBox],
     config: WaterConfig,
     dt: f64,
@@ -256,6 +261,7 @@ pub(crate) fn step(
                     volume: 0.0,
                     position: [0.0; 2],
                     momentum: [0.0; 2],
+                    horizontal_energy: 0.0,
                     durations: [0.0; 2],
                     upstream_first: [u64::MAX; 2],
                     upstream_last: [0; 2],
@@ -274,8 +280,18 @@ pub(crate) fn step(
                 group.contact_max.x.min(contact_max.x),
                 group.contact_max.y.min(contact_max.y),
             );
-            group.add(pa, a.outlet, spills[a.index].unwrap().tick);
-            group.add(pb, b.outlet, spills[b.index].unwrap().tick);
+            group.add(
+                pa,
+                a.outlet,
+                spills[a.index].unwrap().tick,
+                config.splash.is_some(),
+            );
+            group.add(
+                pb,
+                b.outlet,
+                spills[b.index].unwrap().tick,
+                config.splash.is_some(),
+            );
             stats.pairs += 1;
             stats.volume += pa.volume + pb.volume;
             break;
@@ -295,7 +311,7 @@ pub(crate) fn step(
     parcels.truncate(write);
     spills.truncate(write);
     let mut linked = [false; MAX_PARCELS];
-    for group in &scratch.groups {
+    for (group_index, group) in scratch.groups.iter().enumerate() {
         // Several consecutive slices from one outlet represent several time
         // intervals, while simultaneous slices from two outlets do not.
         let duration = group.durations[0].max(group.durations[1]);
@@ -304,6 +320,34 @@ pub(crate) fn step(
             (group.momentum[1] / group.volume) as f32,
         );
         let position = group.center();
+        let mut parcel = Parcel {
+            position,
+            velocity,
+            volume: group.volume,
+            duration,
+            horizontal_bounds: group.bounds,
+        };
+        // Reserve all remaining mixed outputs before considering optional spray.
+        let free = (config.max_parcels - config.reserved_release_parcels)
+            .saturating_sub(parcels.len() + scratch.groups.len() - group_index);
+        let split = config.splash.is_some()
+            && splash.split(
+                &mut parcel,
+                crate::splash::Impact {
+                    position,
+                    normal: Vec2::ZERO,
+                    speed: (group.horizontal_energy / group.volume - f64::from(velocity.x).powi(2))
+                        .max(0.0)
+                        .sqrt(),
+                },
+                free,
+                config,
+            );
+        if split {
+            parcels.push(parcel);
+            spills.push(None);
+            continue;
+        }
         // Inelastic center-of-mass replacement preserves volume and momentum,
         // dissipating relative motion. The common ballistic step follows. A
         // predicted contact may therefore be resolved up to one tick early.
@@ -361,13 +405,7 @@ pub(crate) fn step(
                 ..tail
             }
         };
-        parcels.push(Parcel {
-            position,
-            velocity,
-            volume: group.volume,
-            duration,
-            horizontal_bounds: group.bounds,
-        });
+        parcels.push(parcel);
         spills.push(Some(Spill {
             source,
             tick,

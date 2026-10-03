@@ -1,4 +1,5 @@
 //! Headless captures of the water edge test bed through both production adapters.
+mod splash;
 use crate::{
     render::{self, Viewport},
     thruster_visual_tests::{raster, svg, write_png},

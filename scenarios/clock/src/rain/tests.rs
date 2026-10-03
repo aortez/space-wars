@@ -204,6 +204,7 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     let done = event.step();
                     let s = event.water.stats();
                     assert!(s.parcels <= PARCELS);
+                    assert!(s.splash_bursts <= tick / 15 + 1);
                     assert!(
                         (s.injected - s.pooled - s.in_flight - s.drained - s.reclaimed).abs()
                             < 1e-6
@@ -291,6 +292,15 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     assert_eq!(event.spawns, 1);
                 }
                 assert_eq!(event.physics_counts(), (0, 0));
+                if amount == ClockRainAmount::Heavy {
+                    assert!(event.water.stats().splash_bursts > 0);
+                    assert!(event.diagnostics().drain_splash_microunits > 0);
+                }
+                eprintln!(
+                    "rain splashes aspect={aspect:.3} amount={amount:?} seed={seed}: bursts={} suppressed={}",
+                    event.water.stats().splash_bursts,
+                    event.water.stats().splash_capacity_suppressed
+                );
                 assert_eq!(event.responsive_floor().unwrap().deferrals, 0);
                 assert!(max_open > 0.0);
                 assert!(
