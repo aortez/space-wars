@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location(
@@ -31,6 +32,12 @@ def fixture():
 
 
 class ProjectileDiagnosticsTests(unittest.TestCase):
+    def test_input_hashes_accept_cli_paths_and_module_filename_strings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'input.json'
+            path.write_text('{}')
+            self.assertEqual(P.digest(path), P.digest(str(path)))
+
     def test_current_physical_frame_and_relative_values_are_required(self):
         row, pilot = fixture()
         P.audit_sample(row, pilot)

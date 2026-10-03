@@ -13,7 +13,11 @@ import traceback
 spec = importlib.util.spec_from_file_location('speed', Path(__file__).with_name('validate-transfer-speed.py'))
 S = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(S)
-digest, rows, root_of = S.F.E.digest, S.F.rows, S.C.P.root_of
+rows, root_of = S.F.rows, S.C.P.root_of
+
+
+def digest(path):
+    return S.F.E.digest(Path(path))
 
 
 def command(old, binary, root, enabled):
