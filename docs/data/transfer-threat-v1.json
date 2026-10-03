@@ -1,0 +1,1891 @@
+{
+  "schema": 1,
+  "complete": true,
+  "source_commit": "9e1c8cec1ad1023afacbad643b7492c4fe80f10d",
+  "sources": {
+    "target/transfer-speed/v1/summary.json": "0f6d1217d577f14ba590781ac00987a4ee595db99bab04c8264b9d1f742d865b",
+    "target/transfer-approach/v1/summary.json": "074b66abbaa7e280cdcd9e7438cd5a5106d565f3ea6bf0bba762a0f4a114d9b3"
+  },
+  "native_sources": {
+    "crates/spacewars-ai/src/lib.rs": "fc813d6f989f7b544e71f98a967f5e8426240b470c22181481b9af3610cf42ba",
+    "crates/spacewars-ai/src/combat_pilot.rs": "7ddcac8db736870fe9d58c8aae49e4255d98e744f83132cdebc943e5a31cde9f",
+    "crates/spacewars-ai/src/mission_escape_travel.rs": "c7d6d0c8f97c2bd72875f3b4df71b7b330ea3e36889a50140c399e53acd51679",
+    "scenarios/spacewars/src/surface_sortie/combat.rs": "ab66f32c24940e8c94ac436d5fbe2a8e4607e6e2ae8db9e19e2c7a8616f62663",
+    "scenarios/spacewars/src/surface_sortie/impact.rs": "c3cf7717b35662646322b572f63b9e71a24eddf745fedf2b33ed1b62d6b6bc70",
+    "scenarios/spacewars/src/lib.rs": "022a8910a14d36ef1974eb3c5b52da7a10aa52b0ee5127163d7ab3a316fd8fa4"
+  },
+  "analyzer": {
+    "path": "tools/analyze-transfer-threat.py",
+    "sha256": "b47a49fb84fcc097723924aad688b5955fafa0face7939f50f0cc0072cb36f3a"
+  },
+  "archive": {
+    "path": "docs/data/transfer-threat-v1.json.gz",
+    "sha256": "8d27ae86169eb5ee4c8fd5aec6bd85c118b7a3013329f54bff4d8e7a3527afa4"
+  },
+  "runs": {
+    "shared-armed-world1-p1-powered": {
+      "before": {
+        "inputs": {
+          "target/transfer-approach/v1/shared-armed-world1-p1-powered-approach/report.json": "17d46d255e580128beaa8fac74336bc1b6bb91f68102b9b708e0c5b6b9530fd5",
+          "target/transfer-approach/v1/shared-armed-world1-p1-powered-approach/escape-travel-witnesses.json": "3ea83e9f14e538d7869c2c6715b83df24bc7580a39c50e50ca6558e74c7037b5",
+          "target/transfer-approach/v1/shared-armed-world1-p1-powered-approach/capture-evidence.jsonl": "ffeaff9dc309e7f6048ff0fd5c1c5b6176d50153ca775d6ec6679a1f75c411b9",
+          "target/transfer-approach/v1/shared-armed-world1-p1-powered-approach/trace.jsonl": "5af9899515c321de6c03ef1e1c5abc1c127809284fa7783325ed04f3efe97d0f"
+        },
+        "seat": 0,
+        "attempts": [
+          {
+            "started_tick": 8376,
+            "finished_tick": 9185,
+            "reason": "recovery required",
+            "deadline_tick": 11976,
+            "destination": 2,
+            "exposure": {
+              "ticks": 809,
+              "first": {
+                "tick": 8376,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 399.3178399870976,
+                  "opening_speed": 20.199955692660136,
+                  "relative_speed": 21.065448068350634,
+                  "aim_error_radians": 1.4324278968346877,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "last": {
+                "tick": 9184,
+                "hull": 0.05228239297866821,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "engage ship",
+                "last_hit_tick": 9184,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 81.59654296115717,
+                  "opening_speed": 42.123698661691705,
+                  "relative_speed": 43.48532681112551,
+                  "aim_error_radians": 3.0100817059379685,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "missing_target_ticks": 0,
+              "visible_ticks": 800,
+              "occluded_ticks": 0,
+              "recent_hit_ticks": 34,
+              "combat_goals": {
+                "route around planet": 332,
+                "climb clear of ground": 391,
+                "engage ship": 86
+              },
+              "first_closing": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "maximum_range": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "first_inside_range": {
+                "350": {
+                  "tick": 8614,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 349.1937130032085,
+                    "opening_speed": -50.95722086424025,
+                    "relative_speed": 51.37335846783868,
+                    "aim_error_radians": -0.30047146294332694,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "300": {
+                  "tick": 8671,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 299.83545612447153,
+                    "opening_speed": -52.11267015717059,
+                    "relative_speed": 52.63929917128696,
+                    "aim_error_radians": 0.10328779716233885,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "260": {
+                  "tick": 8717,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 259.6223933782651,
+                    "opening_speed": -49.6948541099795,
+                    "relative_speed": 52.14629236535916,
+                    "aim_error_radians": 0.6034226933852325,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "250": {
+                  "tick": 8729,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 249.30935693529364,
+                    "opening_speed": -49.32893925347528,
+                    "relative_speed": 52.03510295649283,
+                    "aim_error_radians": 0.7599985092006751,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "220": {
+                  "tick": 8764,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 219.26339581560202,
+                    "opening_speed": -54.28589294075083,
+                    "relative_speed": 61.48332659498951,
+                    "aim_error_radians": 1.074693037493581,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                }
+              },
+              "weapons": {
+                "laser": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 809,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 723,
+                    "aim": 774,
+                    "range": 353,
+                    "visibility": 9
+                  }
+                },
+                "cannon": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 809,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 723,
+                    "aim": 774,
+                    "range": 388,
+                    "visibility": 9
+                  }
+                }
+              }
+            },
+            "fatal_contact": null,
+            "actions_by_seat": {
+              "0": {
+                "rows": 809,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 607,
+                  "launch": 202
+                }
+              },
+              "1": {
+                "rows": 809,
+                "laser_ticks": 17,
+                "cannon_ticks": 1,
+                "goals": {
+                  "transfer": 695,
+                  "launch": 1,
+                  "hunt": 113
+                }
+              }
+            },
+            "launch_counter_samples": [
+              {
+                "tick": 8340,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8400,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8460,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8520,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8580,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8640,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8700,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8760,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8820,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8880,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8940,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9000,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9060,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9120,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9180,
+                "fired": [
+                  5,
+                  12
+                ],
+                "hits": [
+                  4,
+                  14
+                ]
+              },
+              {
+                "tick": 9240,
+                "fired": [
+                  5,
+                  13
+                ],
+                "hits": [
+                  4,
+                  15
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "after": {
+        "inputs": {
+          "target/transfer-speed/v1/shared-armed-world1-p1-powered-speed/report.json": "0c93329bcd075c6bd6e405eca8d7e3079015d9c63d60a8c98868edbdef6b5587",
+          "target/transfer-speed/v1/shared-armed-world1-p1-powered-speed/escape-travel-witnesses.json": "d4509ac4f67d6702f804162a267ebc68b0f1f26b1b40a81c48f679539da3926e",
+          "target/transfer-speed/v1/shared-armed-world1-p1-powered-speed/capture-evidence.jsonl": "de65d46af4ff835a61c1186ee24a8e4cddbd3ca706be79f2a803ae62c3d21527",
+          "target/transfer-speed/v1/shared-armed-world1-p1-powered-speed/trace.jsonl": "2087a7081f3362e21c5346072935c242b2d1e13d5eb814c2b2884c3a4d8a238b"
+        },
+        "seat": 0,
+        "attempts": [
+          {
+            "started_tick": 8376,
+            "finished_tick": 8892,
+            "reason": "recovery required",
+            "deadline_tick": 11976,
+            "destination": 2,
+            "exposure": {
+              "ticks": 516,
+              "first": {
+                "tick": 8376,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 399.3178399870976,
+                  "opening_speed": 20.199955692660136,
+                  "relative_speed": 21.065448068350634,
+                  "aim_error_radians": 1.4324278968346877,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "last": {
+                "tick": 8891,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "engage ship",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 143.40273499510874,
+                  "opening_speed": -33.9433328976348,
+                  "relative_speed": 70.20684290286731,
+                  "aim_error_radians": -2.5729473543983703,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "missing_target_ticks": 0,
+              "visible_ticks": 516,
+              "occluded_ticks": 0,
+              "recent_hit_ticks": 22,
+              "combat_goals": {
+                "route around planet": 372,
+                "engage ship": 144
+              },
+              "first_closing": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "maximum_range": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "first_inside_range": {
+                "350": {
+                  "tick": 8617,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 349.65207305024865,
+                    "opening_speed": -43.404916648939974,
+                    "relative_speed": 43.40934234988717,
+                    "aim_error_radians": 0.34397890655250707,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "300": {
+                  "tick": 8688,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 299.536660764949,
+                    "opening_speed": -39.94056063709395,
+                    "relative_speed": 42.97731017242402,
+                    "aim_error_radians": 1.7215723283426885,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "260": {
+                  "tick": 8748,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 259.54944378676856,
+                    "opening_speed": -40.06199471424336,
+                    "relative_speed": 44.94885723439472,
+                    "aim_error_radians": -2.692692426957371,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "250": {
+                  "tick": 8762,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 249.52595941462374,
+                    "opening_speed": -44.04587315679187,
+                    "relative_speed": 46.457526507373665,
+                    "aim_error_radians": -2.425030522422709,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "220": {
+                  "tick": 8799,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 219.7173898636019,
+                    "opening_speed": -54.65025253900929,
+                    "relative_speed": 55.12570773738533,
+                    "aim_error_radians": -2.3264267643715333,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                }
+              },
+              "weapons": {
+                "laser": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 516,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 372,
+                    "aim": 503,
+                    "range": 386
+                  }
+                },
+                "cannon": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 516,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 372,
+                    "aim": 503,
+                    "range": 423
+                  }
+                }
+              }
+            },
+            "fatal_contact": {
+              "spawn_tick": 7977,
+              "contact_tick": 8892,
+              "age_ticks": 915,
+              "age_seconds": 15.25,
+              "damage": 31.174251556396484,
+              "sampled_tick": 8940,
+              "cannon_request_seats_at_spawn": [
+                1
+              ]
+            },
+            "actions_by_seat": {
+              "0": {
+                "rows": 516,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 516
+                }
+              },
+              "1": {
+                "rows": 516,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 515,
+                  "launch": 1
+                }
+              }
+            },
+            "launch_counter_samples": [
+              {
+                "tick": 8340,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8400,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8460,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8520,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8580,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8640,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8700,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8760,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8820,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8880,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8940,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  13
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "health-shared-armed-world1-p1-powered": {
+      "before": {
+        "inputs": {
+          "target/transfer-approach/v1/health-shared-armed-world1-p1-powered-approach/report.json": "5e64fff992df658a65023f4f85d759e6110815953956bbb68e15a4e66252c2aa",
+          "target/transfer-approach/v1/health-shared-armed-world1-p1-powered-approach/escape-travel-witnesses.json": "3ea83e9f14e538d7869c2c6715b83df24bc7580a39c50e50ca6558e74c7037b5",
+          "target/transfer-approach/v1/health-shared-armed-world1-p1-powered-approach/capture-evidence.jsonl": "4132adaec58265ab1274f7a28a8a5a30f110192106ffef27169514ca95fd670c",
+          "target/transfer-approach/v1/health-shared-armed-world1-p1-powered-approach/trace.jsonl": "f5f18f3ebef7763d82b4c92920e4dab69783f07dea34a458bbba15c91d60cdb9"
+        },
+        "seat": 0,
+        "attempts": [
+          {
+            "started_tick": 8376,
+            "finished_tick": 9185,
+            "reason": "recovery required",
+            "deadline_tick": 11976,
+            "destination": 2,
+            "exposure": {
+              "ticks": 809,
+              "first": {
+                "tick": 8376,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 399.3178399870976,
+                  "opening_speed": 20.199955692660136,
+                  "relative_speed": 21.065448068350634,
+                  "aim_error_radians": 1.4324278968346877,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "last": {
+                "tick": 9184,
+                "hull": 0.05228239297866821,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "engage ship",
+                "last_hit_tick": 9184,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 81.59654296115717,
+                  "opening_speed": 42.123698661691705,
+                  "relative_speed": 43.48532681112551,
+                  "aim_error_radians": 3.0100817059379685,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "missing_target_ticks": 0,
+              "visible_ticks": 800,
+              "occluded_ticks": 0,
+              "recent_hit_ticks": 34,
+              "combat_goals": {
+                "route around planet": 332,
+                "climb clear of ground": 391,
+                "engage ship": 86
+              },
+              "first_closing": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "maximum_range": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "first_inside_range": {
+                "350": {
+                  "tick": 8614,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 349.1937130032085,
+                    "opening_speed": -50.95722086424025,
+                    "relative_speed": 51.37335846783868,
+                    "aim_error_radians": -0.30047146294332694,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "300": {
+                  "tick": 8671,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 299.83545612447153,
+                    "opening_speed": -52.11267015717059,
+                    "relative_speed": 52.63929917128696,
+                    "aim_error_radians": 0.10328779716233885,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "260": {
+                  "tick": 8717,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 259.6223933782651,
+                    "opening_speed": -49.6948541099795,
+                    "relative_speed": 52.14629236535916,
+                    "aim_error_radians": 0.6034226933852325,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "250": {
+                  "tick": 8729,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 249.30935693529364,
+                    "opening_speed": -49.32893925347528,
+                    "relative_speed": 52.03510295649283,
+                    "aim_error_radians": 0.7599985092006751,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "220": {
+                  "tick": 8764,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "climb clear of ground",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 219.26339581560202,
+                    "opening_speed": -54.28589294075083,
+                    "relative_speed": 61.48332659498951,
+                    "aim_error_radians": 1.074693037493581,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                }
+              },
+              "weapons": {
+                "laser": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 809,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 723,
+                    "aim": 774,
+                    "range": 353,
+                    "visibility": 9
+                  }
+                },
+                "cannon": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 809,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 723,
+                    "aim": 774,
+                    "range": 388,
+                    "visibility": 9
+                  }
+                }
+              }
+            },
+            "fatal_contact": null,
+            "actions_by_seat": {
+              "0": {
+                "rows": 809,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 607,
+                  "launch": 202
+                }
+              },
+              "1": {
+                "rows": 809,
+                "laser_ticks": 17,
+                "cannon_ticks": 1,
+                "goals": {
+                  "transfer": 695,
+                  "launch": 1,
+                  "hunt": 113
+                }
+              }
+            },
+            "launch_counter_samples": [
+              {
+                "tick": 8340,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8400,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8460,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8520,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8580,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8640,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8700,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8760,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8820,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8880,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8940,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9000,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9060,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9120,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 9180,
+                "fired": [
+                  5,
+                  12
+                ],
+                "hits": [
+                  4,
+                  14
+                ]
+              },
+              {
+                "tick": 9240,
+                "fired": [
+                  5,
+                  13
+                ],
+                "hits": [
+                  4,
+                  15
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "after": {
+        "inputs": {
+          "target/transfer-speed/v1/health-shared-armed-world1-p1-powered-speed/report.json": "2a4a0418ec43cf06119376be2f973511d3aefc4b7e9752fda76a88d3ba077b6e",
+          "target/transfer-speed/v1/health-shared-armed-world1-p1-powered-speed/escape-travel-witnesses.json": "d4509ac4f67d6702f804162a267ebc68b0f1f26b1b40a81c48f679539da3926e",
+          "target/transfer-speed/v1/health-shared-armed-world1-p1-powered-speed/capture-evidence.jsonl": "7e8af36191cc58b6e6839ce341a2ce7516104da05d83f0aab93c50e4e17951cd",
+          "target/transfer-speed/v1/health-shared-armed-world1-p1-powered-speed/trace.jsonl": "b6d00679b0e2c866b8b3dff908f64e1430aa60ff3b6822a5aff98c944e3bb5b7"
+        },
+        "seat": 0,
+        "attempts": [
+          {
+            "started_tick": 8376,
+            "finished_tick": 8892,
+            "reason": "recovery required",
+            "deadline_tick": 11976,
+            "destination": 2,
+            "exposure": {
+              "ticks": 516,
+              "first": {
+                "tick": 8376,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": true,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 399.3178399870976,
+                  "opening_speed": 20.199955692660136,
+                  "relative_speed": 21.065448068350634,
+                  "aim_error_radians": 1.4324278968346877,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "last": {
+                "tick": 8891,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "engage ship",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 143.40273499510874,
+                  "opening_speed": -33.9433328976348,
+                  "relative_speed": 70.20684290286731,
+                  "aim_error_radians": -2.5729473543983703,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "missing_target_ticks": 0,
+              "visible_ticks": 516,
+              "occluded_ticks": 0,
+              "recent_hit_ticks": 22,
+              "combat_goals": {
+                "route around planet": 372,
+                "engage ship": 144
+              },
+              "first_closing": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "maximum_range": {
+                "tick": 8463,
+                "hull": 31.174251556396484,
+                "vehicle": 0,
+                "ship_form": "ship",
+                "mission_goal": "transfer",
+                "combat_goal": "route around planet",
+                "last_hit_tick": 8218,
+                "recent_hit": false,
+                "laser_ready": true,
+                "cannon_ready": true,
+                "action": {
+                  "laser": false,
+                  "cannon": false
+                },
+                "target": {
+                  "range": 419.44457054954074,
+                  "opening_speed": -0.6012786482191533,
+                  "relative_speed": 8.39902408564404,
+                  "aim_error_radians": -0.502810462344278,
+                  "visible": true,
+                  "ground_occluded": false,
+                  "hull": 94.29502868652344,
+                  "form": "ship"
+                }
+              },
+              "first_inside_range": {
+                "350": {
+                  "tick": 8617,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 349.65207305024865,
+                    "opening_speed": -43.404916648939974,
+                    "relative_speed": 43.40934234988717,
+                    "aim_error_radians": 0.34397890655250707,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "300": {
+                  "tick": 8688,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "route around planet",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 299.536660764949,
+                    "opening_speed": -39.94056063709395,
+                    "relative_speed": 42.97731017242402,
+                    "aim_error_radians": 1.7215723283426885,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "260": {
+                  "tick": 8748,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 259.54944378676856,
+                    "opening_speed": -40.06199471424336,
+                    "relative_speed": 44.94885723439472,
+                    "aim_error_radians": -2.692692426957371,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "250": {
+                  "tick": 8762,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 249.52595941462374,
+                    "opening_speed": -44.04587315679187,
+                    "relative_speed": 46.457526507373665,
+                    "aim_error_radians": -2.425030522422709,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                },
+                "220": {
+                  "tick": 8799,
+                  "hull": 31.174251556396484,
+                  "vehicle": 0,
+                  "ship_form": "ship",
+                  "mission_goal": "transfer",
+                  "combat_goal": "engage ship",
+                  "last_hit_tick": 8218,
+                  "recent_hit": false,
+                  "laser_ready": true,
+                  "cannon_ready": true,
+                  "action": {
+                    "laser": false,
+                    "cannon": false
+                  },
+                  "target": {
+                    "range": 219.7173898636019,
+                    "opening_speed": -54.65025253900929,
+                    "relative_speed": 55.12570773738533,
+                    "aim_error_radians": -2.3264267643715333,
+                    "visible": true,
+                    "ground_occluded": false,
+                    "hull": 94.29502868652344,
+                    "form": "ship"
+                  }
+                }
+              },
+              "weapons": {
+                "laser": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 516,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 372,
+                    "aim": 503,
+                    "range": 386
+                  }
+                },
+                "cannon": {
+                  "requested_ticks": 0,
+                  "ready_ticks": 516,
+                  "approximate_eligible_ticks": 0,
+                  "blockers": {
+                    "combat_controller_not_engaging": 372,
+                    "aim": 503,
+                    "range": 423
+                  }
+                }
+              }
+            },
+            "fatal_contact": {
+              "spawn_tick": 7977,
+              "contact_tick": 8892,
+              "age_ticks": 915,
+              "age_seconds": 15.25,
+              "damage": 31.174251556396484,
+              "sampled_tick": 8940,
+              "cannon_request_seats_at_spawn": [
+                1
+              ]
+            },
+            "actions_by_seat": {
+              "0": {
+                "rows": 516,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 516
+                }
+              },
+              "1": {
+                "rows": 516,
+                "laser_ticks": 0,
+                "cannon_ticks": 0,
+                "goals": {
+                  "transfer": 515,
+                  "launch": 1
+                }
+              }
+            },
+            "launch_counter_samples": [
+              {
+                "tick": 8340,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8400,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8460,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8520,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8580,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8640,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8700,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8760,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8820,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8880,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  12
+                ]
+              },
+              {
+                "tick": 8940,
+                "fired": [
+                  5,
+                  11
+                ],
+                "hits": [
+                  4,
+                  13
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

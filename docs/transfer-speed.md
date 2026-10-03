@@ -218,3 +218,8 @@ telemetry, not an incoming-projectile track. Preserve the native safety and
 capture gates, and freeze any new threat-response hypothesis before comparing
 complete outcomes. Do not infer useful escape/travel from a longer match or a
 cleaner approach alone.
+
+The [completed threat investigation](transfer-threat.md) identifies the fatal
+contact as a missile launched at 7977, before this transfer; neither ship fires
+during the candidate trip. That finding shifts the next experiment toward
+bounded projectile observation before choosing an avoidance response.
