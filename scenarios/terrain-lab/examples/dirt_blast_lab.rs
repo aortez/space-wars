@@ -11,14 +11,14 @@ use std::{
 use clap::Parser;
 use scenario_terrain_lab::{
     FIXED_HZ,
-    blast_lab::{Blast, BlastLab, BlastLabConfig, BlastMode, BlastResult, Fixture},
+    blast_lab::{Blast, BlastLab, BlastLabConfig, BlastMode, BlastResult, Fixture, MotionStats},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 #[derive(Debug, Parser)]
 #[command(
-    about = "Compare crater removal with conserved coarse fragments on flat ground and a moving planet"
+    about = "Compare crater removal, rigid pieces, and rounded grains on flat, sloped, and moving planetary ground"
 )]
 struct Args {
     /// New output directory; defaults to target/dirt-blast-lab/<timestamp>.
@@ -29,10 +29,13 @@ struct Args {
     /// Experimental patch width in cells; not terrain processing chunk size.
     #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u32).range(2..=8))]
     patch_cells: u32,
-    #[arg(long, default_value_t = 128, value_parser = clap::value_parser!(u32).range(1..=512))]
-    max_fragments: u32,
+    #[arg(long, alias = "max-fragments", default_value_t = 128, value_parser = clap::value_parser!(u32).range(1..=512))]
+    max_loose_bodies: u32,
     #[arg(long, default_value_t = 0.35)]
     friction: f32,
+    /// Grain-pulse duration at 60 Hz; the total velocity-change budget stays fixed.
+    #[arg(long, default_value_t = 6, value_parser = clap::value_parser!(u32).range(1..=30))]
+    pulse_ticks: u32,
     #[arg(long, default_value_t = 3.0)]
     radius: f32,
     /// Maximum radial velocity change in world units per second.
@@ -73,8 +76,9 @@ fn rounded(value: f32) -> f32 {
 }
 
 impl Capture {
-    fn frame(&mut self, lab: &BlastLab) -> Result<(), Box<dyn Error>> {
+    fn frame(&mut self, lab: &BlastLab) -> Result<MotionStats, Box<dyn Error>> {
         let balance = lab.audit()?;
+        let motion_stats = lab.motion_stats();
         let mut poses = Vec::new();
         for (body, motion) in lab.bodies() {
             let key = format!("{}-{}", body.id.value(), body.terrain.revision());
@@ -108,10 +112,28 @@ impl Capture {
                 rounded(motion.angle)
             ]));
         }
+        for (grain, motion) in lab.grains() {
+            let key = format!("grain-{}", grain.id().value());
+            let index = *self.indices.entry(key).or_insert_with(|| {
+                let index = self.shapes.len();
+                self.shapes.push(json!({"id":grain.id().value(),"rects":[],
+                    "circles":[[0.0,0.0,grain.radius(),grain.cell().material.0]]}));
+                index
+            });
+            poses.push(json!([
+                index,
+                rounded(motion.position.x),
+                rounded(motion.position.y),
+                rounded(motion.angle)
+            ]));
+        }
         self.frames.push(json!({"tick":lab.tick,"poses":poses,"ground":balance.ground,"loose":balance.loose,
             "removed":balance.removed,"fragments":lab.fragment_count(),"contacts":lab.last_physics.contact_pairs,
+            "grains":lab.grains().count(),"loose_bodies":lab.loose_body_count(),
+            "above_surface_cells":motion_stats.above_surface_cells,"supported_slow_cells":motion_stats.supported_slow_cells,
+            "max_clearance":motion_stats.max_clearance,"active_pulses":lab.active_pulses(),
             "sleeping":lab.last_physics.sleeping_bodies}));
-        Ok(())
+        Ok(motion_stats)
     }
 }
 
@@ -127,8 +149,9 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
         mode,
         seed: args.seed,
         patch_cells: args.patch_cells,
-        max_fragments: args.max_fragments as usize,
+        max_loose_bodies: args.max_loose_bodies as usize,
         friction: args.friction,
+        pulse_ticks: args.pulse_ticks,
     };
     let mut lab = BlastLab::new(config)?;
     let mut capture = Capture::default();
@@ -140,7 +163,10 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
     let mut times = Vec::new();
     let mut capture_ms = 0.0;
     let mut peak_fragments = 0;
+    let mut peak_loose_bodies = 0;
     let mut peak_contacts = 0;
+    let mut peak_above_surface_cells = 0;
+    let mut peak_clearance: f32 = 0.0;
     let mut failure = None;
     let ticks = args.seconds * FIXED_HZ;
     let blast_ticks =
@@ -163,18 +189,27 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
             });
             events.push(json!({"tick":lab.tick,"center":[blast.center.x,blast.center.y],"radius":blast.radius,"speed":blast.speed,
                 "admitted":result.admitted,"selected_cells":result.selected_cells,"loose_bodies_hit":result.loose_bodies_hit,
-                "spawned_fragments":result.spawned_fragments,"accelerated_fragments":result.accelerated_fragments,
+                "spawned_fragments":result.spawned_fragments,"accelerated_bodies":result.accelerated_bodies,
+                "spawned_grains":result.spawned_grains,
+                "rejection":result.rejection,
                 "blast_ms":blast_ms}));
         }
         let started = Instant::now();
         lab.step();
         times.push(blast_ms + started.elapsed().as_secs_f64() * 1000.0);
         peak_fragments = peak_fragments.max(lab.fragment_count());
+        peak_loose_bodies = peak_loose_bodies.max(lab.loose_body_count());
         peak_contacts = peak_contacts.max(lab.last_physics.contact_pairs);
         let started = Instant::now();
-        if let Err(error) = capture.frame(&lab) {
-            failure = Some(format!("tick {}: {error}", lab.tick));
-            break;
+        match capture.frame(&lab) {
+            Ok(stats) => {
+                peak_above_surface_cells = peak_above_surface_cells.max(stats.above_surface_cells);
+                peak_clearance = peak_clearance.max(stats.max_clearance);
+            }
+            Err(error) => {
+                failure = Some(format!("tick {}: {error}", lab.tick));
+                break;
+            }
         }
         capture_ms += started.elapsed().as_secs_f64() * 1000.0;
         fingerprints.push(lab.content_motion_hash());
@@ -204,11 +239,12 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
         }
     }
     println!(
-        "{} / {}: {} ticks, {} peak fragments, p95 {:.3} ms, max {:.3} ms, {}",
+        "{} / {}: {} ticks, {} peak bodies, {} peak cells above surface, p95 {:.3} ms, max {:.3} ms, {}",
         fixture.name(),
         mode.name(),
         lab.tick,
-        peak_fragments,
+        peak_loose_bodies,
+        peak_above_surface_cells,
         percentile(&times, 0.95),
         percentile(&times, 1.0),
         failure
@@ -220,6 +256,7 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
         "shapes":capture.shapes,"frames":capture.frames,"failure":failure,"replay_passed":failure.is_none(),
         "simulation_ms":{"p50":percentile(&times,0.5),"p95":percentile(&times,0.95),"max":percentile(&times,1.0)},
         "capture_and_audit_ms":capture_ms,"peak_fragments":peak_fragments,"peak_contacts":peak_contacts,
+        "peak_loose_bodies":peak_loose_bodies,"peak_above_surface_cells":peak_above_surface_cells,"peak_clearance":peak_clearance,
         "rejected_blasts":lab.rejected_blasts,"fingerprints":fingerprints.iter().map(|hash|format!("{hash:016x}")).collect::<Vec<_>>() }),
     )
 }
@@ -256,8 +293,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     fs::create_dir_all(&output)?;
     let mut cases = Vec::new();
-    for fixture in [Fixture::Flat, Fixture::MovingPlanet] {
-        for mode in [BlastMode::Remove, BlastMode::Release] {
+    for fixture in [Fixture::Flat, Fixture::Slope, Fixture::MovingPlanet] {
+        for mode in [
+            BlastMode::Remove,
+            BlastMode::Release,
+            BlastMode::Grains,
+            BlastMode::GrainPulse,
+        ] {
             cases.push(run(&args, fixture, mode)?);
         }
     }
@@ -273,8 +315,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .and_then(fs::read)
         .ok()
         .map(|bytes| format!("{:x}", Sha256::digest(bytes)));
-    let report = json!({"schema":1,"hz":FIXED_HZ,"model":"Coarse rigid fragments; cell-based release and radial velocity impulse",
-        "settings":{"seed":args.seed,"patch_cells":args.patch_cells,"max_fragments":args.max_fragments,"friction":args.friction,
+    let report = json!({"schema":2,"hz":FIXED_HZ,"model":"Rigid patch and cell-sized round contact proxies; conserved cell mass/inertia and radial velocity kicks",
+        "settings":{"seed":args.seed,"patch_cells":args.patch_cells,"max_loose_bodies":args.max_loose_bodies,"friction":args.friction,"pulse_ticks":args.pulse_ticks,
             "radius":args.radius,"speed":args.speed,"x":args.x,"depth":args.depth,"first_at":args.first_at,"second_at":args.second_at,"seconds":args.seconds},
         "build":{"arch":std::env::consts::ARCH,"os":std::env::consts::OS,"debug_assertions":cfg!(debug_assertions),
             "executable_sha256":executable_sha256,

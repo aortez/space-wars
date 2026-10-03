@@ -12,6 +12,9 @@ use crate::world::{
     ColliderShape, ColliderSpec, CollisionGroups, CompoundChild, PhysicsId, PhysicsWorld,
 };
 
+mod grain;
+pub use grain::{GrainSeed, TerrainGrain};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TerrainColliders {
     Separate,

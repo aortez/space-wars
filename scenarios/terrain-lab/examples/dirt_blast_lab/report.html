@@ -21,12 +21,12 @@
   .failure { color: #ffad9c; }
   details { margin-top: 20px; }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
-  @media (max-width: 700px) { body { padding: 16px; } .comparison { grid-template-columns: 1fr; } }
+  @media (max-width: 850px) { body { padding: 16px; } .comparison { grid-template-columns: 1fr; } }
 </style>
 <h1>Dirt blast experiments</h1>
-<p>Recorded geometry from the Rust simulation. Compare material removal with a coarse rigid-fragment reference model.</p>
+<p>Recorded Rust simulation. Compare crater removal, rigid pieces, and rounded grains carrying the same terrain material. The pulse spreads the same radial velocity-change budget over several ticks.</p>
 <div class="controls">
-  <label>Fixture <select id="fixture"><option value="flat">Flat ground</option><option value="moving-planet">Moving planet</option></select></label>
+  <label>Fixture <select id="fixture"><option value="flat">Flat ground</option><option value="slope">Slope</option><option value="moving-planet">Moving planet</option></select></label>
   <button type="button" id="play">Play</button>
   <button type="button" id="reset">Start</button>
   <button type="button" id="step">Next tick</button>
@@ -37,20 +37,21 @@
 <input id="seek" type="range" min="0" value="0" step="1" aria-label="Simulation tick">
 <div class="comparison">
   <figure>
-    <figcaption>Crater removal</figcaption>
-    <canvas id="remove" role="img" aria-label="Recorded terrain and material remaining after crater removal"></canvas>
-    <output id="remove-state"></output>
-    <p class="metric" id="remove-metrics"></p>
+    <figcaption><label>Left model <select id="left-model"><option value="remove">Crater removal</option><option value="release" selected>Rigid pieces</option><option value="grains">Rounded grains</option><option value="grain-pulse">Grains + pulse</option></select></label></figcaption>
+    <canvas id="left" role="img" aria-label="Recorded geometry and material motion for the left model"></canvas>
+    <output id="left-state"></output>
+    <p class="metric" id="left-metrics"></p>
   </figure>
   <figure>
-    <figcaption>Material release</figcaption>
-    <canvas id="release" role="img" aria-label="Recorded loose fragments released by the blast and colliding under gravity"></canvas>
-    <output id="release-state"></output>
-    <p class="metric" id="release-metrics"></p>
+    <figcaption><label>Right model <select id="right-model"><option value="remove">Crater removal</option><option value="release">Rigid pieces</option><option value="grains" selected>Rounded grains</option><option value="grain-pulse">Grains + pulse</option></select></label></figcaption>
+    <canvas id="right" role="img" aria-label="Recorded geometry and material motion for the right model"></canvas>
+    <output id="right-state"></output>
+    <p class="metric" id="right-metrics"></p>
   </figure>
 </div>
 <p id="status" aria-live="polite"></p>
-<p class="metric">Simulation timing includes blast preparation and physics. Audits, capture, replay, export, and this browser playback are excluded. Material counts are cells. Pieces remain rigid; shock propagation, compression, granular flow, and deposition are not modeled.</p>
+<p class="metric">“Above surface” counts loose cell centers more than one cell above the original surface. “Supported &amp; slow” requires a contact path to ground and motion below 0.2 units/s relative to it; it is an instantaneous diagnostic. Counts are cells.</p>
+<p class="metric">Grains preserve cell mass and inertia, using smaller round collision footprints that introduce pore space. These are experimental contact models; pressure, cohesion, compression, and deposition are absent. Simulation timing excludes audits, recording, replay, export, and browser rendering.</p>
 <details><summary>Experiment settings and build</summary><pre id="settings"></pre></details>
 <details><summary>Recorded blasts</summary><pre id="events"></pre></details>
 <script id="data" type="application/json">__DATA__</script>
@@ -59,12 +60,14 @@
   const data = JSON.parse(document.getElementById('data').textContent);
   const $ = id => document.getElementById(id);
   const initial = new URLSearchParams(location.hash.slice(1));
-  if (initial.get('fixture') === 'moving-planet') $('fixture').value = 'moving-planet';
+  if (['slope', 'moving-planet'].includes(initial.get('fixture'))) $('fixture').value = initial.get('fixture');
   let tick = Number(initial.get('tick')) || 0;
   let playing = false, last = null, animation = null;
-  let displayedFixture = null;
-  const modes = ['remove', 'release'];
-  function cases() { return modes.map(mode => data.cases.find(c => c.fixture === $('fixture').value && c.mode === mode)); }
+  let displayedComparison = null;
+  const slots = ['left', 'right'];
+  const models = ['remove', 'release', 'grains', 'grain-pulse'];
+  for (const slot of slots) if (models.includes(initial.get(slot))) $(slot + '-model').value = initial.get(slot);
+  function cases() { return slots.map(slot => data.cases.find(c => c.fixture === $('fixture').value && c.mode === $(slot + '-model').value)); }
   function stop() {
     playing = false; last = null; $('play').textContent = 'Play';
     if (animation !== null) cancelAnimationFrame(animation);
@@ -76,9 +79,9 @@
     tick = Math.max(0, Math.min(tick, max));
     $('seek').max = max; $('seek').value = Math.floor(tick);
     $('time').textContent = `${(Math.floor(tick) / data.hz).toFixed(2)} s · tick ${Math.floor(tick)}`;
-    for (const [index, mode] of modes.entries()) {
+    for (const [index, slot] of slots.entries()) {
       const c = selected[index], f = c.frames[Math.floor(tick)];
-      const canvas = $(mode), ratio = window.devicePixelRatio || 1;
+      const canvas = $(slot), ratio = window.devicePixelRatio || 1;
       const w = canvas.clientWidth, h = canvas.clientHeight;
       canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio);
       const ctx = canvas.getContext('2d');
@@ -95,6 +98,10 @@
           ctx.fillStyle = material === 2 ? '#9b8953' : '#806346';
           ctx.fillRect(cx - rw / 2, cy - rh / 2, rw, rh);
         }
+        for (const [cx, cy, radius, material] of c.shapes[shape].circles || []) {
+          ctx.fillStyle = material === 2 ? '#9b8953' : '#806346';
+          ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
       }
       for (const event of c.events) {
@@ -104,17 +111,18 @@
         ctx.strokeStyle = event.admitted ? '#ffcf83' : '#ff766f';
         ctx.lineWidth = 1.5 / scale; ctx.stroke();
       }
-      $(mode + '-state').textContent = `Ground ${f.ground} · Loose ${f.loose} · Removed ${f.removed}\n${f.fragments} fragments · ${f.contacts} contacts`;
-      $(mode + '-metrics').textContent = `Simulation p95 ${c.simulation_ms.p95.toFixed(3)} ms · max ${c.simulation_ms.max.toFixed(3)} ms · ${c.rejected_blasts} rejected blasts`;
+      $(slot + '-state').textContent = `Ground ${f.ground} · Loose ${f.loose} · Removed ${f.removed}\n${f.fragments} pieces · ${f.grains} grains · ${f.contacts} contacts\nAbove surface ${f.above_surface_cells} · Supported & slow ${f.supported_slow_cells}`;
+      $(slot + '-metrics').textContent = `Peak above surface ${c.peak_above_surface_cells} cells · Simulation p95 ${c.simulation_ms.p95.toFixed(3)} ms · max ${c.simulation_ms.max.toFixed(3)} ms · ${c.rejected_blasts} rejected blasts`;
     }
     const status = selected.some(c => c.failure)
       ? selected.filter(c => c.failure).map(c => `${c.mode}: ${c.failure}`).join(' · ')
       : 'Material and geometry audits passed · Recorded-shot replay matched every tick';
     if ($('status').textContent !== status) $('status').textContent = status;
     $('status').className = selected.some(c => c.failure) ? 'failure' : '';
-    if (displayedFixture !== $('fixture').value) {
+    const comparison = [$('fixture').value, ...selected.map(c => c.mode)].join('/');
+    if (displayedComparison !== comparison) {
       $('events').textContent = JSON.stringify(selected.map(c => ({mode:c.mode, events:c.events})), null, 2);
-      displayedFixture = $('fixture').value;
+      displayedComparison = comparison;
     }
   }
   function frame(now) {
@@ -134,6 +142,7 @@
   $('step').addEventListener('click', () => { stop(); tick = Math.floor(tick) + 1; draw(); });
   $('seek').addEventListener('input', () => { stop(); tick = Number($('seek').value); draw(); });
   $('fixture').addEventListener('change', () => { stop(); draw(); });
+  for (const slot of slots) $(slot + '-model').addEventListener('change', () => { stop(); draw(); });
   $('view').addEventListener('change', draw);
   $('settings').textContent = JSON.stringify({model:data.model, settings:data.settings, build:data.build}, null, 2);
   new ResizeObserver(draw).observe(document.querySelector('.comparison'));

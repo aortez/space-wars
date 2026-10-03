@@ -17,8 +17,9 @@ real Spacewars ships and weapons use material terrain and the shared fragment
 creation path, including explicit base support and service invalidation.
 
 [Dirt blast experiments](dirt-blast-lab.md) provide a separate headless entry
-point for comparing crater removal with conserved material release on flat and
-moving planetary ground, with offline playback and repeatable diagnostics.
+point for comparing crater removal, rigid pieces, and rounded grains on flat,
+sloped, and moving planetary ground, with offline playback and repeatable
+material, motion, and support diagnostics.
 
 | Action | Keyboard / pointer | Xbox layout | Switch Pro |
 | --- | --- | --- | --- |

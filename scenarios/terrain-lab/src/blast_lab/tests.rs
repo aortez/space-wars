@@ -1,5 +1,7 @@
 use super::*;
 
+mod grains;
+
 fn shot(lab: &BlastLab, speed: f32) -> Blast {
     Blast {
         center: lab.surface_point(0.0, 0.5),
@@ -22,7 +24,7 @@ fn released_material_moves_falls_and_remains_accounted_for_in_both_gravity_field
         let initial = lab.audit().unwrap();
         let blast = shot(&lab, 18.0);
         let result = lab.blast(blast).unwrap();
-        assert!(result.admitted && result.selected_cells > 0 && result.accelerated_fragments > 0);
+        assert!(result.admitted && result.selected_cells > 0 && result.accelerated_bodies > 0);
         let after = lab.audit().unwrap();
         assert_eq!(after.initial, initial.initial);
         assert_eq!(after.removed, 0);
@@ -137,7 +139,7 @@ fn repeat_blast_hits_loose_material_and_clone_continuation_matches_fresh_replay(
 #[test]
 fn population_limit_rejects_the_entire_blast_without_losing_material_or_motion() {
     let mut lab = BlastLab::new(BlastLabConfig {
-        max_fragments: 1,
+        max_loose_bodies: 1,
         ..BlastLabConfig::default()
     })
     .unwrap();
@@ -147,7 +149,7 @@ fn population_limit_rejects_the_entire_blast_without_losing_material_or_motion()
     let result = lab.blast(shot(&lab, 18.0)).unwrap();
     assert!(!result.admitted && result.selected_cells > 0);
     assert_eq!(
-        (result.spawned_fragments, result.accelerated_fragments),
+        (result.spawned_fragments, result.accelerated_bodies),
         (0, 0)
     );
     assert_eq!(lab.bodies[0].terrain, before);
@@ -194,7 +196,7 @@ fn removal_baseline_reports_destroyed_material_and_invalid_input_is_atomic() {
     );
     assert!(
         BlastLab::new(BlastLabConfig {
-            max_fragments: 0,
+            max_loose_bodies: 0,
             ..BlastLabConfig::default()
         })
         .is_err()
