@@ -228,6 +228,9 @@ harness failure, probe/physical/route witnesses, validation logs and hashes for
 script and hashes its input probe, ledger and dense stream. Embedded documents,
 raw files, retained source summaries and both frozen binaries were verified.
 
+The follow-up [actual-route recovery experiment](actual-route-recovery.md) tests
+native failure feedback and bounded capture abandonment with the same checks.
+
 - Summary SHA-256:
   `6234d8899878088dd04a1275f07adab7be75357d3181cff41eb3327457dbc014`
 - Archive SHA-256:

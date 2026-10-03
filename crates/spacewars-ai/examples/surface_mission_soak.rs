@@ -321,6 +321,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--initial-cover-seats must be none, 0, 1 or both"),
     };
+    let actual_recovery_seats = match arg("--actual-route-recovery-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--actual-route-recovery-seats must be none, 0, 1 or both"),
+    };
     let destination_retry_seats = match arg("--destination-retry-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -408,6 +415,7 @@ fn main() {
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
         .with_initial_cover(initial_cover_seats[i])
+        .with_actual_route_recovery(actual_recovery_seats[i])
         .with_destination_retry(destination_retry_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
@@ -1058,6 +1066,12 @@ fn main() {
             "profile": "vehicle_flight_continuation_v1",
             "enabled_seats": powered_capture_seats,
             "scope": "Current-state continuation forecasts for an already launched flight. Original launch certificate and 12-second maneuver deadline are retained; current clearance, arrival and remaining-fuel checks are required at each completed survey. Synchronous prediction work remains outside live planner quotas.",
+        });
+    }
+    if actual_recovery_seats.contains(&true) {
+        report["actual_route_recovery"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACTUAL_ROUTE_RECOVERY_PROFILE,
+            "enabled_seats": actual_recovery_seats,
         });
     }
     if initial_cover_seats.contains(&true) {

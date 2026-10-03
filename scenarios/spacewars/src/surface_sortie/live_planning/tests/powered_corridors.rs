@@ -117,6 +117,7 @@ fn powered_local_routes_join_exact_endpoints_and_finish_for_two_actors_before_ex
             for seat in 0..2 {
                 let job = queue.job(tokens[seat]).unwrap();
                 if let Some(survey) = job.positive_candidates() {
+                    assert!(job.actual_local_failure().is_none());
                     let route = survey.actual.unwrap();
                     let c = route
                         .crossing
@@ -262,6 +263,7 @@ fn missing_boarding_support_never_becomes_a_powered_permission() {
         j.step();
     }
     assert!(j.positive_candidates().is_none() && j.exhausted_walk().is_none());
+    assert_eq!(j.actual_local_failure(), Some("hatch_to_crossing"));
     assert_eq!(j.flight_work().started, 0);
     assert_eq!(
         j.measurement_work()

@@ -208,6 +208,7 @@ pub struct MaterialMissionPilot {
     pub(crate) cover_retry_cooldown: bool,
     pub(crate) cover_response: bool,
     pub(crate) initial_cover: bool,
+    pub(crate) actual_route_recovery: bool,
     destination_switched: bool,
 }
 
@@ -276,6 +277,7 @@ impl MaterialMissionPilot {
             cover_retry_cooldown: false,
             cover_response: false,
             initial_cover: false,
+            actual_route_recovery: false,
             destination_switched: false,
         }
     }
@@ -286,6 +288,7 @@ impl MaterialMissionPilot {
         let cover_retry_cooldown = self.cover_retry_cooldown;
         let cover_response = self.cover_response;
         let initial_cover = self.initial_cover;
+        let actual_route_recovery = self.actual_route_recovery;
         let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
@@ -300,6 +303,7 @@ impl MaterialMissionPilot {
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
         self.configure_initial_cover(initial_cover);
+        self.configure_actual_route_recovery(actual_route_recovery);
         self.configure_powered_capture(powered_capture);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
@@ -405,6 +409,14 @@ impl MaterialMissionPilot {
         );
         self.initial_cover = enabled;
     }
+    pub(crate) fn configure_actual_route_recovery(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(!enabled || self.policy() == crate::mission_policy::MissionPolicy::ValuePlanner);
+        self.actual_route_recovery = enabled;
+    }
     fn new_capture_task(&self, o: &MissionObservationV1) -> TacticalCapturePilot {
         let mut capture = TacticalCapturePilot::with_planning(
             self.context,
@@ -415,7 +427,8 @@ impl MaterialMissionPilot {
         .with_active_flight_checks(self.active_flight_checks)
         .with_cover_retry_cooldown(self.cover_retry_cooldown)
         .with_cover_response(self.cover_response)
-        .with_initial_cover(self.initial_cover);
+        .with_initial_cover(self.initial_cover)
+        .with_actual_route_recovery(self.actual_route_recovery);
         capture.start_acquisition(&o.local);
         capture
     }
@@ -1565,6 +1578,34 @@ mod acquisition_tests {
                     capture.telemetry().initial_cover,
                     enabled.then(crate::tactical_sortie::InitialCover::default)
                 );
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    fn actual_route_recovery_reaches_capture_tasks_and_resets_without_progress() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_actual_route_recovery(enabled);
+            for _ in 0..2 {
+                let mut capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().actual_route_recovery.is_some(), enabled);
+                capture.intent(&o.local);
+                capture.reset(context);
+                assert_eq!(
+                    capture.telemetry().actual_route_recovery,
+                    enabled.then(crate::tactical_sortie::ActualRouteRecovery::default)
+                );
+                bot = bot.clone();
                 bot.reset(context);
             }
         }

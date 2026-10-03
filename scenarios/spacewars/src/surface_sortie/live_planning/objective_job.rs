@@ -50,6 +50,7 @@ pub(crate) struct ObjectiveSurveyJob {
     corridor: Option<(Candidate, Box<WalkCorridorJob>)>,
     corridor_rise: Option<(Option<LandingSiteId>, f32)>,
     exhausted_walk: Option<LandingSiteId>,
+    actual_local_failure: Option<&'static str>,
     unsupported_walk: Option<(LandingSiteId, WalkCorridorBounds)>,
     powered: Option<(Candidate, Box<PoweredCorridorJob>)>,
     powered_started: bool,
@@ -219,6 +220,7 @@ impl SurfaceSortieState {
             corridor: None,
             corridor_rise: None,
             exhausted_walk: None,
+            actual_local_failure: None,
             unsupported_walk: None,
             powered: None,
             powered_started: false,
@@ -279,6 +281,10 @@ impl ObjectiveSurveyJob {
                 .iter()
                 .any(|r| r.site == Some(*site) && r.cost().is_some())
         })
+    }
+    pub(super) fn actual_local_failure(&self) -> Option<&'static str> {
+        self.actual_local_failure
+            .filter(|_| !self.has_positive_actual())
     }
     pub(super) fn exhausted_walk(&self) -> Option<LandingSiteId> {
         if self.powered.is_some() {
@@ -725,6 +731,9 @@ impl PlanningJob for ObjectiveSurveyJob {
                     }
                 } else if powered.direct_walk == Some(false) {
                     self.exhausted_walk = candidate.site;
+                    if candidate.site.is_none() {
+                        self.actual_local_failure = powered.failure;
+                    }
                     *self
                         .measurement_work
                         .powered_corridor_failures

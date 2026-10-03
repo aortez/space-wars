@@ -113,6 +113,12 @@ impl TacticalCapturePilot {
         self.telemetry.sortie.policy = Self::policy(self.planning);
         self
     }
+    pub fn with_actual_route_recovery(mut self, enabled: bool) -> Self {
+        self.base.enable_actual_route_recovery(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
     pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
         self.base.enable_cover_retry_cooldown(enabled);
         self.telemetry.sortie = self.base.telemetry().clone();

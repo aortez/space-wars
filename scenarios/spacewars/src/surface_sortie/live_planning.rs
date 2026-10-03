@@ -22,8 +22,8 @@ mod avoiding;
 mod destinations;
 mod diagnostics;
 pub use diagnostics::{
-    ExhaustedWalkingAttempt, ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence,
-    RouteResultCounts, UnsupportedWalkingCorridor,
+    ActualLocalAttemptFailure, ExhaustedWalkingAttempt, ObjectiveWorkEvidence, PublicationDecision,
+    PublicationEvidence, RouteResultCounts, UnsupportedWalkingCorridor,
 };
 mod early_candidates;
 mod flag_survey;
@@ -240,12 +240,32 @@ pub struct LivePlanningTelemetry {
     pub max_parked_requests: usize,
 }
 
-#[derive(Clone, Copy)]
-struct ActualLanding {
-    vehicle: Vec2,
-    angle: f32,
-    exit: Vec2,
-    boarding_hatches: [Option<Vec2>; 2],
+/// Source pose in the planet's local frame; it carries no route permission.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ActualLanding {
+    pub vehicle: Vec2,
+    pub angle: f32,
+    pub exit: Vec2,
+    pub boarding_hatches: [Option<Vec2>; 2],
+}
+impl ActualLanding {
+    fn changed(self, new: Self) -> bool {
+        self.vehicle.distance_to(new.vehicle) > 0.002
+            || self.exit.distance_to(new.exit) > 0.002
+            || self
+                .boarding_hatches
+                .into_iter()
+                .zip(new.boarding_hatches)
+                .any(|(old, new)| match (old, new) {
+                    (Some(a), Some(b)) => a.distance_to(b) > 0.002,
+                    (None, None) => false,
+                    _ => true,
+                })
+            || ((self.angle - new.angle) * 0.5).sin().abs() > 0.0001
+    }
+    pub fn matches(self, p: &PilotObservationV1) -> bool {
+        LiveObjectivePlanner::actual(p).is_some_and(|current| !self.changed(current))
+    }
 }
 
 #[derive(Clone)]
@@ -304,6 +324,7 @@ pub struct LiveObjectivePlanner {
     walk_feedback: bool,
     walk_bounds_feedback: bool,
     powered_corridors: bool,
+    actual_failure_players: std::collections::BTreeSet<usize>,
     covered_handoff_players: std::collections::BTreeSet<usize>,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
@@ -330,6 +351,7 @@ impl LiveObjectivePlanner {
             walk_feedback: false,
             walk_bounds_feedback: false,
             powered_corridors: false,
+            actual_failure_players: Default::default(),
             covered_handoff_players: Default::default(),
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
@@ -452,6 +474,19 @@ impl LiveObjectivePlanner {
     pub fn uses_powered_corridors(&self) -> bool {
         self.powered_corridors
     }
+    /// Historical failure of the actual pose's completed local walk/powered
+    /// attempt. Full fallback continues; no negative route is certified.
+    pub fn with_actual_failure_feedback(
+        mut self,
+        players: impl IntoIterator<Item = usize>,
+    ) -> Self {
+        assert!(self.uses_powered_corridors());
+        self.actual_failure_players = players.into_iter().collect();
+        self
+    }
+    pub fn actual_failure_players(&self) -> &std::collections::BTreeSet<usize> {
+        &self.actual_failure_players
+    }
     /// A current covered-site request may replace one unfinished ordinary scan.
     /// Existing targeted work and usable results retain priority.
     pub fn with_covered_request_handoff(
@@ -566,18 +601,7 @@ impl LiveObjectivePlanner {
             return Err("touchdown_changed");
         }
         if let (Some(old), Some(new)) = (request.actual, actual)
-            && (old.vehicle.distance_to(new.vehicle) > 0.002
-                || old.exit.distance_to(new.exit) > 0.002
-                || old
-                    .boarding_hatches
-                    .into_iter()
-                    .zip(new.boarding_hatches)
-                    .any(|(old, new)| match (old, new) {
-                        (Some(a), Some(b)) => a.distance_to(b) > 0.002,
-                        (None, None) => false,
-                        _ => true,
-                    })
-                || ((old.angle - new.angle) * 0.5).sin().abs() > 0.0001)
+            && old.changed(new)
         {
             return Err("hatch_moved");
         }
@@ -1154,6 +1178,22 @@ impl LiveObjectivePlanner {
                             );
                         } else {
                             o.objective_work = Some(ObjectiveWorkState::Pending);
+                        }
+                        if self.actual_failure_players.contains(&player)
+                            && o.objective_work == Some(ObjectiveWorkState::Pending)
+                            && let Some(pose) = request.actual
+                            && let Some(reason) = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .actual_local_failure()
+                        {
+                            o.objective_evidence.as_mut().unwrap().actual_local_failure =
+                                Some(ActualLocalAttemptFailure {
+                                    actor: o.combat.recovery.flight.pilot.owner,
+                                    pose,
+                                    reason,
+                                });
                         }
                         return;
                     }

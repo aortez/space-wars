@@ -126,6 +126,11 @@ impl MissionBot {
         self.0.configure_initial_cover(enabled);
         self
     }
+    /// Opt-in bounded waiting after a failed native local actual-hatch attempt.
+    pub fn with_actual_route_recovery(mut self, enabled: bool) -> Self {
+        self.0.configure_actual_route_recovery(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

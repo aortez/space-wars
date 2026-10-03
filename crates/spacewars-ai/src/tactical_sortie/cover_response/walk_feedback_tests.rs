@@ -8,6 +8,7 @@ fn receipt(o: &mut TacticalSortieObservationV1, site: LandingSiteId) {
     let objective = LandingObjective::read(p).unwrap();
     o.objective_work = Some(ObjectiveWorkState::Pending);
     o.objective_evidence = Some(ObjectiveWorkEvidence {
+        actual_local_failure: None,
         covered_handoff: None,
         tick: p.tick,
         objective,

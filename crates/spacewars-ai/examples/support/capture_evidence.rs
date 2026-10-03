@@ -68,6 +68,14 @@ impl CaptureEvidence {
         {
             record["covered_handoff"] = json!({"observation":o});
         }
+        if m.capture
+            .as_ref()
+            .and_then(|c| c.actual_route_recovery.as_ref())
+            .and_then(|s| s.abort)
+            .is_some_and(|a| a.tick == p.tick)
+        {
+            record["actual_route_recovery"] = json!({"observation":o});
+        }
         serde_json::to_writer(&mut self.0, &record).unwrap();
         writeln!(self.0).unwrap();
     }

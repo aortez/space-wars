@@ -69,6 +69,15 @@ pub struct UnsupportedWalkingCorridor {
     pub max_steps: u16,
 }
 
+/// One failed native local walk/powered attempt, bound by the enclosing request
+/// evidence. Full fallback remains unknown; this cannot authorize an exit.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ActualLocalAttemptFailure {
+    pub actor: PlayerId,
+    pub pose: ActualLanding,
+    pub reason: &'static str,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ObjectiveWorkEvidence {
     pub tick: u64,
@@ -91,6 +100,8 @@ pub struct ObjectiveWorkEvidence {
     pub unsupported_walk: Option<UnsupportedWalkingCorridor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub covered_handoff: Option<CoveredRequestHandoff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_local_failure: Option<ActualLocalAttemptFailure>,
 }
 impl ObjectiveWorkEvidence {
     pub(super) fn new(tick: u64, objective: LandingObjective) -> Self {
@@ -107,6 +118,7 @@ impl ObjectiveWorkEvidence {
             exhausted_walk: None,
             unsupported_walk: None,
             covered_handoff: None,
+            actual_local_failure: None,
         }
     }
     pub(super) fn request(&mut self, request: &Request) {

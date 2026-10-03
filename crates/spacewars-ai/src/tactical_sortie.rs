@@ -23,12 +23,16 @@ use serde::Serialize;
 
 mod acquisition;
 mod acquisition_wait;
+mod actual_recovery;
 mod cover_response;
 mod cover_retry;
 mod initial_cover;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
+pub use actual_recovery::{
+    ACTUAL_ROUTE_ABORT_REASON, ACTUAL_ROUTE_RECOVERY_PROFILE, ActualRouteAbort, ActualRouteRecovery,
+};
 pub use cover_response::{
     COVER_RESPONSE_PROFILE, COVER_SEARCH_TICKS, CoverResponse, CoverSearch, MAX_COVER_PROBES,
 };
@@ -101,6 +105,8 @@ pub struct TacticalTelemetry {
     pub cover_response: Option<CoverResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_cover: Option<InitialCover>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_route_recovery: Option<ActualRouteRecovery>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -174,6 +180,7 @@ impl TacticalSortiePilot {
                 cover_retry_cooldown: None,
                 cover_response: None,
                 initial_cover: None,
+                actual_route_recovery: None,
             },
             landing,
             site: None,
@@ -210,6 +217,7 @@ impl TacticalSortiePilot {
         let cover_retry_cooldown = self.telemetry.cover_retry_cooldown.is_some();
         let cover_response = self.telemetry.cover_response.is_some();
         let initial_cover = self.telemetry.initial_cover.is_some();
+        let actual_route_recovery = self.telemetry.actual_route_recovery.is_some();
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
         self.required_site = required;
@@ -217,6 +225,7 @@ impl TacticalSortiePilot {
         self.enable_cover_retry_cooldown(cover_retry_cooldown);
         self.enable_cover_response(cover_response);
         self.enable_initial_cover(initial_cover);
+        self.enable_actual_route_recovery(actual_route_recovery);
     }
     /// Explicit continuation trials may constrain selection, but still need
     /// current material, solar and objective-route evidence for this ID.
@@ -602,7 +611,15 @@ impl TacticalSortiePilot {
                 );
                 return CombatIntent::default();
             }
-            if objective.is_some() {
+            if let Some(objective) = objective {
+                if survey
+                    .and_then(|s| s.actual.as_ref())
+                    .and_then(|r| r.cost())
+                    .is_none()
+                    && self.abort_failed_actual_attempt(o, objective)
+                {
+                    return CombatIntent::default();
+                }
                 let Some(survey) = survey else {
                     self.acquisition_reason("actual_route_unavailable");
                     return CombatIntent::default();
