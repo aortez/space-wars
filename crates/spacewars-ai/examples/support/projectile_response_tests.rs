@@ -1,6 +1,20 @@
 use super::*;
 use engine_core::Vec2;
 
+#[test]
+fn response_seat_can_target_p2_without_changing_the_reporting_seat() {
+    assert_eq!(response_seat("reporting", 0), 0);
+    assert_eq!(response_seat("reporting", 1), 1);
+    assert_eq!(response_seat("1", 0), 1);
+    assert_eq!(response_seat("0", 1), 0);
+}
+
+#[test]
+#[should_panic(expected = "--probe-projectile-response-seat")]
+fn response_seat_rejects_an_invalid_actor() {
+    response_seat("2", 0);
+}
+
 fn key() -> TransferKey {
     TransferKey {
         started_tick: 100,

@@ -20,6 +20,15 @@ use std::{
 
 const RESPONSE_TICKS: u64 = 30;
 
+fn response_seat(value: &str, reporting_seat: usize) -> usize {
+    match value {
+        "reporting" => reporting_seat,
+        "0" => 0,
+        "1" => 1,
+        _ => panic!("--probe-projectile-response-seat must be reporting, 0 or 1"),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Mode {
@@ -226,7 +235,10 @@ impl ResponseProbe {
         assert_eq!(crate::arg("--trace-impact", "false"), "false");
         assert_eq!(crate::arg("--continue-successor", "none"), "none");
         Some(Self {
-            seat,
+            seat: response_seat(
+                &crate::arg("--probe-projectile-response-seat", "reporting"),
+                seat,
+            ),
             pulse: Pulse {
                 mode,
                 last_tick: None,
