@@ -18,6 +18,12 @@ I,C,F=H.I,H.C,H.F
 MODEL='detached_actual_request_v1'
 
 
+def assert_handoff_parity(current,retained):
+    # JSON object keys are strings even when the native auditor counted seats
+    # using integers. Preserve every value while comparing serialized receipts.
+    assert json.loads(json.dumps(current))==retained
+
+
 def plan():
     return [dict(name='shared-armed-world1-p1-powered',
                  ticks=[7635,7682,7683,7803,7804,7924,7925,8045,8046,8116]),
@@ -165,7 +171,8 @@ def run(entry,old,binary,out,enabled):
         result['initial_cover']=I.audit_initial(root,old['item'],True)
         result['handoff']=H.audit_handoffs(root,old['item'],True)
         result['replay_parity']=C.P.replay_parity(old,result)
-        assert result['initial_cover']==old['initial_cover'] and result['handoff']==old['handoff']
+        assert result['initial_cover']==old['initial_cover']
+        assert_handoff_parity(result['handoff'],old['handoff'])
         if enabled:result['actual_probe']=audit_probe(root,old['item'],entry['ticks'])
         else:assert not (root/'actual-landing-probe.json').exists()
         result['hashes']={p.name:F.E.digest(p) for p in sorted(root.iterdir()) if p.is_file()}

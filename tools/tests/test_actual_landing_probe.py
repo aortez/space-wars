@@ -20,6 +20,13 @@ def probe():
 
 
 class ActualLandingProbeTests(unittest.TestCase):
+    def test_serialized_seat_keys_preserve_every_handoff_value(self):
+        current=dict(by_seat={0:1},records=[dict(generation=7,tick=5491)])
+        retained=dict(by_seat={'0':1},records=[dict(generation=7,tick=5491)])
+        A.assert_handoff_parity(current,retained)
+        current['records'][0]['generation']=8
+        with self.assertRaises(AssertionError):A.assert_handoff_parity(current,retained)
+
     def test_work_sums_and_dispatch_lower_bound_are_independent_of_live_permissions(self):
         result=A.audit_work(probe())
         self.assertEqual(result['minimum_additional_dispatch_ticks'],1)

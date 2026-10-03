@@ -69,5 +69,13 @@ angular threshold from the retained pilot rows without relaxing validity.
 python3 tools/probe-actual-landing.py \
   --prior target/covered-handoff/v1/summary.json \
   --binary target/actual-landing/surface_mission_soak-FROZEN_COMMIT \
-  --out target/actual-landing/v1
+  --out target/actual-landing/v2
 ```
+
+The first disabled pass in `v1` verified exact replay parity, then stopped on the
+runner's comparison of integer-keyed native seat counts with string-keyed saved
+JSON counts. The serialized receipts and initial-cover records are identical.
+Before any detached outcomes were inspected, the runner was corrected to compare
+canonical JSON receipts, with a test that still rejects changed generations.
+The failed summary/logs remain retained; `v2` repeats both disabled replays before
+running either instrumented comparison. Probe code and frozen binary are unchanged.
