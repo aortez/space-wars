@@ -1,6 +1,8 @@
 use super::*;
 
-fn fixture(enabled: bool) -> (MaterialMissionPilot, MissionObservationV1) {
+pub(in crate::mission_pilot) fn fixture(
+    enabled: bool,
+) -> (MaterialMissionPilot, MissionObservationV1) {
     let (mut bot, mut o) = super::super::capture_escape::tests::armed();
     bot.configure_escape_travel(enabled);
     let c = &mut o.local.combat;

@@ -88,6 +88,11 @@ impl CaptureEvidence {
             record["escape_travel"] = json!({"telemetry":travel,"observation":o,
                 "pursuit":m.pursuit,"combat":m.combat});
         }
+        if let Some(approach) = &m.transfer_approach
+            && approach.last.is_some_and(|s| s.tick == p.tick)
+        {
+            record["transfer_approach"] = json!({"telemetry":approach,"observation":o});
+        }
         serde_json::to_writer(&mut self.0, &record).unwrap();
         writeln!(self.0).unwrap();
     }

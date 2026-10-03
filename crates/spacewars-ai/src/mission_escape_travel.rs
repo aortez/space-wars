@@ -38,6 +38,7 @@ pub struct EscapeTravelAttempt {
 
 impl MaterialMissionPilot {
     pub(crate) fn configure_escape_travel(&mut self, enabled: bool) {
+        assert!(enabled || self.telemetry.transfer_approach.is_none());
         assert!(
             self.previous_tick.is_none(),
             "configure before the first intent"
@@ -296,4 +297,4 @@ impl MaterialMissionPilot {
 
 #[cfg(test)]
 #[path = "mission_escape_travel_tests.rs"]
-mod tests;
+pub(super) mod tests;

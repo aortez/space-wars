@@ -141,6 +141,11 @@ impl MissionBot {
         self.0.configure_escape_travel(enabled);
         self
     }
+    /// Opt-in clear entry geometry during the committed post-escape transfer.
+    pub fn with_transfer_approach(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_approach(enabled);
+        self
+    }
     /// Opt-in capture-failure context for initial and switched destinations.
     pub fn with_destination_retry(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);

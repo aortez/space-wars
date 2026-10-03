@@ -25,6 +25,9 @@ mod capture_escape;
 #[path = "mission_escape_travel.rs"]
 mod escape_travel;
 pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
+#[path = "mission_transfer_approach.rs"]
+mod transfer_approach;
+pub use transfer_approach::{TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample};
 #[path = "mission_pursuit_health.rs"]
 mod pursuit_health;
 pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
@@ -167,6 +170,8 @@ pub struct MissionTelemetry {
     pub capture_escape: Option<CaptureEscape>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub escape_travel: Option<EscapeTravel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_approach: Option<TransferApproach>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -266,6 +271,7 @@ impl MaterialMissionPilot {
                 destination_retry: None,
                 capture_escape: None,
                 escape_travel: None,
+                transfer_approach: None,
             },
             capture: None,
             recovery: None,
@@ -303,6 +309,7 @@ impl MaterialMissionPilot {
         let actual_route_recovery = self.actual_route_recovery;
         let capture_escape = self.telemetry.capture_escape.is_some();
         let escape_travel = self.telemetry.escape_travel.is_some();
+        let transfer_approach = self.telemetry.transfer_approach.is_some();
         let powered_capture = self.telemetry.powered_capture;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
@@ -320,6 +327,7 @@ impl MaterialMissionPilot {
         self.configure_actual_route_recovery(actual_route_recovery);
         self.configure_capture_escape(capture_escape);
         self.configure_escape_travel(escape_travel);
+        self.configure_transfer_approach(transfer_approach);
         self.configure_powered_capture(powered_capture);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
@@ -1008,6 +1016,7 @@ impl MaterialMissionPilot {
             // Neutral handoff; the next observation surveys local landing sites.
             return CombatIntent::default();
         }
+        let entry = self.transfer_entry(o, target);
         let up = (p.ship.position - p.planet.motion.position).normalized();
         let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
         let relative = p.ship.velocity - p.planet.motion.velocity;
@@ -1018,8 +1027,7 @@ impl MaterialMissionPilot {
             p.planet.motion.velocity + up * 18.0
         } else {
             self.goal(MissionGoal::Transfer, p.tick);
-            let entry = target.motion.position
-                + (p.ship.position - target.motion.position).normalized() * (target.radius + 85.0);
+            self.record_transfer_approach_guidance(p.tick);
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
             self.detour_velocity(o, target.motion.velocity)
