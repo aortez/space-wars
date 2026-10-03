@@ -16,6 +16,12 @@ def actions(brake=False):
 
 
 class ProjectileResponseTests(unittest.TestCase):
+    def test_destroyed_unoccupied_ship_does_not_need_to_turn_into_a_pod(self):
+        pilot=dict(ship_available=True,ship_form='ship',vehicle=0,location='on_foot')
+        self.assertFalse(R.source_ship_missing(pilot,0))
+        pilot['ship_available']=False
+        self.assertTrue(R.source_ship_missing(pilot,0))
+
     def test_native_priorities_and_unready_physics_prevent_a_response(self):
         evidence,_=fixture()
         row=dict(goal='transfer',capture_active=False,recovery_active=False,target=1)

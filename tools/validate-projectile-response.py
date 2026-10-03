@@ -86,6 +86,10 @@ def advance(previous, tick, key, selected, mode):
     return expected, applied
 
 
+def source_ship_missing(pilot, vehicle):
+    return not pilot['ship_available'] or pilot['ship_form'] != 'ship' or pilot['vehicle'] != vehicle
+
+
 def audit_response(root, old_root, mode, seat, report):
     evidence = (r for r in rows(root/'capture-evidence.jsonl') if r['seat'] == seat)
     old = iter(rows(old_root/'capture-evidence.jsonl'))
@@ -123,7 +127,7 @@ def audit_response(root, old_root, mode, seat, report):
         if actual is not None:
             if row['damage'] != last_damage:
                 changes.append(dict(tick=tick, damage=row['damage'], pilot=e['pilot'], mission=e['mission']))
-            if loss is None and (e['pilot']['ship_form'] != 'ship' or e['pilot']['vehicle'] != actual['source']['vehicle']):
+            if loss is None and source_ship_missing(e['pilot'], actual['source']['vehicle']):
                 loss = dict(tick=tick, damage=row['damage'], pilot=e['pilot'])
         last_damage = row['damage']
         for _ in range(2):
@@ -143,6 +147,8 @@ def audit_response(root, old_root, mode, seat, report):
     if expected_final is not None and expected_final['finished_tick'] is None:
         expected_final.update(finished_tick=report['elapsed_ticks'], reason='match ended')
     assert final['attempt'] == expected_final
+    if loss is None and expected_final is not None and source_ship_missing(report['final_pilots'][seat], expected_final['source']['vehicle']):
+        loss = dict(tick=report['elapsed_ticks'], damage=final['damage'], pilot=report['final_pilots'][seat])
     path = root/'projectile-response-witnesses.json'
     S.F.D.write(path, dict(schema=1, rows=witnesses, damage_changes=changes, first_ship_loss=loss, final=final))
     return dict(attempt=final['attempt'], first_action_change=first_change, exact_prefix_rows=prefix_rows,

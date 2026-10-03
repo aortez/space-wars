@@ -180,3 +180,8 @@ deadline. Preserve the baseline paths where this missile passes without a flag,
 and report collisions, captures and complete match outcomes. The diagnostic
 establishes an observable warning; a successful avoidance maneuver and a safe
 policy integration remain untested.
+
+The [completed one-pulse experiment](projectile-response.md) now compares fixed
+braking and steering responses on all four retained paths. It reports both
+improved speed-limited follow-through and a braking regression on the older
+approach; no response has been promoted to a default policy.
