@@ -626,7 +626,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.crow", "Off", &page);
+        assert_eq!(control_value(&page, "pause.clock.crow"), Some("Varied"));
+        for choice in ["Shy", "Hardy", "Off"] {
+            page = harness.change_clock_setting("pause.clock.crow", choice, &page);
+        }
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
