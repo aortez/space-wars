@@ -21,6 +21,11 @@ point for comparing crater removal, rigid pieces, and rounded grains on flat,
 sloped, and moving planetary ground, with offline playback and repeatable
 material, motion, and support diagnostics.
 
+[Soil material experiments](soil-mpm-lab.md) add a shared MPM prototype: pour a
+pile, remove a bank's support, and blast a bed twice. Compare internal friction
+and round grains on flat and moving planetary ground, with recorded playback
+and a standalone benchmark for the Picade.
+
 | Action | Keyboard / pointer | Xbox layout | Switch Pro |
 | --- | --- | --- | --- |
 | Walk | A/D or left/right arrows | Left stick or d-pad left/right | Same |

@@ -8,6 +8,10 @@ ground, a slope, and a translating, rotating planet, using shared terrain,
 Rapier, and gravity code available to Terrain Lab, Spacewars, Clock, and
 standalone Scorched Earth.
 
+The next model investigation is the [soil MPM lab](soil-mpm-lab.md), which tests
+material yielding with pouring, support removal, and repeat blasts. These rigid
+release experiments remain the terrain-transfer reference.
+
 ## Run and inspect
 
 From the repository root, run:

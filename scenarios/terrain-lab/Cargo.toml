@@ -11,6 +11,7 @@ engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-gravity = { workspace = true }
 engine-rapier = { workspace = true }
+engine-soil = { workspace = true }
 engine-terrain = { workspace = true }
 
 [dev-dependencies]

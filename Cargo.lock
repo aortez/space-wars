@@ -1567,6 +1567,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine-soil"
+version = "0.1.0"
+dependencies = [
+ "engine-core",
+ "engine-terrain",
+]
+
+[[package]]
 name = "engine-terrain"
 version = "0.1.0"
 dependencies = [
@@ -4702,6 +4710,7 @@ dependencies = [
  "engine-core",
  "engine-gravity",
  "engine-rapier",
+ "engine-soil",
  "engine-terrain",
  "serde_json",
  "sha2",

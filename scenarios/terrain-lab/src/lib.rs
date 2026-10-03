@@ -25,6 +25,7 @@ mod fragments;
 mod impacts;
 mod mining;
 mod render;
+pub mod soil_lab;
 mod tools;
 mod view;
 pub use fragments::TerrainFragment;

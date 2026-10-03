@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Soil motion lab · #165</title>
+<style>
+:root{color-scheme:dark;font:15px system-ui,sans-serif;background:#10191e;color:#e9efee}*{box-sizing:border-box}body{margin:0 auto;max-width:1500px;padding:26px}h1{font-size:27px;margin:0 0 8px}p{color:#aebfc4;line-height:1.55;max-width:1000px}.tag{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#e2b97b}.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}label{display:grid;gap:6px;color:#b8c7cb;font-size:12px}select,button{font:inherit;border:1px solid #3d535c;background:#1c2b32;color:#e9efee;padding:8px 12px;border-radius:7px}button{cursor:pointer}.panels{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:#15232b;border:1px solid #30434d;border-radius:12px;overflow:hidden}.bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:10px}.bar strong{font-size:17px}canvas{width:100%;height:390px;display:block;background:#12212b}.stats{font-size:13px;padding:12px 18px;display:flex;gap:18px;flex-wrap:wrap;border-top:1px solid #30434d;color:#b9c9cd}.stats b{color:#f5d497;font-weight:500}.transport{display:flex;align-items:center;gap:12px;margin:20px 0}input[type=range]{flex:1;min-width:80px;accent-color:#efb868}#clock{font-variant-numeric:tabular-nums;min-width:62px}#event{color:#f0c084;min-height:23px}details{border-top:1px solid #30434d;padding:16px 0;color:#b4c5ca;line-height:1.6}summary{cursor:pointer}table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:8px;border-bottom:1px solid #30434d;text-align:left}.small{font-size:12px}#build{overflow-wrap:anywhere}.legend{display:flex;flex-wrap:wrap;gap:20px;margin:16px 0;font-size:13px;color:#b4c5ca}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#d6ab6c}.dot.alt{background:#ae7650}
+@media(max-width:800px){body{padding:16px}.panels{grid-template-columns:1fr}canvas{height:310px}.transport{gap:7px}.bar{padding:12px}table{font-size:11px}td,th{padding:5px}}
+</style>
+<body>
+<div class="tag">Shared physics experiment · issue #165</div><h1>Pour it. Undermine it. Blast it twice.</h1>
+<p>Recorded solver output on flat and moving planetary ground. Compare a yielding soil continuum with round rigid grains, or remove the soil’s internal friction to see what changes.</p>
+<div class="controls">
+<label>Experiment<select id="experiment"><option value="pour">Pour a pile</option><option value="bank" selected>Remove bank support</option><option value="blasts">Two blasts</option></select></label>
+<label>Ground<select id="fixture"><option value="flat">Flat ground</option><option value="moving-planet">Moving planet</option></select></label>
+<label>Compare with<select id="comparison"><option value="grains">Round rigid grains</option><option value="frictionless">Soil with no internal friction</option></select></label>
+<label>Camera<select id="camera"><option value="surface">Follow the surface</option><option value="wide">Wide view</option></select></label>
+<label>Speed<select id="speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+</div>
+<div class="panels">
+<div class="panel"><div class="bar"><strong>MPM soil</strong><span class="small">35° internal friction</span></div><canvas id="left" aria-label="Recorded soil simulation"></canvas><div class="stats" id="leftStats"></div></div>
+<div class="panel"><div class="bar"><strong id="rightTitle">Round rigid grains</strong><span class="small" id="rightNote">Rapier reference</span></div><canvas id="right" aria-label="Recorded comparison simulation"></canvas><div class="stats" id="rightStats"></div></div>
+</div>
+<div class="transport"><button id="start" title="Start">↤</button><button id="play">Play</button><button id="step" title="Next recorded frame">Step</button><input id="time" type="range" min="0" value="0" step="1" aria-label="Playback time"><output id="clock">0.00 s</output></div>
+<div id="event"></div><div class="legend"><span><i class="dot"></i>Material A</span><span><i class="dot alt"></i>Material B</span><span>Colors track conserved material; both use the same strength.</span></div>
+<p class="small">MPM dots are material sample points, not collision spheres. Grains have circular contact shapes. No soil is deleted, frozen, or converted to terrain. The support is prescribed rigid ground; its removed half is not part of the soil ledger.</p>
+<details open><summary>Measured result</summary><p id="result"></p><div id="table"></div></details>
+<details><summary>Method and limitations</summary><p>2D, unit-depth MLS-MPM with quadratic transfers, Hencky elasticity and cohesionless Drucker–Prager yielding. The control sets the internal friction angle to zero; ground friction stays 0.6. E = 2000, density = 1, ν = 0.2; grid spacing 0.25, initial sample spacing 0.125. Explicit adaptive substeps. These are experimental parameters, not calibrated dirt.</p><p>A 288-point stream pours until 2.3 s. A 494-point bank loses half of its raised support at 2 s. A 1024-point bed receives radial velocity impulses at 2 and 5 s (radius 1.5, peak speed 12). Both blasts use the same location in the moving ground frame. This is a prescribed impulse, not explosive pressure or energy conservation. No cohesion, moisture, hardening, terrain deposition, or two-way rigid-body coupling yet.</p><p>Particle count and material mass are audited every 60 Hz step. Playback captures every third step. Replay compares every step’s state hash on the same build and architecture. Timings include input events and solver work; exclude audits, recording, replay, and drawing. The camera follows ground motion. The planetary base translates and rotates while gravity points toward its center.</p><p id="build" class="small"></p></details>
+<script>
+const report = __REPORT_DATA__;
+const $=id=>document.getElementById(id), cases=report.cases;
+const names={mpm:'MPM soil',frictionless:'No internal friction',grains:'Round rigid grains'};
+const bounds=new Map(cases.map(c=>{let b={xmin:-8,xmax:8,ymin:c.fixture==='moving-planet'?-16:-1,ymax:6};for(const f of c.frames){const co=Math.cos(f.angle),si=Math.sin(f.angle);for(let i=0;i<f.points.length;i+=2){const x=f.points[i]-f.center[0],y=f.points[i+1]-f.center[1],u=x*co+y*si,v=-x*si+y*co-(c.fixture==='moving-planet'?8:0);b.xmin=Math.min(b.xmin,u);b.xmax=Math.max(b.xmax,u);b.ymin=Math.min(b.ymin,v);b.ymax=Math.max(b.ymax,v)}}return [c,b]}));
+const query=new URLSearchParams(location.hash.slice(1));
+for(const id of ['experiment','fixture','comparison','camera'])if(query.has(id))$(id).value=query.get(id);
+if(!cases.some(c=>c.fixture===$('fixture').value))$('fixture').value=cases[0].fixture;
+if(!cases.some(c=>c.fixture===$('fixture').value&&c.experiment===$('experiment').value))$('experiment').value=cases.find(c=>c.fixture===$('fixture').value).experiment;
+if(!cases.some(c=>c.model===$('comparison').value)&&cases.some(c=>c.model==='frictionless'))$('comparison').value='frictionless';
+let cursor=Math.round(Number(query.get('tick')||0)/3),playing=false,last=0,accumulator=0;
+if(!Number.isFinite(cursor))cursor=0;
+$('time').max=report.seconds*20;
+function selected(model){return cases.find(c=>c.fixture===$('fixture').value&&c.experiment===$('experiment').value&&c.model===model)}
+function rounded(v,n=2){return Number(v).toFixed(n)}
+function render(canvas,c){
+ const scale=window.devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;
+ if(canvas.width!==w*scale||canvas.height!==h*scale){canvas.width=w*scale;canvas.height=h*scale}
+ const ctx=canvas.getContext('2d');ctx.setTransform(scale,0,0,scale,0,0);ctx.clearRect(0,0,w,h);
+ if(!c){ctx.fillStyle='#bccace';ctx.fillText('This model was not recorded in this run.',25,40);return}
+ const f=c.frames[Math.min(cursor,c.frames.length-1)],planet=c.fixture==='moving-planet',wide=$('camera').value==='wide';
+ const both=[selected('mpm'),selected($('comparison').value)].filter(Boolean).map(c=>bounds.get(c));
+ const xmin=Math.min(...both.map(b=>b.xmin))-1,xmax=Math.max(...both.map(b=>b.xmax))+1,ymin=Math.min(...both.map(b=>b.ymin))-1,ymax=Math.max(...both.map(b=>b.ymax))+1;
+ const span=wide?xmax-xmin:15,px=Math.min(w/span,h/(wide?ymax-ymin:9)),cy=wide?(ymin+ymax)/2:2.5,cx=wide?(xmin+xmax)/2:0;
+ const world=(x,y)=>{const dx=x-f.center[0],dy=y-f.center[1],co=Math.cos(f.angle),si=Math.sin(f.angle);return [dx*co+dy*si,-dx*si+dy*co-(planet?8:0)]};
+ const point=(x,y)=>[w/2+(x-cx)*px,h/2-(y-cy)*px];
+ const path=vertices=>{ctx.beginPath();vertices.forEach((v,i)=>{let p=point(...v);i?ctx.lineTo(...p):ctx.moveTo(...p)});ctx.closePath()};
+ ctx.strokeStyle='#263b46';ctx.lineWidth=1;
+ for(let x=-20;x<=20;x+=2){const a=point(x,-30),b=point(x,20);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}
+ for(let y=-30;y<=20;y+=2){const a=point(-30,y),b=point(30,y);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}
+ ctx.fillStyle='#3a4a48';ctx.strokeStyle='#7f9390';ctx.lineWidth=1.5;
+ if(planet){const p=point(0,-8);ctx.beginPath();ctx.arc(...p,8*px,0,Math.PI*2)}else{path([[-40,-8],[40,-8],[40,0],[-40,0]])}ctx.fill();ctx.stroke();
+ if(c.experiment==='bank'){
+  let left=f.support_removed?0:-4,poly=planet?[[0,-8]]:[[left,0],[4,0],[4,2],[left,2]];
+  if(planet)for(let i=0;i<=32;i++){let a=(4+(left-4)*i/32)/8;poly.push([Math.sin(a)*10,Math.cos(a)*10-8])}
+  path(poly);ctx.fillStyle='#50655b';ctx.fill();ctx.strokeStyle='#9dad91';ctx.stroke();
+ }
+ for(let i=0;i<f.points.length;i+=2){const p=point(...world(f.points[i],f.points[i+1]));ctx.fillStyle=c.materials[i/2]===1?'#e2b875':'#af7753';ctx.beginPath();ctx.arc(...p,Math.max(1,0.0625*px),0,Math.PI*2);ctx.fill()}
+ for(const e of c.events){const elapsed=(f.tick-e.tick)/60;if(elapsed>=0&&elapsed<0.55){const p=point(...world(e.center.x,e.center.y));ctx.beginPath();ctx.arc(...p,1.5*px*(0.8+elapsed),0,Math.PI*2);ctx.strokeStyle=`rgba(255,210,128,${1-elapsed/0.55})`;ctx.lineWidth=2;ctx.stroke()}}
+ const a=[20,h-33],b=[a[0]+px,a[1]];ctx.strokeStyle='#a7babf';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();ctx.fillStyle='#a7babf';ctx.font='11px system-ui';ctx.fillText('1 world unit',a[0],a[1]+16);
+}
+function stats(c){if(!c)return 'No recording';const m=c.frames[Math.min(cursor,c.frames.length-1)].metrics;return `<span><b>${m.particles}</b> points</span><span><b>${rounded(m.mass[0]+m.mass[1])}</b> soil mass</span><span><b>${rounded(m.rms_speed,3)}</b> RMS speed</span>`}
+function draw(){const left=selected('mpm'),right=selected($('comparison').value);render($('left'),left);render($('right'),right);$('leftStats').innerHTML=stats(left);$('rightStats').innerHTML=stats(right);$('clock').textContent=rounded(cursor/20)+' s';$('time').value=cursor;
+ const t=cursor/20,e=$('experiment').value;$('event').textContent=e==='pour'?(t<2.4?'Pouring from the reserved material supply.':'Pour complete. Watch whether the pile keeps moving.'):e==='bank'?(t<2?'Support removal at 2 s.':'Left half of the raised support removed at 2 s.'):(t<2?'Blasts at 2 and 5 s.':t<5?'First blast fired. Second blast at 5 s.':'Second blast fired into the changed bed.');}
+function refresh(){const comparison=$('comparison').value;$('rightTitle').textContent=names[comparison];$('rightNote').textContent=comparison==='grains'?'Rapier reference':'0° internal friction';
+ const cs=cases.filter(c=>c.fixture===$('fixture').value&&c.experiment===$('experiment').value);
+ $('table').innerHTML='<table><tr><th>Model</th><th>Final RMS speed</th><th>Center height</th><th>Step mean / p95</th><th>Replay</th></tr>'+cs.map(c=>`<tr><td>${names[c.model]}</td><td>${rounded(c.final.rms_speed,3)}</td><td>${rounded(c.final.center_height)}</td><td>${rounded(c.step_ms.mean)} / ${rounded(c.step_ms.p95)} ms</td><td>${c.replay_passed?'Passed':'Not run'}</td></tr>`).join('')+'</table>';
+ $('result').textContent='Speed is relative to the prescribed ground motion. Center height is the 90th percentile of material within ±0.5 of the shot’s ground coordinate; it is a diagnostic, not a rendered terrain surface. Timings are for this recorded machine.';
+ draw();}
+for(const id of ['experiment','fixture','comparison','camera'])$(id).addEventListener('change',refresh);
+$('play').onclick=()=>{playing=!playing;if(playing&&cursor>=Number($('time').max))cursor=0;$('play').textContent=playing?'Pause':'Play'};
+$('start').onclick=()=>{cursor=0;draw()};$('step').onclick=()=>{playing=false;$('play').textContent='Play';cursor=Math.min(cursor+1,Number($('time').max));draw()};
+$('time').oninput=()=>{cursor=Number($('time').value);draw()};
+window.addEventListener('resize',draw);
+function animate(now){if(playing&&last){accumulator+=(now-last)*Number($('speed').value);if(accumulator>=50){cursor+=Math.floor(accumulator/50);accumulator%=50;if(cursor>=Number($('time').max)){cursor=Number($('time').max);playing=false;$('play').textContent='Play'}draw()}}last=now;requestAnimationFrame(animate)}
+$('build').textContent=`${report.build.arch} · ${report.build.machine||''} · revision ${report.build.revision||report.build.label||'unknown'} · ${report.build.status?'working tree modified':'clean or standalone build'} · executable SHA-256 ${report.build.executable_sha256}`;
+cursor=Math.max(0,Math.min(cursor,Number($('time').max)));refresh();requestAnimationFrame(animate);
+</script></body></html>
