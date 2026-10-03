@@ -83,3 +83,91 @@ An override applies only to the selected `--seat` while aboard an escape pod,
 from its requested start; it cannot act on an on-foot pilot or full ship.
 Non-default pod controls require impact tracing and a start inside the trace
 window. The ordinary scenario, policy and other runners retain their defaults.
+
+## Controlled results
+
+Code, runner, tests and the comparison plan were frozen at `fe27b01`. All four
+runs completed and passed the existing physical, route-publication, shared-work
+and active-flight auditors. The prior input files and frozen binary retained
+their hashes through the comparisons.
+
+| Replay | First changed control | Overridden ticks | P1 death tick | Result |
+| --- | --- | ---: | ---: | --- |
+| Probe disabled | None | 0 | 15435 | Exact prior replay |
+| Probe enabled, ordinary bot | None | 0 | 15435 | Exact prior replay |
+| Brake only, zero turn | 15406 | 29 | 15435 | Exact observed physical trajectory |
+| Coast, zero turn | 15406 | 27 | 15433 | Boundary death two ticks earlier |
+
+Both interventions retain all **30,812 player observations/actions** preceding
+15406. Brake-only changes the requested turn from -1 to zero, but the pod's
+large negative spin saturates the same available angular deceleration either
+way. Every ordinary per-tick observed state/mission/evidence record remains
+identical after removing only actions. The complete native impact stream also
+matches after removing the explicitly changed controls and override metadata:
+center-of-mass position/velocity, contacts, health, recovery telemetry and final
+physical state all agree. The final collision's closing speed remains 197.05.
+
+The normal bot holds full brake on all **1,344 recorded P1 ticks from 14091
+through 15434**, with no thrust. Coast retains braking until 15405 and releases
+it for the final 27 ticks. Both interventions preserve the completed crossing
+at 8765, enemy-flag claim at 10713, original-ship boarding at 12297 and departure
+at 12520. All runs end with P1/P2 completed capture sorties of 2/3 and owned
+planets of 1/2. None is a successful rescue or policy improvement.
+
+These comparisons rule out a late brake-only/zero-turn remedy for this recorded
+state. They do not show that every earlier action fails, or that all pod losses
+share this cause. No braking, steering, damage, invulnerability or missile-mass
+change is selected from this investigation.
+
+## Earlier decision to test next
+
+At pursuit entry **12521**, P1 has **53.77 hull** and the visible opposing full
+ship has **94.30 hull**. The recorded reason is `nearby opponent after securing
+ground`, at approximately 283 units of separation. This entry condition checks
+ownership and proximity without comparing own/opponent hull. It is distinct
+from the adjacent vulnerable-opponent and recent-incoming-fire conditions.
+
+P1 retains 53.77 hull through 13600, has 49.44 at 13800, and drops to 8.37 after
+a projectile contact at 13850. Laser damage then destroys the ship at 13942,
+**23.68 seconds after pursuit entry**. The ordinary 30-second pursuit timeout
+would have occurred at 14321, after the ship was already lost. Merely enabling
+the existing timeout escape would not start it during this pursuit before ship
+loss; enabling that experiment earlier in the match is a different trajectory.
+
+The next bounded experiment should test admitting discretionary pursuit with
+an already damaged ship against a stronger full ship. It should preserve
+committed captures and distinguish defensive combat from opportunistic attacks,
+then replay both seats and all retained armed cases. The observed hull
+disadvantage motivates that comparison; it does not supply a validated threshold
+or prove that declining the fight produces a safe transfer. There is no runtime
+policy/default change in this checkpoint.
+
+## Verification and retained evidence
+
+The **40 mission-runner Rust tests and all 663 Python tests pass**, including
+six new checks for center-of-mass versus origin motion, translating/rotating
+frames, circle/ray geometry, unknown/nonfinite inputs, complete control prefixes
+and physical parity. Strict Clippy for the changed example (`--no-deps`),
+formatting and both profiled/ordinary release builds pass. Scenario/AI library
+behavior is unchanged; this checkpoint does not claim a new full-workspace test
+run or Raspberry Pi validation.
+
+Each match retains the shared **4 graph / 384 query** maxima and **120-tick**
+publication lifetime. Diagnostic reads and file output add work outside those
+quotas; this is not a performance improvement.
+
+[The result manifest](data/pod-boundary-impact-v1.json) retains all four outcomes,
+audits and the earlier pursuit observations.
+[The compressed evidence archive](data/pod-boundary-impact-v1.json.gz) contains
+40 exact documents, including native impact streams, derived motion samples,
+the frozen plan, diagnostic patch/replay, physical witnesses, validation logs
+and hashes for 63 comparison files plus 14 initial diagnostic files. Embedded
+text and raw-file hashes were verified. Full ordinary streams and frozen
+binaries remain under `target/pod-braking`.
+
+- Frozen binary SHA-256:
+  `44edd696db6cb07da09568968e6a39d97f396f5c504b9b351b2e92d9030b68eb`
+- Frozen summary SHA-256:
+  `956f90667b2951c3e197eb5dddb4c50b876bf42efd9d3f5a4ad0c884c7e39f07`
+- Evidence archive SHA-256:
+  `a63d6c9c90d50cf3bae59d345346d087f4e0c665766dc5e1a067ab41c4aff0f2`

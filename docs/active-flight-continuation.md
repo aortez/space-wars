@@ -161,5 +161,7 @@ files. Full streams remain under `target/flight-continuation`.
 - Evidence archive SHA-256:
   `50e77d839178cbf9cd16dae5c14a04cd3ae02e73a5151c4e06f16690fdce7a9d`
 
-The option remains disabled by default. The later ship-impact loss is a separate
-investigation; this change does not justify changing bot defaults.
+The option remains disabled by default. The later impact is investigated in
+[the escape-pod boundary replay](pod-boundary-impact.md): the ship is first lost
+to laser damage, then missiles strike its pod. This change does not justify
+changing bot defaults.
