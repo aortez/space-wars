@@ -17,6 +17,8 @@ mod flag_survey;
 mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
+#[path = "support/impact_probe.rs"]
+mod impact_probe;
 #[path = "support/landing_cadence_probe.rs"]
 mod landing_cadence_probe;
 #[path = "support/live_planning.rs"]
@@ -193,6 +195,7 @@ fn main() {
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
     let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
     let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
+    let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -689,6 +692,9 @@ fn main() {
                         pending_claim_footing[i] = None;
                     }
                 }
+                if let Some(probe) = &mut impact_probe {
+                    probe.apply_and_observe(i, &state, &o, pilots[i].telemetry(), &mut intent);
+                }
                 actions.extend(intent.encode(owner));
                 if let Some(evidence) = &mut capture_evidence {
                     evidence.observe(i, &o, pilots[i].telemetry(), intent);
@@ -960,6 +966,9 @@ fn main() {
     }
     if let Some(trace) = &mut trace {
         trace.flush().unwrap();
+    }
+    if let Some(probe) = impact_probe {
+        probe.finish(&state);
     }
     if let Some(file) = &mut timing_csv {
         file.flush().unwrap();
