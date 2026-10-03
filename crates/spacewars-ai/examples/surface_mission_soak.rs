@@ -282,6 +282,13 @@ fn main() {
         "true" => true,
         _ => panic!("--active-flight-checks must be true or false"),
     };
+    let pursuit_health_seats = match arg("--pursuit-health-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--pursuit-health-seats must be none, 0, 1 or both"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -385,6 +392,7 @@ fn main() {
         )
         .with_powered_capture(powered_capture_seats[i])
         .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
+        .with_pursuit_health(pursuit_health_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
@@ -1031,6 +1039,13 @@ fn main() {
             "profile": "vehicle_flight_continuation_v1",
             "enabled_seats": powered_capture_seats,
             "scope": "Current-state continuation forecasts for an already launched flight. Original launch certificate and 12-second maneuver deadline are retained; current clearance, arrival and remaining-fuel checks are required at each completed survey. Synchronous prediction work remains outside live planner quotas.",
+        });
+    }
+    if pursuit_health_seats.contains(&true) {
+        report["pursuit_health"] = json!({
+            "profile": spacewars_ai::mission_pilot::PURSUIT_HEALTH_PROFILE,
+            "enabled_seats": pursuit_health_seats,
+            "scope": "Opt-in remaining-hull comparison for new ownership-based pursuits only. Recent-fire responses, vulnerable targets, ongoing pursuits and committed captures retain their priority. Uses existing observations without new physics queries.",
         });
     }
     for (seat, enabled) in cover_retry_seats.into_iter().enumerate() {

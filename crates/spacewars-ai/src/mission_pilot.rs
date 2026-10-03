@@ -20,6 +20,12 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_pursuit_health.rs"]
+mod pursuit_health;
+pub use pursuit_health::{
+    PURSUIT_HEALTH_PROFILE, PursuitHealthCheck, PursuitHealthDecision, PursuitHealthTelemetry,
+};
+
 #[path = "mission_destination.rs"]
 mod destination;
 pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, DestinationSwitch};
@@ -144,6 +150,8 @@ pub struct MissionTelemetry {
     pub combat: Option<CombatPilotTelemetry>,
     pub pursuit: Option<MissionPursuit>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pursuit_health: Option<PursuitHealthTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub disengagement: Option<MissionDisengagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_planning: Option<DestinationPlanningTelemetry>,
@@ -238,6 +246,7 @@ impl MaterialMissionPilot {
                 opponent: None,
                 combat: None,
                 pursuit: None,
+                pursuit_health: None,
                 disengagement: None,
                 destination_planning: policy
                     .selects_destination()
@@ -269,6 +278,7 @@ impl MaterialMissionPilot {
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let pursuit_health = self.telemetry.pursuit_health.is_some();
         let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
@@ -282,6 +292,7 @@ impl MaterialMissionPilot {
             .as_ref()
             .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
+        self.configure_pursuit_health(pursuit_health);
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
@@ -1017,18 +1028,21 @@ impl MaterialMissionPilot {
             .weapons
             .last_hit_taken_tick
             .is_some_and(|tick| p.tick.saturating_sub(tick) < 3 * 60);
-        let reason = if vulnerable && distance < 400.0 {
-            "nearby vulnerable opponent"
+        let (reason, discretionary) = if vulnerable && distance < 400.0 {
+            ("nearby vulnerable opponent", false)
         } else if under_fire && distance < 300.0 {
-            "responding to incoming fire"
+            ("responding to incoming fire", false)
         } else if established && distance < 300.0 {
-            "nearby opponent after securing ground"
+            ("nearby opponent after securing ground", true)
         } else {
             return false;
         };
         // Offline calibration changes only this new-mission decision. All
         // ordinary eligibility, pursuit maintenance and safety ran above.
         if defer_new {
+            return false;
+        }
+        if discretionary && !self.admit_discretionary_pursuit(o) {
             return false;
         }
         self.reconsider(p.tick, "pausing travel for nearby opponent", false);
