@@ -1,6 +1,7 @@
 use super::*;
 use pilot::LandingSiteQuery;
 
+mod covered_handoff;
 mod destinations;
 mod diagnostics;
 mod early_candidates;

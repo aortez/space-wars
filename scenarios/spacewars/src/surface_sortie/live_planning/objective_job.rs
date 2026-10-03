@@ -263,6 +263,19 @@ impl ObjectiveSurveyJob {
                 .any(|r| r.site == Some(*site) && r.cost().is_some())
         })
     }
+    pub(super) fn prioritizes(&self, site: LandingSiteId) -> bool {
+        self.powered
+            .as_ref()
+            .is_some_and(|(c, _)| c.site == Some(site))
+            || self
+                .corridor
+                .as_ref()
+                .is_some_and(|(c, _)| c.site == Some(site))
+            || self
+                .focused
+                .as_ref()
+                .is_some_and(|job| job.candidates.iter().any(|c| c.site == Some(site)))
+    }
     /// Try one small walking corridor before the complete survey. A failed
     /// patch says nothing about the full graph, jumps or powered alternatives.
     /// The ordinary job and its original measurement clock remain intact.

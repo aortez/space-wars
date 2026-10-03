@@ -61,6 +61,13 @@ impl CaptureEvidence {
             // extra scan, route probe or future-state query is performed.
             record["initial_cover"] = json!({"observation":o});
         }
+        if o.local
+            .objective_evidence
+            .and_then(|e| e.covered_handoff)
+            .is_some_and(|h| h.tick == p.tick)
+        {
+            record["covered_handoff"] = json!({"observation":o});
+        }
         serde_json::to_writer(&mut self.0, &record).unwrap();
         writeln!(self.0).unwrap();
     }

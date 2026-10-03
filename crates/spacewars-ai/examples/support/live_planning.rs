@@ -96,6 +96,19 @@ impl LivePlanningRun {
             "true" => planner.with_powered_corridors(),
             _ => panic!("--powered-objective-routes must be true or false"),
         };
+        let handoff_seats = match super::arg("--covered-request-handoff-seats", "none").as_str() {
+            "none" => vec![],
+            "0" => vec![0],
+            "1" => vec![1],
+            "both" => vec![0, 1],
+            _ => panic!("--covered-request-handoff-seats must be none, 0, 1 or both"),
+        };
+        assert!(handoff_seats.iter().all(|seat| seats.contains(seat)));
+        let planner = if handoff_seats.is_empty() {
+            planner
+        } else {
+            planner.with_covered_request_handoff(handoff_seats)
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
@@ -305,6 +318,12 @@ impl LivePlanningRun {
         }
         if self.planner.uses_powered_corridors() {
             report["powered_objective_routes"] = json!(true);
+        }
+        if !self.planner.covered_handoff_players().is_empty() {
+            report["covered_request_handoff"] = json!({
+                "profile": scenario_spacewars::surface_sortie::live_planning::COVERED_HANDOFF_PROFILE,
+                "enabled_seats": self.planner.covered_handoff_players(),
+            });
         }
         report
     }

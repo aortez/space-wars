@@ -89,6 +89,8 @@ pub struct ObjectiveWorkEvidence {
     /// attempted; other routes and the complete fallback remain unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unsupported_walk: Option<UnsupportedWalkingCorridor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub covered_handoff: Option<CoveredRequestHandoff>,
 }
 impl ObjectiveWorkEvidence {
     pub(super) fn new(tick: u64, objective: LandingObjective) -> Self {
@@ -104,6 +106,7 @@ impl ObjectiveWorkEvidence {
             publication: None,
             exhausted_walk: None,
             unsupported_walk: None,
+            covered_handoff: None,
         }
     }
     pub(super) fn request(&mut self, request: &Request) {
@@ -111,5 +114,6 @@ impl ObjectiveWorkEvidence {
         self.generation = Some(request.token.generation);
         self.request_tick = Some(request.tick);
         self.measurement_tick = Some(request.measurement_tick);
+        self.covered_handoff = request.covered_handoff;
     }
 }

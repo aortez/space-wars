@@ -30,8 +30,10 @@ pub use flag_survey::{
     FlagSurveyEnvelope, FlagSurveyGeometry, FlagSurveyPlanner, FlagSurveyRequest, FlagSurveySample,
     FlagSurveyTelemetry, FlagSurveyValidation,
 };
+mod covered_handoff;
 mod objective_job;
 mod query_budget;
+pub use covered_handoff::{COVERED_HANDOFF_PROFILE, CoveredRequestHandoff};
 pub use destinations::DestinationCoverTelemetry;
 use destinations::Destinations;
 use query_budget::QueryBudget;
@@ -168,6 +170,8 @@ impl ObjectiveMeasurementWork {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct LivePlanningTelemetry {
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub covered_request_handoffs: BTreeMap<usize, u64>,
     #[serde(skip_serializing_if = "is_zero")]
     pub walk_probe_restarts: u64,
     #[serde(skip_serializing_if = "is_zero")]
@@ -246,6 +250,8 @@ struct ActualLanding {
 #[derive(Clone)]
 struct Request {
     token: RequestToken,
+    query: LandingSiteQuery,
+    covered_handoff: Option<CoveredRequestHandoff>,
     objective: LandingObjective,
     tick: u64,
     measurement_tick: u64,
@@ -297,6 +303,7 @@ pub struct LiveObjectivePlanner {
     walk_feedback: bool,
     walk_bounds_feedback: bool,
     powered_corridors: bool,
+    covered_handoff_players: std::collections::BTreeSet<usize>,
     focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
@@ -322,6 +329,7 @@ impl LiveObjectivePlanner {
             walk_feedback: false,
             walk_bounds_feedback: false,
             powered_corridors: false,
+            covered_handoff_players: Default::default(),
             focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
@@ -443,6 +451,22 @@ impl LiveObjectivePlanner {
     pub fn uses_powered_corridors(&self) -> bool {
         self.powered_corridors
     }
+    /// A current covered-site request may replace one unfinished ordinary scan.
+    /// Existing targeted work and usable results retain priority.
+    pub fn with_covered_request_handoff(
+        mut self,
+        players: impl IntoIterator<Item = usize>,
+    ) -> Self {
+        assert!(
+            self.uses_powered_corridors(),
+            "covered handoff requires the bounded route pipeline"
+        );
+        self.covered_handoff_players = players.into_iter().collect();
+        self
+    }
+    pub fn covered_handoff_players(&self) -> &std::collections::BTreeSet<usize> {
+        &self.covered_handoff_players
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -530,6 +554,9 @@ impl LiveObjectivePlanner {
         }
         if request.measurement_tick > p.tick
             || p.tick - request.measurement_tick > MAX_SURVEY_AGE_TICKS
+            || request
+                .covered_handoff
+                .is_some_and(|h| p.tick > h.deadline_tick)
         {
             return Err("expired");
         }
@@ -923,6 +950,13 @@ impl LiveObjectivePlanner {
                 *self.telemetry.invalidations.entry(reason).or_default() += 1;
             }
         }
+        let covered_handoff = self.covered_handoff_candidate(state, player, o, objective);
+        if covered_handoff.is_some() {
+            self.retire(player);
+            // Replacement geometry and its environment share this new epoch.
+            // Charged old work remains in the ledger; never relabel its snapshot.
+            measurements = None;
+        }
         // A new, currently scanned candidate can replace a finished walking
         // probe's fallback. Preserve its charged work; the replacement takes a
         // fresh snapshot instead of relabeling the old measurements as fresh.
@@ -1267,6 +1301,8 @@ impl LiveObjectivePlanner {
                 player,
                 Request {
                     token,
+                    query: p.site_query,
+                    covered_handoff,
                     objective,
                     tick: p.tick,
                     measurement_tick,
@@ -1298,6 +1334,13 @@ impl LiveObjectivePlanner {
                 evidence.request(self.requests.get(&player).unwrap());
             }
             self.telemetry.submitted += 1;
+            if covered_handoff.is_some() {
+                *self
+                    .telemetry
+                    .covered_request_handoffs
+                    .entry(player)
+                    .or_default() += 1;
+            }
             self.telemetry.reused_requests += u64::from(reused);
             self.telemetry.max_retained_requests = self
                 .telemetry
