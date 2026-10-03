@@ -200,3 +200,10 @@ future bounded approach policy needs to account for relative closing speed and
 room to turn or slow down; a clear endpoint alone is insufficient. Freeze any
 such hypothesis before new complete-match comparisons and retain this failure
 as a regression case.
+
+The [relative-speed follow-up](transfer-speed.md) now tests that intervention.
+The observed trip avoids the forced-climb detour, but cannon damage destroys
+both affected ships earlier, before either reaches arrival distance. No new
+capture or departure results. The next investigation is the threat and remaining
+hull along the post-escape trip; the measured clearance improvement alone does
+not support changing defaults.
