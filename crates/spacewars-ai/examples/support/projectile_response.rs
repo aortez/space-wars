@@ -36,7 +36,12 @@ enum Mode {
     Brake,
     Left,
     Right,
+    GuardedBrake,
 }
+
+#[path = "projectile_brake_selection.rs"]
+mod brake_selection;
+use brake_selection::BrakeSelection;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 struct TransferKey {
@@ -211,6 +216,7 @@ fn apply(mode: Mode, intent: &mut CombatIntent) {
             // Preserve native speed/safety braking rather than opposing it with thrust.
             c.primary_held = !c.brake_held;
         }
+        Mode::GuardedBrake => unreachable!("selector must choose a concrete action"),
     }
     intent.flight.wings.closed = false;
 }
@@ -218,6 +224,7 @@ fn apply(mode: Mode, intent: &mut CombatIntent) {
 #[derive(Debug, Clone)]
 struct Pulse {
     mode: Mode,
+    selected_mode: Option<Mode>,
     last_tick: Option<u64>,
     attempt: Option<Attempt>,
 }
@@ -262,10 +269,15 @@ impl Pulse {
             });
             return false;
         }
-        if self.mode == Mode::Observe {
+        let mode = if self.mode == Mode::GuardedBrake {
+            self.selected_mode.expect("first warning selects once")
+        } else {
+            self.mode
+        };
+        if mode == Mode::Observe {
             return false;
         }
-        apply(self.mode, intent);
+        apply(mode, intent);
         a.applied_ticks += 1;
         true
     }
@@ -275,6 +287,7 @@ pub struct ResponseProbe {
     seat: usize,
     scope: Scope,
     pulse: Pulse,
+    selection: Option<BrakeSelection>,
     log: BufWriter<File>,
 }
 impl ResponseProbe {
@@ -285,7 +298,10 @@ impl ResponseProbe {
             "brake" => Mode::Brake,
             "left" => Mode::Left,
             "right" => Mode::Right,
-            _ => panic!("--probe-projectile-response must be none, observe, brake, left or right"),
+            "guarded_brake" => Mode::GuardedBrake,
+            _ => panic!(
+                "--probe-projectile-response must be none, observe, brake, left, right or guarded_brake"
+            ),
         };
         assert_eq!(crate::arg("--mode", "quiet"), "duel");
         assert_eq!(crate::arg("--trace-capture-evidence", "false"), "true");
@@ -300,9 +316,11 @@ impl ResponseProbe {
             ),
             pulse: Pulse {
                 mode,
+                selected_mode: None,
                 last_tick: None,
                 attempt: None,
             },
+            selection: None,
             log: BufWriter::new(
                 OpenOptions::new()
                     .create_new(true)
@@ -342,6 +360,14 @@ impl ResponseProbe {
             .attempt
             .is_some_and(|a| a.finished_tick.is_none());
         let original = *intent;
+        let choosing = self.pulse.mode == Mode::GuardedBrake
+            && self.pulse.attempt.is_none()
+            && threat.is_some();
+        if choosing {
+            let selection = brake_selection::select(o, diagnostic.as_ref().unwrap(), &original);
+            self.pulse.selected_mode = Some(selection.action);
+            self.selection = Some(selection);
+        }
         let applied = self.pulse.step(p.tick, key, threat, intent);
         let context = active || diagnostic.is_some();
         let mut record = json!({"schema":1,"tick":p.tick,"seat":seat,
@@ -357,6 +383,9 @@ impl ResponseProbe {
             record["flight_enabled"] = json!(o.local.combat.recovery.flight.flight.enabled);
             record["match_rules"] = json!(o.match_rules);
         }
+        if self.pulse.mode == Mode::GuardedBrake {
+            record["selection"] = json!(choosing.then_some(self.selection.as_ref()).flatten());
+        }
         serde_json::to_writer(&mut self.log, &record).unwrap();
         writeln!(self.log).unwrap();
     }
@@ -368,13 +397,13 @@ impl ResponseProbe {
             a.finished_tick = Some(state.tick());
             a.reason = Some("match ended");
         }
-        serde_json::to_writer(
-            &mut self.log,
-            &json!({"schema":1,"final_tick":state.tick(),
+        let mut record = json!({"schema":1,"final_tick":state.tick(),
             "seat":self.seat,"mode":self.pulse.mode,"attempt":self.pulse.attempt,
-            "round":state.match_observation(),"damage":state.damage_observation(self.seat)}),
-        )
-        .unwrap();
+            "round":state.match_observation(),"damage":state.damage_observation(self.seat)});
+        if self.pulse.mode == Mode::GuardedBrake {
+            record["selection"] = json!(self.selection);
+        }
+        serde_json::to_writer(&mut self.log, &record).unwrap();
         writeln!(self.log).unwrap();
         self.log.flush().unwrap();
     }

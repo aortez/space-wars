@@ -14,6 +14,8 @@ spec = importlib.util.spec_from_file_location('diagnostics', Path(__file__).with
 P = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(P)
 S, digest, rows, root_of = P.S, P.digest, P.rows, P.root_of
+spec = importlib.util.spec_from_file_location('brake_selection', Path(__file__).with_name('projectile_brake_selection.py'))
+B = importlib.util.module_from_spec(spec); spec.loader.exec_module(B)
 
 
 def command(old, binary, root, mode):
@@ -112,6 +114,7 @@ def audit_response(root, old_root, mode, seat, report):
     probe = iter(rows(root/'projectile-response.jsonl'))
     diagnostic = (r for r in rows(root/'projectiles.jsonl') if r['seat'] == seat)
     previous = None; witnesses = []; first_change = None; changes = []; loss = None
+    selection = None
     last_damage = None; prefix_rows = 0
     all_evidence = iter(rows(root/'capture-evidence.jsonl'))
     for tick in range(report['elapsed_ticks']):
@@ -134,13 +137,27 @@ def audit_response(root, old_root, mode, seat, report):
                 assert o['planets']==e['planets'] and o['match_context']==e['match_context']
                 assert row['flight_enabled']==f['flight']['enabled'] and row['match_rules']==o['match_rules']
         selected = threat(row['diagnostic'])
-        expected, applied = advance(previous, tick, key, selected, mode)
+        choosing = mode == 'guarded_brake' and previous is None and selected is not None
+        if choosing:
+            selection = B.select(row['observation'], row['diagnostic'], row['original_actions'], P.linear_approach)
+            actual_selection = row['selection']
+            assert (selection['action'], selection['reason']) == (actual_selection['action'], actual_selection['reason'])
+            assert len(selection['warnings']) == len(actual_selection['warnings'])
+            for expected_warning, actual_warning in zip(selection['warnings'], actual_selection['warnings']):
+                assert expected_warning['id'] == actual_warning['id']
+                for field in ['entry_seconds', 'brake_toward', 'change_toward']:
+                    assert abs(expected_warning[field] - actual_warning[field]) < 1.e-7
+            selection = actual_selection
+        elif mode == 'guarded_brake':
+            assert row['selection'] is None
+        concrete_mode = (selection or {}).get('action', 'observe') if mode == 'guarded_brake' else mode
+        expected, applied = advance(previous, tick, key, selected, concrete_mode)
         actual = row['attempt']
         if expected is not None:
             assert abs(actual['threat']['entry_seconds']-expected['threat']['entry_seconds']) < 1.e-7
             expected['threat']['entry_seconds'] = actual['threat']['entry_seconds']
         assert actual == expected and row['applied'] == applied
-        assert row['actions'] == (override(row['original_actions'], mode) if applied else row['original_actions'])
+        assert row['actions'] == (override(row['original_actions'], concrete_mode) if applied else row['original_actions'])
         if row['actions'] != row['original_actions'] and first_change is None:
             first_change = tick
         if applied or (actual is not None and tick in [actual['started_tick'], actual['finished_tick']]):
@@ -168,12 +185,16 @@ def audit_response(root, old_root, mode, seat, report):
     if expected_final is not None and expected_final['finished_tick'] is None:
         expected_final.update(finished_tick=report['elapsed_ticks'], reason='match ended')
     assert final['attempt'] == expected_final
+    if mode == 'guarded_brake':
+        assert final['selection'] == selection
     if loss is None and expected_final is not None and source_ship_missing(report['final_pilots'][seat], expected_final['source']['vehicle']):
         loss = dict(tick=report['elapsed_ticks'], damage=final['damage'], pilot=report['final_pilots'][seat])
     path = root/'projectile-response-witnesses.json'
     S.F.D.write(path, dict(schema=1, rows=witnesses, damage_changes=changes, first_ship_loss=loss, final=final))
-    return dict(attempt=final['attempt'], first_action_change=first_change, exact_prefix_rows=prefix_rows,
-                damage_changes=changes, first_ship_loss=loss, witness_sha256=digest(path))
+    result = dict(attempt=final['attempt'], first_action_change=first_change, exact_prefix_rows=prefix_rows,
+                  damage_changes=changes, first_ship_loss=loss, witness_sha256=digest(path))
+    if mode == 'guarded_brake':result['selection'] = selection
+    return result
 
 
 def run(entry, old, binary, out):

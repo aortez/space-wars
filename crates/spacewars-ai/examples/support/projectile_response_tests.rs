@@ -115,9 +115,30 @@ fn threat() -> Threat {
 fn pulse(mode: Mode) -> Pulse {
     Pulse {
         mode,
+        selected_mode: None,
         last_tick: None,
         attempt: None,
     }
+}
+
+#[test]
+fn a_selector_abstention_consumes_the_only_attempt_without_changing_controls() {
+    let mut p = pulse(Mode::GuardedBrake);
+    p.selected_mode = Some(Mode::Observe);
+    for tick in 200..260 {
+        let mut intent = CombatIntent::default();
+        let original = intent;
+        assert!(!p.step(
+            tick,
+            Some(ResponseKey::Escape(key())),
+            Some(threat()),
+            &mut intent
+        ));
+        assert_eq!(intent, original);
+    }
+    assert_eq!(p.attempt.unwrap().started_tick, 200);
+    assert_eq!(p.attempt.unwrap().applied_ticks, 0);
+    assert_eq!(p.attempt.unwrap().finished_tick, Some(230));
 }
 
 #[test]
