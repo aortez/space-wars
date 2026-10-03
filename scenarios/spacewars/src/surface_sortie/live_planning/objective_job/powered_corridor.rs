@@ -34,6 +34,17 @@ pub(super) struct PoweredCorridorJob {
     pub result: Option<(LandingObjectiveRoute, Vec<QueryArea>, f32)>,
 }
 impl PoweredCorridorJob {
+    pub(super) fn diagnostic_phase(&self) -> &'static str {
+        match self.stage {
+            Stage::Direct(_) => "direct_walk",
+            Stage::Nodes(_) => "crossing_nodes",
+            Stage::Proposal(_) => "crossing_proposal",
+            Stage::Walk(_) => "connector_walk",
+            Stage::Flight(_) => "flight_forecast",
+            Stage::Done => "done",
+        }
+    }
+
     pub fn new(parent: &ObjectiveSurveyJob, candidate: Candidate) -> Option<Self> {
         let scene = parent.flight_scene.clone()?;
         if scene.measurement_tick() != parent.result.tick {

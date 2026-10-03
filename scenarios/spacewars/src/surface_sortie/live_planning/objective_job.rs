@@ -242,6 +242,35 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn has_positive_actual(&self) -> bool {
+        self.result
+            .actual
+            .as_ref()
+            .is_some_and(|r| r.cost().is_some())
+    }
+
+    pub(super) fn diagnostic_phase(&self) -> String {
+        if self.corridor.is_some() {
+            return "requested_walk".into();
+        }
+        if let Some(focused) = &self.focused {
+            return format!("focused/{}", focused.diagnostic_phase());
+        }
+        if let Some((_, powered)) = &self.powered {
+            return format!("powered/{}", powered.diagnostic_phase());
+        }
+        let phase = match self.phase {
+            Phase::Ground(_) => "ground",
+            Phase::Avoid(_) => "avoid_hull",
+            Phase::Trip(_) => "round_trip",
+            Phase::Dependencies(_) => "dependencies",
+            Phase::Proposal(_) => "crossing_proposal",
+            Phase::Flight(_) => "flight_forecast",
+            Phase::Done => "done",
+        };
+        format!("full/{phase}/{}", self.index)
+    }
+
     pub(super) fn unsupported_walk(&self) -> Option<(LandingSiteId, WalkCorridorBounds)> {
         self.unsupported_walk.filter(|(site, _)| {
             !self

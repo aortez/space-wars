@@ -129,6 +129,10 @@ impl LivePlanningRun {
     pub fn enabled_for(&self, seat: usize) -> bool {
         self.seats.contains(&seat)
     }
+    #[allow(dead_code)] // Only the mission runner exposes the detached probe.
+    pub fn diagnose_actual_request(&self, seat: usize, max_steps: u32) -> Option<Value> {
+        self.planner.diagnose_actual_request(seat, max_steps)
+    }
     #[allow(dead_code)] // The mission runner also supports native synchronous local sensing.
     pub fn destination_enabled_for(&self, seat: usize) -> bool {
         self.seats.is_empty() || self.enabled_for(seat)

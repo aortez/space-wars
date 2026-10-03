@@ -1,6 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/acquisition_probe.rs"]
 mod acquisition_probe;
+#[path = "support/actual_landing_probe.rs"]
+mod actual_landing_probe;
 #[path = "support/arrival_survey.rs"]
 mod arrival_survey;
 #[path = "support/capture_evidence.rs"]
@@ -194,6 +196,8 @@ fn main() {
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
     let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
+    let mut actual_landing_probe = actual_landing_probe::ActualLandingProbe::from_args();
+    assert!(actual_landing_probe.is_none() || live_planning.is_some());
     let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
     let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
     assert!(
@@ -773,6 +777,9 @@ fn main() {
                         },
                     );
                 }
+                if let Some(probe) = &mut actual_landing_probe {
+                    probe.observe(i, &o, live_planning.as_ref().unwrap());
+                }
                 last_posture[i] = posture_key;
                 if label != last[i] {
                     events.push(json!({"tick":tick,"seat":i,"label":label,"telemetry":pilots[i].telemetry()}));
@@ -996,6 +1003,9 @@ fn main() {
         probe.finish(&out);
     }
     if let Some(probe) = cover_routes_probe {
+        probe.finish(&out);
+    }
+    if let Some(probe) = actual_landing_probe {
         probe.finish(&out);
     }
     let final_audit = state.terrain_diagnostics();

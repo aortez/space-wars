@@ -17,7 +17,10 @@ fn planner() -> LiveObjectivePlanner {
         .with_powered_corridors()
 }
 
-fn fixture(moving: bool, seat: usize) -> (SurfaceSortieState, combat::TacticalSortieObservationV1) {
+pub(super) fn fixture(
+    moving: bool,
+    seat: usize,
+) -> (SurfaceSortieState, combat::TacticalSortieObservationV1) {
     let mut state = if moving {
         SurfaceSortieScenario::init_material_moving_crossing_trial(42, seat, 60.0, 0.015, 0.065)
     } else {

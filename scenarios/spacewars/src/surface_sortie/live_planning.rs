@@ -17,6 +17,7 @@ use std::{
     time::Instant,
 };
 
+mod actual_probe;
 mod avoiding;
 mod destinations;
 mod diagnostics;
