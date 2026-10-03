@@ -236,3 +236,11 @@ than reaching a safe exit. Preserve the recorded cover changes, hatch validity,
 shared budget and complete match outcomes. The late walking publication and
 World 0 P2 return failure remain separate regressions. This experiment does not
 justify relaxing those checks or promoting either option.
+
+The follow-up [actual-landing route investigation](actual-landing-route.md)
+finds one hatch-motion invalidation followed by repeated full-lifetime pending
+requests. Detached native completion finds no positive actual route in any of
+five sampled source epochs; the short pass fails early and its full fallback
+cannot finish within the live lifetime. An exiting comparison survives more
+hatch resets, so the next supported work is bounded actual-attempt feedback and
+recovery behavior, rather than a looser hatch check.

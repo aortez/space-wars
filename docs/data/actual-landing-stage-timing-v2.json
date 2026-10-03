@@ -1,0 +1,3007 @@
+{
+  "schema": 1,
+  "scope": "Post-outcome reconstruction of native stage completion from retained charges.",
+  "derivation": "Each copied job follows the same deterministic native step order and retained snapshot as its source request. The first live dispatch whose cumulative per-generation charges reach the detached full-ground boundary has completed the local attempt. This is a reconstructed dispatch boundary, not a newly logged native event and not a negative full-route certificate.",
+  "inputs": {
+    "target/actual-landing/v2/shared-armed-world1-p1-powered-probe/actual-landing-probe.json": "91eaa2793f0e97feb6ec0637f0e8ce74af9b2e73aa7ef928cca1510277e46080",
+    "target/actual-landing/v2/shared-armed-world1-p1-powered-probe/live-planning.csv": "04abad22c363d3b502288490d4e0bb4fbc10d59ec479a9c8a2976662884649fe",
+    "target/actual-landing/v2/shared-armed-world1-p1-powered-probe/capture-evidence.jsonl": "2fe080ffd953f8db559aaa8015f8083b07417b29ecfe675ef79773e11b7e6026",
+    "/tmp/actual-landing-stage-timing.py": "f0dba7612d088f41f891fb81fabb5312e0fa27623f8e3c2c2b3073768b13834b"
+  },
+  "records": [
+    {
+      "generation": 29,
+      "source_tick": 7635,
+      "detached_boundary": {
+        "flights": {
+          "approved": 0,
+          "rejected": {
+            "arrival_window": 1
+          },
+          "started": 1
+        },
+        "measurements": {
+          "corridor_completed": 1,
+          "corridor_started": 1,
+          "failures": {},
+          "finished_candidates": 0,
+          "finished_surveys": 0,
+          "powered_candidates": 0,
+          "powered_corridor_completed": 1,
+          "powered_corridor_failures": {
+            "arrival_window": 1
+          },
+          "powered_corridor_started": 1,
+          "successful_candidates": 0
+        },
+        "phase": "full/ground/0",
+        "steps": 3189,
+        "work": {
+          "graph": 60,
+          "physics_queries": 3129
+        }
+      },
+      "dispatch_tick": 7655,
+      "cumulative_before": {
+        "graph": 58,
+        "physics_queries": 2778
+      },
+      "cumulative_after": {
+        "graph": 60,
+        "physics_queries": 3162
+      },
+      "next_observation": {
+        "actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "capture": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": 29,
+            "measurement_tick": 7635,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 48.328094482421875,
+                "y": 34.51996612548828
+              },
+              "range": 2.799999952316284,
+              "revision": 1
+            },
+            "objective_work": "pending",
+            "planet": 0,
+            "reason": "actual_route_unavailable",
+            "required_site": null,
+            "revision": 1,
+            "selected_site": {
+              "bearing": 48,
+              "planet": 0
+            },
+            "site_query": {
+              "selected": {
+                "bearing": 48,
+                "planet": 0
+              }
+            },
+            "sites_available": 1,
+            "survey_rejected_by": null,
+            "tick": 7656
+          },
+          "circling_progress_tick": 6807,
+          "circling_remaining": 20.289127349853516,
+          "circling_replans": 0,
+          "completed_tick": null,
+          "cover_replans": 1,
+          "cover_response": {
+            "budget_exhaustions": 0,
+            "deadlines": 0,
+            "exhausted_searches": 0,
+            "exposure_releases": 0,
+            "failures": 1,
+            "filtered_directions": 49,
+            "first_effect_tick": 5490,
+            "measured_sites": 2,
+            "requested_sites": 7,
+            "required_since": null,
+            "search": {
+              "deadline_tick": 6758,
+              "finished_tick": 6420,
+              "guidance": null,
+              "hold_altitude": 64.55076599121094,
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.328067779541016,
+                  "y": 34.519935607910156
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "omitted": 12,
+              "outcome": "selected_covered_route",
+              "pending": [
+                {
+                  "bearing": 48,
+                  "planet": 0
+                },
+                {
+                  "bearing": 49,
+                  "planet": 0
+                },
+                {
+                  "bearing": 50,
+                  "planet": 0
+                }
+              ],
+              "planet": 0,
+              "probes": 6,
+              "revision": 1,
+              "seeded": true,
+              "started_tick": 6158,
+              "walk_deferred": [
+                {
+                  "bearing": 43,
+                  "planet": 0
+                },
+                {
+                  "bearing": 44,
+                  "planet": 0
+                },
+                {
+                  "bearing": 45,
+                  "planet": 0
+                },
+                {
+                  "bearing": 46,
+                  "planet": 0
+                },
+                {
+                  "bearing": 47,
+                  "planet": 0
+                }
+              ]
+            },
+            "searches": 2,
+            "selected_routes": 2
+          },
+          "covered_ticks": 723,
+          "exposed_ticks": 1445,
+          "failed_tick": null,
+          "failure": null,
+          "goal": "surface",
+          "goal_since": 7312,
+          "ground": null,
+          "initial_cover": {
+            "armed_tick": 5489,
+            "finished_tick": 5499,
+            "last_request": {
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5490
+            },
+            "last_seed_tick": 5490,
+            "outcome": "selected_site",
+            "requests": 1,
+            "selected_exposed": true,
+            "selected_site": {
+              "bearing": 0,
+              "planet": 0
+            }
+          },
+          "invalidations": 0,
+          "landing": {
+            "blocked_reason": null,
+            "boarded_tick": null,
+            "claimed_tick": null,
+            "completed_tick": null,
+            "goal": "land",
+            "goal_since": 7401,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_retries": 0,
+            "last_progress_tick": 7589,
+            "policy": "material_landing_v3",
+            "site": {
+              "bearing": 48,
+              "planet": 0
+            },
+            "site_revision": 1,
+            "touchdown_adjustments": 0
+          },
+          "live_invalidations": 2,
+          "objective_replans": 2,
+          "objective_route": {
+            "crossing": {
+              "flights": [
+                {
+                  "arrival_speed": 3.5014774799346924,
+                  "burn_seconds": 2.466665029525757,
+                  "seconds": 7.966667175292969
+                },
+                {
+                  "arrival_speed": 3.4559342861175537,
+                  "burn_seconds": 2.7333314418792725,
+                  "seconds": 8.65000057220459
+                }
+              ],
+              "launch_until_tick": 6476,
+              "measured_tick": 6356,
+              "nodes": [
+                373,
+                395
+              ],
+              "plan": {
+                "anchor": {
+                  "Vehicle": {
+                    "angle": -1.5708011388778687,
+                    "form": "ship",
+                    "index": 0,
+                    "position": {
+                      "x": 64.76806640625,
+                      "y": -6.29425048828125e-05
+                    }
+                  }
+                },
+                "cruise_radius": 70.76806640625,
+                "destination": {
+                  "x": 58.85350036621094,
+                  "y": 7.993256092071533
+                },
+                "direction": "Left",
+                "planet": 0,
+                "revision": 1,
+                "start": {
+                  "x": 58.85344696044922,
+                  "y": -7.9932661056518555
+                }
+              },
+              "version": 2
+            },
+            "endpoint": {
+              "id": 431,
+              "normal": {
+                "x": 0.8365352749824524,
+                "y": 0.5479130148887634
+              },
+              "position": {
+                "x": 49.78300476074219,
+                "y": 32.387420654296875
+              }
+            },
+            "outbound": {
+              "closest_reachable_distance": 2.6301941871643066,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 1,
+              "jumps": 0,
+              "length": 42.22510528564453,
+              "nearest_destination_distance": 2.6301941871643066,
+              "partial": false,
+              "reachable_nodes": 38,
+              "start_distance": 0.006841834168881178,
+              "start_node": 373
+            },
+            "returning": {
+              "closest_reachable_distance": 0.4499942362308502,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 1,
+              "jumps": 0,
+              "length": 42.22510528564453,
+              "nearest_destination_distance": 0.4499942362308502,
+              "partial": false,
+              "reachable_nodes": 38,
+              "start_distance": 0.0,
+              "start_node": 431
+            },
+            "site": {
+              "bearing": 48,
+              "planet": 0
+            }
+          },
+          "policy": "tactical_sortie_v12",
+          "replans": 3,
+          "site": {
+            "bearing": 48,
+            "planet": 0
+          },
+          "solar": {
+            "approach_clearance": 117.13787841796875,
+            "arrival_seconds": 6.658420085906982,
+            "departure_clearance": 55.862762451171875,
+            "departure_side": -1.0,
+            "forecast_tick": 6420,
+            "parked_clearance": 55.862762451171875,
+            "side": -1.0,
+            "surface_seconds": 25.0
+          },
+          "solar_replans": 0,
+          "started_tick": 5489
+        },
+        "cover": [
+          {
+            "approach": false,
+            "departure": false,
+            "grounded": false,
+            "site": {
+              "bearing": 48,
+              "planet": 0
+            }
+          }
+        ],
+        "jetpack": {
+          "burn_seconds": 0.0,
+          "burning": false,
+          "charge": 1.0,
+          "crossing": null,
+          "gravity": {
+            "x": -16.187877655029297,
+            "y": 4.857643127441406
+          },
+          "reference_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "surveyed": false,
+          "terrain_crossings": []
+        },
+        "landing_objective": null,
+        "match_context": {
+          "finished": false,
+          "owned_planets": [
+            1,
+            1
+          ],
+          "pilot_health": [
+            100.0,
+            100.0
+          ],
+          "pilots_alive": [
+            true,
+            true
+          ],
+          "remaining_seconds": 472.399997448
+        },
+        "mission": {
+          "completed_sorties": 1,
+          "goal": "capture",
+          "goal_since": 5488,
+          "policy": "material_mission_v13",
+          "powered_capture": true,
+          "target": 0
+        },
+        "objective_evidence": {
+          "generation": 29,
+          "invalidated_by": null,
+          "measurement_tick": 7635,
+          "objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328094482421875,
+              "y": 34.51996612548828
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "publication": null,
+          "request_tick": 7635,
+          "source_objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328086853027344,
+              "y": 34.519927978515625
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "submission_deferred_by": null,
+          "tick": 7656
+        },
+        "objective_work": "pending",
+        "pilot": {
+          "actor": null,
+          "actor_up": {
+            "x": 0.0,
+            "y": 1.0
+          },
+          "balanced": false,
+          "boarding_hatches": [
+            {
+              "x": 434.6780090332031,
+              "y": 832.0169677734375
+            },
+            {
+              "x": 441.90887451171875,
+              "y": 817.7440795898438
+            }
+          ],
+          "controls_armed": true,
+          "gravity": {
+            "x": 13.084009170532227,
+            "y": 6.368305683135986
+          },
+          "hatch": {
+            "x": 434.6780090332031,
+            "y": 832.0169677734375
+          },
+          "landing": {
+            "altitude": 0.000528186559677124,
+            "angle_degrees": 0.0,
+            "assist_strength": 1.0,
+            "corner_support": false,
+            "descent_speed": -0.01613806188106537,
+            "foot_clearances": [
+              0.0007465779781341553,
+              0.000528186559677124
+            ],
+            "lateral_speed": -0.026857860386371613,
+            "phase": "landed",
+            "planet": 0,
+            "relative_spin": 0.004922814667224884,
+            "settled_seconds": 0.25,
+            "supported_feet": 2
+          },
+          "last_transfer": "boarded",
+          "location": {
+            "aboard": 0
+          },
+          "owner": "player_1",
+          "planet": {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.4645652174949646,
+                  "y": -0.8855388164520264
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 463.25537109375,
+                  "y": 798.8571166992188
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.6731767654418945,
+              "position": {
+                "x": 490.7929382324219,
+                "y": 851.4776000976562
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 4.977687358856201,
+                "y": 19.494829177856445
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          "queries_ready": true,
+          "recovery": {
+            "blocked_attempts": 0,
+            "placement": null,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "relative_speed": 0.0,
+          "ship": {
+            "angle": 2.0396809577941895,
+            "position": {
+              "x": 433.015869140625,
+              "y": 822.2070922851562
+            },
+            "spin": 0.03321833163499832,
+            "velocity": {
+              "x": 5.803653240203857,
+              "y": 17.828744888305664
+            }
+          },
+          "ship_available": true,
+          "ship_form": "ship",
+          "ship_health": 31.862104415893555,
+          "site_query": {
+            "selected": {
+              "bearing": 48,
+              "planet": 0
+            }
+          },
+          "spaceling": 1,
+          "supported_planet": null,
+          "tick": 7656,
+          "transfer": "ready",
+          "transfers": 2,
+          "vehicle": 0,
+          "version": 1
+        },
+        "planets": [
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.4645652174949646,
+                  "y": -0.8855388164520264
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 463.25537109375,
+                  "y": 798.8571166992188
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.6731767654418945,
+              "position": {
+                "x": 490.7929382324219,
+                "y": 851.4776000976562
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 4.977687358856201,
+                "y": 19.494829177856445
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": 0.20109057426452637,
+                  "y": 0.9795726537704468
+                },
+                "player": "player_1",
+                "position": {
+                  "x": 1219.06396484375,
+                  "y": 751.7628173828125
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_1",
+              "phase": "idle",
+              "planet": 1,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "secured"
+            },
+            "index": 1,
+            "motion": {
+              "angle": 2.2585527896881104,
+              "position": {
+                "x": 1212.042724609375,
+                "y": 717.94384765625
+              },
+              "spin": 0.01769542694091797,
+              "velocity": {
+                "x": -2.255859375,
+                "y": -16.3916015625
+              }
+            },
+            "radius": 34.892051696777344,
+            "revision": 0
+          },
+          {
+            "claim": {
+              "captures": 0,
+              "claimant": null,
+              "flag": null,
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": null,
+              "phase": "idle",
+              "planet": 2,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 2,
+            "motion": {
+              "angle": -2.738301992416382,
+              "position": {
+                "x": 890.2617797851562,
+                "y": 256.26171875
+              },
+              "spin": -0.021470187231898308,
+              "velocity": {
+                "x": 14.660628318786621,
+                "y": 3.1527531147003174
+              }
+            },
+            "radius": 43.38127517700195,
+            "revision": 1
+          }
+        ],
+        "schema": 1,
+        "seat": 0
+      }
+    },
+    {
+      "generation": 30,
+      "source_tick": 7683,
+      "detached_boundary": {
+        "flights": {
+          "approved": 0,
+          "rejected": {
+            "arrival_window": 1
+          },
+          "started": 1
+        },
+        "measurements": {
+          "corridor_completed": 1,
+          "corridor_started": 1,
+          "failures": {},
+          "finished_candidates": 0,
+          "finished_surveys": 0,
+          "powered_candidates": 0,
+          "powered_corridor_completed": 1,
+          "powered_corridor_failures": {
+            "arrival_window": 1
+          },
+          "powered_corridor_started": 1,
+          "successful_candidates": 0
+        },
+        "phase": "full/ground/0",
+        "steps": 3221,
+        "work": {
+          "graph": 60,
+          "physics_queries": 3161
+        }
+      },
+      "dispatch_tick": 7703,
+      "cumulative_before": {
+        "graph": 58,
+        "physics_queries": 2778
+      },
+      "cumulative_after": {
+        "graph": 60,
+        "physics_queries": 3162
+      },
+      "next_observation": {
+        "actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "capture": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": 30,
+            "measurement_tick": 7683,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 48.328086853027344,
+                "y": 34.51995086669922
+              },
+              "range": 2.799999952316284,
+              "revision": 1
+            },
+            "objective_work": "pending",
+            "planet": 0,
+            "reason": "actual_route_unavailable",
+            "required_site": null,
+            "revision": 1,
+            "selected_site": null,
+            "site_query": {
+              "deferred": {
+                "next_tick": 7710
+              }
+            },
+            "sites_available": 0,
+            "survey_rejected_by": null,
+            "tick": 7704
+          },
+          "circling_progress_tick": null,
+          "circling_remaining": null,
+          "circling_replans": 0,
+          "completed_tick": null,
+          "cover_replans": 1,
+          "cover_response": {
+            "budget_exhaustions": 0,
+            "deadlines": 0,
+            "exhausted_searches": 0,
+            "exposure_releases": 0,
+            "failures": 1,
+            "filtered_directions": 49,
+            "first_effect_tick": 5490,
+            "measured_sites": 2,
+            "requested_sites": 7,
+            "required_since": null,
+            "search": {
+              "deadline_tick": 6758,
+              "finished_tick": 6420,
+              "guidance": null,
+              "hold_altitude": 64.55076599121094,
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.328067779541016,
+                  "y": 34.519935607910156
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "omitted": 12,
+              "outcome": "selected_covered_route",
+              "pending": [
+                {
+                  "bearing": 48,
+                  "planet": 0
+                },
+                {
+                  "bearing": 49,
+                  "planet": 0
+                },
+                {
+                  "bearing": 50,
+                  "planet": 0
+                }
+              ],
+              "planet": 0,
+              "probes": 6,
+              "revision": 1,
+              "seeded": true,
+              "started_tick": 6158,
+              "walk_deferred": [
+                {
+                  "bearing": 43,
+                  "planet": 0
+                },
+                {
+                  "bearing": 44,
+                  "planet": 0
+                },
+                {
+                  "bearing": 45,
+                  "planet": 0
+                },
+                {
+                  "bearing": 46,
+                  "planet": 0
+                },
+                {
+                  "bearing": 47,
+                  "planet": 0
+                }
+              ]
+            },
+            "searches": 2,
+            "selected_routes": 2
+          },
+          "covered_ticks": 723,
+          "exposed_ticks": 1493,
+          "failed_tick": null,
+          "failure": null,
+          "goal": "survey",
+          "goal_since": 7683,
+          "ground": null,
+          "initial_cover": {
+            "armed_tick": 5489,
+            "finished_tick": 5499,
+            "last_request": {
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5490
+            },
+            "last_seed_tick": 5490,
+            "outcome": "selected_site",
+            "requests": 1,
+            "selected_exposed": true,
+            "selected_site": {
+              "bearing": 0,
+              "planet": 0
+            }
+          },
+          "invalidations": 0,
+          "landing": {
+            "blocked_reason": null,
+            "boarded_tick": null,
+            "claimed_tick": null,
+            "completed_tick": null,
+            "goal": "survey",
+            "goal_since": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_retries": 0,
+            "last_progress_tick": 0,
+            "policy": "rule_pilot_v1",
+            "site": null,
+            "site_revision": null,
+            "touchdown_adjustments": 0
+          },
+          "live_invalidations": 3,
+          "objective_replans": 3,
+          "objective_route": null,
+          "policy": "tactical_sortie_v12",
+          "replans": 4,
+          "site": null,
+          "solar": null,
+          "solar_replans": 0,
+          "started_tick": 5489
+        },
+        "cover": [],
+        "jetpack": {
+          "burn_seconds": 0.0,
+          "burning": false,
+          "charge": 1.0,
+          "crossing": null,
+          "gravity": {
+            "x": -16.187877655029297,
+            "y": 4.857643127441406
+          },
+          "reference_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "surveyed": false,
+          "terrain_crossings": []
+        },
+        "landing_objective": null,
+        "match_context": {
+          "finished": false,
+          "owned_planets": [
+            1,
+            1
+          ],
+          "pilot_health": [
+            100.0,
+            100.0
+          ],
+          "pilots_alive": [
+            true,
+            true
+          ],
+          "remaining_seconds": 471.599997432
+        },
+        "mission": {
+          "completed_sorties": 1,
+          "goal": "capture",
+          "goal_since": 5488,
+          "policy": "material_mission_v13",
+          "powered_capture": true,
+          "target": 0
+        },
+        "objective_evidence": {
+          "generation": 30,
+          "invalidated_by": null,
+          "measurement_tick": 7683,
+          "objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328086853027344,
+              "y": 34.51995086669922
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "publication": null,
+          "request_tick": 7683,
+          "source_objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.32806396484375,
+              "y": 34.51993179321289
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "submission_deferred_by": null,
+          "tick": 7704
+        },
+        "objective_work": "pending",
+        "pilot": {
+          "actor": null,
+          "actor_up": {
+            "x": 0.0,
+            "y": 1.0
+          },
+          "balanced": false,
+          "boarding_hatches": [
+            {
+              "x": 439.5431213378906,
+              "y": 846.2289428710938
+            },
+            {
+              "x": 447.0950622558594,
+              "y": 832.1234130859375
+            }
+          ],
+          "controls_armed": true,
+          "gravity": {
+            "x": 12.938081741333008,
+            "y": 6.571957588195801
+          },
+          "hatch": {
+            "x": 439.5431213378906,
+            "y": 846.2289428710938
+          },
+          "landing": {
+            "altitude": -0.0019071996212005615,
+            "angle_degrees": 0.02797645516693592,
+            "assist_strength": 1.0,
+            "corner_support": false,
+            "descent_speed": -0.0029112123884260654,
+            "foot_clearances": [
+              0.0007846057415008545,
+              -0.0019071996212005615
+            ],
+            "lateral_speed": -0.0033395939972251654,
+            "phase": "landed",
+            "planet": 0,
+            "relative_spin": 0.0006096698343753815,
+            "settled_seconds": 0.25,
+            "supported_feet": 2
+          },
+          "last_transfer": "boarded",
+          "location": {
+            "aboard": 0
+          },
+          "owner": "player_1",
+          "planet": {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.4444025456905365,
+                  "y": -0.8958271741867065
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 468.86383056640625,
+                  "y": 813.72412109375
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.650540351867676,
+              "position": {
+                "x": 495.20330810546875,
+                "y": 866.9544067382812
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 6.028595447540283,
+                "y": 19.198341369628906
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          "queries_ready": true,
+          "recovery": {
+            "blocked_attempts": 0,
+            "placement": null,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "relative_speed": 0.0,
+          "ship": {
+            "angle": 2.061901092529297,
+            "position": {
+              "x": 438.10345458984375,
+              "y": 836.3863525390625
+            },
+            "spin": 0.02890518680214882,
+            "velocity": {
+              "x": 6.892543792724609,
+              "y": 17.578353881835938
+            }
+          },
+          "ship_available": true,
+          "ship_form": "ship",
+          "ship_health": 31.862104415893555,
+          "site_query": {
+            "deferred": {
+              "next_tick": 7710
+            }
+          },
+          "spaceling": 1,
+          "supported_planet": null,
+          "tick": 7704,
+          "transfer": "ready",
+          "transfers": 2,
+          "vehicle": 0,
+          "version": 1
+        },
+        "planets": [
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.4444025456905365,
+                  "y": -0.8958271741867065
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 468.86383056640625,
+                  "y": 813.72412109375
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.650540351867676,
+              "position": {
+                "x": 495.20330810546875,
+                "y": 866.9544067382812
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 6.028595447540283,
+                "y": 19.198341369628906
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": 0.1872037649154663,
+                  "y": 0.98232102394104
+                },
+                "player": "player_1",
+                "position": {
+                  "x": 1216.572021484375,
+                  "y": 738.7741088867188
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_1",
+              "phase": "idle",
+              "planet": 1,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "secured"
+            },
+            "index": 1,
+            "motion": {
+              "angle": 2.2727091312408447,
+              "position": {
+                "x": 1210.0302734375,
+                "y": 704.859130859375
+              },
+              "spin": 0.017693638801574707,
+              "velocity": {
+                "x": -2.761230230331421,
+                "y": -16.318359375
+              }
+            },
+            "radius": 34.892051696777344,
+            "revision": 0
+          },
+          {
+            "claim": {
+              "captures": 0,
+              "claimant": null,
+              "flag": null,
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": null,
+              "phase": "idle",
+              "planet": 2,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 2,
+            "motion": {
+              "angle": -2.755479574203491,
+              "position": {
+                "x": 901.9591064453125,
+                "y": 258.91650390625
+              },
+              "spin": -0.02147197537124157,
+              "velocity": {
+                "x": 14.58375072479248,
+                "y": 3.4786601066589355
+              }
+            },
+            "radius": 43.38127517700195,
+            "revision": 1
+          }
+        ],
+        "schema": 1,
+        "seat": 0
+      }
+    },
+    {
+      "generation": 31,
+      "source_tick": 7804,
+      "detached_boundary": {
+        "flights": {
+          "approved": 0,
+          "rejected": {
+            "fuel_reserve": 1
+          },
+          "started": 1
+        },
+        "measurements": {
+          "corridor_completed": 1,
+          "corridor_started": 1,
+          "failures": {},
+          "finished_candidates": 0,
+          "finished_surveys": 0,
+          "powered_candidates": 0,
+          "powered_corridor_completed": 1,
+          "powered_corridor_failures": {
+            "fuel_reserve": 1
+          },
+          "powered_corridor_started": 1,
+          "successful_candidates": 0
+        },
+        "phase": "full/ground/0",
+        "steps": 3259,
+        "work": {
+          "graph": 60,
+          "physics_queries": 3199
+        }
+      },
+      "dispatch_tick": 7825,
+      "cumulative_before": {
+        "graph": 58,
+        "physics_queries": 3162
+      },
+      "cumulative_after": {
+        "graph": 60,
+        "physics_queries": 3546
+      },
+      "next_observation": {
+        "actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "capture": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": 31,
+            "measurement_tick": 7804,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 48.328086853027344,
+                "y": 34.519962310791016
+              },
+              "range": 2.799999952316284,
+              "revision": 1
+            },
+            "objective_work": "pending",
+            "planet": 0,
+            "reason": "actual_route_unavailable",
+            "required_site": null,
+            "revision": 1,
+            "selected_site": null,
+            "site_query": {
+              "deferred": {
+                "next_tick": 7830
+              }
+            },
+            "sites_available": 0,
+            "survey_rejected_by": null,
+            "tick": 7826
+          },
+          "circling_progress_tick": null,
+          "circling_remaining": null,
+          "circling_replans": 0,
+          "completed_tick": null,
+          "cover_replans": 1,
+          "cover_response": {
+            "budget_exhaustions": 0,
+            "deadlines": 0,
+            "exhausted_searches": 0,
+            "exposure_releases": 0,
+            "failures": 1,
+            "filtered_directions": 49,
+            "first_effect_tick": 5490,
+            "measured_sites": 2,
+            "requested_sites": 7,
+            "required_since": null,
+            "search": {
+              "deadline_tick": 6758,
+              "finished_tick": 6420,
+              "guidance": null,
+              "hold_altitude": 64.55076599121094,
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.328067779541016,
+                  "y": 34.519935607910156
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "omitted": 12,
+              "outcome": "selected_covered_route",
+              "pending": [
+                {
+                  "bearing": 48,
+                  "planet": 0
+                },
+                {
+                  "bearing": 49,
+                  "planet": 0
+                },
+                {
+                  "bearing": 50,
+                  "planet": 0
+                }
+              ],
+              "planet": 0,
+              "probes": 6,
+              "revision": 1,
+              "seeded": true,
+              "started_tick": 6158,
+              "walk_deferred": [
+                {
+                  "bearing": 43,
+                  "planet": 0
+                },
+                {
+                  "bearing": 44,
+                  "planet": 0
+                },
+                {
+                  "bearing": 45,
+                  "planet": 0
+                },
+                {
+                  "bearing": 46,
+                  "planet": 0
+                },
+                {
+                  "bearing": 47,
+                  "planet": 0
+                }
+              ]
+            },
+            "searches": 2,
+            "selected_routes": 2
+          },
+          "covered_ticks": 723,
+          "exposed_ticks": 1615,
+          "failed_tick": null,
+          "failure": null,
+          "goal": "survey",
+          "goal_since": 7683,
+          "ground": null,
+          "initial_cover": {
+            "armed_tick": 5489,
+            "finished_tick": 5499,
+            "last_request": {
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5490
+            },
+            "last_seed_tick": 5490,
+            "outcome": "selected_site",
+            "requests": 1,
+            "selected_exposed": true,
+            "selected_site": {
+              "bearing": 0,
+              "planet": 0
+            }
+          },
+          "invalidations": 0,
+          "landing": {
+            "blocked_reason": null,
+            "boarded_tick": null,
+            "claimed_tick": null,
+            "completed_tick": null,
+            "goal": "survey",
+            "goal_since": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_retries": 0,
+            "last_progress_tick": 0,
+            "policy": "rule_pilot_v1",
+            "site": null,
+            "site_revision": null,
+            "touchdown_adjustments": 0
+          },
+          "live_invalidations": 3,
+          "objective_replans": 3,
+          "objective_route": null,
+          "policy": "tactical_sortie_v12",
+          "replans": 4,
+          "site": null,
+          "solar": null,
+          "solar_replans": 0,
+          "started_tick": 5489
+        },
+        "cover": [],
+        "jetpack": {
+          "burn_seconds": 0.0,
+          "burning": false,
+          "charge": 1.0,
+          "crossing": null,
+          "gravity": {
+            "x": -16.187877655029297,
+            "y": 4.857643127441406
+          },
+          "reference_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "surveyed": false,
+          "terrain_crossings": []
+        },
+        "landing_objective": null,
+        "match_context": {
+          "finished": false,
+          "owned_planets": [
+            1,
+            1
+          ],
+          "pilot_health": [
+            100.0,
+            100.0
+          ],
+          "pilots_alive": [
+            true,
+            true
+          ],
+          "remaining_seconds": 469.566664058
+        },
+        "mission": {
+          "completed_sorties": 1,
+          "goal": "capture",
+          "goal_since": 5488,
+          "policy": "material_mission_v13",
+          "powered_capture": true,
+          "target": 0
+        },
+        "objective_evidence": {
+          "generation": 31,
+          "invalidated_by": null,
+          "measurement_tick": 7804,
+          "objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328086853027344,
+              "y": 34.519962310791016
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "publication": null,
+          "request_tick": 7804,
+          "source_objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328094482421875,
+              "y": 34.519935607910156
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "submission_deferred_by": null,
+          "tick": 7826
+        },
+        "objective_work": "pending",
+        "pilot": {
+          "actor": null,
+          "actor_up": {
+            "x": 0.0,
+            "y": 1.0
+          },
+          "balanced": false,
+          "boarding_hatches": [
+            {
+              "x": 455.7503967285156,
+              "y": 881.1173706054688
+            },
+            {
+              "x": 464.1007385253906,
+              "y": 867.4691772460938
+            }
+          ],
+          "controls_armed": true,
+          "gravity": {
+            "x": 12.546241760253906,
+            "y": 7.063177108764648
+          },
+          "hatch": {
+            "x": 455.7503967285156,
+            "y": 881.1173706054688
+          },
+          "landing": {
+            "altitude": -0.002013295888900757,
+            "angle_degrees": 0.02797645516693592,
+            "assist_strength": 1.0,
+            "corner_support": false,
+            "descent_speed": -0.001284012570977211,
+            "foot_clearances": [
+              0.0005168616771697998,
+              -0.002013295888900757
+            ],
+            "lateral_speed": 0.00722291087731719,
+            "phase": "landed",
+            "planet": 0,
+            "relative_spin": -0.00013396330177783966,
+            "settled_seconds": 0.25,
+            "supported_feet": 2
+          },
+          "last_transfer": "boarded",
+          "location": {
+            "aboard": 0
+          },
+          "owner": "player_1",
+          "planet": {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.3921549320220947,
+                  "y": -0.9198991656303406
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 486.8921813964844,
+                  "y": 850.3511962890625
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.593006134033203,
+              "position": {
+                "x": 510.127197265625,
+                "y": 905.0079956054688
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 8.608241081237793,
+                "y": 18.18795394897461
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          "queries_ready": true,
+          "recovery": {
+            "blocked_attempts": 0,
+            "placement": null,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "relative_speed": 0.0,
+          "ship": {
+            "angle": 2.119443893432617,
+            "position": {
+              "x": 454.879150390625,
+              "y": 871.208251953125
+            },
+            "spin": 0.028161553665995598,
+            "velocity": {
+              "x": 9.559757232666016,
+              "y": 16.630172729492188
+            }
+          },
+          "ship_available": true,
+          "ship_form": "ship",
+          "ship_health": 31.862104415893555,
+          "site_query": {
+            "deferred": {
+              "next_tick": 7830
+            }
+          },
+          "spaceling": 1,
+          "supported_planet": null,
+          "tick": 7826,
+          "transfer": "ready",
+          "transfers": 2,
+          "vehicle": 0,
+          "version": 1
+        },
+        "planets": [
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.3921549320220947,
+                  "y": -0.9198991656303406
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 486.8921813964844,
+                  "y": 850.3511962890625
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.593006134033203,
+              "position": {
+                "x": 510.127197265625,
+                "y": 905.0079956054688
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 8.608241081237793,
+                "y": 18.18795394897461
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": 0.15174558758735657,
+                  "y": 0.9884195327758789
+                },
+                "player": "player_1",
+                "position": {
+                  "x": 1208.4632568359375,
+                  "y": 706.0585327148438
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_1",
+              "phase": "idle",
+              "planet": 1,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "secured"
+            },
+            "index": 1,
+            "motion": {
+              "angle": 2.308689832687378,
+              "position": {
+                "x": 1203.145751953125,
+                "y": 671.93017578125
+              },
+              "spin": 0.01769721508026123,
+              "velocity": {
+                "x": -4.00634765625,
+                "y": -16.058349609375
+              }
+            },
+            "radius": 34.892051696777344,
+            "revision": 0
+          },
+          {
+            "claim": {
+              "captures": 0,
+              "claimant": null,
+              "flag": null,
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": null,
+              "phase": "idle",
+              "planet": 2,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 2,
+            "motion": {
+              "angle": -2.7991392612457275,
+              "position": {
+                "x": 931.3944702148438,
+                "y": 266.8408203125
+              },
+              "spin": -0.02147197350859642,
+              "velocity": {
+                "x": 14.364087104797363,
+                "y": 4.306241989135742
+              }
+            },
+            "radius": 43.38127517700195,
+            "revision": 1
+          }
+        ],
+        "schema": 1,
+        "seat": 0
+      }
+    },
+    {
+      "generation": 32,
+      "source_tick": 7925,
+      "detached_boundary": {
+        "flights": {
+          "approved": 0,
+          "rejected": {
+            "fuel_reserve": 1
+          },
+          "started": 1
+        },
+        "measurements": {
+          "corridor_completed": 1,
+          "corridor_started": 1,
+          "failures": {},
+          "finished_candidates": 0,
+          "finished_surveys": 0,
+          "powered_candidates": 0,
+          "powered_corridor_completed": 1,
+          "powered_corridor_failures": {
+            "fuel_reserve": 1
+          },
+          "powered_corridor_started": 1,
+          "successful_candidates": 0
+        },
+        "phase": "full/ground/0",
+        "steps": 3253,
+        "work": {
+          "graph": 60,
+          "physics_queries": 3193
+        }
+      },
+      "dispatch_tick": 7946,
+      "cumulative_before": {
+        "graph": 58,
+        "physics_queries": 3162
+      },
+      "cumulative_after": {
+        "graph": 60,
+        "physics_queries": 3546
+      },
+      "next_observation": {
+        "actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "capture": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": 32,
+            "measurement_tick": 7925,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 48.328086853027344,
+                "y": 34.519927978515625
+              },
+              "range": 2.799999952316284,
+              "revision": 1
+            },
+            "objective_work": "pending",
+            "planet": 0,
+            "reason": "actual_route_unavailable",
+            "required_site": null,
+            "revision": 1,
+            "selected_site": null,
+            "site_query": {
+              "deferred": {
+                "next_tick": 7950
+              }
+            },
+            "sites_available": 0,
+            "survey_rejected_by": null,
+            "tick": 7947
+          },
+          "circling_progress_tick": null,
+          "circling_remaining": null,
+          "circling_replans": 0,
+          "completed_tick": null,
+          "cover_replans": 1,
+          "cover_response": {
+            "budget_exhaustions": 0,
+            "deadlines": 0,
+            "exhausted_searches": 0,
+            "exposure_releases": 0,
+            "failures": 1,
+            "filtered_directions": 49,
+            "first_effect_tick": 5490,
+            "measured_sites": 2,
+            "requested_sites": 7,
+            "required_since": null,
+            "search": {
+              "deadline_tick": 6758,
+              "finished_tick": 6420,
+              "guidance": null,
+              "hold_altitude": 64.55076599121094,
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.328067779541016,
+                  "y": 34.519935607910156
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "omitted": 12,
+              "outcome": "selected_covered_route",
+              "pending": [
+                {
+                  "bearing": 48,
+                  "planet": 0
+                },
+                {
+                  "bearing": 49,
+                  "planet": 0
+                },
+                {
+                  "bearing": 50,
+                  "planet": 0
+                }
+              ],
+              "planet": 0,
+              "probes": 6,
+              "revision": 1,
+              "seeded": true,
+              "started_tick": 6158,
+              "walk_deferred": [
+                {
+                  "bearing": 43,
+                  "planet": 0
+                },
+                {
+                  "bearing": 44,
+                  "planet": 0
+                },
+                {
+                  "bearing": 45,
+                  "planet": 0
+                },
+                {
+                  "bearing": 46,
+                  "planet": 0
+                },
+                {
+                  "bearing": 47,
+                  "planet": 0
+                }
+              ]
+            },
+            "searches": 2,
+            "selected_routes": 2
+          },
+          "covered_ticks": 723,
+          "exposed_ticks": 1736,
+          "failed_tick": null,
+          "failure": null,
+          "goal": "survey",
+          "goal_since": 7683,
+          "ground": null,
+          "initial_cover": {
+            "armed_tick": 5489,
+            "finished_tick": 5499,
+            "last_request": {
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5490
+            },
+            "last_seed_tick": 5490,
+            "outcome": "selected_site",
+            "requests": 1,
+            "selected_exposed": true,
+            "selected_site": {
+              "bearing": 0,
+              "planet": 0
+            }
+          },
+          "invalidations": 0,
+          "landing": {
+            "blocked_reason": null,
+            "boarded_tick": null,
+            "claimed_tick": null,
+            "completed_tick": null,
+            "goal": "survey",
+            "goal_since": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_retries": 0,
+            "last_progress_tick": 0,
+            "policy": "rule_pilot_v1",
+            "site": null,
+            "site_revision": null,
+            "touchdown_adjustments": 0
+          },
+          "live_invalidations": 3,
+          "objective_replans": 3,
+          "objective_route": null,
+          "policy": "tactical_sortie_v12",
+          "replans": 4,
+          "site": null,
+          "solar": null,
+          "solar_replans": 0,
+          "started_tick": 5489
+        },
+        "cover": [],
+        "jetpack": {
+          "burn_seconds": 0.0,
+          "burning": false,
+          "charge": 1.0,
+          "crossing": null,
+          "gravity": {
+            "x": -16.187877655029297,
+            "y": 4.857643127441406
+          },
+          "reference_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "surveyed": false,
+          "terrain_crossings": []
+        },
+        "landing_objective": null,
+        "match_context": {
+          "finished": false,
+          "owned_planets": [
+            1,
+            1
+          ],
+          "pilot_health": [
+            100.0,
+            100.0
+          ],
+          "pilots_alive": [
+            true,
+            true
+          ],
+          "remaining_seconds": 467.549997351
+        },
+        "mission": {
+          "completed_sorties": 1,
+          "goal": "capture",
+          "goal_since": 5488,
+          "policy": "material_mission_v13",
+          "powered_capture": true,
+          "target": 0
+        },
+        "objective_evidence": {
+          "generation": 32,
+          "invalidated_by": null,
+          "measurement_tick": 7925,
+          "objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328086853027344,
+              "y": 34.519927978515625
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "publication": null,
+          "request_tick": 7925,
+          "source_objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328102111816406,
+              "y": 34.51995849609375
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "submission_deferred_by": null,
+          "tick": 7947
+        },
+        "objective_work": "pending",
+        "pilot": {
+          "actor": null,
+          "actor_up": {
+            "x": 0.0,
+            "y": 1.0
+          },
+          "balanced": false,
+          "boarding_hatches": [
+            {
+              "x": 477.0335998535156,
+              "y": 913.4143676757812
+            },
+            {
+              "x": 486.1485290527344,
+              "y": 900.2645263671875
+            }
+          ],
+          "controls_armed": true,
+          "gravity": {
+            "x": 12.128402709960938,
+            "y": 7.508906841278076
+          },
+          "hatch": {
+            "x": 477.0335998535156,
+            "y": 913.4143676757812
+          },
+          "landing": {
+            "altitude": -0.0017610490322113037,
+            "angle_degrees": 0.02797645516693592,
+            "assist_strength": 1.0,
+            "corner_support": false,
+            "descent_speed": -0.004702173639088869,
+            "foot_clearances": [
+              0.00039395689964294434,
+              -0.0017610490322113037
+            ],
+            "lateral_speed": 0.00205354206264019,
+            "phase": "landed",
+            "planet": 0,
+            "relative_spin": -0.0003548096865415573,
+            "settled_seconds": 0.25,
+            "supported_feet": 2
+          },
+          "last_transfer": "boarded",
+          "location": {
+            "aboard": 0
+          },
+          "owner": "player_1",
+          "planet": {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.3390532433986664,
+                  "y": -0.9407671689987183
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 509.8797302246094,
+                  "y": 884.4736328125
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.5359435081481934,
+              "position": {
+                "x": 529.9597778320312,
+                "y": 940.3665771484375
+              },
+              "spin": 0.028293728828430176,
+              "velocity": {
+                "x": 11.006593704223633,
+                "y": 16.836963653564453
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          "queries_ready": true,
+          "recovery": {
+            "blocked_attempts": 0,
+            "placement": null,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "relative_speed": 0.0,
+          "ship": {
+            "angle": 2.176555633544922,
+            "position": {
+              "x": 476.7288513183594,
+              "y": 903.4713745117188
+            },
+            "spin": 0.02793891914188862,
+            "velocity": {
+              "x": 12.045462608337402,
+              "y": 15.32987117767334
+            }
+          },
+          "ship_available": true,
+          "ship_form": "ship",
+          "ship_health": 31.862104415893555,
+          "site_query": {
+            "deferred": {
+              "next_tick": 7950
+            }
+          },
+          "spaceling": 1,
+          "supported_planet": null,
+          "tick": 7947,
+          "transfer": "ready",
+          "transfers": 2,
+          "vehicle": 0,
+          "version": 1
+        },
+        "planets": [
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.3390532433986664,
+                  "y": -0.9407671689987183
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 509.8797302246094,
+                  "y": 884.4736328125
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.5359435081481934,
+              "position": {
+                "x": 529.9597778320312,
+                "y": 940.3665771484375
+              },
+              "spin": 0.028293728828430176,
+              "velocity": {
+                "x": 11.006593704223633,
+                "y": 16.836963653564453
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": 0.11638391017913818,
+                  "y": 0.9932042956352234
+                },
+                "player": "player_1",
+                "position": {
+                  "x": 1197.9388427734375,
+                  "y": 674.1845703125
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_1",
+              "phase": "idle",
+              "planet": 1,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "secured"
+            },
+            "index": 1,
+            "motion": {
+              "angle": 2.3443756103515625,
+              "position": {
+                "x": 1193.8424072265625,
+                "y": 639.88818359375
+              },
+              "spin": 0.01769542694091797,
+              "velocity": {
+                "x": -5.207519054412842,
+                "y": -15.703124046325684
+              }
+            },
+            "radius": 34.892051696777344,
+            "revision": 0
+          },
+          {
+            "claim": {
+              "captures": 0,
+              "claimant": null,
+              "flag": null,
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": null,
+              "phase": "idle",
+              "planet": 2,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 2,
+            "motion": {
+              "angle": -2.8424410820007324,
+              "position": {
+                "x": 960.094482421875,
+                "y": 276.3475646972656
+              },
+              "spin": -0.02147197537124157,
+              "velocity": {
+                "x": 14.100476264953613,
+                "y": 5.111847877502441
+              }
+            },
+            "radius": 43.38127517700195,
+            "revision": 1
+          }
+        ],
+        "schema": 1,
+        "seat": 0
+      }
+    },
+    {
+      "generation": 33,
+      "source_tick": 8046,
+      "detached_boundary": {
+        "flights": {
+          "approved": 0,
+          "rejected": {
+            "fuel_reserve": 1
+          },
+          "started": 1
+        },
+        "measurements": {
+          "corridor_completed": 1,
+          "corridor_started": 1,
+          "failures": {},
+          "finished_candidates": 0,
+          "finished_surveys": 0,
+          "powered_candidates": 0,
+          "powered_corridor_completed": 1,
+          "powered_corridor_failures": {
+            "fuel_reserve": 1
+          },
+          "powered_corridor_started": 1,
+          "successful_candidates": 0
+        },
+        "phase": "full/ground/0",
+        "steps": 3253,
+        "work": {
+          "graph": 60,
+          "physics_queries": 3193
+        }
+      },
+      "dispatch_tick": 8067,
+      "cumulative_before": {
+        "graph": 58,
+        "physics_queries": 3162
+      },
+      "cumulative_after": {
+        "graph": 60,
+        "physics_queries": 3546
+      },
+      "next_observation": {
+        "actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "capture": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": 33,
+            "measurement_tick": 8046,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 48.328094482421875,
+                "y": 34.51996612548828
+              },
+              "range": 2.799999952316284,
+              "revision": 1
+            },
+            "objective_work": "pending",
+            "planet": 0,
+            "reason": "actual_route_unavailable",
+            "required_site": null,
+            "revision": 1,
+            "selected_site": null,
+            "site_query": {
+              "deferred": {
+                "next_tick": 8070
+              }
+            },
+            "sites_available": 0,
+            "survey_rejected_by": null,
+            "tick": 8068
+          },
+          "circling_progress_tick": null,
+          "circling_remaining": null,
+          "circling_replans": 0,
+          "completed_tick": null,
+          "cover_replans": 1,
+          "cover_response": {
+            "budget_exhaustions": 0,
+            "deadlines": 0,
+            "exhausted_searches": 0,
+            "exposure_releases": 0,
+            "failures": 1,
+            "filtered_directions": 49,
+            "first_effect_tick": 5490,
+            "measured_sites": 2,
+            "requested_sites": 7,
+            "required_since": null,
+            "search": {
+              "deadline_tick": 6758,
+              "finished_tick": 6420,
+              "guidance": null,
+              "hold_altitude": 64.55076599121094,
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.328067779541016,
+                  "y": 34.519935607910156
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "omitted": 12,
+              "outcome": "selected_covered_route",
+              "pending": [
+                {
+                  "bearing": 48,
+                  "planet": 0
+                },
+                {
+                  "bearing": 49,
+                  "planet": 0
+                },
+                {
+                  "bearing": 50,
+                  "planet": 0
+                }
+              ],
+              "planet": 0,
+              "probes": 6,
+              "revision": 1,
+              "seeded": true,
+              "started_tick": 6158,
+              "walk_deferred": [
+                {
+                  "bearing": 43,
+                  "planet": 0
+                },
+                {
+                  "bearing": 44,
+                  "planet": 0
+                },
+                {
+                  "bearing": 45,
+                  "planet": 0
+                },
+                {
+                  "bearing": 46,
+                  "planet": 0
+                },
+                {
+                  "bearing": 47,
+                  "planet": 0
+                }
+              ]
+            },
+            "searches": 2,
+            "selected_routes": 2
+          },
+          "covered_ticks": 723,
+          "exposed_ticks": 1857,
+          "failed_tick": null,
+          "failure": null,
+          "goal": "survey",
+          "goal_since": 7683,
+          "ground": null,
+          "initial_cover": {
+            "armed_tick": 5489,
+            "finished_tick": 5499,
+            "last_request": {
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5490
+            },
+            "last_seed_tick": 5490,
+            "outcome": "selected_site",
+            "requests": 1,
+            "selected_exposed": true,
+            "selected_site": {
+              "bearing": 0,
+              "planet": 0
+            }
+          },
+          "invalidations": 0,
+          "landing": {
+            "blocked_reason": null,
+            "boarded_tick": null,
+            "claimed_tick": null,
+            "completed_tick": null,
+            "goal": "survey",
+            "goal_since": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_retries": 0,
+            "last_progress_tick": 0,
+            "policy": "rule_pilot_v1",
+            "site": null,
+            "site_revision": null,
+            "touchdown_adjustments": 0
+          },
+          "live_invalidations": 3,
+          "objective_replans": 3,
+          "objective_route": null,
+          "policy": "tactical_sortie_v12",
+          "replans": 4,
+          "site": null,
+          "solar": null,
+          "solar_replans": 0,
+          "started_tick": 5489
+        },
+        "cover": [],
+        "jetpack": {
+          "burn_seconds": 0.0,
+          "burning": false,
+          "charge": 1.0,
+          "crossing": null,
+          "gravity": {
+            "x": -16.187877655029297,
+            "y": 4.857643127441406
+          },
+          "reference_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "surveyed": false,
+          "terrain_crossings": []
+        },
+        "landing_objective": null,
+        "match_context": {
+          "finished": false,
+          "owned_planets": [
+            1,
+            1
+          ],
+          "pilot_health": [
+            100.0,
+            100.0
+          ],
+          "pilots_alive": [
+            true,
+            true
+          ],
+          "remaining_seconds": 465.533330644
+        },
+        "mission": {
+          "completed_sorties": 1,
+          "goal": "capture",
+          "goal_since": 5488,
+          "policy": "material_mission_v13",
+          "powered_capture": true,
+          "target": 0
+        },
+        "objective_evidence": {
+          "generation": 33,
+          "invalidated_by": null,
+          "measurement_tick": 8046,
+          "objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328094482421875,
+              "y": 34.51996612548828
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "publication": null,
+          "request_tick": 8046,
+          "source_objective": {
+            "owner": "player_2",
+            "planet": 0,
+            "position": {
+              "x": 48.328094482421875,
+              "y": 34.51997756958008
+            },
+            "range": 2.799999952316284,
+            "revision": 1
+          },
+          "submission_deferred_by": null,
+          "tick": 8068
+        },
+        "objective_work": "pending",
+        "pilot": {
+          "actor": null,
+          "actor_up": {
+            "x": 0.0,
+            "y": 1.0
+          },
+          "balanced": false,
+          "boarding_hatches": [
+            {
+              "x": 503.1275634765625,
+              "y": 942.7628173828125
+            },
+            {
+              "x": 512.9774169921875,
+              "y": 930.154052734375
+            }
+          ],
+          "controls_armed": true,
+          "gravity": {
+            "x": 11.677891731262207,
+            "y": 7.908449649810791
+          },
+          "hatch": {
+            "x": 503.1275634765625,
+            "y": 942.7628173828125
+          },
+          "landing": {
+            "altitude": -0.0014861524105072021,
+            "angle_degrees": 0.01978234015405178,
+            "assist_strength": 1.0,
+            "corner_support": false,
+            "descent_speed": -0.002314639277756214,
+            "foot_clearances": [
+              0.0006801784038543701,
+              -0.0014861524105072021
+            ],
+            "lateral_speed": 0.0026805875822901726,
+            "phase": "landed",
+            "planet": 0,
+            "relative_spin": -0.0004923585802316666,
+            "settled_seconds": 0.25,
+            "supported_feet": 2
+          },
+          "last_transfer": "boarded",
+          "location": {
+            "aboard": 0
+          },
+          "owner": "player_1",
+          "planet": {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.2848479151725769,
+                  "y": -0.9585726857185364
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 537.5712280273438,
+                  "y": 915.7416381835938
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.4788808822631836,
+              "position": {
+                "x": 554.430908203125,
+                "y": 972.6888427734375
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 13.199851989746094,
+                "y": 15.185663223266602
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          "queries_ready": true,
+          "recovery": {
+            "blocked_attempts": 0,
+            "placement": null,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "relative_speed": 0.0,
+          "ship": {
+            "angle": 2.233604907989502,
+            "position": {
+              "x": 503.3900451660156,
+              "y": 932.8184814453125
+            },
+            "spin": 0.02780315838754177,
+            "velocity": {
+              "x": 14.324530601501465,
+              "y": 13.7421236038208
+            }
+          },
+          "ship_available": true,
+          "ship_form": "ship",
+          "ship_health": 27.974777221679688,
+          "site_query": {
+            "deferred": {
+              "next_tick": 8070
+            }
+          },
+          "spaceling": 1,
+          "supported_planet": null,
+          "tick": 8068,
+          "transfer": "ready",
+          "transfers": 2,
+          "vehicle": 0,
+          "version": 1
+        },
+        "planets": [
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": -0.2848479151725769,
+                  "y": -0.9585726857185364
+                },
+                "player": "player_2",
+                "position": {
+                  "x": 537.5712280273438,
+                  "y": 915.7416381835938
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_2",
+              "phase": "idle",
+              "planet": 0,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 0,
+            "motion": {
+              "angle": -2.4788808822631836,
+              "position": {
+                "x": 554.430908203125,
+                "y": 972.6888427734375
+              },
+              "spin": 0.028295516967773438,
+              "velocity": {
+                "x": 13.199851989746094,
+                "y": 15.185663223266602
+              }
+            },
+            "radius": 59.99380874633789,
+            "revision": 1
+          },
+          {
+            "claim": {
+              "captures": 1,
+              "claimant": null,
+              "flag": {
+                "normal": {
+                  "x": 0.08087414503097534,
+                  "y": 0.9967242479324341
+                },
+                "player": "player_1",
+                "position": {
+                  "x": 1184.998046875,
+                  "y": 643.0675659179688
+                },
+                "raised_fraction": 1.0
+              },
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": "player_1",
+              "phase": "idle",
+              "planet": 1,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "secured"
+            },
+            "index": 1,
+            "motion": {
+              "angle": 2.380061388015747,
+              "position": {
+                "x": 1182.1278076171875,
+                "y": 608.6469116210938
+              },
+              "spin": 0.017691850662231445,
+              "velocity": {
+                "x": -6.394042491912842,
+                "y": -15.267333030700684
+              }
+            },
+            "radius": 34.892051696777344,
+            "revision": 0
+          },
+          {
+            "claim": {
+              "captures": 0,
+              "claimant": null,
+              "flag": null,
+              "flag_interaction_range": 3.0,
+              "neutralizations": 0,
+              "owner": null,
+              "phase": "idle",
+              "planet": 2,
+              "progress": 0.0,
+              "stage_required_seconds": 3.0,
+              "status": "aboard"
+            },
+            "index": 2,
+            "motion": {
+              "angle": -2.8857429027557373,
+              "position": {
+                "x": 988.2100830078125,
+                "y": 287.46429443359375
+              },
+              "spin": -0.0214728694409132,
+              "velocity": {
+                "x": 13.781930923461914,
+                "y": 5.904634475708008
+              }
+            },
+            "radius": 43.38127517700195,
+            "revision": 1
+          }
+        ],
+        "schema": 1,
+        "seat": 0
+      }
+    }
+  ],
+  "reproduction_script": "\"\"\"Post-outcome reconstruction of native stage completion from retained charges.\"\"\"\nimport csv\nimport hashlib\nimport json\nfrom pathlib import Path\n\ndigest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()\nroot=Path('target/actual-landing/v2/shared-armed-world1-p1-powered-probe')\nprobe=root/'actual-landing-probe.json';ledger=root/'live-planning.csv';dense=root/'capture-evidence.jsonl'\ndocument=json.loads(probe.read_text())\nstarts={row['probe']['generation']:row['probe'] for row in document['rows']\n    if row['probe'] and row['probe']['request_tick']==row['tick']}\nthresholds={g:next(t for t in r['transitions'] if t['phase']=='full/ground/0') for g,r in starts.items()}\nwork={g:dict(graph=0,physics_queries=0) for g in starts};first={};previous={}\nfor row in csv.DictReader(ledger.open()):\n    g=int(row['generation'])\n    if row['task']!='landing_objective' or int(row['actor'])!=0 or g not in work:continue\n    before=dict(work[g]);work[g]['graph']+=int(row['graph']);work[g]['physics_queries']+=int(row['queries'])\n    if g not in first and all(work[g][k]>=thresholds[g]['work'][k] for k in work[g]):\n        assert any(before[k]<thresholds[g]['work'][k] for k in before)\n        first[g]=dict(generation=g,source_tick=starts[g]['request_tick'],\n            detached_boundary=thresholds[g],dispatch_tick=int(row['tick']),\n            cumulative_before=before,cumulative_after=dict(work[g]))\nassert set(first)==set(starts)\nwanted={r['dispatch_tick']+1:g for g,r in first.items()}\nfor line in dense.open():\n    row=json.loads(line);tick=row['pilot']['tick']\n    if row['seat']!=0 or tick not in wanted:continue\n    g=wanted[tick];e=row['objective_evidence']\n    assert e['generation']==g and e['request_tick']==starts[g]['request_tick']\n    assert e['invalidated_by'] is None and row['landing_objective'] is None\n    assert row['pilot']['landing']['phase']=='landed' and row['pilot']['transfer']=='ready'\n    assert row['capture']['acquisition']['reason']=='actual_route_unavailable'\n    first[g]['next_observation']=row\nassert all('next_observation' in r for r in first.values())\nresult=dict(schema=1,scope=__doc__,\n    derivation='Each copied job follows the same deterministic native step order and retained snapshot as its source request. The first live dispatch whose cumulative per-generation charges reach the detached full-ground boundary has completed the local attempt. This is a reconstructed dispatch boundary, not a newly logged native event and not a negative full-route certificate.',\n    inputs={str(p):digest(p) for p in [probe,ledger,dense,Path(__file__)]},\n    records=list(first.values()))\nout=Path('docs/data/actual-landing-stage-timing-v2.json')\nwith out.open('x') as f:f.write(json.dumps(result,indent=2,allow_nan=False)+'\\n')\nprint(out,digest(out))\nfor r in result['records']:\n    print(r['generation'],r['source_tick'],r['dispatch_tick'],r['next_observation']['pilot']['tick'],\n        r['detached_boundary']['measurements']['powered_corridor_failures'])\n"
+}
