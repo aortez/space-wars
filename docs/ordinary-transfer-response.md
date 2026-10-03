@@ -132,3 +132,189 @@ capture handoff, actual claims/departures, recovery and complete match outcomes.
 Do not retune or broaden again from this experiment's intervention results.
 The extension remains an opt-in laboratory tool; defaults, deployment and remote
 state remain unchanged.
+
+## Live observe and compatibility checks
+
+Both legacy-scope replays retain the previous response logs byte-for-byte, as
+well as native action/observation streams and physical outcomes. All 15 expanded
+observe controls also retain full native replay parity. Their **70,299 eligible
+ticks and all four first warnings match the offline survey exactly**, including
+the additional live flight-enabled check. The new scope increases eligible
+coverage from 1,032 ticks to 70,299 and warning-bearing configurations from two
+to four. Two configurations are the correlated old world-1 example; the other
+two provide additional response states. P2 receives broader coverage
+but still has no physical response opportunity in these cases.
+
+The new native identities are `(vehicle 0, destination 2, goal_since 12747)` for
+health world-0 P1, and `(vehicle 0, destination 0, goal_since 11836)` for fresh
+world-3 P1. The observe windows end at 13545 and 12117 respectively. These are
+probe windows, not renewed mission deadlines. Original native mission state,
+progress accounting and physical arrival/capture gates remain authoritative.
+
+## Complete match results
+
+All **47 matches pass** their physical, planner-budget and response audits.
+There are 39 complete native parity checks: two legacy controls, 15 expanded
+observe controls and 22 inactive brake/left cases. The remaining eight runs
+change controls at the independently reconstructed first warning, with exact
+two-seat native prefixes through that decision. Eleven of the 15 configurations
+have eligible ordinary transfers but no warning; all 33 of their mode runs are
+inactive. No case was dropped or rerun to replace an outcome.
+
+Each cell below is the evaluated seat's outcome, followed by **physical
+captures/departures**. Legacy controls are compatibility checks and are excluded
+from these cohort totals.
+
+| Case | Observe | Brake | Left |
+| --- | --- | --- | --- |
+| World 0 P1 walking | Loss, 4/4 | Loss, 4/4 | Loss, 4/4 |
+| World 0 P1 powered | Win, 5/5 | Win, 5/5 | Win, 5/5 |
+| World 0 P2 powered | Loss, 4/3 | Loss, 4/3 | Loss, 4/3 |
+| World 0 P2 walking | Loss, 4/4 | Loss, 4/4 | Loss, 4/4 |
+| World 1 P1 powered | Loss, 1/1 | Win, 7/6 | Win, 3/3 |
+| World 1 P1 walking | Loss, 1/1 | Loss, 1/1 | Loss, 1/1 |
+| World 1 P2 walking | Win, 4/4 | Win, 4/4 | Win, 4/4 |
+| World 1 P2 powered | Loss, 3/3 | Loss, 3/3 | Loss, 3/3 |
+| Health world 0 P1 walking | Loss, 3/3 | Loss, 3/3 | Loss, 3/3 |
+| Health world 0 P1 powered | Loss, 3/3 | Loss, 6/6 | Loss, 3/3 |
+| Health world 1 P1 powered | Loss, 1/1 | Loss, 6/5 | Win, 3/3 |
+| Fresh world 2 P1 powered | Loss, 1/1 | Loss, 1/1 | Loss, 1/1 |
+| Fresh world 2 P2 powered | Win, 3/3 | Win, 3/3 | Win, 3/3 |
+| Fresh world 3 P1 powered | Loss, 1/1 | Win, 1/1 | Win, 1/1 |
+| Fresh world 3 P2 powered | Win, 4/4 | Win, 4/4 | Win, 4/4 |
+
+| Cohort | Mode | Wins | Captures | Departures | Evaluated pilot deaths |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Retained primary (8) | Observe | 2 | 26 | 25 | 4 |
+| Retained primary (8) | Brake | 3 | 32 | 30 | 3 |
+| Retained primary (8) | Left | 3 | 28 | 27 | 3 |
+| Health (3) | Observe | 0 | 7 | 7 | 3 |
+| Health (3) | Brake | 0 | 15 | 14 | 2 |
+| Health (3) | Left | 1 | 9 | 9 | 2 |
+| Fresh primary (4) | Observe | 2 | 9 | 9 | 2 |
+| Fresh primary (4) | Brake | 3 | 9 | 9 | 1 |
+| Fresh primary (4) | Left | 3 | 9 | 9 | 1 |
+
+The retained primary outcomes and all six previously activated world-1
+primary/health continuations reproduce the earlier suite exactly, including
+native/projectile streams, round results, visits and allocation accounting.
+The stronger earlier no-escape reference remains **2 wins, 28 captures and
+27 departures** across the eight primary cases, versus this immediate observe
+control's 2/26/25. These small, related cohorts do not establish general bot
+strength or an optimal response choice.
+
+## New health world-0 response
+
+Both interventions begin at 13515 and apply 29 ticks. At **13544**, native
+mission control changes from Transfer to Hunt, pausing travel for the nearby
+opponent. Both pulses cancel on that same tick and never rearm. The observe
+trajectory makes that native change at 13552, after its unchanged probe window.
+
+| Mode | Triggering missile contact | Recorded hull damage | First ship loss after warning | Match end | Captures/departures |
+| --- | ---: | ---: | --- | --- | ---: |
+| Observe | 13543 | 51.049 | 14252, laser | 15014, pilot world-boundary impact | 3/3 |
+| Brake | 13544 | 19.883 | 31080, cannon | 31358, pilot planet impact | 6/6 |
+| Left | 13542 | 43.455 | 14282, cannon | 18538, pilot planet impact | 3/3 |
+
+All three initially survive the same missile. Braking mitigates its damage;
+neither response avoids contact. All eventually lose the ship while aboard,
+eject once, fail to rebuild and lose the match. Left extends pilot survival
+without adding a capture. Brake permits three later native capture cycles.
+
+The interrupted destination-2 visit itself never reaches capture in any mode.
+With brake, a new visit starts at 15344, hands off to native capture at 16999,
+physically lands at 18557, exits at 18561, claims at 18964, boards at 18965 and
+departs at 19193. Subsequent physical claims/departures occur on planet 0 at
+22794/23025 and planet 2 at 29821/30047. The intervening failed planet-1
+approaches remain in the archive. Thus the added captures are complete later
+physical cycles, rather than a response flag being counted as arrival.
+
+## New fresh world-3 response
+
+Both interventions apply all 30 ticks from 12087 through 12116 and finish at
+12117. **No mode records contact from the triggering missile**, including the
+observe control, throughout its complete match. Laser hull damage begins at
+12092 in all three continuations. The outcomes therefore measure a change to
+the later battle and trajectory, not demonstrated avoidance of this missile.
+
+| Mode | First ship loss after warning | Match end | Evaluated pilot | Captures/departures |
+| --- | --- | --- | --- | ---: |
+| Observe | 13308, cannon, aboard | 18452, P1 world-boundary impact | Dies; loss | 1/1 |
+| Brake | None | 15574, P2 world-boundary impact | Survives; win | 1/1 |
+| Left | None | 15940, P2 world-boundary impact | Survives; win | 1/1 |
+
+All modes had already lost and rebuilt one ship before the warning. Observe
+finishes with two ship losses, two ejections and one rebuild; brake and left
+each finish with one loss, one ejection and one rebuild. The candidates prevent
+a further ship loss in these continuations, not every ship loss in the match.
+
+Brake and left reach the native destination-0 arrival handoff at 12503 and
+12492 respectively, but both abandon it at 12511 when cover search exhausts
+its observed candidates. Neither physically lands, exits or claims there.
+Later planet-2 attempts also stop for a nearby opponent. Observe abandons its
+original visit at 12556 for that opponent without arrival. No continuation adds
+a physical capture after the warning.
+
+## Verification and retained evidence
+
+The eligibility extension, independent auditor, runner, tests and intervention
+plan were frozen in **`b1bcb69`** before these simulations. All **1,096 Rust
+tests** and **768 Python tests** pass. Formatting, strict AI Clippy and both
+profiled and ordinary release builds pass. Scenario Clippy retains the same
+seven pre-existing findings at the same locations. Tests cover native/P2
+eligibility and priority guards, episode cancellation without rearming, legacy
+identity serialization and preservation of an active visit selected before
+the native episode began.
+
+All **2,386,862 projectile rows** pass their physical-frame, identity, ordering
+and capacity audits. The observed maxima are four retained/in-range projectiles
+and 23 scanned debris entries, with no unavailable shell or capacity truncation.
+These are observed values, not general runtime bounds or deployment performance
+measurements. All native physical capture and planner-budget audits pass.
+
+The frozen binary is
+`target/ordinary-transfer-response/surface_mission_soak-b1bcb69`, SHA-256
+`32086075e2cce09f13aacf718c6b3a98aa9c7994229bee74cff504c1201f7912`.
+The completed summary is `target/ordinary-transfer-response/v1/summary.json`,
+SHA-256 `fbb2f4d04d39e16ba19b3162d3237178694fdf62617f87b54ae707626bb122aa`.
+
+The [manifest](data/ordinary-transfer-response-v1.json) records all 47 outcomes,
+separate cohort totals, paired changes, exact survey comparisons, legacy and
+retained-response parity, input/tool/binary hashes and **752 raw-file hashes**.
+The [compressed archive](data/ordinary-transfer-response-v1.json.gz) preserves
+the original runner summary, physical visit audits, response witnesses,
+triggering-projectile tracks, report checkpoints and final reports excluding
+their large samples/events arrays. Contact, loss and recovery evidence remains
+available for both new states and all previous active cases. Complete raw
+reports and streams remain at their hashed local paths.
+
+```sh
+python3 tools/validate-ordinary-transfer-response.py \
+  --prior target/projectile-response-sweep/v1/summary.json \
+  --survey docs/data/transfer-projectile-survey-v1.json \
+  --binary target/ordinary-transfer-response/surface_mission_soak-b1bcb69 \
+  --out /tmp/ordinary-transfer-response
+python3 tools/analyze-ordinary-transfer-response.py \
+  --summary /tmp/ordinary-transfer-response/summary.json \
+  --out /tmp/ordinary-transfer-response-results.json
+```
+
+Use fresh output paths and a clean checkout for the runner.
+
+## Decision
+
+Keep the expanded scope and both responses opt-in. The survey supplied two
+additional warning states; the frozen intervention experiment found a damage
+and capture benefit for brake in the new health case, and wins without capture
+gains for both modes in the new fresh case. There is still no activated physical
+P2 response, and the fresh case does not demonstrate avoidance of its triggering
+missile. The two old world-1 configurations remain one correlated trajectory.
+
+The earlier [clear-entry braking regression](projectile-response-sweep.md)
+also remains: its short-warning pulse ends after 13 ticks with ship destruction
+at 9173 instead of observe's 9185, with no extra capture. It is a historical
+counterexample, outside these 47 runs and cohort totals. This extension does
+not resolve response selection or make the warning screen a collision predictor.
+Broader independent activated cases and a separately specified response-choice
+rule would be needed before considering a default change. Probe mode remains
+`none`, default scope remains `escape`, and nothing was pushed or deployed.

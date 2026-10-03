@@ -256,3 +256,8 @@ measure their frequency, warning time and actual contacts in both seats. That
 can identify concrete additional states for a separately frozen intervention
 experiment without changing eligibility based on favorable outcomes here.
 All work remains local; nothing was pushed or deployed.
+
+The subsequent [ordinary-transfer survey and response experiment](ordinary-transfer-response.md)
+completes that read-only survey and a separately frozen eligibility extension.
+Its 47 full matches include both newly exposed warning states and exact legacy
+compatibility checks; the extension remains opt-in.

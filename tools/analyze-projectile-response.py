@@ -46,6 +46,15 @@ def attributed_contacts(contacts, spawn, identities, selected):
     return [c for c in contacts if c['source']=='cannon' and c['spawn_tick']==spawn]
 
 
+def visit_start(visits,source,warning_tick):
+    if 'started_tick' in source:return source['started_tick']
+    active=[v for v in visits if v['planet']==source['destination'] and v['source']['vehicle']==source['vehicle']
+            and v['selected_tick']<=warning_tick
+            and all(v['recorded'].get(k) is None or v['recorded'][k]>=warning_tick
+                    for k in ['abandoned_tick','departed_tick'])]
+    return max((v['selected_tick'] for v in active),default=warning_tick)
+
+
 def analyze(entry, run):
     root = R.root_of(run)
     report = json.loads((root/'report.json').read_text())
@@ -79,8 +88,8 @@ def analyze(entry, run):
     first_loss = losses[0] if losses else None
     if response['first_ship_loss'] is not None:
         assert first_loss is not None and first_loss['tick'] == response['first_ship_loss']['tick']
-    ticks = {start, a['finished_tick'], report['elapsed_ticks'],
-             report['missions'][seat]['escape_travel']['last']['finished_tick']}
+    travel=(report['missions'][seat]['escape_travel'] or {}).get('last') or {}
+    ticks = {start, a['finished_tick'], report['elapsed_ticks'],travel.get('finished_tick')}
     ticks.update(loss['tick'] for loss in losses)
     samples = {min(range(len(report['samples'])),
                    key=lambda i:abs(report['samples'][i]['pilots'][seat]['tick']-tick))
@@ -100,7 +109,8 @@ def analyze(entry, run):
                 track.append(dict(tick=row['tick'], seat=row['seat'], projectile=p,
                                   observer=d['observer'], vehicle=d['vehicle'], ship_form=d['ship_form']))
     assert identity in same_launch_ids
-    after_visits = [v for v in visits if v['selected_tick'] >= a['source']['started_tick']]
+    anchor=visit_start(visits,a['source'],start)
+    after_visits = [v for v in visits if v['selected_tick'] >= anchor]
     summary.update(attempt=a, first_action_change=response['first_action_change'],
                    exact_prefix_rows=response['exact_prefix_rows'], first_ship_loss=first_loss,
                    ship_losses=losses, final_recovery=report['final_pilots'][seat]['recovery'],
@@ -108,6 +118,7 @@ def analyze(entry, run):
                    triggered_projectile_contacts=attributed_contacts(contacts,spawn,same_launch_ids,identity),
                    launch_identity_unambiguous=same_launch_ids=={identity},
                    triggered_projectile_observed_ids=sorted(same_launch_ids),
+                   visit_anchor_tick=anchor,
                    post_transfer_visits=after_visits,
                    post_transfer_claims=sum(v['physical']['claimed'] is not None for v in after_visits),
                    post_transfer_departures=sum(v['physical']['departed'] is not None for v in after_visits))

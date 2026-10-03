@@ -12,6 +12,14 @@ def damage(contact_tick=8, damage_tick=8, source='cannon', spawn=1, lost=False):
 
 
 class ResponseAnalysisTests(unittest.TestCase):
+    def test_native_episode_includes_the_active_visit_selected_before_goal_since(self):
+        visits=[dict(planet=2,selected_tick=t,source=dict(vehicle=0),recorded=dict(abandoned_tick=end,departed_tick=None))
+                for t,end in [(10,20),(30,None)]]
+        source=dict(goal_since=40,vehicle=0,destination=2)
+        self.assertEqual(A.visit_start(visits,source,50),30)
+        self.assertEqual(A.visit_start(visits,dict(source,vehicle=1),50),50)
+        self.assertEqual(A.visit_start(visits,dict(source,started_tick=35),50),35)
+
     def test_simultaneous_launches_cannot_be_assigned_to_one_projectile(self):
         contacts=[dict(tick=20,source='cannon',spawn_tick=10)]
         self.assertEqual(A.attributed_contacts(contacts,10,{1},1),contacts)
