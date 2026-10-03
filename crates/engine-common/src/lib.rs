@@ -408,6 +408,13 @@ pub struct ClockRainState {
     pub parcels: usize,
     pub source_limited_ticks: u64,
     pub water_limited_ticks: u64,
+    #[serde(default)]
+    pub drain_splash_bursts: u64,
+    /// Cumulative redirected water, not an additional volume-ledger category.
+    #[serde(default)]
+    pub drain_splash_microunits: u64,
+    #[serde(default)]
+    pub drain_splash_suppressed: u64,
     /// Applied physical/visible digits; a rare capacity deferral can lag the reading.
     #[serde(default)]
     pub surface_digits: [Option<u8>; 4],
@@ -712,6 +719,13 @@ pub struct ClockMeltdownState {
     pub spill_parcels: usize,
     #[serde(default)]
     pub capacity_limited_ticks: u64,
+    #[serde(default)]
+    pub drain_splash_bursts: u64,
+    /// Cumulative redirected water, not an additional volume-ledger category.
+    #[serde(default)]
+    pub drain_splash_microunits: u64,
+    #[serde(default)]
+    pub drain_splash_suppressed: u64,
     /// All material physically exiting the arena: liquid plus solid blocks.
     pub drained_microunits: u64,
     /// Subset of drained_microunits that left as solid blocks, NOT extra volume.

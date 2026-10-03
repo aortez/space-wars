@@ -118,6 +118,11 @@ impl MeltdownEvent {
             };
             let mut water = WaterWorld::new(
                 WaterConfig {
+                    // Share the selected preset with Rain and the testbed.
+                    // Multi-gap courses retain their existing water behavior.
+                    splash: floor
+                        .as_ref()
+                        .map(|_| crate::floor::responsive::drain_splash(seed)),
                     max_parcels: MAX_SPILL_PARCELS,
                     exit_y: f64::from(context.layout.bounds_min.y),
                     ..WaterConfig::default()
@@ -423,6 +428,9 @@ impl MeltdownEvent {
             displaced_microunits: micro(water.displaced),
             spill_parcels: water.parcels,
             capacity_limited_ticks: water.capacity_limited_ticks,
+            drain_splash_bursts: water.splash_bursts,
+            drain_splash_microunits: micro(water.splash_volume),
+            drain_splash_suppressed: water.splash_capacity_suppressed,
             drained_microunits: micro(water.drained + self.exited_solid_area),
             exited_solid_microunits: micro(self.exited_solid_area),
             reclaimed_microunits: micro(water.reclaimed + self.reclaimed_area),

@@ -171,10 +171,13 @@ fn responsive_meltdown_sweep_conserves_material_and_releases_its_floor() {
                 let mut peak_load = 0;
                 let mut previous_open = 0;
                 let mut saw_closing = false;
+                let mut splash_bursts = 0;
                 for elapsed in 0..510 {
                     assert_volume(&state);
                     assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
                     let stats = state.meltdown_state().unwrap();
+                    splash_bursts = stats.drain_splash_bursts;
+                    assert!(splash_bursts <= elapsed / 15 + 1);
                     assert_eq!(stats, replay.meltdown_state().unwrap());
                     assert_eq!(
                         stats.floor_motion_deferrals, 0,
@@ -235,6 +238,15 @@ fn responsive_meltdown_sweep_conserves_material_and_releases_its_floor() {
                     "{aspect} {hour} {seed}: {peak_open} {peak_load}"
                 );
                 assert!(state.meltdown_state().is_none());
+                if hour == 8 {
+                    assert!(
+                        splash_bursts > 0,
+                        "no drain splashes: aspect={aspect} format={format:?} seed={seed}"
+                    );
+                }
+                eprintln!(
+                    "meltdown splashes aspect={aspect:.3} hour={hour} format={format:?} seed={seed}: bursts={splash_bursts}"
+                );
                 assert!(
                     saw_closing,
                     "floor never started closing: {aspect} {hour} {seed}"

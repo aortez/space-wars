@@ -5,11 +5,27 @@ use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
     PhysicsWorld,
 };
-use engine_water::{Boundary, PoolGeometry, PoolSpec, SolidBox, WaterError, WaterWorld};
+use engine_water::{
+    Boundary, PoolGeometry, PoolSpec, SolidBox, SplashConfig, SplashVariation, WaterError,
+    WaterWorld,
+};
 
 use crate::layout::Layout;
 
 pub(crate) const MAX_COLUMNS: usize = 64;
+
+/// Varied Lively, selected in the drain testbed. An event seed changes the fan
+/// without consuming Rain's source RNG or Meltdown's material RNG.
+pub(crate) fn drain_splash(seed: u64) -> SplashConfig {
+    SplashConfig {
+        interval: 0.25,
+        variation: Some(SplashVariation {
+            seed,
+            max_interval: 0.55,
+        }),
+        ..SplashConfig::default()
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct FloorShape {

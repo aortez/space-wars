@@ -111,6 +111,7 @@ pub(crate) struct Motion {
     pub position: Vec2,
     pub velocity: Vec2,
     pub caught: Option<(usize, usize)>,
+    pub impact: Option<crate::splash::Impact>,
 }
 
 impl WaterWorld {
@@ -137,6 +138,7 @@ impl WaterWorld {
         leaving_pool: Option<usize>,
         collect: bool,
     ) -> Motion {
+        let mut impact: Option<crate::splash::Impact> = None;
         for _ in 0..MAX_CONTACTS {
             let contact = self
                 .solids
@@ -157,6 +159,7 @@ impl WaterWorld {
                     position: end,
                     velocity,
                     caught: Some(caught),
+                    impact,
                 };
             }
             let Some(contact) = contact else {
@@ -164,8 +167,19 @@ impl WaterWorld {
                     position: to,
                     velocity,
                     caught: None,
+                    impact,
                 };
             };
+            if self.config.splash.is_some() {
+                let speed = -f64::from(velocity.dot(contact.normal));
+                if speed > impact.map_or(0.0, |i| i.speed) {
+                    impact = Some(crate::splash::Impact {
+                        position: contact.position,
+                        normal: contact.normal,
+                        speed,
+                    });
+                }
+            }
             // Inelastic wall contact: retain tangent motion and all water.
             // Sweep the remaining displacement too, so crossing a thin wall
             // or contacting two faces in one tick cannot tunnel through it.
@@ -181,6 +195,7 @@ impl WaterWorld {
             position: from,
             velocity,
             caught: None,
+            impact,
         }
     }
 

@@ -509,6 +509,9 @@ mod tests {
             parcels: 126,
             source_limited_ticks: 2,
             water_limited_ticks: 0,
+            drain_splash_bursts: 4,
+            drain_splash_microunits: 50_000,
+            drain_splash_suppressed: 1,
             surface_digits: [Some(1), Some(2), Some(3), Some(4)],
             surface_water_microunits: 100_000,
             drip_parcels_emitted: 123,
@@ -542,6 +545,9 @@ mod tests {
         assert_eq!(ClockEventKind::Rain as u8, 6);
         let mut value = serde_json::to_value(&state).unwrap();
         for field in [
+            "drain_splash_bursts",
+            "drain_splash_microunits",
+            "drain_splash_suppressed",
             "surface_digits",
             "surface_water_microunits",
             "drip_parcels_emitted",
@@ -563,6 +569,9 @@ mod tests {
         assert_eq!(older.surface_water_microunits, 0);
         assert_eq!(older.drip_parcels_emitted, 0);
         assert_eq!(older.surface_impacts, 0);
+        assert_eq!(older.drain_splash_bursts, 0);
+        assert_eq!(older.drain_splash_microunits, 0);
+        assert_eq!(older.drain_splash_suppressed, 0);
         assert!(!older.surface_change_pending);
         assert_eq!(older.surface_change_deferrals, 0);
         assert_eq!(older.floor_open_milli, 0);
@@ -724,6 +733,9 @@ mod tests {
             displaced_microunits: 2_000_000,
             spill_parcels: 12,
             capacity_limited_ticks: 3,
+            drain_splash_bursts: 5,
+            drain_splash_microunits: 75_000,
+            drain_splash_suppressed: 2,
             drained_microunits: 35_000_000,
             exited_solid_microunits: 1_000_000,
             floor_open_milli: 420,
@@ -749,6 +761,9 @@ mod tests {
             "displaced_microunits",
             "spill_parcels",
             "capacity_limited_ticks",
+            "drain_splash_bursts",
+            "drain_splash_microunits",
+            "drain_splash_suppressed",
             "exited_solid_microunits",
             "floor_open_milli",
             "floor_load_milli",
@@ -764,6 +779,9 @@ mod tests {
         assert_eq!(material.displaced_microunits, 0);
         assert_eq!(material.spill_parcels, 0);
         assert_eq!(material.capacity_limited_ticks, 0);
+        assert_eq!(material.drain_splash_bursts, 0);
+        assert_eq!(material.drain_splash_microunits, 0);
+        assert_eq!(material.drain_splash_suppressed, 0);
         assert_eq!(material.exited_solid_microunits, 0);
         assert_eq!(material.floor_open_milli, 0);
         assert_eq!(material.floor_load_milli, 0);

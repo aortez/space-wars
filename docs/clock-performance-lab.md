@@ -10,6 +10,12 @@ also documents why pausing a game alone does not remove background raster work
 when collecting headless measurements alongside the kiosk. Those binaries
 predate the rendering optimizations below; their timings retain that scope.
 
+The [drain-splash profile](water-drain-splash-profile.md) compares the selected
+varied Lively preset against splash-disabled constructors in otherwise-identical
+current code. Its 36 full-event Pi runs show median paired CPU frame-work
+changes between -0.5% and +0.3%; small idle differences are comparable in size.
+This comparison includes the newer rendering code and retains the raw reports.
+
 The historical managed-floor captures below drew 101 primitives in the ordinary
 24-hour face. The current wooden surround, corner lamps and per-cell digit glow
 add several hundred primitives; counts also depend on the time and selected
