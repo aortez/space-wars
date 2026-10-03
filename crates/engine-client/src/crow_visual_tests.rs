@@ -7,6 +7,8 @@ use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use std::time::Duration;
 
+mod ground;
+
 #[test]
 fn crow_flight_renders_and_exports_playback() {
     let output = std::env::var_os("SPACEWARS_CROW_FLIGHT_ARTIFACTS").map(std::path::PathBuf::from);

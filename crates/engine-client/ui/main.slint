@@ -620,6 +620,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-meltdown-enabled: true;
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-crow-enabled: true;
+    in-out property <string> launcher-clock-crow-water-tolerance: "Varied";
     in-out property <bool> launcher-clock-explosion-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
@@ -1373,7 +1374,7 @@ export component MainWindow inherits Window {
                     y: 168px;
                     width: 90px;
                     height: 48px;
-                    text: "Crow\n" + (root.launcher-clock-crow-enabled ? "On" : "Off");
+                    text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
                     selected: root.ingame-clock-focus-index == 14;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(14, 1); }
@@ -2253,7 +2254,7 @@ export component MainWindow inherits Window {
                             y: 208px;
                             width: (parent.width - 24px) / 4;
                             height: 48px;
-                            text: "Crow\n" + (root.launcher-clock-crow-enabled ? "On" : "Off");
+                            text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
                             selected: root.launcher-settings-focus-index == 13;
                             activated => { root.launcher-settings-focus-index = 13; root.ui-action(3); }
                         }

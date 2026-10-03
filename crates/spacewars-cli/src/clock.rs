@@ -269,7 +269,7 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
         if let Some(crow) = &state.crow {
             println!(
-                "Crow #{}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}",
+                "Crow #{}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}, ground={:?} visits={} pecks={}, water={} wet={}/1000 departures={}",
                 crow.visit_id,
                 crow.phase.as_str(),
                 crow.age_ticks,
@@ -277,7 +277,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 crow.position_milli,
                 crow.target,
                 crow.hops,
-                crow.escapes
+                crow.escapes,
+                crow.ground_target_milli,
+                crow.ground_visits,
+                crow.pecks,
+                crow.water_tolerance.label(),
+                crow.wetness_milli,
+                crow.wet_departures
             );
         }
         let world_vector =

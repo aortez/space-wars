@@ -1019,7 +1019,11 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
             clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
             clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
-            clock_crow_enabled: window.get_launcher_clock_crow_enabled(),
+            clock_crow: if window.get_launcher_clock_crow_enabled() {
+                window.get_launcher_clock_crow_water_tolerance().to_string()
+            } else {
+                "Off".into()
+            },
             clock_explosion_enabled: window.get_launcher_clock_explosion_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
