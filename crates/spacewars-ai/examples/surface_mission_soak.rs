@@ -39,6 +39,8 @@ mod physics_profile;
 mod planning_probe;
 #[path = "support/projectile_diagnostics.rs"]
 mod projectile_diagnostics;
+#[path = "support/projectile_response.rs"]
+mod projectile_response;
 #[path = "support/successor_continuation.rs"]
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
@@ -202,6 +204,7 @@ fn main() {
     assert!(actual_landing_probe.is_none() || live_planning.is_some());
     let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
     let mut projectile_trace = projectile_diagnostics::ProjectileTrace::from_args(&out);
+    let mut projectile_response = projectile_response::ResponseProbe::from_args(&out, seat);
     let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
     assert!(
         !native_capture_probe::timing_enabled()
@@ -758,6 +761,9 @@ fn main() {
                 if let Some(probe) = &mut impact_probe {
                     probe.apply_and_observe(i, &state, &o, pilots[i].telemetry(), &mut intent);
                 }
+                if let Some(probe) = &mut projectile_response {
+                    probe.observe(i, &state, &o, pilots[i].telemetry(), &mut intent);
+                }
                 actions.extend(intent.encode(owner));
                 if let Some(evidence) = &mut capture_evidence {
                     evidence.observe(i, &o, pilots[i].telemetry(), intent);
@@ -1056,6 +1062,9 @@ fn main() {
     }
     if let Some(trace) = projectile_trace {
         trace.finish();
+    }
+    if let Some(probe) = projectile_response {
+        probe.finish(&state);
     }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
