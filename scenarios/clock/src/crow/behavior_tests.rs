@@ -260,10 +260,10 @@ fn hardy_crow_accepts_shallow_puddles_but_still_leaves_deep_water_or_lost_suppor
                 );
                 assert_eq!(
                     crow.phase,
-                    Phase::Flying,
+                    Phase::Leaving,
                     "hardiness must not override support"
                 );
-                assert!(matches!(crow.target, Some(Target::Digit(_))));
+                assert!(crow.target.is_none());
             }
         }
     }
@@ -317,14 +317,28 @@ fn hardy_crow_tolerates_ten_times_the_spray_but_eventually_gets_soaked() {
 }
 
 #[test]
-fn dry_ground_pecks_then_returns_but_a_puddle_rejects_that_landing_spot() {
+fn dry_ground_pecks_then_departs_but_a_puddle_rejects_that_landing_spot() {
     let (state, mut crow, env) = fixture();
     for _ in 0..PECK_TICKS {
         assert!(!crow.step(&state.segments, None, env));
     }
-    assert_eq!(crow.pecks, 3);
-    assert_eq!(crow.phase, Phase::Flying);
-    assert!(matches!(crow.target, Some(Target::Digit(_))));
+    assert_eq!(crow.pecks, 2);
+    assert_eq!(crow.phase, Phase::Leaving);
+    assert!(crow.target.is_none());
+    assert!(crow.flight.velocity.y > 0.0);
+    let mut finished = false;
+    for _ in 0..EXIT_TICKS {
+        if crow.step(&state.segments, None, env) {
+            finished = true;
+            break;
+        }
+        assert_eq!(crow.phase, Phase::Leaving);
+        assert_eq!(crow.pecks, 2);
+    }
+    assert!(finished);
+    assert!(
+        crow.position.x < crow.layout.bounds_min.x || crow.position.x > crow.layout.bounds_max.x
+    );
     let spots = env.ground_spots(crow.layout, crow.water_tolerance);
     let water = puddle(spots[0].unwrap(), crow.layout.pitch);
     let before = water.stats();
@@ -337,6 +351,49 @@ fn dry_ground_pecks_then_returns_but_a_puddle_rejects_that_landing_spot() {
         [None, spots[1]]
     );
     assert_eq!(water.stats(), before, "sensing must not consume water");
+}
+
+#[test]
+fn ground_excursion_is_an_occasional_seeded_choice_and_is_not_retried() {
+    let (state, original, env) = fixture();
+    let mut selected = 0;
+    for seed in 0..1000 {
+        let mut crow = CrowVisit::new(
+            original.layout,
+            seed,
+            1,
+            ClockCrowWaterTolerance::Shy,
+            &state.segments,
+            None,
+        );
+        let mut replay = CrowVisit::new(
+            original.layout,
+            seed,
+            1,
+            ClockCrowWaterTolerance::Shy,
+            &state.segments,
+            None,
+        );
+        for visit in [&mut crow, &mut replay] {
+            visit.position = visit.target.unwrap().feet();
+            visit.phase = Phase::Perched;
+            visit.age = 150;
+        }
+        let chosen = crow.try_ground(env);
+        assert_eq!(chosen, replay.try_ground(env));
+        assert_eq!(crow.diagnostics(), replay.diagnostics());
+        selected += usize::from(chosen);
+        let after = crow.diagnostics();
+        for _ in 0..10 {
+            assert!(!crow.try_ground(env));
+            assert_eq!(crow.diagnostics(), after);
+        }
+    }
+    assert!(
+        (150..=250).contains(&selected),
+        "{selected} ground choices / 1000 eligible visits"
+    );
+    eprintln!("{selected} ground choices / 1000 eligible visits");
 }
 
 #[test]
@@ -445,11 +502,11 @@ fn withdrawing_floor_support_interrupts_pecking_without_advancing_on_pause() {
         [None; 2]
     );
     crow.synchronize(&state.segments, None, moving);
-    assert_eq!(crow.phase, Phase::Flying);
+    assert_eq!(crow.phase, Phase::Leaving);
     assert_eq!(crow.age, before.age_ticks);
     assert_eq!(crow.diagnostics().position_milli, before.position_milli);
     assert!(crow.flight.velocity.y > 0.0);
-    assert!(matches!(crow.target, Some(Target::Digit(_))));
+    assert!(crow.target.is_none());
 }
 
 #[test]

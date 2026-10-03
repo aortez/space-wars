@@ -18,7 +18,8 @@ fn render_visits(output_var: &str, compare_tolerance: bool) {
     let output = std::env::var_os(output_var).map(std::path::PathBuf::from);
     // Seed 5 visits adjacent digit tops, so the rain comparison shows hopping
     // through puddles instead of returning to the isolated tip of the "1".
-    let seed = if compare_tolerance { 5 } else { 1 };
+    // Seed 13 chooses the occasional ground visit on both landscape layouts.
+    let seed = if compare_tolerance { 5 } else { 13 };
     let mut cases = Vec::new();
     for (width, height) in [(1024, 768), (800, 480), (480, 800)] {
         for second in [false, true] {

@@ -426,7 +426,7 @@ fn crow_pause_resize_disable_and_readmission_remain_bounded() {
 fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
     let mut first_landings = Vec::new();
     let mut ground_visits = 0;
-    let mut ground_returns = 0;
+    let mut ground_departures = 0;
     for aspect in [0.25, 0.6, 0.75, 1024.0 / 768.0, 800.0 / 480.0, 4.0] {
         for font in ClockFont::ALL {
             for seed in 0..8 {
@@ -436,7 +436,7 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                 let mut last_position = state.crow_visit.as_ref().unwrap().position;
                 let mut entered = false;
                 let mut visited_ground = false;
-                let mut returned = false;
+                let mut departed_after_pecks = false;
                 for _ in 0..crow::CROW_TICKS {
                     if let Some(visit) = &state.crow_visit {
                         let p = visit.position;
@@ -472,7 +472,7 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                         }
                         if visit.phase == crow::Phase::Perched {
                             first_landing.get_or_insert(visit.diagnostics().age_ticks);
-                            returned |= visited_ground;
+                            assert!(!visited_ground, "pecking must end the visit");
                         }
                         if visit.phase == crow::Phase::Pecking {
                             visited_ground = true;
@@ -483,10 +483,20 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                                 first_landing.is_some(),
                                 "flight timed out before landing: {aspect} {font:?} {seed}"
                             );
-                            assert!(
-                                visit.diagnostics().age_ticks >= 17 * 60,
-                                "approach timed out during an ordinary visit: {aspect} {font:?} {seed}"
-                            );
+                            if visited_ground {
+                                assert_eq!(
+                                    visit.diagnostics().pecks,
+                                    2,
+                                    "{aspect} {font:?} {seed}"
+                                );
+                                assert_eq!(visit.diagnostics().ground_visits, 1);
+                                departed_after_pecks = true;
+                            } else {
+                                assert!(
+                                    visit.diagnostics().age_ticks >= 17 * 60,
+                                    "approach timed out during an ordinary visit: {aspect} {font:?} {seed}"
+                                );
+                            }
                         }
                         last_position = p;
                     } else {
@@ -500,7 +510,7 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
                 );
                 first_landings.push(first_landing.unwrap());
                 ground_visits += usize::from(visited_ground);
-                ground_returns += usize::from(returned);
+                ground_departures += usize::from(departed_after_pecks);
                 assert!(state.crow_state().is_none());
                 assert!(
                     last_position.x < layout.bounds_min.x || last_position.x > layout.bounds_max.x,
@@ -510,9 +520,10 @@ fn crow_flight_lands_and_clears_the_frame_across_fonts_and_layouts() {
             }
         }
     }
-    assert!(ground_visits > 0 && ground_returns > 0);
+    assert!(ground_visits > 0 && ground_visits < first_landings.len() / 4);
+    assert_eq!(ground_visits, ground_departures);
     eprintln!(
-        "{} visits, first landing range {}–{} ticks; {ground_visits} ground visits, {ground_returns} returns",
+        "{} visits, first landing range {}–{} ticks; {ground_visits} ground visits, {ground_departures} departures after pecking",
         first_landings.len(),
         first_landings.iter().min().unwrap(),
         first_landings.iter().max().unwrap()

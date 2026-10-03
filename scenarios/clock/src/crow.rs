@@ -18,7 +18,8 @@ use crate::{SegmentRepresentation, SegmentState, layout::Layout};
 pub const CROW_TICKS: u64 = 22 * 60;
 const MAX_FLIGHT_TICKS: u64 = 8 * 60;
 const EXIT_TICKS: u64 = 5 * 60;
-const PECK_TICKS: u64 = 84;
+const PECK_TICKS: u64 = 56;
+const GROUND_VISIT_CHANCE: f64 = 0.2;
 
 #[derive(Debug, Clone, Copy)]
 struct Perch {
@@ -261,7 +262,11 @@ impl CrowVisit {
             return;
         }
         self.escapes += 1;
-        self.return_to_perch(&candidates, environment);
+        if self.phase == Phase::Pecking {
+            self.leave();
+        } else {
+            self.return_to_perch(&candidates, environment);
+        }
     }
 
     fn return_to_perch(&mut self, candidates: &[Option<Perch>; 24], environment: Environment<'_>) {
@@ -293,13 +298,18 @@ impl CrowVisit {
             return false;
         }
         self.ground_attempted = true;
-        // Reserve a climb back to the digits and the ordinary offscreen exit.
-        // Very tall/narrow layouts can simply keep the existing perch visit.
-        let round_trip = 2.0 * (Self::cruise_height(self.layout) - self.layout.floor_y)
+        // Allow the full approach timeout and two pecks before the ordinary
+        // departure deadline, which already reserves five seconds for the exit.
+        let available = (CROW_TICKS - EXIT_TICKS).saturating_sub(self.age);
+        // A tall layout must still allow a climb from the floor and a short
+        // crossing offscreen within that exit window.
+        let exit_seconds = (Self::cruise_height(self.layout) - self.layout.floor_y)
             / (self.layout.pitch * 5.0)
-            + 8.0;
-        let available = (CROW_TICKS - EXIT_TICKS).saturating_sub(self.age) as f32 / 60.0;
-        if round_trip > available || !self.rng.random_bool(0.65) {
+            + 1.5;
+        if exit_seconds > EXIT_TICKS as f32 / 60.0
+            || MAX_FLIGHT_TICKS + PECK_TICKS > available
+            || !self.rng.random_bool(GROUND_VISIT_CHANCE)
+        {
             return false;
         }
         let spots = environment.ground_spots(self.layout, self.water_tolerance);
@@ -346,7 +356,8 @@ impl CrowVisit {
                 self.pecks += 1;
             }
             if self.phase_tick >= self.duration {
-                self.return_to_perch(&perches(self.layout, segments, event), environment);
+                // Ground pecking is the final activity of an occasional visit.
+                self.leave();
             }
             return false;
         }

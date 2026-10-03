@@ -6,18 +6,23 @@ fixed simulation tick, seeded decisions, and native renderer.
 
 ## Visit behavior
 
-- After half a second on a digit, consider one ground excursion with a 65%
-  seeded chance, subject to an estimated travel budget. Failed opportunities are
-  not retried repeatedly. Ordinary hopping/perching continues otherwise.
+- After half a second on a digit, consider one ground excursion with a 20%
+  seeded chance, subject to a travel budget and ground clearance. The decision
+  is made once; later perch stops do not reroll it. Ordinary hopping/perching
+  continues otherwise.
 - Two side lanes stay outside the complete digit face and inside the frame, with
   clearance for the crow silhouette. Pick the nearer eligible spot. Some narrow
   layouts have no lane or insufficient time and retain digit-only visits.
 - Only the ordinary level floor or fully closed Rain panels permit a ground
   visit. Moving panels and custom duck courses are excluded; support changes
-  abort an approach or interrupt pecking. They never create a phantom floor.
-- Peck three times over 84 ticks (1.4 seconds), then choose a nearby dry digit,
-  favoring a high perch to reduce the return descent. The normal departure at
-  17 seconds can interrupt a late return; the 22-second hard visit cap remains.
+  abort an approach or end a pecking visit. They never create a phantom floor.
+- Peck twice over 56 ticks (about 0.93 seconds), then climb and fly offscreen.
+  Ground pecking is the last activity of the visit; losing support while pecking
+  also makes the crow leave. There is no return to the digits after pecking.
+  Admission reserves the full eight-second approach allowance plus pecking
+  before the normal 17-second departure deadline. A climb/crossing estimate
+  rejects floors too far below the face for the five-second exit window.
+  The 22-second hard visit cap remains.
 - A last-moment abandoned descent still respects the surviving floor, including
   the actual tilted panel surface and its open drain gap.
   Ground trips add no Rapier bodies, colliders, food actors, or physics world.
@@ -64,10 +69,13 @@ tolerance used. Older state JSON defaults to Shy, matching its original behavior
 ## Verification and preview
 
 The 192 dry font/layout/seed visits still land and leave offscreen. In the initial
-checkpoint, 44 visits included ground pecking, 40 returned to a digit, and four
+65%-chance prototype, 44 visits included ground pecking, 40 returned to a digit, and four
 were redirected into the scheduled departure during their return. Those four
 were Classic at 800×480 seed 0 and at aspect 4 seeds 1/2, plus Matrix at aspect 4
-seed 6. These are bounded visit outcomes, not flight stalls.
+seed 6. The terminal-peck follow-up replaces that return with direct departure:
+12 of the 192 fixtures visit the ground, and all 12 complete two pecks and
+leave offscreen. A separate 1,000-seed decision test selects 194 ground trips
+when geometry and time permit, verifies replay, and prevents repeated rolls.
 
 Eight paired heavy-rain visits (two landscape ratios × four seeds) compare the
 actual water statistics and every falling parcel at every tick, with and without
@@ -81,16 +89,17 @@ compares the expanded crow diagnostics and flight state exactly.
 Export native dry/rain captures with:
 
 ```sh
-SPACEWARS_CROW_GROUND_ARTIFACTS="$PWD/target/crow-flight/ground" \
+SPACEWARS_CROW_GROUND_ARTIFACTS="$PWD/target/crow-flight/peck" \
   cargo +1.89.0 test --locked --profile ci -p engine-client \
   crow_ground_and_rain_render_and_export_playback
 python3 -m http.server 8766 --directory target/crow-flight
 ```
 
-Open `http://localhost:8766/ground/`. Matrix font, seed 1, reading 12:34; Heavy
+Open `http://localhost:8766/peck/`. Matrix font, seed 13, reading 12:34; Heavy
 Rain starts at three seconds in the right-hand scene. All three display sizes
 run for 22 seconds. The narrow portrait fixture intentionally skips ground
-visits. Captures use the actual Rust simulation and both native render adapters;
+visits. The earlier return-to-perch prototype remains at `/ground/`.
+Captures use the actual Rust simulation and both native render adapters;
 the HTML only replays frames. Full exports are opt-in, and normal tests include
 peck-pose and periodic raster/vector smoke samples.
 
@@ -135,8 +144,10 @@ Each six-case native gallery contains 3,966 playback PNGs. Native peck/rain and
 Shy/Hardy stills were inspected; all frame files, served manifests/viewer, and
 JavaScript syntax were checked.
 Interactive browser/device testing and the display-driven functional workflow
-were not run for this slice. The existing flight-only PR #157 passed all six CI
-jobs; this follow-up remains on `crow-behavior-followup` for visual review.
+were not run for this slice. Flight-only PR #157 passed all six CI jobs and was
+merged. The accepted water/ground prototype is committed on
+`crow-behavior-followup` in PR #159. Occasional peck-and-depart behavior is the
+next slice on `crow-peck-departure`.
 
 Puddle follow-up (2026-10-03): 313 Clock tests passed (four opt-in tests skipped),
 including 24 real-rain visits and the controlled wet-hop comparison. The six
@@ -144,3 +155,13 @@ native preview cases passed; Hardy makes one hop on each landscape layout and
 two on portrait, starting around eight seconds. All 3,966 frames and the viewer
 were checked, and hop/landing stills were inspected. Scoped strict Clock Clippy,
 formatting and diff checks passed. This follow-up has not been deployed.
+
+Occasional-peck follow-up (2026-10-03): the final two-peck tuning passed all 314
+Clock tests and the native dry/rain capture test, along with scoped strict Clock
+Clippy, formatting and diff checks. The preceding three-peck pass also covered
+eight selected client checks.
+The native preview has 3,966 frames across six cases. In the dry landscape scenes,
+the two pecks occur around 9.4–10.7 seconds, followed directly by climbing and
+departure; portrait retains its ordinary digit visit. Peck/exit stills, the
+served viewer, frame completeness and JavaScript syntax were checked. The
+previous flight, ground-return and puddle previews remain available separately.
