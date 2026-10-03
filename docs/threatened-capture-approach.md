@@ -228,3 +228,9 @@ retain their hashes.
   `92ab7a667abb4e1af53306b7a28e6c3f67640b888a8c76db8f0b3c3726c33444`
 - Evidence archive SHA-256:
   `8273740d539f6c94ba7a118ce89121e799fa7b48e1116b595a667a757a573881`
+
+The follow-up [initial-cover admission experiment](initial-cover-admission.md)
+implements and compares the proposed check. It remains disabled after mixed
+complete outcomes, loss of the earlier successful capture, and evidence that an
+early sensor request does not necessarily reprioritize an already pending route
+job.
