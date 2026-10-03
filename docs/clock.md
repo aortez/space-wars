@@ -452,11 +452,12 @@ crosses, then brakes onto its chosen digit. Landing depends on position and spee
 travel no longer takes a fixed 100 ticks. Cruising height follows the digit size,
 with room for the wings in wide layouts. Nearby hops retain their existing motion.
 
-After a short look around, a crow can make one ground excursion: descend through
-a clear lane beside the digits, peck three times, then head back to a nearby dry
-perch. A time/clearance check skips unsuitable trips, especially in narrow layouts.
-The normal departure deadline still wins over a late return. Custom duck courses
-and moving floor panels are excluded; losing level support interrupts the trip.
+After a short look around, about one in five eligible visits includes a ground
+excursion: descend through a clear lane beside the digits, peck twice,
+then climb and fly away. The choice is made once per visit; pecking ends that
+visit. Time and clearance checks skip unsuitable trips, especially in narrow
+layouts. Custom duck courses and moving floor panels are excluded. Losing level
+support during pecking also prompts departure.
 
 Landing choices reject water deeper than the bird tolerates. Shy visitors avoid
 puddles at their feet and ground landings in spray. Hardy visitors accept puddles
