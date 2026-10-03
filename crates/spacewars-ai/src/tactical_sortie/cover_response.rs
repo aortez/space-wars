@@ -1,4 +1,5 @@
-//! Bounded, opt-in evidence acquisition after a witnessed cover failure.
+//! Bounded, opt-in evidence acquisition after a witnessed cover failure or
+//! an explicitly enabled initial approach qualification.
 //! A requested site is a sensor request, never a retained landing permission.
 use super::*;
 use scenario_spacewars::surface_sortie::{
@@ -67,6 +68,7 @@ pub(super) fn usable_cover(o: &TacticalSortieObservationV1, site: &PilotLandingS
 
 impl TacticalSortiePilot {
     pub(crate) fn enable_cover_response(&mut self, enabled: bool) {
+        assert!(enabled || self.telemetry.initial_cover.is_none());
         self.telemetry.cover_response = enabled.then(CoverResponse::default);
     }
 
@@ -286,6 +288,7 @@ impl TacticalSortiePilot {
         if !self.cover_required(o, selection::exposed(o)) {
             return None;
         }
+        let initial_active = self.initial_cover_active();
         let state = self.telemetry.cover_response.as_mut().unwrap();
         let search = state.search.as_mut()?;
         state.first_effect_tick.get_or_insert(p.tick);
@@ -294,7 +297,7 @@ impl TacticalSortiePilot {
                 || self
                     .required_site
                     .is_some_and(|id| p.site_query == LandingSiteQuery::Selected(id));
-            if !complete_scan || (objective.is_some() && survey.is_none()) {
+            if !complete_scan || (objective.is_some() && survey.is_none() && !initial_active) {
                 self.acquisition_reason("cover_evidence_pending");
                 return Some(self.wait_for_site(o, 12.0));
             }
@@ -305,9 +308,23 @@ impl TacticalSortiePilot {
                 .take(MAX_COVER_PROBES - search.probes)
                 .collect();
             search.omitted = unknown.len() - search.pending.len();
+            if initial_active {
+                self.telemetry
+                    .initial_cover
+                    .as_mut()
+                    .unwrap()
+                    .last_seed_tick = Some(p.tick);
+            }
             if !search.pending.is_empty() {
                 search.probes += 1;
                 state.requested_sites += 1;
+                if initial_active {
+                    self.telemetry
+                        .initial_cover
+                        .as_mut()
+                        .unwrap()
+                        .requested(p.tick, search.pending[0]);
+                }
             }
         } else if let Some(id) = search.pending.first().copied() {
             let deferred_walk = unknown.contains(&id) && walking_method_deferred(o, search, id);
@@ -328,6 +345,13 @@ impl TacticalSortiePilot {
             if !search.pending.is_empty() {
                 search.probes += 1;
                 state.requested_sites += 1;
+                if initial_active {
+                    self.telemetry
+                        .initial_cover
+                        .as_mut()
+                        .unwrap()
+                        .requested(p.tick, search.pending[0]);
+                }
             }
         }
         if search.pending.is_empty() {

@@ -25,6 +25,7 @@ mod acquisition;
 mod acquisition_wait;
 mod cover_response;
 mod cover_retry;
+mod initial_cover;
 mod selection;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
 pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
@@ -32,6 +33,7 @@ pub use cover_response::{
     COVER_RESPONSE_PROFILE, COVER_SEARCH_TICKS, CoverResponse, CoverSearch, MAX_COVER_PROBES,
 };
 pub use cover_retry::{COVER_RETRY_PROFILE, COVER_RETRY_TICKS, CoverRetryCooldown};
+pub use initial_cover::{INITIAL_COVER_PROFILE, InitialCover, InitialCoverRequest};
 #[cfg(test)]
 pub(crate) use selection::select as select_for_test;
 pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};
@@ -97,6 +99,8 @@ pub struct TacticalTelemetry {
     pub cover_retry_cooldown: Option<CoverRetryCooldown>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cover_response: Option<CoverResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_cover: Option<InitialCover>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -169,6 +173,7 @@ impl TacticalSortiePilot {
                 acquisition_wait: None,
                 cover_retry_cooldown: None,
                 cover_response: None,
+                initial_cover: None,
             },
             landing,
             site: None,
@@ -204,12 +209,14 @@ impl TacticalSortiePilot {
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.telemetry.cover_retry_cooldown.is_some();
         let cover_response = self.telemetry.cover_response.is_some();
+        let initial_cover = self.telemetry.initial_cover.is_some();
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
         self.required_site = required;
         self.bounded_acquisition = bounded_acquisition;
         self.enable_cover_retry_cooldown(cover_retry_cooldown);
         self.enable_cover_response(cover_response);
+        self.enable_initial_cover(initial_cover);
     }
     /// Explicit continuation trials may constrain selection, but still need
     /// current material, solar and objective-route evidence for this ID.
@@ -300,6 +307,7 @@ impl TacticalSortiePilot {
     ) {
         self.begin_acquisition(o);
         self.acquisition_reason(reason);
+        self.prepare_initial_cover(o);
         self.check_acquisition_deadline(o);
         self.check_cover_search_deadline(o);
     }
@@ -381,6 +389,7 @@ impl TacticalSortiePilot {
             self.acquisition_reason("controls_unarmed");
             return CombatIntent::default();
         }
+        self.prepare_initial_cover(o);
         if self.check_acquisition_deadline(o) || self.check_cover_search_deadline(o) {
             return self.combat.intent(c);
         }
@@ -673,6 +682,7 @@ impl TacticalSortiePilot {
                 acquisition.checks = checks;
             }
             if let Some((site, side, solar, _)) = selected {
+                self.finish_initial_cover(p.tick, "selected_site", Some(site.id), Some(exposed));
                 self.finish_selected_cover_search(o, site, survey);
                 self.acquisition_reason("selected_site");
                 self.site = Some(site);

@@ -51,6 +51,16 @@ impl CaptureEvidence {
                 "target":o.local.combat.target,
                 "last_hit_taken_tick":o.local.combat.weapons.last_hit_taken_tick});
         }
+        if let Some(initial) = m.capture.as_ref().and_then(|c| c.initial_cover.as_ref())
+            && (initial.armed_tick == Some(p.tick)
+                || initial.finished_tick == Some(p.tick)
+                || initial.last_seed_tick == Some(p.tick)
+                || initial.last_request.is_some_and(|r| r.tick == p.tick))
+        {
+            // Bounded event witnesses use the exact consumed observation. No
+            // extra scan, route probe or future-state query is performed.
+            record["initial_cover"] = json!({"observation":o});
+        }
         serde_json::to_writer(&mut self.0, &record).unwrap();
         writeln!(self.0).unwrap();
     }

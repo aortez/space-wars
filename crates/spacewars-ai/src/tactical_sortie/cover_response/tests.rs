@@ -5,6 +5,8 @@ use scenario_spacewars::surface_sortie::{
     ground_navigation::GroundRouteDiagnostics, landing_objective::ObjectivePlanning,
 };
 
+#[path = "initial_tests.rs"]
+mod initial;
 #[path = "walk_feedback_tests.rs"]
 mod walk_feedback;
 

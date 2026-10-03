@@ -30,6 +30,8 @@ pub struct Settings {
     pub bounded_acquisition: bool,
     pub cover_retry: bool,
     pub cover_response: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub initial_cover: bool,
 }
 
 pub fn pair(
@@ -103,7 +105,8 @@ fn run(
     )
     .with_bounded_acquisition(settings.bounded_acquisition)
     .with_cover_retry_cooldown(settings.cover_retry)
-    .with_cover_response(settings.cover_response);
+    .with_cover_response(settings.cover_response)
+    .with_initial_cover(settings.initial_cover);
     let initial_audit = state.terrain_diagnostics();
     let conserved = initial_audit.occupied_cells + initial_audit.removed_cells;
     let initial_claim = initial.planet.claim.as_ref().unwrap();
@@ -281,6 +284,7 @@ mod tests {
             bounded_acquisition: false,
             cover_retry: false,
             cover_response: true,
+            initial_cover: false,
         };
         for planning in [
             ObjectivePlanning::JointRoundTrip,

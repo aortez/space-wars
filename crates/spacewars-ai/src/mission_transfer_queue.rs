@@ -67,6 +67,7 @@ struct Source {
     breaks: CombatBreakSettings,
     bounded_acquisition: bool,
     cover_response: bool,
+    initial_cover: bool,
     destination_failures: Option<Vec<DestinationFailure>>,
     disengagement: Option<(bool, bool, bool)>,
     selected_tick: u64,
@@ -111,6 +112,7 @@ impl Source {
             breaks: bot.breaks,
             bounded_acquisition: bot.bounded_acquisition,
             cover_response: bot.cover_response,
+            initial_cover: bot.initial_cover,
             destination_failures: bot
                 .telemetry
                 .destination_retry
@@ -154,6 +156,7 @@ impl Source {
             || bot.objective_planning() != self.objective_planning
             || bot.bounded_acquisition != self.bounded_acquisition
             || bot.cover_response != self.cover_response
+            || bot.initial_cover != self.initial_cover
             || Self::disengagement_config(bot) != self.disengagement
         {
             return Err("controller configuration changed");
@@ -948,6 +951,7 @@ mod tests {
             |b, _| b.breaks.interval_seconds += 1,
             |b, _| b.bounded_acquisition = !b.bounded_acquisition,
             |b, _| b.cover_response = !b.cover_response,
+            |b, _| b.initial_cover = !b.initial_cover,
             |b, _| b.telemetry.powered_capture = !b.telemetry.powered_capture,
             |b, _| b.enable_destination_retry(true),
             |b, _| b.enable_pursuit_disengagement(true),

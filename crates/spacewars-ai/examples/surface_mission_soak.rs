@@ -310,6 +310,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--cover-response-seats must be none, 0, 1 or both"),
     };
+    let initial_cover_seats = match arg("--initial-cover-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--initial-cover-seats must be none, 0, 1 or both"),
+    };
     let destination_retry_seats = match arg("--destination-retry-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -396,6 +403,7 @@ fn main() {
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
+        .with_initial_cover(initial_cover_seats[i])
         .with_destination_retry(destination_retry_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
@@ -761,6 +769,7 @@ fn main() {
                             bounded_acquisition: acquisition_seats[i],
                             cover_retry: cover_retry_seats[i],
                             cover_response: cover_response_seats[i],
+                            initial_cover: initial_cover_seats[i],
                         },
                     );
                 }
@@ -1039,6 +1048,12 @@ fn main() {
             "profile": "vehicle_flight_continuation_v1",
             "enabled_seats": powered_capture_seats,
             "scope": "Current-state continuation forecasts for an already launched flight. Original launch certificate and 12-second maneuver deadline are retained; current clearance, arrival and remaining-fuel checks are required at each completed survey. Synchronous prediction work remains outside live planner quotas.",
+        });
+    }
+    if initial_cover_seats.contains(&true) {
+        report["initial_cover"] = json!({
+            "profile": spacewars_ai::tactical_sortie::INITIAL_COVER_PROFILE,
+            "enabled_seats": initial_cover_seats,
         });
     }
     if pursuit_health_seats.contains(&true) {

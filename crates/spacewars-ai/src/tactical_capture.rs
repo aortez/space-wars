@@ -106,6 +106,13 @@ impl TacticalCapturePilot {
         self.telemetry.sortie.policy = Self::policy(self.planning);
         self
     }
+    /// Opt-in current cover qualification before the first airborne choice.
+    pub fn with_initial_cover(mut self, enabled: bool) -> Self {
+        self.base.enable_initial_cover(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
     pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
         self.base.enable_cover_retry_cooldown(enabled);
         self.telemetry.sortie = self.base.telemetry().clone();

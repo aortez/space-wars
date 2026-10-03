@@ -117,7 +117,13 @@ impl MissionBot {
     /// Opt-in response to confirmed cover failures; standard defaults omit it.
     pub fn with_cover_response(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        assert!(enabled || !self.0.initial_cover);
         self.0.cover_response = enabled;
+        self
+    }
+    /// Opt-in initial qualification; requires the bounded cover response.
+    pub fn with_initial_cover(mut self, enabled: bool) -> Self {
+        self.0.configure_initial_cover(enabled);
         self
     }
     /// Opt-in capture-failure context for initial and switched destinations.
