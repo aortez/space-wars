@@ -170,3 +170,8 @@ departure or disengagement response that preserves defensive weapons and
 physical safety priorities while measuring whether it actually gains separation.
 Do not treat suppressing pursuit as proof of escape, or tune that next policy
 against only this already-known match.
+
+The [bounded escape follow-up](capture-escape.md) tests that transition. It
+extends immediate ship survival, but the two affected full matches complete
+fewer objectives and lose earlier. The escape remains opt-in; the next gap is
+the handoff into travel and subsequent pursuit.
