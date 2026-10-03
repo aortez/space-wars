@@ -78,3 +78,88 @@ python3 tools/validate-flight-continuation.py \
   --binary target/flight-continuation/surface_mission_soak-COMMIT \
   --out target/flight-continuation/v1
 ```
+
+## Frozen results
+
+Implementation, tests, plan and runner were frozen at `4d360d1`. All 21 runs
+completed and passed the physical, publication, allocation and continuation
+auditors. All seven disabled replays retain the exact prior streams and
+non-timing telemetry, including the original interruption. All seven enabled
+walking-policy cases also retain their prior streams. Thirteen of the fourteen
+enabled cases have identical action sequences and physical/mission outcomes.
+Only `shared-armed-world1-p1-powered` changes controls, first at tick **8430**.
+
+That case completes the previously interrupted flight and the previously
+abandoned enemy-flag visit:
+
+| Event for evaluated P1 | Prior powered route | Active-flight checks |
+| --- | --- | --- |
+| First actual launch press | 8283 | 8283 |
+| Behavior at 8430 | Interrupts; begins settling | Continues Cross |
+| Completed crossing | None | 8765, with 19.44% charge |
+| Planet 0 enemy flag claimed | None | 10713 |
+| Original ship boarded within this capture visit | None | 12297 |
+| Departure completing this capture visit | None | 12520 |
+| Total completed capture sorties in the match | 2 | 2 |
+| Match result | Loss at 13547 | Loss at 15435 |
+
+The prior run abandoned this visit at 8822 and made a recovery boarding at
+8973. Its second completed capture was a later planet 2 visit. The new run's
+second completed capture is the repaired planet 0 visit; it does not add a third
+sortie or change the winner. The new loss is a later ship impact, separate from
+the completed on-foot crossing and capture.
+
+Sixteen current-state predictions approve this one flight, at ticks 8310 through
+8760. Twelve approve when the ordinary new-launch forecast is unavailable.
+Every request retains the actual launch tick **8283**, the original forecast
+measured at **8280**, and its launch expiry at **8400**. No response changes
+those clocks. The first approval at the former interruption has 77.78% charge,
+predicts 5.483 seconds remaining and 1.750 seconds of burn, within the remaining
+time and fuel limits. The final approval predicts zero remaining flight time;
+the controller completes the physical landing five ticks later. No match
+continuation was rejected; rejection behavior is exercised by the physical and
+negative tests, not inferred from these successful match samples.
+
+The other thirteen cases contain no active-flight checks. Across all fourteen
+enabled runs, evaluated-seat armed wins remain **2/8**, and no armed run changes
+its number of completed capture departures. This small, correlated corpus
+supports the specific interruption fix, not a general win-rate improvement.
+
+## Validation and evidence
+
+- **1,017 Rust tests and 657 Python tests pass.** Physical continuation tests
+  cover parked ships plus 24 moving-world flights across three radii, reflected
+  motion, both seats and both directions. They remove prospective-launch
+  forecasts during flight, exercise stale/missing/failed responses, and retain
+  physical landing, fuel and recharge checks. A separate test adds new collision
+  geometry and verifies rejection without mutating the observed state.
+- Formatting, strict AI Clippy and both profiled and ordinary release builds
+  pass. Scenario Clippy still reports seven existing findings in unchanged code.
+- The enabled runs audit 481,274 pilot rows and 273,037 shared dispatch ticks.
+  Maximum charged work remains **4 graph operations / 384 physics queries per
+  dispatch**, and route publication age stays at or below **120 ticks**.
+  The longer changed match performs 2,457 more graph operations and 12,954 more
+  charged physics queries in total; these totals do not measure efficiency.
+- The separate continuation sensor stage records 16 calls, 1.270306 ms total
+  inclusive time and 0.145485 ms maximum on this machine. These are local timing
+  observations from two concurrent games, outside the planner quota. They do
+  not establish Raspberry Pi throughput.
+
+[The result manifest](data/active-flight-continuation-v1.json) summarizes every
+run, including losses and unchanged outcomes.
+[The compressed evidence archive](data/active-flight-continuation-v1.json.gz)
+contains 68 exact documents: frozen summaries, diagnostic patch/log/replay,
+raw-file hashes, first changed controls, all continuation responses, physical
+milestones, sensor timings and validation logs. All embedded text hashes and
+all 288 trial files plus 12 diagnostic files were verified against local raw
+files. Full streams remain under `target/flight-continuation`.
+
+- Frozen binary SHA-256:
+  `a2a0d26bb95d2b47a35a3b4b3f7953f6fad7656ad5e526f2ae829dbab8fdbae0`
+- Frozen summary SHA-256:
+  `73eee49482fd6a1b46ba4838be65d5080824c60759a636bc306225c860397a8a`
+- Evidence archive SHA-256:
+  `50e77d839178cbf9cd16dae5c14a04cd3ae02e73a5151c4e06f16690fdce7a9d`
+
+The option remains disabled by default. The later ship-impact loss is a separate
+investigation; this change does not justify changing bot defaults.
