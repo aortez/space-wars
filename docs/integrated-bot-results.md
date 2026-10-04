@@ -145,6 +145,11 @@ were checked again after the complete comparison.
 
 ## Next boundary
 
+The [completed combat/recovery diagnosis](integrated-bot-regression.md) now
+reproduces the recorded v10 pair exactly and identifies a bounded pursuit-climb
+laser opportunity for the next experiment. The original selection below remains
+the record of how that investigation was chosen.
+
 The candidate demonstrates some useful completed missions, but it does not pass
 the screen for a broader/device evaluation. Defaults remain unchanged and
 [#142](https://github.com/aortez/space-wars/issues/142) stays open.
