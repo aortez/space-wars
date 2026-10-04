@@ -94,9 +94,9 @@ cargo +1.89.0 run --locked --release -p engine-agent -- --suite navigation-v1 --
 cargo +1.89.0 run --locked --release -p engine-agent -- --suite strategy-v1 --verify
 ```
 
-GitHub currently permits only squash merges. The published checkpoint tag
-`bot-execution-checkpoint-2026-10-03` keeps this investigation's source commits
-reachable independently of the eventual PR branch lifecycle. Files under
+GitHub currently permits only squash merges. Publish the checkpoint tag
+`bot-execution-checkpoint-2026-10-03` with the branch to keep this investigation's
+source commits reachable independently of the eventual PR branch lifecycle. Files under
 `docs/data/` are marked as generated for GitHub review; the data remains tracked.
 
 This PR does not close [the policy-quality gate](https://github.com/aortez/space-wars/issues/142).
