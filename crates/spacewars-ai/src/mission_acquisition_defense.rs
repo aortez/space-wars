@@ -5,6 +5,39 @@ use engine_common::Action;
 use scenario_spacewars::surface_sortie::{LandingPhase, VehicleId};
 
 pub const ACQUISITION_DEFENSE_PROFILE: &str = "airborne_acquisition_defense_v1";
+pub const ACQUISITION_CLEARANCE_PROFILE: &str = "airborne_acquisition_clearance_v1";
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct AcquisitionClearance {
+    pub checks: u32,
+    pub rejected: u32,
+    pub last: Option<AcquisitionClearanceCheck>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AcquisitionClearanceCheck {
+    pub tick: u64,
+    pub decision: &'static str,
+    pub planet: usize,
+    pub vehicle: VehicleId,
+    pub opponent: PlayerId,
+    pub hit_source: &'static str,
+    pub capture: CaptureTelemetry,
+    pub native_actions: [Action; 3],
+    pub direction: Vec2,
+    pub estimated_min_range: f32,
+    pub estimated_clearance: f32,
+}
+
+fn clearance_decision(clearance: f32) -> &'static str {
+    if !clearance.is_finite() {
+        "nonfinite_forecast"
+    } else if clearance < 0.0 {
+        "negative_clearance"
+    } else {
+        "admitted"
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct AcquisitionDefense {
@@ -50,6 +83,18 @@ impl MaterialMissionPilot {
         );
         assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
         self.telemetry.acquisition_defense = enabled.then(AcquisitionDefense::default);
+        if !enabled {
+            self.telemetry.acquisition_clearance = None;
+        }
+    }
+
+    pub(crate) fn configure_acquisition_clearance(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(!enabled || self.telemetry.acquisition_defense.is_some());
+        self.telemetry.acquisition_clearance = enabled.then(AcquisitionClearance::default);
     }
 
     fn acquisition_defending(&self) -> bool {
@@ -120,6 +165,29 @@ impl MaterialMissionPilot {
         let capture = capture.clone();
         let (direction, estimated_min_range, estimated_clearance) =
             disengagement::escape_direction(o, true);
+        if let Some(gate) = &mut self.telemetry.acquisition_clearance {
+            let decision = clearance_decision(estimated_clearance);
+            gate.checks += 1;
+            gate.last = Some(AcquisitionClearanceCheck {
+                tick: p.tick,
+                decision,
+                planet: p.planet.index,
+                vehicle: p.vehicle,
+                opponent: target.owner,
+                hit_source: c.weapons.last_hit_source.unwrap(),
+                capture: capture.clone(),
+                native_actions: native.encode(p.owner),
+                direction,
+                estimated_min_range,
+                estimated_clearance,
+            });
+            if decision != "admitted" {
+                gate.rejected += 1;
+                // Keep the native task and intent. A rejected proposal starts
+                // neither the escape clock nor the source-planet cooldown.
+                return native;
+            }
+        }
         let deadline_tick = p.tick + DISENGAGEMENT_TICKS;
         let state = self.telemetry.acquisition_defense.as_mut().unwrap();
         state.attempts += 1;

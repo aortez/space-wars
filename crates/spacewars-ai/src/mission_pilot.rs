@@ -25,7 +25,8 @@ mod acquisition_defense;
 #[path = "mission_capture_escape.rs"]
 mod capture_escape;
 pub use acquisition_defense::{
-    ACQUISITION_DEFENSE_PROFILE, AcquisitionDefense, AcquisitionDefenseAttempt,
+    ACQUISITION_CLEARANCE_PROFILE, ACQUISITION_DEFENSE_PROFILE, AcquisitionClearance,
+    AcquisitionClearanceCheck, AcquisitionDefense, AcquisitionDefenseAttempt,
 };
 #[path = "mission_escape_travel.rs"]
 mod escape_travel;
@@ -192,6 +193,8 @@ pub struct MissionTelemetry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acquisition_defense: Option<AcquisitionDefense>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition_clearance: Option<AcquisitionClearance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub escape_travel: Option<EscapeTravel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer_approach: Option<TransferApproach>,
@@ -298,6 +301,7 @@ impl MaterialMissionPilot {
                 destination_retry: None,
                 capture_escape: None,
                 acquisition_defense: None,
+                acquisition_clearance: None,
                 escape_travel: None,
                 transfer_approach: None,
                 transfer_speed: None,
@@ -340,6 +344,7 @@ impl MaterialMissionPilot {
         let actual_route_recovery = self.actual_route_recovery;
         let capture_escape = self.telemetry.capture_escape.is_some();
         let acquisition_defense = self.telemetry.acquisition_defense.is_some();
+        let acquisition_clearance = self.telemetry.acquisition_clearance.is_some();
         let escape_travel = self.telemetry.escape_travel.is_some();
         let transfer_approach = self.telemetry.transfer_approach.is_some();
         let transfer_speed = self.telemetry.transfer_speed.is_some();
@@ -361,6 +366,7 @@ impl MaterialMissionPilot {
         self.configure_actual_route_recovery(actual_route_recovery);
         self.configure_capture_escape(capture_escape);
         self.configure_acquisition_defense(acquisition_defense);
+        self.configure_acquisition_clearance(acquisition_clearance);
         self.configure_escape_travel(escape_travel);
         self.configure_transfer_approach(transfer_approach);
         self.configure_transfer_speed(transfer_speed);

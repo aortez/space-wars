@@ -316,6 +316,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--acquisition-defense-seats must be none, 0, 1 or both"),
     };
+    let acquisition_clearance_seats = match arg("--acquisition-clearance-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--acquisition-clearance-seats must be none, 0, 1 or both"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -464,6 +471,7 @@ fn main() {
         .with_pursuit_health(pursuit_health_seats[i])
         .with_pursuit_climb_laser(pursuit_climb_laser_seats[i])
         .with_acquisition_defense(acquisition_defense_seats[i])
+        .with_acquisition_clearance(acquisition_clearance_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
@@ -1190,6 +1198,18 @@ fn main() {
             if enabled {
                 report["policy_configuration"][seat]["acquisition_defense_model"] =
                     json!(spacewars_ai::mission_pilot::ACQUISITION_DEFENSE_PROFILE);
+            }
+        }
+    }
+    if acquisition_clearance_seats.contains(&true) {
+        report["acquisition_clearance"] = json!({
+            "profile": spacewars_ai::mission_pilot::ACQUISITION_CLEARANCE_PROFILE,
+            "enabled_seats": acquisition_clearance_seats,
+        });
+        for (seat, enabled) in acquisition_clearance_seats.into_iter().enumerate() {
+            if enabled {
+                report["policy_configuration"][seat]["acquisition_clearance_model"] =
+                    json!(spacewars_ai::mission_pilot::ACQUISITION_CLEARANCE_PROFILE);
             }
         }
     }

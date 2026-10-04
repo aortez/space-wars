@@ -329,3 +329,185 @@ fn enabled_configuration_is_v13_only_and_cannot_change_mid_episode() {
         .is_err()
     );
 }
+
+fn without_defense_options(bot: &MaterialMissionPilot) -> serde_json::Value {
+    let mut value = serde_json::to_value(&bot.telemetry).unwrap();
+    value.as_object_mut().unwrap().remove("acquisition_defense");
+    value
+        .as_object_mut()
+        .unwrap()
+        .remove("acquisition_clearance");
+    value
+}
+
+#[test]
+fn negative_forecast_preserves_native_capture_actions_and_coordinator_state() {
+    let (mut gated, mut o) = fixture(true);
+    gated.configure_acquisition_clearance(true);
+    o.boundary.radius = 170.0;
+    let (mut native, _) = fixture(false);
+    let observation = o.clone();
+    assert_eq!(gated.intent(&o), native.intent(&o));
+    assert_eq!(o, observation);
+    assert_eq!(
+        without_defense_options(&gated),
+        without_defense_options(&native)
+    );
+    assert_eq!(gated.deferred, native.deferred);
+    assert_eq!(gated.next_pursuit_tick, native.next_pursuit_tick);
+    assert_eq!(
+        gated.capture.as_ref().unwrap().telemetry(),
+        native.capture.as_ref().unwrap().telemetry()
+    );
+    assert_eq!(
+        gated.telemetry.acquisition_defense,
+        Some(AcquisitionDefense::default())
+    );
+    let gate = gated.telemetry.acquisition_clearance.as_ref().unwrap();
+    assert_eq!((gate.checks, gate.rejected), (1, 1));
+    let check = gate.last.as_ref().unwrap();
+    assert_eq!(check.tick, 100);
+    assert_eq!(check.decision, "negative_clearance");
+    assert!(check.estimated_clearance < 0.0);
+    assert_eq!(&check.capture, native.capture.as_ref().unwrap().telemetry());
+    assert_eq!(
+        check.native_actions,
+        native.intent(&o).encode(PlayerId::PLAYER_1)
+    );
+}
+
+#[test]
+fn positive_forecast_preserves_original_escape_and_deadline() {
+    let (mut gated, o) = fixture(true);
+    gated.configure_acquisition_clearance(true);
+    let (mut original, _) = fixture(true);
+    assert_eq!(gated.intent(&o), original.intent(&o));
+    assert_eq!(last(&gated), last(&original));
+    assert_eq!(last(&gated).deadline_tick, 820);
+    assert_eq!(
+        without_defense_options(&gated),
+        without_defense_options(&original)
+    );
+    assert_eq!(gated.deferred, original.deferred);
+    let check = gated
+        .telemetry
+        .acquisition_clearance
+        .as_ref()
+        .unwrap()
+        .last
+        .as_ref()
+        .unwrap();
+    assert_eq!(check.decision, "admitted");
+    assert!(check.estimated_clearance >= 0.0);
+    assert_eq!(check.estimated_clearance, last(&gated).estimated_clearance);
+    assert_eq!(check.capture, last(&gated).capture);
+}
+
+#[test]
+fn rejection_does_not_prevent_a_later_safe_proposal_or_start_its_clock_early() {
+    let (mut bot, mut o) = fixture(true);
+    bot.configure_acquisition_clearance(true);
+    o.boundary.radius = 170.0;
+    bot.intent(&o);
+    assert!(!bot.acquisition_defending());
+    o.boundary.radius = 5000.0;
+    o.local.combat.recovery.flight.pilot.tick = 101;
+    o.local.combat.weapons.last_hit_taken_tick = Some(101);
+    bot.intent(&o);
+    assert!(bot.acquisition_defending());
+    assert_eq!(last(&bot).started_tick, 101);
+    assert_eq!(last(&bot).deadline_tick, 821);
+    assert_eq!(bot.deferred, vec![(0, 1901)]);
+    let gate = bot.telemetry.acquisition_clearance.as_ref().unwrap();
+    assert_eq!((gate.checks, gate.rejected), (2, 1));
+}
+
+#[test]
+fn duplicate_ticks_clones_and_reset_keep_the_clearance_receipt_bounded() {
+    let (mut bot, mut o) = fixture(true);
+    bot.configure_acquisition_clearance(true);
+    o.boundary.radius = 170.0;
+    let mut cloned = bot.clone();
+    assert_eq!(bot.intent(&o), cloned.intent(&o));
+    assert_eq!(bot.telemetry, cloned.telemetry);
+    let first = bot.telemetry.clone();
+    bot.intent(&o);
+    assert_eq!(bot.telemetry, first);
+    o.local.combat.recovery.flight.pilot.tick = 101;
+    o.local.combat.weapons.last_hit_taken_tick = Some(101);
+    bot.intent(&o);
+    let gate = bot.telemetry.acquisition_clearance.as_ref().unwrap();
+    assert_eq!((gate.checks, gate.rejected), (2, 2));
+    assert_eq!(gate.last.as_ref().unwrap().tick, 101);
+    bot.reset(bot.context);
+    assert_eq!(
+        bot.telemetry.acquisition_clearance,
+        Some(AcquisitionClearance::default())
+    );
+    assert_eq!(
+        bot.telemetry.acquisition_defense,
+        Some(AcquisitionDefense::default())
+    );
+}
+
+#[test]
+fn clearance_is_only_checked_for_a_current_eligible_handoff() {
+    for change in 0..4 {
+        let (mut bot, mut o) = fixture(true);
+        bot.configure_acquisition_clearance(true);
+        match change {
+            0 => o.local.combat.weapons.last_hit_taken_tick = Some(99),
+            1 => o.local.combat.target.as_mut().unwrap().visible = false,
+            2 => o.local.combat.recovery.flight.pilot.landing.supported_feet = 1,
+            _ => o.local.combat.recovery.flight.pilot.controls_armed = false,
+        }
+        bot.intent(&o);
+        assert_eq!(
+            bot.telemetry.acquisition_clearance,
+            Some(AcquisitionClearance::default())
+        );
+    }
+}
+
+#[test]
+fn zero_clearance_is_admissible_but_negative_and_nonfinite_are_not() {
+    for value in [0.0, -0.0, 20.0] {
+        assert_eq!(clearance_decision(value), "admitted");
+    }
+    for value in [-f32::EPSILON, -16.47] {
+        assert_eq!(clearance_decision(value), "negative_clearance");
+    }
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        assert_eq!(clearance_decision(value), "nonfinite_forecast");
+    }
+}
+
+#[test]
+fn clearance_requires_defense_and_configuration_before_the_first_intent() {
+    let (mut disabled, _) = fixture(false);
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            disabled.configure_acquisition_clearance(true);
+        }))
+        .is_err()
+    );
+    let (mut bot, o) = fixture(true);
+    assert!(
+        serde_json::to_value(&bot.telemetry)
+            .unwrap()
+            .get("acquisition_clearance")
+            .is_none()
+    );
+    bot.configure_acquisition_clearance(true);
+    bot.configure_acquisition_defense(false);
+    assert!(bot.telemetry.acquisition_clearance.is_none());
+    bot.configure_acquisition_defense(true);
+    bot.configure_acquisition_clearance(true);
+    bot.intent(&o);
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            bot.configure_acquisition_clearance(false);
+        }))
+        .is_err()
+    );
+}
