@@ -147,6 +147,51 @@ Keep improvements, reference pixel checks, Pi playtesting and reproduction
 notes together. A remaining architectural performance project should not
 become an unbounded requirement for finishing the terrain work.
 
+## Direction: GPU acceleration, with bounded software improvements now
+
+Keep native 1× rendering as the baseline. The [Clock follow-up](clock-performance-lab.md#native-resolution-follow-up-short-blends-and-covered-clears-2026-09-29)
+adds smaller exact ARM blend batches and omits output-background clears hidden
+by opaque RGB images. It deliberately does not add a rectangle raster fast
+path or change scene geometry, lighting or gameplay.
+
+GPU acceleration is the longer-term architectural direction, not an unlimited
+series of CPU shape-specific optimizations. A future experiment should measure
+two distinct steps: GPU presentation of the existing CPU-generated image, then
+GPU rendering of the scenario's geometry/layers as well. The former cannot
+remove the CPU scene-rasterization cost. Preserve the shared renderer inputs
+and software fallback, and verify clipping, alpha/layer order, text, screenshots,
+input and rotated HyperPixel output alongside the Pi 4 Picades. Benchmark CPU,
+frame pacing and visual quality before selecting a default; enabling the
+desktop GPU renderer does not establish support in the current Yocto kiosk.
+
+### Next isolated GPU experiment
+
+Use a separate branch and an opt-in build/runtime choice; keep software as the
+default until the device checks pass. The current pinned LinuxKMS backend has
+a FemtoVG/OpenGL option, while `engine-client`'s kiosk feature and renderer policy
+are configured for software. First audit that path and the image's EGL/GBM/Mesa
+support before choosing a backend or requiring an OS update.
+
+Compare three paths with the same scene, native viewport and fixed workload:
+
+1. Current CPU scene rasterization plus software presentation: the reference.
+2. CPU scene rasterization plus GPU image presentation: isolate output drawing,
+   upload and synchronization costs, including text and UI. This is a milestone,
+   not the final architecture.
+3. GPU drawing of scene geometry/layers plus GPU presentation: use the existing
+   scene representation so scenarios do not need GPU-specific code. Prototype
+   Clock first, then check a terrain/HUD-heavy Spacewars frame before generalizing.
+
+Report preparation, upload/presentation, total CPU, frame pacing and memory on
+both Pi 4 Picade and rotated Pi 5 HyperPixel. A stable 60 FPS alone is insufficient
+when the software reference already reaches it: the experiment must show useful
+CPU headroom. Check alpha/layer order, clipping, fonts, menus, screenshots and
+input/rotation against reference captures. GPU antialiasing need not be
+byte-identical, but missing geometry or changed composition is not acceptable.
+Retain an explicit software selection and test the failure/rollback route when
+GPU initialization is unavailable. Do not change physics, event cadence or
+resolution to make the comparison pass.
+
 ## Later: sustained 60 Hz, then higher-refresh support
 
 The Pi's boot configuration explicitly requests

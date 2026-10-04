@@ -77,7 +77,7 @@ pub(crate) fn approach_score(short: f32, side: f32, solar: bool, radius: f32) ->
     angle.abs() * (radius + 60.0)
 }
 
-pub(super) fn exposed(o: &TacticalSortieObservationV1) -> bool {
+pub(crate) fn exposed(o: &TacticalSortieObservationV1) -> bool {
     let p = &o.combat.recovery.flight.pilot;
     o.combat.target.is_some_and(|t| {
         !t.ground_occluded && t.motion.position.distance_to(p.ship.position) < 300.0

@@ -31,10 +31,11 @@ enum Failure {
     Denied,
     Keep,
     Rollback,
+    ManageDenied,
 }
 
 struct Fake {
-    inventory: Inventory,
+    inventory: Mutex<Inventory>,
     calls: Mutex<Vec<&'static str>>,
     failure: Failure,
     ready_calls: AtomicUsize,
@@ -51,11 +52,26 @@ impl Fake {
 }
 
 impl Backend for Fake {
+    async fn manage(&self, id: &str, change: ProfileChange) -> Result<(), String> {
+        self.call("manage");
+        assert_eq!(id, "profile-a");
+        if matches!(self.failure, Failure::ManageDenied) {
+            return Err("Profile change denied.".into());
+        }
+        let mut inventory = self.inventory.lock().unwrap();
+        let profile = inventory.profiles.iter_mut().find(|p| p.id == id).unwrap();
+        match change {
+            ProfileChange::Autoconnect(enabled) => profile.autoconnect = enabled,
+            _ => panic!("unexpected profile operation"),
+        }
+        Ok(())
+    }
+
     async fn inventory(&self) -> Result<Inventory, String> {
         if self.fail_inventory.swap(false, Ordering::Relaxed) {
             return Err("Inventory temporarily unavailable.".into());
         }
-        Ok(self.inventory.clone())
+        Ok(self.inventory.lock().unwrap().clone())
     }
     async fn scan(&self, _: &[String]) -> Result<(), String> {
         self.call("scan");
@@ -75,18 +91,23 @@ impl Backend for Fake {
     }
     async fn activate(
         &self,
-        _: &Network,
+        network: &Network,
         password: Option<&str>,
         trial: &mut Trial,
     ) -> Result<(), String> {
         assert_eq!(trial.checkpoint, "/checkpoint");
-        assert_eq!(password, Some("secret123"));
+        if network.saved.is_some() {
+            assert_eq!(network.saved.as_deref(), Some("/saved/exact"));
+            assert_eq!(password, None);
+        } else {
+            assert_eq!(password, Some("secret123"));
+        }
         self.call("activate");
         if matches!(self.failure, Failure::LostReply) {
             return futures_lite::future::pending().await;
         }
         trial.active = "/active".into();
-        trial.created_profile = Some("/candidate".into());
+        trial.created_profile = network.saved.is_none().then(|| "/candidate".into());
         match self.failure {
             Failure::Activate => Err("Activation failed.".into()),
             Failure::Hang => futures_lite::future::pending().await,
@@ -130,20 +151,42 @@ enum Finish {
 }
 
 fn exercise(failure: Failure, finish: Finish, valid_inventory: bool) -> (Vec<&'static str>, View) {
+    exercise_target(failure, finish, valid_inventory, false)
+}
+
+fn exercise_target(
+    failure: Failure,
+    finish: Finish,
+    valid_inventory: bool,
+    saved: bool,
+) -> (Vec<&'static str>, View) {
     async_io::block_on(async {
         let (tx, rx) = async_channel::bounded(2);
         let shared = Arc::new(Mutex::new(View::default()));
         let (events, received) = async_channel::unbounded();
         let fake = Fake {
-            inventory: Inventory {
+            inventory: Mutex::new(Inventory {
                 can_connect: !matches!(failure, Failure::Denied),
                 networks: if valid_inventory {
                     vec![network()]
                 } else {
                     vec![]
                 },
+                profiles: if saved && valid_inventory {
+                    vec![SavedNetwork {
+                        id: "profile-a".into(),
+                        autoconnect: false,
+                        network: Some(Network {
+                            saved: Some("/saved/exact".into()),
+                            ..network()
+                        }),
+                        ..SavedNetwork::default()
+                    }]
+                } else {
+                    vec![]
+                },
                 ..Inventory::default()
-            },
+            }),
             calls: Mutex::new(vec![]),
             failure,
             ready_calls: AtomicUsize::new(0),
@@ -151,9 +194,15 @@ fn exercise(failure: Failure, finish: Finish, valid_inventory: bool) -> (Vec<&'s
             scan_release: None,
             fail_inventory: AtomicBool::new(false),
         };
-        tx.send(Command::Connect {
-            id: "test-wifi".into(),
-            password: Some("secret123".into()),
+        tx.send(if saved {
+            Command::ConnectProfile {
+                id: "profile-a".into(),
+            }
+        } else {
+            Command::Connect {
+                id: "test-wifi".into(),
+                password: Some("secret123".into()),
+            }
         })
         .await
         .unwrap();
@@ -262,13 +311,13 @@ fn opening_scans_once_keeps_cached_results_and_rescan_is_rate_limited() {
         let (events, received) = async_channel::unbounded();
         let (release, scan_release) = async_channel::bounded(1);
         let fake = Fake {
-            inventory: Inventory {
+            inventory: Mutex::new(Inventory {
                 can_connect: true,
                 can_scan: true,
                 devices: vec!["/wifi".into()],
                 networks: vec![network()],
                 ..Inventory::default()
-            },
+            }),
             calls: Mutex::new(vec![]),
             failure: Failure::None,
             ready_calls: AtomicUsize::new(0),
@@ -364,4 +413,160 @@ fn session_busy_gate_rejects_duplicates_and_secrets_never_enter_view() {
     assert!(!format!("{:?}", session.snapshot()).contains("secret123"));
     drop(session);
     assert!(receiver.is_closed());
+}
+
+#[test]
+fn saved_changes_are_blocked_during_every_busy_phase() {
+    for phase in [
+        Phase::Discovering,
+        Phase::Connecting,
+        Phase::Confirm,
+        Phase::Saving,
+        Phase::Restoring,
+        Phase::Managing,
+    ] {
+        let (mut session, _, receiver) = Session::simulated(View {
+            phase,
+            ..View::default()
+        });
+        for change in [
+            ProfileChange::Autoconnect(false),
+            ProfileChange::Prefer,
+            ProfileChange::Forget { allow_active: true },
+        ] {
+            session.send(Command::Manage {
+                id: "profile-a".into(),
+                change,
+            });
+        }
+        session.send(Command::ConnectProfile {
+            id: "profile-a".into(),
+        });
+        assert!(
+            receiver.is_empty(),
+            "queued a saved-profile action during {phase:?}"
+        );
+    }
+}
+
+#[test]
+fn manual_profile_with_autoconnect_off_uses_keep_and_restore_trials() {
+    let (calls, view) = exercise_target(Failure::None, Finish::Keep, true, true);
+    assert_eq!(calls, ["checkpoint", "activate", "keep"]);
+    assert!(view.status.starts_with("Connection kept"));
+    assert!(!view.inventory.profiles[0].autoconnect);
+    let (calls, _) = exercise_target(Failure::None, Finish::CancelConfirmed, true, true);
+    assert_eq!(calls, ["checkpoint", "activate", "rollback"]);
+    let (calls, view) = exercise_target(Failure::None, Finish::Keep, false, true);
+    assert!(calls.is_empty());
+    assert!(view.status.contains("no longer exists"));
+}
+
+#[test]
+fn profile_worker_revalidates_stale_views_and_refreshes_successes_and_failures() {
+    for case in [
+        "success",
+        "denied",
+        "removed",
+        "active",
+        "permission",
+        "manual",
+        "read-error",
+    ] {
+        async_io::block_on(async {
+            let (events, _received) = async_channel::unbounded();
+            let fake = Fake {
+                inventory: Mutex::new(Inventory {
+                    can_manage: true,
+                    profiles: vec![SavedNetwork {
+                        id: "profile-a".into(),
+                        autoconnect: true,
+                        ..SavedNetwork::default()
+                    }],
+                    ..Inventory::default()
+                }),
+                calls: Mutex::new(vec![]),
+                failure: if case == "denied" {
+                    Failure::ManageDenied
+                } else {
+                    Failure::None
+                },
+                ready_calls: AtomicUsize::new(0),
+                events,
+                scan_release: None,
+                fail_inventory: AtomicBool::new(false),
+            };
+            let (mut session, latest, receiver) = Session::simulated(View {
+                phase: Phase::Discovering,
+                ..View::default()
+            });
+            let run = worker::run(&fake, receiver, latest);
+            let driver = async {
+                while session.snapshot().phase != Phase::Idle {
+                    async_io::Timer::after(Duration::from_millis(1)).await;
+                }
+                // Change daemon state after the UI's snapshot, before its click.
+                let change = {
+                    let mut inventory = fake.inventory.lock().unwrap();
+                    match case {
+                        "removed" => inventory.profiles.clear(),
+                        "active" => inventory.profiles[0].connected = true,
+                        "permission" => inventory.can_manage = false,
+                        "manual" => inventory.profiles[0].autoconnect = false,
+                        "read-error" => fake.fail_inventory.store(true, Ordering::Relaxed),
+                        _ => {}
+                    }
+                    match case {
+                        "active" => ProfileChange::Forget {
+                            allow_active: false,
+                        },
+                        "manual" => ProfileChange::Prefer,
+                        _ => ProfileChange::Autoconnect(false),
+                    }
+                };
+                session.send(Command::Manage {
+                    id: "profile-a".into(),
+                    change,
+                });
+                assert_eq!(session.snapshot().phase, Phase::Managing);
+                // A duplicate button press cannot initiate a second change.
+                session.send(Command::Manage {
+                    id: "profile-a".into(),
+                    change,
+                });
+                while session.snapshot().phase != Phase::Idle {
+                    async_io::Timer::after(Duration::from_millis(1)).await;
+                }
+                let view = session.snapshot();
+                assert_eq!(view.inventory, *fake.inventory.lock().unwrap());
+                let expected = match case {
+                    "success" => "setting saved",
+                    "denied" => "denied",
+                    "removed" => "no longer exists",
+                    "active" => "now active",
+                    "permission" => "check permissions",
+                    "manual" => "Enable Connect automatically",
+                    "read-error" => "temporarily unavailable",
+                    _ => unreachable!(),
+                };
+                assert!(view.status.contains(expected), "{case}: {}", view.status);
+                let expected_calls: &[&str] = if matches!(case, "success" | "denied") {
+                    &["manage"]
+                } else {
+                    &[]
+                };
+                assert_eq!(*fake.calls.lock().unwrap(), expected_calls, "{case}");
+                if case == "success" {
+                    assert!(!view.inventory.profiles[0].autoconnect);
+                }
+                drop(session);
+            };
+            worker::bounded(Duration::from_secs(5), async {
+                futures_lite::future::zip(run, driver).await;
+                Ok(())
+            })
+            .await
+            .expect("profile worker must finish");
+        });
+    }
 }

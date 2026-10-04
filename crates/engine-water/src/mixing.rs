@@ -2,7 +2,7 @@
 //! and oriented-footprint tests join local slices, not whole distant streams. Rain,
 //! splashes and already mixed jets are deliberately outside this first model.
 use crate::{
-    MAX_PARCELS, Parcel, WaterConfig,
+    MAX_PARCELS, Parcel, SolidBox, WaterConfig,
     spill::{Section, Spill, SpillSource},
 };
 use engine_core::Vec2;
@@ -35,6 +35,7 @@ struct Group {
     volume: f64,
     position: [f64; 2],
     momentum: [f64; 2],
+    horizontal_energy: f64,
     durations: [f64; 2],
     upstream_first: [u64; 2],
     upstream_last: [u64; 2],
@@ -43,12 +44,22 @@ struct Group {
 }
 
 impl Group {
-    fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64) {
+    fn center(&self) -> Vec2 {
+        Vec2::new(
+            (self.position[0] / self.volume) as f32,
+            (self.position[1] / self.volume) as f32,
+        )
+    }
+
+    fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64, splash: bool) {
         self.volume += parcel.volume;
         self.position[0] += parcel.position.x as f64 * parcel.volume;
         self.position[1] += parcel.position.y as f64 * parcel.volume;
         self.momentum[0] += parcel.velocity.x as f64 * parcel.volume;
         self.momentum[1] += parcel.velocity.y as f64 * parcel.volume;
+        if splash {
+            self.horizontal_energy += f64::from(parcel.velocity.x).powi(2) * parcel.volume;
+        }
         let side = usize::from(outlet == self.outlets[1]);
         self.durations[side] += parcel.duration;
         self.upstream_first[side] = self.upstream_first[side].min(emission_tick);
@@ -143,11 +154,14 @@ fn swept_overlap(a: Candidate, b: Candidate, pa: Parcel, pb: Parcel, dt: f64) ->
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn step(
     parcels: &mut Vec<Parcel>,
     spills: &mut Vec<Option<Spill>>,
     scratch: &mut Scratch,
     stats: &mut Stats,
+    splash: &mut crate::splash::State,
+    solids: &[SolidBox],
     config: WaterConfig,
     dt: f64,
     tick: u64,
@@ -203,11 +217,26 @@ pub(crate) fn step(
             if !swept_overlap(a, b, pa, pb, dt) {
                 continue;
             }
+            // Mixing replaces the two centers with their weighted mean before
+            // advection. Do not move that volume through intervening scenery;
+            // the later wall sweep cannot recover each source's side of a wall.
+            if solids
+                .iter()
+                .any(|solid| solid.blocks_segment(pa.position, pb.position))
+            {
+                continue;
+            }
             consumed[a.index] = true;
             consumed[b.index] = true;
             let outlets = [a.outlet.min(b.outlet), a.outlet.max(b.outlet)];
             let contact_min = Vec2::new(a.min.x.max(b.min.x), a.min.y.max(b.min.y));
             let contact_max = Vec2::new(a.max.x.min(b.max.x), a.max.y.min(b.max.y));
+            let pair_center = Vec2::new(
+                ((pa.position.x as f64 * pa.volume + pb.position.x as f64 * pb.volume)
+                    / (pa.volume + pb.volume)) as f32,
+                ((pa.position.y as f64 * pa.volume + pb.position.y as f64 * pb.volume)
+                    / (pa.volume + pb.volume)) as f32,
+            );
             // Only a shared local contact patch may aggregate several slices.
             // Two remote intersections of the same outlets stay separate.
             let group = if let Some(i) = scratch.groups.iter().position(|g| {
@@ -217,6 +246,11 @@ pub(crate) fn step(
                     && contact_max.x >= g.contact_min.x
                     && contact_min.y <= g.contact_max.y
                     && contact_max.y >= g.contact_min.y
+                    // Several individually clear pairs must not aggregate
+                    // around a corner into a center inside the same solid.
+                    && !solids
+                        .iter()
+                        .any(|solid| solid.blocks_segment(g.center(), pair_center))
             }) {
                 &mut scratch.groups[i]
             } else {
@@ -227,6 +261,7 @@ pub(crate) fn step(
                     volume: 0.0,
                     position: [0.0; 2],
                     momentum: [0.0; 2],
+                    horizontal_energy: 0.0,
                     durations: [0.0; 2],
                     upstream_first: [u64::MAX; 2],
                     upstream_last: [0; 2],
@@ -245,8 +280,18 @@ pub(crate) fn step(
                 group.contact_max.x.min(contact_max.x),
                 group.contact_max.y.min(contact_max.y),
             );
-            group.add(pa, a.outlet, spills[a.index].unwrap().tick);
-            group.add(pb, b.outlet, spills[b.index].unwrap().tick);
+            group.add(
+                pa,
+                a.outlet,
+                spills[a.index].unwrap().tick,
+                config.splash.is_some(),
+            );
+            group.add(
+                pb,
+                b.outlet,
+                spills[b.index].unwrap().tick,
+                config.splash.is_some(),
+            );
             stats.pairs += 1;
             stats.volume += pa.volume + pb.volume;
             break;
@@ -266,7 +311,7 @@ pub(crate) fn step(
     parcels.truncate(write);
     spills.truncate(write);
     let mut linked = [false; MAX_PARCELS];
-    for group in &scratch.groups {
+    for (group_index, group) in scratch.groups.iter().enumerate() {
         // Several consecutive slices from one outlet represent several time
         // intervals, while simultaneous slices from two outlets do not.
         let duration = group.durations[0].max(group.durations[1]);
@@ -274,10 +319,35 @@ pub(crate) fn step(
             (group.momentum[0] / group.volume) as f32,
             (group.momentum[1] / group.volume) as f32,
         );
-        let position = Vec2::new(
-            (group.position[0] / group.volume) as f32,
-            (group.position[1] / group.volume) as f32,
-        );
+        let position = group.center();
+        let mut parcel = Parcel {
+            position,
+            velocity,
+            volume: group.volume,
+            duration,
+            horizontal_bounds: group.bounds,
+        };
+        // Reserve all remaining mixed outputs before considering optional spray.
+        let free = (config.max_parcels - config.reserved_release_parcels)
+            .saturating_sub(parcels.len() + scratch.groups.len() - group_index);
+        let split = config.splash.is_some()
+            && splash.split(
+                &mut parcel,
+                crate::splash::Impact {
+                    position,
+                    normal: Vec2::ZERO,
+                    speed: (group.horizontal_energy / group.volume - f64::from(velocity.x).powi(2))
+                        .max(0.0)
+                        .sqrt(),
+                },
+                free,
+                config,
+            );
+        if split {
+            parcels.push(parcel);
+            spills.push(None);
+            continue;
+        }
         // Inelastic center-of-mass replacement preserves volume and momentum,
         // dissipating relative motion. The common ballistic step follows. A
         // predicted contact may therefore be resolved up to one tick early.
@@ -335,13 +405,7 @@ pub(crate) fn step(
                 ..tail
             }
         };
-        parcels.push(Parcel {
-            position,
-            velocity,
-            volume: group.volume,
-            duration,
-            horizontal_bounds: group.bounds,
-        });
+        parcels.push(parcel);
         spills.push(Some(Spill {
             source,
             tick,

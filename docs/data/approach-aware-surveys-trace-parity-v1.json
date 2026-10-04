@@ -1,0 +1,53 @@
+{
+  "scope": "Post-study complete control/range/ownership traces, ignoring only policy identity. No reruns.",
+  "comparisons": [
+    {
+      "baseline": "world0-asteroids0-v15",
+      "candidate": "world0-asteroids0-v16-p1",
+      "equal_rows": 72000,
+      "first_difference": null
+    },
+    {
+      "baseline": "world0-asteroids0-v15",
+      "candidate": "world0-asteroids0-v16-p2",
+      "equal_rows": 72000,
+      "first_difference": null
+    },
+    {
+      "baseline": "world0-asteroids3-v15",
+      "candidate": "world0-asteroids3-v16-p1",
+      "equal_rows": 18926,
+      "first_difference": null
+    },
+    {
+      "baseline": "world0-asteroids3-v15",
+      "candidate": "world0-asteroids3-v16-p2",
+      "equal_rows": 18926,
+      "first_difference": null
+    },
+    {
+      "baseline": "world1-asteroids0-v15",
+      "candidate": "world1-asteroids0-v16-p1",
+      "equal_rows": 20060,
+      "first_difference": null
+    },
+    {
+      "baseline": "world1-asteroids0-v15",
+      "candidate": "world1-asteroids0-v16-p2",
+      "equal_rows": 20060,
+      "first_difference": null
+    },
+    {
+      "baseline": "world1-asteroids3-v15",
+      "candidate": "world1-asteroids3-v16-p1",
+      "equal_rows": 72000,
+      "first_difference": null
+    },
+    {
+      "baseline": "world1-asteroids3-v15",
+      "candidate": "world1-asteroids3-v16-p2",
+      "equal_rows": 72000,
+      "first_difference": null
+    }
+  ]
+}

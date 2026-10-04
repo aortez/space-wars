@@ -13,7 +13,11 @@ mod impact;
 mod mixing;
 mod moving_bed;
 mod slopes;
+mod solids;
+mod splash;
 pub use moving_bed::PoolGeometry;
+pub use solids::{MAX_SOLID_BOXES, SolidBox};
+pub use splash::{SplashConfig, SplashVariation};
 mod spill;
 mod supports;
 use spill::{Section, Spill};
@@ -49,6 +53,8 @@ pub struct PoolSpec {
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaterConfig {
+    /// Bounded spray from colliding automatic outfalls. Off by default.
+    pub splash: Option<SplashConfig>,
     /// Conservative local mixing between colliding, opposing automatic
     /// outfalls. Disable for an A/B control; not a general particle solver.
     pub mix_spills: bool,
@@ -79,6 +85,7 @@ pub struct WaterConfig {
 impl Default for WaterConfig {
     fn default() -> Self {
         Self {
+            splash: None,
             mix_spills: true,
             gravity: 400.0,
             damping: 0.8,
@@ -375,6 +382,9 @@ pub struct WaterSample {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct WaterStats {
+    pub splash_bursts: u64,
+    pub splash_volume: f64,
+    pub splash_capacity_suppressed: u64,
     pub injected: f64,
     pub pooled: f64,
     pub in_flight: f64,
@@ -399,6 +409,7 @@ pub struct WaterStats {
 pub struct WaterWorld {
     config: WaterConfig,
     pools: Vec<Pool>,
+    solids: Vec<SolidBox>,
     parcels: Vec<Parcel>,
     /// Parallel, preallocated presentation history. Explicit rain/splash sources
     /// have no attached stream, and retain the ordinary parcel representation.
@@ -408,6 +419,7 @@ pub struct WaterWorld {
     tick: u64,
     mixing: mixing::Scratch,
     mix_stats: mixing::Stats,
+    splash: splash::State,
     injected: f64,
     drained: f64,
     reclaimed: f64,
@@ -424,6 +436,7 @@ impl WaterWorld {
             || config.max_parcels == 0
             || config.max_parcels > MAX_PARCELS
             || config.reserved_release_parcels >= config.max_parcels
+            || config.splash.is_some_and(|s| !s.valid())
             || ![config.gravity, config.max_speed]
                 .iter()
                 .all(|v| v.is_finite() && *v > 0.0 && *v <= 1.0e6)
@@ -479,6 +492,7 @@ impl WaterWorld {
             }
         }
         Ok(Self {
+            solids: Vec::with_capacity(MAX_SOLID_BOXES),
             heads: vec![[None; 2]; specs.len()],
             origins: vec![[Vec2::ZERO; 2]; specs.len()],
             pools: specs
@@ -507,6 +521,7 @@ impl WaterWorld {
             tick: 0,
             mixing: mixing::Scratch::new(config.max_parcels),
             mix_stats: mixing::Stats::default(),
+            splash: splash::State::default(),
             config,
             injected: 0.0,
             drained: 0.0,
@@ -615,12 +630,15 @@ impl WaterWorld {
         }
         let previous_tick = self.tick;
         self.tick = self.tick.wrapping_add(1);
+        self.splash.begin_step(dt);
         if self.config.mix_spills {
             mixing::step(
                 &mut self.parcels,
                 &mut self.spills,
                 &mut self.mixing,
                 &mut self.mix_stats,
+                &mut self.splash,
+                &self.solids,
                 self.config,
                 dt,
                 previous_tick,
@@ -642,7 +660,10 @@ impl WaterWorld {
                     parcel.velocity.x = 0.0;
                 }
             }
-            if let Some((pool, column)) = self.catch(from, parcel.position, None) {
+            let motion = self.collide(from, parcel.position, parcel.velocity, None, true);
+            parcel.position = motion.position;
+            parcel.velocity = motion.velocity;
+            if let Some((pool, column)) = motion.caught {
                 self.deposit(pool, column, parcel);
                 self.parcels.swap_remove(i);
                 self.spills.swap_remove(i);
@@ -651,14 +672,21 @@ impl WaterWorld {
                 self.parcels.swap_remove(i);
                 self.spills.swap_remove(i);
             } else {
+                self.splash_wall(i, &mut parcel, motion.impact);
                 self.parcels[i] = parcel;
-                if let Some(spill) = &mut self.spills[i] {
-                    spill.advance(dt, self.config, parcel.horizontal_bounds);
+                if let Some(mut spill) = self.spills[i] {
+                    if self.solids.is_empty() {
+                        spill.advance(dt, self.config, parcel.horizontal_bounds);
+                    } else {
+                        self.advance_section(&mut spill.tail, dt, parcel.horizontal_bounds);
+                        self.advance_section(&mut spill.head, dt, parcel.horizontal_bounds);
+                    }
                     if spill.tick == previous_tick
                         && let SpillSource::Outlet { pool, edge } = spill.source
                     {
                         self.heads[pool][edge] = Some(spill.tail);
                     }
+                    self.spills[i] = Some(spill);
                 }
                 i += 1;
             }
@@ -673,7 +701,7 @@ impl WaterWorld {
             }
             pool.refresh_displacement();
             let mut free = (self.config.max_parcels - self.config.reserved_release_parcels)
-                .saturating_sub(self.parcels.len());
+                .saturating_sub(self.parcels.len() + self.splash.pending_count());
             let mut reserved = [false; 2];
             let mut total = [Emission::default(); 2];
             for _ in 0..substeps {
@@ -771,8 +799,8 @@ impl WaterWorld {
         // later motion, or a narrow/nearby collector could be skipped at birth.
         // Reverse order keeps swap_remove aligned with unprocessed new parcels.
         for i in (first_emitted..self.parcels.len()).rev() {
-            let spill = self.spills[i].expect("newly emitted outfall");
-            let parcel = self.parcels[i];
+            let mut spill = self.spills[i].expect("newly emitted outfall");
+            let mut parcel = self.parcels[i];
             let (source_pool, edge) = match spill.source {
                 SpillSource::Outlet { pool, edge } | SpillSource::Drip { pool, edge } => {
                     (pool, edge)
@@ -780,7 +808,16 @@ impl WaterWorld {
                 SpillSource::Junction { .. } => unreachable!(),
             };
             let origin = self.origins[source_pool][edge];
-            if let Some((pool, column)) = self.catch(origin, parcel.position, Some(source_pool)) {
+            let motion = self.collide(
+                origin,
+                parcel.position,
+                parcel.velocity,
+                Some(source_pool),
+                true,
+            );
+            parcel.position = motion.position;
+            parcel.velocity = motion.velocity;
+            if let Some((pool, column)) = motion.caught {
                 self.deposit(pool, column, parcel);
                 self.pools[pool].refresh_displacement();
                 self.parcels.swap_remove(i);
@@ -789,7 +826,30 @@ impl WaterWorld {
                 self.drained += parcel.volume;
                 self.parcels.swap_remove(i);
                 self.spills.swap_remove(i);
+            } else {
+                if self.splash_wall(i, &mut parcel, motion.impact) {
+                    self.parcels[i] = parcel;
+                    continue;
+                }
+                self.parcels[i] = parcel;
+                let head = self.collide(
+                    spill.tail.position,
+                    spill.head.position,
+                    spill.head.velocity,
+                    None,
+                    false,
+                );
+                spill.head.position = head.position;
+                spill.head.velocity = head.velocity;
+                self.spills[i] = Some(spill);
             }
+        }
+        // New spray starts at the contact, at most one frame after it. Keeping
+        // it pending avoids order-dependent double stepping and reserves slots
+        // before automatic outlets run. Spray never participates in mixing.
+        if let Some(drops) = self.splash.take() {
+            self.parcels.extend(drops);
+            self.spills.extend([None; 3]);
         }
         self.capacity_limited_ticks += u64::from(limited);
         Ok(())
@@ -923,6 +983,9 @@ impl WaterWorld {
 
     pub fn stats(&self) -> WaterStats {
         WaterStats {
+            splash_bursts: self.splash.bursts,
+            splash_volume: self.splash.volume,
+            splash_capacity_suppressed: self.splash.suppressed,
             injected: self.injected,
             pooled: self.pools.iter().flat_map(|p| &p.volume).sum(),
             in_flight: self.parcels.iter().map(|p| p.volume).sum(),

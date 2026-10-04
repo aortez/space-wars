@@ -1,5 +1,6 @@
 use super::tests::{finish, fixture};
 use super::*;
+use crate::mission_policy::MissionPolicy;
 use scenario_spacewars::surface_sortie::{
     destination_cover::{
         CoverCandidate, CoverFinding, CoverMeasurement, CoverStatus, DestinationCoverObservation,
@@ -410,4 +411,259 @@ fn owned_current_destination_keeps_the_original_alternative_request() {
         candidate.alternative_request(&o, &mission),
         predecessor.alternative_request(&o, &mission)
     );
+}
+
+#[test]
+fn v13_survey_options_leave_newer_policy_demand_and_models_unchanged() {
+    for policy in [
+        MissionPolicy::SurveyValuePlanner,
+        MissionPolicy::LandingPlanPlanner,
+        MissionPolicy::ApproachSurveyPlanner,
+    ] {
+        let (_, mut o, mut mission) = current_neutral();
+        mission.policy = policy.id();
+        let mut retained = MissionEvaluator::new(2);
+        let mut configured = MissionEvaluator::new(2)
+            .with_flag_costs([true, false])
+            .with_current_neutral_surveys([true, false]);
+        for tick in [100, 129, 130, 160] {
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.ship.position = p.ship.position.rotate_radians(0.5);
+            let request = retained.alternative_request(&o, &mission).unwrap();
+            assert_eq!(configured.alternative_request(&o, &mission), Some(request));
+            assert_eq!(request.candidates.into_iter().flatten().count(), 2);
+            assert!(
+                request
+                    .candidates
+                    .into_iter()
+                    .flatten()
+                    .all(|id| { Some(id.planet) == mission.target })
+            );
+            for evaluator in [&mut retained, &mut configured] {
+                evaluator.observe(&o, &mission);
+                for dispatch in tick..tick + 4 {
+                    evaluator.advance(dispatch, DEFAULT_WORK);
+                }
+                assert_eq!(
+                    evaluator.latest(PlayerId::PLAYER_1).unwrap().model,
+                    model_for_policy(policy.id())
+                );
+            }
+            assert_eq!(
+                serde_json::to_value(configured.latest(PlayerId::PLAYER_1)).unwrap(),
+                serde_json::to_value(retained.latest(PlayerId::PLAYER_1)).unwrap()
+            );
+        }
+    }
+}
+
+fn approach_fixture(
+    policy: MissionPolicy,
+) -> (MissionEvaluator, MissionObservationV1, MissionTelemetry) {
+    let (_, mut o, bot) = fixture();
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick = 100;
+    p.site_query = LandingSiteQuery::NotRequested;
+    p.landing.supported_feet = 0;
+    p.planet.motion.position = Vec2::ZERO;
+    p.planet.motion.angle = std::f32::consts::FRAC_PI_2;
+    p.ship.position = -Vec2::X * 200.0;
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = None;
+    claim.flag = None;
+    o.planets = vec![p.planet.clone()];
+    let mut mission = bot.telemetry().clone();
+    mission.policy = policy.id();
+    mission.target = Some(p.planet.index);
+    o.local.combat.target = None;
+    (MissionEvaluator::new(1), o, mission)
+}
+
+#[test]
+fn approach_requests_refresh_at_most_each_thirty_ticks_and_yield_to_local_sensing() {
+    for policy in [
+        MissionPolicy::LandingPlanPlanner,
+        MissionPolicy::ApproachSurveyPlanner,
+    ] {
+        let (mut e, mut o, m) = approach_fixture(policy);
+        let first = e.alternative_request(&o, &m).unwrap();
+        o.local.combat.recovery.flight.pilot.ship.position = Vec2::Y * 200.0;
+        o.local.combat.recovery.flight.pilot.tick = 129;
+        assert_eq!(e.alternative_request(&o, &m), Some(first));
+        o.local.combat.recovery.flight.pilot.tick = 130;
+        o.local.combat.recovery.flight.pilot.site_query = LandingSiteQuery::Survey;
+        assert!(e.alternative_request(&o, &m).is_none());
+        o.local.combat.recovery.flight.pilot.site_query = LandingSiteQuery::NotRequested;
+        let changed = e.alternative_request(&o, &m).unwrap();
+        if policy == MissionPolicy::LandingPlanPlanner {
+            assert_eq!(changed, first);
+        } else {
+            assert_eq!(changed.generation, 130);
+            assert_ne!(changed.candidates, first.candidates);
+            assert_eq!(changed.candidates.iter().flatten().count(), 2);
+            o.local.combat.recovery.flight.pilot.tick = 1000;
+            assert_eq!(
+                e.alternative_request(&o, &m),
+                Some(changed),
+                "unchanged bearings retain generation"
+            );
+        }
+    }
+}
+
+fn measured_approaches(
+    policy: MissionPolicy,
+) -> (MissionEvaluator, MissionObservationV1, MissionTelemetry) {
+    let (mut e, mut o, m) = approach_fixture(policy);
+    let request = e.alternative_request(&o, &m).unwrap();
+    let planet = &o.planets[0];
+    let mut measured_planet = planet.motion;
+    measured_planet.position = Vec2::new(100.0, 100.0);
+    measured_planet.angle = 0.0;
+    let candidates = request
+        .candidates
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .map(|(i, id)| {
+            let local =
+                Vec2::Y.rotate_radians(f32::from(id.bearing) * std::f32::consts::TAU / 64.0);
+            let point = measured_planet.position + local * planet.radius;
+            CoverCandidate {
+                id,
+                status: CoverStatus::Stale,
+                reason: Some("historical measurement"),
+                measurement: Some(CoverMeasurement {
+                    tick: request.generation + i as u64,
+                    revision: planet.revision,
+                    planet: measured_planet,
+                    ship_form: ShipForm::Ship,
+                    opponent: None,
+                    queries: 40,
+                    finding: CoverFinding::Measured,
+                    cover: None,
+                    climb_clear: Some(true),
+                    site: Some(PilotLandingSite {
+                        id,
+                        revision: planet.revision,
+                        local_position: local * planet.radius,
+                        position: point,
+                        normal: local,
+                        velocity: Vec2::ZERO,
+                        vehicle_position: point + local * 5.45,
+                        hatch_position: point,
+                        boarding_hatches: [Some(point), None],
+                        hatch_has_settling_margin: true,
+                    }),
+                }),
+            }
+        })
+        .collect();
+    o.destination_cover = Some(DestinationCoverObservation {
+        generation: request.generation,
+        candidates,
+    });
+    o.local.combat.recovery.flight.pilot.tick = 102;
+    (e, o, m)
+}
+
+#[test]
+fn approach_ranking_reprojects_material_geometry_and_preserves_original_measurement_age() {
+    for policy in [
+        MissionPolicy::LandingPlanPlanner,
+        MissionPolicy::ApproachSurveyPlanner,
+    ] {
+        let (mut e, mut o, m) = measured_approaches(policy);
+        e.observe(&o, &m);
+        let s = &e.actors[&0].evidence[0];
+        assert_eq!(
+            s.site.bearing,
+            if policy == MissionPolicy::ApproachSurveyPlanner {
+                0
+            } else {
+                16
+            }
+        );
+        assert_eq!(
+            s.tick,
+            if policy == MissionPolicy::ApproachSurveyPlanner {
+                100
+            } else {
+                101
+            }
+        );
+        assert_eq!(s.costs, Some(model::no_flag_costs()));
+        o.destination_cover.as_mut().unwrap().candidates.reverse();
+        let site = s.site;
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        e.observe(&o, &m);
+        assert_eq!(
+            e.actors[&0].evidence[0].site, site,
+            "ranking does not depend on publication order"
+        );
+    }
+}
+
+#[test]
+fn approach_score_ties_prefer_recency_then_bearing() {
+    for equal_age in [false, true] {
+        let (mut e, mut o, m) = measured_approaches(MissionPolicy::ApproachSurveyPlanner);
+        let samples = &mut o.destination_cover.as_mut().unwrap().candidates;
+        // Equal vehicle points isolate exact score ties from trigonometric rounding.
+        let first = samples[0].measurement.as_ref().unwrap().clone();
+        let second = samples[1].measurement.as_mut().unwrap();
+        second.site.as_mut().unwrap().vehicle_position = first.site.unwrap().vehicle_position;
+        if equal_age {
+            second.tick = first.tick;
+        }
+        samples.reverse();
+        e.observe(&o, &m);
+        assert_eq!(
+            e.actors[&0].evidence[0].site.bearing,
+            if equal_age { 0 } else { 16 }
+        );
+    }
+}
+
+#[test]
+fn approach_ranking_rejects_degenerate_geometry_and_never_renews_expired_sources() {
+    for mutation in 0..6 {
+        let (mut e, mut o, m) = measured_approaches(MissionPolicy::ApproachSurveyPlanner);
+        match mutation {
+            0 => o.local.combat.recovery.flight.pilot.ship.position = o.planets[0].motion.position,
+            1 => o.planets[0].motion.angle = f32::NAN,
+            2 => {
+                for c in &mut o.destination_cover.as_mut().unwrap().candidates {
+                    c.measurement
+                        .as_mut()
+                        .unwrap()
+                        .site
+                        .as_mut()
+                        .unwrap()
+                        .vehicle_position
+                        .x = f32::NAN;
+                }
+            }
+            3 => o.local.combat.recovery.flight.pilot.tick += MAX_EVIDENCE_AGE,
+            4 => o.local.combat.recovery.flight.pilot.ship.position.x = f32::MAX / 2.0,
+            _ => {
+                for c in &mut o.destination_cover.as_mut().unwrap().candidates {
+                    c.measurement
+                        .as_mut()
+                        .unwrap()
+                        .site
+                        .as_mut()
+                        .unwrap()
+                        .vehicle_position
+                        .x = f32::MAX / 2.0;
+                }
+            }
+        }
+        e.observe(&o, &m);
+        assert!(
+            e.actors[&0].evidence.iter().all(|s| s.costs.is_none()),
+            "mutation {mutation}"
+        );
+    }
 }

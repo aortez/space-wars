@@ -1,5 +1,7 @@
 use super::*;
 
+mod background;
+
 slint::slint! {
     export component TextureWindow inherits Window {
         in property <image> texture;
@@ -17,7 +19,14 @@ slint::slint! {
         in property <bool> tiled;
         in property <bool> overlay;
         in property <length> overlay-x: 8px;
-        background: #152b40;
+        in property <bool> underlay;
+        in property <bool> gradient-background;
+        in property <color> window-background: #152b40;
+        background: root.gradient-background ? @linear-gradient(90deg, #152b40, #614922) : root.window-background;
+        if root.underlay : Rectangle {
+            x: 2px; y: 1px; width: 15px; height: 12px;
+            background: #aaee2280;
+        }
         Rectangle {
             width: root.clipped ? parent.width - 7px : parent.width;
             height: root.clipped ? parent.height - 5px : parent.height;

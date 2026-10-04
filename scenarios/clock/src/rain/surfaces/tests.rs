@@ -43,7 +43,7 @@ fn every_support_matches_a_lit_rendered_cell_and_preserves_real_gaps() {
     for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
         let layout = Layout::new(aspect);
         for display in [face(8, 8), face(11, 11), DisplaySnapshot::unsynchronized()] {
-            let (_, water) = DigitSurfaces::new(layout, display);
+            let (_, water) = DigitSurfaces::new(layout, display, 0);
             assert_eq!(water.pools().len(), 98);
             assert_eq!(
                 water
@@ -78,7 +78,7 @@ fn every_support_matches_a_lit_rendered_cell_and_preserves_real_gaps() {
 #[test]
 fn wet_reading_changes_transfer_water_once_without_advancing_time() {
     let initial = face(8, 8);
-    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial);
+    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial, 0);
     let mut visible = segments(initial);
     wet_supports(&mut water);
     let before = water.stats();
@@ -115,7 +115,7 @@ fn wet_reading_changes_transfer_water_once_without_advancing_time() {
 fn actual_rain_collection_keeps_the_gaps_between_clock_pixels_open() {
     let layout = Layout::new(4.0 / 3.0);
     for on_cell in [false, true] {
-        let (_, mut water) = DigitSurfaces::new(layout, face(8, 8));
+        let (_, mut water) = DigitSurfaces::new(layout, face(8, 8), 0);
         let spec = water.pools()[2].spec();
         let x = if on_cell {
             spec.left + spec.column_width
@@ -143,7 +143,7 @@ fn actual_rain_collection_keeps_the_gaps_between_clock_pixels_open() {
 #[test]
 fn exhausted_release_reserve_defers_visible_geometry_then_applies_only_latest_reading() {
     let initial = face(8, 8);
-    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial);
+    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial, 0);
     let mut visible = segments(initial);
     // Simulate consecutive paused corrections before released parcels can fall.
     for _ in 0..PARCELS - RELEASE_SLOTS {
@@ -191,7 +191,7 @@ fn exhausted_release_reserve_defers_visible_geometry_then_applies_only_latest_re
 #[test]
 fn digit_runoff_stays_at_its_ledge_while_floor_outflow_uses_the_drain() {
     let layout = Layout::new(4.0 / 3.0);
-    let (_, mut water) = DigitSurfaces::new(layout, face(8, 8));
+    let (_, mut water) = DigitSurfaces::new(layout, face(8, 8), 0);
     let spec = water.pools()[2].spec();
     let x = spec.left + spec.column_width;
     water.add_to_pool(2, x, 40.0).unwrap();

@@ -47,9 +47,9 @@ pub use digits::{
 };
 
 use engine_common::{
-    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont, ClockFontPool,
-    ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount, ClockSettings,
-    ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
+    Action, ClockCrowWaterTolerance, ClockEventKind, ClockEventProfile, ClockEvents, ClockFont,
+    ClockFontPool, ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount,
+    ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
 };
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
@@ -64,7 +64,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 11;
+pub const CLOCK_ACTION_VERSION: u16 = 12;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -78,7 +78,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 12 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 13 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -166,6 +166,7 @@ impl ClockAction {
             u8::from(settings.fonts.rotate),
             settings.fonts.pool.bits(),
         ]);
+        payload.push(settings.crow_water_tolerance as u8);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -231,7 +232,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 13..=MAX_CONFIGURE_BYTES)
+            (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
                 if payload[5] <= 1 && payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
@@ -264,8 +265,10 @@ impl ClockAction {
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
+                    crow_water_tolerance: *ClockCrowWaterTolerance::ALL
+                        .get(usize::from(payload[12]))?,
                     show_date: payload[8] != 0,
-                    marquee_message: std::str::from_utf8(&payload[12..]).ok()?.parse().ok()?,
+                    marquee_message: std::str::from_utf8(&payload[13..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -374,6 +377,7 @@ pub struct ClockConfig {
     pub marquee_preset: ClockMarqueePreset,
     pub marquee_message: ClockMarqueeMessage,
     pub rain_amount: ClockRainAmount,
+    pub crow_water_tolerance: ClockCrowWaterTolerance,
 }
 
 impl Default for ClockConfig {
@@ -392,6 +396,7 @@ impl Default for ClockConfig {
             marquee_preset: ClockMarqueePreset::default(),
             marquee_message: ClockMarqueeMessage::default(),
             rain_amount: ClockRainAmount::default(),
+            crow_water_tolerance: ClockCrowWaterTolerance::default(),
         }
     }
 }
@@ -412,6 +417,7 @@ impl ClockConfig {
             marquee_preset: self.marquee_preset,
             marquee_message: self.marquee_message,
             rain_amount: self.rain_amount,
+            crow_water_tolerance: self.crow_water_tolerance,
         }
     }
 }
@@ -449,6 +455,7 @@ impl ClockState {
             marquee_preset: self.config.marquee_preset,
             marquee_message: self.config.marquee_message,
             rain_amount: self.config.rain_amount,
+            crow_water_tolerance: self.config.crow_water_tolerance,
         }
     }
 
@@ -465,6 +472,7 @@ impl ClockState {
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
         self.config.rain_amount = settings.rain_amount;
+        self.config.crow_water_tolerance = settings.crow_water_tolerance;
         self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
@@ -740,6 +748,7 @@ impl ClockState {
                 Layout::new(self.aspect_ratio()),
                 seed,
                 self.schedule.event_id,
+                self.config.crow_water_tolerance,
                 &self.segments,
                 self.event_kind(),
             ));
@@ -900,11 +909,40 @@ impl ClockState {
         {
             self.finish_duck_visit();
         }
+        self.update_crow(true);
+    }
+
+    fn update_crow(&mut self, advance: bool) {
         let kind = self.event_kind();
-        if let Some(crow) = &mut self.crow_visit
-            && crow.step(&self.segments, kind)
-        {
-            self.finish_crow_visit();
+        let environment = crow::Environment {
+            panels: match &self.active_event {
+                Some(ActiveEvent::Rain(rain)) => rain.responsive_floor(),
+                Some(ActiveEvent::Meltdown(melt)) => melt.floor.as_ref(),
+                _ => self
+                    .duck_visit
+                    .as_ref()
+                    .and_then(|duck| duck.responsive_floor()),
+            },
+            water: match &self.active_event {
+                Some(ActiveEvent::Rain(rain)) => Some(&rain.water),
+                Some(ActiveEvent::Meltdown(melt)) => Some(&melt.water),
+                _ => None,
+            },
+            // A course or moving panel is not the ordinary level ground. The
+            // crow yields immediately instead of standing on imaginary support.
+            ground_available: self.duck_visit.is_none()
+                && (self.floor.mode() == engine_common::ClockFloorMode::Closed
+                    || matches!(&self.active_event, Some(ActiveEvent::Rain(rain))
+                        if rain.responsive_floor().is_some_and(|floor| floor.opening <= 1e-6))),
+        };
+        if let Some(crow) = &mut self.crow_visit {
+            if advance {
+                if crow.step(&self.segments, kind, environment) {
+                    self.finish_crow_visit();
+                }
+            } else {
+                crow.synchronize(&self.segments, kind, environment);
+            }
         }
     }
 
@@ -1061,10 +1099,7 @@ impl Scenario for ClockScenario {
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.
         if dt.is_zero() {
-            let kind = state.event_kind();
-            if let Some(crow) = &mut state.crow_visit {
-                crow.synchronize(&state.segments, kind);
-            }
+            state.update_crow(false);
         } else {
             // The visitor revalidates support after the timed event updates it.
             state.advance_tick();

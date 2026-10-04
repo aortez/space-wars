@@ -280,7 +280,7 @@ fn admission_rejects_incompatible_stale_future_and_unsupported_evidence() {
             _ => unreachable!(),
         }
         assert!(
-            admit(&o, &base, Some(request), &s, Some(key)).is_err(),
+            admit(&o, &base, Some(request), &s, Some(key), false).is_err(),
             "mutation {mutation}"
         );
     }
@@ -295,7 +295,7 @@ fn historical_cover_is_ignored_and_equal_source_age_is_allowed_without_renewal()
         .as_ref()
         .unwrap()
         .planets[1];
-    let expected = admit(&o, base, Some(request), &s, Some(key)).unwrap();
+    let expected = admit(&o, base, Some(request), &s, Some(key), false).unwrap();
     s.measurement.opponent = Some(
         scenario_spacewars::surface_sortie::destination_cover::CoverOpponent {
             owner: PlayerId::PLAYER_2,
@@ -307,10 +307,13 @@ fn historical_cover_is_ignored_and_equal_source_age_is_allowed_without_renewal()
         },
     );
     o.local.combat.recovery.flight.pilot.tick = 1860;
-    assert_eq!(admit(&o, base, Some(request), &s, Some(key)), Ok(expected));
+    assert_eq!(
+        admit(&o, base, Some(request), &s, Some(key), false),
+        Ok(expected)
+    );
     o.local.combat.recovery.flight.pilot.tick += 1;
     assert_eq!(
-        admit(&o, base, Some(request), &s, Some(key)),
+        admit(&o, base, Some(request), &s, Some(key), false),
         Err("flag source expired")
     );
 }

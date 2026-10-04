@@ -91,6 +91,7 @@ fn choice(
         current_seconds: 60.0,
         destination_seconds: 20.0,
         value: None,
+        landing: None,
     }
 }
 

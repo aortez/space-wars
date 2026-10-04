@@ -13,6 +13,8 @@ mod capture_execution;
 mod capture_probe;
 #[path = "support/cover_probe.rs"]
 mod cover_probe;
+#[path = "support/destination_behavior.rs"]
+mod destination_behavior;
 #[path = "support/flag_survey.rs"]
 mod flag_survey;
 #[path = "support/flag_value_shadow.rs"]
@@ -197,6 +199,7 @@ fn main() {
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
+    let mut behavior_trace = destination_behavior::BehaviorTrace::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
     let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
@@ -768,6 +771,9 @@ fn main() {
                 if let Some(evidence) = &mut capture_evidence {
                     evidence.observe(i, &o, pilots[i].telemetry(), intent);
                 }
+                if let Some(trace) = &mut behavior_trace {
+                    trace.observe(&o, pilots[i].telemetry(), &intent);
+                }
                 let label = pilots[i].label();
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
                 let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
@@ -851,8 +857,9 @@ fn main() {
                         live.observe_destination_cover(&state, i, &mut o, request);
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
-                    let admit_flags = evaluator.evaluator.uses_flag_costs(owner);
-                    if !admit_flags {
+                    let admit_flags = evaluator.evaluator.uses_flag_costs(owner)
+                        || pilots[i].policy().consumes_flag_surveys();
+                    if !admit_flags || flag_survey.is_none() {
                         successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
                     }
                     if let Some(flags) = &mut flag_survey {
@@ -861,9 +868,13 @@ fn main() {
                             evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
                         flags.planner.observe(&state, i, &o, flag_request);
                         if admit_flags {
-                            evaluator.observe_with_flags(
+                            // Publications from earlier ticks are available to
+                            // this source. Dispatch later in this tick cannot
+                            // retroactively enter the submitted comparison.
+                            evaluator.observe_with_flag_surveys(
                                 &o,
                                 pilots[i].telemetry(),
+                                flag_request,
                                 &flags.planner.samples(),
                             );
                         }
@@ -1222,6 +1233,9 @@ fn main() {
             }
         }
         report["mission_evaluation"] = evaluator.report();
+    }
+    if let Some(trace) = &mut behavior_trace {
+        trace.flush();
     }
     if let Some(flags) = &mut flag_survey {
         report["flag_survey"] = flags.report();

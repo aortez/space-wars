@@ -327,6 +327,30 @@ pub struct ClockSettings {
     pub marquee_preset: ClockMarqueePreset,
     pub marquee_message: ClockMarqueeMessage,
     pub rain_amount: ClockRainAmount,
+    /// Chosen once at admission; live setting changes affect the next crow.
+    pub crow_water_tolerance: ClockCrowWaterTolerance,
+}
+
+/// Most visitors dislike rain; an occasional hardy bird tolerates much more.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockCrowWaterTolerance {
+    #[default]
+    Varied = 0,
+    Shy = 1,
+    Hardy = 2,
+}
+
+impl ClockCrowWaterTolerance {
+    pub const ALL: [Self; 3] = [Self::Varied, Self::Shy, Self::Hardy];
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Varied => "Varied",
+            Self::Shy => "Shy",
+            Self::Hardy => "Hardy",
+        }
+    }
 }
 
 /// Amount per Rain visit, independent of the global event frequency.
@@ -408,6 +432,13 @@ pub struct ClockRainState {
     pub parcels: usize,
     pub source_limited_ticks: u64,
     pub water_limited_ticks: u64,
+    #[serde(default)]
+    pub drain_splash_bursts: u64,
+    /// Cumulative redirected water, not an additional volume-ledger category.
+    #[serde(default)]
+    pub drain_splash_microunits: u64,
+    #[serde(default)]
+    pub drain_splash_suppressed: u64,
     /// Applied physical/visible digits; a rare capacity deferral can lag the reading.
     #[serde(default)]
     pub surface_digits: [Option<u8>; 4],
@@ -649,10 +680,13 @@ pub struct ClockExplosionState {
     pub shared_arena: bool,
 }
 
-/// Bounded kinematic visitor diagnostics, independent of the timed animation.
+/// Bounded Crow visitor diagnostics, independent of the timed animation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockCrowState {
     pub visit_id: u64,
+    /// Resolved temperament, fixed for this visit. Older crows were all rain-shy.
+    #[serde(default = "shy_crow_water_tolerance")]
+    pub water_tolerance: ClockCrowWaterTolerance,
     pub phase: ClockCrowPhase,
     pub phase_tick: u64,
     pub age_ticks: u64,
@@ -660,8 +694,24 @@ pub struct ClockCrowState {
     pub facing_right: bool,
     /// Digit slot, grid column, grid row of the intended foot support.
     pub target: Option<[u8; 3]>,
+    /// Intended ground foot support in world mill units; absent for digit perches.
+    #[serde(default)]
+    pub ground_target_milli: Option<[i32; 2]>,
+    #[serde(default)]
+    pub ground_visits: u32,
+    #[serde(default)]
+    pub pecks: u32,
+    /// Fraction of this visitor's spray tolerance used, 0..=1000.
+    #[serde(default)]
+    pub wetness_milli: u16,
+    #[serde(default)]
+    pub wet_departures: u32,
     pub hops: u32,
     pub escapes: u32,
+}
+
+fn shy_crow_water_tolerance() -> ClockCrowWaterTolerance {
+    ClockCrowWaterTolerance::Shy
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -669,6 +719,7 @@ pub struct ClockCrowState {
 pub enum ClockCrowPhase {
     Entering,
     Perched,
+    Pecking,
     Hopping,
     Flying,
     Leaving,
@@ -679,6 +730,7 @@ impl ClockCrowPhase {
         match self {
             Self::Entering => "entering",
             Self::Perched => "perched",
+            Self::Pecking => "pecking",
             Self::Hopping => "hopping",
             Self::Flying => "flying",
             Self::Leaving => "leaving",
@@ -712,6 +764,13 @@ pub struct ClockMeltdownState {
     pub spill_parcels: usize,
     #[serde(default)]
     pub capacity_limited_ticks: u64,
+    #[serde(default)]
+    pub drain_splash_bursts: u64,
+    /// Cumulative redirected water, not an additional volume-ledger category.
+    #[serde(default)]
+    pub drain_splash_microunits: u64,
+    #[serde(default)]
+    pub drain_splash_suppressed: u64,
     /// All material physically exiting the arena: liquid plus solid blocks.
     pub drained_microunits: u64,
     /// Subset of drained_microunits that left as solid blocks, NOT extra volume.

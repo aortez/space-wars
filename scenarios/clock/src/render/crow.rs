@@ -5,19 +5,35 @@ use crate::crow::{CrowVisit, Phase};
 pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) {
     let pixel = layout.pitch * 0.105;
     let mirror = if crow.facing_right { 1.0 } else { -1.0 };
-    let rows = [
-        "        OOOO  ",
-        "       OBBBBK ",
-        "       OBWBBKK",
-        "      OBBBBKK ",
-        "     OBBBBBO  ",
-        " OOOBBBBBBO   ",
-        "OBBBBBBBBBO   ",
-        " OOBBBBBBO    ",
-        "   OOOOOO     ",
-        "     K K      ",
-        "    KK KK     ",
-    ];
+    let rows = if crow.phase == Phase::Pecking && (12..20).contains(&(crow.phase_tick % 28)) {
+        [
+            "              ",
+            "              ",
+            "              ",
+            " OOOO         ",
+            "OBBBBOOOO     ",
+            "OBBBBBBBBOO   ",
+            " OBBBBBBBBBO  ",
+            "  OBBBBBBBWO  ",
+            "   OOOOOOBBK  ",
+            "     K K  KK  ",
+            "    KK KK  K  ",
+        ]
+    } else {
+        [
+            "        OOOO  ",
+            "       OBBBBK ",
+            "       OBWBBKK",
+            "      OBBBBKK ",
+            "     OBBBBBO  ",
+            " OOOBBBBBBO   ",
+            "OBBBBBBBBBO   ",
+            " OOBBBBBBO    ",
+            "   OOOOOO     ",
+            "     K K      ",
+            "    KK KK     ",
+        ]
+    };
     let transform = |x: f32, y: f32| {
         RenderPoint::new(
             crow.position.x + mirror * x * pixel,
@@ -26,7 +42,7 @@ pub(super) fn render(frame: &mut RenderFrame, crow: &CrowVisit, layout: Layout) 
     };
     let outline = RenderColor::rgb(0.35, 0.40, 0.51);
     if matches!(crow.phase, Phase::Entering | Phase::Flying | Phase::Leaving) {
-        let flap = (crow.phase_tick as f32 * 0.34).sin();
+        let flap = crow.flight.wing;
         frame.push_primitive(
             8,
             RenderPrimitive::Polygon(RenderPolygon {

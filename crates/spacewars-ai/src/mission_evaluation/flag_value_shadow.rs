@@ -194,7 +194,7 @@ impl FlagValueShadow {
                 .planets
                 .iter()
                 .find(|k| k.planet == sample.site.planet);
-            let costs = admit(o, base, request, sample, key);
+            let costs = admit(o, base, request, sample, key, false);
             awaiting_source |= costs == Err("flag evidence unavailable at comparison source")
                 && sample.reason.is_none()
                 && sample.validated_tick == Some(sample.completed_tick)
@@ -342,19 +342,9 @@ fn preferred(report: &MissionEvaluation) -> Option<usize> {
     report.value_comparison.as_ref().and_then(|v| v.preferred)
 }
 
-fn admit(
-    o: &MissionObservationV1,
-    base: &MissionEvaluation,
-    request: Option<FlagSurveyRequest>,
-    s: &FlagSurveySample,
-    baseline_key: Option<&PlanetKey>,
-) -> Result<PhaseCosts, &'static str> {
-    admitted_costs(o, base, request, s, baseline_key, false)
-}
-
 /// Shared certificate checks. The opt-in playing experiment also surveys its
 /// current enemy destination; the historical shadow remains alternative-only.
-pub(super) fn admitted_costs(
+pub(super) fn admit(
     o: &MissionObservationV1,
     base: &MissionEvaluation,
     request: Option<FlagSurveyRequest>,
@@ -436,7 +426,7 @@ pub(super) fn admitted_costs(
         .iter()
         .find(|c| c.planet == planet.index)
         .ok_or("flag outside comparison shortlist")?;
-    if (!allow_current && candidate.current)
+    if (candidate.current && !allow_current)
         || candidate.revision != planet.revision
         || candidate.observed_owner != claim.owner
         || !candidate.ownership_known

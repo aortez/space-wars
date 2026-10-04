@@ -4,7 +4,9 @@ use crate::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, SegmentId, SegmentKind, SegmentState, digits,
     floor::responsive::FloorShape, layout::Layout,
 };
-use engine_water::{Boundary, DripConfig, PoolSpec, WaterConfig, WaterError, WaterWorld};
+use engine_water::{
+    Boundary, DripConfig, PoolSpec, SplashConfig, WaterConfig, WaterError, WaterWorld,
+};
 
 #[cfg(test)]
 pub(super) const FLOOR_POOLS: usize = 2;
@@ -27,9 +29,14 @@ pub(super) struct DigitSurfaces {
 mod tests;
 
 impl DigitSurfaces {
-    pub fn new(layout: Layout, display: DisplaySnapshot) -> (Self, WaterWorld) {
+    pub fn new(layout: Layout, display: DisplaySnapshot, seed: u64) -> (Self, WaterWorld) {
         let floor = FloorShape::clock(layout);
-        let (surfaces, mut water) = Self::with_floor(layout, display, floor.pools().into());
+        let (surfaces, mut water) = Self::with_floor(
+            layout,
+            display,
+            floor.pools().into(),
+            Some(crate::floor::responsive::drain_splash(seed)),
+        );
         floor.configure(&mut water);
         (surfaces, water)
     }
@@ -38,9 +45,14 @@ impl DigitSurfaces {
         layout: Layout,
         display: DisplaySnapshot,
         floor: &crate::floor::responsive::ResponsiveFloor,
+        seed: u64,
     ) -> (Self, WaterWorld) {
-        let (surfaces, mut water) =
-            Self::with_floor(layout, display, floor.shape.pools_at(floor.opening).into());
+        let (surfaces, mut water) = Self::with_floor(
+            layout,
+            display,
+            floor.shape.pools_at(floor.opening).into(),
+            Some(crate::floor::responsive::drain_splash(seed)),
+        );
         floor.shape.configure_at(&mut water, floor.opening);
         (surfaces, water)
     }
@@ -49,6 +61,7 @@ impl DigitSurfaces {
         layout: Layout,
         display: DisplaySnapshot,
         mut specs: Vec<PoolSpec>,
+        splash: Option<SplashConfig>,
     ) -> (Self, WaterWorld) {
         let floor_pools = specs.len();
         let cell_pools = crate::fonts::guides(display.font).cells().count() * DIGIT_SLOT_COUNT;
@@ -91,6 +104,7 @@ impl DigitSurfaces {
         assert_eq!(specs.len(), floor_pools + cell_pools);
         let mut water = WaterWorld::new(
             WaterConfig {
+                splash,
                 // A gentle local response when a drop reaches an already-wet
                 // surface. Shared engine defaults and Meltdown stay unchanged.
                 impact_response: 0.12,

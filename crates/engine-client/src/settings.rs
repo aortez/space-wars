@@ -364,6 +364,18 @@ player_health_percent = 200
 "#;
         fs::write(&path, original).unwrap();
         let loaded = load_settings(&path).unwrap();
+        let LoadStatus::RecoveredFields {
+            backup_path,
+            fields,
+        } = &loaded.status
+        else {
+            panic!(
+                "unknown controller should be recovered: {:?}",
+                loaded.status
+            );
+        };
+        assert_eq!(fields, &["spacewars.player_2_controller"]);
+        assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
         assert_eq!(loaded.settings.audio.master_volume, 0.05);
         assert!(loaded.settings.audio.muted);
         assert!(loaded.settings.autostart.enabled);
@@ -637,6 +649,25 @@ enabled = true
                     toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
                 assert_eq!(settings.clock, restored.clock);
             }
+        }
+    }
+
+    #[test]
+    fn crow_tolerance_defaults_for_old_settings_and_round_trips_all_choices() {
+        use engine_common::ClockCrowWaterTolerance;
+        let mut settings: Settings =
+            toml::from_str("[clock]\nevent_profile = 'off'\n[clock.events]\ncrow = false\n")
+                .unwrap();
+        assert_eq!(
+            settings.clock.crow_water_tolerance,
+            ClockCrowWaterTolerance::Varied
+        );
+        assert!(!settings.clock.events.crow);
+        for tolerance in ClockCrowWaterTolerance::ALL {
+            settings.clock.crow_water_tolerance = tolerance;
+            let saved = toml::to_string(&settings).unwrap();
+            let loaded: Settings = toml::from_str(&saved).unwrap();
+            assert_eq!(loaded.clock, settings.clock);
         }
     }
 

@@ -5,8 +5,8 @@ use scenario_spacewars::surface_sortie::live_planning::FlagSurveySample;
 pub(super) const MODEL: &str = "capture_value_published_flags_v1";
 pub(super) const SCOPE: &str = "conditional historical landing/walk/return costs from published flag certificates; unchanged flag/material identity; native arrival, acquisition and exposure remain unmodelled; live controls reacquire their own site and route";
 
-pub(super) fn is_flag(sample: &LocalEvidence) -> bool {
-    sample.remote && sample.route_objective.is_some()
+pub(super) fn enabled(policy: &str) -> bool {
+    policy == crate::mission_policy::MissionPolicy::ValuePlanner.id()
 }
 
 pub(super) fn observe(
@@ -35,8 +35,7 @@ pub(super) fn observe(
             .take(MAX_PLANETS)
             .find(|planet| planet.index == sample.site.planet)
             .map(PlanetKey::read);
-        let costs =
-            flag_value_shadow::admitted_costs(o, &base, request, sample, key.as_ref(), true);
+        let costs = flag_value_shadow::admit(o, &base, request, sample, key.as_ref(), true);
         let index = admissions.len();
         admissions.push(FlagShadowAdmission {
             site: sample.site,
@@ -138,7 +137,7 @@ mod tests {
     #[test]
     fn opt_in_keeps_native_evidence_epochs_and_pins_source_before_selection() {
         let (mut o, m, mut e, sample) = fixture(true);
-        e.observe_with_flag_surveys(&o, &m, &[&sample]);
+        e.observe_with_flag_surveys(&o, &m, None, &[&sample]);
         complete(&mut e, &mut o);
         let r = e.latest(PlayerId::PLAYER_1).unwrap();
         assert_eq!(r.model, MODEL);
@@ -169,7 +168,7 @@ mod tests {
     fn absence_negative_replacement_and_expiry_revoke_a_published_cost() {
         for mutation in 0..4 {
             let (mut o, m, mut e, mut sample) = fixture(true);
-            e.observe_with_flag_surveys(&o, &m, &[&sample]);
+            e.observe_with_flag_surveys(&o, &m, None, &[&sample]);
             complete(&mut e, &mut o);
             assert!(e.selection(&o, &m).is_some());
             o.local.combat.recovery.flight.pilot.tick += 1;
@@ -181,7 +180,7 @@ mod tests {
                 _ => unreachable!(),
             }
             let samples = [&sample];
-            e.observe_with_flag_surveys(&o, &m, if mutation == 0 { &[] } else { &samples });
+            e.observe_with_flag_surveys(&o, &m, None, if mutation == 0 { &[] } else { &samples });
             assert!(e.selection(&o, &m).is_none());
             complete(&mut e, &mut o);
             assert!(
@@ -198,9 +197,32 @@ mod tests {
     }
 
     #[test]
+    fn v13_opt_in_does_not_override_other_policy_models_or_evidence() {
+        use crate::mission_policy::MissionPolicy;
+        for policy in MissionPolicy::ALL {
+            if policy == MissionPolicy::ValuePlanner {
+                continue;
+            }
+            let reports = [false, true].map(|configured| {
+                let (mut o, mut m, mut e, sample) = fixture(configured);
+                m.policy = policy.id();
+                let request = e.actors[&0].flag_survey.as_ref().unwrap().request;
+                e.observe_with_flag_surveys(&o, &m, Some(request), &[&sample]);
+                complete(&mut e, &mut o);
+                let report = e.latest(PlayerId::PLAYER_1).unwrap();
+                assert_eq!(report.model, model_for_policy(policy.id()));
+                assert!(report.flag_admissions.is_none());
+                assert!(report.flag_cost_scope.is_none());
+                serde_json::to_value(report).unwrap()
+            });
+            assert_eq!(reports[0], reports[1], "{}", policy.id());
+        }
+    }
+
+    #[test]
     fn predecessor_ignores_flag_costs_and_current_target_demand_is_opt_in() {
         let (mut o, mut m, mut e, sample) = fixture(false);
-        e.observe_with_flag_surveys(&o, &m, &[&sample]);
+        e.observe_with_flag_surveys(&o, &m, None, &[&sample]);
         complete(&mut e, &mut o);
         assert_eq!(e.latest(PlayerId::PLAYER_1).unwrap().model, value::MODEL);
         assert!(

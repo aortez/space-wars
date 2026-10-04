@@ -732,6 +732,19 @@ fn pool_passes_are_symmetric_nonnegative_and_conservative() {
         panic!()
     };
     event.cells.clear();
+    // Exercise the symmetric pool/floor solve without the deliberately uneven
+    // drain fan. Live splashes have separate replay/conservation coverage.
+    let floor = event.floor.as_ref().unwrap();
+    event.water = WaterWorld::new(
+        WaterConfig {
+            max_parcels: MAX_SPILL_PARCELS,
+            exit_y: f64::from(Layout::new(800.0 / 480.0).bounds_min.y),
+            ..WaterConfig::default()
+        },
+        floor.shape.pools_at(floor.opening).into(),
+    )
+    .unwrap();
+    floor.shape.configure_at(&mut event.water, floor.opening);
     let left = event.water.pools()[0].spec();
     let x = left.left + 10.5 * left.column_width;
     event

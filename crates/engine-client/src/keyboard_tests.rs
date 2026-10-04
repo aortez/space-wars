@@ -647,6 +647,14 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert!(!window.get_launcher_clock_duck_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 8);
     assert!(window.get_launcher_clock_crow_enabled());
+    for expected in ["Shy", "Hardy"] {
+        click(&window, 480.0, 324.0);
+        assert!(window.get_launcher_clock_crow_enabled());
+        assert_eq!(
+            window.get_launcher_clock_crow_water_tolerance().as_str(),
+            expected
+        );
+    }
     click(&window, 480.0, 324.0);
     assert!(!window.get_launcher_clock_crow_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 13);

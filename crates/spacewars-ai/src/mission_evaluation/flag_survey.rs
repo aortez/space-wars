@@ -39,7 +39,7 @@ pub(super) fn request(
         .into_iter()
         .take(MAX_OPTIONS)
         .find(|planet| {
-            (include_current || planet.index != target)
+            (include_current || planet.index != target || flag_evidence::enabled(mission.policy))
                 && planet.claim.as_ref().is_some_and(|c| {
                     c.owner.is_some_and(|owner| owner != p.owner)
                         && c.flag.is_some_and(|f| Some(f.player) == c.owner)

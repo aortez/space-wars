@@ -19,7 +19,9 @@ use tempfile::{Builder, TempDir};
 
 const ARTIFACT_REQUEST_TIMEOUT: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
-const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
+// The first femtovg launcher on a fresh CI runner has needed over 10 seconds
+// before serving control requests. Startup gets a separate budget from actions.
+const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -31,6 +33,9 @@ mod sound;
 
 #[path = "ui_control_functional/device_info.rs"]
 mod device_info;
+
+#[path = "ui_control_functional/attached.rs"]
+mod attached;
 
 #[path = "ui_control_functional/controllers.rs"]
 mod controllers;
@@ -639,6 +644,7 @@ impl FunctionalHarness {
                 "elapsed_ms": 0,
                 "command": "spawn engine-client",
                 "arguments": arguments,
+                "backend": backend,
             })],
             last_state: None,
             failure: None,
@@ -677,6 +683,7 @@ impl FunctionalHarness {
                     return state;
                 }
                 Err(error) if is_retryable_readiness_error(&error) => {
+                    self.record_error("ui state (readiness)", &error);
                     last_error = Some(error.to_string());
                 }
                 Err(error) => {

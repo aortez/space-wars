@@ -38,6 +38,7 @@ pub use cover_response::{
 };
 pub use cover_retry::{COVER_RETRY_PROFILE, COVER_RETRY_TICKS, CoverRetryCooldown};
 pub use initial_cover::{INITIAL_COVER_PROFILE, InitialCover, InitialCoverRequest};
+pub(crate) use selection::exposed;
 #[cfg(test)]
 pub(crate) use selection::select as select_for_test;
 pub use selection::{LandingChoiceComparison, LandingDirectionAssessment};

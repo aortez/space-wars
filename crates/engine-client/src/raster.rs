@@ -14,6 +14,8 @@ use slint::{Image, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
 
 use crate::render::{self, FrameLayout, Viewport};
 
+mod blend;
+
 pub const DEFAULT_OVERVIEW_CACHE_PERIOD: u64 = 6;
 
 const BUFFER_COUNT: usize = 3;
@@ -1609,9 +1611,7 @@ fn fill_rect(
                     fill_rgb_pixels(&mut pixels[start..end], blended_background);
                 }
                 _ => {
-                    for pixel in &mut pixels[start..end] {
-                        blend_pixel(pixel, color);
-                    }
+                    blend_rgb_span(&mut pixels[start..end], color);
                 }
             }
         }
@@ -1651,9 +1651,7 @@ fn fill_span(
                 fill_rgb_pixels(&mut pixels[start..end], blended_background);
             }
             _ => {
-                for pixel in &mut pixels[start..end] {
-                    blend_pixel(pixel, color);
-                }
+                blend_rgb_span(&mut pixels[start..end], color);
             }
         }
     }
@@ -1670,6 +1668,10 @@ fn paint_pixel(pixels: &mut [Rgb8Pixel], width: u32, x: i32, y: i32, color: Rast
 
 fn blend_pixel(destination: &mut Rgb8Pixel, source: RasterColor) {
     blend_rgb_pixel(destination, rgb_pixel(source.pixel), source.pixel.a);
+}
+
+fn blend_rgb_span(pixels: &mut [Rgb8Pixel], source: RasterColor) {
+    blend::solid_span(pixels, rgb_pixel(source.pixel), source.pixel.a);
 }
 
 fn blend_rgb_pixel(destination: &mut Rgb8Pixel, source: Rgb8Pixel, alpha: u8) {

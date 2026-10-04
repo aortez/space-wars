@@ -45,10 +45,10 @@ emissions (`None` means free flight). A channel must contain its outlet: it cann
 teleport newborn runoff across the world. Changing it detaches old ribbon history
 without moving existing parcels or replacing their bounds. Explicit
 `add_falling` sources must supply their own bounds (or `None` for free flight).
-Normal Meltdown uses the central drain channel for outflow and the outer screen
-walls for its impact spray; the open collecting-pool fixture is unconfined.
-The channel is not a general solid
-collision system. Independent rain/splash parcels still pass through one another.
+The moving Clock floor leaves its outfalls unconfined by vertical channels;
+instead it registers the two actual tilted, finite panels as solid boxes. Impact
+spray retains the outer screen bounds. Independent rain/splash parcels still
+pass through one another.
 
 The accounting contract is:
 
@@ -60,8 +60,8 @@ passed through the outlet. Unlike the old forced drain current, a flat basin
 does not necessarily empty in the Clock's seven-second material window.
 
 Pools reserve all column/face scratch storage at construction; stepping allocates
-no additional buffers. Limits are 128 pools, 512 columns total, and at most
-512 parcels (128 in Clock Meltdown; 512 in Rain, including release reserves).
+no additional buffers. Limits are 256 pools, 1024 columns total, and at most
+512 parcels (192 in ordinary Clock Meltdown; 512 in Rain, including release reserves).
 Each caller step accepts `(0, 1/30]` seconds and is
 split into substeps no larger than 1/240 second. Speeds and donor withdrawals
 are limited; these are stability/work bounds, not an accuracy guarantee at
@@ -79,6 +79,316 @@ retain unlimited height (not finite-height walls).
 Parcel deposition transfers volume. By default it does not impart impact
 motion; the optional local surface-response approximation below is not full
 momentum coupling. These remain explicit limitations for future body/wave work.
+
+### Drain-wall collision
+
+See the [paired Picade profile](../water-drain-collision-profile.md) for the
+before/after cost of this collision and rendering change, including full Rain
+and Meltdown cycles and retained raw measurements.
+
+`WaterWorld::set_solid_boxes` supplies at most eight explicit, finite rectangles.
+Pool beds alone remain receiving surfaces, so rain can still fall underneath
+elevated digit ledges. Falling parcels sweep their center paths against the boxes,
+including the half-step advance at birth. A wall removes inward normal motion;
+tangent motion and all water volume remain. Collection stops at the first wall,
+so a receiving pool behind it cannot collect water through the panel. Coincident
+pool tops still receive water instead of suspending it at the collision skin.
+The remaining displacement is swept again, with a four-contact limit per path.
+If that limit is reached, the unchecked remainder is not applied.
+
+Opposing outfalls only mix when the segment between their centers is clear of
+solid scenery. Aggregating several pairs requires the same check between their
+weighted centers. Otherwise early center-of-mass replacement could transfer
+water through a wall before the ordinary collision step sees it. Unobstructed
+mixing retains its existing volume/momentum rules and bounded scratch storage.
+
+Rain and Meltdown update these boxes from `FloorShape::panel_pose` only after an
+accepted floor movement. A capacity deferral retains the previous pools, solids,
+rendering and rigid-body poses together. Water overlapped by a moving panel is
+projected onto its nearest face on the next water step. Attached stream faces
+receive the same wall response; rendering subtracts the finite boxes from the
+ribbons and highlights for both production adapters. This is center-path collision
+plus visual width clipping, not a finite-volume pressure solver or splash model.
+
+The one-sided `DrainFixture` reproduces opposite-wall penetration without relying
+on stream-to-stream mixing. Tests cover both directions, three apertures, three
+depths, and 30/60/120 Hz, plus fast thin-wall crossings, upward impacts, birth
+steps, moving walls, conservation and stable storage. Full Rain/Meltdown sweeps
+also check panel interiors while preserving their existing delivery, duck exit,
+cleanup and replay assertions. To export the focused production-renderer captures:
+
+```sh
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/spacewars-drain \
+  cargo test --locked --profile ci -p engine-client --bin engine-client \
+  drain_wall_lab_keeps_rendered_water_outside_the_panels
+```
+
+Captured through the production raster renderer. The first pair shows the same
+fixture at tick 12; the second pair shows flow in both directions at tick 60.
+These are deterministic lab captures, not device screenshots.
+
+| Before: water enters the opposite panel | After: water stops at the wall |
+| --- | --- |
+| ![Before wall collision](../screenshots/water/drain-wall-before.png) | ![After wall collision](../screenshots/water/drain-wall-after.png) |
+
+| Flow from the left, sliding down the right panel | Mirrored flow |
+| --- | --- |
+| ![Flow down the right panel](../screenshots/water/drain-wall-flow-right.png) | ![Flow down the left panel](../screenshots/water/drain-wall-flow-left.png) |
+
+### Drain splashes (#102, October 2, 2026)
+
+Clock's responsive drain uses **varied Lively**, selected after visual review of
+the testbed below. Rain and Meltdown share that preset; the general engine
+default remains `WaterConfig::splash = None`. Separate water labs and Duck
+courses with multiple gaps keep their existing behavior. The original fixed
+and off treatments remain available for comparisons.
+
+The DirtSim comparison used a live Meltdown capture from `dirtsim.local` and
+inspection of `apps/src/core/scenarios/clock_scenario/MeltdownEvent.cpp`. Its
+impact treatment converts falling digit blocks into four upward fragments over
+a broad fan. Visually, separated blue fragments and long upward arcs make the
+impact conspicuous. That is a useful reference, but a different source of water
+from our continuously draining pools. This experiment redirects existing runoff
+into three ballistic droplets and uses the existing compact-drop renderer.
+
+![DirtSim Meltdown splash reference](../screenshots/water/dirtsim-meltdown-splash-reference.png)
+
+`SplashConfig` is optional. Its original fixed-pattern treatment uses four bounded tuning values:
+
+| Setting | Lively | Restrained |
+| --- | ---: | ---: |
+| Minimum collision speed | 24 | 24 |
+| Fraction of impacted slice sent into spray | 0.12 | 0.12 |
+| Fraction of estimated lost kinetic energy available to spray | 0.75 | 0.30 |
+| Minimum interval between bursts, seconds | 0.35 | 0.55 |
+
+Only automatic outfalls qualify. Wall strikes use inward normal speed;
+opposing-stream junctions use the horizontal velocity variance lost in mixing.
+The spray's initial kinetic energy is bounded by that loss estimate. A wall fan
+points toward its free side; an opposing-stream fan is symmetric. The upward
+direction is authored: **vector momentum and total system energy are not solved**.
+Normal collection, gravity, finite solid collision, horizontal bounds and exit
+accounting apply to the droplets. Independent rain, existing spray and already
+mixed streams cannot recursively generate additional spray.
+
+The split subtracts water from the source exactly once. Three fixed pending
+slots hold it until the end of the step, delaying launch by at most one frame.
+Those slots count against the normal parcel cap before other outlets emit.
+Optional spray also leaves eight slots for flow, as well as any caller's support
+release reserve. If it cannot fit, the whole split is skipped and the source is
+unchanged. There is no new allocation during water stepping. Diagnostics count
+`splash_bursts`, cumulative `splash_volume` (not unique water), and
+`splash_capacity_suppressed`.
+
+The fixed-panel `DrainFixture` now provides seven repeatable flows: gentle,
+opposed, heavy, one-sided in both directions, unequal, and a wider drain. Each
+comparison starts empty, replenishes its donor reservoirs for four seconds,
+then stops feeding. Water returning to a donor reduces subsequent replenishment;
+the on/off cases therefore need not have identical total injected volume.
+All movement, collection, mixing and drainage use the real solver.
+
+The exported browser gallery compares off/Restrained/Lively, with synchronized
+playback, slow motion, scrubbing, counters, and links to vector, portrait and
+16-second cleanup captures. It plays production-renderer captures, not a second
+JavaScript fluid model. It works as a local HTML file; an HTTP server is optional.
+Only a small look-ahead window is explicitly prefetched. Generated frames stay
+outside Git and can be recreated with:
+
+```sh
+SPACEWARS_DRAIN_SPLASH_ARTIFACTS=/tmp/spacewars-drain-splash \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client \
+  drain_splash_lab_renders -- --nocapture
+# Open /tmp/spacewars-drain-splash/index.html in a browser.
+
+cargo +1.89.0 test --locked --profile ci -p engine-water splash::tests
+cargo +1.89.0 test --locked --profile ci -p scenario-clock splash_lab -- --nocapture
+SPACEWARS_DRAIN_SPLASH_PROFILE=/tmp/drain-splash-profile.csv \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client \
+  drain_splash_lab_profile -- --ignored --nocapture
+```
+
+At 60 Hz, Lively produces no bursts for the gentle case and 11–12 bursts during
+the first four seconds in the other cases. Heavy opposing flow visibly clears
+the lip; one-sided wall spray is much subtler. The strongest observed upward
+trajectory reaches about 42 world units above the nominal floor. These are
+fixture-scale observations, not tuned behavior for the full Clock layout.
+
+| Heavy flow, spray off | Same setup, Lively |
+| --- | --- |
+| ![Drain splash control](../screenshots/water/drain-splash-control.png) | ![Lively drain splash](../screenshots/water/drain-splash-lively.png) |
+
+Checks cover conservation, finite panel exclusion, deterministic replay, storage
+reuse, source rejection under capacity pressure, launch-energy bounds, burst
+rate, invalid tuning and reclamation. The seven fixtures run at 30/60/120 Hz;
+each physically drains over 99% of injected water by 16 seconds (four feeding,
+twelve draining), and explicit reclamation removes the remaining film without
+changing its accounting category. Raster pixels stay outside panel interiors;
+finite bounded vector paths and raster captures cover 1024×768, 800×480 and
+480×800 layouts. The inspected SVG captures use system librsvg; they are not
+device screenshots or proof of native Slint presentation performance.
+
+The [paired desktop measurements](../data/water-drain-splash-lab-20261002.csv)
+and [environment/source metadata](../data/water-drain-splash-lab-20261002.json)
+cover seven cases, two raster scales, and three process-local paired repeats
+(84 runs; 40,320 measured frames). Each run warms for 60 steps, resets, then
+measures the eight-second feeding/draining cycle. Pair order alternates.
+This uses the optimized `ci` profile on x86-64, comparing splash off and Lively
+in the same code. It does not measure this patch's disabled-path cost against
+an older executable.
+
+The table is water stepping **including replenishment**, scene construction,
+and CPU raster image generation, in **microseconds/frame**. Vector adapter
+construction is recorded separately in the CSV and is not added to the raster
+total. Actual raster buffers are 1024×768 at 1× and 2048×1536 at 2×; both the
+viewport and `RasterOptions` are scaled. PNG encoding and display presentation
+are excluded.
+
+| Fixture | Scale | Median run mean, off → Lively | Median paired increase |
+| --- | --- | ---: | ---: |
+| Opposing streams | 1× | 189.7 → 191.3 | +1.3 |
+| Opposing streams | 2× | 401.4 → 403.4 | +1.6 |
+| Heavy opposing streams | 1× | 281.9 → 283.9 | +2.0 |
+| Heavy opposing streams | 2× | 612.3 → 615.9 | +3.6 |
+| Right-wall strike | 1× | 154.0 → 155.8 | +2.0 |
+| Right-wall strike | 2× | 323.6 → 327.6 | +2.5 |
+
+Across all cases the median paired increase was 0.1–4.0 microseconds, with at
+most 71 of 256 parcels live and zero capacity-limited ticks. These small local
+differences support continuing the visual experiment; they are not Pi FPS or
+full Rain/Meltdown performance measurements.
+
+Two limits still bound this integration:
+
+- Bursts currently split one emitted slice. Burst size varies with caller step
+  duration: the 30/120 Hz tests establish accounting and safety, not identical
+  spray amounts. The review gallery uses the Clock's normal 60 Hz step. A
+  time-normalized packet or bounded accumulated burst volume needs evaluation
+  before claiming timestep-independent appearance. Normal Clock water uses the
+  same fixed 60 Hz step as the selected preview.
+- A world-wide cooldown favors the first eligible collision in deterministic
+  processing order. It bounds this one-drain experiment; multiple independent
+  drains would need a fairer/local emission policy. Multi-gap Duck courses do
+  not enable this effect yet. Existing ribbon seams and
+  transient compact outfall slices remain visible in some control captures.
+
+#### Seeded timing and fan variation
+
+The optional `SplashVariation { seed, max_interval }` makes the repeated fan less
+regular. The fixed preset remains available with `variation: None`. When this
+option was first added, all 5,692 original PNG/SVG captures matched the first
+gallery byte-for-byte. Review subsequently found that fixed rays could point
+into tilted panels: the clearance clamp ran only for varied fans. Both patterns
+now share that clamp. Earlier fixed-pattern captures and lab timing datasets
+predate this correction; regenerated fixed captures include it. The selected
+varied Clock treatment and its random sequence are unchanged. All 36 regenerated
+live Clock PNG/SVG captures and their cycle diagnostics matched the pre-fix
+versions byte-for-byte across the three cabinet layouts.
+
+Only a **successful burst** generates a pattern. It uses the engine's existing
+seeded RNG, with a seed derived from the configured seed and accepted burst
+number. Quiet impacts, cooldown rejections and capacity suppression do not
+consume random draws or change the next pattern. There is no per-frame random
+roll and no dependency on another scenario's RNG state.
+
+- Lively samples its next cooldown from **0.25–0.55 seconds**; Restrained uses
+  **0.45–0.85 seconds**. The next eligible collision after that delay creates
+  the burst; a timer alone cannot create spray.
+- Each of the three base launch angles gets up to **10 degrees** of jitter.
+  Wall fans are clamped to the free side of the actual tilted surface. The same
+  seed produces reflected patterns on mirrored walls.
+- Positive random shares are normalized to the same total **12% of the impacted
+  slice**. Each droplet gets 75–100% of the available launch speed. Varying the
+  shares and speeds stays within the original water, launch-energy, speed and
+  parcel caps.
+
+The viewer defaults to **Fixed vs varied** and includes seeds **7, 19 and 61**,
+plus Off vs varied and Off vs fixed comparisons for both strengths. Restart
+repeats the same captured sequence; selecting another seed shows a different
+one. All seven flows and three cabinet layouts are captured. The 63 sequences
+contain 15,183 animation frames; the browser explicitly retains only a small
+prefetch window. The same export command above regenerates the updated gallery.
+
+Replay and accounting sweeps cover each seed at 30/60/120 Hz. Tests also check
+that rejected attempts leave later patterns unchanged, different seeds diverge,
+cooldowns remain bounded, wall directions stay clear, and volume/energy/speed
+caps hold for fixed and varied fans on tilted walls with capped or uncapped
+launch speeds. Mirroring checks cover both patterns. Unequal flows
+still use the same centered base fan; adding a bias from the incoming flow is a
+separate experiment. The existing slice-size dependence on timestep also remains.
+
+The [variation profile](../data/water-drain-splash-variation-20261002.csv) and
+[source/environment metadata](../data/water-drain-splash-variation-20261002.json)
+repeat the desktop protocol with off, fixed Lively and varied Lively (seed 7):
+126 runs and 60,480 measured frames. Relative to fixed Lively, median paired
+changes in step + scene + raster work range from **−1.3 to +1.9 microseconds per
+frame**, all within 0.7%. Heavy flow at 1× changes from 286.1 to 288.4
+microseconds in median run means, with a +1.9 microsecond median paired change;
+at 2× the paired change is +0.5 microseconds. Peak occupancy across the varied
+cases is 73 of 256 parcels, with zero capacity-limited ticks.
+
+This comparison includes the changed droplet paths and burst frequency: heavy
+flow produces 18 varied bursts versus 23 fixed bursts over the eight-second
+measurement. It does not isolate RNG cost. The small desktop differences show
+no material regression in this testbed. The separate
+[full Clock Pi profile](../water-drain-splash-profile.md) measures complete
+events; native display presentation remains outside both comparisons.
+
+![Varied heavy-flow splash, seed 7](../screenshots/water/drain-splash-varied.png)
+
+#### Clock integration
+
+`floor::responsive::drain_splash(seed)` supplies the same selected preset to the
+gallery, Rain and normal Meltdown. Each event uses its existing event seed;
+splash pattern generation does not advance the rain source or falling-block RNG.
+Digit drips, independent rain, and impact spray do not qualify as drain outfalls
+and cannot recursively generate this spray. Shared visits on the responsive
+floor also use the preset. Multi-gap courses and older water labs stay disabled.
+
+Both event diagnostics expose `drain_splash_bursts`,
+`drain_splash_microunits` and `drain_splash_suppressed`. The volume counter is
+cumulative redirected water, never an extra term in the material ledger. Older
+control payloads default these additive fields to zero.
+
+The existing complete Rain and Meltdown sweeps now exercise the live preset,
+including three cabinet aspects, multiple seeds, responsive panel exclusion,
+water/material accounting, source delivery, duck exit, paused replay and final
+cleanup. The pool symmetry regression uses a splash-free world because uneven
+fans intentionally break bilateral symmetry. A separate live capture test
+follows each event to completion and exports a burst plus its next 0.4 seconds
+through both production render adapters:
+
+```sh
+SPACEWARS_DRAIN_SPLASH_CLOCK_ARTIFACTS=/tmp/spacewars-clock-splashes \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client \
+  live_clock_drain_splashes_render_and_clean_up
+# Open /tmp/spacewars-clock-splashes/index.html.
+```
+
+The [seed-7 cycle results](../data/water-drain-splash-clock-20261002.json)
+record 63–95 bursts during each 42-second heavy Rain cycle, and 16 during each
+8.5-second Meltdown cycle. Peak occupancy is 257–263 of 512 Rain parcels and
+106–116 of 192 Meltdown parcels. None of these six runs suppresses a burst for
+capacity, and all return to the ordinary dry Clock after cleanup. These are
+native desktop simulation captures, not device timing measurements.
+
+| Heavy Rain | Meltdown |
+| --- | --- |
+| ![Varied Lively in Clock Rain](../screenshots/water/drain-splash-clock-rain.png) | ![Varied Lively in Clock Meltdown](../screenshots/water/drain-splash-clock-meltdown.png) |
+
+The selected varied Lively preset passed manual playtesting on
+`sw-picade.local` after deployment on October 2, 2026. The installed client and
+CLI hashes were verified, the kiosk stayed healthy, and saved settings were
+preserved. A live Meltdown sample recorded five splash bursts with no capacity
+suppression and an exactly conserved material ledger.
+
+The [full-event Pi comparison](../water-drain-splash-profile.md) subsequently
+completed 36 runs and 76,320 measured frames against the same code with the
+Clock preset disabled. Median paired whole-frame changes across Rain and
+Meltdown were -0.5% to +0.3%, with similarly sized idle variation. At the saved
+2× scale, Rain changed by +0.025 ms/frame (+0.1%). This supports keeping the
+effect without an optimization detour; it is CPU frame-work evidence rather
+than displayed FPS or a speedup claim. The report retains exact builds, raw
+measurements and reproduction steps.
 
 ### Optional wet-surface impact response
 
@@ -112,10 +422,9 @@ updates may release supports but do not apply impacts or advance the waves.
 
 This is a cheap, damped surface disturbance, **not** vertical-pressure dynamics,
 a spray generator or a momentum/energy-conserving fluid/body solver. Asymmetric
-depths and walls can produce asymmetric horizontal motion. There is no new
-attraction toward the drain or moving drain geometry; those remain separate
-work under #102. Exaggerated splash art can later use an explicit bounded
-effect without pretending it is extra water.
+depths and walls can produce asymmetric horizontal motion. Drain motion and the
+bounded drain splashes described above are separate responses. Splashes redirect
+existing water rather than adding to the volume ledger.
 
 `water_fixture::ImpactFixture` compares the same tank, volume and falling drop
 at response 0 and 0.25. These production-renderer captures show the same instant
