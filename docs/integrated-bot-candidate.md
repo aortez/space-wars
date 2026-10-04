@@ -163,3 +163,21 @@ At definition time, #81 and #142 have been refreshed through merged #166 and
 remain open. No fresh matches, device timings or playtests have been run for
 this candidate. The next execution step is qualification and the frozen full
 comparison, with aggregate reporting and the acceptance checks above.
+
+### Definition validation
+
+Configuration, tests and acceptance criteria were frozen at `5724c95` before
+startup checks. All **801 Python tests**, the Rust 1.89.0 profiled release build
+and all **12 one-second configuration checks** pass. The checks verify both
+seats against v9, v10 and v16, including the disabled options, consumed model
+identities, shared route setup, cadence and combat-break settings. No controller
+or runtime Rust code changed in this definition step.
+
+The [validation manifest](data/integrated-bot-candidate-v1.json) and
+[compressed archive](data/integrated-bot-candidate-v1.json.gz) retain the 112-case
+expanded plan, startup summary, all twelve reports, and the frozen compiler and
+plan text. All sixteen embedded document hashes were verified. The copied binary
+has SHA-256 `3801be7ce18226c62e283d694eafce88711b5808501e0245b8bab49ceb79bb42`.
+Full local artifacts are under `target/integrated-bot`. The planned evaluation
+case directories do not exist yet: **0/16 qualification and 0/96 fresh matches
+have run**. Passing startup checks is configuration evidence only.
