@@ -8,6 +8,9 @@ surveyed and actual hatch positions, interrupted powered crossings, and losses
 after escape while travelling to the next destination. This branch records the
 bounded execution candidates and the physical evidence needed to evaluate them.
 
+The subsequent [review and integration record](bot-checkpoint-integration.md)
+documents compatibility with the newer v14-v16 work on `main` and PR validation.
+
 It extends the earlier [planning checkpoint](bot-planning-checkpoint.md) and
 [mission-value work](capture-mission-value.md). It closes the current local
 investigation with [one conservative projectile-response selector](projectile-response-selection.md).
@@ -20,7 +23,7 @@ two previously successful braking continuations and rejects the recorded
 clear-entry braking regression, but all 16 new candidate matches remain exactly
 equal to their controls: one short warning is rejected and fifteen cases never
 warn. The decision is **retain as experimental**. This closes the investigation
-without claiming a stronger default bot. Current validation passes 1,103 Rust
+without claiming a stronger default bot. The original checkpoint passes 1,103 Rust
 tests, 775 Python tests, formatting, strict AI Clippy and both release builds.
 
 ## Review map
@@ -84,5 +87,6 @@ track, not a prerequisite for that programmed-bot milestone.
 
 This is the stopping point for the present investigation. Additional prediction
 models, more response tuning or further seed searches belong in a separately
-scoped change. No push, PR publication, merge, deployment or GitHub issue edit
-is part of this local checkpoint.
+scoped change. Publication and integration follow separately in the linked
+review record; the frozen investigation itself did not push, merge, deploy or
+edit GitHub issues.
