@@ -15,6 +15,7 @@ pub struct TerrainDiagnostics {
     pub fragments: usize,
     pub loose_cells: usize,
     pub deposited_cells: u64,
+    pub settling: engine_rapier::terrain::SettlingDiagnostics,
     pub loose_limit: usize,
     pub rejected_releases: u64,
     pub terrain_colliders: usize,
@@ -52,6 +53,11 @@ impl SpacewarsState {
                 .loose
                 .as_ref()
                 .map_or(0, LooseTerrain::deposited_cells),
+            settling: self
+                .terrain
+                .loose
+                .as_ref()
+                .map_or(Default::default(), LooseTerrain::settling_diagnostics),
             loose_limit: self
                 .terrain
                 .loose

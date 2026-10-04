@@ -282,7 +282,9 @@ fn dynamic_attachment_preserves_linear_and_angular_momentum() {
 fn blocked_candidates_cannot_starve_later_grains_under_the_per_tick_budget() {
     let terrain = Terrain::generate(
         98,
-        3,
+        // No spare row above the blockers: local redistribution cannot bypass
+        // them, so admission really must advance to later candidates.
+        2,
         1.0,
         vec![Material {
             id: MaterialId(1),
@@ -368,4 +370,149 @@ fn blocked_candidates_cannot_starve_later_grains_under_the_per_tick_budget() {
     }
     assert_eq!(pool.deposited_cells(), 32);
     assert_eq!(pool.len(), 64);
+}
+
+#[test]
+fn smooth_surface_clearance_checks_growth_without_rejecting_unchanged_ground() {
+    for surface in [TerrainSurface::Contour, TerrainSurface::Interpolated] {
+        for obstructs in [false, true] {
+            let (mut world, mut field, mut pool) = fixture(surface, GrainShape::Round);
+            release(&mut world, &mut field, &mut pool, &mut 2);
+            for _ in 0..28 {
+                step(&mut world, &mut field, &mut pool);
+            }
+            let blocker = PhysicsId::new(99);
+            let offset = if obstructs {
+                Vec2::new(0.43, 0.43)
+            } else {
+                Vec2::new(1.1, 0.7)
+            };
+            world.insert_body(
+                BodyId::new(blocker, BodyRole::PRIMARY),
+                BodySpec {
+                    kind: BodyKind::Fixed,
+                    position: field.terrain.cell_center(CELL) + offset,
+                    ..Default::default()
+                },
+                &[ColliderSpec::ball(
+                    ColliderId::new(blocker, ColliderRole::PRIMARY, 0),
+                    0.03,
+                )],
+            );
+            let before = field.terrain.clone();
+            for _ in 0..120 {
+                step(&mut world, &mut field, &mut pool);
+            }
+            assert_eq!(
+                pool.len(),
+                usize::from(obstructs),
+                "{surface:?} obstructs={obstructs}"
+            );
+            assert!(world.contains_entity(blocker));
+            if obstructs {
+                assert_eq!(field.terrain, before);
+                assert_eq!(pool.settling_diagnostics().obstructed, 1);
+            } else {
+                assert_eq!(pool.deposited_cells(), 1);
+                assert_eq!(field.terrain.cell(CELL).unwrap().durability, 73);
+            }
+        }
+    }
+}
+
+#[test]
+fn grains_on_an_actor_cannot_use_it_as_a_path_to_terrain() {
+    let (mut world, mut field, mut pool) = fixture(TerrainSurface::Blocks, GrainShape::Round);
+    release(&mut world, &mut field, &mut pool, &mut 2);
+    let center = field.terrain.cell_center(CELL);
+    let actor = PhysicsId::new(99);
+    world.insert_body(
+        BodyId::new(actor, BodyRole::PRIMARY),
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: center + Vec2::new(0.0, 1.0),
+            ..Default::default()
+        },
+        &[ColliderSpec::cuboid(
+            ColliderId::new(actor, ColliderRole::PRIMARY, 0),
+            2.0,
+            0.25,
+        )],
+    );
+    let grain = pool.iter().next().unwrap().body();
+    world.set_pose(grain, center + Vec2::new(0.0, 1.75), 0.0, true);
+    let before = field.terrain.clone();
+    for _ in 0..180 {
+        step(&mut world, &mut field, &mut pool);
+    }
+    assert_eq!(pool.len(), 1);
+    assert_eq!(pool.settling_diagnostics().unsupported, 1);
+    assert_eq!(field.terrain, before);
+}
+
+#[test]
+fn compact_groups_keep_every_cells_damage_across_all_surfaces_and_shapes() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        for shape in [GrainShape::Round, GrainShape::Hexagon] {
+            let (mut world, mut field, _) = fixture(surface, shape);
+            let mut pool = LooseTerrain::new(LooseTerrainConfig {
+                max_grains: 5,
+                shape,
+                ..Default::default()
+            })
+            .unwrap();
+            let plan = PreparedRelease::new(
+                &field.terrain,
+                &[TerrainEdit {
+                    brush: Brush::Capsule {
+                        start: CellCoord::new(4, 5),
+                        end: CellCoord::new(8, 5),
+                        radius: 0,
+                    },
+                    mode: EditMode::Remove,
+                }],
+            )
+            .unwrap();
+            assert_eq!(plan.grain_count(), 5);
+            pool.commit(&mut world, view(&mut field), plan, &mut 2)
+                .unwrap();
+            let center = field.terrain.cell_center(CELL);
+            for (i, g) in pool.iter().enumerate() {
+                let offset = if i < 3 {
+                    Vec2::new((i as f32 - 1.0) * 0.95, 0.0)
+                } else {
+                    Vec2::new((i as f32 - 3.5) * 0.95, 0.9)
+                };
+                world.set_pose(g.body(), center + offset, 0.0, true);
+            }
+            let mut replay = (world.clone(), field.clone(), pool.clone());
+            for _ in 0..600 {
+                step(&mut world, &mut field, &mut pool);
+                step(&mut replay.0, &mut replay.1, &mut replay.2);
+                assert_eq!(pool.settling_hash(), replay.2.settling_hash());
+                assert_eq!(field.terrain, replay.1.terrain);
+                pool.audit(&world).unwrap();
+            }
+            assert_eq!(
+                pool.deposited_cells(),
+                5,
+                "{surface:?} {shape:?}: {:?}",
+                pool.settling_diagnostics()
+            );
+            assert_eq!(
+                field
+                    .terrain
+                    .cells()
+                    .iter()
+                    .filter(|c| c.durability == 73)
+                    .count(),
+                1
+            );
+            assert_eq!(world.body_count(), 1);
+        }
+    }
 }

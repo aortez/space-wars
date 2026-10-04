@@ -5,7 +5,7 @@ use engine_terrain::{DetachedCell, MaterialId, TerrainEdit, TerrainError};
 use std::collections::BTreeMap;
 
 mod deposition;
-pub use deposition::DepositCommit;
+pub use deposition::{DepositCommit, SettlingDiagnostics};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LooseTerrainConfig {
@@ -156,6 +156,7 @@ pub struct LooseTerrain {
     grains: Vec<TerrainGrain>,
     settling: BTreeMap<PhysicsId, deposition::SettlingState>,
     deposited_cells: u64,
+    settling_diagnostics: SettlingDiagnostics,
 }
 
 impl LooseTerrain {
@@ -173,6 +174,7 @@ impl LooseTerrain {
             grains: Vec::new(),
             settling: BTreeMap::new(),
             deposited_cells: 0,
+            settling_diagnostics: SettlingDiagnostics::default(),
         })
     }
     pub fn config(&self) -> LooseTerrainConfig {
@@ -295,6 +297,7 @@ impl LooseTerrain {
             .synchronize(world, source.terrain, source.geometry)
             .expect("validated material source and geometry");
         self.grains.extend(grains);
+        self.settling_diagnostics.waiting += new_grains;
         *next_id = end;
         Ok(ReleaseCommit {
             fragments,

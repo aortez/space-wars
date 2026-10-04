@@ -1574,15 +1574,94 @@ impl PhysicsWorld {
         }
         let shape = SharedShape::cuboid(half_extents.x, half_extents.y);
         let pose = Pose::new(to_rapier(position), angle);
-        let bounds = shape.compute_aabb(&pose);
-        self.raw.colliders.iter().all(|(_, collider)| {
+        self.current_shapes_are_clear(&[(pose, shape)], groups, excluded)
+    }
+
+    /// Check convex additions against current solid bodies, including unflushed
+    /// edits. Patches are local to the supplied pose and should contain only new
+    /// solid area, so an actor touching unchanged terrain does not veto a deposit.
+    pub fn current_polygons_are_clear(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> bool {
+        self.current_polygons_clearance(position, angle, polygons, groups, excluded)
+            .into_iter()
+            .all(|clear| clear)
+    }
+
+    /// Per-patch result for a prepared edit. The caller can discard obstructed
+    /// placements without reconstructing and querying the same surface again.
+    pub fn current_polygons_clearance(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> Vec<bool> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return vec![false; polygons.len()];
+        }
+        let mut shapes = Vec::with_capacity(polygons.len());
+        for polygon in polygons {
+            if polygon.len() < 3 || polygon.iter().any(|v| !finite_vec2(*v)) {
+                return vec![false; polygons.len()];
+            }
+            let center =
+                polygon.iter().copied().fold(Vec2::ZERO, |a, b| a + b) / polygon.len() as f32;
+            let vertices: Vec<_> = polygon.iter().map(|v| to_rapier(*v - center)).collect();
+            let Some(shape) = SharedShape::convex_hull(&vertices) else {
+                return vec![false; polygons.len()];
+            };
+            shapes.push((
+                Pose::new(to_rapier(position + center.rotate_radians(angle)), angle),
+                shape,
+            ));
+        }
+        self.current_shapes_clearance(&shapes, groups, excluded, false)
+    }
+
+    fn current_shapes_are_clear(
+        &self,
+        shapes: &[(Pose, SharedShape)],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> bool {
+        self.current_shapes_clearance(shapes, groups, excluded, true)
+            .into_iter()
+            .all(|clear| clear)
+    }
+
+    fn current_shapes_clearance(
+        &self,
+        shapes: &[(Pose, SharedShape)],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+        stop_on_first: bool,
+    ) -> Vec<bool> {
+        let bounds: Vec<_> = shapes.iter().map(|(p, s)| s.compute_aabb(p)).collect();
+        let Some(mut envelope) = bounds.first().copied() else {
+            return Vec::new();
+        };
+        for b in &bounds[1..] {
+            envelope.mins.x = envelope.mins.x.min(b.mins.x);
+            envelope.mins.y = envelope.mins.y.min(b.mins.y);
+            envelope.maxs.x = envelope.maxs.x.max(b.maxs.x);
+            envelope.maxs.y = envelope.maxs.y.max(b.maxs.y);
+        }
+        let mut results = vec![true; shapes.len()];
+        for (_, collider) in self.raw.colliders.iter() {
             if !collider.is_enabled()
                 || collider.is_sensor()
                 || !collider.collision_groups().test(groups.to_rapier())
                 || decode_collider(collider.user_data)
                     .is_some_and(|id| excluded.contains(&id.entity))
             {
-                return true;
+                continue;
             }
             let other_pose = collider
                 .parent()
@@ -1591,21 +1670,37 @@ impl PhysicsWorld {
                     *body.position() * collider.position_wrt_parent().copied().unwrap_or_default()
                 });
             let other_bounds = collider.shape().compute_aabb(&other_pose);
-            if bounds.maxs.x <= other_bounds.mins.x
-                || bounds.mins.x >= other_bounds.maxs.x
-                || bounds.maxs.y <= other_bounds.mins.y
-                || bounds.mins.y >= other_bounds.maxs.y
+            // Most of a multi-planet world's colliders are far from this edit.
+            // Reject them once, before visiting every local surface patch.
+            if envelope.maxs.x <= other_bounds.mins.x
+                || envelope.mins.x >= other_bounds.maxs.x
+                || envelope.maxs.y <= other_bounds.mins.y
+                || envelope.mins.y >= other_bounds.maxs.y
             {
-                return true;
+                continue;
             }
-            !rapier2d::parry::query::intersection_test(
-                &pose,
-                shape.as_ref(),
-                &other_pose,
-                collider.shape(),
-            )
-            .unwrap_or(true)
-        })
+            for (((pose, shape), bounds), clear) in shapes.iter().zip(&bounds).zip(&mut results) {
+                if !*clear
+                    || bounds.maxs.x <= other_bounds.mins.x
+                    || bounds.mins.x >= other_bounds.maxs.x
+                    || bounds.maxs.y <= other_bounds.mins.y
+                    || bounds.mins.y >= other_bounds.maxs.y
+                {
+                    continue;
+                }
+                *clear = !rapier2d::parry::query::intersection_test(
+                    pose,
+                    shape.as_ref(),
+                    &other_pose,
+                    collider.shape(),
+                )
+                .unwrap_or(true);
+                if stop_on_first && !*clear {
+                    return results;
+                }
+            }
+        }
+        results
     }
 
     /// Sweep an existing collider along a world direction, excluding its entity

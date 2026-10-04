@@ -646,6 +646,10 @@ impl BlastLab {
         self.grains.deposited_cells()
     }
 
+    pub fn settling_diagnostics(&self) -> engine_rapier::terrain::SettlingDiagnostics {
+        self.grains.settling_diagnostics()
+    }
+
     /// Audit outside the timed step. Cell counts preserve material identity;
     /// matching collider mass and geometry are checked for each dynamic piece.
     pub fn audit(&self) -> Result<MaterialBalance, TerrainError> {

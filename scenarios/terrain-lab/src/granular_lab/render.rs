@@ -187,7 +187,7 @@ pub(super) fn frame(state: &GranularLabState) -> RenderFrame {
     });
     text(
         &mut frame,
-        center - Vec2::Y * h * 0.34,
+        center - Vec2::Y * h * 0.30,
         format!(
             "{} / {} loose · {} resting · {} settled · {}",
             state.lab.loose_body_count(),
@@ -197,6 +197,22 @@ pub(super) fn frame(state: &GranularLabState) -> RenderFrame {
             probe
         ),
         14.0,
+        TEXT,
+    );
+    let settling = state.lab.settling_diagnostics();
+    text(
+        &mut frame,
+        center - Vec2::Y * h * 0.345,
+        format!(
+            "Waiting {} · moving {} · no ground {} · no room {} · blocked {} · budget {}",
+            settling.waiting,
+            settling.moving,
+            settling.unsupported,
+            settling.no_room,
+            settling.obstructed,
+            settling.budget
+        ),
+        12.0,
         TEXT,
     );
     let area = state.config.cell_size.powi(2);

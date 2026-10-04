@@ -1,0 +1,2607 @@
+{
+  "date": "2026-10-03",
+  "target": "spacewars@sw-picade.local",
+  "hardware": "Raspberry Pi 4 Model B Rev 1.4",
+  "rust": "1.89.0",
+  "profile": "release; fat LTO; aarch64-unknown-linux-gnu; -C target-feature=+crt-static",
+  "application_state": "Kiosk running, terrain-grains paused. Benchmarks serial; no deployment during measurements.",
+  "baseline": "89fdf7e3f9280dfd19e219299338e1d3d52dd67a; archived single-grain deposition binaries from /tmp/terrain-deposition.qEelJGra",
+  "current": "Group settling and local growth preview in the commit containing this report, based on 89fdf7e.",
+  "commands": [
+    "granular_sandbox --verify-replay",
+    "granular_sandbox --workload pile-cycle --ticks 1200 --verify-replay",
+    "loose_terrain_benchmark --seconds 30"
+  ],
+  "repeat_policy": "One baseline run and one final run per comparable case. Pile-cycle is current only. Intermediate tuning/profile runs excluded. Workloads diverge physically, so timings do not isolate settling overhead.",
+  "temperature_before_celsius": 73.036,
+  "temperature_after_celsius": 78.393,
+  "scaling_cur_freq_before_khz": 1500000,
+  "scaling_cur_freq_after_khz": 1500000,
+  "temperature_note": "Final-run endpoint sysfs samples; no firmware throttle telemetry.",
+  "binaries": {
+    "granular_sandbox": {
+      "sha256": "3452a140a4d90861a5e7fb2a3c69fa2f7decd1c3d80273a0faaf083d983aff04",
+      "bytes": 2915952
+    },
+    "loose_terrain_benchmark": {
+      "sha256": "ebb4a948a063c54fd5437dbeefd4ff67bfb472c1d3feee0e5b4bbc162c176d68",
+      "bytes": 3373808
+    }
+  },
+  "spacewars_before": [
+    {
+      "scene": "combat",
+      "mode": "off",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "0",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "234",
+      "deposited": "0",
+      "step_mean_ms": "0.223",
+      "step_p50_ms": "0.202",
+      "step_p95_ms": "0.374",
+      "step_p99_ms": "0.741",
+      "step_max_ms": "1.140",
+      "frame_p95_ms": "0.109",
+      "state_hash": "08fcec9c16b72028"
+    },
+    {
+      "scene": "combat",
+      "mode": "round",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "174",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "0",
+      "deposited": "23",
+      "step_mean_ms": "1.873",
+      "step_p50_ms": "0.686",
+      "step_p95_ms": "5.364",
+      "step_p99_ms": "7.018",
+      "step_max_ms": "8.205",
+      "frame_p95_ms": "0.231",
+      "state_hash": "28d86a7d910de12a"
+    },
+    {
+      "scene": "combat",
+      "mode": "angular",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "180",
+      "fragments": "0",
+      "blocked": "1",
+      "removed": "0",
+      "deposited": "16",
+      "step_mean_ms": "2.371",
+      "step_p50_ms": "0.816",
+      "step_p95_ms": "6.556",
+      "step_p99_ms": "8.307",
+      "step_max_ms": "9.280",
+      "frame_p95_ms": "0.257",
+      "state_hash": "6079969ae3719972"
+    },
+    {
+      "scene": "match",
+      "mode": "off",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "0",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "578",
+      "deposited": "0",
+      "step_mean_ms": "1.242",
+      "step_p50_ms": "1.136",
+      "step_p95_ms": "1.652",
+      "step_p99_ms": "2.535",
+      "step_max_ms": "9.446",
+      "frame_p95_ms": "3.982",
+      "state_hash": "83612e6c699db1f9"
+    },
+    {
+      "scene": "match",
+      "mode": "round",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "179",
+      "fragments": "0",
+      "blocked": "9",
+      "removed": "0",
+      "deposited": "3",
+      "step_mean_ms": "9.810",
+      "step_p50_ms": "12.379",
+      "step_p95_ms": "15.306",
+      "step_p99_ms": "16.178",
+      "step_max_ms": "24.139",
+      "frame_p95_ms": "4.175",
+      "state_hash": "9eb85aa205879d41"
+    },
+    {
+      "scene": "match",
+      "mode": "angular",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "173",
+      "fragments": "0",
+      "blocked": "9",
+      "removed": "0",
+      "deposited": "9",
+      "step_mean_ms": "10.405",
+      "step_p50_ms": "12.950",
+      "step_p95_ms": "16.380",
+      "step_p99_ms": "17.921",
+      "step_max_ms": "32.408",
+      "frame_p95_ms": "3.877",
+      "state_hash": "b0b8f5eed3354533"
+    }
+  ],
+  "spacewars_after": [
+    {
+      "scene": "combat",
+      "mode": "off",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "0",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "234",
+      "deposited": "0",
+      "step_mean_ms": "0.222",
+      "step_p50_ms": "0.203",
+      "step_p95_ms": "0.354",
+      "step_p99_ms": "0.743",
+      "step_max_ms": "2.203",
+      "frame_p95_ms": "0.107",
+      "state_hash": "08fcec9c16b72028"
+    },
+    {
+      "scene": "combat",
+      "mode": "round",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "26",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "0",
+      "deposited": "200",
+      "step_mean_ms": "0.565",
+      "step_p50_ms": "0.219",
+      "step_p95_ms": "1.993",
+      "step_p99_ms": "2.896",
+      "step_max_ms": "6.085",
+      "frame_p95_ms": "0.177",
+      "state_hash": "7bf14f96a1cdaa85"
+    },
+    {
+      "scene": "combat",
+      "mode": "angular",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "17",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "0",
+      "deposited": "217",
+      "step_mean_ms": "1.149",
+      "step_p50_ms": "0.247",
+      "step_p95_ms": "4.494",
+      "step_p99_ms": "6.444",
+      "step_max_ms": "9.975",
+      "frame_p95_ms": "0.240",
+      "state_hash": "5a7daf448b8d54ba"
+    },
+    {
+      "scene": "match",
+      "mode": "off",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "0",
+      "fragments": "0",
+      "blocked": "0",
+      "removed": "578",
+      "deposited": "0",
+      "step_mean_ms": "1.243",
+      "step_p50_ms": "1.147",
+      "step_p95_ms": "1.628",
+      "step_p99_ms": "2.511",
+      "step_max_ms": "9.865",
+      "frame_p95_ms": "4.205",
+      "state_hash": "83612e6c699db1f9"
+    },
+    {
+      "scene": "match",
+      "mode": "round",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "177",
+      "fragments": "0",
+      "blocked": "9",
+      "removed": "0",
+      "deposited": "5",
+      "step_mean_ms": "10.858",
+      "step_p50_ms": "12.956",
+      "step_p95_ms": "18.485",
+      "step_p99_ms": "21.800",
+      "step_max_ms": "27.650",
+      "frame_p95_ms": "4.175",
+      "state_hash": "7d7b94937cf9f9ea"
+    },
+    {
+      "scene": "match",
+      "mode": "angular",
+      "seed": "42",
+      "limit": "192",
+      "steps": "1800",
+      "grains": "176",
+      "fragments": "0",
+      "blocked": "9",
+      "removed": "0",
+      "deposited": "6",
+      "step_mean_ms": "11.650",
+      "step_p50_ms": "13.808",
+      "step_p95_ms": "19.765",
+      "step_p99_ms": "24.237",
+      "step_max_ms": "26.990",
+      "frame_p95_ms": "4.326",
+      "state_hash": "53e5b1aeae99671b"
+    }
+  ],
+  "sandbox_before": {
+    "architecture": "aarch64",
+    "cases": [
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 152,
+        "cell_size": 0.5,
+        "conserved_cells": 5289,
+        "deposited_cells": 9,
+        "event_update": {
+          "max_ms": 5.266223,
+          "mean_ms": 3.27737075,
+          "p95_ms": 5.266223,
+          "samples": 4
+        },
+        "final_hash": "5ae251b06b2da952",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.5690890000000001,
+          "mean_ms": 0.08821081333333325,
+          "p95_ms": 0.15561,
+          "samples": 600
+        },
+        "ground_cells": 5134,
+        "loose_cells": 155,
+        "native_update": {
+          "max_ms": 5.774071,
+          "mean_ms": 1.719030845637584,
+          "p95_ms": 3.3484209999999996,
+          "samples": 596
+        },
+        "peak_loose_bodies": 155,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 165,
+        "cell_size": 0.5,
+        "conserved_cells": 5289,
+        "deposited_cells": 9,
+        "event_update": {
+          "max_ms": 4.437895,
+          "mean_ms": 2.783911,
+          "p95_ms": 4.437895,
+          "samples": 4
+        },
+        "final_hash": "85ffc3cc786abdf2",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.316702,
+          "mean_ms": 0.08692415333333338,
+          "p95_ms": 0.15651700000000002,
+          "samples": 600
+        },
+        "ground_cells": 5145,
+        "loose_cells": 144,
+        "native_update": {
+          "max_ms": 4.717911,
+          "mean_ms": 1.5508771342281862,
+          "p95_ms": 2.8140359999999998,
+          "samples": 596
+        },
+        "peak_loose_bodies": 147,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 198,
+        "cell_size": 0.5,
+        "conserved_cells": 5289,
+        "deposited_cells": 8,
+        "event_update": {
+          "max_ms": 4.540782999999999,
+          "mean_ms": 2.95167425,
+          "p95_ms": 4.540782999999999,
+          "samples": 4
+        },
+        "final_hash": "7b87bcdf46f50cf1",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.422016,
+          "mean_ms": 0.11063635000000008,
+          "p95_ms": 0.192517,
+          "samples": 600
+        },
+        "ground_cells": 5140,
+        "loose_cells": 149,
+        "native_update": {
+          "max_ms": 5.29087,
+          "mean_ms": 1.8600667399328839,
+          "p95_ms": 3.484309,
+          "samples": 596
+        },
+        "peak_loose_bodies": 153,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 184,
+        "cell_size": 0.5,
+        "conserved_cells": 5241,
+        "deposited_cells": 6,
+        "event_update": {
+          "max_ms": 4.048824000000001,
+          "mean_ms": 2.4899502500000006,
+          "p95_ms": 4.048824000000001,
+          "samples": 4
+        },
+        "final_hash": "9612b276f635fc46",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.277424,
+          "mean_ms": 0.09032742000000002,
+          "p95_ms": 0.157387,
+          "samples": 600
+        },
+        "ground_cells": 5108,
+        "loose_cells": 133,
+        "native_update": {
+          "max_ms": 3.995806,
+          "mean_ms": 1.4725909932885912,
+          "p95_ms": 2.638278,
+          "samples": 596
+        },
+        "peak_loose_bodies": 137,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 240,
+        "cell_size": 0.5,
+        "conserved_cells": 5241,
+        "deposited_cells": 9,
+        "event_update": {
+          "max_ms": 4.150249,
+          "mean_ms": 2.8925632500000003,
+          "p95_ms": 4.150249,
+          "samples": 4
+        },
+        "final_hash": "4a8b8349c4b5a148",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.405053,
+          "mean_ms": 0.0912120816666667,
+          "p95_ms": 0.155092,
+          "samples": 600
+        },
+        "ground_cells": 5099,
+        "loose_cells": 142,
+        "native_update": {
+          "max_ms": 4.358802,
+          "mean_ms": 1.4798249161073818,
+          "p95_ms": 2.891794,
+          "samples": 596
+        },
+        "peak_loose_bodies": 147,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 163,
+        "cell_size": 0.5,
+        "conserved_cells": 5241,
+        "deposited_cells": 10,
+        "event_update": {
+          "max_ms": 4.38321,
+          "mean_ms": 2.840221,
+          "p95_ms": 4.38321,
+          "samples": 4
+        },
+        "final_hash": "36a1d0828d894000",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.410145,
+          "mean_ms": 0.11027084,
+          "p95_ms": 0.19260999999999998,
+          "samples": 600
+        },
+        "ground_cells": 5094,
+        "loose_cells": 147,
+        "native_update": {
+          "max_ms": 5.292204,
+          "mean_ms": 1.7249550402684573,
+          "p95_ms": 3.300866,
+          "samples": 596
+        },
+        "peak_loose_bodies": 146,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 78,
+        "cell_size": 0.5,
+        "conserved_cells": 3209,
+        "deposited_cells": 10,
+        "event_update": {
+          "max_ms": 4.516875,
+          "mean_ms": 2.641287,
+          "p95_ms": 4.516875,
+          "samples": 4
+        },
+        "final_hash": "f4b6c096458c90b5",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.316998,
+          "mean_ms": 0.08978358333333335,
+          "p95_ms": 0.164573,
+          "samples": 600
+        },
+        "ground_cells": 3062,
+        "loose_cells": 147,
+        "native_update": {
+          "max_ms": 5.1212230000000005,
+          "mean_ms": 1.6152244848993282,
+          "p95_ms": 3.2109579999999998,
+          "samples": 596
+        },
+        "peak_loose_bodies": 153,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 139,
+        "cell_size": 0.5,
+        "conserved_cells": 3209,
+        "deposited_cells": 9,
+        "event_update": {
+          "max_ms": 3.9124529999999997,
+          "mean_ms": 2.6213745,
+          "p95_ms": 3.9124529999999997,
+          "samples": 4
+        },
+        "final_hash": "8f37597e7f11b6a5",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.378386,
+          "mean_ms": 0.08564961000000007,
+          "p95_ms": 0.154536,
+          "samples": 600
+        },
+        "ground_cells": 3077,
+        "loose_cells": 132,
+        "native_update": {
+          "max_ms": 4.15497,
+          "mean_ms": 1.4455535889261746,
+          "p95_ms": 2.765629,
+          "samples": 596
+        },
+        "peak_loose_bodies": 138,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 134,
+        "cell_size": 0.5,
+        "conserved_cells": 3209,
+        "deposited_cells": 7,
+        "event_update": {
+          "max_ms": 4.936576,
+          "mean_ms": 2.890262,
+          "p95_ms": 4.936576,
+          "samples": 4
+        },
+        "final_hash": "dbe56a4bd68ceca8",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.387423,
+          "mean_ms": 0.11137734000000002,
+          "p95_ms": 0.194795,
+          "samples": 600
+        },
+        "ground_cells": 3052,
+        "loose_cells": 157,
+        "native_update": {
+          "max_ms": 5.977384,
+          "mean_ms": 1.9836058573825521,
+          "p95_ms": 4.066249,
+          "samples": 596
+        },
+        "peak_loose_bodies": 159,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "ticks": 600
+      }
+    ],
+    "fixed_hz": 60,
+    "schema": 1,
+    "seed": 42,
+    "timing_scope": "native scenario update and RenderFrame construction; excludes pixels, host, input transport, replay and post-step audits",
+    "workload": "blast at 0; box at 180; blast below box at 360; fresh ground at 450"
+  },
+  "sandbox_after": {
+    "architecture": "aarch64",
+    "cases": [
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 91,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 62,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 10
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 18,
+            "last_release": 74,
+            "loose_bodies": 56,
+            "settling": {
+              "budget": 0,
+              "moving": 9,
+              "no_room": 0,
+              "obstructed": 41,
+              "unsupported": 0,
+              "waiting": 6
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 72,
+            "last_release": 72,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 59,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 5,
+              "waiting": 10
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 96,
+            "last_release": 74,
+            "loose_bodies": 125,
+            "settling": {
+              "budget": 0,
+              "moving": 82,
+              "no_room": 0,
+              "obstructed": 29,
+              "unsupported": 3,
+              "waiting": 10
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 120,
+            "last_release": 74,
+            "loose_bodies": 101,
+            "settling": {
+              "budget": 0,
+              "moving": 25,
+              "no_room": 0,
+              "obstructed": 65,
+              "unsupported": 0,
+              "waiting": 10
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 120,
+        "event_update": {
+          "max_ms": 4.2531490000000005,
+          "mean_ms": 2.84316075,
+          "p95_ms": 4.2531490000000005,
+          "samples": 4
+        },
+        "final_hash": "039f5cda69eb526a",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.331109,
+          "mean_ms": 0.07586933166666664,
+          "p95_ms": 0.13040600000000002,
+          "samples": 600
+        },
+        "ground_cells": 5168,
+        "loose_cells": 121,
+        "native_update": {
+          "max_ms": 8.456261,
+          "mean_ms": 1.4327578070469809,
+          "p95_ms": 3.070733,
+          "samples": 596
+        },
+        "peak_loose_bodies": 125,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 25,
+          "no_room": 0,
+          "obstructed": 65,
+          "unsupported": 0,
+          "waiting": 10
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 3,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 61,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 11
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 5,
+            "last_release": 74,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 1,
+              "no_room": 0,
+              "obstructed": 45,
+              "unsupported": 0,
+              "waiting": 23
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 63,
+            "loose_bodies": 63,
+            "settling": {
+              "budget": 0,
+              "moving": 51,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 10
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 76,
+            "last_release": 74,
+            "loose_bodies": 135,
+            "settling": {
+              "budget": 0,
+              "moving": 60,
+              "no_room": 0,
+              "obstructed": 53,
+              "unsupported": 2,
+              "waiting": 20
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 144,
+            "last_release": 74,
+            "loose_bodies": 67,
+            "settling": {
+              "budget": 0,
+              "moving": 9,
+              "no_room": 0,
+              "obstructed": 26,
+              "unsupported": 3,
+              "waiting": 29
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 144,
+        "event_update": {
+          "max_ms": 4.797978,
+          "mean_ms": 2.85463325,
+          "p95_ms": 4.797978,
+          "samples": 4
+        },
+        "final_hash": "faa8d168d059eb13",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.24864599999999998,
+          "mean_ms": 0.07144941666666667,
+          "p95_ms": 0.12768400000000002,
+          "samples": 600
+        },
+        "ground_cells": 5222,
+        "loose_cells": 67,
+        "native_update": {
+          "max_ms": 12.174136,
+          "mean_ms": 1.0926419530201343,
+          "p95_ms": 2.260517,
+          "samples": 596
+        },
+        "peak_loose_bodies": 135,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 9,
+          "no_room": 0,
+          "obstructed": 26,
+          "unsupported": 3,
+          "waiting": 29
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 221,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 67,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 5,
+              "waiting": 2
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 21,
+            "last_release": 74,
+            "loose_bodies": 53,
+            "settling": {
+              "budget": 0,
+              "moving": 4,
+              "no_room": 0,
+              "obstructed": 22,
+              "unsupported": 0,
+              "waiting": 27
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 24,
+            "last_release": 33,
+            "loose_bodies": 83,
+            "settling": {
+              "budget": 0,
+              "moving": 55,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 28,
+              "waiting": 0
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 27,
+            "last_release": 77,
+            "loose_bodies": 158,
+            "settling": {
+              "budget": 0,
+              "moving": 74,
+              "no_room": 0,
+              "obstructed": 26,
+              "unsupported": 16,
+              "waiting": 41
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 91,
+            "last_release": 77,
+            "loose_bodies": 94,
+            "settling": {
+              "budget": 0,
+              "moving": 2,
+              "no_room": 7,
+              "obstructed": 70,
+              "unsupported": 1,
+              "waiting": 13
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 91,
+        "event_update": {
+          "max_ms": 4.767774,
+          "mean_ms": 3.02908975,
+          "p95_ms": 4.767774,
+          "samples": 4
+        },
+        "final_hash": "fb218efe879671dc",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.43475600000000003,
+          "mean_ms": 0.10766418666666672,
+          "p95_ms": 0.18485,
+          "samples": 600
+        },
+        "ground_cells": 5195,
+        "loose_cells": 94,
+        "native_update": {
+          "max_ms": 12.585947,
+          "mean_ms": 1.941454145973154,
+          "p95_ms": 4.146131,
+          "samples": 596
+        },
+        "peak_loose_bodies": 158,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 2,
+          "no_room": 7,
+          "obstructed": 70,
+          "unsupported": 1,
+          "waiting": 13
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 35,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 50,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 13
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 55,
+            "last_release": 69,
+            "loose_bodies": 14,
+            "settling": {
+              "budget": 0,
+              "moving": 3,
+              "no_room": 0,
+              "obstructed": 1,
+              "unsupported": 1,
+              "waiting": 9
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 65,
+            "last_release": 65,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 50,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 9,
+              "waiting": 10
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 68,
+            "last_release": 69,
+            "loose_bodies": 136,
+            "settling": {
+              "budget": 0,
+              "moving": 81,
+              "no_room": 0,
+              "obstructed": 21,
+              "unsupported": 12,
+              "waiting": 21
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 79,
+            "last_release": 69,
+            "loose_bodies": 125,
+            "settling": {
+              "budget": 0,
+              "moving": 14,
+              "no_room": 18,
+              "obstructed": 48,
+              "unsupported": 7,
+              "waiting": 37
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 79,
+        "event_update": {
+          "max_ms": 4.438221,
+          "mean_ms": 2.46338175,
+          "p95_ms": 4.438221,
+          "samples": 4
+        },
+        "final_hash": "42d5335155842fc4",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.39527399999999996,
+          "mean_ms": 0.07380350000000005,
+          "p95_ms": 0.130498,
+          "samples": 600
+        },
+        "ground_cells": 5115,
+        "loose_cells": 126,
+        "native_update": {
+          "max_ms": 5.480546,
+          "mean_ms": 1.050490854026846,
+          "p95_ms": 2.9190679999999998,
+          "samples": 596
+        },
+        "peak_loose_bodies": 136,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 14,
+          "no_room": 18,
+          "obstructed": 48,
+          "unsupported": 7,
+          "waiting": 37
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 56,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 56,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 7
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 13,
+            "last_release": 69,
+            "loose_bodies": 56,
+            "settling": {
+              "budget": 0,
+              "moving": 8,
+              "no_room": 0,
+              "obstructed": 31,
+              "unsupported": 2,
+              "waiting": 15
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 54,
+            "last_release": 78,
+            "loose_bodies": 93,
+            "settling": {
+              "budget": 0,
+              "moving": 77,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 5,
+              "waiting": 11
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 57,
+            "last_release": 69,
+            "loose_bodies": 161,
+            "settling": {
+              "budget": 0,
+              "moving": 73,
+              "no_room": 0,
+              "obstructed": 32,
+              "unsupported": 11,
+              "waiting": 43
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 88,
+            "last_release": 69,
+            "loose_bodies": 130,
+            "settling": {
+              "budget": 0,
+              "moving": 53,
+              "no_room": 0,
+              "obstructed": 49,
+              "unsupported": 6,
+              "waiting": 20
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 88,
+        "event_update": {
+          "max_ms": 5.630211,
+          "mean_ms": 3.5653627500000002,
+          "p95_ms": 5.630211,
+          "samples": 4
+        },
+        "final_hash": "fa2332e3824b759c",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.34709,
+          "mean_ms": 0.09022670500000003,
+          "p95_ms": 0.150036,
+          "samples": 600
+        },
+        "ground_cells": 5108,
+        "loose_cells": 133,
+        "native_update": {
+          "max_ms": 9.103014,
+          "mean_ms": 1.604819966442953,
+          "p95_ms": 3.470081,
+          "samples": 596
+        },
+        "peak_loose_bodies": 161,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 53,
+          "no_room": 0,
+          "obstructed": 49,
+          "unsupported": 6,
+          "waiting": 20
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 46,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 59,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 9,
+              "waiting": 1
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 62,
+            "last_release": 69,
+            "loose_bodies": 7,
+            "settling": {
+              "budget": 0,
+              "moving": 2,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 1,
+              "waiting": 4
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 69,
+            "last_release": 53,
+            "loose_bodies": 53,
+            "settling": {
+              "budget": 0,
+              "moving": 43,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 10,
+              "waiting": 0
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 70,
+            "loose_bodies": 118,
+            "settling": {
+              "budget": 0,
+              "moving": 68,
+              "no_room": 0,
+              "obstructed": 23,
+              "unsupported": 11,
+              "waiting": 16
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 118,
+            "last_release": 70,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 30,
+              "no_room": 0,
+              "obstructed": 23,
+              "unsupported": 0,
+              "waiting": 21
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 118,
+        "event_update": {
+          "max_ms": 3.585173,
+          "mean_ms": 2.057223,
+          "p95_ms": 3.585173,
+          "samples": 4
+        },
+        "final_hash": "039a750bc237a895",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.30584999999999996,
+          "mean_ms": 0.08633018166666671,
+          "p95_ms": 0.161795,
+          "samples": 600
+        },
+        "ground_cells": 5167,
+        "loose_cells": 74,
+        "native_update": {
+          "max_ms": 7.507046,
+          "mean_ms": 1.0800433204697983,
+          "p95_ms": 2.86029,
+          "samples": 596
+        },
+        "peak_loose_bodies": 118,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 30,
+          "no_room": 0,
+          "obstructed": 23,
+          "unsupported": 0,
+          "waiting": 21
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 48,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 14
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 52,
+            "last_release": 64,
+            "loose_bodies": 12,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 5,
+              "unsupported": 2,
+              "waiting": 5
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 62,
+            "last_release": 72,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 58,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 3,
+              "waiting": 13
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 62,
+            "last_release": 73,
+            "loose_bodies": 149,
+            "settling": {
+              "budget": 0,
+              "moving": 122,
+              "no_room": 0,
+              "obstructed": 10,
+              "unsupported": 5,
+              "waiting": 10
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 153,
+            "last_release": 73,
+            "loose_bodies": 58,
+            "settling": {
+              "budget": 0,
+              "moving": 8,
+              "no_room": 11,
+              "obstructed": 23,
+              "unsupported": 6,
+              "waiting": 8
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 153,
+        "event_update": {
+          "max_ms": 6.598387,
+          "mean_ms": 2.98361275,
+          "p95_ms": 6.598387,
+          "samples": 4
+        },
+        "final_hash": "03172e7477355a73",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.254479,
+          "mean_ms": 0.07213150833333333,
+          "p95_ms": 0.130332,
+          "samples": 600
+        },
+        "ground_cells": 3151,
+        "loose_cells": 58,
+        "native_update": {
+          "max_ms": 11.375606,
+          "mean_ms": 1.0780549513422826,
+          "p95_ms": 3.088011,
+          "samples": 596
+        },
+        "peak_loose_bodies": 149,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 8,
+          "no_room": 11,
+          "obstructed": 23,
+          "unsupported": 6,
+          "waiting": 8
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 55,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 7
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 61,
+            "last_release": 64,
+            "loose_bodies": 3,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 1
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 62,
+            "last_release": 62,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 47,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 11
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 122,
+            "last_release": 73,
+            "loose_bodies": 77,
+            "settling": {
+              "budget": 0,
+              "moving": 59,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 9,
+              "waiting": 9
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 184,
+            "last_release": 73,
+            "loose_bodies": 15,
+            "settling": {
+              "budget": 0,
+              "moving": 2,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 7,
+              "waiting": 6
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 184,
+        "event_update": {
+          "max_ms": 2.557423,
+          "mean_ms": 1.8551875,
+          "p95_ms": 2.557423,
+          "samples": 4
+        },
+        "final_hash": "0f121539b1e6fb5b",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.271294,
+          "mean_ms": 0.061461365000000066,
+          "p95_ms": 0.11285099999999999,
+          "samples": 600
+        },
+        "ground_cells": 3194,
+        "loose_cells": 15,
+        "native_update": {
+          "max_ms": 4.413888,
+          "mean_ms": 0.660877427852349,
+          "p95_ms": 1.584042,
+          "samples": 596
+        },
+        "peak_loose_bodies": 77,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 2,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 7,
+          "waiting": 6
+        },
+        "ticks": 600
+      },
+      {
+        "blasts": 3,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 58,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 5,
+              "waiting": 1
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 41,
+            "last_release": 64,
+            "loose_bodies": 23,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 12,
+              "unsupported": 2,
+              "waiting": 9
+            },
+            "tick": 181
+          },
+          {
+            "deposited_cells": 62,
+            "last_release": 62,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 49,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 15,
+              "waiting": 0
+            },
+            "tick": 361
+          },
+          {
+            "deposited_cells": 102,
+            "last_release": 73,
+            "loose_bodies": 98,
+            "settling": {
+              "budget": 0,
+              "moving": 63,
+              "no_room": 0,
+              "obstructed": 9,
+              "unsupported": 18,
+              "waiting": 7
+            },
+            "tick": 451
+          },
+          {
+            "deposited_cells": 153,
+            "last_release": 73,
+            "loose_bodies": 47,
+            "settling": {
+              "budget": 0,
+              "moving": 4,
+              "no_room": 0,
+              "obstructed": 25,
+              "unsupported": 8,
+              "waiting": 9
+            },
+            "tick": 600
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 153,
+        "event_update": {
+          "max_ms": 3.904263,
+          "mean_ms": 2.27461025,
+          "p95_ms": 3.904263,
+          "samples": 4
+        },
+        "final_hash": "5df0eea758a42354",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.35216400000000003,
+          "mean_ms": 0.08107707000000004,
+          "p95_ms": 0.14066499999999998,
+          "samples": 600
+        },
+        "ground_cells": 3161,
+        "loose_cells": 48,
+        "native_update": {
+          "max_ms": 8.594611,
+          "mean_ms": 1.0540662802013412,
+          "p95_ms": 2.230165,
+          "samples": 596
+        },
+        "peak_loose_bodies": 98,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 4,
+          "no_room": 0,
+          "obstructed": 25,
+          "unsupported": 8,
+          "waiting": 9
+        },
+        "ticks": 600
+      }
+    ],
+    "fixed_hz": 60,
+    "schema": 1,
+    "seed": 42,
+    "timing_scope": "native scenario update and RenderFrame construction; excludes pixels, host, input transport, replay and post-step audits",
+    "workload": "blast at 0; box at 180; blast below box at 360; fresh ground at 450"
+  },
+  "pile_cycle": {
+    "architecture": "aarch64",
+    "cases": [
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 60,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 12
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 74,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 59,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 3,
+              "waiting": 12
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 145,
+            "last_release": 74,
+            "loose_bodies": 3,
+            "settling": {
+              "budget": 0,
+              "moving": 3,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 145,
+        "event_update": {
+          "max_ms": 3.411785,
+          "mean_ms": 3.0003725,
+          "p95_ms": 3.411785,
+          "samples": 2
+        },
+        "final_hash": "5880ef8efe15fbc0",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.263091,
+          "mean_ms": 0.04991145999999996,
+          "p95_ms": 0.091573,
+          "samples": 1200
+        },
+        "ground_cells": 5286,
+        "loose_cells": 3,
+        "native_update": {
+          "max_ms": 9.792156,
+          "mean_ms": 0.49416720617696175,
+          "p95_ms": 1.425543,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 74,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 3,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 62,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 10
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 74,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 60,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 4,
+              "waiting": 10
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 146,
+            "last_release": 74,
+            "loose_bodies": 2,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 146,
+        "event_update": {
+          "max_ms": 2.7559210000000003,
+          "mean_ms": 2.742662,
+          "p95_ms": 2.7559210000000003,
+          "samples": 2
+        },
+        "final_hash": "191b5eeec172e7bb",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.258164,
+          "mean_ms": 0.048097875000000026,
+          "p95_ms": 0.090926,
+          "samples": 1200
+        },
+        "ground_cells": 5287,
+        "loose_cells": 2,
+        "native_update": {
+          "max_ms": 10.150042,
+          "mean_ms": 0.3763574532554256,
+          "p95_ms": 1.465006,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 74,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 2,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 74,
+            "loose_bodies": 74,
+            "settling": {
+              "budget": 0,
+              "moving": 70,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 4,
+              "waiting": 0
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 74,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 74,
+            "last_release": 73,
+            "loose_bodies": 73,
+            "settling": {
+              "budget": 0,
+              "moving": 68,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 5,
+              "waiting": 0
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 147,
+            "last_release": 73,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5289,
+        "deposited_cells": 147,
+        "event_update": {
+          "max_ms": 2.545108,
+          "mean_ms": 2.4509695000000002,
+          "p95_ms": 2.545108,
+          "samples": 2
+        },
+        "final_hash": "454a951271a148fb",
+        "fixture": "flat",
+        "frame_construction": {
+          "max_ms": 0.297182,
+          "mean_ms": 0.058981280833333344,
+          "p95_ms": 0.115962,
+          "samples": 1200
+        },
+        "ground_cells": 5289,
+        "loose_cells": 0,
+        "native_update": {
+          "max_ms": 11.718307000000001,
+          "mean_ms": 0.6050806961602672,
+          "p95_ms": 1.7054850000000001,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 74,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 48,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 15
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 65,
+            "last_release": 69,
+            "loose_bodies": 4,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 4,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 65,
+            "last_release": 65,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 51,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 7,
+              "waiting": 11
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 125,
+            "last_release": 65,
+            "loose_bodies": 9,
+            "settling": {
+              "budget": 0,
+              "moving": 1,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 8,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 125,
+        "event_update": {
+          "max_ms": 2.4521640000000002,
+          "mean_ms": 2.321452,
+          "p95_ms": 2.4521640000000002,
+          "samples": 2
+        },
+        "final_hash": "e0570bf633fc27ec",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.301145,
+          "mean_ms": 0.05688779249999994,
+          "p95_ms": 0.100221,
+          "samples": 1200
+        },
+        "ground_cells": 5232,
+        "loose_cells": 9,
+        "native_update": {
+          "max_ms": 4.645682,
+          "mean_ms": 0.4283035392320529,
+          "p95_ms": 1.3478400000000001,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 69,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 1,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 8,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 56,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 7
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 65,
+            "last_release": 69,
+            "loose_bodies": 4,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 4,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 65,
+            "last_release": 65,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 53,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 12,
+              "waiting": 4
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 124,
+            "last_release": 65,
+            "loose_bodies": 10,
+            "settling": {
+              "budget": 0,
+              "moving": 2,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 8,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 124,
+        "event_update": {
+          "max_ms": 2.540423,
+          "mean_ms": 2.3900354999999998,
+          "p95_ms": 2.540423,
+          "samples": 2
+        },
+        "final_hash": "4198abc1d01970b6",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.236887,
+          "mean_ms": 0.05421986916666662,
+          "p95_ms": 0.089333,
+          "samples": 1200
+        },
+        "ground_cells": 5231,
+        "loose_cells": 10,
+        "native_update": {
+          "max_ms": 4.56735,
+          "mean_ms": 0.3676210308848077,
+          "p95_ms": 1.173138,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 69,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 2,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 8,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 69,
+            "loose_bodies": 69,
+            "settling": {
+              "budget": 0,
+              "moving": 61,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 8,
+              "waiting": 0
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 69,
+            "last_release": 69,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 69,
+            "last_release": 65,
+            "loose_bodies": 65,
+            "settling": {
+              "budget": 0,
+              "moving": 55,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 10,
+              "waiting": 0
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 134,
+            "last_release": 65,
+            "loose_bodies": 0,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 0,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 5241,
+        "deposited_cells": 134,
+        "event_update": {
+          "max_ms": 2.428498,
+          "mean_ms": 2.320156,
+          "p95_ms": 2.428498,
+          "samples": 2
+        },
+        "final_hash": "f4d535d920847093",
+        "fixture": "slope",
+        "frame_construction": {
+          "max_ms": 0.320349,
+          "mean_ms": 0.05813961166666671,
+          "p95_ms": 0.110018,
+          "samples": 1200
+        },
+        "ground_cells": 5241,
+        "loose_cells": 0,
+        "native_update": {
+          "max_ms": 8.145707999999999,
+          "mean_ms": 0.43920967445742903,
+          "p95_ms": 1.432932,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 69,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 48,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 14
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 64,
+            "loose_bodies": 1,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 1,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 62,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 48,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 6,
+              "waiting": 9
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 124,
+            "last_release": 62,
+            "loose_bodies": 3,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 124,
+        "event_update": {
+          "max_ms": 2.2892759999999996,
+          "mean_ms": 2.1745085,
+          "p95_ms": 2.2892759999999996,
+          "samples": 2
+        },
+        "final_hash": "ecd9d323c0541ef6",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.194387,
+          "mean_ms": 0.05020701416666664,
+          "p95_ms": 0.079148,
+          "samples": 1200
+        },
+        "ground_cells": 3206,
+        "loose_cells": 3,
+        "native_update": {
+          "max_ms": 5.738654,
+          "mean_ms": 0.30162948330550954,
+          "p95_ms": 1.174212,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 64,
+        "preset": "Round",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 2,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 53,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 2,
+              "waiting": 9
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 64,
+            "loose_bodies": 1,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 1,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 62,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 45,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 10,
+              "waiting": 8
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 119,
+            "last_release": 62,
+            "loose_bodies": 8,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 6,
+              "unsupported": 1,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 119,
+        "event_update": {
+          "max_ms": 2.274721,
+          "mean_ms": 2.1517315000000004,
+          "p95_ms": 2.274721,
+          "samples": 2
+        },
+        "final_hash": "0811993233c7ae5c",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.24870099999999998,
+          "mean_ms": 0.051607890833333336,
+          "p95_ms": 0.082703,
+          "samples": 1200
+        },
+        "ground_cells": 3201,
+        "loose_cells": 8,
+        "native_update": {
+          "max_ms": 7.0786620000000005,
+          "mean_ms": 0.32766169532554246,
+          "p95_ms": 1.194693,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 64,
+        "preset": "Round + grip",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 6,
+          "unsupported": 1,
+          "waiting": 0
+        },
+        "ticks": 1200
+      },
+      {
+        "blasts": 2,
+        "body_limit": 192,
+        "box_supported_frames": 0,
+        "cell_size": 0.5,
+        "checkpoints": [
+          {
+            "deposited_cells": 0,
+            "last_release": 64,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 60,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 4,
+              "waiting": 0
+            },
+            "tick": 1
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 64,
+            "loose_bodies": 1,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 1,
+              "waiting": 0
+            },
+            "tick": 600
+          },
+          {
+            "deposited_cells": 63,
+            "last_release": 63,
+            "loose_bodies": 64,
+            "settling": {
+              "budget": 0,
+              "moving": 55,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 9,
+              "waiting": 0
+            },
+            "tick": 601
+          },
+          {
+            "deposited_cells": 126,
+            "last_release": 63,
+            "loose_bodies": 1,
+            "settling": {
+              "budget": 0,
+              "moving": 0,
+              "no_room": 0,
+              "obstructed": 0,
+              "unsupported": 1,
+              "waiting": 0
+            },
+            "tick": 1200
+          }
+        ],
+        "conserved_cells": 3209,
+        "deposited_cells": 126,
+        "event_update": {
+          "max_ms": 2.5303109999999998,
+          "mean_ms": 2.424775,
+          "p95_ms": 2.5303109999999998,
+          "samples": 2
+        },
+        "final_hash": "f2190a7cafa3f248",
+        "fixture": "moving-planet",
+        "frame_construction": {
+          "max_ms": 0.266054,
+          "mean_ms": 0.05370213000000002,
+          "p95_ms": 0.098129,
+          "samples": 1200
+        },
+        "ground_cells": 3208,
+        "loose_cells": 1,
+        "native_update": {
+          "max_ms": 5.116863,
+          "mean_ms": 0.37144862270450774,
+          "p95_ms": 1.470895,
+          "samples": 1198
+        },
+        "peak_loose_bodies": 64,
+        "preset": "Angular",
+        "rejected_blasts": 0,
+        "removed_cells": 0,
+        "same_build_replay_verified": true,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 1,
+          "waiting": 0
+        },
+        "ticks": 1200
+      }
+    ],
+    "fixed_hz": 60,
+    "schema": 1,
+    "seed": 42,
+    "timing_scope": "native scenario update and RenderFrame construction; excludes pixels, host, input transport, replay and post-step audits",
+    "workload": "unobstructed blast at 0; reblast at 600; checkpoints every 600 ticks"
+  },
+  "deployment": {
+    "target": "sw-picade.local",
+    "method": "./update.sh --fast --skip-build --target sw-picade.local; client/CLI only; no reboot",
+    "client_sha256": "3c7d643d9c72c651639453fb189d0f534b804c0d6831c33747a443b250cdd03d",
+    "cli_sha256": "970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5",
+    "service": "active",
+    "restarts": 0,
+    "live_checks": [
+      {
+        "fixture": "flat",
+        "shape": "round",
+        "released_grains": 74,
+        "deposited_cells": 74,
+        "loose_bodies": 0,
+        "resting_grains": 0,
+        "screenshot": "docs/screenshots/granular-terrain/picade-pile-settling.png"
+      },
+      {
+        "fixture": "flat",
+        "shape": "angular",
+        "released_grains": 74,
+        "deposited_cells": 74,
+        "loose_bodies": 0,
+        "resting_grains": 0,
+        "screenshot": "docs/screenshots/granular-terrain/picade-pile-settling-angular.png"
+      }
+    ]
+  }
+}

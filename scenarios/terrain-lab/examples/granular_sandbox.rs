@@ -31,8 +31,26 @@ enum Preset {
     Angular,
 }
 
+#[derive(Clone, Copy, ValueEnum, PartialEq)]
+enum Workload {
+    Sandbox,
+    PileCycle,
+}
+impl Workload {
+    fn description(self) -> &'static str {
+        match self {
+            Self::Sandbox => "blast at 0; box at 180; blast below box at 360; fresh ground at 450",
+            Self::PileCycle => {
+                "unobstructed blast at 0; reblast at 600; checkpoints every 600 ticks"
+            }
+        }
+    }
+}
+
 #[derive(Parser)]
 struct Args {
+    #[arg(long, value_enum, default_value = "sandbox")]
+    workload: Workload,
     #[arg(long, value_enum, default_value = "all")]
     fixture: Ground,
     #[arg(long, value_enum, default_value = "all")]
@@ -53,7 +71,7 @@ fn stats(mut ms: Vec<f64>) -> Value {
         "p95_ms":ms[(ms.len()*95/100).min(ms.len()-1)], "max_ms":ms[ms.len()-1]})
 }
 
-fn run(config: GranularLabConfig, ticks: u32, verify: bool) -> Value {
+fn run(config: GranularLabConfig, workload: Workload, ticks: u32, verify: bool) -> Value {
     let mut state = GranularLabScenario::init(config, 42);
     let dt = Duration::from_secs_f64(1.0 / 60.0);
     let mut commands = Vec::<Vec<Action>>::new();
@@ -63,22 +81,33 @@ fn run(config: GranularLabConfig, ticks: u32, verify: bool) -> Value {
     let mut frames = Vec::new();
     let mut max_bodies = 0;
     let mut box_supported_frames = 0;
+    let mut checkpoints = Vec::new();
     for tick in 0..ticks {
-        let actions = match tick {
-            0 => vec![GranularLabAction::Command(Command::Fire).encode()],
-            180 => vec![GranularLabAction::Command(Command::Drop).encode()],
-            360 => {
-                let position = state.lab.probe_snapshot().unwrap().motion.position;
-                vec![
-                    GranularLabAction::Aim(position - state.lab.up_at(position) * 1.0).encode(),
+        let actions = if workload == Workload::PileCycle {
+            match tick {
+                0 | 600 => vec![
+                    GranularLabAction::Aim(state.lab.surface_point(0.0, 0.5)).encode(),
                     GranularLabAction::Command(Command::Fire).encode(),
-                ]
+                ],
+                _ => vec![],
             }
-            450 => vec![
-                GranularLabAction::Aim(state.lab.surface_point(6.0, 0.75)).encode(),
-                GranularLabAction::Command(Command::Fire).encode(),
-            ],
-            _ => vec![],
+        } else {
+            match tick {
+                0 => vec![GranularLabAction::Command(Command::Fire).encode()],
+                180 => vec![GranularLabAction::Command(Command::Drop).encode()],
+                360 => {
+                    let position = state.lab.probe_snapshot().unwrap().motion.position;
+                    vec![
+                        GranularLabAction::Aim(position - state.lab.up_at(position) * 1.0).encode(),
+                        GranularLabAction::Command(Command::Fire).encode(),
+                    ]
+                }
+                450 => vec![
+                    GranularLabAction::Aim(state.lab.surface_point(6.0, 0.75)).encode(),
+                    GranularLabAction::Command(Command::Fire).encode(),
+                ],
+                _ => vec![],
+            }
         };
         let start = Instant::now();
         GranularLabScenario::step(&mut state, &actions, dt);
@@ -103,6 +132,11 @@ fn run(config: GranularLabConfig, ticks: u32, verify: bool) -> Value {
             .lab
             .audit()
             .expect("conserved material, finite motion and matching colliders");
+        if !actions.is_empty() || (tick + 1) % 600 == 0 {
+            checkpoints.push(json!({"tick":tick + 1, "loose_bodies":state.lab.loose_body_count(),
+                "deposited_cells":state.lab.deposited_cells(), "settling":state.lab.settling_diagnostics(),
+                "last_release":state.last_blast.map(|b| b.spawned_grains)}));
+        }
         if verify {
             commands.push(actions);
             hashes.push(GranularLabScenario::observe(&state).payload);
@@ -126,6 +160,8 @@ fn run(config: GranularLabConfig, ticks: u32, verify: bool) -> Value {
         "box_supported_frames":box_supported_frames,"ground_cells":balance.ground,
         "loose_cells":balance.loose,"conserved_cells":balance.initial,"removed_cells":balance.removed,
         "deposited_cells":state.lab.deposited_cells(),
+        "settling":state.lab.settling_diagnostics(),
+        "checkpoints":checkpoints,
         "native_update":stats(steps),"event_update":stats(events),"frame_construction":stats(frames),
         "same_build_replay_verified":verify,"final_hash":format!("{:016x}",state.lab.content_motion_hash())})
 }
@@ -169,6 +205,7 @@ fn main() {
                     cell_size: args.cell_size,
                     max_loose_bodies: args.limit as usize,
                 },
+                args.workload,
                 args.ticks,
                 args.verify_replay,
             ));
@@ -176,5 +213,5 @@ fn main() {
     }
     println!("{}",serde_json::to_string_pretty(&json!({"schema":1,"architecture":std::env::consts::ARCH,
         "fixed_hz":60,"seed":42,"timing_scope":"native scenario update and RenderFrame construction; excludes pixels, host, input transport, replay and post-step audits",
-        "workload":"blast at 0; box at 180; blast below box at 360; fresh ground at 450", "cases":cases})).unwrap());
+        "workload":args.workload.description(), "cases":cases})).unwrap());
 }

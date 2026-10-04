@@ -5,8 +5,8 @@ Related issues: [#67, rounder planets](https://github.com/aortez/space-wars/issu
 and [#51, particles filling planetary surfaces](https://github.com/aortez/space-wars/issues/51).
 This preserves the initial source audit and proposed experiment. The subsequent
 opt-in implementation and measured results are documented in
-[Rounder planet surface comparison](../rounder-planets.md). Deposition remains
-a separate future experiment.
+[Rounder planet surface comparison](../rounder-planets.md). The subsequent deposition trial is documented in the
+[shared loose-terrain lifecycle](../shared-loose-terrain.md).
 
 ## Findings
 

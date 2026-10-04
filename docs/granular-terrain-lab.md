@@ -58,10 +58,12 @@ Material remaining outside the camera still exists and counts toward the limit.
 
 “Supported and slow” requires an upward contact path to the ground and low
 relative speed/spin. A grain can be supported through another grain or the box.
-This is a diagnostic. Separately, directly supported grains that remain quiet
-for half a second can return to terrain when there is room for a cell. The HUD
-shows cumulative settled cells; their loose-body slots become available again.
-Blocked placements retain their grains. “Box on
+This is a diagnostic. Separately, grains with a quiet contact chain to terrain
+can pack in groups after half a second, when their whole cells fit nearby. The
+box cannot provide this deposition path. The HUD shows cumulative settled cells
+and the reasons grains remain loose: waiting, moving, no ground, no room, blocked
+or budget. Returned cells free their loose-body slots; blocked placements retain
+their grains. Rigid fragments are excluded from the settling-reason counters. “Box on
 loose dirt” reports an upward grain contact, not a guarantee of permanent rest.
 
 ## Integration with the terrain engine
@@ -113,11 +115,18 @@ compares this workload before and after the shared release lifecycle, explains
 the changed trajectories, and records three repetitions alongside the MPM and
 ordinary Spacewars comparisons.
 The subsequent [deposition check](shared-loose-terrain.md#deposition-check-on-picade-2026-10-03)
-records the return path's current cost and packing limits.
+records the original single-grain return path; the newer pile review in the
+same document measures group packing. The [group-settling results](shared-loose-terrain.md#group-settling-check-on-picade-2026-10-03)
+include repeated blasts, rejection counters and live captures with all 74 grains
+returned to terrain for both shapes.
 
 ```sh
 cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox -- \
   --verify-replay > target/granular-sandbox.json
+
+# Two unobstructed blast/settle cycles, with moving-ground and shape comparisons.
+cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox -- \
+  --workload pile-cycle --ticks 1200 --verify-replay
 
 cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox -- \
   --fixture flat --cell-size 0.25 --limit 384 --verify-replay
@@ -126,7 +135,9 @@ cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox 
 The workload runs 600 fixed updates: blast at tick 0, drop the box at 180, blast
 below its actual position at 360, and blast fresh ground at 450. JSON records
 population, rejected events, conserved quantities, deposited cells, box support, timings and a
-final fingerprint. Optional replay uses the exact recorded world-space actions
+final fingerprint. `--workload pile-cycle --ticks 1200` instead blasts at tick 0
+and again at 600, recording checkpoints for capacity recovery and reblasting
+without a probe box. Optional replay uses the exact recorded world-space actions
 and compares observations every tick within the same build. Each normal run
 audits per-material conservation, physical mass, collider geometry and finite
 motion outside its timed update.

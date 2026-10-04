@@ -4,6 +4,65 @@ const FIXTURES: [Fixture; 3] = [Fixture::Flat, Fixture::Slope, Fixture::MovingPl
 const MODES: [BlastMode; 2] = [BlastMode::Grains, BlastMode::GrainPulse];
 
 #[test]
+fn most_of_an_unobstructed_pile_returns_to_terrain_and_can_be_reblasted() {
+    for fixture in [Fixture::Flat, Fixture::MovingPlanet] {
+        for grain_shape in [GrainShape::Round, GrainShape::Hexagon] {
+            let mut lab = BlastLab::new(BlastLabConfig {
+                fixture,
+                grain_shape,
+                mode: BlastMode::Grains,
+                deposition: true,
+                max_loose_bodies: 192,
+                friction: 0.6,
+                ..Default::default()
+            })
+            .unwrap();
+            let blast = shot(&lab, 18.0);
+            let released = lab.blast(blast).unwrap();
+            assert!(released.admitted && released.spawned_grains > 50);
+            for _ in 0..600 {
+                lab.step();
+                assert_eq!(lab.audit().unwrap().removed, 0);
+                let d = lab.settling_diagnostics();
+                assert_eq!(
+                    d.unsupported + d.moving + d.waiting + d.no_room + d.obstructed + d.budget,
+                    lab.grains.len()
+                );
+            }
+            eprintln!(
+                "{fixture:?} {grain_shape:?}: {} / {} returned, {:?}",
+                lab.deposited_cells(),
+                released.spawned_grains,
+                lab.settling_diagnostics()
+            );
+            assert!(
+                lab.deposited_cells() as usize * 5 >= released.spawned_grains * 4,
+                "{fixture:?} {grain_shape:?}: {} / {} returned, {:?}",
+                lab.deposited_cells(),
+                released.spawned_grains,
+                lab.settling_diagnostics()
+            );
+            let before = lab.deposited_cells();
+            let second = lab
+                .blast(Blast {
+                    center: lab.surface_point(0.0, 0.5),
+                    ..blast
+                })
+                .unwrap();
+            assert!(second.admitted && second.spawned_grains > 0);
+            let mut replay = lab.clone();
+            for _ in 0..600 {
+                lab.step();
+                replay.step();
+                assert_eq!(lab.content_motion_hash(), replay.content_motion_hash());
+                lab.audit().unwrap();
+            }
+            assert!(lab.deposited_cells() > before);
+        }
+    }
+}
+
+#[test]
 fn conserved_deposition_and_reblasts_work_in_real_stationary_and_moving_fixtures() {
     for fixture in [Fixture::Flat, Fixture::MovingPlanet] {
         for grain_shape in [GrainShape::Round, GrainShape::Hexagon] {
@@ -70,7 +129,12 @@ fn conserved_deposition_and_reblasts_work_in_real_stationary_and_moving_fixtures
                 lab.deposited_cells() > 0,
                 "{fixture:?} {grain_shape:?}: no deposition"
             );
-            assert!(lab.deposited_cells() < total_released || lab.loose_body_count() == 0);
+            // Solid fragments also count toward loose_body_count; all grains
+            // may return while a disconnected rigid fragment remains physical.
+            assert_eq!(
+                lab.deposited_cells() + lab.grains.len() as u64,
+                total_released
+            );
             assert_eq!(lab.rejected_blasts, 0);
             assert!(
                 reblasted_deposit,

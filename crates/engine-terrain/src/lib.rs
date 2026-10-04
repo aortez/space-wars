@@ -13,6 +13,7 @@ mod connectivity;
 pub use connectivity::DetachedTerrain;
 mod transfer;
 pub use transfer::{CellDeposit, DetachedCell, ReleasedCells};
+mod additions;
 
 pub const CHUNK_SIZE: u32 = 32;
 const FORMAT_VERSION: u32 = 1;

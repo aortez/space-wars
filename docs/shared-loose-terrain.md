@@ -67,16 +67,33 @@ reject the batch without changing the field. Interpolated surfaces get a fresh
 midpoint sample for each added cell; adjacent geometry caches refresh normally.
 An eventual MPM adapter can accumulate cell quantities and use the same API.
 
-`LooseTerrain::settle` requires a direct terrain contact and 0.5 seconds of low
-relative speed/spin, with little drift in the supporting body's local frame.
-Translation and rotation are included in the reference velocity. A candidate
-must fit a nearby, vacant, face-connected cell of the same material scale.
-Clearance checks include current collider edits and protect actors and grains
-that remain loose. Blocked placements retry after another quiet interval.
-At most 32 grains transfer per tick. Each destination publishes material and
-geometry and retires its accepted grain bodies at the same boundary. Dynamic
-destinations receive the grains' linear and angular momentum; prescribed
-terrain retains its commanded motion. Deposited cells can be blasted loose again.
+`LooseTerrain::settle` follows contact chains to terrain and requires 0.5 seconds
+of low relative speed/spin, with little drift in the supporting body's local
+frame. Translation and rotation are included in the reference velocity. Every
+admitted grain needs a quiet contact path to that terrain; actors cannot provide
+that path. Nearby grounded grains can pack together even when a small gap
+separates their contact proxies.
+
+At most 64 candidates are examined per tick, oldest attempt first. Placement
+matches grains to distinct, face-connected vacant cells, moving each center at
+most 1.75 cell widths in a group (1.25 for an isolated grain). This small local
+redistribution accommodates the extra volume of square cells relative to their
+inscribed contact proxies. Material and remaining durability stay with each
+grain. Failed attempts retain quiet eligibility and retry after half a second.
+
+Clearance checks the actual added surface against current colliders, including
+edits already published at the same boundary. Contour/interpolated growth uses
+a clipped polygon difference against the previous surface. If only part of a
+group fits, omitted grains become obstacles again and the smaller plan is
+revalidated. Every accepted cell and its retired grain publish together.
+Dynamic destinations receive the grains' linear and angular momentum;
+prescribed terrain retains its commanded motion. Deposits can be blasted loose
+again, freeing and reusing the same bounded pool.
+
+`SettlingDiagnostics` partitions surviving grains into waiting, moving,
+unsupported, no room, obstructed and deferred by the per-tick budget. A rejection
+remains visible while waiting for a retry. These counts exclude rigid fragments
+and are available in both scenario adapters; the native lab displays them.
 
 The lab also uses `LooseTerrain`, while retaining its own fixture choices,
 probe box, blast pulse and aggregate grain-plus-fragment budget. Clock and
@@ -92,14 +109,12 @@ Contact circles have pore space; nominal cell quantity and mass are conserved,
 not the exact area covered by collision proxies. The radial kick is a gameplay
 parameter, not a calibrated blast-pressure model.
 
-This implements the initial conserved return path for
-[#51](https://github.com/aortez/space-wars/issues/51). Only grains with direct
-terrain support pack; upper layers can follow as the surface grows. Dense piles,
-incompatible materials/sizes, field edges and nearby actors can prevent packing.
-Contour/interpolated surfaces use a conservative neighboring-cell clearance
-band. Blocked and orbiting grains remain physical and continue counting against
-the budget. This is cell packing, not calibrated soil compaction or cohesion.
-The trial remains Off by default while those limits and terrain growth are explored.
+This implements the whole-cell return path for
+[#51](https://github.com/aortez/space-wars/issues/51), including quiet piles.
+Incompatible materials/sizes, field edges, larger dense groups and nearby actors
+can still prevent packing. Blocked and orbiting grains remain physical and
+continue counting against the budget. This is local cell redistribution, not
+calibrated soil compaction or cohesion. The Spacewars trial remains Off by default.
 
 ## Verification
 
@@ -135,6 +150,60 @@ final observation hash is reported outside timing to check repeatability.
 Frame time measures primitive construction, not final rasterization/display.
 On/Off cases diverge physically after the first release, so these are workload
 costs rather than a controlled solver-only comparison.
+
+## Group settling check on Picade (2026-10-03)
+
+The next pass addresses resting piles that could not pack one grain at a time.
+704 library tests pass, including compact groups across all three surfaces and
+both grain shapes, damage retention, actor clearance, unsupported passengers,
+moving-ground replay and fair admission. The native launcher/pause/restart test
+also passes with both renderers. Local surface previews avoid rebuilding chunks
+for rejected plans; a shared clearance pass avoids checking the same growth
+once per candidate.
+
+All nine 1,200-tick blast/settle/reblast runs on Picade conserve material and
+replay identically. After the first 600 ticks (ten simulated seconds), returned
+grains are:
+
+| Fixture | Round | Round + grip | Angular |
+| --- | ---: | ---: | ---: |
+| Flat | 74 / 74 | 74 / 74 | 74 / 74 |
+| Slope | 65 / 69 | 65 / 69 | 69 / 69 |
+| Moving planet | 63 / 64 | 63 / 64 | 63 / 64 |
+
+The second blast is admitted in every case. The ordinary sandbox's three blasts
+and box drop now return 79–184 cells cumulatively, versus 6–10 before this pass.
+Its p95 update times span 1.58–4.15 ms, with a largest ordinary update of 12.59 ms.
+Some dirt remains moving, outside ground contact, obstructed or without space;
+the counters expose those distinctions. Returned totals can exceed the initial
+release because later blasts can release the same material again.
+
+The existing 1,800-tick Spacewars benchmark remains mixed:
+
+| Workload | p95 before | p95 after | Returned before → after |
+| --- | ---: | ---: | ---: |
+| Combat, round | 5.36 ms | 1.99 ms | 23 → 200 |
+| Combat, angular | 6.56 ms | 4.49 ms | 16 → 217 |
+| Three planets, round | 15.31 ms | 18.49 ms | 3 → 5 |
+| Three planets, angular | 16.38 ms | 19.77 ms | 9 → 6 |
+
+Combat recovers capacity and finishes with 26/17 loose grains. The crowded
+three-planet scene still has 177/176 grains and nine rejected releases; its p95
+cost increases about 3 ms. That remains a limit of this opt-in trial. Off-mode
+hashes are unchanged, with p95 approximately 0.35/1.63 ms.
+
+These are single before/after workload runs, not a repeated regression study.
+They use Rust 1.89.0, the same release/static-CRT configuration, seed 42 and limit
+192, with the kiosk paused. Final-run temperature endpoints were 73.0/78.4°C and
+sysfs reported 1.5 GHz; firmware throttle telemetry was unavailable. Commands,
+binary hashes, all cases, replay flags and checkpoints are in the
+[group-settling report](data/terrain-pile-settling-picade-20261003.json).
+
+The deployed client also returned all 74 grains from the initial blast in live
+[round](screenshots/granular-terrain/picade-pile-settling.png) and
+[angular](screenshots/granular-terrain/picade-pile-settling-angular.png) checks.
+The HUD showed zero loose/resting grains and 74 settled cells in each case.
+The lab was returned to Round and paused after verification.
 
 ## Deposition check on Picade (2026-10-03)
 

@@ -1,17 +1,55 @@
-//! Supported grains return to vacant cells at the caller's edit boundary.
+//! Supported groups return to vacant cells at the caller's edit boundary.
 use super::*;
 use engine_terrain::{Cell, CellCoord, CellDeposit};
 use std::collections::BTreeSet;
 
+mod packing;
+mod support;
+
 const QUIET_SECONDS: f32 = 0.5;
-const MAX_DEPOSITS: usize = 32;
+const MAX_DEPOSITS: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reason {
+    Unsupported,
+    Moving,
+    Waiting,
+    NoRoom,
+    Obstructed,
+    Budget,
+}
+
+/// Current reasons that surviving grains have not returned to terrain. These
+/// counts partition the loose pool. Rejections remain visible during retry wait.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+pub struct SettlingDiagnostics {
+    pub unsupported: usize,
+    pub moving: usize,
+    pub waiting: usize,
+    pub no_room: usize,
+    pub obstructed: usize,
+    pub budget: usize,
+}
+impl SettlingDiagnostics {
+    fn count(&mut self, reason: Reason) {
+        *match reason {
+            Reason::Unsupported => &mut self.unsupported,
+            Reason::Moving => &mut self.moving,
+            Reason::Waiting => &mut self.waiting,
+            Reason::NoRoom => &mut self.no_room,
+            Reason::Obstructed => &mut self.obstructed,
+            Reason::Budget => &mut self.budget,
+        } += 1;
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct SettlingState {
     destination: BodyId,
-    coordinate: CellCoord,
     anchor: Vec2,
     seconds: f32,
+    retry_seconds: f32,
+    reason: Reason,
 }
 
 #[derive(Debug, Clone)]
@@ -23,13 +61,15 @@ pub struct DepositCommit {
 }
 
 impl LooseTerrain {
-    /// Cumulative transfers back to terrain, not a removed/material quantity.
     pub fn deposited_cells(&self) -> u64 {
         self.deposited_cells
     }
+    pub fn settling_diagnostics(&self) -> SettlingDiagnostics {
+        self.settling_diagnostics
+    }
 
-    /// Continuation state for scenario observations. Timers and local anchors
-    /// affect future transfers even when material/motion currently match.
+    /// Continuation state for scenario observations. Local anchors, quiet time
+    /// and retry state affect future transfers even when current motion matches.
     pub fn settling_hash(&self) -> u64 {
         let mut hash = 0xcbf29ce484222325u64;
         let mut write = |value: u64| {
@@ -42,25 +82,25 @@ impl LooseTerrain {
             write(id.value());
             write(state.destination.entity.value());
             write(u64::from(state.destination.role.value()));
-            write(state.coordinate.x as u64);
-            write(state.coordinate.y as u64);
-            for v in [state.anchor.x, state.anchor.y, state.seconds] {
+            write(state.reason as u64);
+            for v in [
+                state.anchor.x,
+                state.anchor.y,
+                state.seconds,
+                state.retry_seconds,
+            ] {
                 write(u64::from(v.to_bits()));
             }
         }
         hash
     }
 
-    /// Call once per simulation tick, after a completed solve and before the
-    /// next solve. Contacts must still belong to the supplied terrain bodies.
-    /// Quiet time is measured relative to the supporting body's point velocity
-    /// and rotation, never world speed or a fixed gravity direction. Only direct
-    /// terrain contacts qualify; upper pile layers can follow as support packs.
-    ///
-    /// At most 32 cells transfer per call. Blocked placements retry after another
-    /// quiet interval; unsupported/out-of-field/incompatible cells stay loose.
-    /// A conservative envelope prevents growth through other solid bodies. Each
-    /// destination publishes material, geometry and body retirement together.
+    /// Call once per simulation tick after a completed solve. Quiet grains can
+    /// be supported through other grains, but each admitted group must have its
+    /// own terrain contact. Motion is measured in that terrain body's frame.
+    /// Up to 64 candidates are examined per call, oldest first; failed groups
+    /// retry after another quiet interval. Prepared local placements preserve
+    /// quantity/damage and validate actual added surface against all other bodies.
     pub fn settle<'a>(
         &mut self,
         world: &mut PhysicsWorld,
@@ -70,6 +110,7 @@ impl LooseTerrain {
         if !dt.is_finite() || dt <= 0.0 || dt > 0.25 {
             return Err(TerrainError("invalid settling timestep"));
         }
+        self.settling_diagnostics = SettlingDiagnostics::default();
         if self.is_empty() {
             return Ok(Vec::new());
         }
@@ -84,180 +125,149 @@ impl LooseTerrain {
                 return Err(TerrainError("invalid settling destination"));
             }
         }
+        if self.grains.iter().any(|g| !world.contains_body(g.body())) {
+            return Err(TerrainError("missing loose body"));
+        }
+        let graph = support::ContactGraph::new(world, &self.grains, &fields);
         let mut quiet = BTreeMap::new();
-        let mut ready = BTreeMap::<BodyId, Vec<(PhysicsId, CellDeposit)>>::new();
-        let mut reserved = BTreeSet::new();
-        let mut budget = MAX_DEPOSITS;
-        // Oldest quiet candidates go first. With a large pool, repeatedly
-        // blocked low IDs must not consume every admission slot forever.
-        let mut grains: Vec<_> = self.grains.iter().collect();
-        grains.sort_by(|a, b| {
-            let age = |id| self.settling.get(&id).map_or(0.0, |s| s.seconds);
-            age(b.id())
-                .total_cmp(&age(a.id()))
-                .then(a.id().cmp(&b.id()))
-        });
-        for grain in grains {
-            let motion = world
-                .motion(grain.body())
-                .ok_or(TerrainError("missing loose body"))?;
-            let size = grain.cell_size();
-            let mut best: Option<(f32, BodyId, CellCoord, Vec2)> = None;
-            for contact in world.surface_contacts(grain.collider()) {
-                let Some(body) = world.collider_body(contact.collider) else {
-                    continue;
-                };
-                let Some(field) = fields.get(&body) else {
-                    continue;
-                };
-                if field.terrain.cell_size() != size
-                    || field
-                        .terrain
-                        .material(grain.cell().material)
-                        .is_none_or(|m| m.hardness < grain.cell().durability)
-                    || contact.separation > size * 0.05
-                {
-                    continue;
-                }
-                let support = world.motion(body).expect("validated destination");
-                let velocity = world.velocity_at_point(body, motion.position).unwrap();
-                if motion.linear_velocity.distance_to(velocity) > size * 0.2
-                    || (motion.angular_velocity - support.angular_velocity).abs() * grain.radius()
-                        > size * 0.2
-                {
-                    continue;
-                }
-                let local = (motion.position - support.position).rotate_radians(-support.angle);
-                let point = contact.local_surface.position;
-                if local.distance_to(point) > size * 0.7 {
-                    continue; // A moved body cannot keep an old contact alive.
-                }
-                let Some(owner) =
-                    field
-                        .geometry
-                        .contact_cell(field.terrain, point, contact.local_surface.normal)
-                else {
-                    continue;
-                };
-                for (x, y) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
-                    let coordinate = CellCoord::new(owner.x + x, owner.y + y);
-                    let center = field.terrain.cell_center(coordinate);
-                    let distance = local.distance_to(center);
-                    if field.terrain.cell(coordinate) != Some(Cell::VOID)
-                        || distance > size * 0.8
-                        || (center - point).dot(contact.local_surface.normal) <= 0.0
-                    {
-                        continue;
-                    }
-                    // Contact traversal uses solver handles; ties use stable IDs
-                    // and coordinates so cache rebuild order cannot choose a cell.
-                    let key = (distance, body, coordinate.y, coordinate.x);
-                    if best.is_none_or(|(d, b, c, _)| key < (d, b, c.y, c.x)) {
-                        best = Some((distance, body, coordinate, local));
-                    }
-                }
-            }
-            let Some((_, destination, coordinate, local)) = best else {
+        let mut ready = BTreeSet::new();
+        let mut reasons = vec![Reason::Unsupported; self.len()];
+        for (i, grain) in self.grains.iter().enumerate() {
+            let Some(destination) = graph.destination[i] else {
                 continue;
             };
+            let field = &fields[&destination];
+            if field.terrain.cell_size() != grain.cell_size()
+                || field
+                    .terrain
+                    .material(grain.cell().material)
+                    .is_none_or(|m| m.hardness < grain.cell().durability)
+            {
+                reasons[i] = Reason::NoRoom;
+                continue;
+            }
+            let motion = world.motion(grain.body()).unwrap();
+            let support = world.motion(destination).unwrap();
+            let velocity = world
+                .velocity_at_point(destination, motion.position)
+                .unwrap();
+            if motion.linear_velocity.distance_to(velocity) > grain.cell_size() * 0.2
+                || (motion.angular_velocity - support.angular_velocity).abs() * grain.radius()
+                    > grain.cell_size() * 0.2
+            {
+                reasons[i] = Reason::Moving;
+                continue;
+            }
+            let local = (motion.position - support.position).rotate_radians(-support.angle);
             let previous = self.settling.get(&grain.id()).filter(|s| {
                 s.destination == destination
-                    && s.coordinate == coordinate
-                    && s.anchor.distance_to(local) <= size * 0.15
+                    && s.anchor.distance_to(local) <= grain.cell_size() * 0.15
             });
             let mut state = previous.copied().unwrap_or(SettlingState {
                 destination,
-                coordinate,
                 anchor: local,
                 seconds: 0.0,
+                retry_seconds: 0.0,
+                reason: Reason::Waiting,
             });
             state.seconds = (state.seconds + dt).min(60.0);
-            if state.seconds >= QUIET_SECONDS
-                && budget > 0
-                && reserved.insert((destination, coordinate.y, coordinate.x))
-            {
-                ready.entry(destination).or_default().push((
-                    grain.id(),
-                    CellDeposit {
-                        coordinate,
-                        cell: grain.cell(),
-                        cell_size: size,
-                    },
-                ));
-                state.seconds = 0.0;
-                budget -= 1;
+            state.retry_seconds = (state.retry_seconds + dt).min(60.0);
+            if state.seconds >= QUIET_SECONDS {
+                ready.insert(i);
             }
+            reasons[i] = state.reason;
             quiet.insert(grain.id(), state);
         }
         self.settling = quiet;
+        let ready = graph.grounded(&ready);
+        let mut seeds: Vec<_> = ready
+            .iter()
+            .copied()
+            .filter(|&i| {
+                graph.roots[i].contains(&graph.destination[i].unwrap())
+                    && self.settling[&self.grains[i].id()].retry_seconds >= QUIET_SECONDS
+            })
+            .collect();
+        seeds.sort_by(|&a, &b| {
+            self.settling[&self.grains[b].id()]
+                .retry_seconds
+                .total_cmp(&self.settling[&self.grains[a].id()].retry_seconds)
+                .then(self.grains[a].id().cmp(&self.grains[b].id()))
+        });
+        let mut attempted = BTreeSet::new();
+        let mut retired = BTreeSet::new();
         let mut commits = Vec::new();
-        for (body, mut deposits) in ready {
-            let field = fields.get_mut(&body).unwrap();
-            let motion = world.motion(body).unwrap();
-            // Contour/interpolated changes can extend into neighboring cells.
-            // Keep that whole band clear; densely packed grains can remain loose.
-            let half = field.terrain.cell_size()
-                * match field.geometry.surface() {
-                    TerrainSurface::Blocks => 0.5,
-                    TerrainSurface::Contour | TerrainSurface::Interpolated => 1.5,
-                };
-            loop {
-                let excluded: Vec<_> = std::iter::once(body.entity)
-                    .chain(deposits.iter().map(|(id, _)| *id))
-                    .collect();
-                let before = deposits.len();
-                deposits.retain(|(_, deposit)| {
-                    let position = motion.position
-                        + field
-                            .terrain
-                            .cell_center(deposit.coordinate)
-                            .rotate_radians(motion.angle);
-                    world.current_cuboid_is_clear(
-                        position,
-                        motion.angle,
-                        Vec2::new(half, half),
-                        field.assembly.spec.collision_groups,
-                        &excluded,
-                    )
-                });
-                if deposits.len() == before {
-                    break;
-                }
-                // A rejected grain becomes an obstacle again. Iterate to a
-                // fixed point before retiring anything from this batch.
-            }
-            if deposits.is_empty() {
+        let mut budget = MAX_DEPOSITS;
+        for seed in seeds {
+            if attempted.contains(&seed) {
                 continue;
             }
-            let mut next = field.terrain.clone();
-            next.deposit_cells(&deposits.iter().map(|(_, d)| *d).collect::<Vec<_>>())?;
+            if budget == 0 {
+                reasons[seed] = Reason::Budget;
+                continue;
+            }
+            let group = graph.group(seed, &ready, &attempted, budget);
+            budget -= group.len();
+            attempted.extend(group.iter().copied());
+            let body = graph.destination[seed].unwrap();
+            let field = fields.get_mut(&body).unwrap();
+            let grains: Vec<_> = group.iter().map(|&i| &self.grains[i]).collect();
+            let plan = packing::prepare(world, field, &grains);
+            let reason = match &plan {
+                Ok(plan) => plan.remaining_reason,
+                Err(reason) => *reason,
+            };
+            for &i in &group {
+                let state = self.settling.get_mut(&self.grains[i].id()).unwrap();
+                state.retry_seconds = 0.0;
+                state.reason = reason;
+                reasons[i] = reason;
+            }
+            let Ok(plan) = plan else { continue };
+            let accepted: Vec<_> = plan.accepted.iter().map(|&i| group[i]).collect();
+            let grains: Vec<_> = accepted.iter().map(|&i| &self.grains[i]).collect();
             let mut momentum = Momentum::default();
             momentum.add(world, body);
-            for (id, _) in &deposits {
-                momentum.add(world, BodyId::new(*id, BodyRole::PRIMARY));
+            for grain in &grains {
+                momentum.add(world, grain.body());
             }
-            *field.terrain = next;
-            let dirty_chunks = field.geometry.refresh(field.terrain);
+            *field.terrain = plan.terrain;
+            *field.geometry = plan.geometry;
             let rebuilt_chunks = field
                 .assembly
                 .synchronize(world, field.terrain, field.geometry)
                 .expect("validated deposit geometry");
             momentum.restore(world, body);
-            let retired_grains: Vec<_> = deposits.iter().map(|(id, _)| *id).collect();
+            let retired_grains: Vec<_> = grains.iter().map(|g| g.id()).collect();
             for id in &retired_grains {
                 world.remove_entity(*id);
                 self.settling.remove(id);
             }
-            self.grains
-                .retain(|grain| !retired_grains.contains(&grain.id()));
             self.deposited_cells += retired_grains.len() as u64;
+            retired.extend(accepted);
             commits.push(DepositCommit {
                 body,
                 retired_grains,
-                dirty_chunks,
+                dirty_chunks: plan.dirty_chunks,
                 rebuilt_chunks,
             });
         }
+        if budget == 0 {
+            for i in ready.difference(&attempted) {
+                reasons[*i] = Reason::Budget;
+            }
+        }
+        for (i, reason) in reasons.into_iter().enumerate() {
+            if !retired.contains(&i) {
+                self.settling_diagnostics.count(reason);
+            }
+        }
+        let mut i = 0;
+        self.grains.retain(|_| {
+            let keep = !retired.contains(&i);
+            i += 1;
+            keep
+        });
         Ok(commits)
     }
 }
