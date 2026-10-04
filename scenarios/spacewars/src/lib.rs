@@ -2635,6 +2635,18 @@ fn apply_world_gravity_with_pilots(
             1.0,
         ));
     }
+    if let Some(pool) = &terrain.loose {
+        for grain in pool.iter() {
+            gravity_participants.push(GravityParticipant::target(
+                tagged_gravity_id(GRAVITY_TERRAIN_FRAGMENT_TAG, grain.id().value()),
+                physics
+                    .world
+                    .center_of_mass(grain.body())
+                    .expect("loose mass"),
+                1.0,
+            ));
+        }
+    }
     let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
     gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
         GravityParticipant::target(
@@ -6008,6 +6020,8 @@ fn render_state_with_camera(
             );
         }
     }
+
+    terrain::render_loose(&mut frame, state, None);
 
     for rover in &state.rovers {
         let Some(snapshot) = state.physics.rover_snapshot(rover) else {

@@ -12,7 +12,7 @@ mod storage;
 mod connectivity;
 pub use connectivity::DetachedTerrain;
 mod transfer;
-pub use transfer::DetachedCell;
+pub use transfer::{DetachedCell, ReleasedCells};
 
 pub const CHUNK_SIZE: u32 = 32;
 const FORMAT_VERSION: u32 = 1;
@@ -425,6 +425,14 @@ impl Terrain {
     }
 
     pub fn apply(&mut self, edit: TerrainEdit) -> Result<EditResult, TerrainError> {
+        self.apply_recording_release(edit, None)
+    }
+
+    fn apply_recording_release(
+        &mut self,
+        edit: TerrainEdit,
+        mut released: Option<&mut Vec<DetachedCell>>,
+    ) -> Result<EditResult, TerrainError> {
         let coordinates = edit.brush.coordinates(self.width, self.height)?;
         let mut result = EditResult {
             revision: self.revision,
@@ -454,6 +462,13 @@ impl Terrain {
                 EditMode::Damage(work) => cell.durability.saturating_sub(work),
             };
             self.cells[index] = if durability == 0 {
+                if let Some(samples) = &mut released {
+                    samples.push(DetachedCell {
+                        cell,
+                        cell_size: self.cell_size,
+                        parent_offset: self.cell_center(coord),
+                    });
+                }
                 removed[cell.material.0 as usize] += 1;
                 if self.distances.is_some() {
                     removed_coords.push(coord);

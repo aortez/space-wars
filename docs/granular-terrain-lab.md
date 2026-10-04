@@ -76,26 +76,18 @@ The first reusable boundary is implemented in the shared crates:
    dynamic round or hexagonal contact proxy. It retains nominal square-cell
    mass/inertia and inherits the source body's velocity at the release point,
    including angular motion. `GrainSeed` remains an alias for compatibility.
-3. **Transaction and gameplay policy — the caller.**
-   `BlastLab::blast` prepares edits on cloned fields, checks the total resulting
-   body count, then commits the field edits, refreshes `TerrainGeometry`,
-   synchronizes `TerrainAssembly`, inserts released bodies and applies the blast
-   before the next physics step. Disconnected solid pieces remain physical
-   fragments. Neither the terrain kernel nor the grain type awards mining yield
-   or knows about a weapon, tank, ship or score.
+3. **Shared lifecycle — `engine-rapier::terrain::LooseTerrain`.**
+   `PreparedRelease` prepares edits, departing cells and disconnected pieces.
+   `LooseTerrain::commit` admits capacity/IDs, publishes field geometry and bodies,
+   and retains loose-material ownership and per-material accounting. Callers
+   provide their canonical world and apply their own gravity and blast rules.
+   The lab additionally checks its aggregate grain-plus-fragment budget.
 
-Spacewars, Clock/Scorched Earth and standalone Scorched Earth can use these same
-field and contact APIs. Their adapters choose which damaged cells become loose
-material, supply source-body motion and local gravity, and retain their own
-weapon/game rules. This change exercises the complete handoff in Terrain Lab;
-it does not yet change the games' explosion policies.
-
-The next integration slice should route one bounded Spacewars terrain explosion
-through this release path and check ships, spacelings and base-support
-invalidation against the changed ground. Scorched Earth can supply a tank as the
-ordinary supported body. Transfer admission and per-material accounting should
-move into a common adapter when those callers share the transaction, rather
-than copying the lab's control or fixture code into a game.
+The [Spacewars integration](shared-loose-terrain.md) now uses this same lifecycle
+for cannon and asteroid impacts through the existing scenarios' **Loose dirt
+(trial)** setting. Clock/Scorched Earth and standalone Scorched Earth can use
+these APIs without importing the lab's fixture or controls. Their adapters and
+explosion policies remain future work.
 
 The return path belongs to conserved deposition
 [#51](https://github.com/aortez/space-wars/issues/51): select supported, quiet

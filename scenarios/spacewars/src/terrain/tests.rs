@@ -162,7 +162,7 @@ fn fast_shell_damage_stays_on_a_rotated_moving_planets_contact_cells() {
         }
     }
     assert_eq!(state.terrain_cannon_hits(), 1);
-    let PendingEdit { body, edit } = state.terrain.pending[0];
+    let PendingEdit { body, edit, .. } = state.terrain.pending[0];
     assert_eq!(body, physics::planet_entity(0));
     let Brush::Circle { center: cell, .. } = edit.brush else {
         panic!("cannon circle");
@@ -599,3 +599,5 @@ fn chunk_culling_preserves_visible_geometry_after_rotation_edits_and_detachment(
     }
     assert!(rejected > 0, "test must exercise culling");
 }
+
+mod loose;

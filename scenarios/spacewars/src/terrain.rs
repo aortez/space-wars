@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use engine_core::Vec2;
 use engine_rapier::{
-    terrain::{TerrainAssembly, TerrainFragment},
+    terrain::{LooseTerrain, LooseTerrainConfig, RadialImpulse, TerrainAssembly, TerrainFragment},
     world::{BodyKind, BodySpec, ContactPoint, PhysicsId},
 };
 use engine_terrain::{
@@ -15,6 +15,8 @@ use engine_terrain::{
 
 use super::*;
 
+mod loose;
+pub(super) use loose::render_loose;
 mod diagnostics;
 pub use diagnostics::TerrainDiagnostics;
 mod motion_trace;
@@ -46,6 +48,7 @@ pub(super) struct PlanetTerrain {
 struct PendingEdit {
     body: PhysicsId,
     edit: TerrainEdit,
+    blast: Option<RadialImpulse>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,9 @@ pub(super) struct TerrainState {
     pub planets: BTreeMap<usize, PlanetTerrain>,
     pub fragments: BTreeMap<u64, TerrainFragment>,
     pending: Vec<PendingEdit>,
+    pending_blasts: Vec<(PhysicsId, RadialImpulse)>,
+    pub loose: Option<LooseTerrain>,
+    pub rejected_releases: u64,
     next_fragment: u64,
     pub fixture: bool,
     pub legacy_services: bool,
@@ -74,6 +80,9 @@ impl Default for TerrainState {
             planets: BTreeMap::new(),
             fragments: BTreeMap::new(),
             pending: Vec::new(),
+            pending_blasts: Vec::new(),
+            loose: None,
+            rejected_releases: 0,
             next_fragment: FRAGMENT_ID_BASE,
             fixture: false,
             legacy_services: true,
@@ -226,6 +235,7 @@ impl SpacewarsState {
         self.terrain.pending.push(PendingEdit {
             body: physics::planet_entity(planet),
             edit,
+            blast: None,
         });
         Ok(())
     }
@@ -240,7 +250,11 @@ impl SpacewarsState {
             .field(body)
             .ok_or(TerrainError("unknown material body"))?;
         let _ = field.brush_cells(edit.brush)?;
-        self.terrain.pending.push(PendingEdit { body, edit });
+        self.terrain.pending.push(PendingEdit {
+            body,
+            edit,
+            blast: None,
+        });
         Ok(())
     }
 }
@@ -288,7 +302,9 @@ fn generate_field(radius: f32, seed: u64) -> Result<Terrain, TerrainError> {
 /// split. Weapon contacts from this tick never mutate the active solver world.
 pub(super) fn commit(state: &mut SpacewarsState) {
     let mut changed = BTreeMap::<PhysicsId, bool>::new();
-    for pending in std::mem::take(&mut state.terrain.pending) {
+    let pending = std::mem::take(&mut state.terrain.pending);
+    let pending = loose::commit_releases(state, pending);
+    for pending in pending {
         let Some(field) = state.terrain.field_mut(pending.body) else {
             continue;
         };
@@ -436,27 +452,12 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
             let Some(&shell_index) = shells.get(&shell.value()) else {
                 continue;
             };
-            let Some(field) = state.terrain.field(surface) else {
-                continue;
-            };
-            let Some(edit) = local.and_then(|contact| {
-                impact_edit(
-                    field,
-                    state.terrain.surface,
-                    contact,
-                    CANNON_RADIUS,
-                    CANNON_WORK,
-                )
+            let Some(hit) = local.and_then(|contact| {
+                loose::contact_hit(state, surface, contact, CANNON_RADIUS, CANNON_WORK)
             }) else {
                 continue;
             };
-            hits.entry(shell.value()).or_insert((
-                shell_index,
-                PendingEdit {
-                    body: surface,
-                    edit,
-                },
-            ));
+            hits.entry(shell.value()).or_insert((shell_index, hit));
         }
     }
     state.terrain.budget_skips += hits.len().saturating_sub(MAX_CANNON_HITS) as u64;
@@ -465,7 +466,7 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
         // tick's work budget is full. It cannot drill by resting on the ground.
         state.debris[shell].dead = true;
         if ordinal < MAX_CANNON_HITS {
-            state.terrain.pending.push(edit);
+            loose::queue_hit(&mut state.terrain, edit);
             state.terrain.cannon_hits += 1;
         }
     }
@@ -498,20 +499,16 @@ pub(super) fn queue_asteroid_hit(
             ] {
                 if debris.value() == asteroid
                     && surface == target
-                    && let Some(field) = state.terrain.field(surface)
-                    && let Some(edit) = contact
-                        .and_then(|p| impact_edit(field, state.terrain.surface, p, radius, work))
+                    && let Some(hit) =
+                        contact.and_then(|p| loose::contact_hit(state, surface, p, radius, work))
                 {
-                    return Some(PendingEdit {
-                        body: surface,
-                        edit,
-                    });
+                    return Some(hit);
                 }
             }
             None
         });
     if let Some(edit) = hit {
-        state.terrain.pending.push(edit);
+        loose::queue_hit(&mut state.terrain, edit);
         true
     } else {
         false
@@ -930,6 +927,7 @@ pub(super) fn observation(state: &SpacewarsState) -> Observation {
     } else if terrain.surface == TerrainSurface::Interpolated {
         payload.extend(b"interpolated-v1");
     }
+    loose::observe(state, &mut payload);
     Observation { payload }
 }
 

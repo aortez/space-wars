@@ -519,5 +519,14 @@ impl SurfaceSortieState {
     }
 }
 
+impl SurfaceSortieState {
+    /// Opt the ordinary material scenario into the bounded dirt trial before play.
+    pub fn enable_loose_terrain(&mut self) {
+        self.world
+            .enable_loose_terrain(engine_rapier::terrain::LooseTerrainConfig::default())
+            .expect("initial loose terrain configuration");
+    }
+}
+
 #[cfg(test)]
 mod tests;

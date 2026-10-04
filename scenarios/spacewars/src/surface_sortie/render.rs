@@ -117,6 +117,7 @@ pub(super) fn frame_with_camera(
             );
         }
     }
+    terrain::render_loose(&mut frame, &state.world, view);
     if let Some(mining) = &observation.mining {
         if let Some((start, end)) = mining.beam {
             line(

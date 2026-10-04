@@ -24,6 +24,12 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 scenario,
                 "spacewars-terrain-combat" | "spacewars-terrain-duel"
             ) {
+                let loose = "launcher.settings.combat.loose-dirt.next";
+                if renderer == "vector" {
+                    assert_eq!(control_value(&state, loose), Some("Off"));
+                    state = harness.activate_guarded(loose, &state);
+                }
+                assert_eq!(control_value(&state, loose), Some("On · 192 grains"));
                 let interval = "launcher.settings.combat.break-interval.next";
                 let duration = "launcher.settings.combat.break-duration.next";
                 let mission = "launcher.settings.combat.mission.next";

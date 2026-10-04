@@ -1,5 +1,42 @@
 use super::*;
 
+#[test]
+fn releasing_damage_retains_the_departing_cells_and_the_normal_cut_surface() {
+    let mut source = field().with_surface_distances(|_| 0.3).unwrap();
+    let mut reference = source.clone();
+    let edit = TerrainEdit {
+        brush: Brush::Circle {
+            center: CellCoord::new(33, 32),
+            radius: 2,
+        },
+        mode: EditMode::Damage(160),
+    };
+    let result = source.apply_releasing(edit).unwrap();
+    assert_eq!(result.edit, reference.apply(edit).unwrap());
+    assert_eq!(source, reference);
+    assert!(!result.cells.is_empty());
+    assert!(
+        result
+            .cells
+            .iter()
+            .all(|c| c.cell.material == MaterialId(1) && c.cell.durability == 100)
+    );
+    let second = source
+        .apply_releasing(TerrainEdit {
+            mode: EditMode::Damage(20),
+            ..edit
+        })
+        .unwrap();
+    assert!(!second.cells.is_empty());
+    assert!(
+        second
+            .cells
+            .iter()
+            .all(|c| c.cell.material == MaterialId(2) && c.cell.durability == 20)
+    );
+    assert!(source.apply_releasing(edit).unwrap().cells.is_empty());
+}
+
 fn field() -> Terrain {
     Terrain::generate(
         70,

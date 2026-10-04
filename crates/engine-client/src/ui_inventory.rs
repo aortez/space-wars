@@ -113,6 +113,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) match_length: String,
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
+    pub(crate) loose_dirt: bool,
     pub(crate) combat_mission: String,
     pub(crate) combat_asteroid_interval: String,
     pub(crate) combat_asteroid_strength: String,
@@ -440,6 +441,15 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
             ] {
                 push_choice(&mut controls, id, &value);
             }
+            push_choice(
+                &mut controls,
+                "launcher.settings.match.loose-dirt",
+                if context.loose_dirt {
+                    "On · 192 grains"
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -450,6 +460,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.match.asteroid-interval",
                 "launcher.settings.match.asteroid-strength",
                 "launcher.settings.match.length",
+                "launcher.settings.match.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -536,6 +547,15 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.asteroid-strength",
                 &context.combat_asteroid_strength,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.loose-dirt",
+                if context.loose_dirt {
+                    "On · 192 grains"
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -544,6 +564,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.mission",
                 "launcher.settings.combat.asteroid-interval",
                 "launcher.settings.combat.asteroid-strength",
+                "launcher.settings.combat.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -571,11 +592,21 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.travel.asteroid-strength",
                 &context.combat_asteroid_strength,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.loose-dirt",
+                if context.loose_dirt {
+                    "On · 192 grains"
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.travel.asteroid-interval",
                 "launcher.settings.travel.asteroid-strength",
+                "launcher.settings.travel.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -1314,7 +1345,7 @@ mod tests {
     #[test]
     fn settings_inventory_matches_each_scenario() {
         let cases = [
-            ("spacewars", 20, "launcher.settings.match.player-2"),
+            ("spacewars", 22, "launcher.settings.match.player-2"),
             (
                 "spacewars-classic",
                 16,

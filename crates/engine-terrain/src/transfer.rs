@@ -14,7 +14,26 @@ pub struct DetachedCell {
     pub parent_offset: Vec2,
 }
 
+/// A damage edit's field changes and the material that left the field. The
+/// samples retain their state immediately before the releasing hit: that hit
+/// breaks their attachment, not their material identity or quantity. Surviving
+/// cells retain ordinary partial damage. `edit.removed` counts transfer out of
+/// the field; callers must not also credit those cells as destroyed/recovered.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReleasedCells {
+    pub edit: EditResult,
+    pub cells: Vec<DetachedCell>,
+}
+
 impl Terrain {
+    /// Apply the ordinary damage/removal and surface-cut rules, retaining every
+    /// departing cell as transferable material. Does not detach remaining
+    /// islands; callers can do that once after a batch of edits.
+    pub fn apply_releasing(&mut self, edit: TerrainEdit) -> Result<ReleasedCells, TerrainError> {
+        let mut cells = Vec::new();
+        let edit = self.apply_recording_release(edit, Some(&mut cells))?;
+        Ok(ReleasedCells { edit, cells })
+    }
     /// Transfer occupied cells into individual samples for grains, particles,
     /// or another representation. Preserves material, durability and location;
     /// it does not award mining yield. Order is row-major and duplicates/void

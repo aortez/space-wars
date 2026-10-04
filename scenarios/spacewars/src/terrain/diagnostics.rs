@@ -13,6 +13,9 @@ pub struct TerrainDiagnostics {
     pub occupied_cells: u64,
     pub removed_cells: u64,
     pub fragments: usize,
+    pub loose_cells: usize,
+    pub loose_limit: usize,
+    pub rejected_releases: u64,
     pub terrain_colliders: usize,
     pub physics_bodies: usize,
     pub physics_colliders: usize,
@@ -42,6 +45,13 @@ impl SpacewarsState {
             occupied_cells: 0,
             removed_cells: self.terrain.removed_cells,
             fragments: self.terrain.fragments.len(),
+            loose_cells: self.terrain.loose.as_ref().map_or(0, LooseTerrain::len),
+            loose_limit: self
+                .terrain
+                .loose
+                .as_ref()
+                .map_or(0, |p| p.config().max_grains),
+            rejected_releases: self.terrain.rejected_releases,
             terrain_colliders: 0,
             physics_bodies: world.body_count(),
             physics_colliders: world.collider_count(),
@@ -133,6 +143,15 @@ impl SpacewarsState {
                 ));
             }
         }
+        if let Some(pool) = &self.terrain.loose {
+            if let Err(error) = pool.audit(world) {
+                result.issues.push(error.to_string());
+            }
+            for grain in pool.iter() {
+                expected_bodies.insert(grain.body());
+                expected_colliders.insert(grain.collider());
+            }
+        }
         result.terrain_colliders = expected_colliders.len();
         for (&index, planet) in &self.terrain.planets {
             let supported = planet.footing.iter().all(|c| {
@@ -193,6 +212,12 @@ impl SpacewarsState {
             .fragments
             .keys()
             .copied()
+            .chain(
+                self.terrain
+                    .loose
+                    .iter()
+                    .flat_map(|p| p.iter().map(|g| g.id().value())),
+            )
             .collect::<BTreeSet<_>>();
         if tracked != self.physics.terrain_fragments {
             result

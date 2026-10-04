@@ -6,7 +6,10 @@ use std::collections::BTreeMap;
 use engine_core::Vec2;
 use engine_gravity::{GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver};
 use engine_rapier::{
-    terrain::{GrainSeed, GrainShape, TerrainAssembly, TerrainFragment, TerrainGrain, TerrainSpec},
+    terrain::{
+        GrainShape, LooseTerrain, LooseTerrainConfig, PreparedRelease, RadialImpulse,
+        TerrainAssembly, TerrainBodyMut, TerrainFragment, TerrainGrain, TerrainSpec,
+    },
     world::{
         BodyId, BodyKind, BodyMotion, BodySpec, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
         PhysicsWorldConfig,
@@ -152,7 +155,7 @@ pub struct BlastLab {
     pub rejected_blasts: u64,
     pub last_physics: PhysicsStepMetrics,
     bodies: Vec<TerrainFragment>,
-    grains: Vec<TerrainGrain>,
+    grains: LooseTerrain,
     pulses: Vec<BlastPulse>,
     physics: PhysicsWorld,
     gravity: GravitySolver,
@@ -166,7 +169,6 @@ struct PreparedBody {
     id: PhysicsId,
     terrain: Terrain,
     released: Vec<DetachedTerrain>,
-    grains: Vec<GrainSeed>,
     motion: BodyMotion,
     center: Vec2,
 }
@@ -277,7 +279,12 @@ impl BlastLab {
             rejected_blasts: 0,
             last_physics: PhysicsStepMetrics::default(),
             bodies: vec![body],
-            grains: Vec::new(),
+            grains: LooseTerrain::new(LooseTerrainConfig {
+                max_grains: config.max_loose_bodies,
+                shape: config.grain_shape,
+                friction: config.friction,
+                restitution: 0.0,
+            })?,
             pulses: Vec::new(),
             physics,
             gravity: GravitySolver::new(),
@@ -341,6 +348,7 @@ impl BlastLab {
             return Err(TerrainError("invalid blast position, radius or speed"));
         }
         let mut prepared = Vec::new();
+        let mut grain_plans = Vec::new();
         let mut removed = [0u64; 256];
         let mut result = BlastResult::default();
         let mut emptied = 0;
@@ -372,9 +380,22 @@ impl BlastLab {
             }
             result.selected_cells += selected.len() as u64;
             result.loose_bodies_hit += usize::from(body.id != GROUND);
+            if matches!(self.config.mode, BlastMode::Grains | BlastMode::GrainPulse) {
+                let plan = PreparedRelease::new(
+                    &body.terrain,
+                    &[TerrainEdit {
+                        brush,
+                        mode: EditMode::Remove,
+                    }],
+                )?;
+                emptied += usize::from(body.id != GROUND && plan.source_empty());
+                result.spawned_fragments += plan.fragment_count();
+                result.spawned_grains += plan.grain_count();
+                grain_plans.push((body.id, plan));
+                continue;
+            }
             let mut terrain = body.terrain.clone();
             let mut released = Vec::new();
-            let mut grains = Vec::new();
             match self.config.mode {
                 BlastMode::Remove => {
                     for material in terrain
@@ -403,7 +424,7 @@ impl BlastLab {
                     }
                 }
                 BlastMode::Grains | BlastMode::GrainPulse => {
-                    grains = terrain.extract_individual_cells(&selected)?;
+                    unreachable!("shared release path above")
                 }
             }
             released.extend(terrain.detach_disconnected()?);
@@ -416,12 +437,10 @@ impl BlastLab {
                 emptied += 1;
             }
             result.spawned_fragments += released.len();
-            result.spawned_grains += grains.len();
             prepared.push(PreparedBody {
                 id: body.id,
                 terrain,
                 released,
-                grains,
                 motion,
                 center: self.physics.center_of_mass(body.assembly.body()).unwrap(),
             });
@@ -443,6 +462,28 @@ impl BlastLab {
             result.spawned_fragments = 0;
             result.spawned_grains = 0;
             return Ok(result);
+        }
+        for (id, plan) in grain_plans {
+            let body = self.bodies.iter_mut().find(|body| body.id == id).unwrap();
+            let committed = self
+                .grains
+                .commit(
+                    &mut self.physics,
+                    TerrainBodyMut {
+                        terrain: &mut body.terrain,
+                        geometry: &mut body.geometry,
+                        assembly: &mut body.assembly,
+                    },
+                    plan,
+                    &mut self.next_id,
+                )
+                .expect("pre-admitted material release");
+            body.hash = body.terrain.hash();
+            body.edited_chunks = committed.dirty_chunks;
+            if id != GROUND && body.geometry.shape_count() == 0 {
+                self.physics.remove_entity(id);
+            }
+            self.bodies.extend(committed.fragments);
         }
         for update in prepared {
             let body = self
@@ -480,28 +521,6 @@ impl BlastLab {
                     .expect("validated transferred terrain"),
                 );
             }
-            for seed in update.grains {
-                let id = PhysicsId::new(self.next_id);
-                self.next_id = self
-                    .next_id
-                    .checked_add(1)
-                    .expect("blast fixture ID exhausted");
-                self.grains.push(
-                    TerrainGrain::insert_with_shape(
-                        &mut self.physics,
-                        id,
-                        seed,
-                        update.motion,
-                        update.center,
-                        TerrainSpec {
-                            friction: self.config.friction,
-                            ..TerrainSpec::default()
-                        },
-                        self.config.grain_shape,
-                    )
-                    .expect("validated transferred grain"),
-                );
-            }
         }
         self.bodies
             .retain(|body| body.id == GROUND || body.geometry.rectangle_count() > 0);
@@ -526,22 +545,13 @@ impl BlastLab {
     }
 
     fn apply_blast_velocity(&mut self, blast: Blast) -> usize {
-        // Existing loose pieces and newly released ones receive the same impulse
-        // policy. Geometry/velocities are committed before the next mechanics step.
-        let mut accelerated = 0;
-        let dynamic: Vec<_> = self.moving_bodies().collect();
-        for body in dynamic {
-            let offset = self.physics.center_of_mass(body).unwrap() - blast.center;
-            let distance = offset.length();
-            if distance > 0.0001 && distance < blast.radius {
-                let delta = offset / distance * (blast.speed * (1.0 - distance / blast.radius));
-                if delta.length_squared() > 0.0 {
-                    self.physics.apply_velocity_delta(body, delta, true);
-                    accelerated += 1;
-                }
-            }
+        let bodies: Vec<_> = self.moving_bodies().collect();
+        RadialImpulse {
+            center: blast.center,
+            radius: blast.radius,
+            speed: blast.speed,
         }
-        accelerated
+        .apply(&mut self.physics, bodies)
     }
 
     pub fn step(&mut self) {
@@ -648,17 +658,10 @@ impl BlastLab {
                 }
             }
         }
-        for (grain, motion) in self.grains() {
-            total[grain.cell().material.0 as usize] += 1;
-            balance.loose += 1;
-            let expected = grain.cell_size().powi(2);
-            let mass = self.physics.body_mass(grain.body()).unwrap();
-            if !finite_motion(motion)
-                || !mass.is_finite()
-                || (mass - expected).abs() > expected * 0.0001
-            {
-                return Err(TerrainError("transferred grain mass or motion mismatch"));
-            }
+        self.grains.audit(&self.physics)?;
+        for quantity in self.grains.quantities() {
+            total[quantity.material.0 as usize] += quantity.cells;
+            balance.loose += quantity.cells;
         }
         if total != self.initial
             || self.physics.body_count() != self.loose_body_count() + 1 + usize::from(self.probe)

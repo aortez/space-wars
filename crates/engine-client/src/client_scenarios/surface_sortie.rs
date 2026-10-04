@@ -296,6 +296,9 @@ fn create_combat_duel(
 fn material_combat_state(seed: u64, settings: &Settings) -> SurfaceSortieState {
     let mut state = SurfaceSortieScenario::init_material_combat(seed);
     state.set_asteroid_pressure(settings.material_combat.asteroids);
+    if settings.material_combat.loose_dirt {
+        state.enable_loose_terrain();
+    }
     state
 }
 
