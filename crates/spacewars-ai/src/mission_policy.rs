@@ -149,6 +149,11 @@ impl MissionBot {
         self.0.configure_pursuit_health(enabled);
         self
     }
+    /// Opt-in v13 laser opportunity during required pursuit climbs.
+    pub fn with_pursuit_climb_laser(mut self, enabled: bool) -> Self {
+        self.0.configure_pursuit_climb_laser(enabled);
+        self
+    }
     /// Opt-in first-site deadline and local waiting guidance for comparison.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
         self.0.bounded_acquisition = enabled;

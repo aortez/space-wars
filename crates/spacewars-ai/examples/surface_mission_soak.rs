@@ -302,6 +302,13 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--pursuit-health-seats must be none, 0, 1 or both"),
     };
+    let pursuit_climb_laser_seats = match arg("--pursuit-climb-laser-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--pursuit-climb-laser-seats must be none, 0, 1 or both"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -448,6 +455,7 @@ fn main() {
         .with_powered_capture(powered_capture_seats[i])
         .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
         .with_pursuit_health(pursuit_health_seats[i])
+        .with_pursuit_climb_laser(pursuit_climb_laser_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
         .with_cover_retry_cooldown(cover_retry_seats[i])
         .with_cover_response(cover_response_seats[i])
@@ -1164,6 +1172,19 @@ fn main() {
             "profile": spacewars_ai::tactical_sortie::INITIAL_COVER_PROFILE,
             "enabled_seats": initial_cover_seats,
         });
+    }
+    if pursuit_climb_laser_seats.contains(&true) {
+        report["pursuit_climb_laser"] = json!({
+            "profile": spacewars_ai::mission_pilot::PURSUIT_CLIMB_LASER_PROFILE,
+            "enabled_seats": pursuit_climb_laser_seats,
+            "scope": "Opt-in laser-only requests during required pursuit climbs, using existing observations and native firing gates; flight controls, cannon, scheduled weapons-off breaks and pursuit clocks are unchanged.",
+        });
+        for (seat, enabled) in pursuit_climb_laser_seats.into_iter().enumerate() {
+            if enabled {
+                report["policy_configuration"][seat]["pursuit_climb_laser_model"] =
+                    json!(spacewars_ai::mission_pilot::PURSUIT_CLIMB_LASER_PROFILE);
+            }
+        }
     }
     if pursuit_health_seats.contains(&true) {
         report["pursuit_health"] = json!({

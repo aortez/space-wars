@@ -51,6 +51,12 @@ impl CaptureEvidence {
                 "target":o.local.combat.target,
                 "last_hit_taken_tick":o.local.combat.weapons.last_hit_taken_tick});
         }
+        if let Some(gate) = &m.pursuit_climb_laser
+            && gate.last.as_ref().is_some_and(|check| check.tick == p.tick)
+        {
+            record["pursuit_climb_laser"] = json!({"telemetry":gate,
+                "observation":o,"pursuit":m.pursuit,"combat":m.combat,"reason":m.reason});
+        }
         if let Some(initial) = m.capture.as_ref().and_then(|c| c.initial_cover.as_ref())
             && (initial.armed_tick == Some(p.tick)
                 || initial.finished_tick == Some(p.tick)
