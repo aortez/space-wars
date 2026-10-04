@@ -139,6 +139,8 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings.match.asteroid-strength.next",
                 "launcher.settings.match.length.previous",
                 "launcher.settings.match.length.next",
+                "launcher.settings.match.loose-dirt.previous",
+                "launcher.settings.match.loose-dirt.next",
                 "launcher.settings.back",
                 "launcher.settings.start",
             ]

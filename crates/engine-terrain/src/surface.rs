@@ -46,7 +46,7 @@ fn has_clipped_corner(t: &Terrain, c: CellCoord) -> bool {
     CORNERS.iter().any(|&(x, y)| clipped(t, c, x, y))
 }
 
-fn cell_polygon(t: &Terrain, c: CellCoord) -> Vec<Vec2> {
+pub(crate) fn cell_polygon(t: &Terrain, c: CellCoord) -> Vec<Vec2> {
     let center = t.cell_center(c);
     let half = t.cell_size() * 0.5;
     let corners = CORNERS.map(|(x, y)| Vec2::new(x as f32, y as f32));
@@ -70,7 +70,7 @@ fn cell_polygon(t: &Terrain, c: CellCoord) -> Vec<Vec2> {
     vertices
 }
 
-fn fills(t: &Terrain, owner: CellCoord) -> Vec<SolidPolygon> {
+pub(crate) fn fills(t: &Terrain, owner: CellCoord) -> Vec<SolidPolygon> {
     let mut result = Vec::new();
     for (dx, dy) in SIDES {
         let void = offset(owner, -dx, -dy);

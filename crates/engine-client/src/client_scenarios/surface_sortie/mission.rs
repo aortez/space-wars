@@ -112,6 +112,9 @@ fn create_with_seats(
         state.set_match_time_limit((seconds != 0).then(|| Duration::from_secs(seconds.into())));
     }
     state.set_asteroid_pressure(settings.material_combat.asteroids);
+    if settings.material_combat.loose_dirt {
+        state.enable_loose_terrain();
+    }
     Box::new(MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario::new(state),
         bots,

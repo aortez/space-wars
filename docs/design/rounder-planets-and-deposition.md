@@ -5,8 +5,8 @@ Related issues: [#67, rounder planets](https://github.com/aortez/space-wars/issu
 and [#51, particles filling planetary surfaces](https://github.com/aortez/space-wars/issues/51).
 This preserves the initial source audit and proposed experiment. The subsequent
 opt-in implementation and measured results are documented in
-[Rounder planet surface comparison](../rounder-planets.md). Deposition remains
-a separate future experiment.
+[Rounder planet surface comparison](../rounder-planets.md). The subsequent deposition trial is documented in the
+[shared loose-terrain lifecycle](../shared-loose-terrain.md).
 
 ## Findings
 
@@ -151,9 +151,15 @@ the ordinary generated match after the combined physical tests pass.
 
 ## How #51 can build on that foundation
 
+The first whole-cell return path is now implemented in the
+[shared loose-terrain lifecycle](../shared-loose-terrain.md), with conservation,
+moving-frame settling, clearance checks and a Picade evaluation. The proposal
+below records the starting point of this investigation; finer sediment transport
+and smoothing remain future work.
+
 Treat deposition as material transfer through the same edit boundary, not as
-permanent visual effects. `EditMode` currently supports only removal and damage;
-there is no addition, fill fraction or granular state. A future deposit operation
+permanent visual effects. At the time of this investigation, `EditMode` supported
+only removal and damage; there was no addition, fill fraction or granular state. A deposit operation
 needs a defined material quantity and destination and must atomically debit the
 source and credit the terrain, without overlapping an actor or double-counting
 material.

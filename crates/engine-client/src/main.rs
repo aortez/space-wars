@@ -740,6 +740,7 @@ fn show_launcher(
             engine_common::MaterialCombatMission::Capture => "Capture",
         },
     ));
+    window.set_launcher_loose_dirt(settings.material_combat.loose_dirt);
     let asteroids = settings.material_combat.asteroids.normalized();
     window.set_launcher_combat_asteroid_interval(SharedString::from(
         if asteroids.interval_seconds == 0 {
@@ -1471,14 +1472,14 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 10,
+        "spacewars" => 11,
         "spacewars-classic" => 8,
         "pizza" => 5,
-        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 9,
         "spacewars-terrain-travel"
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
-        | "spacewars-terrain-arena-duel" => 5,
+        | "spacewars-terrain-arena-duel" => 6,
         "clock" => 17,
         "falling" => 1,
         "nes" => 2,
@@ -1529,6 +1530,19 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         return;
     }
 
+    let loose_focus = match window.get_launcher_scenario().as_str() {
+        "spacewars" => Some(9),
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => Some(7),
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => Some(4),
+        _ => None,
+    };
+    if loose_focus == Some(focus) {
+        window.set_launcher_loose_dirt(!window.get_launcher_loose_dirt());
+        return;
+    }
     match window.get_launcher_scenario().as_str() {
         "surface-expedition"
         | "spacewars-terrain"
@@ -2274,6 +2288,7 @@ fn launcher_selections_from_window(
             | "spacewars-terrain-arena-duel"
     ) {
         engine_common::MaterialCombatSettings {
+            loose_dirt: window.get_launcher_loose_dirt(),
             asteroids: engine_common::MaterialAsteroidSettings {
                 interval_seconds: match window.get_launcher_combat_asteroid_interval().as_str() {
                     "Off" => 0,
@@ -3206,6 +3221,7 @@ mod tests {
         let selections = LauncherSelections {
             spacewars_match: engine_common::MatchSettings::default(),
             material_combat: engine_common::MaterialCombatSettings {
+                loose_dirt: true,
                 mission: engine_common::MaterialCombatMission::Capture,
                 asteroids: engine_common::MaterialAsteroidSettings {
                     interval_seconds: 3,

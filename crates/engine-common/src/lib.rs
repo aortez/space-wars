@@ -147,6 +147,8 @@ pub struct Settings {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MaterialCombatSettings {
+    /// Experimental conserved dirt from impacts; default off until deposition.
+    pub loose_dirt: bool,
     pub mission: MaterialCombatMission,
     pub asteroids: MaterialAsteroidSettings,
 }

@@ -12,6 +12,15 @@ use crate::world::{
     ColliderShape, ColliderSpec, CollisionGroups, CompoundChild, PhysicsId, PhysicsWorld,
 };
 
+mod grain;
+pub use grain::{GrainSeed, GrainShape, TerrainGrain};
+mod loose;
+pub use loose::{
+    DepositCommit, LooseTerrain, LooseTerrainConfig, MaterialEdit, MaterialQuantity,
+    PreparedRelease, RadialImpulse, ReleaseCommit, ReleaseError, SettlingDiagnostics,
+    TerrainBodyMut,
+};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TerrainColliders {
     Separate,

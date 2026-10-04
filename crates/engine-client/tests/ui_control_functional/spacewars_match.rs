@@ -54,6 +54,7 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.break-duration.next", "6"),
                 ("launcher.settings.match.asteroid-interval.next", "8"),
                 ("launcher.settings.match.asteroid-strength.next", "Heavy"),
+                ("launcher.settings.match.loose-dirt.next", "On · 192 grains"),
             ] {
                 for _ in 0..4 {
                     if control_value(&state, control) == Some(expected) {
@@ -130,6 +131,7 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.break-duration.next", "6"),
                 ("launcher.settings.match.asteroid-interval.next", "8"),
                 ("launcher.settings.match.asteroid-strength.next", "Heavy"),
+                ("launcher.settings.match.loose-dirt.next", "On · 192 grains"),
             ] {
                 assert_eq!(control_value(&state, control), Some(expected));
             }

@@ -16,6 +16,21 @@ cargo run -p engine-client -- --scenario terrain-lab --seed 42
 real Spacewars ships and weapons use material terrain and the shared fragment
 creation path, including explicit base support and service invalidation.
 
+[Dirt blast experiments](dirt-blast-lab.md) provide a separate headless entry
+point for comparing crater removal, rigid pieces, and rounded grains on flat,
+sloped, and moving planetary ground, with offline playback and repeatable
+material, motion, and support diagnostics.
+
+[Live granular terrain](granular-terrain-lab.md) brings the cell-to-grain transfer
+into the native launcher as **terrain-grains**. Aim repeated blasts, drop a
+physical test box onto the resulting pile, and compare grain shapes, friction,
+resolution and population limits on all three ground fixtures.
+
+[Soil material experiments](soil-mpm-lab.md) add a shared MPM prototype: pour a
+pile, remove a bank's support, and blast a bed twice. Compare internal friction
+and round grains on flat and moving planetary ground, with recorded playback
+and a standalone benchmark for the Picade.
+
 | Action | Keyboard / pointer | Xbox layout | Switch Pro |
 | --- | --- | --- | --- |
 | Walk | A/D or left/right arrows | Left stick or d-pad left/right | Same |

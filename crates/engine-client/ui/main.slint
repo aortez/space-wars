@@ -584,6 +584,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-player-health-text: "100";
     in-out property <string> launcher-combat-break-interval: "15";
     in-out property <string> launcher-combat-break-duration: "4";
+    in-out property <bool> launcher-loose-dirt: false;
     in-out property <string> launcher-combat-mission: "Dogfight";
     in-out property <string> launcher-combat-asteroid-interval: "Off";
     in-out property <string> launcher-combat-asteroid-strength: "Mixed";
@@ -2371,13 +2372,24 @@ export component MainWindow inherits Window {
                         next => { root.launcher-settings-focus-index = 8; root.ui-action(3); }
                     }
 
+                    if root.launcher-material-match || root.launcher-material-combat || root.launcher-material-travel: ChoiceRow {
+                        y: root.launcher-material-match || root.launcher-material-combat ? 260px : 156px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Loose dirt (trial)";
+                        value: root.launcher-loose-dirt ? "On · 192 grains" : "Off";
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4);
+                        previous => { root.launcher-settings-focus-index = root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4; root.ui-action(3); }
+                    }
+
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 270px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 9 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 16 : root.launcher-material-combat ? 7 : root.launcher-material-travel ? 4 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 16 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -2385,7 +2397,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 270px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-material-combat || root.launcher-material-match ? 322px : root.launcher-material-travel ? 218px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: root.launcher-material-match ? "Play World" : "Start Game";

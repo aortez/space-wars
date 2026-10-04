@@ -113,6 +113,45 @@ mod tests {
         }
         assert_eq!(a.asteroid_pressure().spawned, spawned);
     }
+    #[test]
+    fn conserved_asteroid_impacts_share_the_actor_world_and_recycle_settled_material() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        state.enable_loose_terrain();
+        state.set_asteroid_pressure(MaterialAsteroidSettings {
+            interval_seconds: 1,
+            severity: MaterialAsteroidSeverity::Heavy,
+        });
+        let initial = state.terrain_diagnostics().occupied_cells;
+        for tick in 0..1800 {
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+            assert_eq!(state.world.tick, tick + 1);
+            if tick % 60 == 0 {
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                assert_eq!(
+                    initial,
+                    audit.occupied_cells + audit.loose_cells as u64 + audit.removed_cells
+                );
+                assert_eq!(audit.removed_cells, 0);
+            }
+        }
+        let audit = state.terrain_diagnostics();
+        assert!(audit.loose_cells > 0 && audit.loose_cells <= 192);
+        assert!(audit.deposited_cells > 0);
+        let mut replay = state.clone();
+        for _ in 0..120 {
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+            SurfaceSortieScenario::step(&mut replay, &[], DT);
+            assert_eq!(
+                SurfaceSortieScenario::observe(&state).payload,
+                SurfaceSortieScenario::observe(&replay).payload
+            );
+            assert_eq!(
+                state.world.physics.snapshot_bytes(),
+                replay.world.physics.snapshot_bytes()
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
