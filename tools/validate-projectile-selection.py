@@ -15,6 +15,10 @@ O=importlib.util.module_from_spec(spec);spec.loader.exec_module(O)
 R=O.R
 
 
+def archived_equal(current,saved):
+    return json.loads(json.dumps(current,allow_nan=False))==saved
+
+
 def cases(ordinary,original):
     result=[dict(key=c['key'],group='historical_'+c['group'],item=copy.deepcopy(c['item']),scope='transfer',
                  reference_file='ordinary',reference_key=c['key']+'-observe') for c in ordinary['cases']]
@@ -65,7 +69,7 @@ def run(entry,case,template,old,binary,out):
             if entry.get('legacy'):
                 assert R.digest(root/'projectile-response.jsonl')==template['hashes']['projectile-response.jsonl']
                 for f in ['capture-evidence.jsonl','projectiles.jsonl']:assert R.digest(root/f)==template['hashes'][f]
-                assert r['round']==template['round'] and r['visits']==template['visits'] and r['allocation']==template['allocation']
+                assert all(archived_equal(r[f],template[f]) for f in ['round','visits','allocation'])
                 r['legacy_parity']=True
         r['hashes']={p.name:R.digest(p) for p in sorted(root.iterdir()) if p.is_file()}
     except Exception:r['error']=traceback.format_exc()
@@ -75,6 +79,7 @@ def run(entry,case,template,old,binary,out):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ['ordinary','original','binary','out']:parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--resume-audit-correction',action='store_true')
     args=parser.parse_args();assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip(),'freeze first'
     inputs={k:json.loads(getattr(args,k).read_text()) for k in ['ordinary','original']}
     assert all(s['complete'] for s in inputs.values());selected=cases(**inputs)
@@ -96,16 +101,39 @@ def main():
     plan += [dict(key=c['key']+'-none',source=c['key'],mode='none',group=c['group']) for c in selected if c.get('new')]
     plan += [dict(key=c['key']+'-guarded_brake',source=c['key'],mode='guarded_brake',group=c['group']) for c in selected]
     assert len(plan)==52
-    binary=args.binary.resolve(strict=True);args.out.mkdir(parents=True,exist_ok=False)
+    binary=args.binary.resolve(strict=True)
     source_paths=[args.ordinary,args.original]
     tool_paths=[Path(__file__),Path(O.__file__),Path(R.__file__),Path(R.B.__file__)]
     s=dict(schema=1,complete=False,source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
            binary=dict(path=str(binary),sha256=R.digest(binary)),sources={str(p):R.digest(p) for p in source_paths},
            tools={str(p):R.digest(p) for p in tool_paths},cases=selected,legacy=legacy,plan=plan,runs={})
+    if args.resume_audit_correction:
+        current=s;s=json.loads((args.out/'summary.json').read_text())
+        assert not s['complete'] and not s.get('audit_correction')
+        assert all(s[f]==current[f] for f in ['binary','sources','cases','legacy','plan'])
+        assert all(current['tools'][p]==h for p,h in s['tools'].items() if Path(p).resolve()!=Path(__file__).resolve())
+        assert set(s['runs'])=={e['key'] for e in plan if e.get('legacy')},'only the legacy phase may have run'
+        backup=args.out/'pre-audit-correction-summary.json';assert not backup.exists()
+        backup.write_bytes((args.out/'summary.json').read_bytes())
+        failures={}
+        for c in legacy:
+            r=s['runs'][c['key']];ref=inputs[c['reference_file']]['runs'][c['reference_key']]
+            if 'error' not in r:continue
+            assert "r['round']==template['round']" in r['error'] and r['error'].rstrip().endswith('AssertionError')
+            assert all(archived_equal(r[f],ref[f]) for f in ['round','visits','allocation'])
+            root=R.root_of(r)
+            for f in ['projectile-response.jsonl','capture-evidence.jsonl','projectiles.jsonl']:
+                assert R.digest(root/f)==ref['hashes'][f]
+            failures[c['key']]=r.pop('error');r['legacy_parity']=True
+            r['hashes']={p.name:R.digest(p) for p in sorted(root.iterdir()) if p.is_file()}
+        s['audit_correction']=dict(source_commit=current['source_commit'],reason='normalize in-memory integer seat keys to archived JSON keys',
+            original_summary=dict(path=str(backup),sha256=R.digest(backup)),failures=failures,original_tools=s['tools'])
+        s['tools']=current['tools'];s.pop('error',None)
+    else:args.out.mkdir(parents=True,exist_ok=False)
     save=lambda:R.S.F.D.write(args.out/'summary.json',s);save();lookup={c['key']:c for c in selected+legacy}
     try:
         for phase in ['legacy','none','guarded_brake']:
-            entries=[e for e in plan if ('legacy' if e.get('legacy') else e['mode'])==phase]
+            entries=[e for e in plan if ('legacy' if e.get('legacy') else e['mode'])==phase and e['key'] not in s['runs']]
             with ThreadPoolExecutor(max_workers=2) as pool:
                 futures=[]
                 for e in entries:
@@ -123,7 +151,7 @@ def main():
             if not c.get('new') and (r['response']['selection'] or {}).get('action')=='brake':
                 ref=inputs[c['reference_file']]['runs'][c['reference_key'].rsplit('-',1)[0]+'-brake']
                 for f in ['capture-evidence.jsonl','projectiles.jsonl']:assert r['hashes'][f]==ref['hashes'][f]
-                assert r['round']==ref['round'] and r['visits']==ref['visits'] and r['allocation']==ref['allocation']
+                assert all(archived_equal(r[f],ref[f]) for f in ['round','visits','allocation'])
                 r['retained_brake_parity']=True
         assert R.digest(binary)==s['binary']['sha256']
         assert all(R.digest(p)==h for p,h in {**s['sources'],**s['tools']}.items())

@@ -152,3 +152,19 @@ guarantee or Picade performance measurement.
 An unchanged or sparsely activated held-out suite cannot justify promotion.
 After this comparison, record the result and package a local review checkpoint;
 do not silently change the policy, thresholds, defaults or experiment scope.
+
+## Legacy audit correction before independent trials
+
+The three legacy simulations ran first. Clear-entry brake and speed-limited
+left reproduced their old response, capture and projectile streams byte-for-byte,
+but their final Python comparison failed: in-memory visit tables use integer
+seat keys, whereas archived JSON uses strings. Round, visits and allocation
+are identical after JSON normalization. The P2 observe replay passed directly.
+
+Correct only that archive comparison and retain a regression test that still
+rejects changed physical visit ticks. Resume the declared plan using the same
+frozen runtime binary; do not rerun the three completed matches. Preserve the
+original failed summary, tracebacks and hashes, recheck the existing files and
+normalized results, and record the audit correction's commit/tool hashes. No
+independent-world simulation ran before this correction, and no decision rule,
+case, seed, duration or physical result changes.
