@@ -201,21 +201,26 @@ four-crate library suite to 707 passing tests; the native launcher/pause/restart
 workflow passes with both renderers. Clippy completes with nine existing
 Spacewars warnings.
 
-Both three-minute desktop cases finish 10,800 updates and recycle 2,221/2,111
-cells, with no quantity loss. The completed Round Picade soak matches its
-desktop observation hash, with p95 25.72 ms and a 54.19 ms maximum update.
-It ends with 176 loose grains and 38 reported release rejections, so sustained
-bombardment can still saturate the pool. Angular reached tick 8,821 on Picade
-with conservation audits passing; its final result has not yet been retrieved
-after the interrupted session and is not counted as a completed target soak.
+Both three-minute desktop and Picade cases finish 10,800 updates and recycle
+2,221/2,111 cells, with no quantity loss and matching observation hashes between
+desktop and target. Round/Angular end with 176/180 loose grains and 38 reported
+release rejections each, so sustained bombardment can still saturate the pool.
+Picade p95 updates are 25.72/25.68 ms, with maxima of 54.19/49.62 ms.
 
 These are single workload runs, not repeated regression measurements. The
-target was warm (sampled at 80.8–81.3°C during the soak); one frequency sample
-reported 1.5 GHz, with no firmware throttle telemetry. The
+Round ran on a warm target (sampled at 80.8–81.3°C); the completed Angular run
+followed a power cycle and warmed from 52.6 to 65.2°C. Frequency samples reported
+1.5 GHz, with no firmware throttle telemetry. The small timing difference
+between those soaks is not a controlled shape comparison. The
 [measurement record](data/terrain-clearance-picade-20261004.json) preserves the
-captured results, build hashes, scope and outstanding verification. The
-application bundle is built; deployment/live verification is pending because
-`sw-picade.local` is currently unreachable.
+captured results, build hashes and measurement scope. The matching application
+and CLI are deployed to `sw-picade.local`, with installed hashes verified and
+the kiosk service healthy.
+
+Live checks of [Round](screenshots/granular-terrain/picade-clearance-round.png)
+and [Angular](screenshots/granular-terrain/picade-clearance-angular.png) each
+returned all 74 initial grains to terrain, with zero loose/resting grains and
+unchanged total material area. Spacewars gameplay was restored after the checks.
 
 ## Group settling check on Picade (2026-10-03)
 

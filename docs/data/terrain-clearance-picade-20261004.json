@@ -8,7 +8,7 @@
   "baseline": "56dd3ea, archived group-settling binaries from /tmp/terrain-pile.5bCJK6Ik/final",
   "current": "Conservative envelopes for degenerate added-surface patches in the commit containing this report, based on 56dd3ea.",
   "remote_artifacts": "/tmp/terrain-clearance.hNEJudcv",
-  "evidence_scope": "Results transcribed from captured tool output before a workstation reboot cleared local temporary logs. Full remote result files have not been retrieved since the interruption. Only completed cases observed below are reported as completed.",
+  "evidence_scope": "Earlier results transcribed from captured tool output after a workstation reboot cleared temporary logs. The remaining Angular target soak was rerun to completion with persistent local capture; both target soak cases below are complete.",
   "repeat_policy": "One baseline and one current run of the 30-second Spacewars and ordinary sandbox workloads. Pile-cycle and sustained runs are current only. Physics diverges when more releases/deposits succeed; timing does not isolate query overhead.",
   "timing_scope": "Simulation updates and frame construction measured separately; excludes display rasterization/submission, audit scans, diagnostic output and replay verification.",
   "commands": [
@@ -252,10 +252,29 @@
       "step_max_ms": "54.186",
       "frame_p95_ms": "6.092",
       "state_hash": "f670a039d4843126"
+    },
+    {
+      "scene": "match",
+      "mode": "angular",
+      "seed": "42",
+      "limit": "192",
+      "steps": "10800",
+      "grains": "180",
+      "fragments": "3",
+      "blocked": "38",
+      "removed": "0",
+      "deposited": "2111",
+      "step_mean_ms": "14.319",
+      "step_p50_ms": "14.008",
+      "step_p95_ms": "25.682",
+      "step_p99_ms": "31.806",
+      "step_max_ms": "49.624",
+      "frame_p95_ms": "5.392",
+      "state_hash": "38893e6a28d96023"
     }
   ],
   "three_minute_target_angular": {
-    "status": "Final CSV not retrieved; not counted as a completed target soak.",
+    "status": "The original final CSV was lost. A fresh run of the same binary completed successfully after the target was powered on again; see three_minute_target_completed.",
     "last_observed": {
       "tick": 8821,
       "deposited": 1764,
@@ -522,8 +541,368 @@
     "slivers": "Captured duplicate/collinear patches and coincident points clear in an empty world; tiny newly inserted obstacles still block their patch without a broadphase refresh."
   },
   "deployment": {
-    "status": "Bundle built; installation/live verification pending target connectivity.",
+    "status": "Installed and live-verified; both initial blast checks returned all 74 grains. Restored Spacewars gameplay.",
     "client_sha256": "4b95afa13714e7fa41a3e4559d8177227a7863a41d7778cd7fa169d798bbed30",
-    "cli_sha256": "970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5"
+    "cli_sha256": "970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5",
+    "method": "./update.sh --fast --skip-build --target sw-picade.local; application restart only, no reboot",
+    "service": {
+      "ActiveState": "active",
+      "NRestarts": 0
+    },
+    "live_checks": [
+      {
+        "shape": "Round",
+        "fixture": "flat",
+        "limit": 192,
+        "cell_size": 0.5,
+        "loose": 0,
+        "resting": 0,
+        "settled": 74,
+        "solid_plus_loose_area": 1322.25,
+        "screenshot": "docs/screenshots/granular-terrain/picade-clearance-round.png"
+      },
+      {
+        "shape": "Angular",
+        "fixture": "flat",
+        "limit": 192,
+        "cell_size": 0.5,
+        "loose": 0,
+        "resting": 0,
+        "settled": 74,
+        "solid_plus_loose_area": 1322.25,
+        "screenshot": "docs/screenshots/granular-terrain/picade-clearance-angular.png"
+      }
+    ],
+    "restored_ui": {
+      "schema_version": 1,
+      "revision": 13,
+      "screen": "gameplay",
+      "active_scenario": "spacewars",
+      "selected_scenario": "spacewars",
+      "selected_control": null,
+      "controls": [],
+      "actions": [],
+      "scenario_revision": 3,
+      "paused": false,
+      "benchmark_active": false,
+      "error": null
+    }
+  },
+  "angular_soak_completion": {
+    "command": "loose_terrain_benchmark --scene match --mode angular --seconds 180 --diagnostics",
+    "application_state": "Newly deployed kiosk paused in Spacewars; benchmark process ran alone.",
+    "temperature_before_celsius": 52.582,
+    "temperature_after_celsius": 65.244,
+    "scaling_cur_freq_before_khz": 1500000,
+    "scaling_cur_freq_after_khz": 1500000,
+    "binary_sha256": "4bfe8ce3f9a7d8665d55288a99895035c35b4dc96e9540890932c59bfe9def52",
+    "desktop_observation_hash_matches": true,
+    "note": "Separate run after the target was powered on; cooler than the earlier Round soak. Do not interpret the small Round/Angular timing difference as a controlled shape comparison.",
+    "diagnostic_samples": [
+      {
+        "deposited": 0,
+        "grains": 0,
+        "mode": "angular",
+        "rejected": 0,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "tick": 1
+      },
+      {
+        "deposited": 68,
+        "grains": 61,
+        "mode": "angular",
+        "rejected": 0,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 45,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 5,
+          "waiting": 11
+        },
+        "tick": 601
+      },
+      {
+        "deposited": 223,
+        "grains": 4,
+        "mode": "angular",
+        "rejected": 0,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 3,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 1,
+          "waiting": 0
+        },
+        "tick": 1201
+      },
+      {
+        "deposited": 405,
+        "grains": 87,
+        "mode": "angular",
+        "rejected": 1,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 8,
+          "no_room": 0,
+          "obstructed": 72,
+          "unsupported": 2,
+          "waiting": 5
+        },
+        "tick": 1801
+      },
+      {
+        "deposited": 521,
+        "grains": 183,
+        "mode": "angular",
+        "rejected": 4,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 21,
+          "no_room": 0,
+          "obstructed": 107,
+          "unsupported": 17,
+          "waiting": 38
+        },
+        "tick": 2401
+      },
+      {
+        "deposited": 658,
+        "grains": 109,
+        "mode": "angular",
+        "rejected": 9,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 3,
+          "no_room": 0,
+          "obstructed": 98,
+          "unsupported": 4,
+          "waiting": 4
+        },
+        "tick": 3001
+      },
+      {
+        "deposited": 686,
+        "grains": 131,
+        "mode": "angular",
+        "rejected": 9,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 12,
+          "no_room": 0,
+          "obstructed": 108,
+          "unsupported": 6,
+          "waiting": 5
+        },
+        "tick": 3601
+      },
+      {
+        "deposited": 781,
+        "grains": 167,
+        "mode": "angular",
+        "rejected": 11,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 13,
+          "no_room": 0,
+          "obstructed": 121,
+          "unsupported": 6,
+          "waiting": 27
+        },
+        "tick": 4201
+      },
+      {
+        "deposited": 957,
+        "grains": 108,
+        "mode": "angular",
+        "rejected": 13,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 5,
+          "no_room": 0,
+          "obstructed": 98,
+          "unsupported": 2,
+          "waiting": 3
+        },
+        "tick": 4801
+      },
+      {
+        "deposited": 1082,
+        "grains": 121,
+        "mode": "angular",
+        "rejected": 17,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 8,
+          "no_room": 0,
+          "obstructed": 98,
+          "unsupported": 3,
+          "waiting": 12
+        },
+        "tick": 5401
+      },
+      {
+        "deposited": 1204,
+        "grains": 143,
+        "mode": "angular",
+        "rejected": 20,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 3,
+          "no_room": 0,
+          "obstructed": 122,
+          "unsupported": 2,
+          "waiting": 16
+        },
+        "tick": 6001
+      },
+      {
+        "deposited": 1339,
+        "grains": 76,
+        "mode": "angular",
+        "rejected": 20,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 70,
+          "unsupported": 1,
+          "waiting": 5
+        },
+        "tick": 6601
+      },
+      {
+        "deposited": 1448,
+        "grains": 121,
+        "mode": "angular",
+        "rejected": 21,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 30,
+          "no_room": 0,
+          "obstructed": 73,
+          "unsupported": 12,
+          "waiting": 6
+        },
+        "tick": 7201
+      },
+      {
+        "deposited": 1581,
+        "grains": 115,
+        "mode": "angular",
+        "rejected": 22,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 2,
+          "no_room": 0,
+          "obstructed": 95,
+          "unsupported": 4,
+          "waiting": 14
+        },
+        "tick": 7801
+      },
+      {
+        "deposited": 1665,
+        "grains": 174,
+        "mode": "angular",
+        "rejected": 24,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 2,
+          "no_room": 22,
+          "obstructed": 109,
+          "unsupported": 5,
+          "waiting": 36
+        },
+        "tick": 8401
+      },
+      {
+        "deposited": 1793,
+        "grains": 161,
+        "mode": "angular",
+        "rejected": 28,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 3,
+          "no_room": 0,
+          "obstructed": 125,
+          "unsupported": 2,
+          "waiting": 31
+        },
+        "tick": 9001
+      },
+      {
+        "deposited": 1928,
+        "grains": 156,
+        "mode": "angular",
+        "rejected": 30,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 20,
+          "no_room": 0,
+          "obstructed": 101,
+          "unsupported": 7,
+          "waiting": 28
+        },
+        "tick": 9601
+      },
+      {
+        "deposited": 2066,
+        "grains": 142,
+        "mode": "angular",
+        "rejected": 34,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 33,
+          "no_room": 0,
+          "obstructed": 91,
+          "unsupported": 0,
+          "waiting": 18
+        },
+        "tick": 10201
+      },
+      {
+        "deposited": 2111,
+        "grains": 180,
+        "mode": "angular",
+        "rejected": 38,
+        "scene": "match",
+        "settling": {
+          "budget": 0,
+          "moving": 11,
+          "no_room": 0,
+          "obstructed": 125,
+          "unsupported": 3,
+          "waiting": 41
+        },
+        "tick": 10741
+      }
+    ]
   }
 }
