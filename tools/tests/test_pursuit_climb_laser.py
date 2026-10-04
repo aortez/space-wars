@@ -1,7 +1,10 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 spec = importlib.util.spec_from_file_location(
@@ -144,6 +147,36 @@ class PursuitClimbLaserTests(unittest.TestCase):
             L.compare_prefix(iter([before]), iter([after]), None)
         with self.assertRaises(AssertionError):
             L.compare_prefix(iter([before]), iter([]), None)
+
+    def test_ship_losses_use_actor_counters_not_recovery_task_telemetry(self):
+        for final_step_loss in (False, True):
+            with self.subTest(final_step_loss=final_step_loss), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                traces, impacts = [], []
+                loss_tick = 2 if final_step_loss else 1
+                damage = dict(last_damage_tick=loss_tick, last_ship_lost=True, last_source='laser',
+                              last_damage_percent=.1, last_contact_tick=None, last_contact_source=None)
+                for tick in (0, 1):
+                    for seat in (0, 1):
+                        lost = int(seat == 1 and tick >= loss_tick)
+                        _, trace, _ = fixture()
+                        trace.update(tick=tick, seat=seat, controls={})
+                        pilot = trace['observation']['local']['combat']['recovery']['flight']['pilot']
+                        pilot.update(ship_form='escape_pod' if lost else 'ship', recovery=dict(ships_lost=lost))
+                        traces.append(trace)
+                        impacts.append(dict(tick=tick, seat=seat, overridden=False, controls={}, bot_controls={},
+                            actions=trace['actions'], form=pilot['ship_form'], goal=trace['mission']['goal'],
+                            recovery=dict(goal='land_pod') if lost else None, damage=damage))
+                final = dict(final_tick=2, round={}, damage=[{}, damage], config=dict(
+                    seat=0, control='bot', control_from_tick=0, trace_start_tick=0, trace_end_tick=3))
+                impacts.append(final)
+                for name, rows in [('trace', traces), ('impact', impacts)]:
+                    (root / (name + '.jsonl')).write_text(''.join(json.dumps(r) + '\n' for r in rows))
+                report = dict(elapsed_ticks=2, round={}, final_pilots=[dict(recovery=dict(ships_lost=n)) for n in (0, 1)])
+                with patch.object(L.D, 'IMPACT_START', 0), patch.object(L.D, 'END', 3):
+                    result = L.impact_audit(root, report)
+                self.assertEqual(result['losses'][1][0]['receipt']['tick'], loss_tick)
+                self.assertEqual(result['losses'][0], [])
 
 
 if __name__ == '__main__':

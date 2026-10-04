@@ -59,3 +59,12 @@ outcomes in both configurations. A saved known loss with a retained control win
 would justify a broader frozen comparison. It would not establish general
 strength or justify default promotion. A regression or ineffective opportunity
 stays visible in the results; the old candidate/results are not rewritten.
+
+The first analysis caught an auditor schema error: impact `recovery` contains
+recovery-task telemetry, while lifetime ship losses belong to the pilot
+observation. The corrected auditor joins impact rows to the dense pilot trace
+and checks native loss receipts at the actual counter transitions. A regression
+test covers losses during the trace and on the final step. The original games,
+runtime binary and failed summary are retained. To re-audit all four saved games
+without executing any simulation, use `--previous` instead of `--binary` and a
+new output directory; commands, raw files and logs must retain their hashes.

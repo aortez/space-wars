@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import copy
 import csv
 import importlib.util
-from itertools import zip_longest
+from itertools import islice, zip_longest
 import json
 import math
 from pathlib import Path
@@ -211,6 +211,8 @@ def compare_prefix(before, after, first_request):
 
 def impact_audit(root, report):
     losses, previous, final = {0: [], 1: []}, {}, None
+    previous_losses = {}
+    traces = iter(islice(D.rows(root / 'trace.jsonl'), D.IMPACT_START * 2, None))
     expected = (D.IMPACT_START, 0)
     count = 0
     for row in D.rows(root / 'impact.jsonl'):
@@ -221,34 +223,56 @@ def impact_audit(root, report):
         assert final is None and (row['tick'], row['seat']) == expected
         tick, seat = expected
         assert not row['overridden'] and row['controls'] == row['bot_controls']
-        lost = (row['recovery'] or {}).get('ships_lost', 0)
-        if seat in previous and lost > (previous[seat]['recovery'] or {}).get('ships_lost', 0):
+        trace = next(traces)
+        assert (trace['tick'], trace['seat']) == expected
+        pilot = trace['observation']['local']['combat']['recovery']['flight']['pilot']
+        assert row['actions'] == trace['actions']
+        assert row['form'] == pilot['ship_form'] and row['goal'] == trace['mission']['goal']
+        assert {k: row['controls'][k] for k in trace['controls']} == trace['controls']
+        # Impact `recovery` is task telemetry, not lifetime ship-loss counters.
+        # Read the actor's recovery observation from the exact matching tick.
+        lost = (pilot['recovery'] or {}).get('ships_lost', 0)
+        if seat not in previous:
+            assert lost == 0, 'loss predates this diagnostic window'
+        elif lost > previous_losses[seat]:
+            assert lost == previous_losses[seat] + 1
             losses[seat].append(dict(receipt=D.loss_receipt(row, tick), before=previous[seat], after=row))
+        else:
+            assert lost == previous_losses[seat], 'lifetime losses decreased'
         previous[seat] = row
+        previous_losses[seat] = lost
         expected = (tick, 1) if seat == 0 else (tick + 1, 0)
         count += 1
     ticks = report['elapsed_ticks']
     assert expected == (ticks, 0) and final['final_tick'] == ticks
+    assert next(traces, None) is None
     assert final['round'] == report['round']
     assert final['config'] == dict(seat=0, control='bot', control_from_tick=0,
                                  trace_start_tick=D.IMPACT_START, trace_end_tick=D.END)
     for seat in (0, 1):
         lost = (report['final_pilots'][seat]['recovery'] or {}).get('ships_lost', 0)
-        if lost > (previous[seat]['recovery'] or {}).get('ships_lost', 0):
+        if lost > previous_losses[seat]:
+            assert lost == previous_losses[seat] + 1
             losses[seat].append(dict(receipt=D.loss_receipt(dict(tick=ticks, damage=final['damage'][seat]), ticks),
                                      before=previous[seat], after=final))
         assert len(losses[seat]) == lost, 'ship loss outside recorded evidence'
     return dict(rows=count, overrides=0, losses=losses, final=final)
 
 
-def run_case(prior, job, out):
+def run_case(prior, job, out, previous=None):
     root = root_of(job)
     result = copy.deepcopy(job)
-    log = out / (root.name + '.log')
+    log = root.parent / (root.name + '.log')
     try:
-        assert not root.exists()
-        with log.open('x') as stream:
-            subprocess.run(job['command'], check=True, stdout=stream, stderr=stream, timeout=1800)
+        if previous is None:
+            assert not root.exists()
+            with log.open('x') as stream:
+                subprocess.run(job['command'], check=True, stdout=stream, stderr=stream, timeout=1800)
+        else:
+            assert all(previous[key] == job[key] for key in ('command', 'item', 'enabled', 'prior'))
+            assert I.raw_hashes(root) == previous['hashes'], 'changed completed raw game'
+            assert T.digest(log) == previous['log_sha256']
+            result['reused_raw'] = True
         result['hashes'] = I.raw_hashes(root)
         result.update(I.analyze(root, job, out))
         report = json.loads((root / 'report.json').read_text())
@@ -265,6 +289,8 @@ def run_case(prior, job, out):
             result['evidence'] = dict(path=str(path), sha256=T.digest(path))
             result['impact'] = dict(rows=impact['rows'], overrides=0,
                 losses={s: [r['receipt'] for r in rows] for s, rows in impact['losses'].items()})
+        if previous is not None:
+            assert I.raw_hashes(root) == previous['hashes']
         result['audited'] = True
     except Exception:
         result['error'] = traceback.format_exc()
@@ -290,17 +316,28 @@ def verify_prior(prior):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--prior', type=Path, required=True)
-    parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--binary', type=Path)
+    parser.add_argument('--previous', type=Path, help='re-audit four hash-bound games without rerunning them')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     assert __debug__
+    assert bool(args.binary) != bool(args.previous), 'choose a new binary or saved games to re-audit'
     assert not subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip(), 'freeze code, tests and plan first'
     prior = json.loads(args.prior.read_text())
     verify_prior(prior)
+    previous = json.loads(args.previous.read_text()) if args.previous else None
+    if previous is not None:
+        assert previous['profile'] == PROFILE
+        assert previous['prior_summary']['sha256'] == T.digest(args.prior)
+        assert T.digest(previous['binary']['path']) == previous['binary']['sha256']
+        assert set(previous['runs']) == {a + suffix for a in ARMS for suffix in ('-retained', '-laser')}
     args.out.mkdir(parents=True, exist_ok=False)
-    binary = (args.out / 'surface_mission_soak').resolve()
-    shutil.copy2(args.binary, binary)
-    binary.chmod(0o555)
+    if previous is not None:
+        binary = Path(previous['binary']['path'])
+    else:
+        binary = (args.out / 'surface_mission_soak').resolve()
+        shutil.copy2(args.binary, binary)
+        binary.chmod(0o555)
     inputs = dict(prior['inputs'])
     inputs[str(Path(__file__).resolve().relative_to(ROOT))] = T.digest(__file__)
     jobs = []
@@ -309,21 +346,28 @@ def main():
             old = prior['runs'][D.GROUP + '-' + arm]
             name = arm + ('-laser' if enabled else '-retained')
             item = dict(old['item'], name=name, stage='known_qualification')
+            root = root_of(previous['runs'][name]) if previous is not None else args.out / name
             jobs.append(dict(item=item, enabled=enabled, prior=old['item']['name'],
-                command=command(old, binary, args.out / name, enabled)))
+                command=command(old, binary, root, enabled)))
     result = dict(schema=1, complete=False, profile=PROFILE,
         source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         binary=dict(path=str(binary), sha256=T.digest(binary)), inputs=inputs,
         prior_summary=dict(path=str(args.prior), sha256=T.digest(args.prior)),
         plan=dict(purpose='known qualification; no new independent worlds or default promotion',
                   jobs=jobs, default_changes=False, tuning_after_results=False), runs={})
+    if previous is not None:
+        assert result['plan'] == previous['plan'], 're-audit cannot change the frozen plan'
+        result['previous_summary'] = dict(path=str(args.previous), sha256=T.digest(args.previous))
+    result['runtime_source_commit'] = (previous.get('runtime_source_commit', previous['source_commit'])
+                                       if previous is not None else result['source_commit'])
     save = lambda: I.write(args.out / 'summary.json', result)
     save()
     try:
         for enabled in (False, True):
             phase = [job for job in jobs if job['enabled'] == enabled]
             with ThreadPoolExecutor(max_workers=2) as pool:
-                futures = [pool.submit(run_case, prior['runs'][j['prior']], j, args.out) for j in phase]
+                futures = [pool.submit(run_case, prior['runs'][j['prior']], j, args.out,
+                    previous['runs'][j['item']['name']] if previous is not None else None) for j in phase]
                 # Drain and retain both results even if either audit fails.
                 for job, future in zip(phase, futures):
                     run = future.result()
@@ -336,6 +380,8 @@ def main():
         assert T.digest(binary) == result['binary']['sha256']
         for path, digest in inputs.items():
             assert T.digest(ROOT / path) == digest
+        if previous is not None:
+            assert T.digest(args.previous) == result['previous_summary']['sha256']
         result['complete'] = True
     finally:
         save()
