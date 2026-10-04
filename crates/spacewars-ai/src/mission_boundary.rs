@@ -14,7 +14,11 @@ pub struct BoundaryGuidance {
     pub stopping_clearance: f32,
 }
 
-pub(super) fn stopping_clearance(o: &MissionObservationV1, position: Vec2, velocity: Vec2) -> f32 {
+pub(in crate::mission_pilot) fn stopping_clearance(
+    o: &MissionObservationV1,
+    position: Vec2,
+    velocity: Vec2,
+) -> f32 {
     let outward = (position - o.boundary.center).normalized();
     let closing = velocity.dot(outward).max(0.0);
     let f = &o.local.combat.recovery.flight;
@@ -42,12 +46,19 @@ impl MaterialMissionPilot {
         ) {
             return (desired, false);
         }
-        let Some(guard) = self
+        let capture_guard = self
             .telemetry
-            .disengagement
+            .capture_escape
             .as_mut()
-            .and_then(|d| d.boundary.as_mut())
-        else {
+            .and_then(|s| s.last.as_mut())
+            .filter(|a| a.finished_tick.is_none())
+            .map(|a| &mut a.boundary);
+        let Some(guard) = capture_guard.or_else(|| {
+            self.telemetry
+                .disengagement
+                .as_mut()
+                .and_then(|d| d.boundary.as_mut())
+        }) else {
             return (desired, false);
         };
         let p = &o.local.combat.recovery.flight.pilot;

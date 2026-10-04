@@ -269,3 +269,7 @@ timing tail still do not justify promotion. The next evidence gap is usable
 surface costs before native approach commitment, with explicit acquisition and
 exposure uncertainty. Preserve the switch margin while investigating that gap;
 this sample is not a reason to lower it.
+
+The [current-neutral follow-up](current-neutral-costs.md) audits when comparisons
+become available and tests earlier current-destination surveys. It improves
+coverage but exposes interrupted trips and retains the existing defaults.

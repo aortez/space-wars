@@ -109,7 +109,8 @@ pub(super) fn survey_rejection(
 
 /// Keep site order, preferred/opposite direction order, check precedence and
 /// f32 arithmetic identical for the playing selector and its diagnostic. The
-/// native call has a no-op sink, with no retained ledger or allocation.
+/// default call retains no ledger. The opt-in cover response collects only
+/// currently qualified IDs whose objective-route evidence is missing.
 pub(crate) fn select(
     pilot: &TacticalSortiePilot,
     o: &TacticalSortieObservationV1,
@@ -136,6 +137,9 @@ pub(crate) fn select(
         } else if pilot.solar_rejected.iter().any(|(id, _)| *id == site.id) {
             checks.solar_cooldown += 1;
             Some("solar_cooldown")
+        } else if pilot.cover_retry_blocked(o, site, exposed) {
+            checks.cover_cooldown += 1;
+            Some("cover_cooldown")
         } else {
             None
         };
@@ -173,6 +177,12 @@ pub(crate) fn select(
                 continue;
             }
             let cover = o.cover.iter().find(|s| s.site == site.id);
+            if pilot.cover_required(o, exposed) && !super::cover_response::usable_cover(o, site) {
+                checks.cover_required += 1;
+                assessment.rejection = Some("cover_required");
+                record(assessment);
+                continue;
+            }
             let ground_cost = if objective.is_some() {
                 let Some(survey) = survey else {
                     checks.survey_unavailable += 1;

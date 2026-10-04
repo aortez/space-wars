@@ -65,6 +65,7 @@ fn flag_approach_candidates_arrive_with_routes_on_the_original_decision_ticks() 
             },
         });
         let request = MissionSensorRequest {
+            vehicle_flight: None,
             destination_cover: None,
             objective_planning: Default::default(),
             site: None,

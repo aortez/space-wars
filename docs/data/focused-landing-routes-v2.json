@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "complete": true,
+  "scope": "Diagnostic counter correction; all earlier physical outcomes and planner comparisons remain identical.",
+  "implementation_commit": "7d3faca3707f63fddef9d9f249e15c7d77195da3",
+  "binary_sha256": "8be0a7949cc52a9d4bf758fecad008644d20f824a079e867a44984c975f93bf6",
+  "summary": {
+    "path": "target/focused-routes/v2/summary.json",
+    "sha256": "17372b382b09c8155ee1636482ab96f49b5e8d18359a85ecc0b91f1f78b690ec"
+  },
+  "base_results": {
+    "path": "docs/data/focused-landing-routes-v1.json",
+    "sha256": "ef876e0c17523b94038349ddeef6aa27d4cd143604450d3b6fbfc2b8cf3fa96d"
+  },
+  "unchanged_witness_archive": {
+    "path": "docs/data/focused-landing-routes-v1.json.gz",
+    "sha256": "5df79239eacd45f6f7e1627c7bf05b7a068b8beccaeb44806d1dbe02af8df735"
+  },
+  "inputs": {
+    "path": "docs/data/focused-landing-routes-v2.json.gz",
+    "sha256": "4d144eeb35d50047c2ded03cd6908078f5eb54e9fc0e5e29b8d33634d983224f"
+  },
+  "raw_files": {
+    "path": "target/focused-routes/raw-v2-files.json",
+    "sha256": "ff2b69ac0f16bf9797bd7714ced2384167f957c982e01b17380a61414bc1eda4"
+  },
+  "checks": {
+    "rust_tests": 977,
+    "python_tests": 646,
+    "strict_ai_clippy": "passed",
+    "profiled_and_ordinary_builds": "passed",
+    "retention_replays": 6,
+    "focused_replays": 14,
+    "exact_focused_streams": 98,
+    "exact_allocation_ledgers": 14,
+    "unchanged_original_comparisons": 14,
+    "sensor_rows": 450376,
+    "unchanged_physical_witnesses": 14,
+    "unchanged_delivery_witnesses": 14
+  },
+  "corrected_reuse": {
+    "shared-armed-world0-p1-walking": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 56,
+        "physics_queries": 112,
+        "walks": 0
+      }
+    },
+    "shared-armed-world0-p1-powered": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 56,
+        "physics_queries": 112,
+        "walks": 0
+      }
+    },
+    "shared-armed-world0-p2-powered": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 123,
+        "physics_queries": 246,
+        "walks": 0
+      }
+    },
+    "shared-armed-world0-p2-walking": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 56,
+        "physics_queries": 112,
+        "walks": 0
+      }
+    },
+    "shared-armed-world1-p2-walking": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 140,
+        "physics_queries": 280,
+        "walks": 0
+      }
+    },
+    "shared-armed-world1-p2-powered": {
+      "before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "after": {
+        "nodes": 140,
+        "physics_queries": 280,
+        "walks": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,428 @@
+{
+  "schema": 1,
+  "complete": true,
+  "decision": "Existing powered local capture planning completes all six previously blocked states. Proceed to separately evaluated mission integration and live-budget delivery; retain defaults.",
+  "implementation_commit": "211d4677464191a3633c8ce8e4d746dc174ab368",
+  "binary": {
+    "path": "target/capture-execution/surface_mission_soak-211d467",
+    "sha256": "7c381211ca8b7e95defdf1e583ec78bf7ac9d2415c1ed31eeb38c70f9e0ad081"
+  },
+  "study": {
+    "path": "target/capture-execution/v2/summary.json",
+    "sha256": "7b480a5d90847a253011eaf6274ea75238f9372b8d0c2c4d80b9f1780832e422"
+  },
+  "inputs": {
+    "path": "capture-jetpack-execution-v1.json.gz",
+    "sha256": "c57469e93d845a1f7a5dd11debc6c70ca8a10be05422c4b6d857ba1717e36d82",
+    "uncompressed_bytes": 26418130
+  },
+  "totals": {
+    "replays": 3,
+    "snapshots": 7,
+    "arms": 14,
+    "physical_trace_rows": 35531,
+    "physical_audits": 613,
+    "completed_arms": 8,
+    "failed_arms": 6,
+    "jetpack_launches": 6,
+    "completed_crossings": 6,
+    "exact_main_streams": 18,
+    "main_sensor_observations": 32400,
+    "main_planner_ticks": 32400,
+    "maximum_main_graph": 3,
+    "maximum_main_queries": 97,
+    "tests": 686
+  },
+  "snapshots": [
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3270,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 3270,
+          "end_tick": 4170,
+          "stop": "controller_failed",
+          "failure": "cover search probe budget exhausted with unmeasured candidates",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 901
+        },
+        {
+          "name": "powered",
+          "start_tick": 3270,
+          "end_tick": 7476,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 5149,
+            "exited": 5161,
+            "neutralized": 6410,
+            "claimed": 6590,
+            "boarded": 7095
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.1388869434595108,
+          "burn_seconds": 2.58333158493042,
+          "physics_ok": true,
+          "trace_rows": 4207
+        }
+      ]
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3930,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 3930,
+          "end_tick": 4320,
+          "stop": "controller_failed",
+          "failure": "cover search probe budget exhausted with unmeasured candidates",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 391
+        },
+        {
+          "name": "powered",
+          "start_tick": 3930,
+          "end_tick": 7475,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 5146,
+            "exited": 5161,
+            "neutralized": 6399,
+            "claimed": 6579,
+            "boarded": 7094
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.1388869434595108,
+          "burn_seconds": 2.58333158493042,
+          "physics_ok": true,
+          "trace_rows": 3546
+        }
+      ]
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 8580,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 8580,
+          "end_tick": 9270,
+          "stop": "controller_failed",
+          "failure": "cover search probe budget exhausted with unmeasured candidates",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 691
+        },
+        {
+          "name": "powered",
+          "start_tick": 8580,
+          "end_tick": 12736,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 10395,
+            "exited": 10411,
+            "neutralized": 11670,
+            "claimed": 11850,
+            "boarded": 12353
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.166664719581604,
+          "burn_seconds": 2.4999983310699463,
+          "physics_ok": true,
+          "trace_rows": 4157
+        }
+      ]
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 9030,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 9030,
+          "end_tick": 9420,
+          "stop": "controller_failed",
+          "failure": "cover search probe budget exhausted with unmeasured candidates",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 391
+        },
+        {
+          "name": "powered",
+          "start_tick": 9030,
+          "end_tick": 12750,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 10406,
+            "exited": 10411,
+            "neutralized": 11680,
+            "claimed": 11860,
+            "boarded": 12367
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.166664719581604,
+          "burn_seconds": 2.4999983310699463,
+          "physics_ok": true,
+          "trace_rows": 3721
+        }
+      ]
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9270,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 9270,
+          "end_tick": 10742,
+          "stop": "controller_failed",
+          "failure": "capture approach exhausted its time or retry budget",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 1473
+        },
+        {
+          "name": "powered",
+          "start_tick": 9270,
+          "end_tick": 13428,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 11059,
+            "exited": 11071,
+            "neutralized": 12338,
+            "claimed": 12518,
+            "boarded": 13045
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.17777583003044128,
+          "burn_seconds": 2.466665029525757,
+          "physics_ok": true,
+          "trace_rows": 4159
+        }
+      ]
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9720,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 9720,
+          "end_tick": 10892,
+          "stop": "controller_failed",
+          "failure": "capture approach exhausted its time or retry budget",
+          "milestones": {
+            "landed": null,
+            "exited": null,
+            "neutralized": null,
+            "claimed": null,
+            "boarded": null
+          },
+          "selected_site": null,
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 1173
+        },
+        {
+          "name": "powered",
+          "start_tick": 9720,
+          "end_tick": 13428,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 11064,
+            "exited": 11071,
+            "neutralized": 12342,
+            "claimed": 12522,
+            "boarded": 13045
+          },
+          "selected_site": {
+            "bearing": 32,
+            "planet": 1
+          },
+          "launches": 1,
+          "completed_crossings": 1,
+          "lowest_charge": 0.17777583003044128,
+          "burn_seconds": 2.466665029525757,
+          "physics_ok": true,
+          "trace_rows": 3709
+        }
+      ]
+    },
+    {
+      "run": "successful-control",
+      "world_tick": 3510,
+      "arms": [
+        {
+          "name": "walking",
+          "start_tick": 3510,
+          "end_tick": 7516,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 4720,
+            "exited": 4741,
+            "neutralized": 5992,
+            "claimed": 6172,
+            "boarded": 7137
+          },
+          "selected_site": {
+            "bearing": 0,
+            "planet": 1
+          },
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 4007
+        },
+        {
+          "name": "powered",
+          "start_tick": 3510,
+          "end_tick": 6514,
+          "stop": "controller_completed",
+          "failure": null,
+          "milestones": {
+            "landed": 4720,
+            "exited": 4741,
+            "neutralized": 5448,
+            "claimed": 5628,
+            "boarded": 6135
+          },
+          "selected_site": {
+            "bearing": 0,
+            "planet": 1
+          },
+          "launches": 0,
+          "completed_crossings": 0,
+          "lowest_charge": 1.0,
+          "burn_seconds": 0.0,
+          "physics_ok": true,
+          "trace_rows": 3005
+        }
+      ]
+    }
+  ],
+  "fuel_correction": {
+    "schema": 1,
+    "complete": true,
+    "prior_summary_sha256": "39fe1eeb20c1aeb09e8015c410b2236322669950fbe7062b867f23b2bc1ba2da",
+    "final_summary_sha256": "7b480a5d90847a253011eaf6274ea75238f9372b8d0c2c4d80b9f1780832e422",
+    "physical_trace_sha256": {
+      "capture-execution-3270-p0-powered.jsonl": "450f397a3feaea100e18909829cb13c25e14a234a40e91827d0410250bd830cf",
+      "capture-execution-3270-p0-walking.jsonl": "cc7d5672da5d583db87af1896e70cdec886b1daae18819d062ec00de51723f87",
+      "capture-execution-3930-p0-powered.jsonl": "c3196a1e680e571dae6b10c62373a8bd92fda04c0fd6598201baf1dc38973063",
+      "capture-execution-3930-p0-walking.jsonl": "183aadd36fe9455d4726ec31c2c23f2922a47dd11c54cecd49d24d59cd323cb9",
+      "capture-execution-8580-p0-powered.jsonl": "1b604b81435dd6432f7cf139468c695ce74f012e8db5d3276c495259e86ad72a",
+      "capture-execution-8580-p0-walking.jsonl": "be8643ec1b5e1c4f8ab6b7f1aaf006e556edc4bda85d79dd2ecbc1d3f16321ee",
+      "capture-execution-9030-p0-powered.jsonl": "9dad74718de9769bde22381acb27d23a34f879d1a3b77190d7d9a17c8bdf12ec",
+      "capture-execution-9030-p0-walking.jsonl": "3d5a165cecd398b5101f55cc7aed834ca11c6bab7bf382ccd01d4777343d66ab"
+    },
+    "scope": "All eight prior physical traces are byte-identical after fixing fuel summaries; other execution metadata is identical apart from fuel count/reset fields."
+  },
+  "verification": {
+    "physics": "All 14 arms pass physical conservation and end audits.",
+    "main_replay": "All 18 controller/planner streams, 32400 sensor observations, reports and original diagnostics unchanged.",
+    "freshness": "All six actual launches match recent native forecasts and require at least 98% launch charge.",
+    "tests": "7 objective + 3 existing physical jetpack + 40 harness + 636 Python = 686 passing tests.",
+    "builds": "Profiled and normal release builds pass; strict harness Clippy and formatting pass."
+  },
+  "limitations": [
+    "All clocks are correlated states from three quiet-mode runs at seed 42, seat 0.",
+    "Fresh local controllers omit original mission/controller memory and armed opponents.",
+    "Native synchronous cadenced sensors have no dispatch budget in the cloned attempts; live-budget delivery remains untested.",
+    "The successful walking control completes in both models but its ground behavior and completion time differ."
+  ]
+}

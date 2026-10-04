@@ -35,6 +35,7 @@ impl std::ops::Deref for CaptureTelemetry {
 }
 #[derive(Debug, Clone)]
 pub struct TacticalCapturePilot {
+    active_flight_checks: bool,
     planning: ObjectivePlanning,
     context: BrainReset,
     base: TacticalSortiePilot,
@@ -60,6 +61,7 @@ impl TacticalCapturePilot {
         let mut sortie = base.telemetry().clone();
         sortie.policy = Self::policy(planning);
         Self {
+            active_flight_checks: false,
             planning,
             context,
             base,
@@ -83,6 +85,44 @@ impl TacticalCapturePilot {
     /// Headless comparison option; retained policy defaults remain unchanged.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
         self.base.enable_bounded_acquisition(enabled);
+        self
+    }
+    pub fn with_active_flight_checks(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.planning == ObjectivePlanning::JetpackRoundTrip);
+        self.active_flight_checks = enabled;
+        self
+    }
+    pub fn vehicle_flight_request(
+        &self,
+    ) -> Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleFlightRequest> {
+        self.ground
+            .as_ref()
+            .and_then(|g| g.vehicle_flight_request())
+    }
+    /// Opt-in memory of cover-rejected sites for headless comparisons.
+    pub fn with_cover_response(mut self, enabled: bool) -> Self {
+        self.base.enable_cover_response(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
+    /// Opt-in current cover qualification before the first airborne choice.
+    pub fn with_initial_cover(mut self, enabled: bool) -> Self {
+        self.base.enable_initial_cover(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
+    pub fn with_actual_route_recovery(mut self, enabled: bool) -> Self {
+        self.base.enable_actual_route_recovery(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+        self
+    }
+    pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
+        self.base.enable_cover_retry_cooldown(enabled);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
         self
     }
     pub(crate) fn start_acquisition(&mut self, o: &TacticalSortieObservationV1) {
@@ -258,6 +298,7 @@ impl TacticalCapturePilot {
                 }
             }
             let ground = self.ground.as_mut().unwrap();
+            ground.set_active_flight_checks(self.active_flight_checks);
             ground.set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip);
             let controls = ground.step(&o.combat.recovery);
             if ground.is_crossing()

@@ -12,6 +12,9 @@ const DT: f32 = 1.0 / 60.0;
 // cruise; the remaining margin encloses the capsule and transform tolerance.
 pub(crate) const FORECAST_REGION_HEIGHT: f32 = 40.0;
 const MAX_STEPS: usize = 12 * 60;
+mod continuation;
+use continuation::ContinuationLimits;
+pub use continuation::{VehicleFlightContinuation, VehicleFlightRequest};
 mod environment;
 pub(crate) use environment::FlightEnvironment;
 type Preview = Arc<dyn Fn(Vec2, f32, Vec2, f32) -> bool + Send + Sync>;
@@ -98,6 +101,7 @@ fn crossing_edges(nodes: [u16; 2], plan: CrossingPlan) -> [GroundEdge; 2] {
 pub(crate) struct Proposal {
     pub plan: CrossingPlan,
     pub nodes: [u16; 2],
+    pub measured_nodes: [GroundNode; 2],
 }
 impl Proposal {
     pub fn edges(self) -> [GroundEdge; 2] {
@@ -194,6 +198,7 @@ impl PlanningJob for ProposalJob {
                 if angle <= 0.55 && left.position.distance_to(right.position) < 30.0 {
                     self.result = Some(Proposal {
                         nodes: [right.id, left.id],
+                        measured_nodes: [right, left],
                         plan: CrossingPlan {
                             planet: self.map.planet,
                             revision: self.map.revision,
@@ -245,6 +250,9 @@ pub(crate) struct FlightForecastJob {
     sample: usize,
     samples: usize,
     warmup_left: u64,
+    streamed: bool,
+    launch_environment: FlightEnvironment,
+    launch_environment_age: u64,
     burn: f32,
     query: Vec2,
     query_size: usize,
@@ -253,6 +261,8 @@ pub(crate) struct FlightForecastJob {
     maximum: Vec2,
     result: Option<VehicleCrossingForecast>,
     rejection: Option<&'static str>,
+    continuation: Option<ContinuationLimits>,
+    continuation_result: Option<FlightEstimate>,
 }
 #[derive(Clone)]
 pub(crate) struct FlightScene {
@@ -266,6 +276,9 @@ pub(crate) struct FlightScene {
     pub vehicle: usize,
 }
 impl FlightScene {
+    pub(crate) fn measurement_tick(&self) -> u64 {
+        self.environment.tick
+    }
     pub(crate) fn read(
         state: &SurfaceSortieState,
         player: usize,
@@ -344,6 +357,9 @@ impl FlightForecastJob {
         let mut job = Self {
             proposal,
             initial_environment: environment.clone(),
+            launch_environment: environment.clone(),
+            launch_environment_age: 0,
+            streamed: false,
             environment,
             snapshot,
             frame_position,
@@ -370,9 +386,145 @@ impl FlightForecastJob {
             maximum: proposal.plan.start,
             result: None,
             rejection: None,
+            continuation: None,
+            continuation_result: None,
         };
         job.launch();
         job
+    }
+    /// One integration at launch and after each successful hull query. No
+    /// query is omitted or combined with another query. Launch environments
+    /// retain the same f32 recurrence and are reused across both directions.
+    pub(crate) fn with_streamed_steps(mut self) -> Self {
+        self.streamed = true;
+        self
+    }
+    fn integrate(&mut self) {
+        let plan = self.plan();
+        let elapsed = self.step as f32 * DT;
+        let time = self.launch_delay() + elapsed;
+        let offset = self.position - self.environment.center();
+        let gravity = self.environment.gravity(self.position);
+        if self.step >= self.continuation.map_or(MAX_STEPS, |c| c.steps) {
+            self.reject("time_limit");
+            return;
+        }
+        if !gravity.length().is_finite() || gravity.length() < 0.1 {
+            self.reject("invalid_gravity");
+            return;
+        }
+        let up = -gravity.normalized();
+        // This first primitive assumes gravity approximately normal to the retained footing.
+        if up.dot(offset.normalized()) < 0.98 {
+            self.reject("gravity_direction");
+            return;
+        }
+        let right = Vec2::new(up.y, -up.x);
+        let surface_velocity = self.environment.surface_velocity(offset);
+        let relative = self.velocity - surface_velocity;
+        let target = if self.flight_phase == FlightPhase::Lift {
+            plan.start
+        } else {
+            plan.destination
+        };
+        let error = (target.rotate_radians(self.environment.spin * time) - offset).dot(right);
+        if self.flight_phase == FlightPhase::Descend
+            && offset.length()
+                <= plan.destination.length() + ground_navigation::standing_height() + 0.12
+        {
+            if error.abs() < 0.5 && relative.dot(right).abs() < 1.0 && relative.length() <= 7.0 {
+                let estimate = FlightEstimate {
+                    seconds: elapsed,
+                    burn_seconds: self.burn,
+                    arrival_speed: relative.length(),
+                };
+                if self.continuation.is_some() {
+                    self.continuation_result = Some(estimate);
+                    self.stop();
+                    return;
+                }
+                if self.estimates.len() <= self.direction {
+                    self.estimates.push(estimate);
+                } else {
+                    let worst = &mut self.estimates[self.direction];
+                    worst.seconds = worst.seconds.max(estimate.seconds);
+                    worst.burn_seconds = worst.burn_seconds.max(estimate.burn_seconds);
+                    worst.arrival_speed = worst.arrival_speed.max(estimate.arrival_speed);
+                }
+                if self.direction == 0 {
+                    self.direction = 1;
+                    self.launch();
+                } else if self.sample + 1 < self.samples {
+                    self.sample += 1;
+                    self.direction = 0;
+                    self.launch();
+                } else {
+                    self.result = Some(VehicleCrossingForecast {
+                        version: 2,
+                        measured_tick: self.environment.tick,
+                        launch_until_tick: self.environment.tick + environment::LAUNCH_WINDOW_TICKS,
+                        plan: self.proposal.plan,
+                        nodes: self.proposal.nodes,
+                        flights: [self.estimates[0], self.estimates[1]],
+                    });
+                    self.stop();
+                }
+            } else {
+                self.reject("arrival_window");
+            }
+            return;
+        }
+        let sample = FlightSample {
+            radius: offset.length(),
+            radial_speed: relative.dot(up),
+            error,
+            lateral_speed: relative.dot(right),
+            frame_speed: (surface_velocity - self.reference).dot(right),
+            air_speed: motor::AIR_SPEED,
+            supported: false,
+            previous_jump: false,
+        };
+        flight::advance_phase(&plan, &mut self.flight_phase, sample);
+        let command = flight::flight_command(&plan, &mut self.flight_phase, sample);
+        let side_delta = (command.horizontal * motor::AIR_SPEED
+            - (self.velocity - self.reference).dot(right))
+        .clamp(-motor::AIR_ACCELERATION * DT, motor::AIR_ACCELERATION * DT);
+        self.velocity += right * side_delta;
+        if command.primary_held && (self.step > 0 || self.continuation.is_some()) {
+            let impulse = (motor::RISE_SPEED + gravity.length() * DT
+                - (self.velocity - self.reference).dot(up))
+            .clamp(0.0, motor::THRUST * DT);
+            self.burn += impulse / motor::THRUST;
+            self.velocity += up * impulse;
+        }
+        if self.burn
+            > self.continuation.map_or(
+                (LAUNCH_CHARGE - LANDING_RESERVE) * motor::BURN_SECONDS,
+                |c| c.burn_seconds,
+            )
+        {
+            self.reject("fuel_reserve");
+            return;
+        }
+        self.velocity += gravity * DT;
+        self.position += self.velocity * DT;
+        self.step += 1;
+        self.environment.advance();
+        let offset = self.position - self.environment.center();
+        if offset.length() > plan.cruise_radius + 20.0 {
+            self.reject("height_limit");
+            return;
+        }
+        self.query = offset.rotate_radians(-self.environment.spin * (time + DT));
+        self.query_size = usize::from(
+            offset.length()
+                > plan.start.length().max(plan.destination.length()) + corridor_endpoint_height(),
+        );
+        self.minimum.x = self.minimum.x.min(self.query.x);
+        self.minimum.y = self.minimum.y.min(self.query.y);
+        self.maximum.x = self.maximum.x.max(self.query.x);
+        self.maximum.y = self.maximum.y.max(self.query.y);
+        self.phase = Phase::WorldQuery;
     }
     fn plan(&self) -> CrossingPlan {
         if self.direction == 0 {
@@ -382,8 +534,13 @@ impl FlightForecastJob {
         }
     }
     fn launch(&mut self) {
-        self.environment.clone_from(&self.initial_environment);
-        self.warmup_left = self.launch_delay_ticks();
+        if self.streamed {
+            self.environment.clone_from(&self.launch_environment);
+            self.warmup_left = self.launch_delay_ticks() - self.launch_environment_age;
+        } else {
+            self.environment.clone_from(&self.initial_environment);
+            self.warmup_left = self.launch_delay_ticks();
+        }
         self.phase = Phase::Warmup;
     }
     fn begin_flight(&mut self) {
@@ -453,132 +610,17 @@ impl PlanningJob for FlightForecastJob {
                     self.environment.advance();
                     self.warmup_left -= 1;
                 } else {
-                    self.begin_flight();
-                }
-            }
-            Phase::Integrate => {
-                let plan = self.plan();
-                let elapsed = self.step as f32 * DT;
-                let time = self.launch_delay() + elapsed;
-                let offset = self.position - self.environment.center();
-                let gravity = self.environment.gravity(self.position);
-                if self.step >= MAX_STEPS {
-                    self.reject("time_limit");
-                    return;
-                }
-                if !gravity.length().is_finite() || gravity.length() < 0.1 {
-                    self.reject("invalid_gravity");
-                    return;
-                }
-                let up = -gravity.normalized();
-                // This first primitive assumes gravity approximately normal to the retained footing.
-                if up.dot(offset.normalized()) < 0.98 {
-                    self.reject("gravity_direction");
-                    return;
-                }
-                let right = Vec2::new(up.y, -up.x);
-                let surface_velocity = self.environment.surface_velocity(offset);
-                let relative = self.velocity - surface_velocity;
-                let target = if self.flight_phase == FlightPhase::Lift {
-                    plan.start
-                } else {
-                    plan.destination
-                };
-                let error =
-                    (target.rotate_radians(self.environment.spin * time) - offset).dot(right);
-                if self.flight_phase == FlightPhase::Descend
-                    && offset.length()
-                        <= plan.destination.length() + ground_navigation::standing_height() + 0.12
-                {
-                    if error.abs() < 0.5
-                        && relative.dot(right).abs() < 1.0
-                        && relative.length() <= 7.0
-                    {
-                        let estimate = FlightEstimate {
-                            seconds: elapsed,
-                            burn_seconds: self.burn,
-                            arrival_speed: relative.length(),
-                        };
-                        if self.estimates.len() <= self.direction {
-                            self.estimates.push(estimate);
-                        } else {
-                            let worst = &mut self.estimates[self.direction];
-                            worst.seconds = worst.seconds.max(estimate.seconds);
-                            worst.burn_seconds = worst.burn_seconds.max(estimate.burn_seconds);
-                            worst.arrival_speed = worst.arrival_speed.max(estimate.arrival_speed);
-                        }
-                        if self.direction == 0 {
-                            self.direction = 1;
-                            self.launch();
-                        } else if self.sample + 1 < self.samples {
-                            self.sample += 1;
-                            self.direction = 0;
-                            self.launch();
-                        } else {
-                            self.result = Some(VehicleCrossingForecast {
-                                version: 2,
-                                measured_tick: self.environment.tick,
-                                launch_until_tick: self.environment.tick
-                                    + environment::LAUNCH_WINDOW_TICKS,
-                                plan: self.proposal.plan,
-                                nodes: self.proposal.nodes,
-                                flights: [self.estimates[0], self.estimates[1]],
-                            });
-                            self.stop();
-                        }
-                    } else {
-                        self.reject("arrival_window");
+                    if self.streamed {
+                        self.launch_environment.clone_from(&self.environment);
+                        self.launch_environment_age = self.launch_delay_ticks();
                     }
-                    return;
+                    self.begin_flight();
+                    if self.streamed {
+                        self.integrate();
+                    }
                 }
-                let sample = FlightSample {
-                    radius: offset.length(),
-                    radial_speed: relative.dot(up),
-                    error,
-                    lateral_speed: relative.dot(right),
-                    frame_speed: (surface_velocity - self.reference).dot(right),
-                    air_speed: motor::AIR_SPEED,
-                    supported: false,
-                    previous_jump: false,
-                };
-                flight::advance_phase(&plan, &mut self.flight_phase, sample);
-                let command = flight::flight_command(&plan, &mut self.flight_phase, sample);
-                let side_delta = (command.horizontal * motor::AIR_SPEED
-                    - (self.velocity - self.reference).dot(right))
-                .clamp(-motor::AIR_ACCELERATION * DT, motor::AIR_ACCELERATION * DT);
-                self.velocity += right * side_delta;
-                if command.primary_held && self.step > 0 {
-                    let impulse = (motor::RISE_SPEED + gravity.length() * DT
-                        - (self.velocity - self.reference).dot(up))
-                    .clamp(0.0, motor::THRUST * DT);
-                    self.burn += impulse / motor::THRUST;
-                    self.velocity += up * impulse;
-                }
-                if self.burn > (LAUNCH_CHARGE - LANDING_RESERVE) * motor::BURN_SECONDS {
-                    self.reject("fuel_reserve");
-                    return;
-                }
-                self.velocity += gravity * DT;
-                self.position += self.velocity * DT;
-                self.step += 1;
-                self.environment.advance();
-                let offset = self.position - self.environment.center();
-                if offset.length() > plan.cruise_radius + 20.0 {
-                    self.reject("height_limit");
-                    return;
-                }
-                self.query = offset.rotate_radians(-self.environment.spin * (time + DT));
-                self.query_size = usize::from(
-                    offset.length()
-                        > plan.start.length().max(plan.destination.length())
-                            + corridor_endpoint_height(),
-                );
-                self.minimum.x = self.minimum.x.min(self.query.x);
-                self.minimum.y = self.minimum.y.min(self.query.y);
-                self.maximum.x = self.maximum.x.max(self.query.x);
-                self.maximum.y = self.maximum.y.max(self.query.y);
-                self.phase = Phase::WorldQuery;
             }
+            Phase::Integrate => self.integrate(),
             Phase::WorldQuery => {
                 if self.capsules[self.query_size].is_clear(
                     &self.snapshot,
@@ -598,6 +640,9 @@ impl PlanningJob for FlightForecastJob {
                     self.angle,
                 ) {
                     self.phase = Phase::Integrate;
+                    if self.streamed {
+                        self.integrate();
+                    }
                 } else {
                     self.reject("hull_clearance");
                 }
@@ -895,3 +940,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "forecast/streamed_tests.rs"]
+mod streamed_tests;

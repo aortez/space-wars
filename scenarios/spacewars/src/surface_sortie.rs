@@ -36,6 +36,7 @@ mod outpost;
 pub mod pilot;
 pub mod pod_righting;
 mod profiles;
+pub mod projectile_diagnostics;
 mod query_footprint;
 pub mod rebuild_placement;
 mod recovery;

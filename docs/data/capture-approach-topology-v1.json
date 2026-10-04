@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "complete": true,
+  "decision": "Keep gameplay and defaults unchanged. Probe the existing measured jetpack crossing on these observations before any v13 integration. Reordering cover probes cannot produce a sheltered walk/jump route in these recorded states.",
+  "implementation_commit": "b925912",
+  "audit_commit": "28ffaa96459ee87295398b49f084e7e08adb7fc0",
+  "binary": {
+    "path": "target/capture-topology/surface_mission_soak-b925912",
+    "sha256": "a8b2c4c9ea4ceb4e9c7cd004d4e0c1f58f4296b4ebbf7b79df72ef8b66518456"
+  },
+  "study": {
+    "path": "target/capture-topology/v3/summary.json",
+    "sha256": "46a1384a7cbf2ad954c935ff505be0c76b0ded62555a4d8dd590d4ad8e1a6918"
+  },
+  "inputs": {
+    "path": "capture-approach-topology-v1.json.gz",
+    "sha256": "140b711dd06ab816ff7f23d66ff17566d4278fc0e177b53fc4dcdff35cf813ab",
+    "uncompressed_bytes": 13377332
+  },
+  "plot": {
+    "path": "capture-approach-topology-v1.svg",
+    "sha256": "e0da5777d377b5b68c044dce0fe74407f35222e2fd63cfd22fd95430c9710a15",
+    "tool": "tools/plot-capture-topology.py",
+    "tool_sha256": "f29d5c3202993ae4be4663347c28fa6566e243c0a88824558841b5e33d8f139a"
+  },
+  "totals": {
+    "replays": 3,
+    "snapshots": 7,
+    "sites": 413,
+    "native_batches": 56,
+    "exact_streams": 18,
+    "sensor_observations": 32400,
+    "planner_ticks": 32400,
+    "maximum_graph": 3,
+    "maximum_queries": 97,
+    "tests": 667
+  },
+  "snapshots": [
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3270,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": 0,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": 0,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3930,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": null,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": null,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 8580,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": 0,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": 0,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 9030,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": null,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": null,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9270,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": 0,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": 0,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9720,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": 0,
+        "diagnostic_covered_round_trips": 0,
+        "omitted_covered_round_trips": 0,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 54
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    },
+    {
+      "run": "successful-control",
+      "world_tick": 3510,
+      "counts": {
+        "observed_sites": 59,
+        "approach_covered": 37,
+        "native_eligible_covered": 4,
+        "diagnostic_covered_round_trips": 37,
+        "omitted_covered_round_trips": 33,
+        "missing_cover": 0,
+        "round_trips_without_own_ship": 59,
+        "covered_round_trips_without_own_ship": 37,
+        "hull_breaks_round_trip": 6
+      },
+      "base_nodes": 503,
+      "base_edges": 1004,
+      "base_component_sizes": [
+        503
+      ],
+      "rejected_by_reason": {
+        "capsule_obstructed": 9
+      }
+    }
+  ],
+  "checks": {
+    "scenario-tests": {
+      "path": "/tmp/capture-topology-scenario-tests.log",
+      "sha256": "e560cf7c5066a071c669139c89c6aacbdc6411d5c9f272b1434105d00468d035",
+      "passed_tests": 5
+    },
+    "harness-tests": {
+      "path": "/tmp/capture-topology-harness-tests.log",
+      "sha256": "4c72a7d0319e8279d38e797c53f689d035c928d823969bee0523f32e1cdd2585",
+      "passed_tests": 39
+    },
+    "python-tests": {
+      "path": "/tmp/capture-topology-python-tests.log",
+      "sha256": "16b7b95648d314e56ab0dfcf1c582a991bc1d6007c4a6fdd588aa353e5a8f26b",
+      "passed_tests": 623
+    },
+    "clippy": {
+      "path": "/tmp/capture-topology-clippy.log",
+      "sha256": "1483eddf9fa7dfa29c6b0c055c4963a7e9105eab7e143b46d8dbc5dc75ef4c40",
+      "passed_tests": null
+    },
+    "ai-clippy": {
+      "path": "/tmp/capture-topology-ai-clippy.log",
+      "sha256": "7cab6c104251bda2e13ab7003e0de189177d7e2a9409472c631dfabd74c2984f",
+      "passed_tests": null
+    },
+    "build": {
+      "path": "/tmp/capture-topology-build.log",
+      "sha256": "2493fd49a2c71ed020779651de7c2617a9b4962d13e239e1f144d6752a296626",
+      "passed_tests": null
+    },
+    "normal-build": {
+      "path": "/tmp/capture-topology-normal-build.log",
+      "sha256": "aae0f00759218f3fd4e8225cbd9a857c2e14453921495a73b634305f22c23472",
+      "passed_tests": null
+    }
+  },
+  "prior_audits": [
+    {
+      "path": "target/capture-topology/v1/summary.json",
+      "sha256": "987c25f66f8b7762a9d5775327e421a9fd6349b1239c3991d02938e71f7a907f",
+      "complete": false
+    },
+    {
+      "path": "target/capture-topology/v2/summary.json",
+      "sha256": "5e4c762a43dfca566584b373ee2bf524d675e58938db45a05bbc33ba5611d677",
+      "complete": true
+    }
+  ],
+  "scope": "Three recorded replays, seven fixed-clock observations. Graphs describe native bounded outer-contour walk/jump measurements. Without-ship routes are counterfactual, not physical capture evidence. Extra diagnostics do not enter live controls or quotas. No policy change or strength trial.",
+  "limitations": [
+    "Quiet mode suppresses weapons but preserves exposure checks.",
+    "Without-ship routes are graph counterfactuals, not physically completed powered routes.",
+    "Seven selected snapshots from correlated known cases are not strength evidence.",
+    "Offline native and topology work is additional and outside live quotas."
+  ]
+}

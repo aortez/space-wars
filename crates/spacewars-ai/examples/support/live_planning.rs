@@ -66,6 +66,62 @@ impl LivePlanningRun {
             "true" => planner.with_early_candidates(),
             _ => panic!("--early-objective-routes must be true or false"),
         };
+        let planner = match super::arg("--focused-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_focused_candidates(),
+            _ => panic!("--focused-objective-routes must be true or false"),
+        };
+        let planner = match super::arg("--requested-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_requested_corridors(),
+            _ => panic!("--requested-objective-routes must be true or false"),
+        };
+        let planner = match super::arg("--extended-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_extended_corridors(),
+            _ => panic!("--extended-objective-routes must be true or false"),
+        };
+        let planner = match super::arg("--cover-walk-feedback", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_walk_feedback(),
+            _ => panic!("--cover-walk-feedback must be true or false"),
+        };
+        let planner = match super::arg("--cover-walk-bounds", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_walk_bounds_feedback(),
+            _ => panic!("--cover-walk-bounds must be true or false"),
+        };
+        let planner = match super::arg("--powered-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_powered_corridors(),
+            _ => panic!("--powered-objective-routes must be true or false"),
+        };
+        let handoff_seats = match super::arg("--covered-request-handoff-seats", "none").as_str() {
+            "none" => vec![],
+            "0" => vec![0],
+            "1" => vec![1],
+            "both" => vec![0, 1],
+            _ => panic!("--covered-request-handoff-seats must be none, 0, 1 or both"),
+        };
+        assert!(handoff_seats.iter().all(|seat| seats.contains(seat)));
+        let planner = if handoff_seats.is_empty() {
+            planner
+        } else {
+            planner.with_covered_request_handoff(handoff_seats)
+        };
+        let actual_seats = match super::arg("--actual-route-recovery-seats", "none").as_str() {
+            "none" => vec![],
+            "0" => vec![0],
+            "1" => vec![1],
+            "both" => vec![0, 1],
+            _ => panic!("--actual-route-recovery-seats must be none, 0, 1 or both"),
+        };
+        assert!(actual_seats.iter().all(|seat| seats.contains(seat)));
+        let planner = if actual_seats.is_empty() {
+            planner
+        } else {
+            planner.with_actual_failure_feedback(actual_seats)
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
@@ -85,6 +141,10 @@ impl LivePlanningRun {
     }
     pub fn enabled_for(&self, seat: usize) -> bool {
         self.seats.contains(&seat)
+    }
+    #[allow(dead_code)] // Only the mission runner exposes the detached probe.
+    pub fn diagnose_actual_request(&self, seat: usize, max_steps: u32) -> Option<Value> {
+        self.planner.diagnose_actual_request(seat, max_steps)
     }
     #[allow(dead_code)] // The mission runner also supports native synchronous local sensing.
     pub fn destination_enabled_for(&self, seat: usize) -> bool {
@@ -208,13 +268,37 @@ impl LivePlanningRun {
                 "max_ms":values.last()})
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
-            if self.planner.uses_early_candidates() {
+            if self.planner.uses_powered_corridors() {
+                "live_jetpack_objective_v12"
+            } else if self.planner.uses_walk_bounds_feedback() {
+                "live_jetpack_objective_v11"
+            } else if self.planner.uses_walk_feedback() {
+                "live_jetpack_objective_v10"
+            } else if self.planner.uses_extended_corridors() {
+                "live_jetpack_objective_v9"
+            } else if self.planner.uses_requested_corridors() {
+                "live_jetpack_objective_v8"
+            } else if self.planner.uses_focused_candidates() {
+                "live_jetpack_objective_v7"
+            } else if self.planner.uses_early_candidates() {
                 "live_jetpack_objective_v6"
             } else if self.planner.uses_route_dependencies() {
                 "live_jetpack_objective_v5"
             } else {
                 "live_jetpack_objective_v3"
             }
+        } else if self.planner.uses_powered_corridors() {
+            "live_joint_objective_v12"
+        } else if self.planner.uses_walk_bounds_feedback() {
+            "live_joint_objective_v11"
+        } else if self.planner.uses_walk_feedback() {
+            "live_joint_objective_v10"
+        } else if self.planner.uses_extended_corridors() {
+            "live_joint_objective_v9"
+        } else if self.planner.uses_requested_corridors() {
+            "live_joint_objective_v8"
+        } else if self.planner.uses_focused_candidates() {
+            "live_joint_objective_v7"
         } else if self.planner.uses_early_candidates() {
             "live_joint_objective_v6"
         } else if self.planner.uses_route_dependencies() {
@@ -224,7 +308,7 @@ impl LivePlanningRun {
         } else {
             "live_joint_objective_v1"
         };
-        json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
+        let mut report = json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
             "objective_dependencies":if self.planner.uses_route_dependencies() { "routes" } else { "region" },
             "reuse_objective_ground":self.planner.reuses_ground(),
             "early_objective_routes":self.planner.uses_early_candidates(),
@@ -233,6 +317,36 @@ impl LivePlanningRun {
             "destination_cover":self.planner.destination_cover_telemetry(),
             "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),
             "dispatch":timing(&self.dispatch),"active_dispatch":timing(&self.active_dispatch),
-            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"})
+            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"});
+        if self.planner.uses_focused_candidates() {
+            report["focused_objective_routes"] = json!(true);
+        }
+        if self.planner.uses_requested_corridors() {
+            report["requested_objective_routes"] = json!(true);
+        }
+        if self.planner.uses_extended_corridors() {
+            report["extended_objective_routes"] = json!(true);
+        }
+        if self.planner.uses_walk_feedback() {
+            report["cover_walk_feedback"] = json!(true);
+        }
+        if self.planner.uses_walk_bounds_feedback() {
+            report["cover_walk_bounds"] = json!(true);
+        }
+        if self.planner.uses_powered_corridors() {
+            report["powered_objective_routes"] = json!(true);
+        }
+        if !self.planner.actual_failure_players().is_empty() {
+            report["actual_failure_feedback"] = json!({
+                "enabled_seats": self.planner.actual_failure_players(),
+            });
+        }
+        if !self.planner.covered_handoff_players().is_empty() {
+            report["covered_request_handoff"] = json!({
+                "profile": scenario_spacewars::surface_sortie::live_planning::COVERED_HANDOFF_PROFILE,
+                "enabled_seats": self.planner.covered_handoff_players(),
+            });
+        }
+        report
     }
 }

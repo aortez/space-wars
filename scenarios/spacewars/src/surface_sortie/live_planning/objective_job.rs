@@ -1,7 +1,10 @@
 use super::*;
+use ground_navigation::{WalkCorridorBounds, WalkCorridorJob, WalkCorridorResult};
 use jetpack::forecast::{
     FlightForecastJob, FlightScene, Proposal, ProposalJob, VehicleCrossingForecast,
 };
+mod powered_corridor;
+use powered_corridor::PoweredCorridorJob;
 
 #[derive(Clone)]
 enum Phase {
@@ -41,6 +44,16 @@ pub(crate) struct ObjectiveSurveyJob {
     clearance_radius: f32,
     preview: HullPreview,
     result: LandingObjectiveSurvey,
+    focused: Option<Box<ObjectiveSurveyJob>>,
+    focused_reused: ReusedGroundWork,
+    direct_hull_queries: bool,
+    corridor: Option<(Candidate, Box<WalkCorridorJob>)>,
+    corridor_rise: Option<(Option<LandingSiteId>, f32)>,
+    exhausted_walk: Option<LandingSiteId>,
+    actual_local_failure: Option<&'static str>,
+    unsupported_walk: Option<(LandingSiteId, WalkCorridorBounds)>,
+    powered: Option<(Candidate, Box<PoweredCorridorJob>)>,
+    powered_started: bool,
 }
 impl SurfaceSortieState {
     #[cfg(test)]
@@ -201,6 +214,16 @@ impl SurfaceSortieState {
                 sites: Vec::new(),
                 actual: None,
             },
+            focused: None,
+            focused_reused: ReusedGroundWork::default(),
+            direct_hull_queries: false,
+            corridor: None,
+            corridor_rise: None,
+            exhausted_walk: None,
+            actual_local_failure: None,
+            unsupported_walk: None,
+            powered: None,
+            powered_started: false,
         })
     }
 
@@ -221,12 +244,198 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn has_positive_actual(&self) -> bool {
+        self.result
+            .actual
+            .as_ref()
+            .is_some_and(|r| r.cost().is_some())
+    }
+
+    pub(super) fn diagnostic_phase(&self) -> String {
+        if self.corridor.is_some() {
+            return "requested_walk".into();
+        }
+        if let Some(focused) = &self.focused {
+            return format!("focused/{}", focused.diagnostic_phase());
+        }
+        if let Some((_, powered)) = &self.powered {
+            return format!("powered/{}", powered.diagnostic_phase());
+        }
+        let phase = match self.phase {
+            Phase::Ground(_) => "ground",
+            Phase::Avoid(_) => "avoid_hull",
+            Phase::Trip(_) => "round_trip",
+            Phase::Dependencies(_) => "dependencies",
+            Phase::Proposal(_) => "crossing_proposal",
+            Phase::Flight(_) => "flight_forecast",
+            Phase::Done => "done",
+        };
+        format!("full/{phase}/{}", self.index)
+    }
+
+    pub(super) fn unsupported_walk(&self) -> Option<(LandingSiteId, WalkCorridorBounds)> {
+        self.unsupported_walk.filter(|(site, _)| {
+            !self
+                .result
+                .sites
+                .iter()
+                .any(|r| r.site == Some(*site) && r.cost().is_some())
+        })
+    }
+    pub(super) fn actual_local_failure(&self) -> Option<&'static str> {
+        self.actual_local_failure
+            .filter(|_| !self.has_positive_actual())
+    }
+    pub(super) fn exhausted_walk(&self) -> Option<LandingSiteId> {
+        if self.powered.is_some() {
+            return None;
+        }
+        self.exhausted_walk.filter(|site| {
+            !self
+                .result
+                .sites
+                .iter()
+                .any(|r| r.site == Some(*site) && r.cost().is_some())
+        })
+    }
+    pub(super) fn prioritizes(&self, site: LandingSiteId) -> bool {
+        self.powered
+            .as_ref()
+            .is_some_and(|(c, _)| c.site == Some(site))
+            || self
+                .corridor
+                .as_ref()
+                .is_some_and(|(c, _)| c.site == Some(site))
+            || self
+                .focused
+                .as_ref()
+                .is_some_and(|job| job.candidates.iter().any(|c| c.site == Some(site)))
+    }
+    /// Try one small walking corridor before the complete survey. A failed
+    /// patch says nothing about the full graph, jumps or powered alternatives.
+    /// The ordinary job and its original measurement clock remain intact.
+    pub(super) fn with_focused_candidate(mut self, cursor: usize) -> Self {
+        assert!(self.local_dependencies && self.focused.is_none());
+        let candidate = self
+            .candidates
+            .iter()
+            .find(|c| c.site.is_none())
+            .copied()
+            .unwrap_or(self.candidates[cursor % self.candidates.len()]);
+        let bearing = |point: Vec2| (-point.x).atan2(point.y);
+        let start = bearing(candidate.hatch);
+        let delta = (bearing(self.result.objective.position) - start + std::f32::consts::PI)
+            .rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        let samples = ground_navigation::GROUND_SAMPLES as f32 / std::f32::consts::TAU;
+        // Two sample margins allow actual footing near each endpoint. Farther
+        // routes go directly to the unchanged full survey, without a verdict.
+        let half_width = (delta.abs() * samples * 0.5).ceil() as u16 + 2;
+        if half_width > 8 {
+            return self;
+        }
+        let center = ((start + delta * 0.5).rem_euclid(std::f32::consts::TAU) * samples).round()
+            as u16
+            % ground_navigation::GROUND_SAMPLES as u16;
+        let mut focused = self.clone().with_walk_patch(center, half_width);
+        focused.candidates = vec![candidate];
+        focused.flight_scene = None;
+        focused.direct_hull_queries = true;
+        focused.result.validated_routes_only = true;
+        self.measurement_work.focused_started = 1;
+        self.focused = Some(Box::new(focused));
+        self
+    }
     pub(super) fn with_walk_patch(mut self, center: u16, half_width: u16) -> Self {
         let Phase::Ground(job) = std::mem::replace(&mut self.phase, Phase::Done) else {
             panic!("restrict a survey before dispatch");
         };
         self.phase = Phase::Ground(Box::new((*job).with_walk_patch(center, half_width)));
         self.walk_patch = true;
+        self
+    }
+    /// Extend the opt-in short patch only for an explicitly requested site or
+    /// the actual hatch. Keep the full job, snapshot and source clock unchanged.
+    pub(super) fn with_requested_corridor(self, query: LandingSiteQuery) -> Self {
+        self.requested_corridor(query, false)
+    }
+    pub(super) fn with_extended_corridor(self, query: LandingSiteQuery) -> Self {
+        self.requested_corridor(query, true)
+    }
+    pub(super) fn with_powered_corridor(mut self, query: LandingSiteQuery) -> Self {
+        let candidate = self
+            .candidates
+            .iter()
+            .find(|c| c.site.is_none())
+            .or_else(|| {
+                self.candidates.iter().find(|c| {
+                    matches!(query,
+                LandingSiteQuery::Selected(id) if c.site == Some(id))
+                })
+            })
+            .copied();
+        if let Some(candidate) = candidate {
+            self.powered =
+                PoweredCorridorJob::new(&self, candidate).map(|job| (candidate, Box::new(job)));
+            if self.powered.is_some() {
+                // This pass measures the same direct walk first, with fixed
+                // bookkeeping committed at each charged node/edge query.
+                // No prefix has dispatched yet; replace its scheduled work.
+                self.focused = None;
+                self.corridor = None;
+                self.measurement_work.focused_started = 0;
+                self.measurement_work.corridor_started = 0;
+                self.measurement_work.extended_started = 0;
+            }
+        }
+        self
+    }
+    fn requested_corridor(mut self, query: LandingSiteQuery, extended: bool) -> Self {
+        assert!(self.local_dependencies && self.corridor.is_none());
+        if self.focused.is_some() {
+            return self;
+        }
+        let candidate = self
+            .candidates
+            .iter()
+            .find(|c| c.site.is_none())
+            .or_else(|| {
+                self.candidates
+                    .iter()
+                    .find(|c| matches!(query, LandingSiteQuery::Selected(id) if c.site == Some(id)))
+            })
+            .copied();
+        let Some(c) = candidate else {
+            return self;
+        };
+        let Phase::Ground(ground) = &self.phase else {
+            panic!("start a corridor before dispatch");
+        };
+        let (position, angle) = (self.position, self.angle);
+        let preview = Arc::clone(&self.preview);
+        let hull = Arc::new(move |point: Vec2| {
+            preview(
+                position + point.rotate_radians(angle),
+                rotation_for_direction(point) + angle,
+                c.vehicle,
+                c.angle,
+            )
+        });
+        match ground.walk_corridor(
+            c.hatch,
+            self.result.objective.position,
+            self.result.objective.range,
+            c.boarding_hatches,
+            hull,
+            extended,
+        ) {
+            Ok(job) => {
+                self.measurement_work.corridor_started = 1;
+                self.measurement_work.extended_started = u64::from(job.is_extended());
+                self.corridor = Some((c, Box::new(job)));
+            }
+            Err(bounds) => self.unsupported_walk = c.site.map(|site| (site, bounds)),
+        }
         self
     }
     /// Only finished positive candidates have complete path dependencies.
@@ -250,6 +459,18 @@ impl ObjectiveSurveyJob {
     }
     pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
         &self.dependencies
+    }
+    pub(super) fn corridor_rise_valid(
+        &self,
+        site: Option<LandingSiteId>,
+        gravity: impl FnOnce() -> f32,
+    ) -> bool {
+        self.corridor_rise.is_none_or(|(id, rise)| {
+            id != site
+                || rise
+                    <= SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * gravity().max(1.0))
+                        * 0.75
+        })
     }
     pub(super) fn walking_footprint(&self) -> Option<query_footprint::QueryFootprint> {
         self.measurements
@@ -277,9 +498,18 @@ impl ObjectiveSurveyJob {
         })
     }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
-        match &self.phase {
+        let full = match &self.phase {
             Phase::Ground(job) => job.reused(),
             _ => self.reused,
+        };
+        let focused = self
+            .focused
+            .as_ref()
+            .map_or(self.focused_reused, |j| j.reused());
+        ReusedGroundWork {
+            nodes: full.nodes + focused.nodes,
+            walks: full.walks + focused.walks,
+            physics_queries: full.physics_queries + focused.physics_queries,
         }
     }
     pub(crate) fn into_measurements(self) -> Box<GroundMeasurements> {
@@ -289,7 +519,7 @@ impl ObjectiveSurveyJob {
         }
     }
     fn avoid(&self) -> Phase {
-        Phase::Avoid(Box::new(AvoidingJob::new(
+        let job = AvoidingJob::new(
             Arc::clone(self.base.as_ref().unwrap()),
             self.candidates[self.index],
             self.position,
@@ -297,11 +527,23 @@ impl ObjectiveSurveyJob {
             self.clearance_radius,
             self.gravity,
             Arc::clone(&self.preview),
-        )))
+        );
+        Phase::Avoid(Box::new(if self.direct_hull_queries {
+            job.with_direct_queries()
+        } else {
+            job
+        }))
     }
     fn finish_route(&mut self, route: LandingObjectiveRoute) {
+        if self
+            .corridor_rise
+            .is_some_and(|(site, _)| site == route.site)
+        {
+            self.corridor_rise = None;
+        }
         self.measurement_work.record(&route);
         if route.site.is_some() {
+            self.result.sites.retain(|old| old.site != route.site);
             self.result.sites.push(route);
         } else {
             self.result.actual = Some(route);
@@ -324,8 +566,7 @@ impl ObjectiveSurveyJob {
     // Boarding floor/clearance probes are distinct from the last path node:
     // a route may stop within boarding range rather than at the probe itself.
     // Include both bounded probe corridors in positive-result validation.
-    fn entrance_dependencies(&self) -> [QueryArea; 2] {
-        let c = self.candidates[self.index];
+    fn entrance_dependencies(&self, c: Candidate) -> [QueryArea; 2] {
         let local = |point: Vec2| (point - self.position).rotate_radians(-self.angle);
         let up = (c.vehicle - self.position).normalized();
         let right = Vec2::new(up.y, -up.x);
@@ -357,6 +598,15 @@ impl ObjectiveSurveyJob {
 impl PlanningJob for ObjectiveSurveyJob {
     type Output = LandingObjectiveSurvey;
     fn next_work(&self) -> Option<WorkKind> {
+        if let Some((_, corridor)) = &self.corridor {
+            return corridor.next_work().or(Some(WorkKind::Graph));
+        }
+        if let Some(focused) = &self.focused {
+            return focused.next_work().or(Some(WorkKind::Graph));
+        }
+        if let Some((_, powered)) = &self.powered {
+            return powered.next_work().or(Some(WorkKind::Graph));
+        }
         match &self.phase {
             Phase::Ground(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Avoid(j) => j.next_work().or(Some(WorkKind::Graph)),
@@ -371,6 +621,132 @@ impl PlanningJob for ObjectiveSurveyJob {
         matches!(self.phase, Phase::Done).then_some(&self.result)
     }
     fn step(&mut self) {
+        if let Some((_, corridor)) = &mut self.corridor {
+            if corridor.next_work().is_some() {
+                corridor.step();
+            } else {
+                let (candidate, mut corridor) = self.corridor.take().unwrap();
+                self.measurement_work.corridor_completed += 1;
+                let extended = u64::from(corridor.is_extended());
+                self.measurement_work.extended_completed += extended;
+                if let Some(WalkCorridorResult {
+                    outbound,
+                    returning,
+                    endpoint,
+                    mut areas,
+                    max_rise,
+                }) = corridor.take_result()
+                {
+                    self.measurement_work.corridor_successes += 1;
+                    self.measurement_work.extended_successes += extended;
+                    self.corridor_rise = Some((candidate.site, max_rise));
+                    self.powered = None;
+                    areas.extend(self.entrance_dependencies(candidate));
+                    self.dependencies.push((candidate.site, areas));
+                    let route = LandingObjectiveRoute {
+                        site: candidate.site,
+                        outbound,
+                        returning: Some(returning),
+                        endpoint: Some(endpoint),
+                        crossing: None,
+                    };
+                    if candidate.site.is_some() {
+                        self.result.sites.push(route);
+                    } else {
+                        self.result.actual = Some(route);
+                    }
+                } else {
+                    self.exhausted_walk = candidate.site;
+                }
+            }
+            return;
+        }
+        if let Some(focused) = &mut self.focused {
+            if focused.next_work().is_some() {
+                focused.step();
+            } else {
+                let focused = self.focused.take().unwrap();
+                self.focused_reused = focused.reused();
+                self.measurement_work.focused_completed += 1;
+                if let Some(survey) = focused.positive_candidates() {
+                    self.measurement_work.focused_successes += 1;
+                    self.result.sites = survey.sites;
+                    self.result.actual = survey.actual;
+                    self.dependencies = focused.dependencies;
+                    if self.powered.as_ref().is_some_and(|(c, _)| {
+                        self.result
+                            .sites
+                            .iter()
+                            .chain(self.result.actual.iter())
+                            .any(|r| r.site == c.site && r.cost().is_some())
+                    }) {
+                        self.powered = None;
+                    }
+                } else {
+                    self.exhausted_walk = focused.candidates[0].site;
+                }
+            }
+            return;
+        }
+        if let Some((_, powered)) = &mut self.powered {
+            if !self.powered_started {
+                self.powered_started = true;
+                self.measurement_work.powered_corridor_started += 1;
+                self.measurement_work.corridor_started += 1;
+                self.measurement_work.extended_started += u64::from(powered.extended_walk);
+            }
+            if powered.next_work().is_some() {
+                let old = powered.flight_work.clone();
+                let old_walk = powered.direct_walk;
+                powered.step();
+                if old_walk.is_none()
+                    && let Some(success) = powered.direct_walk
+                {
+                    self.measurement_work.corridor_completed += 1;
+                    self.measurement_work.corridor_successes += u64::from(success);
+                    self.measurement_work.extended_completed += u64::from(powered.extended_walk);
+                    self.measurement_work.extended_successes +=
+                        u64::from(powered.extended_walk && success);
+                }
+                self.flight_work.started += powered.flight_work.started - old.started;
+                self.flight_work.approved += powered.flight_work.approved - old.approved;
+                for (&reason, &count) in &powered.flight_work.rejected {
+                    *self.flight_work.rejected.entry(reason).or_default() +=
+                        count - old.rejected.get(reason).copied().unwrap_or(0);
+                }
+                self.flight_dependent |= powered.flight_work.started > 0;
+            } else {
+                let (candidate, mut powered) = self.powered.take().unwrap();
+                self.measurement_work.powered_corridor_completed += 1;
+                if let Some((route, mut areas, rise)) = powered.result.take() {
+                    self.measurement_work.powered_corridor_successes +=
+                        u64::from(route.crossing.is_some());
+                    self.corridor_rise = Some((candidate.site, rise));
+                    areas.extend(self.entrance_dependencies(candidate));
+                    self.dependencies.push((candidate.site, areas));
+                    if route.site.is_some() {
+                        self.result.sites.push(route);
+                    } else {
+                        self.result.actual = Some(route);
+                    }
+                } else if powered.direct_walk == Some(false) {
+                    self.exhausted_walk = candidate.site;
+                    if candidate.site.is_none() {
+                        self.actual_local_failure = powered.failure;
+                    }
+                    *self
+                        .measurement_work
+                        .powered_corridor_failures
+                        .entry(
+                            powered
+                                .failure
+                                .expect("unsuccessful powered pass has a reason"),
+                        )
+                        .or_default() += 1;
+                }
+            }
+            return;
+        }
         match &mut self.phase {
             Phase::Ground(j) => {
                 if j.next_work().is_some() {
@@ -484,8 +860,9 @@ impl PlanningJob for ObjectiveSurveyJob {
                         endpoint: result.endpoint,
                     };
                     let mut areas = j.take_areas();
-                    areas.extend(self.entrance_dependencies());
+                    areas.extend(self.entrance_dependencies(self.candidates[self.index]));
                     areas.extend(self.flight_area);
+                    self.dependencies.retain(|(site, _)| *site != route.site);
                     self.dependencies.push((route.site, areas));
                     self.finish_route(route);
                 }

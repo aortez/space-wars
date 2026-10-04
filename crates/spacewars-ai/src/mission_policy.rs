@@ -4,6 +4,8 @@ use engine_common::CombatBreakSettings;
 use scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning;
 use serde::Serialize;
 
+pub const POWERED_CAPTURE_PROFILE: &str = "mission_powered_capture_v1";
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub enum MissionPolicy {
     #[default]
@@ -133,9 +135,72 @@ impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
     }
+    /// Opt-in v13 route/controller comparison, configured before the first intent.
+    pub fn with_powered_capture(mut self, enabled: bool) -> Self {
+        self.0.configure_powered_capture(enabled);
+        self
+    }
+    pub fn with_active_flight_checks(mut self, enabled: bool) -> Self {
+        self.0.configure_active_flight_checks(enabled);
+        self
+    }
+    /// Opt-in hull comparison for new ownership-based pursuits.
+    pub fn with_pursuit_health(mut self, enabled: bool) -> Self {
+        self.0.configure_pursuit_health(enabled);
+        self
+    }
     /// Opt-in first-site deadline and local waiting guidance for comparison.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
         self.0.bounded_acquisition = enabled;
+        self
+    }
+    /// Opt-in response to confirmed cover failures; standard defaults omit it.
+    pub fn with_cover_response(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        assert!(enabled || !self.0.initial_cover);
+        self.0.cover_response = enabled;
+        self
+    }
+    /// Opt-in initial qualification; requires the bounded cover response.
+    pub fn with_initial_cover(mut self, enabled: bool) -> Self {
+        self.0.configure_initial_cover(enabled);
+        self
+    }
+    /// Opt-in bounded waiting after a failed native local actual-hatch attempt.
+    pub fn with_actual_route_recovery(mut self, enabled: bool) -> Self {
+        self.0.configure_actual_route_recovery(enabled);
+        self
+    }
+    /// Opt-in escape after a witnessed local actual-hatch capture abort.
+    pub fn with_capture_escape(mut self, enabled: bool) -> Self {
+        self.0.configure_capture_escape(enabled);
+        self
+    }
+    /// Opt-in bounded transfer commitment following actual-hatch escape.
+    pub fn with_escape_travel(mut self, enabled: bool) -> Self {
+        self.0.configure_escape_travel(enabled);
+        self
+    }
+    /// Opt-in clear entry geometry during the committed post-escape transfer.
+    pub fn with_transfer_approach(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_approach(enabled);
+        self
+    }
+    /// Opt-in relative closing-speed limits during committed transfer.
+    pub fn with_transfer_speed(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_speed(enabled);
+        self
+    }
+    /// Opt-in capture-failure context for initial and switched destinations.
+    pub fn with_destination_retry(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.enable_destination_retry(enabled);
+        self
+    }
+    /// Opt-in v13 capture retry experiment; policy defaults leave it disabled.
+    pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.cover_retry_cooldown = enabled;
         self
     }
     /// Opt-in headless experiment; standard policy selection leaves it disabled.

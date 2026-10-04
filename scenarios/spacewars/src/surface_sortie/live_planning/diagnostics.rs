@@ -56,6 +56,29 @@ pub struct PublicationEvidence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ExhaustedWalkingAttempt {
+    pub actor: PlayerId,
+    pub site: LandingSiteId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct UnsupportedWalkingCorridor {
+    pub actor: PlayerId,
+    pub site: LandingSiteId,
+    pub required_steps: u16,
+    pub max_steps: u16,
+}
+
+/// One failed native local walk/powered attempt, bound by the enclosing request
+/// evidence. Full fallback remains unknown; this cannot authorize an exit.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ActualLocalAttemptFailure {
+    pub actor: PlayerId,
+    pub pose: ActualLanding,
+    pub reason: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ObjectiveWorkEvidence {
     pub tick: u64,
     pub objective: LandingObjective,
@@ -67,6 +90,18 @@ pub struct ObjectiveWorkEvidence {
     pub invalidated_by: Option<&'static str>,
     pub submission_deferred_by: Option<&'static str>,
     pub publication: Option<PublicationEvidence>,
+    /// Historical completion of one unsuccessful walking hypothesis, bound to
+    /// this request and source clock. Never a negative route certificate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exhausted_walk: Option<ExhaustedWalkingAttempt>,
+    /// The requested corridor exceeds its constructor bound. No walk was
+    /// attempted; other routes and the complete fallback remain unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsupported_walk: Option<UnsupportedWalkingCorridor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub covered_handoff: Option<CoveredRequestHandoff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_local_failure: Option<ActualLocalAttemptFailure>,
 }
 impl ObjectiveWorkEvidence {
     pub(super) fn new(tick: u64, objective: LandingObjective) -> Self {
@@ -80,6 +115,10 @@ impl ObjectiveWorkEvidence {
             invalidated_by: None,
             submission_deferred_by: None,
             publication: None,
+            exhausted_walk: None,
+            unsupported_walk: None,
+            covered_handoff: None,
+            actual_local_failure: None,
         }
     }
     pub(super) fn request(&mut self, request: &Request) {
@@ -87,5 +126,6 @@ impl ObjectiveWorkEvidence {
         self.generation = Some(request.token.generation);
         self.request_tick = Some(request.tick);
         self.measurement_tick = Some(request.measurement_tick);
+        self.covered_handoff = request.covered_handoff;
     }
 }

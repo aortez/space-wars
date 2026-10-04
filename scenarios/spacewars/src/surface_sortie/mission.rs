@@ -25,6 +25,7 @@ pub struct LandingSurveyStamp {
 
 #[derive(Debug, Clone, Copy)]
 pub struct MissionSensorRequest {
+    pub vehicle_flight: Option<jetpack::forecast::VehicleFlightRequest>,
     pub destination_cover: Option<destination_cover::DestinationCoverRequest>,
     pub site: Option<LandingSiteId>,
     pub last_survey: Option<LandingSurveyStamp>,
@@ -370,6 +371,7 @@ impl SurfaceSortieState {
         self.mission_observation_with_cadence(
             player,
             MissionSensorRequest {
+                vehicle_flight: None,
                 destination_cover: None,
                 objective_planning: Default::default(),
                 site,
@@ -474,6 +476,31 @@ impl SurfaceSortieState {
             request.last_survey,
             flag_approach,
         );
+        let mut local = self.tactical_sortie_observation_profile(
+            player,
+            query,
+            request.objective_planning,
+            objective_surveys,
+        );
+        if request.objective_planning == landing_objective::ObjectivePlanning::JetpackRoundTrip
+            && let Some(flight) = request.vehicle_flight
+            && local
+                .combat
+                .recovery
+                .jetpack
+                .as_ref()
+                .is_some_and(|j| j.surveyed)
+        {
+            let continuation =
+                self.vehicle_flight_continuation(player, &local.combat.recovery, flight);
+            local
+                .combat
+                .recovery
+                .jetpack
+                .as_mut()
+                .unwrap()
+                .vehicle_continuation = Some(continuation);
+        }
         MissionObservationV1 {
             destination_cover: request
                 .destination_cover
@@ -481,12 +508,7 @@ impl SurfaceSortieState {
             version: 1,
             match_rules: self.round.is_some(),
             match_context: self.mission_match_context(),
-            local: self.tactical_sortie_observation_profile(
-                player,
-                query,
-                request.objective_planning,
-                objective_surveys,
-            ),
+            local,
             planets,
             sun: self.world.sun.map(|sun| MissionObstacle {
                 position: sun.position,
@@ -656,6 +678,7 @@ mod tests {
             let before = state.world.physics.world.snapshot_bytes().unwrap();
             for seat in 0..2 {
                 let request = MissionSensorRequest {
+                    vehicle_flight: None,
                     destination_cover: None,
                     objective_planning: Default::default(),
                     site: None,
@@ -693,6 +716,7 @@ mod tests {
                     other => panic!("unexpected query {other:?}"),
                 }
                 let request = MissionSensorRequest {
+                    vehicle_flight: None,
                     destination_cover: None,
                     objective_planning: Default::default(),
                     site: Some(selected),
@@ -729,6 +753,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         let site = state.pilot_observation(0, None).sites[0];
         let mut request = MissionSensorRequest {
+            vehicle_flight: None,
             destination_cover: None,
             objective_planning: Default::default(),
             site: Some(site.id),
@@ -847,6 +872,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
         let request = MissionSensorRequest {
+            vehicle_flight: None,
             destination_cover: None,
             objective_planning: Default::default(),
             site: None,

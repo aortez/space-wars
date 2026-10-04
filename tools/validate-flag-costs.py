@@ -18,6 +18,7 @@ def module(name, filename):
 
 
 P = module('promotion', 'validate-capture-value.py')
+M = module('mission_visits', 'audit-mission-visits.py')
 D, E = P.D, P.E
 
 
@@ -145,6 +146,9 @@ def first_predictions(report, path):
 
 def analyze(root, item, policies):
     report = json.loads((root/'report.json').read_text())
+    visit_audit = M.audit(report)
+    assert not any(visit_audit['counts'].get(key, 0) for key in
+                   ['unverified', 'corrected_visits', 'milestones_outside_visit']), 'visit endings disagree with mission events'
     assert [c['policy'] for c in report['policy_configuration']] == policies
     assert report['seed'] == item['seed'] and report['round']['time_limit_seconds'] == 600
     assert report['live_objective_planning']['enabled_seats'] == []
@@ -156,7 +160,7 @@ def analyze(root, item, policies):
     for progress in report['mission_progress']['players']:
         assert progress['eligible_ticks'] == progress['progress_ticks'] + progress['ticks_without_progress']
         assert progress['distance_observed_ticks'] <= progress['eligible_ticks']
-    return dict(players=[D.finished_player(report, s) for s in range(2)],
+    return dict(visit_audit=visit_audit['counts'], players=[D.finished_player(report, s) for s in range(2)],
         progress=report['mission_progress'],
         first_predictions=first_predictions(report, root/'mission-evaluations.jsonl'),
         decisions=P.switch_predictions(report, rows(root/'mission-evaluations.jsonl')),
@@ -175,7 +179,7 @@ def main():
     args.out.mkdir(parents=True, exist_ok=False)
     result = dict(schema=1, plan=plan(), runs={}, comparisons=[], complete=False,
         source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-        binary_sha256=E.digest(binary), tools={Path(m.__file__).name:E.digest(Path(m.__file__)) for m in [P, D, E]},
+        binary_sha256=E.digest(binary), tools={Path(m.__file__).name:E.digest(Path(m.__file__)) for m in [P, D, E, M]},
         runner_sha256=E.digest(Path(__file__)),
         scope='32 known directed trials and 32 fresh finished matches. Four generated worlds reused across asteroid pressure and seats; correlated, not 16 independent candidate matches. Same v13 predecessor with unused flag surveys versus opt-in published flag costs; v10 opponent. No weights, thresholds or defaults fitted.')
     save = lambda: D.write(args.out/'summary.json', result)

@@ -1,0 +1,455 @@
+//! Positive walking evidence along one short arc, without a general graph search.
+//! A failed hypothesis says nothing about other walks, jumps or powered routes.
+use super::*;
+use engine_rapier::world::QueryArea;
+
+const MAX_STEPS: u16 = 96;
+// At most one inspection per edge plus six start/transition operations. Two
+// longest corridors leave room within 120 dispatches of four graph operations.
+const EXTENDED_MAX_STEPS: u16 = 224;
+type HullCheck = Arc<dyn Fn(Vec2) -> bool + Send + Sync>;
+
+/// Constructor geometry only: no walking measurement has been attempted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct WalkCorridorBounds {
+    pub required_steps: u16,
+    pub max_steps: u16,
+}
+
+#[derive(Clone, Copy)]
+enum Phase {
+    Ray(u16),
+    Capsule(GroundNode, Vec2),
+    Hull(GroundNode, Vec2),
+    Inspect(Option<GroundNode>),
+    Begin,
+    WalkCapsule(bool, usize),
+    WalkHull(bool, usize, Vec2),
+    Floor(bool, usize),
+    Advance,
+    Done,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct WalkCorridorResult {
+    pub outbound: GroundRouteDiagnostics,
+    pub returning: GroundRouteDiagnostics,
+    pub endpoint: GroundNode,
+    pub areas: Vec<QueryArea>,
+    pub max_rise: f32,
+}
+
+/// One real physics query, node inspection or constant-size transition per
+/// operation. Both directed walks use the ordinary nine capsule/three floor
+/// samples. Hull checks are separate, charged queries. No graph scan is hidden
+/// in a query operation. The start window is five nodes. The opt-in longer
+/// pass commits each edge at its last support query, retaining every query.
+#[derive(Clone)]
+pub(crate) struct WalkCorridorJob {
+    ground: GroundSurveyJob,
+    hull: HullCheck,
+    phase: Phase,
+    start: Vec2,
+    target: Vec2,
+    range: f32,
+    hatches: [Option<Vec2>; 2],
+    start_id: u16,
+    start_cursor: u16,
+    nearest: Option<GroundNode>,
+    previous: Option<GroundNode>,
+    next: Option<GroundNode>,
+    direction: i32,
+    remaining: u16,
+    length: f32,
+    nodes: usize,
+    first: Option<GroundNode>,
+    nearest_target: f32,
+    nearest_hatch: f32,
+    hatch_nodes: usize,
+    max_rise: f32,
+    areas: Vec<QueryArea>,
+    result: Option<WalkCorridorResult>,
+    streamed: bool,
+    max_steps: u16,
+    exact_start: Option<GroundNode>,
+    exact_target: Option<GroundNode>,
+    streamed_nodes: bool,
+    #[cfg(test)]
+    path: Vec<GroundNode>,
+}
+
+impl GroundSurveyJob {
+    pub(crate) fn corridor_geometry(
+        start: Vec2,
+        target: Vec2,
+        extended: bool,
+    ) -> Result<(u16, i32), WalkCorridorBounds> {
+        let id = |point: Vec2| {
+            ((-point.x).atan2(point.y).rem_euclid(std::f32::consts::TAU) * GROUND_SAMPLES as f32
+                / std::f32::consts::TAU)
+                .round() as u16
+                % GROUND_SAMPLES as u16
+        };
+        let start_id = id(start);
+        let delta = signed_span(start_id, id(target));
+        let required_steps = delta.unsigned_abs() as u16 + 4;
+        let max_steps = if extended {
+            EXTENDED_MAX_STEPS
+        } else {
+            MAX_STEPS
+        };
+        if required_steps > max_steps {
+            Err(WalkCorridorBounds {
+                required_steps,
+                max_steps,
+            })
+        } else {
+            Ok((start_id, delta))
+        }
+    }
+    pub(crate) fn walk_corridor(
+        &self,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        hatches: [Option<Vec2>; 2],
+        hull: HullCheck,
+        extended: bool,
+    ) -> Result<WalkCorridorJob, WalkCorridorBounds> {
+        let (start_id, delta) = Self::corridor_geometry(start, target, extended)?;
+        // Include the start-window displacement and two samples past the flag
+        // bearing. Longer arcs remain the full survey's responsibility.
+        let required_steps = delta.unsigned_abs() as u16 + 4;
+        let streamed = required_steps > MAX_STEPS;
+        let mut ground = self.clone();
+        ground.measurements.footprint = Some(RefCell::new(QueryFootprint::new(
+            ground.measurements.position,
+            ground.measurements.angle,
+        )));
+        Ok(WalkCorridorJob {
+            ground,
+            hull,
+            phase: Phase::Ray(offset(start_id, -2)),
+            start,
+            target,
+            range,
+            hatches,
+            start_id,
+            start_cursor: 0,
+            nearest: None,
+            previous: None,
+            next: None,
+            direction: delta.signum(),
+            remaining: 0,
+            length: 0.0,
+            nodes: 0,
+            first: None,
+            nearest_target: f32::INFINITY,
+            nearest_hatch: f32::INFINITY,
+            hatch_nodes: 0,
+            max_rise: 0.0,
+            areas: Vec::new(),
+            result: None,
+            streamed,
+            max_steps: if streamed {
+                EXTENDED_MAX_STEPS
+            } else {
+                MAX_STEPS
+            },
+            exact_start: None,
+            exact_target: None,
+            streamed_nodes: false,
+            #[cfg(test)]
+            path: Vec::new(),
+        })
+    }
+}
+
+fn offset(id: u16, delta: i32) -> u16 {
+    (i32::from(id) + delta).rem_euclid(GROUND_SAMPLES as i32) as u16
+}
+fn signed_span(from: u16, to: u16) -> i32 {
+    let half = GROUND_SAMPLES as i32 / 2;
+    (i32::from(to) - i32::from(from) + half).rem_euclid(GROUND_SAMPLES as i32) - half
+}
+
+impl WalkCorridorJob {
+    /// Exact sampled endpoints join a separately measured flight without a
+    /// nearest-node snap. Stream only fixed node/edge bookkeeping; keep every
+    /// support, capsule and hull query in both directions.
+    pub(crate) fn with_exact_endpoints(
+        mut self,
+        start: Option<GroundNode>,
+        target: Option<GroundNode>,
+    ) -> Self {
+        self.exact_start = start;
+        self.exact_target = target;
+        self.streamed = true;
+        self.streamed_nodes = true;
+        self
+    }
+    pub(crate) fn is_extended(&self) -> bool {
+        self.max_steps == EXTENDED_MAX_STEPS
+    }
+    pub(crate) fn take_result(&mut self) -> Option<WalkCorridorResult> {
+        assert!(matches!(self.phase, Phase::Done));
+        self.result.take()
+    }
+    fn center(node: GroundNode) -> Vec2 {
+        node.position + node.position.normalized() * SurfaceSortieState::spec().half_height()
+    }
+    fn hatch_distance(&self, node: GroundNode) -> f32 {
+        self.hatches
+            .into_iter()
+            .flatten()
+            .map(|h| Self::center(node).distance_to(h))
+            .min_by(f32::total_cmp)
+            .unwrap_or(f32::INFINITY)
+    }
+    fn take_footprint(&mut self) -> bool {
+        let measurement = &self.ground.measurements;
+        let footprint = measurement.footprint.as_ref().unwrap();
+        let old = footprint.replace(QueryFootprint::new(measurement.position, measurement.angle));
+        self.areas.extend(old.areas.into_iter().flatten());
+        old.complete
+    }
+    fn endpoints(&self, returning: bool) -> (GroundNode, GroundNode) {
+        let pair = (self.previous.unwrap(), self.next.unwrap());
+        if returning { (pair.1, pair.0) } else { pair }
+    }
+    fn foot(&self, returning: bool, t: f32) -> Vec2 {
+        let (from, to) = self.endpoints(returning);
+        from.position + (to.position - from.position) * t
+    }
+    fn visit(&mut self, node: GroundNode) {
+        self.nodes += 1;
+        self.nearest_target = self
+            .nearest_target
+            .min(Self::center(node).distance_to(self.target));
+        self.nearest_hatch = self.nearest_hatch.min(self.hatch_distance(node));
+        self.hatch_nodes += usize::from(self.hatch_distance(node) < HATCH_APPROACH_RANGE);
+        #[cfg(test)]
+        self.path.push(node);
+        self.previous = Some(node);
+        if self.exact_target.map_or_else(
+            || Self::center(node).distance_to(self.target) < self.range,
+            |goal| node.id == goal.id && node.position.distance_to(goal.position) < 0.002,
+        ) {
+            let first = self.first.unwrap();
+            self.result = Some(WalkCorridorResult {
+                outbound: GroundRouteDiagnostics {
+                    failure: None,
+                    partial: false,
+                    start_node: Some(first.id),
+                    start_distance: Some(first.position.distance_to(self.start)),
+                    destination_nodes: 1,
+                    nearest_destination_distance: Some(self.nearest_target),
+                    reachable_nodes: self.nodes,
+                    closest_reachable_distance: Some(self.nearest_target),
+                    length: self.length,
+                    jumps: 0,
+                    flights: 0,
+                },
+                returning: GroundRouteDiagnostics {
+                    failure: None,
+                    partial: false,
+                    start_node: Some(node.id),
+                    start_distance: Some(0.0),
+                    destination_nodes: self.hatch_nodes,
+                    nearest_destination_distance: Some(self.nearest_hatch),
+                    reachable_nodes: self.nodes,
+                    closest_reachable_distance: Some(self.nearest_hatch),
+                    length: self.length,
+                    jumps: 0,
+                    flights: 0,
+                },
+                endpoint: node,
+                areas: std::mem::take(&mut self.areas),
+                max_rise: self.max_rise,
+            });
+            self.phase = Phase::Done;
+        } else if self.remaining == 0 {
+            self.phase = Phase::Done;
+        } else {
+            self.remaining -= 1;
+            self.phase = Phase::Ray(offset(node.id, self.direction));
+        }
+    }
+    fn inspect(&mut self, node: Option<GroundNode>) {
+        let spec = SurfaceSortieState::spec();
+        if self.first.is_none() {
+            if !self.take_footprint() {
+                self.phase = Phase::Done;
+                return;
+            }
+            if let Some(node) = node.filter(|n| {
+                self.exact_start.is_none_or(|start| {
+                    n.id == start.id && n.position.distance_to(start.position) < 0.002
+                })
+            }) && self.nearest.is_none_or(|old| {
+                node.position.distance_to(self.start) < old.position.distance_to(self.start)
+            }) {
+                self.nearest = Some(node);
+            }
+            self.start_cursor += 1;
+            self.phase = if self.start_cursor == 5 {
+                Phase::Begin
+            } else {
+                Phase::Ray(offset(self.start_id, i32::from(self.start_cursor) - 2))
+            };
+        } else if let Some(node) = node {
+            let previous = self.previous.unwrap();
+            let rise = (node.position - previous.position)
+                .dot((node.position + previous.position).normalized())
+                .abs();
+            let height = spec.jump_speed.powi(2) / (2.0 * self.ground.gravity);
+            if rise >= 0.3 || rise > height * 0.75 {
+                self.phase = Phase::Done;
+            } else {
+                self.max_rise = self.max_rise.max(rise);
+                self.next = Some(node);
+                self.phase = Phase::WalkCapsule(false, 0);
+            }
+        } else {
+            self.phase = Phase::Done;
+        }
+    }
+    fn advance(&mut self) {
+        if !self.take_footprint() {
+            self.phase = Phase::Done;
+            return;
+        }
+        let node = self.next.take().unwrap();
+        self.length += self.previous.unwrap().position.distance_to(node.position);
+        self.visit(node);
+    }
+}
+
+impl PlanningJob for WalkCorridorJob {
+    type Output = Option<WalkCorridorResult>;
+    fn next_work(&self) -> Option<WorkKind> {
+        match self.phase {
+            Phase::Done => None,
+            Phase::Inspect(_) | Phase::Begin | Phase::Advance => Some(WorkKind::Graph),
+            _ => Some(WorkKind::PhysicsQuery),
+        }
+    }
+    fn output(&self) -> Option<&Self::Output> {
+        matches!(self.phase, Phase::Done).then_some(&self.result)
+    }
+    fn step(&mut self) {
+        let spec = SurfaceSortieState::spec();
+        match self.phase {
+            Phase::Ray(id) => {
+                let up = Vec2::Y
+                    .rotate_radians(id as f32 * std::f32::consts::TAU / GROUND_SAMPLES as f32);
+                let m = &self.ground.measurements;
+                let world_up = up.rotate_radians(m.angle);
+                self.phase = match self.ground.ray(
+                    m.position + world_up * (m.radius + 8.0),
+                    -world_up,
+                    m.radius + 8.0,
+                ) {
+                    Some(hit) if hit.normal.dot(world_up) >= spec.min_support_alignment => {
+                        let node = GroundNode {
+                            id,
+                            position: (hit.point - m.position).rotate_radians(-m.angle),
+                            normal: hit.normal.rotate_radians(-m.angle),
+                        };
+                        Phase::Capsule(node, node.position + up * standing_height())
+                    }
+                    _ => Phase::Inspect(None),
+                };
+            }
+            Phase::Capsule(node, center) => {
+                self.phase = if self.ground.clear(center) {
+                    Phase::Hull(node, center)
+                } else {
+                    Phase::Inspect(None)
+                };
+            }
+            Phase::Hull(node, center) => {
+                self.phase = Phase::Inspect((self.hull)(center).then_some(node));
+            }
+            Phase::Inspect(node) => self.inspect(node),
+            Phase::Begin => {
+                let Some(first) = self.nearest.filter(|n| {
+                    n.position.distance_to(self.start) < 3.0
+                        && (self.exact_start.is_some()
+                            || self.hatch_distance(*n) < HATCH_APPROACH_RANGE)
+                }) else {
+                    self.phase = Phase::Done;
+                    return;
+                };
+                self.first = Some(first);
+                // The initial angular bound already includes this displacement.
+                let target_id = ((-self.target.x)
+                    .atan2(self.target.y)
+                    .rem_euclid(std::f32::consts::TAU)
+                    * GROUND_SAMPLES as f32
+                    / std::f32::consts::TAU)
+                    .round() as u16
+                    % GROUND_SAMPLES as u16;
+                let delta = signed_span(first.id, target_id);
+                self.direction = delta.signum();
+                self.remaining = delta.unsigned_abs() as u16 + 2;
+                assert!(self.remaining <= self.max_steps);
+                self.visit(first);
+            }
+            Phase::WalkCapsule(returning, sample) => {
+                let foot = self.foot(returning, sample as f32 / 8.0);
+                let center = foot + foot.normalized() * standing_height();
+                self.phase = if self.ground.clear(center) {
+                    Phase::WalkHull(returning, sample, center)
+                } else {
+                    Phase::Done
+                };
+            }
+            Phase::WalkHull(returning, sample, center) => {
+                self.phase = if !(self.hull)(center) {
+                    Phase::Done
+                } else if sample < 8 {
+                    Phase::WalkCapsule(returning, sample + 1)
+                } else {
+                    Phase::Floor(returning, 1)
+                };
+            }
+            Phase::Floor(returning, sample) => {
+                let foot = self.foot(returning, sample as f32 / 4.0);
+                let up = foot
+                    .normalized()
+                    .rotate_radians(self.ground.measurements.angle);
+                self.phase = if !self
+                    .ground
+                    .ray(self.ground.world(foot) + up * 0.4, -up, 0.75)
+                    .is_some_and(|hit| hit.normal.dot(up) >= spec.min_support_alignment)
+                {
+                    Phase::Done
+                } else if sample < 3 {
+                    Phase::Floor(returning, sample + 1)
+                } else if returning && self.streamed {
+                    // The final support query has certified this edge in both
+                    // directions. Commit its fixed-size result here, just as
+                    // the ordinary ground survey commits an edge after its
+                    // final query. No additional query or node scan occurs.
+                    self.advance();
+                    return;
+                } else if returning {
+                    Phase::Advance
+                } else {
+                    Phase::WalkCapsule(true, 0)
+                };
+            }
+            Phase::Advance => self.advance(),
+            Phase::Done => {}
+        }
+        if self.streamed_nodes
+            && let Phase::Inspect(node) = self.phase
+        {
+            self.inspect(node);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,10 +1,18 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/acquisition_probe.rs"]
 mod acquisition_probe;
+#[path = "support/actual_landing_probe.rs"]
+mod actual_landing_probe;
 #[path = "support/arrival_survey.rs"]
 mod arrival_survey;
+#[path = "support/capture_evidence.rs"]
+mod capture_evidence;
+#[path = "support/capture_execution.rs"]
+mod capture_execution;
 #[path = "support/capture_probe.rs"]
 mod capture_probe;
+#[path = "support/cover_probe.rs"]
+mod cover_probe;
 #[path = "support/destination_behavior.rs"]
 mod destination_behavior;
 #[path = "support/flag_survey.rs"]
@@ -13,6 +21,8 @@ mod flag_survey;
 mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
+#[path = "support/impact_probe.rs"]
+mod impact_probe;
 #[path = "support/landing_cadence_probe.rs"]
 mod landing_cadence_probe;
 #[path = "support/live_planning.rs"]
@@ -29,6 +39,10 @@ mod native_capture_probe;
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
 mod planning_probe;
+#[path = "support/projectile_diagnostics.rs"]
+mod projectile_diagnostics;
+#[path = "support/projectile_response.rs"]
+mod projectile_response;
 #[path = "support/successor_continuation.rs"]
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
@@ -188,6 +202,13 @@ fn main() {
     let mut behavior_trace = destination_behavior::BehaviorTrace::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut native_capture_probe = native_capture_probe::NativeCaptureProbe::from_args();
+    let mut cover_routes_probe = cover_probe::CoverProbe::from_args(&out);
+    let mut actual_landing_probe = actual_landing_probe::ActualLandingProbe::from_args();
+    assert!(actual_landing_probe.is_none() || live_planning.is_some());
+    let mut capture_evidence = capture_evidence::CaptureEvidence::from_args(&out);
+    let mut projectile_trace = projectile_diagnostics::ProjectileTrace::from_args(&out);
+    let mut projectile_response = projectile_response::ResponseProbe::from_args(&out, seat);
+    let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -262,12 +283,94 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    let powered_capture_seats = match arg("--powered-capture-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--powered-capture-seats must be none, 0, 1 or both"),
+    };
+    let active_flight_checks = match arg("--active-flight-checks", "false").as_str() {
+        "false" => false,
+        "true" => true,
+        _ => panic!("--active-flight-checks must be true or false"),
+    };
+    let pursuit_health_seats = match arg("--pursuit-health-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--pursuit-health-seats must be none, 0, 1 or both"),
+    };
     let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
         "1" => [false, true],
         "both" => [true, true],
         _ => panic!("--bounded-acquisition-seats must be none, 0, 1 or both"),
+    };
+    let cover_retry_seats = match arg("--cover-retry-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--cover-retry-seats must be none, 0, 1 or both"),
+    };
+    let cover_response_seats = match arg("--cover-response-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--cover-response-seats must be none, 0, 1 or both"),
+    };
+    let initial_cover_seats = match arg("--initial-cover-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--initial-cover-seats must be none, 0, 1 or both"),
+    };
+    let actual_recovery_seats = match arg("--actual-route-recovery-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--actual-route-recovery-seats must be none, 0, 1 or both"),
+    };
+    let capture_escape_seats = match arg("--capture-escape-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--capture-escape-seats must be none, 0, 1 or both"),
+    };
+    let escape_travel_seats = match arg("--escape-travel-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--escape-travel-seats must be none, 0, 1 or both"),
+    };
+    let transfer_approach_seats = match arg("--transfer-approach-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--transfer-approach-seats must be none, 0, 1 or both"),
+    };
+    let transfer_speed_seats = match arg("--transfer-speed-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--transfer-speed-seats must be none, 0, 1 or both"),
+    };
+    let destination_retry_seats = match arg("--destination-retry-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--destination-retry-seats must be none, 0, 1 or both"),
     };
     let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
         "none" => [false, false],
@@ -342,7 +445,19 @@ fn main() {
             },
             breaks,
         )
+        .with_powered_capture(powered_capture_seats[i])
+        .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
+        .with_pursuit_health(pursuit_health_seats[i])
         .with_bounded_acquisition(acquisition_seats[i])
+        .with_cover_retry_cooldown(cover_retry_seats[i])
+        .with_cover_response(cover_response_seats[i])
+        .with_initial_cover(initial_cover_seats[i])
+        .with_actual_route_recovery(actual_recovery_seats[i])
+        .with_capture_escape(capture_escape_seats[i])
+        .with_escape_travel(escape_travel_seats[i])
+        .with_transfer_approach(transfer_approach_seats[i])
+        .with_transfer_speed(transfer_speed_seats[i])
+        .with_destination_retry(destination_retry_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
@@ -430,8 +545,7 @@ fn main() {
                 let clock = Instant::now();
                 let mut observe = || {
                     if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i)
-                            && !selected_policies[i].objective_planning().is_legacy()
+                        live.enabled_for(i) && !request.objective_planning.is_legacy()
                     }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
@@ -647,7 +761,16 @@ fn main() {
                         pending_claim_footing[i] = None;
                     }
                 }
+                if let Some(probe) = &mut impact_probe {
+                    probe.apply_and_observe(i, &state, &o, pilots[i].telemetry(), &mut intent);
+                }
+                if let Some(probe) = &mut projectile_response {
+                    probe.observe(i, &state, &o, pilots[i].telemetry(), &mut intent);
+                }
                 actions.extend(intent.encode(owner));
+                if let Some(evidence) = &mut capture_evidence {
+                    evidence.observe(i, &o, pilots[i].telemetry(), intent);
+                }
                 if let Some(trace) = &mut behavior_trace {
                     trace.observe(&o, pilots[i].telemetry(), &intent);
                 }
@@ -690,6 +813,27 @@ fn main() {
                     }
                     serde_json::to_writer(&mut *trace, &record).unwrap();
                     writeln!(trace).unwrap();
+                }
+                if let Some(probe) = &mut cover_routes_probe {
+                    probe.observe(
+                        &state,
+                        i,
+                        tick,
+                        &pilots[i],
+                        &o,
+                        capture_execution::Settings {
+                            seed,
+                            breaks,
+                            cadence,
+                            bounded_acquisition: acquisition_seats[i],
+                            cover_retry: cover_retry_seats[i],
+                            cover_response: cover_response_seats[i],
+                            initial_cover: initial_cover_seats[i],
+                        },
+                    );
+                }
+                if let Some(probe) = &mut actual_landing_probe {
+                    probe.observe(i, &o, live_planning.as_ref().unwrap());
                 }
                 last_posture[i] = posture_key;
                 if label != last[i] {
@@ -811,6 +955,9 @@ fn main() {
                 planning_ms += comparison.survey_arrival(&state, remaining, &busy);
             }
         }
+        if let Some(trace) = &mut projectile_trace {
+            trace.observe(&state);
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -907,6 +1054,9 @@ fn main() {
     if let Some(trace) = &mut trace {
         trace.flush().unwrap();
     }
+    if let Some(probe) = impact_probe {
+        probe.finish(&state);
+    }
     if let Some(file) = &mut timing_csv {
         file.flush().unwrap();
     }
@@ -914,6 +1064,18 @@ fn main() {
     sensor_profiles.flush().unwrap();
     if let Some(probe) = planning_probe {
         probe.finish(&out);
+    }
+    if let Some(probe) = cover_routes_probe {
+        probe.finish(&out);
+    }
+    if let Some(probe) = actual_landing_probe {
+        probe.finish(&out);
+    }
+    if let Some(trace) = projectile_trace {
+        trace.finish();
+    }
+    if let Some(probe) = projectile_response {
+        probe.finish(&state);
     }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
@@ -949,7 +1111,107 @@ fn main() {
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
-    report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if let Some(evidence) = capture_evidence {
+        evidence.finish();
+    }
+    report["policy_configuration"] = json!(pilots.each_ref().map(|p| p.descriptor()));
+    if powered_capture_seats.contains(&true) {
+        report["powered_capture"] = json!({
+            "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,
+            "enabled_seats": powered_capture_seats,
+            "scope": "Opt-in v13 native powered landing routes and on-foot controller. The configured live planner allowance and all forecast validity gates remain in force; other sensors retain their synchronous work.",
+        });
+    }
+    if active_flight_checks {
+        report["active_flight_checks"] = json!({
+            "profile": "vehicle_flight_continuation_v1",
+            "enabled_seats": powered_capture_seats,
+            "scope": "Current-state continuation forecasts for an already launched flight. Original launch certificate and 12-second maneuver deadline are retained; current clearance, arrival and remaining-fuel checks are required at each completed survey. Synchronous prediction work remains outside live planner quotas.",
+        });
+    }
+    if transfer_speed_seats.contains(&true) {
+        report["transfer_speed"] = json!({
+            "profile": spacewars_ai::mission_pilot::TRANSFER_SPEED_PROFILE,
+            "enabled_seats": transfer_speed_seats,
+        });
+    }
+    if transfer_approach_seats.contains(&true) {
+        report["transfer_approach"] = json!({
+            "profile": spacewars_ai::mission_pilot::TRANSFER_APPROACH_PROFILE,
+            "enabled_seats": transfer_approach_seats,
+        });
+    }
+    if escape_travel_seats.contains(&true) {
+        report["escape_travel"] = json!({
+            "profile": spacewars_ai::mission_pilot::ESCAPE_TRAVEL_PROFILE,
+            "enabled_seats": escape_travel_seats,
+        });
+    }
+    if capture_escape_seats.contains(&true) {
+        report["capture_escape"] = json!({
+            "profile": spacewars_ai::mission_pilot::CAPTURE_ESCAPE_PROFILE,
+            "enabled_seats": capture_escape_seats,
+        });
+    }
+    if actual_recovery_seats.contains(&true) {
+        report["actual_route_recovery"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACTUAL_ROUTE_RECOVERY_PROFILE,
+            "enabled_seats": actual_recovery_seats,
+        });
+    }
+    if initial_cover_seats.contains(&true) {
+        report["initial_cover"] = json!({
+            "profile": spacewars_ai::tactical_sortie::INITIAL_COVER_PROFILE,
+            "enabled_seats": initial_cover_seats,
+        });
+    }
+    if pursuit_health_seats.contains(&true) {
+        report["pursuit_health"] = json!({
+            "profile": spacewars_ai::mission_pilot::PURSUIT_HEALTH_PROFILE,
+            "enabled_seats": pursuit_health_seats,
+            "scope": "Opt-in remaining-hull comparison for new ownership-based pursuits only. Recent-fire responses, vulnerable targets, ongoing pursuits and committed captures retain their priority. Uses existing observations without new physics queries.",
+        });
+    }
+    for (seat, enabled) in cover_retry_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["cover_retry_model"] =
+                json!(spacewars_ai::tactical_sortie::COVER_RETRY_PROFILE);
+        }
+    }
+    if cover_retry_seats.contains(&true) {
+        report["cover_retry_cooldown"] = json!({
+            "profile": spacewars_ai::tactical_sortie::COVER_RETRY_PROFILE,
+            "enabled_seats": cover_retry_seats,
+            "cooldown_ticks": spacewars_ai::tactical_sortie::COVER_RETRY_TICKS,
+        });
+    }
+    for (seat, enabled) in cover_response_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["cover_response_model"] =
+                json!(spacewars_ai::tactical_sortie::COVER_RESPONSE_PROFILE);
+        }
+    }
+    if cover_response_seats.contains(&true) {
+        report["cover_response"] = json!({
+            "profile": spacewars_ai::tactical_sortie::COVER_RESPONSE_PROFILE,
+            "enabled_seats": cover_response_seats,
+            "deadline_ticks": spacewars_ai::tactical_sortie::COVER_SEARCH_TICKS,
+            "max_probes": spacewars_ai::tactical_sortie::MAX_COVER_PROBES,
+        });
+    }
+    for (seat, enabled) in destination_retry_seats.into_iter().enumerate() {
+        if enabled {
+            report["policy_configuration"][seat]["destination_retry_model"] =
+                json!(spacewars_ai::mission_pilot::DESTINATION_RETRY_PROFILE);
+        }
+    }
+    if destination_retry_seats.contains(&true) {
+        report["destination_retry"] = json!({
+            "profile": spacewars_ai::mission_pilot::DESTINATION_RETRY_PROFILE,
+            "enabled_seats": destination_retry_seats,
+            "scope": "Prefer destinations without unchanged capture failure; if all eligible targets failed, retry incomplete evidence before observed constraints, oldest first. Native cooldowns and attempt limits remain unchanged.",
+        });
+    }
     if let Some(progress) = progress {
         report["mission_progress"] = json!({"players":progress,"scope":mission_progress::SCOPE});
     }
@@ -961,6 +1223,13 @@ fn main() {
             {
                 report["policy_configuration"][seat]["flag_cost_model"] =
                     json!("capture_value_published_flags_v1");
+            }
+            if evaluator
+                .evaluator
+                .surveys_current_neutral(PlayerId::from_index(seat).unwrap())
+            {
+                report["policy_configuration"][seat]["current_neutral_model"] =
+                    json!(spacewars_ai::mission_evaluation::CURRENT_NEUTRAL_MODEL);
             }
         }
         report["mission_evaluation"] = evaluator.report();

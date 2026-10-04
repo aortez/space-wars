@@ -13,11 +13,32 @@ use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
         PilotLocation, SurfaceSortieAction,
+        landing_objective::ObjectivePlanning,
         mission::{LandingSurveyStamp, MissionObservationV1, MissionSensorRequest},
         pilot::{LANDING_SITE_COUNT, LandingSiteId, LandingSiteQuery, PilotPlanetObservation},
     },
 };
 use serde::Serialize;
+
+#[path = "mission_capture_escape.rs"]
+mod capture_escape;
+#[path = "mission_escape_travel.rs"]
+mod escape_travel;
+pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
+#[path = "mission_transfer_approach.rs"]
+mod transfer_approach;
+pub use transfer_approach::{TRANSFER_APPROACH_PROFILE, TransferApproach, TransferApproachSample};
+#[path = "mission_transfer_speed.rs"]
+mod transfer_speed;
+pub use transfer_speed::{
+    TRANSFER_SPEED_PROFILE, TransferSpeed, TransferSpeedLimit, TransferSpeedSample,
+};
+#[path = "mission_pursuit_health.rs"]
+mod pursuit_health;
+pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
+pub use pursuit_health::{
+    PURSUIT_HEALTH_PROFILE, PursuitHealthCheck, PursuitHealthDecision, PursuitHealthTelemetry,
+};
 
 #[path = "mission_destination.rs"]
 mod destination;
@@ -25,6 +46,14 @@ pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, Dest
 #[path = "mission_landing_handoff.rs"]
 mod landing_handoff;
 pub use landing_handoff::LandingHandoff;
+
+#[path = "mission_destination_retry.rs"]
+mod destination_retry;
+pub use destination_retry::{
+    DESTINATION_RETRY_PROFILE, DestinationFailure, DestinationFailureContext,
+    DestinationFailureKind, DestinationRetryAdmission, DestinationRetryDecision,
+    DestinationRetryTelemetry, DestinationSelectionPath,
+};
 
 #[path = "mission_transfer_forecast.rs"]
 mod transfer_forecast;
@@ -120,6 +149,8 @@ pub struct MissionEvent {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionTelemetry {
     pub policy: &'static str,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub powered_capture: bool,
     pub goal: MissionGoal,
     pub goal_since: u64,
     pub target: Option<usize>,
@@ -136,9 +167,21 @@ pub struct MissionTelemetry {
     pub combat: Option<CombatPilotTelemetry>,
     pub pursuit: Option<MissionPursuit>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pursuit_health: Option<PursuitHealthTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub disengagement: Option<MissionDisengagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_planning: Option<DestinationPlanningTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_retry: Option<DestinationRetryTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_escape: Option<CaptureEscape>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escape_travel: Option<EscapeTravel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_approach: Option<TransferApproach>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_speed: Option<TransferSpeed>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -163,6 +206,7 @@ pub struct MissionAvoidance {
 
 #[derive(Debug, Clone)]
 pub struct MaterialMissionPilot {
+    active_flight_checks: bool,
     policy: crate::mission_policy::MissionPolicy,
     context: BrainReset,
     breaks: CombatBreakSettings,
@@ -186,6 +230,10 @@ pub struct MaterialMissionPilot {
     next_pursuit_tick: u64,
     last_survey: Option<LandingSurveyStamp>,
     pub(crate) bounded_acquisition: bool,
+    pub(crate) cover_retry_cooldown: bool,
+    pub(crate) cover_response: bool,
+    pub(crate) initial_cover: bool,
+    pub(crate) actual_route_recovery: bool,
     destination_switched: bool,
     landing_reference: Option<crate::mission_evaluation::CostedLandingReference>,
 }
@@ -204,11 +252,13 @@ impl MaterialMissionPilot {
         policy: crate::mission_policy::MissionPolicy,
     ) -> Self {
         Self {
+            active_flight_checks: false,
             policy,
             context,
             breaks,
             telemetry: MissionTelemetry {
                 policy: policy.id(),
+                powered_capture: false,
                 goal: MissionGoal::Select,
                 goal_since: 0,
                 target: None,
@@ -224,10 +274,16 @@ impl MaterialMissionPilot {
                 opponent: None,
                 combat: None,
                 pursuit: None,
+                pursuit_health: None,
                 disengagement: None,
                 destination_planning: policy
                     .selects_destination()
                     .then(DestinationPlanningTelemetry::default),
+                destination_retry: None,
+                capture_escape: None,
+                escape_travel: None,
+                transfer_approach: None,
+                transfer_speed: None,
             },
             capture: None,
             recovery: None,
@@ -248,12 +304,28 @@ impl MaterialMissionPilot {
             next_pursuit_tick: 0,
             last_survey: None,
             bounded_acquisition: false,
+            cover_retry_cooldown: false,
+            cover_response: false,
+            initial_cover: false,
+            actual_route_recovery: false,
             destination_switched: false,
             landing_reference: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let pursuit_health = self.telemetry.pursuit_health.is_some();
+        let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
+        let cover_retry_cooldown = self.cover_retry_cooldown;
+        let cover_response = self.cover_response;
+        let initial_cover = self.initial_cover;
+        let actual_route_recovery = self.actual_route_recovery;
+        let capture_escape = self.telemetry.capture_escape.is_some();
+        let escape_travel = self.telemetry.escape_travel.is_some();
+        let transfer_approach = self.telemetry.transfer_approach.is_some();
+        let transfer_speed = self.telemetry.transfer_speed.is_some();
+        let powered_capture = self.telemetry.powered_capture;
+        let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
             .telemetry
@@ -261,7 +333,19 @@ impl MaterialMissionPilot {
             .as_ref()
             .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
+        self.configure_pursuit_health(pursuit_health);
         self.bounded_acquisition = bounded_acquisition;
+        self.cover_retry_cooldown = cover_retry_cooldown;
+        self.cover_response = cover_response;
+        self.configure_initial_cover(initial_cover);
+        self.configure_actual_route_recovery(actual_route_recovery);
+        self.configure_capture_escape(capture_escape);
+        self.configure_escape_travel(escape_travel);
+        self.configure_transfer_approach(transfer_approach);
+        self.configure_transfer_speed(transfer_speed);
+        self.configure_powered_capture(powered_capture);
+        self.configure_active_flight_checks(active_flight_checks);
+        self.enable_destination_retry(destination_retry);
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
             self.configure_handoff_probe(probe);
@@ -274,6 +358,34 @@ impl MaterialMissionPilot {
     }
     pub fn policy(&self) -> crate::mission_policy::MissionPolicy {
         self.policy
+    }
+    pub(crate) fn configure_powered_capture(&mut self, enabled: bool) {
+        assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(
+            self.previous_tick.is_none() && self.capture.is_none(),
+            "configure powered capture before the first intent"
+        );
+        self.telemetry.powered_capture = enabled;
+    }
+    pub(crate) fn configure_active_flight_checks(&mut self, enabled: bool) {
+        assert!(!enabled || self.telemetry.powered_capture);
+        assert!(self.previous_tick.is_none() && self.capture.is_none());
+        self.active_flight_checks = enabled;
+    }
+    /// The instance owns both its sensor semantics and its local controller.
+    pub fn objective_planning(&self) -> ObjectivePlanning {
+        if self.telemetry.powered_capture {
+            ObjectivePlanning::JetpackRoundTrip
+        } else {
+            self.policy.objective_planning()
+        }
+    }
+    pub fn descriptor(&self) -> crate::mission_policy::PolicyDescriptor {
+        let mut descriptor = self.policy.descriptor();
+        if self.telemetry.powered_capture {
+            descriptor.sensor_profile = "mission_cadenced_jetpack_routes_capture_value_v1";
+        }
+        descriptor
     }
     pub fn label(&self) -> String {
         let task = if self.telemetry.goal == MissionGoal::Capture {
@@ -311,22 +423,52 @@ impl MaterialMissionPilot {
 
     pub fn sensor_request(&self) -> MissionSensorRequest {
         MissionSensorRequest {
+            vehicle_flight: self
+                .capture
+                .as_ref()
+                .and_then(|c| c.vehicle_flight_request()),
             destination_cover: self
                 .disengaging()
                 .then(|| self.telemetry.disengagement.as_ref().unwrap().cover_request)
                 .flatten(),
-            objective_planning: self.policy.objective_planning(),
+            objective_planning: self.objective_planning(),
             site: self.site_request(),
             last_survey: self.last_survey,
         }
+    }
+    pub(crate) fn configure_initial_cover(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(
+            !enabled
+                || (self.policy() == crate::mission_policy::MissionPolicy::ValuePlanner
+                    && self.cover_response)
+        );
+        self.initial_cover = enabled;
+    }
+    pub(crate) fn configure_actual_route_recovery(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(!enabled || self.policy() == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(enabled || self.telemetry.capture_escape.is_none());
+        self.actual_route_recovery = enabled;
     }
     fn new_capture_task(&self, o: &MissionObservationV1) -> TacticalCapturePilot {
         let mut capture = TacticalCapturePilot::with_planning(
             self.context,
             self.breaks,
-            self.policy.objective_planning(),
+            self.objective_planning(),
         )
-        .with_bounded_acquisition(self.bounded_acquisition);
+        .with_bounded_acquisition(self.bounded_acquisition)
+        .with_active_flight_checks(self.active_flight_checks)
+        .with_cover_retry_cooldown(self.cover_retry_cooldown)
+        .with_cover_response(self.cover_response)
+        .with_initial_cover(self.initial_cover)
+        .with_actual_route_recovery(self.actual_route_recovery);
         if let Some(reference) = self.landing_reference {
             capture = capture.requiring_site(reference.site);
         }
@@ -391,6 +533,7 @@ impl MaterialMissionPilot {
         });
     }
     fn reconsider(&mut self, tick: u64, reason: &'static str, defer: bool) {
+        self.end_escape_travel(tick, reason);
         self.invalidate_landing_handoff(tick, reason);
         self.event(tick, "replan", Some(reason));
         if defer && let Some(planet) = self.telemetry.target {
@@ -524,6 +667,7 @@ impl MaterialMissionPilot {
             }
             return self.previous_intent;
         }
+        self.refresh_destination_failures(o);
         if self.last_frame.is_some_and(|index| index != p.planet.index) {
             self.telemetry.frame_changes += 1;
         }
@@ -536,13 +680,14 @@ impl MaterialMissionPilot {
             });
         }
         self.prepare_landing_handoff(o);
-        let result = self.choose_with_continuation(
+        let mut result = self.choose_with_continuation(
             o,
             continuation.as_deref_mut(),
             selection,
             probe,
             defer_new_pursuit,
         );
+        self.finish_escape_travel_frame(o, &mut result);
         self.observe_landing_handoff(o);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
@@ -570,6 +715,8 @@ impl MaterialMissionPilot {
         self.telemetry.reason = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
+        self.update_capture_escape(o);
+        self.observe_escape_travel(o);
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
         let replacing = self.recovery.as_ref().is_some_and(|task| {
             task.telemetry().goal == crate::recovery_task::RecoveryGoal::Scuttle
@@ -657,6 +804,10 @@ impl MaterialMissionPilot {
         if !p.controls_armed {
             return CombatIntent::default();
         }
+        if let Some(intent) = self.capture_escape_intent(o) {
+            return intent;
+        }
+        self.prepare_escape_travel(o);
         if self.pursuit_opportunity(o, defer_new_pursuit) {
             return self.hunt(o);
         }
@@ -700,21 +851,50 @@ impl MaterialMissionPilot {
                             .any(|(index, _)| *index == planet.index)
                 })
                 .collect();
-            let other = candidates
-                .iter()
-                .any(|planet| planet.index != p.planet.index);
-            let selected = candidates
-                .into_iter()
-                .filter(|planet| !other || planet.index != p.planet.index)
-                .min_by(|a, b| {
-                    a.motion
-                        .position
-                        .distance_to(p.ship.position)
-                        .total_cmp(&b.motion.position.distance_to(p.ship.position))
-                });
+            let nearest = |candidates: &[&PilotPlanetObservation]| {
+                let other = candidates
+                    .iter()
+                    .any(|planet| planet.index != p.planet.index);
+                candidates
+                    .iter()
+                    .copied()
+                    .filter(|planet| !other || planet.index != p.planet.index)
+                    .min_by(|a, b| {
+                        a.motion
+                            .position
+                            .distance_to(p.ship.position)
+                            .total_cmp(&b.motion.position.distance_to(p.ship.position))
+                    })
+                    .map(|planet| planet.index)
+            };
+            let original = nearest(&candidates);
+            let selected = if self.telemetry.destination_retry.is_some() {
+                let admitted: Vec<_> = candidates
+                    .into_iter()
+                    .filter(|planet| self.destination_retry_admitted(o, planet.index))
+                    .collect();
+                nearest(&admitted)
+            } else {
+                original
+            };
+            if original != selected
+                && let Some(rejected) = original
+            {
+                self.record_destination_retry_rejection(
+                    o,
+                    DestinationSelectionPath::Initial,
+                    rejected,
+                    selected,
+                );
+            }
             if let Some(planet) = selected {
+                self.record_destination_retry_admission(
+                    o,
+                    DestinationSelectionPath::Initial,
+                    planet,
+                );
                 self.destination_switched = false;
-                self.telemetry.target = Some(planet.index);
+                self.telemetry.target = Some(planet);
                 self.selected_tick = p.tick;
                 self.progress_tick = p.tick;
                 self.best_distance = f32::INFINITY;
@@ -754,7 +934,18 @@ impl MaterialMissionPilot {
                 return CombatIntent::default();
             }
             if let Some(reason) = t.failure {
+                let abort = t
+                    .actual_route_recovery
+                    .as_ref()
+                    .and_then(|r| r.abort)
+                    .filter(|a| {
+                        t.failed_tick == Some(a.tick)
+                            && reason == crate::tactical_sortie::ACTUAL_ROUTE_ABORT_REASON
+                    });
                 self.reconsider(p.tick, reason, true);
+                if let Some(abort) = abort {
+                    self.start_capture_escape(o, abort);
+                }
                 return CombatIntent::default();
             }
             if (p.planet.index != target.index || self.departure_obstacle.is_some())
@@ -816,11 +1007,17 @@ impl MaterialMissionPilot {
                 return CombatIntent::default();
             }
             let intent = capture.intent(&o.local);
+            if self.telemetry.destination_retry.is_some()
+                && capture.telemetry().failed_tick == Some(p.tick)
+            {
+                let failure = capture.telemetry().clone();
+                self.remember_capture_failure(o, &failure);
+            }
             self.goal(MissionGoal::Capture, p.tick);
             return intent;
         }
-        if p.tick.saturating_sub(self.selected_tick) > 60 * 60
-            || p.tick.saturating_sub(self.progress_tick) > 20 * 60
+        if p.tick.saturating_sub(self.selected_tick) > escape_travel::TRANSFER_TICKS
+            || p.tick.saturating_sub(self.progress_tick) > escape_travel::TRANSFER_PROGRESS_TICKS
         {
             self.reconsider(p.tick, "transfer exhausted its progress budget", true);
             return CombatIntent::default();
@@ -841,24 +1038,28 @@ impl MaterialMissionPilot {
             // Neutral handoff; the next observation surveys local landing sites.
             return CombatIntent::default();
         }
+        let entry = self.transfer_entry(o, target);
         let up = (p.ship.position - p.planet.motion.position).normalized();
         let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
+        let mut speed_brake = false;
         let desired = if altitude < 70.0 + falling * falling / 50.0 {
             self.goal(MissionGoal::Launch, p.tick);
             self.progress_tick = p.tick;
             p.planet.motion.velocity + up * 18.0
         } else {
             self.goal(MissionGoal::Transfer, p.tick);
-            let entry = target.motion.position
-                + (p.ship.position - target.motion.position).normalized() * (target.radius + 85.0);
+            self.record_transfer_approach_guidance(p.tick);
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
-            self.detour_velocity(o, target.motion.velocity)
-                + delta.normalized() * (delta.length() * 0.7).min(55.0)
+            let ordinary = self.detour_velocity(o, target.motion.velocity)
+                + delta.normalized() * (delta.length() * 0.7).min(55.0);
+            let (velocity, brake) = self.transfer_velocity(o, ordinary);
+            speed_brake = brake;
+            velocity
         };
-        self.guide(o, desired)
+        self.guide_with_brake(o, desired, speed_brake)
     }
     fn end_pursuit(&mut self, tick: u64, reason: &'static str) {
         if self.telemetry.pursuit.take().is_some() {
@@ -927,18 +1128,24 @@ impl MaterialMissionPilot {
             .weapons
             .last_hit_taken_tick
             .is_some_and(|tick| p.tick.saturating_sub(tick) < 3 * 60);
-        let reason = if vulnerable && distance < 400.0 {
-            "nearby vulnerable opponent"
+        let (reason, discretionary) = if vulnerable && distance < 400.0 {
+            ("nearby vulnerable opponent", false)
         } else if under_fire && distance < 300.0 {
-            "responding to incoming fire"
+            ("responding to incoming fire", false)
         } else if established && distance < 300.0 {
-            "nearby opponent after securing ground"
+            ("nearby opponent after securing ground", true)
         } else {
             return false;
         };
         // Offline calibration changes only this new-mission decision. All
         // ordinary eligibility, pursuit maintenance and safety ran above.
         if defer_new {
+            return false;
+        }
+        if self.defer_escape_travel_pursuit(o, reason) {
+            return false;
+        }
+        if discretionary && !self.admit_discretionary_pursuit(o) {
             return false;
         }
         self.reconsider(p.tick, "pausing travel for nearby opponent", false);
@@ -1224,11 +1431,20 @@ impl MaterialMissionPilot {
         (waypoint, None)
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
+        self.guide_with_brake(o, desired_world, false)
+    }
+    fn guide_with_brake(
+        &mut self,
+        o: &MissionObservationV1,
+        desired_world: Vec2,
+        force_brake: bool,
+    ) -> CombatIntent {
         let (desired_world, boundary_brake) = self.boundary_guidance(o, desired_world);
         let f = &o.local.combat.recovery.flight;
         let p = &f.pilot;
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-        let brake = boundary_brake
+        let brake = force_brake
+            || boundary_brake
             || desired_world.length() < 10.0
             || p.ship.velocity.length() > desired_world.length() + 4.0;
         let acceleration = (desired_world - p.ship.velocity) * 2.0
@@ -1283,6 +1499,214 @@ mod acquisition_tests {
     use engine_common::Scenario;
     use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
     use std::time::Duration;
+
+    #[test]
+    fn active_flight_checks_are_opt_in_and_survive_clone_and_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let baseline = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+            .with_powered_capture(true);
+        assert!(!baseline.active_flight_checks);
+        let mut bot = baseline.with_active_flight_checks(true);
+        for _ in 0..2 {
+            assert!(bot.active_flight_checks && bot.clone().active_flight_checks);
+            assert!(bot.sensor_request().vehicle_flight.is_none());
+            bot.reset(context);
+        }
+    }
+
+    #[test]
+    fn powered_capture_binds_sensor_and_controller_through_clone_and_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_powered_capture(enabled);
+            for _ in 0..2 {
+                let planning = if enabled {
+                    ObjectivePlanning::JetpackRoundTrip
+                } else {
+                    ObjectivePlanning::JointRoundTrip
+                };
+                assert_eq!(bot.sensor_request().objective_planning, planning);
+                let o = state.mission_observation_with_cadence(
+                    0,
+                    bot.sensor_request(),
+                    Default::default(),
+                );
+                let capture = bot.new_capture_task(&o);
+                assert_eq!(
+                    capture.telemetry().policy,
+                    if enabled {
+                        "tactical_sortie_v12"
+                    } else {
+                        "tactical_sortie_v11"
+                    }
+                );
+                let mut copy = bot.clone();
+                assert_eq!(copy.intent(&o), bot.intent(&o));
+                assert_eq!(copy.telemetry(), bot.telemetry());
+                assert_eq!(bot.telemetry().powered_capture, enabled);
+                assert_eq!(
+                    serde_json::to_value(bot.telemetry())
+                        .unwrap()
+                        .get("powered_capture")
+                        .is_some(),
+                    enabled
+                );
+                assert_eq!(bot.descriptor().sensor_profile.contains("jetpack"), enabled);
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "configure powered capture before the first intent")]
+    fn powered_capture_cannot_change_an_active_controller() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let state = SurfaceSortieScenario::init_material_travel(42, false);
+        let mut bot = MissionBot::new(
+            MissionPolicy::ValuePlanner,
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            Default::default(),
+        );
+        bot.intent(&state.mission_observation(0, None));
+        let _ = bot.with_powered_capture(true);
+    }
+
+    #[test]
+    fn cover_retry_option_reaches_new_capture_tasks_and_survives_mission_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_cover_retry_cooldown(enabled);
+            for _ in 0..2 {
+                let capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().cover_retry_cooldown.is_some(), enabled);
+                if enabled {
+                    let memory = capture.telemetry().cover_retry_cooldown.as_ref().unwrap();
+                    assert!(memory.rejected.is_empty());
+                    assert_eq!(memory.blocked_selections, 0);
+                }
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    fn cover_response_option_reaches_new_capture_tasks_and_survives_mission_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_cover_response(enabled);
+            for _ in 0..2 {
+                let capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().cover_response.is_some(), enabled);
+                if enabled {
+                    let memory = capture.telemetry().cover_response.as_ref().unwrap();
+                    assert!(memory.search.is_none());
+                    assert_eq!(memory.failures, 0);
+                }
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    fn initial_cover_option_reaches_capture_tasks_and_resets_without_progress() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_cover_response(true)
+                .with_initial_cover(enabled);
+            for _ in 0..2 {
+                let mut capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().initial_cover.is_some(), enabled);
+                capture.intent(&o.local);
+                capture.reset(context);
+                assert_eq!(
+                    capture.telemetry().initial_cover,
+                    enabled.then(crate::tactical_sortie::InitialCover::default)
+                );
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    fn actual_route_recovery_reaches_capture_tasks_and_resets_without_progress() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let context = BrainReset {
+            actor: o.local.combat.recovery.flight.pilot.owner,
+            episode_seed: 42,
+        };
+        for enabled in [false, true] {
+            let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+                .with_actual_route_recovery(enabled);
+            for _ in 0..2 {
+                let mut capture = bot.new_capture_task(&o);
+                assert_eq!(capture.telemetry().actual_route_recovery.is_some(), enabled);
+                capture.intent(&o.local);
+                capture.reset(context);
+                assert_eq!(
+                    capture.telemetry().actual_route_recovery,
+                    enabled.then(crate::tactical_sortie::ActualRouteRecovery::default)
+                );
+                bot = bot.clone();
+                bot.reset(context);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn initial_cover_requires_an_enabled_cover_response() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        MissionBot::new(
+            MissionPolicy::ValuePlanner,
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            Default::default(),
+        )
+        .with_initial_cover(true);
+    }
 
     #[test]
     fn acquisition_failure_defers_the_planet_and_solar_escape_keeps_priority() {

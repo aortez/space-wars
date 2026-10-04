@@ -1,0 +1,1715 @@
+{
+  "schema": 1,
+  "complete": true,
+  "source_commit": "ab7262452f16bc1079437b18568d4bce7e872127",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/projectile-diagnostics/surface_mission_soak-3a31d0e",
+    "sha256": "6d8d406b06813c78b68650fedebd437c2b4788fc41006b524c8c3a0bf780b8d8"
+  },
+  "sources": {
+    "target/projectile-diagnostics/v1/summary.json": "70ba8a21f883aaeedb935c9e0e06b18a7e46227ca92175f237a2dd2fd76a50dc",
+    "docs/data/transfer-threat-v1.json": "5f4a80a74e65d7f5d7906445c89d5695ced629179eeefa7e328b3f2a5ec5ff08"
+  },
+  "analyzer_sha256": "ae4a75701297de3603656ceae4c96ce30b5d04f6c3b721db4dcdba32d6c378df",
+  "runner_sha256": "309ec61ea392fb06fb43e4498f9c974b74001e05dfac7d44d19fd0b0611721bb",
+  "archive": {
+    "path": "docs/data/projectile-diagnostics-v1.json.gz",
+    "sha256": "4e2be9e59a25c3924450a4f8f30c35f24397abce217b83cd4c6ac0d1a91d64c1"
+  },
+  "raw_files": {
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/capture-evidence.jsonl": "ffeaff9dc309e7f6048ff0fd5c1c5b6176d50153ca775d6ec6679a1f75c411b9",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/destination-cover.jsonl": "201dcf00ee1e4704657bb45aa7b1802999b6e5bd7360304b1e4be6a14fb84f3c",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/flag-survey-work.jsonl": "aaca0a219226f57186c6567f5e75c97279333f3e1f4e9784a270c8e850a3410c",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/flag-survey.jsonl": "3c5f55cd523d4550f9d18530eb846046235466657cc673948e6545e04eb7d5af",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/flight-continuation-witnesses.json": "2dd9c0020289b18585858b75e4cbecbefccabc1d3418e6a410e5cbb4afd75783",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/live-planning.csv": "5898fb66807e0623ddd146d9a2ebe7a1b6dcaff57cf7b9e1acd4246e61d5072c",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/mission-evaluation-work.jsonl": "31fa09aecd0a5e48b92e37089216c1629537c5e59ab5119ba597f538650c988d",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/mission-evaluations.jsonl": "0afb6c488c24a4ff47e18dcd48913b7b81f74c6c35e6cfbadf538fc0ac26bec6",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/powered-mission-witnesses.json": "1526cbe5897a84b70fb44c236b4408637261894c3b31bb69b06bf74a6b5a07be",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/powered-route-witnesses.json": "a9bb37a770f8860d9696253268453813de5635afcf6e16bab774844192a7e831",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/projectiles.jsonl": "72a6e2d9b6c9fd39761723c1fb71f958e74617bc497138e752fe07581c1709ee",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/report.json": "12965091f1b788d25784f4a0ad81c4316c2e64b692ace79289063cc133c5a4b0",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/sensors.jsonl": "2c62876cd633a6e1a0108917b9e9c892789e3a9f8e083e79078e23cf355e268b",
+    "target/projectile-diagnostics/v1/approach-shared-armed-world1-p1-powered/trace.jsonl": "5af9899515c321de6c03ef1e1c5abc1c127809284fa7783325ed04f3efe97d0f",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/capture-evidence.jsonl": "4132adaec58265ab1274f7a28a8a5a30f110192106ffef27169514ca95fd670c",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/destination-cover.jsonl": "201dcf00ee1e4704657bb45aa7b1802999b6e5bd7360304b1e4be6a14fb84f3c",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/flag-survey-work.jsonl": "aaca0a219226f57186c6567f5e75c97279333f3e1f4e9784a270c8e850a3410c",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/flag-survey.jsonl": "3c5f55cd523d4550f9d18530eb846046235466657cc673948e6545e04eb7d5af",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/flight-continuation-witnesses.json": "2dd9c0020289b18585858b75e4cbecbefccabc1d3418e6a410e5cbb4afd75783",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/live-planning.csv": "403087afecda084e16051233901f8aeae153f3563c2c8da2fae167d916836644",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/mission-evaluation-work.jsonl": "31fa09aecd0a5e48b92e37089216c1629537c5e59ab5119ba597f538650c988d",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/mission-evaluations.jsonl": "0afb6c488c24a4ff47e18dcd48913b7b81f74c6c35e6cfbadf538fc0ac26bec6",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/powered-mission-witnesses.json": "1526cbe5897a84b70fb44c236b4408637261894c3b31bb69b06bf74a6b5a07be",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/powered-route-witnesses.json": "a9bb37a770f8860d9696253268453813de5635afcf6e16bab774844192a7e831",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/projectiles.jsonl": "72a6e2d9b6c9fd39761723c1fb71f958e74617bc497138e752fe07581c1709ee",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/report.json": "63fd9e7ca0395e2cce4020afdf9139ee9feaa10a7e49f93ed80d790ea7465cae",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/sensors.jsonl": "ea2d9c2b17bbb624f6c9b56ad5563f056711c410d5506bc75dd6cd6ce9c798b4",
+    "target/projectile-diagnostics/v1/approach-health-shared-armed-world1-p1-powered/trace.jsonl": "f5f18f3ebef7763d82b4c92920e4dab69783f07dea34a458bbba15c91d60cdb9",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/capture-evidence.jsonl": "de65d46af4ff835a61c1186ee24a8e4cddbd3ca706be79f2a803ae62c3d21527",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/destination-cover.jsonl": "dc74707961724d0cbb5a5266308d41ad9ee628f21b219ee7ec7439a51a6d4018",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/flag-survey-work.jsonl": "17816a134312017cf8c74178a360e4644c22c0ce1aa54adf3d4c3538d5dba9a9",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/flag-survey.jsonl": "b69c3b5286f9804ccfe3a9ae1ede6bd109c7ea3a2e8d90fa603d7f4ad4aa6181",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/flight-continuation-witnesses.json": "2dd9c0020289b18585858b75e4cbecbefccabc1d3418e6a410e5cbb4afd75783",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/live-planning.csv": "230a1bd2e5b78c9299dbe67fdc61258a435c9f1eaf591d84c3baaf5b8a2fb682",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/mission-evaluation-work.jsonl": "0da7618e0c41eadf9fa92872e0c6bb0c4fd6a7dd832cba524b4b020dcb6a9b25",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/mission-evaluations.jsonl": "b75b084cf56f59f82de73a1cef1454f7faf7363b5cac95598ecaa68e177b1659",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/powered-mission-witnesses.json": "1526cbe5897a84b70fb44c236b4408637261894c3b31bb69b06bf74a6b5a07be",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/powered-route-witnesses.json": "a9bb37a770f8860d9696253268453813de5635afcf6e16bab774844192a7e831",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/projectiles.jsonl": "11772f3863223f58a997ab631bb27b8f409267db43f7717d5770db3584ba2d4a",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/report.json": "d492fecb7330adc55998cca7ec01008a3a785305edf489ec108d90a661eb66b3",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/sensors.jsonl": "845195168a5040407c6ae3d7ee340400b25eb2869f7966ba5881a424f452017c",
+    "target/projectile-diagnostics/v1/speed-shared-armed-world1-p1-powered/trace.jsonl": "2087a7081f3362e21c5346072935c242b2d1e13d5eb814c2b2884c3a4d8a238b",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/capture-evidence.jsonl": "7e8af36191cc58b6e6839ce341a2ce7516104da05d83f0aab93c50e4e17951cd",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/destination-cover.jsonl": "dc74707961724d0cbb5a5266308d41ad9ee628f21b219ee7ec7439a51a6d4018",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/flag-survey-work.jsonl": "17816a134312017cf8c74178a360e4644c22c0ce1aa54adf3d4c3538d5dba9a9",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/flag-survey.jsonl": "b69c3b5286f9804ccfe3a9ae1ede6bd109c7ea3a2e8d90fa603d7f4ad4aa6181",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/flight-continuation-witnesses.json": "2dd9c0020289b18585858b75e4cbecbefccabc1d3418e6a410e5cbb4afd75783",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/live-planning.csv": "f3b43a909c74f83258acc9699d305cc1fd0e861e0d34be1b4526bb347d831461",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/mission-evaluation-work.jsonl": "0da7618e0c41eadf9fa92872e0c6bb0c4fd6a7dd832cba524b4b020dcb6a9b25",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/mission-evaluations.jsonl": "b75b084cf56f59f82de73a1cef1454f7faf7363b5cac95598ecaa68e177b1659",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/powered-mission-witnesses.json": "1526cbe5897a84b70fb44c236b4408637261894c3b31bb69b06bf74a6b5a07be",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/powered-route-witnesses.json": "a9bb37a770f8860d9696253268453813de5635afcf6e16bab774844192a7e831",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/projectiles.jsonl": "11772f3863223f58a997ab631bb27b8f409267db43f7717d5770db3584ba2d4a",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/report.json": "88a1bb1c10fccc22438a211fc0a0b52ff9babaa267a310a4913d0e273a5fc3b7",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/sensors.jsonl": "2eb9c445a7cb0071335704ffed03b3683179e86604b319a2829fd1390a21dbe0",
+    "target/projectile-diagnostics/v1/speed-health-shared-armed-world1-p1-powered/trace.jsonl": "b6d00679b0e2c866b8b3dff908f64e1430aa60ff3b6822a5aff98c944e3bb5b7",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/capture-evidence.jsonl": "de65d46af4ff835a61c1186ee24a8e4cddbd3ca706be79f2a803ae62c3d21527",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/destination-cover.jsonl": "dc74707961724d0cbb5a5266308d41ad9ee628f21b219ee7ec7439a51a6d4018",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/flag-survey-work.jsonl": "17816a134312017cf8c74178a360e4644c22c0ce1aa54adf3d4c3538d5dba9a9",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/flag-survey.jsonl": "b69c3b5286f9804ccfe3a9ae1ede6bd109c7ea3a2e8d90fa603d7f4ad4aa6181",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/flight-continuation-witnesses.json": "2dd9c0020289b18585858b75e4cbecbefccabc1d3418e6a410e5cbb4afd75783",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/live-planning.csv": "885642a1017c1fe51c05e971cb74c1af28cf008f1db35e80ecb45a477e1e3f48",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/mission-evaluation-work.jsonl": "0da7618e0c41eadf9fa92872e0c6bb0c4fd6a7dd832cba524b4b020dcb6a9b25",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/mission-evaluations.jsonl": "b75b084cf56f59f82de73a1cef1454f7faf7363b5cac95598ecaa68e177b1659",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/powered-mission-witnesses.json": "1526cbe5897a84b70fb44c236b4408637261894c3b31bb69b06bf74a6b5a07be",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/powered-route-witnesses.json": "a9bb37a770f8860d9696253268453813de5635afcf6e16bab774844192a7e831",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/report.json": "53290902ec03df36c2680f74d91915ed010b845d38e9a7cddf93a8df0d762355",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/sensors.jsonl": "6a41bf4531c8ae7942ce58586529b95e0b170d0ad28e904b355c429231f4d187",
+    "target/projectile-diagnostics/v1/disabled-shared-armed-world1-p1-powered/trace.jsonl": "2087a7081f3362e21c5346072935c242b2d1e13d5eb814c2b2884c3a4d8a238b"
+  },
+  "parity": {
+    "approach-shared-armed-world1-p1-powered": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 18814,
+        "work_sha256": "9f6f6a9a6254ef2a9cb617732b5f519ef38048957f1cf465435d87b1cf87376f"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    },
+    "approach-health-shared-armed-world1-p1-powered": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 18814,
+        "work_sha256": "9f6f6a9a6254ef2a9cb617732b5f519ef38048957f1cf465435d87b1cf87376f"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    },
+    "speed-shared-armed-world1-p1-powered": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 21372,
+        "work_sha256": "951597bb57c7910e678dd8235c84993fed573d9f6f78b851fb47c436d7c6b510"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    },
+    "speed-health-shared-armed-world1-p1-powered": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 21372,
+        "work_sha256": "951597bb57c7910e678dd8235c84993fed573d9f6f78b851fb47c436d7c6b510"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    },
+    "disabled-shared-armed-world1-p1-powered": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 21372,
+        "work_sha256": "951597bb57c7910e678dd8235c84993fed573d9f6f78b851fb47c436d7c6b510"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    }
+  },
+  "diagnostics": {
+    "approach-shared-armed-world1-p1-powered": {
+      "rows": 18814,
+      "maximum": {
+        "projectiles": 4,
+        "debris_scanned": 13,
+        "unavailable_shells": 0,
+        "shells_in_range": 4
+      }
+    },
+    "approach-health-shared-armed-world1-p1-powered": {
+      "rows": 18814,
+      "maximum": {
+        "projectiles": 4,
+        "debris_scanned": 13,
+        "unavailable_shells": 0,
+        "shells_in_range": 4
+      }
+    },
+    "speed-shared-armed-world1-p1-powered": {
+      "rows": 21372,
+      "maximum": {
+        "projectiles": 4,
+        "debris_scanned": 12,
+        "unavailable_shells": 0,
+        "shells_in_range": 4
+      }
+    },
+    "speed-health-shared-armed-world1-p1-powered": {
+      "rows": 21372,
+      "maximum": {
+        "projectiles": 4,
+        "debris_scanned": 12,
+        "unavailable_shells": 0,
+        "shells_in_range": 4
+      }
+    },
+    "disabled-shared-armed-world1-p1-powered": null
+  },
+  "runs": {
+    "approach-shared-armed-world1-p1-powered": {
+      "stable_ids": [
+        100025
+      ],
+      "launch_tick": 7977,
+      "owner": "player_2",
+      "transfer_start": 8376,
+      "transfer_end": 9185,
+      "transfer_end_reason": "recovery required",
+      "tracked_samples": 678,
+      "transfer_samples": 423,
+      "unavailable_observer_ticks": 0,
+      "truncated_transfer_ticks": 0,
+      "all_observed_intervals": [
+        {
+          "first_tick": 7978,
+          "last_tick": 8093,
+          "ticks": 116
+        },
+        {
+          "first_tick": 8099,
+          "last_tick": 8237,
+          "ticks": 139
+        },
+        {
+          "first_tick": 8619,
+          "last_tick": 9041,
+          "ticks": 423
+        }
+      ],
+      "transfer_observed_intervals": [
+        {
+          "first_tick": 8619,
+          "last_tick": 9041,
+          "ticks": 423
+        }
+      ],
+      "transfer_screen_intervals": [],
+      "checkpoints": [
+        {
+          "tick": 8619,
+          "projectile": {
+            "collision_radius": 2.731271982192993,
+            "id": 100025,
+            "motion": {
+              "angle": 2.9043633937835693,
+              "position": {
+                "x": 1373.427001953125,
+                "y": 447.2138977050781
+              },
+              "spin": 250.31114196777344,
+              "velocity": {
+                "x": -51.6417350769043,
+                "y": -93.0669174194336
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 525.70458984375,
+              "y": 284.1600036621094
+            },
+            "relative_velocity": {
+              "x": -107.69725036621094,
+              "y": -132.1120147705078
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": 0.01919194497168064,
+            "position": {
+              "x": 847.722412109375,
+              "y": 163.05389404296875
+            },
+            "spin": 0.25819075107574463,
+            "velocity": {
+              "x": 56.055511474609375,
+              "y": 39.045101165771484
+            }
+          },
+          "observer_radius": 7.802530288696289,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 597.5886741430392,
+            "opening_speed": -157.5630421160342,
+            "closest_seconds": 2.0,
+            "closest_clearance": 300.41602401694985,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 23.334880828857422,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 54.147178649902344,
+              "stopping_distance": 36.648963928222656,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.28699925541877747,
+              "y": 0.6747127175331116
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.3536794662475586,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    80,
+                    105,
+                    85,
+                    190,
+                    1,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 9041,
+          "projectile": {
+            "collision_radius": 2.707185983657837,
+            "id": 100025,
+            "motion": {
+              "angle": -1.692442536354065,
+              "position": {
+                "x": 529.2063598632812,
+                "y": 583.631591796875
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -189.4639129638672,
+                "y": 140.04673767089844
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": -533.9758911132812,
+              "y": 268.1876525878906
+            },
+            "relative_velocity": {
+              "x": -184.26446533203125,
+              "y": 163.08299255371094
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -3.1286466121673584,
+            "position": {
+              "x": 1063.1822509765625,
+              "y": 315.4439392089844
+            },
+            "spin": 0.3430229425430298,
+            "velocity": {
+              "x": -5.199451923370361,
+              "y": -23.036251068115234
+            }
+          },
+          "observer_radius": 7.78340482711792,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 597.5406842139085,
+            "opening_speed": 237.85765686088766,
+            "closest_seconds": 0.0,
+            "closest_clearance": 587.0500934031328,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 9040,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 15.229195594787598,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 16.75493812561035,
+              "stopping_distance": 3.5090994834899902,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": -0.2730020582675934,
+              "y": 2.9816696643829346
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 0.4188734531402588,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    128,
+                    191,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "final_damage": {
+        "debris_contacts": 24,
+        "hits": 227,
+        "last_contact_source": "cannon",
+        "last_contact_spawn_tick": 9281,
+        "last_contact_tick": 9295,
+        "last_damage_percent": 0.05228239297866821,
+        "last_damage_tick": 9185,
+        "last_ship_lost": true,
+        "last_solar_damage_tick": 4857,
+        "last_source": "laser",
+        "last_strike_tick": null,
+        "strikes": 0
+      }
+    },
+    "approach-health-shared-armed-world1-p1-powered": {
+      "stable_ids": [
+        100025
+      ],
+      "launch_tick": 7977,
+      "owner": "player_2",
+      "transfer_start": 8376,
+      "transfer_end": 9185,
+      "transfer_end_reason": "recovery required",
+      "tracked_samples": 678,
+      "transfer_samples": 423,
+      "unavailable_observer_ticks": 0,
+      "truncated_transfer_ticks": 0,
+      "all_observed_intervals": [
+        {
+          "first_tick": 7978,
+          "last_tick": 8093,
+          "ticks": 116
+        },
+        {
+          "first_tick": 8099,
+          "last_tick": 8237,
+          "ticks": 139
+        },
+        {
+          "first_tick": 8619,
+          "last_tick": 9041,
+          "ticks": 423
+        }
+      ],
+      "transfer_observed_intervals": [
+        {
+          "first_tick": 8619,
+          "last_tick": 9041,
+          "ticks": 423
+        }
+      ],
+      "transfer_screen_intervals": [],
+      "checkpoints": [
+        {
+          "tick": 8619,
+          "projectile": {
+            "collision_radius": 2.731271982192993,
+            "id": 100025,
+            "motion": {
+              "angle": 2.9043633937835693,
+              "position": {
+                "x": 1373.427001953125,
+                "y": 447.2138977050781
+              },
+              "spin": 250.31114196777344,
+              "velocity": {
+                "x": -51.6417350769043,
+                "y": -93.0669174194336
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 525.70458984375,
+              "y": 284.1600036621094
+            },
+            "relative_velocity": {
+              "x": -107.69725036621094,
+              "y": -132.1120147705078
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": 0.01919194497168064,
+            "position": {
+              "x": 847.722412109375,
+              "y": 163.05389404296875
+            },
+            "spin": 0.25819075107574463,
+            "velocity": {
+              "x": 56.055511474609375,
+              "y": 39.045101165771484
+            }
+          },
+          "observer_radius": 7.802530288696289,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 597.5886741430392,
+            "opening_speed": -157.5630421160342,
+            "closest_seconds": 2.0,
+            "closest_clearance": 300.41602401694985,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 23.334880828857422,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 54.147178649902344,
+              "stopping_distance": 36.648963928222656,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.28699925541877747,
+              "y": 0.6747127175331116
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.3536794662475586,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    80,
+                    105,
+                    85,
+                    190,
+                    1,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 9041,
+          "projectile": {
+            "collision_radius": 2.707185983657837,
+            "id": 100025,
+            "motion": {
+              "angle": -1.692442536354065,
+              "position": {
+                "x": 529.2063598632812,
+                "y": 583.631591796875
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -189.4639129638672,
+                "y": 140.04673767089844
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": -533.9758911132812,
+              "y": 268.1876525878906
+            },
+            "relative_velocity": {
+              "x": -184.26446533203125,
+              "y": 163.08299255371094
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -3.1286466121673584,
+            "position": {
+              "x": 1063.1822509765625,
+              "y": 315.4439392089844
+            },
+            "spin": 0.3430229425430298,
+            "velocity": {
+              "x": -5.199451923370361,
+              "y": -23.036251068115234
+            }
+          },
+          "observer_radius": 7.78340482711792,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 597.5406842139085,
+            "opening_speed": 237.85765686088766,
+            "closest_seconds": 0.0,
+            "closest_clearance": 587.0500934031328,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 9040,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 15.229195594787598,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 16.75493812561035,
+              "stopping_distance": 3.5090994834899902,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": -0.2730020582675934,
+              "y": 2.9816696643829346
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 0.4188734531402588,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    128,
+                    191,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "final_damage": {
+        "debris_contacts": 24,
+        "hits": 227,
+        "last_contact_source": "cannon",
+        "last_contact_spawn_tick": 9281,
+        "last_contact_tick": 9295,
+        "last_damage_percent": 0.05228239297866821,
+        "last_damage_tick": 9185,
+        "last_ship_lost": true,
+        "last_solar_damage_tick": 4857,
+        "last_source": "laser",
+        "last_strike_tick": null,
+        "strikes": 0
+      }
+    },
+    "speed-shared-armed-world1-p1-powered": {
+      "stable_ids": [
+        100025
+      ],
+      "launch_tick": 7977,
+      "owner": "player_2",
+      "transfer_start": 8376,
+      "transfer_end": 8892,
+      "transfer_end_reason": "recovery required",
+      "tracked_samples": 527,
+      "transfer_samples": 272,
+      "unavailable_observer_ticks": 0,
+      "truncated_transfer_ticks": 0,
+      "all_observed_intervals": [
+        {
+          "first_tick": 7978,
+          "last_tick": 8093,
+          "ticks": 116
+        },
+        {
+          "first_tick": 8099,
+          "last_tick": 8237,
+          "ticks": 139
+        },
+        {
+          "first_tick": 8620,
+          "last_tick": 8891,
+          "ticks": 272
+        }
+      ],
+      "transfer_observed_intervals": [
+        {
+          "first_tick": 8620,
+          "last_tick": 8891,
+          "ticks": 272
+        }
+      ],
+      "transfer_screen_intervals": [
+        {
+          "first_tick": 8837,
+          "last_tick": 8891,
+          "ticks": 55
+        }
+      ],
+      "checkpoints": [
+        {
+          "tick": 8620,
+          "projectile": {
+            "collision_radius": 2.679056167602539,
+            "id": 100025,
+            "motion": {
+              "angle": 0.4666565954685211,
+              "position": {
+                "x": 1372.566650390625,
+                "y": 445.6628723144531
+              },
+              "spin": 250.31114196777344,
+              "velocity": {
+                "x": -51.6417350769043,
+                "y": -93.0669174194336
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 525.4906616210938,
+              "y": 285.8948059082031
+            },
+            "relative_velocity": {
+              "x": -103.62869262695312,
+              "y": -123.1250991821289
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": 0.6594455242156982,
+            "position": {
+              "x": 847.0759887695312,
+              "y": 159.76806640625
+            },
+            "spin": 0.949266254901886,
+            "velocity": {
+              "x": 51.986961364746094,
+              "y": 30.05817985534668
+            }
+          },
+          "observer_radius": 8.576713562011719,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 598.2276117802187,
+            "opening_speed": -149.8706091445146,
+            "closest_seconds": 2.0,
+            "closest_clearance": 309.4374062107356,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": -15.15754508972168,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 46.96324157714844,
+              "stopping_distance": 27.569324493408203,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.2814403772354126,
+              "y": 0.6689460277557373
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.174081039428711,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    128,
+                    63,
+                    0,
+                    0,
+                    1,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 8837,
+          "projectile": {
+            "collision_radius": 2.7129063606262207,
+            "id": 100025,
+            "motion": {
+              "angle": -1.7095963954925537,
+              "position": {
+                "x": 1177.7772216796875,
+                "y": 114.09414672851562
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -191.38771057128906,
+                "y": 136.07537841796875
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 208.01666259765625,
+              "y": -124.08152770996094
+            },
+            "relative_velocity": {
+              "x": -223.56100463867188,
+              "y": 128.19143676757812
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -2.028801202774048,
+            "position": {
+              "x": 969.7605590820312,
+              "y": 238.17567443847656
+            },
+            "spin": 0.06232130527496338,
+            "velocity": {
+              "x": 32.17329025268555,
+              "y": 7.88394021987915
+            }
+          },
+          "observer_radius": 8.397727012634277,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 242.213041426561,
+            "opening_speed": -257.66822057884326,
+            "closest_seconds": 0.9397408647851979,
+            "closest_clearance": -6.943735249975814,
+            "entry_seconds": 0.8997741881791749
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 28.27023696899414,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 45.925960540771484,
+              "stopping_distance": 26.36492347717285,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.4800432622432709,
+              "y": 1.2146943807601929
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.148149013519287,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    202,
+                    110,
+                    36,
+                    189,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 8891,
+          "projectile": {
+            "collision_radius": 2.692147970199585,
+            "id": 100025,
+            "motion": {
+              "angle": 2.533878803253174,
+              "position": {
+                "x": 1005.4944458007812,
+                "y": 236.99551391601562
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -191.353271484375,
+                "y": 137.20767211914062
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 0.3839111328125,
+              "y": -6.0302886962890625
+            },
+            "relative_velocity": {
+              "x": -235.7338104248047,
+              "y": 132.64041137695312
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -1.8401095867156982,
+            "position": {
+              "x": 1005.1105346679688,
+              "y": 243.0258026123047
+            },
+            "spin": 0.7205783724784851,
+            "velocity": {
+              "x": 44.38053512573242,
+              "y": 4.567258834838867
+            }
+          },
+          "observer_radius": 8.325878143310547,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 6.042496960569283,
+            "opening_speed": -147.34981472230345,
+            "closest_seconds": 0.01216939923835109,
+            "closest_clearance": -5.950816488418198,
+            "entry_seconds": 0.0
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 48.12577819824219,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 56.30833435058594,
+              "stopping_distance": 39.63285827636719,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.4332123398780823,
+              "y": 1.4533480405807495
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.4077083587646484,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    23,
+                    234,
+                    226,
+                    190,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "final_damage": {
+        "debris_contacts": 29,
+        "hits": 215,
+        "last_contact_source": "fragment",
+        "last_contact_spawn_tick": 10666,
+        "last_contact_tick": 10671,
+        "last_damage_percent": 31.174251556396484,
+        "last_damage_tick": 8892,
+        "last_ship_lost": true,
+        "last_solar_damage_tick": 4857,
+        "last_source": "cannon",
+        "last_strike_tick": null,
+        "strikes": 0
+      }
+    },
+    "speed-health-shared-armed-world1-p1-powered": {
+      "stable_ids": [
+        100025
+      ],
+      "launch_tick": 7977,
+      "owner": "player_2",
+      "transfer_start": 8376,
+      "transfer_end": 8892,
+      "transfer_end_reason": "recovery required",
+      "tracked_samples": 527,
+      "transfer_samples": 272,
+      "unavailable_observer_ticks": 0,
+      "truncated_transfer_ticks": 0,
+      "all_observed_intervals": [
+        {
+          "first_tick": 7978,
+          "last_tick": 8093,
+          "ticks": 116
+        },
+        {
+          "first_tick": 8099,
+          "last_tick": 8237,
+          "ticks": 139
+        },
+        {
+          "first_tick": 8620,
+          "last_tick": 8891,
+          "ticks": 272
+        }
+      ],
+      "transfer_observed_intervals": [
+        {
+          "first_tick": 8620,
+          "last_tick": 8891,
+          "ticks": 272
+        }
+      ],
+      "transfer_screen_intervals": [
+        {
+          "first_tick": 8837,
+          "last_tick": 8891,
+          "ticks": 55
+        }
+      ],
+      "checkpoints": [
+        {
+          "tick": 8620,
+          "projectile": {
+            "collision_radius": 2.679056167602539,
+            "id": 100025,
+            "motion": {
+              "angle": 0.4666565954685211,
+              "position": {
+                "x": 1372.566650390625,
+                "y": 445.6628723144531
+              },
+              "spin": 250.31114196777344,
+              "velocity": {
+                "x": -51.6417350769043,
+                "y": -93.0669174194336
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 525.4906616210938,
+              "y": 285.8948059082031
+            },
+            "relative_velocity": {
+              "x": -103.62869262695312,
+              "y": -123.1250991821289
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": 0.6594455242156982,
+            "position": {
+              "x": 847.0759887695312,
+              "y": 159.76806640625
+            },
+            "spin": 0.949266254901886,
+            "velocity": {
+              "x": 51.986961364746094,
+              "y": 30.05817985534668
+            }
+          },
+          "observer_radius": 8.576713562011719,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 598.2276117802187,
+            "opening_speed": -149.8706091445146,
+            "closest_seconds": 2.0,
+            "closest_clearance": 309.4374062107356,
+            "entry_seconds": null
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": -15.15754508972168,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 46.96324157714844,
+              "stopping_distance": 27.569324493408203,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.2814403772354126,
+              "y": 0.6689460277557373
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.174081039428711,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    128,
+                    63,
+                    0,
+                    0,
+                    1,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 8837,
+          "projectile": {
+            "collision_radius": 2.7129063606262207,
+            "id": 100025,
+            "motion": {
+              "angle": -1.7095963954925537,
+              "position": {
+                "x": 1177.7772216796875,
+                "y": 114.09414672851562
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -191.38771057128906,
+                "y": 136.07537841796875
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 208.01666259765625,
+              "y": -124.08152770996094
+            },
+            "relative_velocity": {
+              "x": -223.56100463867188,
+              "y": 128.19143676757812
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -2.028801202774048,
+            "position": {
+              "x": 969.7605590820312,
+              "y": 238.17567443847656
+            },
+            "spin": 0.06232130527496338,
+            "velocity": {
+              "x": 32.17329025268555,
+              "y": 7.88394021987915
+            }
+          },
+          "observer_radius": 8.397727012634277,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 242.213041426561,
+            "opening_speed": -257.66822057884326,
+            "closest_seconds": 0.9397408647851979,
+            "closest_clearance": -6.943735249975814,
+            "entry_seconds": 0.8997741881791749
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 28.27023696899414,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 45.925960540771484,
+              "stopping_distance": 26.36492347717285,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.4800432622432709,
+              "y": 1.2146943807601929
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.148149013519287,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    202,
+                    110,
+                    36,
+                    189,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "tick": 8891,
+          "projectile": {
+            "collision_radius": 2.692147970199585,
+            "id": 100025,
+            "motion": {
+              "angle": 2.533878803253174,
+              "position": {
+                "x": 1005.4944458007812,
+                "y": 236.99551391601562
+              },
+              "spin": 118.7536849975586,
+              "velocity": {
+                "x": -191.353271484375,
+                "y": 137.20767211914062
+              }
+            },
+            "owner": "player_2",
+            "radius": 2.0,
+            "relative_position": {
+              "x": 0.3839111328125,
+              "y": -6.0302886962890625
+            },
+            "relative_velocity": {
+              "x": -235.7338104248047,
+              "y": 132.64041137695312
+            },
+            "spawn_tick": 7977
+          },
+          "observer": {
+            "angle": -1.8401095867156982,
+            "position": {
+              "x": 1005.1105346679688,
+              "y": 243.0258026123047
+            },
+            "spin": 0.7205783724784851,
+            "velocity": {
+              "x": 44.38053512573242,
+              "y": 4.567258834838867
+            }
+          },
+          "observer_radius": 8.325878143310547,
+          "ship_form": "ship",
+          "vehicle": 0,
+          "screen": {
+            "range": 6.042496960569283,
+            "opening_speed": -147.34981472230345,
+            "closest_seconds": 0.01216939923835109,
+            "closest_clearance": -5.950816488418198,
+            "entry_seconds": 0.0
+          },
+          "native": {
+            "hull": 31.174251556396484,
+            "mission": {
+              "completed_sorties": 1,
+              "goal": "transfer",
+              "goal_since": 8376,
+              "policy": "material_mission_v13",
+              "powered_capture": true,
+              "target": 2
+            },
+            "flight": {
+              "enabled": true,
+              "forward_speed": 48.12577819824219,
+              "limits": {
+                "brake_acceleration": 40.0,
+                "brake_gain": 4.0,
+                "cruise_speed": 70.0,
+                "thrust_acceleration": 45.0,
+                "turn_acceleration": 6.0,
+                "turn_speed": 1.7999999523162842
+              },
+              "relative_speed": 56.30833435058594,
+              "stopping_distance": 39.63285827636719,
+              "sweep": 0.0,
+              "version": 1,
+              "wings_closed": false
+            },
+            "gravity": {
+              "x": 0.4332123398780823,
+              "y": 1.4533480405807495
+            },
+            "half_turn_seconds": 1.7453292982297663,
+            "nominal_brake_seconds": 1.4077083587646484,
+            "actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    23,
+                    234,
+                    226,
+                    190,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "final_damage": {
+        "debris_contacts": 29,
+        "hits": 215,
+        "last_contact_source": "fragment",
+        "last_contact_spawn_tick": 10666,
+        "last_contact_tick": 10671,
+        "last_damage_percent": 31.174251556396484,
+        "last_damage_tick": 8892,
+        "last_ship_lost": true,
+        "last_solar_damage_tick": 4857,
+        "last_source": "cannon",
+        "last_strike_tick": null,
+        "strikes": 0
+      }
+    }
+  }
+}

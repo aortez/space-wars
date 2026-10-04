@@ -1,0 +1,1004 @@
+{
+  "schema": 1,
+  "profile": "destination_failure_context_v1",
+  "scope": "32 recorded replays (both original cover settings), then 32 new finished matches in four correlated worlds with cover response disabled. Only the tested v13 seat destination-failure preference differs within each pair. No new sensors, timing coefficients, retry limits or defaults.",
+  "source_commit": "0bafeb5218657b752ed212c083e4b09a5e7f5b59",
+  "binary": {
+    "path": "target/destination-retry/surface_mission_soak-0bafeb5",
+    "sha256": "7e93de98e6ded36ac1fe85326c52b967b8a8b2522c09a5468d50fa88cb819a00"
+  },
+  "runner": {
+    "path": "tools/validate-destination-retry.py",
+    "sha256": "7f0f439b50f738312e5080b9980695a1c8c385ce87935c8f87173bd60f87851f"
+  },
+  "source_summary_sha256": "03b85f91c72abb378c3ebb35850eeb197f8bf641b13b311a4b2f34c150f70aa2",
+  "archive": {
+    "path": "capture-destination-retry-v1.json.gz",
+    "sha256": "91c0f53c0a2cc8cca79cec9162f8d408ea6d9a38cfb01d54d9b37632b6604809",
+    "decoded_sha256": "025a558ed8aaeb193a4658830fca30f78499f504c37db82787f576ffad8098aa",
+    "decoded_bytes": 7197551
+  },
+  "totals": {
+    "recorded-predecessor": {
+      "counts": {
+        "runs": 16,
+        "unfinished": 6,
+        "completed_sorties": 35,
+        "completed_recoveries": 12,
+        "elapsed_ticks": 352788,
+        "ships_lost": 11,
+        "eligible_ticks": 265066,
+        "progress_ticks": 54930,
+        "ticks_without_progress": 210136,
+        "ticks_after_20s_without_progress": 29423,
+        "win": 6,
+        "loss": 4
+      },
+      "memory": {},
+      "revisits": {
+        "visits": 107,
+        "verified_visits": 107,
+        "abandoned_visits": 67,
+        "deferral_no": 45,
+        "verified_returns": 54,
+        "return_value_switch": 7,
+        "return_ended_abandoned": 37,
+        "return_initial_picker": 47,
+        "deferral_yes": 22,
+        "witnessed_capture_failures": 22,
+        "arrived_unclaimed_abandonments": 36,
+        "deferred_returns": 16,
+        "deferred_return_value_switch": 3,
+        "deferred_return_ended_abandoned": 12,
+        "deferred_return_after_pursuit_expiry": 14,
+        "capture_failure_returns": 16,
+        "capture_failure_return_value_switch": 3,
+        "deferred_return_nominally_slower": 3,
+        "deferred_return_with_new_evidence": 3,
+        "no_recorded_return": 13,
+        "return_ended_completed": 12,
+        "deferred_return_initial_picker": 13,
+        "capture_failure_return_initial_picker": 13,
+        "return_ended_unfinished": 5,
+        "deferred_return_ended_completed": 2,
+        "deferred_return_ended_unfinished": 2
+      }
+    },
+    "recorded-candidate": {
+      "counts": {
+        "runs": 16,
+        "unfinished": 6,
+        "completed_sorties": 37,
+        "completed_recoveries": 12,
+        "elapsed_ticks": 352788,
+        "ships_lost": 11,
+        "eligible_ticks": 267556,
+        "progress_ticks": 55382,
+        "ticks_without_progress": 212174,
+        "ticks_after_20s_without_progress": 29423,
+        "win": 6,
+        "loss": 4
+      },
+      "memory": {
+        "recorded_failures": 19,
+        "context_invalidations": 8,
+        "initial_changes": 0,
+        "switch_rejections": 153,
+        "probe_rejections": 0,
+        "retry_selections": 7,
+        "affected_runs": 2
+      },
+      "revisits": {
+        "visits": 105,
+        "verified_visits": 105,
+        "abandoned_visits": 63,
+        "deferral_no": 42,
+        "verified_returns": 52,
+        "return_value_switch": 4,
+        "return_ended_abandoned": 33,
+        "return_initial_picker": 48,
+        "return_ended_completed": 14,
+        "deferral_yes": 21,
+        "witnessed_capture_failures": 21,
+        "arrived_unclaimed_abandonments": 35,
+        "deferred_returns": 15,
+        "deferred_return_initial_picker": 15,
+        "deferred_return_ended_abandoned": 11,
+        "deferred_return_after_pursuit_expiry": 13,
+        "capture_failure_returns": 15,
+        "capture_failure_return_initial_picker": 15,
+        "no_recorded_return": 11,
+        "return_ended_unfinished": 5,
+        "deferred_return_ended_completed": 2,
+        "deferred_return_ended_unfinished": 2
+      }
+    },
+    "held_out-predecessor": {
+      "counts": {
+        "runs": 16,
+        "win": 8,
+        "completed_sorties": 42,
+        "completed_recoveries": 5,
+        "elapsed_ticks": 346724,
+        "ships_lost": 12,
+        "eligible_ticks": 258971,
+        "progress_ticks": 50734,
+        "ticks_without_progress": 208237,
+        "ticks_after_20s_without_progress": 47390,
+        "loss": 8
+      },
+      "memory": {},
+      "revisits": {
+        "visits": 76,
+        "verified_visits": 76,
+        "abandoned_visits": 31,
+        "deferral_no": 29,
+        "no_recorded_return": 11,
+        "deferral_yes": 2,
+        "witnessed_capture_failures": 2,
+        "arrived_unclaimed_abandonments": 13,
+        "verified_returns": 20,
+        "return_initial_picker": 20,
+        "return_ended_completed": 5,
+        "return_ended_abandoned": 13,
+        "return_ended_unfinished": 2
+      }
+    },
+    "held_out-candidate": {
+      "counts": {
+        "runs": 16,
+        "win": 8,
+        "completed_sorties": 42,
+        "completed_recoveries": 5,
+        "elapsed_ticks": 346724,
+        "ships_lost": 12,
+        "eligible_ticks": 258971,
+        "progress_ticks": 50734,
+        "ticks_without_progress": 208237,
+        "ticks_after_20s_without_progress": 47390,
+        "loss": 8
+      },
+      "memory": {
+        "recorded_failures": 2,
+        "context_invalidations": 2,
+        "initial_changes": 0,
+        "switch_rejections": 0,
+        "probe_rejections": 0,
+        "retry_selections": 0,
+        "affected_runs": 0
+      },
+      "revisits": {
+        "visits": 76,
+        "verified_visits": 76,
+        "abandoned_visits": 31,
+        "deferral_no": 29,
+        "no_recorded_return": 11,
+        "deferral_yes": 2,
+        "witnessed_capture_failures": 2,
+        "arrived_unclaimed_abandonments": 13,
+        "verified_returns": 20,
+        "return_initial_picker": 20,
+        "return_ended_completed": 5,
+        "return_ended_abandoned": 13,
+        "return_ended_unfinished": 2
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "group": "recorded-directed-failure-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": false,
+      "first_effect_tick": 7264,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 514,
+        "before_tick": 7264,
+        "normalized_sha256": "396647689aa8fec41cf7151e9c6a617c66cd626bbdb34864513263891aa3e27d"
+      }
+    },
+    {
+      "group": "recorded-directed-failure-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": false,
+      "first_effect_tick": 6482,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 473,
+        "before_tick": 6482,
+        "normalized_sha256": "656cbd872222bcb8cfd0c557b074ae912d26afe3fbd4bb5fa098714732727e1c"
+      }
+    },
+    {
+      "group": "recorded-directed-control-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 427,
+        "before_tick": null,
+        "normalized_sha256": "aaeb102124af7ea7fda6eda90271d12426c2c5fea0a1723db0982654637b0181"
+      }
+    },
+    {
+      "group": "recorded-directed-control-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 427,
+        "before_tick": null,
+        "normalized_sha256": "86382173a8740c797cf06a06a1de3aba07658a724572a47d1e5ef88332caac3c"
+      }
+    },
+    {
+      "group": "recorded-recorded-asteroids-cover-predecessor",
+      "kind": "recorded",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 2566,
+        "before_tick": null,
+        "normalized_sha256": "2fde681b115e9967eaf4113a2e18749e7abad7ac10af059638bd00b5a431bcb4"
+      }
+    },
+    {
+      "group": "recorded-recorded-asteroids-cover-candidate",
+      "kind": "recorded",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1686,
+        "before_tick": null,
+        "normalized_sha256": "6fd3737f6ef1f1bc4d1653fa9d495aff22416664d5041d79d4c479e4fced9cff"
+      }
+    },
+    {
+      "group": "recorded-fresh-p1-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 2099,
+        "before_tick": null,
+        "normalized_sha256": "e4716f5e8bcc95c08662ad4ad7696af6d45a7e5dcefe26853ecf051b01c9910a"
+      }
+    },
+    {
+      "group": "recorded-fresh-p1-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 678,
+        "before_tick": null,
+        "normalized_sha256": "36767e0691b9f707fedbd5880fb64b706d8d0be4abf4ab8c33cb20b8c3d0014b"
+      }
+    },
+    {
+      "group": "recorded-fresh-p2-cover-predecessor",
+      "kind": "recorded",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 2099,
+        "before_tick": null,
+        "normalized_sha256": "5fa3efd1f10a9657e9ed47f586af21009205ddddbb63c80f7fa0dcffa7582451"
+      }
+    },
+    {
+      "group": "recorded-fresh-p2-cover-candidate",
+      "kind": "recorded",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1093,
+        "before_tick": null,
+        "normalized_sha256": "8eb8a374636333af8ae4f37cdf6face33a288134d663fcba7a28ad9728c18fd8"
+      }
+    },
+    {
+      "group": "recorded-world2-asteroids0-p1-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 2478,
+        "before_tick": null,
+        "normalized_sha256": "67cd30fc59d3c62b4ed0b38a75ba66ba21f20bc77e7cbc661868cd2dc5e4e69b"
+      }
+    },
+    {
+      "group": "recorded-world2-asteroids0-p1-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1853,
+        "before_tick": null,
+        "normalized_sha256": "ce6acf0ecad42df24e78d92c0ae077fc25aaf38e964064f4b4753ea6452be964"
+      }
+    },
+    {
+      "group": "recorded-world1-asteroids0-p1-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1763,
+        "before_tick": null,
+        "normalized_sha256": "e534b76d5c9e1fe66c4dc6981ad2003bcc1ffe1c72b7c9adb19b8df58b264697"
+      }
+    },
+    {
+      "group": "recorded-world1-asteroids0-p1-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1763,
+        "before_tick": null,
+        "normalized_sha256": "876c3fb1b30776927519b93c1dcc5f2390fa600e9df62e25c849a8091a4ac51a"
+      }
+    },
+    {
+      "group": "recorded-destination-p1-bearing-0.8-cover-predecessor",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 506,
+        "before_tick": null,
+        "normalized_sha256": "7e7b78f4442962fe04072a0ed2106aeab7b061ad104ea363068823a0c2053ab7"
+      }
+    },
+    {
+      "group": "recorded-destination-p1-bearing-0.8-cover-candidate",
+      "kind": "recorded",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "unfinished",
+      "candidate_outcome": "unfinished",
+      "prefix_parity": {
+        "rows": 506,
+        "before_tick": null,
+        "normalized_sha256": "0fe17e87144f3922634004722f407ddd9cb6c36e22e00cf9336078d8f1249843"
+      }
+    },
+    {
+      "group": "world0-asteroids0-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1800,
+        "before_tick": null,
+        "normalized_sha256": "5364d86a449cd029152aaa96cd751805b99b44f2c9420434d46819811b89c71d"
+      }
+    },
+    {
+      "group": "world0-asteroids0-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1800,
+        "before_tick": null,
+        "normalized_sha256": "f0318a53ef156acb1fa01cb76b7310edfaa7db919ceb21eb08595517116d064f"
+      }
+    },
+    {
+      "group": "world0-asteroids3-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1979,
+        "before_tick": null,
+        "normalized_sha256": "4d6d53a7693199a4a0d306092442924faf1069de8272fbf895835f074aff68b9"
+      }
+    },
+    {
+      "group": "world0-asteroids3-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1979,
+        "before_tick": null,
+        "normalized_sha256": "3cae54486ce62dd40f872c5dd037e445c079223109c7c256cdc75d97fb6744f1"
+      }
+    },
+    {
+      "group": "world1-asteroids0-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 2054,
+        "before_tick": null,
+        "normalized_sha256": "7da7f991a6bc9ee77b2e1bc54dcb21ffc61ce08d54939d3f14c712b6c0b4f907"
+      }
+    },
+    {
+      "group": "world1-asteroids0-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 2054,
+        "before_tick": null,
+        "normalized_sha256": "401bca7be0d5a41a0b18e77cacd1a84a8096d1bc9db14d7a498f9c55f8223355"
+      }
+    },
+    {
+      "group": "world1-asteroids3-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1239,
+        "before_tick": null,
+        "normalized_sha256": "bdd3664659b01b96ed4dd580ca618ae4e2d5d13cbb724384620d56f9ed6b32ef"
+      }
+    },
+    {
+      "group": "world1-asteroids3-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1239,
+        "before_tick": null,
+        "normalized_sha256": "69d16cd713699a1c9e3c59111ad0bb6020e65f738dde20ff91fb4f93eb579a8f"
+      }
+    },
+    {
+      "group": "world2-asteroids0-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 229,
+        "before_tick": null,
+        "normalized_sha256": "2d5ece371e226d9fbf0893471949b83f111771b6ddaef7060794c9f9e2f4435c"
+      }
+    },
+    {
+      "group": "world2-asteroids0-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 229,
+        "before_tick": null,
+        "normalized_sha256": "363d74e871bb45bf65842e019ec7d3a1542817b811bf12584995abd2fa6e6f5a"
+      }
+    },
+    {
+      "group": "world2-asteroids3-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 775,
+        "before_tick": null,
+        "normalized_sha256": "227b0773ee69b7eb84254ff6da990c6109627053b118fffd83739dd647063b5b"
+      }
+    },
+    {
+      "group": "world2-asteroids3-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 775,
+        "before_tick": null,
+        "normalized_sha256": "c78968bd8d8bd937026cac803697d3b31da4b981bc82a7208f01c191947acb1f"
+      }
+    },
+    {
+      "group": "world3-asteroids0-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 1455,
+        "before_tick": null,
+        "normalized_sha256": "c320fe5868e60cc132521da5e89beb7f21f6b4edf8e13fbfcbbd9858f553256f"
+      }
+    },
+    {
+      "group": "world3-asteroids0-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 1455,
+        "before_tick": null,
+        "normalized_sha256": "f30b5d45a773678db80173efd8a624bfd4b9a4a429f1ad1d4862d5c8b0a6f536"
+      }
+    },
+    {
+      "group": "world3-asteroids3-p1",
+      "kind": "held_out",
+      "seat": 0,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "win",
+      "candidate_outcome": "win",
+      "prefix_parity": {
+        "rows": 365,
+        "before_tick": null,
+        "normalized_sha256": "0f0e56fa3b89554e4ca18a90cc397a0d5382eddafb5f21dae014155167794826"
+      }
+    },
+    {
+      "group": "world3-asteroids3-p2",
+      "kind": "held_out",
+      "seat": 1,
+      "matching_recorded_physical_outcomes": true,
+      "first_effect_tick": null,
+      "predecessor_outcome": "loss",
+      "candidate_outcome": "loss",
+      "prefix_parity": {
+        "rows": 365,
+        "before_tick": null,
+        "normalized_sha256": "d75a7598443ddf002768eb75d4a5d21bf79e7c93c116ac5350fd6c973e0679e4"
+      }
+    }
+  ],
+  "work": {
+    "runs": 64,
+    "audited_dispatch_ticks": 1399024,
+    "maximum": {
+      "graph": 4,
+      "physics_queries": 192
+    },
+    "disabled_sensor_rows": 640776,
+    "scope": "Main dispatch counts only. Native synchronous sensing is outside these quotas; desktop elapsed timings are retained in the full archive and do not establish Pi performance."
+  },
+  "successful_retry_contexts": {
+    "scope": "First retained trace observations of invalidated failure contexts before the two previously successful retries. Observation ticks are not exact invalidation ticks; changed material permits reassessment but does not establish why a later attempt succeeds.",
+    "cases": [
+      {
+        "name": "recorded-world2-asteroids0-p1-cover-candidate-candidate",
+        "seat": 0,
+        "successful_selected_tick": 21182,
+        "input": {
+          "path": "target/destination-retry/v1/recorded-world2-asteroids0-p1-cover-candidate-candidate/trace.jsonl",
+          "sha256": "52755e02b65c388bd4112718e82e749b36a59e6a97ec6616b73c04fb198efbbb"
+        },
+        "first_observed_clear_tick": 19860,
+        "failure": {
+          "acquisition": {
+            "checks": {
+              "directions": 2,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 1,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 1,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 1
+            },
+            "generation": null,
+            "measurement_tick": 19380,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 111.47576904296875,
+                "y": 29.762920379638672
+              },
+              "range": 2.799999952316284,
+              "revision": 0
+            },
+            "objective_work": null,
+            "planet": 0,
+            "reason": "evidence_budget_exhausted",
+            "required_site": null,
+            "revision": 0,
+            "selected_site": null,
+            "site_query": {
+              "selected": {
+                "bearing": 7,
+                "planet": 0
+              }
+            },
+            "sites_available": 1,
+            "survey_rejected_by": null,
+            "tick": 19380
+          },
+          "context": {
+            "flag": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 111.47576904296875,
+                "y": 29.762920379638672
+              },
+              "range": 2.799999952316284,
+              "revision": 0
+            },
+            "owner": "player_2",
+            "planet": 0,
+            "revision": 0
+          },
+          "cover_replans": 1,
+          "cover_search": {
+            "deadline_tick": 19734,
+            "finished_tick": 19380,
+            "guidance": null,
+            "hold_altitude": 61.11961364746094,
+            "objective": {
+              "owner": "player_2",
+              "planet": 0,
+              "position": {
+                "x": 111.47581481933594,
+                "y": 29.762920379638672
+              },
+              "range": 2.799999952316284,
+              "revision": 0
+            },
+            "omitted": 6,
+            "outcome": "evidence_budget_exhausted",
+            "pending": [],
+            "planet": 0,
+            "probes": 8,
+            "revision": 0,
+            "seeded": true,
+            "started_tick": 19134
+          },
+          "failed_tick": 19380,
+          "kind": "incomplete_search",
+          "reason": "cover search probe budget exhausted with unmeasured candidates",
+          "selected_tick": 18293,
+          "site": null,
+          "started_tick": 18793
+        },
+        "planet_observation": {
+          "claim": {
+            "captures": 3,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": -0.29979702830314636,
+                "y": 0.9540030360221863
+              },
+              "player": "player_2",
+              "position": {
+                "x": 999.4624633789062,
+                "y": 1446.2789306640625
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 2,
+            "owner": "player_2",
+            "phase": "idle",
+            "planet": 0,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "aboard"
+          },
+          "index": 0,
+          "motion": {
+            "angle": 1.616715908050537,
+            "position": {
+              "x": 1034.3111572265625,
+              "y": 1336.286865234375
+            },
+            "spin": -0.03308035433292389,
+            "velocity": {
+              "x": -18.38709259033203,
+              "y": 2.3548738956451416
+            }
+          },
+          "radius": 116.54698181152344,
+          "revision": 1
+        }
+      },
+      {
+        "name": "recorded-recorded-asteroids-cover-candidate-candidate",
+        "seat": 1,
+        "successful_selected_tick": 12155,
+        "input": {
+          "path": "target/destination-retry/v1/recorded-recorded-asteroids-cover-candidate-candidate/trace.jsonl",
+          "sha256": "480f1b3a61666e04f2f5f0337796315c3eab467a8d95536ba96a9c26de5c10ed"
+        },
+        "first_observed_clear_tick": 4545,
+        "failure": {
+          "acquisition": {
+            "checks": {
+              "directions": 0,
+              "eligible": 0,
+              "previously_rejected": 0,
+              "required_site": 0,
+              "route_absent": 0,
+              "route_unusable": 0,
+              "solar_cooldown": 0,
+              "survey_unavailable": 0,
+              "unsafe_approach": 0,
+              "unsafe_departure": 0,
+              "unsafe_parking": 0,
+              "unsafe_solar": 0
+            },
+            "generation": null,
+            "measurement_tick": null,
+            "objective": {
+              "owner": "player_1",
+              "planet": 1,
+              "position": {
+                "x": 147.09146118164062,
+                "y": 4.860160827636719
+              },
+              "range": 2.799999952316284,
+              "revision": 9
+            },
+            "objective_work": null,
+            "planet": 1,
+            "reason": "on_foot",
+            "required_site": null,
+            "revision": 9,
+            "selected_site": {
+              "bearing": 4,
+              "planet": 1
+            },
+            "site_query": {
+              "selected": {
+                "bearing": 4,
+                "planet": 1
+              }
+            },
+            "sites_available": 1,
+            "survey_rejected_by": null,
+            "tick": 4186
+          },
+          "context": {
+            "flag": {
+              "owner": "player_1",
+              "planet": 1,
+              "position": {
+                "x": 147.09146118164062,
+                "y": 4.860160827636719
+              },
+              "range": 2.799999952316284,
+              "revision": 9
+            },
+            "owner": "player_1",
+            "planet": 1,
+            "revision": 9
+          },
+          "cover_replans": 1,
+          "cover_search": {
+            "deadline_tick": 3045,
+            "finished_tick": 2475,
+            "guidance": null,
+            "hold_altitude": 60.0,
+            "objective": {
+              "owner": "player_1",
+              "planet": 1,
+              "position": {
+                "x": 147.0914306640625,
+                "y": 4.86016845703125
+              },
+              "range": 2.799999952316284,
+              "revision": 3
+            },
+            "omitted": 0,
+            "outcome": "selected_covered_route",
+            "pending": [],
+            "planet": 1,
+            "probes": 0,
+            "revision": 3,
+            "seeded": false,
+            "started_tick": 2445
+          },
+          "failed_tick": 4186,
+          "kind": "observed_ground_route_failure",
+          "reason": "no complete flag round trip in fresh surveys",
+          "selected_tick": 1,
+          "site": {
+            "bearing": 4,
+            "planet": 1
+          },
+          "started_tick": 1770
+        },
+        "planet_observation": {
+          "claim": {
+            "captures": 1,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": -0.7142733931541443,
+                "y": -0.6998668313026428
+              },
+              "player": "player_1",
+              "position": {
+                "x": 1456.4268798828125,
+                "y": 1245.029052734375
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 0,
+            "owner": "player_1",
+            "phase": "idle",
+            "planet": 1,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "aboard"
+          },
+          "index": 1,
+          "motion": {
+            "angle": -2.3969507217407227,
+            "position": {
+              "x": 1561.2939453125,
+              "y": 1348.2879638671875
+            },
+            "spin": -0.03164470195770264,
+            "velocity": {
+              "x": 7.1262946128845215,
+              "y": -14.007772445678711
+            }
+          },
+          "radius": 148.65867614746094,
+          "revision": 10
+        }
+      }
+    ]
+  },
+  "successful_retry_contexts_sha256": "00e5e54db616b2e7001bb263d0573f2d693eaf575b139fa00b3d4beda63f90fa",
+  "checks": {
+    "ai_unit_tests": 314,
+    "physical_destination_tests": 4,
+    "harness_tests": 39,
+    "python_tests": 615,
+    "total_tests": 972,
+    "rustfmt": true,
+    "strict_ai_clippy_no_deps": true,
+    "profiled_release_build": true,
+    "normal_release_build": true,
+    "commands": [
+      "CARGO_TARGET_DIR=target RUST_MIN_STACK=16777216 cargo +1.89.0 test --offline --locked --profile ci -p spacewars-ai --lib --test capture_destination --example surface_mission_soak",
+      "python3 -m unittest discover -s tools/tests",
+      "cargo +1.89.0 fmt --all -- --check",
+      "CARGO_TARGET_DIR=target cargo +1.89.0 clippy --offline --locked --profile ci -p spacewars-ai --lib --no-deps -- -D warnings",
+      "CARGO_TARGET_DIR=target cargo +1.89.0 build --offline --locked --release -p spacewars-ai --example surface_mission_soak --features sensor-profile",
+      "CARGO_TARGET_DIR=target cargo +1.89.0 build --offline --locked --release -p spacewars-ai --example surface_mission_soak"
+    ],
+    "logs": {
+      "rust-tests": {
+        "path": "/tmp/destination-retry-rust-tests.log",
+        "sha256": "1097e0ccd6d7ab6fd64925dbe54979602eabd237f7765aab48df926a5bdb6e15"
+      },
+      "python-tests": {
+        "path": "/tmp/destination-retry-python-tests.log",
+        "sha256": "63e1061c8240a80d19a0d6816407c920ecd34e52e088b7d6388ba2d8d7742908"
+      },
+      "clippy": {
+        "path": "/tmp/destination-retry-clippy.log",
+        "sha256": "0d83f6bb8407da06d742c41d654210061221850795305217724838d586e82815"
+      },
+      "build": {
+        "path": "/tmp/destination-retry-build.log",
+        "sha256": "0db9c3f95b11709423e32d3cbad13ba98b6b0e88e67ad150a94a581a434cae7a"
+      },
+      "normal-build": {
+        "path": "/tmp/destination-retry-normal-build.log",
+        "sha256": "e1dc533b06d04db3c0f52a430f29b23efa39bee2a90cdfee105fb23a3bae5efe"
+      },
+      "validation": {
+        "path": "/tmp/destination-retry-validation.log",
+        "sha256": "df7dc4723edec8a83bb8be5c1ffbe93a339a8b6db744cd2b58cc7112c8658cd1"
+      }
+    }
+  },
+  "decision": {
+    "promote": false,
+    "defaults_changed": false,
+    "retain_opt_in": true,
+    "reason": "Both recorded directed value loops gain one completed neutral capture, with the two prior successful retries and all 14 other recorded pairs preserved. The 16 fresh pairs are physically identical and contain no destination-preference intervention, so no broader strength gain is established.",
+    "limitations": [
+      "The fresh four worlds are reused across seats and asteroid settings; paired outcomes are correlated.",
+      "The recorded cover-disabled and cover-enabled variants reuse a directed fixture and are not independent strength samples.",
+      "No gameplay initial-picker change occurs in this study; that path is exercised by unit tests. The observed intervention is value-switch rejection.",
+      "The fresh arms each win eight and lose eight with 42 completed sorties. Only two unclaimed capture failures are recorded there, both later invalidated; no fallback retry or choice change occurs.",
+      "Both formerly successful retries follow material revision changes observed before the return. This does not prove the changes caused success.",
+      "After completing the neutral capture, both improved directed runs still return to and fail at the remaining enemy planet. The blocked approach itself is unresolved.",
+      "Switch-rejection counts include repeated forecasts on adjacent control ticks, not independent decisions.",
+      "Recorded eligible time and time without progress increase while time after 20 seconds without progress is unchanged; this is not evidence of a broad stall reduction."
+    ]
+  }
+}

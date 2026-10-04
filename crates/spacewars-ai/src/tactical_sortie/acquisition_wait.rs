@@ -87,6 +87,9 @@ impl TacticalSortiePilot {
         o: &TacticalSortieObservationV1,
         clearance_speed: f32,
     ) -> CombatIntent {
+        if let Some(intent) = self.wait_for_cover_evidence(o, clearance_speed) {
+            return intent;
+        }
         let p = &o.combat.recovery.flight.pilot;
         let offset = p.ship.position - p.planet.motion.position;
         let up = offset.normalized();
@@ -96,46 +99,64 @@ impl TacticalSortiePilot {
         }) else {
             return self.guide(o, legacy, Vec2::ZERO);
         };
-        let altitude = offset.length() - p.planet.radius;
-        let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-        let falling = (-relative.dot(up)).max(0.0);
-        // Foot rays saturate at 26: that is no hit in the short ray, not a
-        // measured high-altitude clearance. Preserve the clearance command
-        // around observed ground and while stopping a substantial inward fall.
-        let near_ground = p.landing.supported_feet > 0
-            || p.landing
-                .foot_clearances
-                .iter()
-                .any(|h| !h.is_finite() || *h < 25.0)
-            || altitude < 40.0 + falling * falling / 50.0;
-        let desired = up * ((wait.hold_altitude - altitude) * 0.5).clamp(-6.0, 12.0);
-        let solar_near = o.sun.is_some_and(|sun| {
-            let next = p.ship.position + (p.planet.velocity_at(p.ship.position) + desired) * 2.0;
-            crate::landing_safety::distance_to_segment(sun.position, p.ship.position, next)
-                < sun.heat_radius + 10.0
-        });
-        let guidance = if p.tick.saturating_sub(wait.started_tick) < CLEARANCE_GRACE_TICKS {
-            "initial_clearance"
-        } else if near_ground {
-            "ground_clearance"
-        } else if solar_near {
-            "solar_clearance"
-        } else {
-            "hold_altitude"
-        };
+        let (desired, guidance) = waiting_velocity(
+            o,
+            wait.hold_altitude,
+            p.tick.saturating_sub(wait.started_tick) < CLEARANCE_GRACE_TICKS,
+            clearance_speed,
+        );
         let state = self.telemetry.acquisition_wait.as_mut().unwrap();
         state.last_wait_reason = self.telemetry.acquisition.map(|a| a.reason);
         state.guidance = Some(guidance);
-        self.guide(
-            o,
-            if guidance == "hold_altitude" {
-                desired
-            } else {
-                legacy
-            },
-            Vec2::ZERO,
-        )
+        self.guide(o, desired, Vec2::ZERO)
     }
+}
+
+/// Both bounded waits retain the existing ground and solar clearance guards.
+pub(super) fn waiting_velocity(
+    o: &TacticalSortieObservationV1,
+    hold_altitude: f32,
+    initial_clearance: bool,
+    clearance_speed: f32,
+) -> (Vec2, &'static str) {
+    let p = &o.combat.recovery.flight.pilot;
+    let offset = p.ship.position - p.planet.motion.position;
+    let up = offset.normalized();
+    let altitude = offset.length() - p.planet.radius;
+    let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
+    let falling = (-relative.dot(up)).max(0.0);
+    // Foot rays saturate at 26: that is no hit in the short ray, not a
+    // measured high-altitude clearance. Preserve the clearance command
+    // around observed ground and while stopping a substantial inward fall.
+    let near_ground = p.landing.supported_feet > 0
+        || p.landing
+            .foot_clearances
+            .iter()
+            .any(|h| !h.is_finite() || *h < 25.0)
+        || altitude < 40.0 + falling * falling / 50.0;
+    let desired = up * ((hold_altitude - altitude) * 0.5).clamp(-6.0, 12.0);
+    let solar_near = o.sun.is_some_and(|sun| {
+        let next = p.ship.position + (p.planet.velocity_at(p.ship.position) + desired) * 2.0;
+        crate::landing_safety::distance_to_segment(sun.position, p.ship.position, next)
+            < sun.heat_radius + 10.0
+    });
+    let guidance = if initial_clearance {
+        "initial_clearance"
+    } else if near_ground {
+        "ground_clearance"
+    } else if solar_near {
+        "solar_clearance"
+    } else {
+        "hold_altitude"
+    };
+    (
+        if guidance == "hold_altitude" {
+            desired
+        } else {
+            up * clearance_speed
+        },
+        guidance,
+    )
 }
 
 #[cfg(test)]

@@ -24,6 +24,103 @@ pub struct TransferScanClock {
     pub site_selection_seconds: Option<f32>,
 }
 
+impl TransferScanClock {
+    pub(super) fn new(
+        bot: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        destination: usize,
+        cadence: LandingSurveyCadence,
+    ) -> Self {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let planet = o.planets.iter().find(|p| p.index == destination).unwrap();
+        let last_survey = bot.sensor_request().last_survey;
+        // Native matches accumulate integer nanoseconds. Dividing seconds by
+        // the f64 tick can round an exact deadline upward (e.g. 31 ticks).
+        let remaining = o
+            .match_context
+            .as_ref()
+            .and_then(|m| m.remaining_seconds)
+            .map(|seconds| {
+                let duration = std::time::Duration::try_from_secs_f64(seconds)
+                    .map_err(|_| "match duration unsupported")?;
+                u64::try_from(duration.as_nanos().div_ceil(16_666_667))
+                    .map_err(|_| "match duration unsupported")
+            })
+            .transpose();
+        let unknown = if !arrival_local::neutral_claim(planet) {
+            Some("claim outside neutral-idle scan domain")
+        } else if last_survey.is_some_and(|s| s.tick > p.tick) {
+            Some("survey history later than source")
+        } else if o.match_context.as_ref().is_some_and(|m| {
+            m.finished
+                || m.pilots_alive.iter().any(|alive| !alive)
+                || m.remaining_seconds
+                    .is_some_and(|s| !s.is_finite() || s < 0.0)
+        }) {
+            Some("match unavailable for scan clock")
+        } else if remaining.is_err() {
+            Some("match duration unsupported")
+        } else {
+            None
+        };
+        Self {
+            model: "conditional_neutral_scan_v1",
+            source_tick: p.tick,
+            actor: p.owner,
+            destination,
+            revision: planet.revision,
+            form: p.ship_form,
+            cadence,
+            last_survey,
+            match_remaining_ticks: remaining.unwrap_or(None),
+            complete: false,
+            handoff_tick: None,
+            request_tick: None,
+            opportunity_tick: None,
+            handoff_to_scan_ticks: None,
+            unknown,
+            conditions: "query-ready native handoff at the predicted tick; uninterrupted capture requests in the same approach frame and ship form; unchanged neutral claim and material; supplied native cadence; no intervening survey",
+            site_selection_seconds: None,
+        }
+    }
+
+    pub(super) fn finish(&mut self, end: TransferForecastEnd, transfer_ticks: u64) {
+        self.complete = true;
+        if end != TransferForecastEnd::KinematicHandoff {
+            self.unknown.get_or_insert("no conditional handoff");
+            return;
+        }
+        self.handoff_tick = self.source_tick.checked_add(transfer_ticks);
+        if self.unknown.is_some() {
+            return;
+        }
+        let result = (|| {
+            let handoff = self.handoff_tick.ok_or("scan clock overflow")?;
+            let request = handoff.checked_add(1).ok_or("scan clock overflow")?;
+            self.request_tick = Some(request);
+            let delay = self.cadence.survey_delay_ticks(
+                request,
+                self.actor.index(),
+                (self.destination, self.form),
+                self.last_survey,
+                false,
+            );
+            let scan = request.checked_add(delay).ok_or("scan clock overflow")?;
+            // Match completion precedes controller intent at the deadline tick.
+            if self
+                .match_remaining_ticks
+                .is_some_and(|limit| scan - self.source_tick >= limit)
+            {
+                return Err("match ends before scan opportunity");
+            }
+            self.opportunity_tick = Some(scan);
+            self.handoff_to_scan_ticks = Some(scan - handoff);
+            Ok(())
+        })();
+        self.unknown = result.err();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,102 +263,5 @@ mod tests {
             );
             assert_eq!(clock.opportunity_tick.is_some(), nanos > 31 * 16_666_667);
         }
-    }
-}
-
-impl TransferScanClock {
-    pub(super) fn new(
-        bot: &MaterialMissionPilot,
-        o: &MissionObservationV1,
-        destination: usize,
-        cadence: LandingSurveyCadence,
-    ) -> Self {
-        let p = &o.local.combat.recovery.flight.pilot;
-        let planet = o.planets.iter().find(|p| p.index == destination).unwrap();
-        let last_survey = bot.sensor_request().last_survey;
-        // Native matches accumulate integer nanoseconds. Dividing seconds by
-        // the f64 tick can round an exact deadline upward (e.g. 31 ticks).
-        let remaining = o
-            .match_context
-            .as_ref()
-            .and_then(|m| m.remaining_seconds)
-            .map(|seconds| {
-                let duration = std::time::Duration::try_from_secs_f64(seconds)
-                    .map_err(|_| "match duration unsupported")?;
-                u64::try_from(duration.as_nanos().div_ceil(16_666_667))
-                    .map_err(|_| "match duration unsupported")
-            })
-            .transpose();
-        let unknown = if !arrival_local::neutral_claim(planet) {
-            Some("claim outside neutral-idle scan domain")
-        } else if last_survey.is_some_and(|s| s.tick > p.tick) {
-            Some("survey history later than source")
-        } else if o.match_context.as_ref().is_some_and(|m| {
-            m.finished
-                || m.pilots_alive.iter().any(|alive| !alive)
-                || m.remaining_seconds
-                    .is_some_and(|s| !s.is_finite() || s < 0.0)
-        }) {
-            Some("match unavailable for scan clock")
-        } else if remaining.is_err() {
-            Some("match duration unsupported")
-        } else {
-            None
-        };
-        Self {
-            model: "conditional_neutral_scan_v1",
-            source_tick: p.tick,
-            actor: p.owner,
-            destination,
-            revision: planet.revision,
-            form: p.ship_form,
-            cadence,
-            last_survey,
-            match_remaining_ticks: remaining.unwrap_or(None),
-            complete: false,
-            handoff_tick: None,
-            request_tick: None,
-            opportunity_tick: None,
-            handoff_to_scan_ticks: None,
-            unknown,
-            conditions: "query-ready native handoff at the predicted tick; uninterrupted capture requests in the same approach frame and ship form; unchanged neutral claim and material; supplied native cadence; no intervening survey",
-            site_selection_seconds: None,
-        }
-    }
-
-    pub(super) fn finish(&mut self, end: TransferForecastEnd, transfer_ticks: u64) {
-        self.complete = true;
-        if end != TransferForecastEnd::KinematicHandoff {
-            self.unknown.get_or_insert("no conditional handoff");
-            return;
-        }
-        self.handoff_tick = self.source_tick.checked_add(transfer_ticks);
-        if self.unknown.is_some() {
-            return;
-        }
-        let result = (|| {
-            let handoff = self.handoff_tick.ok_or("scan clock overflow")?;
-            let request = handoff.checked_add(1).ok_or("scan clock overflow")?;
-            self.request_tick = Some(request);
-            let delay = self.cadence.survey_delay_ticks(
-                request,
-                self.actor.index(),
-                (self.destination, self.form),
-                self.last_survey,
-                false,
-            );
-            let scan = request.checked_add(delay).ok_or("scan clock overflow")?;
-            // Match completion precedes controller intent at the deadline tick.
-            if self
-                .match_remaining_ticks
-                .is_some_and(|limit| scan - self.source_tick >= limit)
-            {
-                return Err("match ends before scan opportunity");
-            }
-            self.opportunity_tick = Some(scan);
-            self.handoff_to_scan_ticks = Some(scan - handoff);
-            Ok(())
-        })();
-        self.unknown = result.err();
     }
 }

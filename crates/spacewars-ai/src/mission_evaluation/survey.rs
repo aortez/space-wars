@@ -1,6 +1,6 @@
-//! One neutral destination and two material bearings. V16 may refresh the
-//! bearings as the ship moves and rank their measured approach geometry.
-//! The host registers demand after controls through its existing query budget.
+//! Two bearings per neutral planet: v13 may opt into current plus alternative;
+//! v14-v16 retain one destination, with v16 refreshing and ranking approaches.
+//! The host registers demand after controls and keeps its existing query budget.
 use super::*;
 use scenario_spacewars::surface_sortie::{
     destination_cover::{CoverFinding, DestinationCoverRequest},
@@ -10,7 +10,7 @@ use scenario_spacewars::surface_sortie::{
 #[derive(Clone)]
 pub(super) struct AlternativeSurvey {
     request: DestinationCoverRequest,
-    key: PlanetKey,
+    keys: Vec<PlanetKey>,
     target: usize,
     visit: Option<u64>,
     approach_aware: bool,
@@ -60,6 +60,7 @@ pub(super) fn request(
     retained: &mut Option<AlternativeSurvey>,
     o: &MissionObservationV1,
     mission: &MissionTelemetry,
+    include_current: bool,
 ) -> Option<DestinationCoverRequest> {
     let p = &o.local.combat.recovery.flight.pilot;
     let eligible = o.planets.len() <= MAX_PLANETS
@@ -78,22 +79,39 @@ pub(super) fn request(
         *retained = None;
         return None;
     };
-    let Some(planet) = candidate_planets(o, mission)
+    let options: Vec<_> = candidate_planets(o, mission)
         .into_iter()
         .take(MAX_OPTIONS)
-        .find(|planet| {
-            (planet.index != target || flag_evidence::enabled(mission.policy))
-                && planet.claim.as_ref().is_some_and(|c| {
-                    c.owner.is_none()
-                        && c.flag.is_none()
-                        && (c.stage_required_seconds - 3.0).abs() <= 0.001
-                })
+        .filter(|planet| {
+            planet.claim.as_ref().is_some_and(|c| {
+                c.owner.is_none()
+                    && c.flag.is_none()
+                    && (c.stage_required_seconds - 3.0).abs() <= 0.001
+            })
         })
-    else {
+        .collect();
+    // Keep v14-v16's single-planet demand independent of the v13 experiment.
+    let planets: Vec<_> = if flag_evidence::enabled(mission.policy) {
+        options.into_iter().take(1).collect()
+    } else {
+        let current = options
+            .iter()
+            .copied()
+            .find(|planet| include_current && planet.index == target);
+        let alternative = options
+            .iter()
+            .copied()
+            .find(|planet| planet.index != target);
+        current.into_iter().chain(alternative).collect()
+    };
+    if planets.is_empty() {
         *retained = None;
         return None;
-    };
-    let key = PlanetKey::read(planet);
+    }
+    let keys: Vec<_> = planets
+        .iter()
+        .map(|planet| PlanetKey::read(planet))
+        .collect();
     let visit = selection_tick(mission);
     let approach_aware =
         mission.policy == crate::mission_policy::MissionPolicy::ApproachSurveyPlanner.id();
@@ -103,21 +121,30 @@ pub(super) fn request(
     if retained.as_ref().is_none_or(|old| {
         old.target != target
             || old.visit != visit
-            || !old.key.matches(&key)
+            || old.keys.len() != keys.len()
+            || !old
+                .keys
+                .iter()
+                .zip(&keys)
+                .all(|(old, new)| old.matches(new))
             || old.request.generation > p.tick
             || old.approach_aware != approach_aware
             || (approach_aware
                 && available
                 && p.tick.saturating_sub(old.request.generation) >= RETARGET_TICKS
-                && old.request.candidates != candidates(o, planet))
+                && old.request.candidates != candidates(o, planets[0]))
     }) {
+        let mut candidates = [None; 4];
+        for (index, planet) in planets.iter().enumerate() {
+            candidates[index * 2..index * 2 + 2].copy_from_slice(&self::candidates(o, planet)[..2]);
+        }
         *retained = Some(AlternativeSurvey {
             request: DestinationCoverRequest {
                 generation: p.tick,
-                candidates: candidates(o, planet),
+                candidates,
                 sample_climb: true,
             },
-            key,
+            keys,
             target,
             visit,
             approach_aware,
@@ -130,83 +157,95 @@ pub(super) fn request(
 pub(super) fn evidence(
     retained: &Option<AlternativeSurvey>,
     o: &MissionObservationV1,
-) -> Option<LocalEvidence> {
-    let request = retained.as_ref()?;
-    let result = o.destination_cover.as_ref()?;
+) -> Vec<LocalEvidence> {
+    let Some(request) = retained.as_ref() else {
+        return Vec::new();
+    };
+    let Some(result) = o.destination_cover.as_ref() else {
+        return Vec::new();
+    };
     let p = &o.local.combat.recovery.flight.pilot;
     if !p.queries_ready || result.generation != request.request.generation {
-        return None;
+        return Vec::new();
     }
-    let planet = o
-        .planets
+    request
+        .keys
         .iter()
-        .take(MAX_PLANETS)
-        .find(|v| v.index == request.key.planet)?;
-    if !request.key.matches(&PlanetKey::read(planet)) {
-        return None;
-    }
-    result
-        .candidates
-        .iter()
-        .take(2)
-        .filter_map(|candidate| {
-            if !request.request.candidates.contains(&Some(candidate.id)) {
+        .filter_map(|key| {
+            let planet = o
+                .planets
+                .iter()
+                .take(MAX_PLANETS)
+                .find(|v| v.index == key.planet)?;
+            if !key.matches(&PlanetKey::read(planet)) {
                 return None;
             }
-            let m = candidate.measurement.as_ref()?;
-            if m.tick < request.request.generation
-                || m.tick > p.tick
-                || p.tick - m.tick > MAX_EVIDENCE_AGE
-                || m.revision != planet.revision
-                || m.ship_form != ShipForm::Ship
-            {
-                return None;
-            }
-            let approach = request
-                .approach_aware
-                .then(|| approach_angle(m, planet, p.ship.position))
-                .flatten();
-            let reason = if m.finding != CoverFinding::Measured {
-                Some("alternative landing unavailable or incomplete")
-            } else if m.site.is_none_or(|s| {
-                s.id != candidate.id
-                    || s.revision != m.revision
-                    || !s.boarding_hatches.iter().any(Option::is_some)
-            }) {
-                Some("alternative exit or boarding unmeasured")
-            } else if m.climb_clear != Some(true) {
-                Some("alternative climb samples blocked or unmeasured")
-            } else if request.approach_aware && approach.is_none() {
-                Some("alternative approach geometry unavailable")
-            } else {
-                None
-            };
-            Some((
-                LocalEvidence {
-                    key: request.key,
-                    site: candidate.id,
-                    tick: m.tick,
-                    gravity: 0.0,
-                    costs: reason.is_none().then(model::no_flag_costs),
-                    reason,
-                    choice: None,
-                    route_source_tick: None,
-                    route_validated_tick: None,
-                    route_objective: None,
-                    remote: true,
-                },
-                approach,
-            ))
+            result
+                .candidates
+                .iter()
+                .take(request.keys.len() * 2)
+                .filter_map(|candidate| {
+                    if candidate.id.planet != key.planet
+                        || !request.request.candidates.contains(&Some(candidate.id))
+                    {
+                        return None;
+                    }
+                    let m = candidate.measurement.as_ref()?;
+                    if m.tick < request.request.generation
+                        || m.tick > p.tick
+                        || p.tick - m.tick > MAX_EVIDENCE_AGE
+                        || m.revision != planet.revision
+                        || m.ship_form != ShipForm::Ship
+                    {
+                        return None;
+                    }
+                    let approach = request
+                        .approach_aware
+                        .then(|| approach_angle(m, planet, p.ship.position))
+                        .flatten();
+                    let reason = if m.finding != CoverFinding::Measured {
+                        Some("alternative landing unavailable or incomplete")
+                    } else if m.site.is_none_or(|s| {
+                        s.id != candidate.id
+                            || s.revision != m.revision
+                            || !s.boarding_hatches.iter().any(Option::is_some)
+                    }) {
+                        Some("alternative exit or boarding unmeasured")
+                    } else if m.climb_clear != Some(true) {
+                        Some("alternative climb samples blocked or unmeasured")
+                    } else if request.approach_aware && approach.is_none() {
+                        Some("alternative approach geometry unavailable")
+                    } else {
+                        None
+                    };
+                    Some((
+                        LocalEvidence {
+                            key: *key,
+                            site: candidate.id,
+                            tick: m.tick,
+                            gravity: 0.0,
+                            costs: reason.is_none().then(model::no_flag_costs),
+                            reason,
+                            choice: None,
+                            route_source_tick: None,
+                            route_validated_tick: None,
+                            route_objective: None,
+                            remote: true,
+                        },
+                        approach,
+                    ))
+                })
+                .min_by(|a, b| {
+                    a.0.reason
+                        .is_some()
+                        .cmp(&b.0.reason.is_some())
+                        .then_with(|| a.1.unwrap_or(0.0).total_cmp(&b.1.unwrap_or(0.0)))
+                        .then_with(|| b.0.tick.cmp(&a.0.tick))
+                        .then(a.0.site.bearing.cmp(&b.0.site.bearing))
+                })
+                .map(|(sample, _)| sample)
         })
-        .min_by(|a, b| {
-            a.0.reason
-                .is_some()
-                .cmp(&b.0.reason.is_some())
-                .then_with(|| a.1.unwrap_or(0.0).total_cmp(&b.1.unwrap_or(0.0)))
-                .then_with(|| b.0.tick.cmp(&a.0.tick))
-                .then(a.0.site.bearing.cmp(&b.0.site.bearing))
-        })
-        .map(|(sample, _)| sample)
+        .collect()
 }
 
 /// Rank at the observed pose, not a predicted arrival. Reproject the measured

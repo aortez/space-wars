@@ -1,5 +1,11 @@
 # Budgeted planning for material-match bots
 
+For the subsequent local mission-execution work and its stopping point, see the
+[route-evidence checkpoint](../bot-route-evidence-checkpoint.md). It connects
+route delivery, physical capture/recovery and projectile-response experiments
+to the remaining policy-quality and device-performance gates. The historical
+milestones below retain their original scope and evidence.
+
 Status: steps 1–2 are merged. The first selectable
 joint-trip candidate and seat-swapped comparison harness are described in
 [mission policy comparison](../mission-policy-comparison.md). Step 3 now has a

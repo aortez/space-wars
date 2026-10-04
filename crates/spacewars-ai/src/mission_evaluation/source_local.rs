@@ -173,9 +173,11 @@ impl MissionEvaluator {
             let fresh = if local {
                 model::observe_local(o, mission)
             } else {
-                state
-                    .and_then(|s| survey::evidence(&s.survey, o))
-                    .filter(|s| s.key.planet == destination)
+                state.and_then(|s| {
+                    survey::evidence(&s.survey, o)
+                        .into_iter()
+                        .find(|sample| sample.key.planet == destination)
+                })
             };
             let sample = match fresh {
                 Some(mut sample) => {
