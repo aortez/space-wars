@@ -181,3 +181,38 @@ has SHA-256 `3801be7ce18226c62e283d694eafce88711b5808501e0245b8bab49ceb79bb42`.
 Full local artifacts are under `target/integrated-bot`. The planned evaluation
 case directories do not exist yet: **0/16 qualification and 0/96 fresh matches
 have run**. Passing startup checks is configuration evidence only.
+
+### Execution protocol
+
+[The evaluation runner](../tools/validate-integrated-bot.py) consumes the exact
+hashed plan and copied binary above; it does not regenerate commands or replace
+parameters. Freeze the runner, its tests and this protocol before qualification:
+
+```sh
+python3 tools/validate-integrated-bot.py \
+  --plan target/integrated-bot/comparison-v1/plan.json \
+  --out target/integrated-bot/evaluation-v1
+```
+
+Two workers execute one control/candidate pair at a time. A failed case or audit
+drains that pair, records both results and stops before submitting another pair.
+Successful cases retain hashes of every raw file and a separate audit document.
+The existing visit, publication, powered-route, walking-feedback, launch,
+continuation, flag-admission, accepted-switch and shared-allocation auditors are
+reused. The combined physical pass also checks dense per-seat clocks and counts
+owned-planet ticks from consumed observations. Desktop timings remain diagnostic.
+
+For the useful-completion screen, compare actual completed visits by planet and
+completion ordinal. An additional completion, or an earlier same-planet ordinal,
+qualifies only after the pair's first changed action. This is a comparison of
+two executed trajectories, not an outcome assigned to an unchosen forecast.
+A missing directed control completion fails the directed guard even if the
+candidate completed a different planet. The acceptance screen uses integer
+cross-products for no-progress fractions; a net overall match tie cannot hide
+a decline within one of the predeclared opponent/seat/asteroid aggregates.
+
+If an auditor needs correction, preserve its failed summary, freeze the change,
+and use a fresh output directory with `--previous PATH/summary.json`. That mode
+verifies and re-audits every prior raw file before continuing the same unrun
+cases. It does not silently overwrite or rerun recorded games. Qualification
+regressions remain in the final decision; only validity failures stop collection.
