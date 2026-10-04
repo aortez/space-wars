@@ -82,6 +82,15 @@ impl CaptureEvidence {
         {
             record["actual_route_recovery"] = json!({"observation":o});
         }
+        if let Some(defense) = &m.acquisition_defense
+            && defense
+                .last
+                .as_ref()
+                .is_some_and(|a| a.observed_tick == p.tick)
+        {
+            record["acquisition_defense"] = json!({"telemetry":defense,"observation":o,
+                "pursuit":m.pursuit,"combat":m.combat});
+        }
         if let Some(escape) = &m.capture_escape
             && escape.last.is_some_and(|a| a.observed_tick == p.tick)
         {

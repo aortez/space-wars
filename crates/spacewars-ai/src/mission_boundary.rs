@@ -53,7 +53,14 @@ impl MaterialMissionPilot {
             .and_then(|s| s.last.as_mut())
             .filter(|a| a.finished_tick.is_none())
             .map(|a| &mut a.boundary);
-        let Some(guard) = capture_guard.or_else(|| {
+        let acquisition_guard = self
+            .telemetry
+            .acquisition_defense
+            .as_mut()
+            .and_then(|s| s.last.as_mut())
+            .filter(|a| a.finished_tick.is_none())
+            .map(|a| &mut a.boundary);
+        let Some(guard) = capture_guard.or(acquisition_guard).or_else(|| {
             self.telemetry
                 .disengagement
                 .as_mut()
