@@ -1,6 +1,7 @@
 use super::*;
 
 mod grains;
+mod probe;
 
 fn shot(lab: &BlastLab, speed: f32) -> Blast {
     Blast {

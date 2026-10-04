@@ -102,6 +102,10 @@ The local launcher includes the following scenarios and presets:
   collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
   craters and tunnels, inspect chunk colliders, and watch ray queries and physical
   support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
+- **terrain-grains** — the live loose-dirt sandbox: blast terrain into conserved
+  grains, drop a physical box onto the pile, and blast it again. Compare round,
+  grippy and angular grains on flat, sloped and moving planetary ground. See
+  [Live granular terrain](docs/granular-terrain-lab.md).
 - **Spacewars Terrain** — the Expedition loop on destructible ground: land, exit,
   claim with a surface flag, mine material, and rebuild after ship loss. Destroyed
   flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).

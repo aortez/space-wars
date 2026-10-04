@@ -3,7 +3,46 @@
 
 use super::*;
 
+/// A cell whose material ownership has left a field. The destination chooses
+/// its mechanics; cell_size² is the same unit-depth quantity as in the source.
+/// This carries nominal cell quantity, not an interpolated surface's area.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetachedCell {
+    pub cell: Cell,
+    pub cell_size: f32,
+    /// Original cell center in the source body's local frame.
+    pub parent_offset: Vec2,
+}
+
 impl Terrain {
+    /// Transfer occupied cells into individual samples for grains, particles,
+    /// or another representation. Preserves material, durability and location;
+    /// it does not award mining yield. Order is row-major and duplicates/void
+    /// cells are ignored. Invalid input leaves the field unchanged.
+    ///
+    /// Destinations are prepared before committing the source edit. A caller
+    /// with a bounded destination should prepare on a cloned field, admit the
+    /// whole transfer, then refresh geometry/colliders at its normal edit boundary.
+    pub fn extract_individual_cells(
+        &mut self,
+        coordinates: &[CellCoord],
+    ) -> Result<Vec<DetachedCell>, TerrainError> {
+        let indices = self.transfer_indices(coordinates)?;
+        let samples = indices
+            .iter()
+            .map(|&index| DetachedCell {
+                cell: self.cells[index as usize],
+                cell_size: self.cell_size,
+                parent_offset: self.cell_center(CellCoord::new(
+                    (index % self.width) as i32,
+                    (index / self.width) as i32,
+                )),
+            })
+            .collect();
+        self.commit_transfer(&indices);
+        Ok(samples)
+    }
+
     /// Transfer selected occupied cells into independent connected fields.
     ///
     /// Coordinates must belong to this field. Duplicates and void cells are
@@ -19,23 +58,10 @@ impl Terrain {
         &mut self,
         coordinates: &[CellCoord],
     ) -> Result<Vec<DetachedTerrain>, TerrainError> {
-        let mut indices = Vec::with_capacity(coordinates.len());
-        for &coordinate in coordinates {
-            let cell = self
-                .cell(coordinate)
-                .ok_or(TerrainError("transfer coordinate outside field"))?;
-            if cell.material != MaterialId::VOID {
-                indices.push(coordinate.y as u32 * self.width + coordinate.x as u32);
-            }
-        }
-        indices.sort_unstable();
-        indices.dedup();
+        let indices = self.transfer_indices(coordinates)?;
         let Some(&first) = indices.first() else {
             return Ok(Vec::new());
         };
-        if self.revision == u64::MAX {
-            return Err(TerrainError("terrain revision exhausted"));
-        }
         let coordinate =
             |index: u32| CellCoord::new((index % self.width) as i32, (index / self.width) as i32);
         let mut bounds = CellBounds {
@@ -60,9 +86,35 @@ impl Terrain {
         let mut result = vec![selected];
         result.extend(others);
 
+        self.commit_transfer(&indices);
+        Ok(result)
+    }
+
+    fn transfer_indices(&self, coordinates: &[CellCoord]) -> Result<Vec<u32>, TerrainError> {
+        let mut indices = Vec::with_capacity(coordinates.len());
+        for &coordinate in coordinates {
+            let cell = self
+                .cell(coordinate)
+                .ok_or(TerrainError("transfer coordinate outside field"))?;
+            if cell.material != MaterialId::VOID {
+                indices.push(coordinate.y as u32 * self.width + coordinate.x as u32);
+            }
+        }
+        indices.sort_unstable();
+        indices.dedup();
+        if !indices.is_empty() && self.revision == u64::MAX {
+            return Err(TerrainError("terrain revision exhausted"));
+        }
+        Ok(indices)
+    }
+
+    fn commit_transfer(&mut self, indices: &[u32]) {
+        if indices.is_empty() {
+            return;
+        }
         self.revision += 1;
         let columns = self.width.div_ceil(CHUNK_SIZE);
-        for index in indices {
+        for &index in indices {
             self.cells[index as usize] = Cell::VOID;
             if let Some(distances) = &mut self.distances {
                 distances[index as usize] = -distances[index as usize].abs();
@@ -71,7 +123,6 @@ impl Terrain {
                 (index / self.width / CHUNK_SIZE) * columns + index % self.width / CHUNK_SIZE;
             self.chunk_revisions[chunk as usize] = self.revision;
         }
-        Ok(result)
     }
 
     pub(super) fn copy_region_cells(

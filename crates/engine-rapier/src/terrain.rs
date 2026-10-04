@@ -13,7 +13,7 @@ use crate::world::{
 };
 
 mod grain;
-pub use grain::{GrainSeed, TerrainGrain};
+pub use grain::{GrainSeed, GrainShape, TerrainGrain};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TerrainColliders {

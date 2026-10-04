@@ -56,6 +56,13 @@ impl BlastLab {
                 support_ids(grain.collider(), up(motion.position)).collect(),
             );
         }
+        // Grains may also be supported through the ordinary test object.
+        if let Some(probe) = self.probe_snapshot() {
+            supports.insert(
+                probe::body().entity,
+                support_ids(probe::collider(), up(probe.motion.position)).collect(),
+            );
+        }
         // Contact with another airborne piece does not establish ground support.
         let mut supported = BTreeSet::from([GROUND]);
         loop {
@@ -78,11 +85,14 @@ impl BlastLab {
                 Fixture::MovingPlanet => local.length() - PLANET_RADIUS,
             };
             stats.max_clearance = stats.max_clearance.max(clearance);
-            stats.above_surface_cells += u64::from(clearance > CELL_SIZE);
+            stats.above_surface_cells += u64::from(clearance > self.config.cell_size);
             let ground_velocity = self.physics.velocity_at_point(ground, point).unwrap();
             if supported.contains(&id)
                 && velocity.distance_to(ground_velocity) < 0.2
-                && (angular_velocity - ground_motion.angular_velocity).abs() * CELL_SIZE * 0.5 < 0.2
+                && (angular_velocity - ground_motion.angular_velocity).abs()
+                    * self.config.cell_size
+                    * 0.5
+                    < 0.2
             {
                 stats.supported_slow_cells += 1;
             }

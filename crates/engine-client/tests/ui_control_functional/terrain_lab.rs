@@ -6,6 +6,12 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
     run_terrain_lifecycle("terrain-lab");
 }
 
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn terrain_grains_launch_pause_restart_and_both_renderers() {
+    run_terrain_lifecycle("terrain-grains");
+}
+
 pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
     // Slint's software backend does not draw Path items. Femtovg exercises
     // actual vector paths as well as our software raster image and text overlay.
@@ -132,6 +138,39 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 &format!("{scenario}-{renderer}.png"),
                 minimum_scene_pixels,
             );
+            if scenario == "terrain-grains" {
+                for button in [
+                    spacewars_control::InputButton::South,
+                    spacewars_control::InputButton::West,
+                ] {
+                    let mut request = spacewars_control::InputPressRequest::new(&state, button);
+                    request.hold_ms = 2000;
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(5))
+                        .unwrap()
+                        .state;
+                }
+                let path = harness
+                    .capture_screenshot(&format!("{scenario}-{renderer}-box-and-grains.png"));
+                let mut reader = png::Decoder::new(File::open(path).unwrap())
+                    .read_info()
+                    .unwrap();
+                let mut buffer = vec![0; reader.output_buffer_size()];
+                let info = reader.next_frame(&mut buffer).unwrap();
+                let grains = buffer[..info.buffer_size()]
+                    .chunks_exact(4)
+                    .filter(|p| {
+                        (174..=179).contains(&p[0])
+                            && (120..=125).contains(&p[1])
+                            && (64..=69).contains(&p[2])
+                    })
+                    .count();
+                assert!(
+                    grains > 100,
+                    "blasted grains are absent from {renderer}: {grains} pixels"
+                );
+            }
             let first_instance = state.scenario_revision;
             let pause = harness.pause_guarded(&state);
             state = harness.wait_for(

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use engine_core::Vec2;
 use engine_gravity::{GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver};
 use engine_rapier::{
-    terrain::{GrainSeed, TerrainAssembly, TerrainFragment, TerrainGrain, TerrainSpec},
+    terrain::{GrainSeed, GrainShape, TerrainAssembly, TerrainFragment, TerrainGrain, TerrainSpec},
     world::{
         BodyId, BodyKind, BodyMotion, BodySpec, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
         PhysicsWorldConfig,
@@ -20,7 +20,6 @@ use engine_terrain::{
 use crate::{FIXED_HZ, ORE, ROCK};
 
 const GROUND: PhysicsId = PhysicsId::new(1);
-const CELL_SIZE: f32 = 0.5;
 const PLANET_RADIUS: f32 = 16.0;
 const GRAVITY: f32 = 18.0;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
@@ -29,6 +28,8 @@ const MAX_ACTIVE_PULSES: usize = 8;
 
 mod diagnostics;
 pub use diagnostics::MotionStats;
+mod probe;
+pub use probe::ProbeSnapshot;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Fixture {
@@ -89,6 +90,8 @@ pub struct BlastLabConfig {
     pub friction: f32,
     /// Number of fixed ticks sharing a pulse's maximum velocity-change budget.
     pub pulse_ticks: u32,
+    pub grain_shape: GrainShape,
+    pub cell_size: f32,
 }
 
 impl Default for BlastLabConfig {
@@ -101,6 +104,8 @@ impl Default for BlastLabConfig {
             max_loose_bodies: 128,
             friction: 0.35,
             pulse_ticks: 6,
+            grain_shape: GrainShape::Round,
+            cell_size: 0.5,
         }
     }
 }
@@ -154,6 +159,7 @@ pub struct BlastLab {
     next_id: u64,
     initial: [u64; 256],
     removed: [u64; 256],
+    probe: bool,
 }
 
 struct PreparedBody {
@@ -172,19 +178,27 @@ impl BlastLab {
             || !config.friction.is_finite()
             || !(0.0..=1.5).contains(&config.friction)
             || !(1..=30).contains(&config.pulse_ticks)
+            || !config.cell_size.is_finite()
+            || !(0.25..=1.0).contains(&config.cell_size)
         {
             return Err(TerrainError(
-                "invalid patch size, body limit, friction or pulse duration",
+                "invalid patch size, body limit, friction, pulse duration or cell size",
             ));
         }
         let (width, height) = match config.fixture {
-            Fixture::Flat | Fixture::Slope => (129, 81),
-            Fixture::MovingPlanet => (65, 65),
+            Fixture::Flat | Fixture::Slope => (
+                (64.0 / config.cell_size).ceil() as u32 + 1,
+                (40.0 / config.cell_size).ceil() as u32 + 1,
+            ),
+            Fixture::MovingPlanet => {
+                let side = (2.0 * PLANET_RADIUS / config.cell_size).ceil() as u32 + 1;
+                (side, side)
+            }
         };
         let terrain = Terrain::generate(
             width,
             height,
-            CELL_SIZE,
+            config.cell_size,
             vec![
                 Material {
                     id: ROCK,
@@ -199,7 +213,7 @@ impl BlastLab {
                 let local = Vec2::new(
                     c.x as f32 + 0.5 - width as f32 * 0.5,
                     c.y as f32 + 0.5 - height as f32 * 0.5,
-                ) * CELL_SIZE;
+                ) * config.cell_size;
                 let solid = match config.fixture {
                     Fixture::Flat => local.y <= 0.0,
                     Fixture::Slope => local.y <= SLOPE * local.x,
@@ -270,6 +284,7 @@ impl BlastLab {
             next_id: 2,
             initial,
             removed: [0; 256],
+            probe: false,
         })
     }
 
@@ -296,12 +311,21 @@ impl BlastLab {
             .map(|grain| (grain, self.physics.motion(grain.body()).unwrap()))
     }
 
-    fn loose_bodies(&self) -> impl Iterator<Item = BodyId> + '_ {
+    pub fn config(&self) -> BlastLabConfig {
+        self.config
+    }
+
+    pub fn ground_motion(&self) -> BodyMotion {
+        self.physics.motion(self.bodies[0].assembly.body()).unwrap()
+    }
+
+    fn moving_bodies(&self) -> impl Iterator<Item = BodyId> + '_ {
         self.bodies
             .iter()
             .skip(1)
             .map(|body| body.assembly.body())
             .chain(self.grains.iter().map(TerrainGrain::body))
+            .chain(self.probe.then_some(probe::body()))
     }
 
     /// Prepare every transfer before admitting the event. Population rejection
@@ -336,7 +360,7 @@ impl BlastLab {
             };
             let brush = Brush::Circle {
                 center,
-                radius: (blast.radius / CELL_SIZE).round() as u32,
+                radius: (blast.radius / body.terrain.cell_size()).round() as u32,
             };
             let selected: Vec<_> = body
                 .terrain
@@ -379,16 +403,7 @@ impl BlastLab {
                     }
                 }
                 BlastMode::Grains | BlastMode::GrainPulse => {
-                    for coordinate in &selected {
-                        grains.push(GrainSeed {
-                            cell: terrain.cell(*coordinate).unwrap(),
-                            cell_size: terrain.cell_size(),
-                            parent_offset: terrain.cell_center(*coordinate),
-                        });
-                    }
-                    // The prepared grains take ownership of every selected cell.
-                    // The returned fields are only the intermediate transfer.
-                    terrain.extract_cells(&selected)?;
+                    grains = terrain.extract_individual_cells(&selected)?;
                 }
             }
             released.extend(terrain.detach_disconnected()?);
@@ -472,7 +487,7 @@ impl BlastLab {
                     .checked_add(1)
                     .expect("blast fixture ID exhausted");
                 self.grains.push(
-                    TerrainGrain::insert(
+                    TerrainGrain::insert_with_shape(
                         &mut self.physics,
                         id,
                         seed,
@@ -482,6 +497,7 @@ impl BlastLab {
                             friction: self.config.friction,
                             ..TerrainSpec::default()
                         },
+                        self.config.grain_shape,
                     )
                     .expect("validated transferred grain"),
                 );
@@ -513,7 +529,7 @@ impl BlastLab {
         // Existing loose pieces and newly released ones receive the same impulse
         // policy. Geometry/velocities are committed before the next mechanics step.
         let mut accelerated = 0;
-        let dynamic: Vec<_> = self.loose_bodies().collect();
+        let dynamic: Vec<_> = self.moving_bodies().collect();
         for body in dynamic {
             let offset = self.physics.center_of_mass(body).unwrap() - blast.center;
             let distance = offset.length();
@@ -543,7 +559,7 @@ impl BlastLab {
                 self.pulses.push(pulse);
             }
         }
-        let dynamic: Vec<_> = self.loose_bodies().collect();
+        let dynamic: Vec<_> = self.moving_bodies().collect();
         match self.config.fixture {
             Fixture::Flat | Fixture::Slope => {
                 for body in dynamic {
@@ -624,7 +640,7 @@ impl BlastLab {
                 return Err(TerrainError("material geometry mismatch"));
             }
             if body.id != GROUND {
-                let expected = occupied as f32 * CELL_SIZE.powi(2);
+                let expected = occupied as f32 * body.terrain.cell_size().powi(2);
                 let mass = self.physics.body_mass(body.assembly.body()).unwrap();
                 if occupied == 0 || !mass.is_finite() || (mass - expected).abs() > expected * 0.0001
                 {
@@ -644,8 +660,16 @@ impl BlastLab {
                 return Err(TerrainError("transferred grain mass or motion mismatch"));
             }
         }
-        if total != self.initial || self.physics.body_count() != self.loose_body_count() + 1 {
+        if total != self.initial
+            || self.physics.body_count() != self.loose_body_count() + 1 + usize::from(self.probe)
+        {
             return Err(TerrainError("material or body accounting mismatch"));
+        }
+        if self
+            .probe_snapshot()
+            .is_some_and(|probe| !finite_motion(probe.motion))
+        {
+            return Err(TerrainError("nonfinite probe motion"));
         }
         Ok(balance)
     }
@@ -672,6 +696,19 @@ impl BlastLab {
         };
         for value in [self.tick, self.next_id, self.blasts, self.rejected_blasts] {
             write(value);
+        }
+        if let Some(probe) = self.probe_snapshot() {
+            write(2);
+            for value in [
+                probe.motion.position.x,
+                probe.motion.position.y,
+                probe.motion.angle,
+                probe.motion.linear_velocity.x,
+                probe.motion.linear_velocity.y,
+                probe.motion.angular_velocity,
+            ] {
+                write(value.to_bits() as u64);
+            }
         }
         for value in self.removed {
             write(value);
@@ -709,6 +746,7 @@ impl BlastLab {
             write(grain.id().value());
             write(u64::from(grain.cell().material.0));
             write(u64::from(grain.cell().durability));
+            write(grain.shape() as u64);
             for value in [
                 grain.cell_size(),
                 motion.position.x,

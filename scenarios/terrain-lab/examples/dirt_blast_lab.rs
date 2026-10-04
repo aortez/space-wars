@@ -152,6 +152,7 @@ fn run(args: &Args, fixture: Fixture, mode: BlastMode) -> Result<Value, Box<dyn 
         max_loose_bodies: args.max_loose_bodies as usize,
         friction: args.friction,
         pulse_ticks: args.pulse_ticks,
+        ..BlastLabConfig::default()
     };
     let mut lab = BlastLab::new(config)?;
     let mut capture = Capture::default();

@@ -22,6 +22,7 @@ use engine_terrain::{
 
 pub mod blast_lab;
 mod fragments;
+pub mod granular_lab;
 mod impacts;
 mod mining;
 mod render;

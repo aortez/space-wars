@@ -20,6 +20,7 @@ mod rover_lab;
 mod spaceling_lab;
 mod spacewars;
 mod surface_sortie;
+mod terrain_grains;
 mod terrain_lab;
 
 pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
@@ -425,6 +426,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     rover_lab::REGISTRATION,
     spaceling_lab::REGISTRATION,
     terrain_lab::REGISTRATION,
+    terrain_grains::REGISTRATION,
     surface_sortie::MATCH_REGISTRATION,
     spacewars::REGISTRATION,
     surface_sortie::REGISTRATION,
@@ -527,6 +529,7 @@ mod tests {
                 "rover-lab",
                 "spaceling-lab",
                 "terrain-lab",
+                "terrain-grains",
                 "spacewars",
                 "spacewars-classic",
                 "surface-sortie",

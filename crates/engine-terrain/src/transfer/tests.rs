@@ -158,3 +158,62 @@ fn sampled_boundaries_survive_transfer_serialization_and_repeated_extraction() {
         child_before.cells
     );
 }
+
+#[test]
+fn individual_transfer_preserves_damaged_cells_and_updates_the_surface() {
+    let mut source = field().with_surface_distances(|_| 0.3).unwrap();
+    let damaged = CellCoord::new(33, 32);
+    source
+        .apply(TerrainEdit {
+            brush: Brush::Circle {
+                center: damaged,
+                radius: 0,
+            },
+            mode: EditMode::Damage(37),
+        })
+        .unwrap();
+    let coordinates = [damaged, CellCoord::new(31, 31), damaged];
+    let before = source.clone();
+    let mut geometry = TerrainGeometry::new(&source);
+    let samples = source.extract_individual_cells(&coordinates).unwrap();
+    assert_eq!(samples.len(), 2);
+    for (sample, coordinate) in samples.iter().zip([coordinates[1], damaged]) {
+        assert_eq!(sample.cell, before.cell(coordinate).unwrap());
+        assert_eq!(sample.parent_offset, before.cell_center(coordinate));
+        assert_eq!(sample.cell_size, 0.5);
+        assert_eq!(source.cell(coordinate), Some(Cell::VOID));
+    }
+    assert_eq!(samples[1].cell.durability, 143);
+    assert_eq!(geometry.refresh(&source), [ChunkId(0), ChunkId(4)]);
+    source.validate().unwrap();
+    assert_eq!(source.revision(), before.revision() + 1);
+    let after = source.clone();
+    assert!(
+        source
+            .extract_individual_cells(&coordinates)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(source, after);
+}
+
+#[test]
+fn individual_transfer_is_atomic_on_invalid_input_or_exhausted_revision() {
+    let mut source = field();
+    let before = source.clone();
+    assert!(
+        source
+            .extract_individual_cells(&[CellCoord::new(2, 2), CellCoord::new(-1, 0)])
+            .is_err()
+    );
+    assert_eq!(source, before);
+    source.revision = u64::MAX;
+    let before = source.clone();
+    assert!(
+        source
+            .extract_individual_cells(&[CellCoord::new(2, 2)])
+            .is_err()
+    );
+    assert_eq!(source, before);
+    assert!(source.extract_individual_cells(&[]).unwrap().is_empty());
+}
