@@ -90,6 +90,13 @@ Dynamic destinations receive the grains' linear and angular momentum;
 prescribed terrain retains its commanded motion. Deposits can be blasted loose
 again, freeing and reusing the same bounded pool.
 
+Very thin surface differences can collapse to lines or points when converted
+back to single precision. Clearance encloses these patches in a tiny capsule;
+it does not discard them or reject the entire group because a convex hull cannot
+be built. The envelope is only a query shape and never contributes material or
+changes the visible/collision surface. This also avoids the hull constructor's
+degenerate-point panic. Actual obstructions still use the bounded retry policy.
+
 `SettlingDiagnostics` partitions surviving grains into waiting, moving,
 unsupported, no room, obstructed and deferred by the per-tick budget. A rejection
 remains visible while waiting for a retry. These counts exclude rigid fragments
@@ -115,6 +122,9 @@ Incompatible materials/sizes, field edges, larger dense groups and nearby actors
 can still prevent packing. Blocked and orbiting grains remain physical and
 continue counting against the budget. This is local cell redistribution, not
 calibrated soil compaction or cohesion. The Spacewars trial remains Off by default.
+Dense quiet patches larger than the 64-candidate batch can mutually obstruct
+packing. Rebuilt craters can also leave ledges that the small pilot cannot walk
+over; conserving material does not promise a traversable grade.
 
 ## Verification
 
@@ -126,6 +136,10 @@ cargo run --locked --release -p scenario-spacewars --example loose_terrain_bench
 # Select one scene or grain shape; default is both scenes and all three modes.
 cargo run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
   --scene match --mode angular --seed 42 --seconds 60 --limit 192
+
+# Three-minute repeated-impact run, with per-second settling reasons on stderr.
+cargo run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
+  --scene match --seconds 180 --diagnostics
 ```
 
 Tests exercise real cannon and asteroid contacts, all three terrain surfaces,
@@ -135,10 +149,17 @@ and clone continuation. Deposition tests cover repeated release/settle/release
 with a one-grain budget, damage retention, all three surfaces and both shapes,
 stationary and translating/rotating ground, dynamic momentum, obstructed growth,
 airborne/sliding rejection, registry retirement and real lab blast cycles.
+Actor integration tests loosen and rebuild a shallow planetary surface, then
+walk the canonical pilot across it and land a ship on its deposited cells. Both
+grain shapes lose actor support correctly when that ground is blasted again;
+pilot continuation also replays identically. Precision regressions use captured
+three-planet slivers, including completely coincident points, and confirm that
+even tiny newly inserted obstacles still block growth before a broadphase update.
 Native functional checks exercise launcher settings,
 restart/persistence and vector/raster rendering.
 
-The benchmark runs up to 3,600 fixed updates per case with seed 42 and heavy asteroids
+The benchmark defaults to 3,600 fixed updates per case (up to 10,800 with
+`--seconds 180`) with seed 42 and heavy asteroids
 arriving about once per second. The ordinary combat and three-planet match
 scenarios include their actors; no bots are driven. It audits conservation and
 world/cache ownership once per simulated second, outside the timing interval.
@@ -150,6 +171,51 @@ final observation hash is reported outside timing to check repeatability.
 Frame time measures primitive construction, not final rasterization/display.
 On/Off cases diverge physically after the first release, so these are workload
 costs rather than a controlled solver-only comparison.
+
+## Crowded-world clearance check (2026-10-04)
+
+The three-planet failures were often numerical: added-surface slivers collapsed
+to duplicate or nearly collinear vertices, and one failed convex hull rejected
+the entire deposit plan. Conservative capsule queries let those clear plans
+finish and retire their grains, avoiding repeated false obstruction checks.
+Real obstructions retain the existing half-second retry interval.
+
+The same 1,800-update, seed-42, 192-grain workload on Picade now gives:
+
+| Three-planet workload | Returned before → after | Mean update before → after | p95 before → after |
+| --- | ---: | ---: | ---: |
+| Round | 5 → 379 | 11.02 → 7.63 ms | 18.93 → 17.77 ms |
+| Angular | 6 → 405 | 11.76 → 7.31 ms | 20.20 → 18.37 ms |
+
+Round finishes with 105 loose grains and two rejected releases; Angular has 87
+grains and one rejection, versus 177/176 grains and nine rejections before.
+The more active worlds have larger worst updates: 37.64/41.74 ms, versus
+29.42/28.02 ms before. This improves recycling and average cost, but is not a
+60 Hz guarantee. Combat returns 200/217 cells with p95 1.95/4.53 ms. The
+three-planet Off-mode observation hash is unchanged.
+
+All nine ordinary sandbox cases and all nine 1,200-tick pile-cycle cases conserve
+material and pass same-build replay. Ordinary sandbox returned totals match the
+baseline, with p95 1.57–4.08 ms. The new actor/precision regressions bring the
+four-crate library suite to 707 passing tests; the native launcher/pause/restart
+workflow passes with both renderers. Clippy completes with nine existing
+Spacewars warnings.
+
+Both three-minute desktop cases finish 10,800 updates and recycle 2,221/2,111
+cells, with no quantity loss. The completed Round Picade soak matches its
+desktop observation hash, with p95 25.72 ms and a 54.19 ms maximum update.
+It ends with 176 loose grains and 38 reported release rejections, so sustained
+bombardment can still saturate the pool. Angular reached tick 8,821 on Picade
+with conservation audits passing; its final result has not yet been retrieved
+after the interrupted session and is not counted as a completed target soak.
+
+These are single workload runs, not repeated regression measurements. The
+target was warm (sampled at 80.8–81.3°C during the soak); one frequency sample
+reported 1.5 GHz, with no firmware throttle telemetry. The
+[measurement record](data/terrain-clearance-picade-20261004.json) preserves the
+captured results, build hashes, scope and outstanding verification. The
+application bundle is built; deployment/live verification is pending because
+`sw-picade.local` is currently unreachable.
 
 ## Group settling check on Picade (2026-10-03)
 

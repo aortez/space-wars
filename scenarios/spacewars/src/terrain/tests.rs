@@ -1,6 +1,18 @@
 use super::*;
 use engine_rapier::world::{CollisionGroups, RayCastOptions};
 
+impl SpacewarsState {
+    /// Controlled actor fixtures use the same next-tick release boundary as an
+    /// impact, with explicit local impulse parameters to isolate support changes.
+    pub(crate) fn queue_test_blast(&mut self, edit: TerrainEdit, blast: RadialImpulse) {
+        self.terrain.pending.push(PendingEdit {
+            body: physics::planet_entity(0),
+            edit,
+            blast: Some(blast),
+        });
+    }
+}
+
 fn step(state: &mut SpacewarsState) {
     SpacewarsScenario::step(state, &[], Duration::from_secs_f64(1.0 / 60.0));
 }

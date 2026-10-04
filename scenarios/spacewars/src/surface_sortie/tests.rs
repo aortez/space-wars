@@ -8,6 +8,7 @@ mod compatibility_tests;
 mod flight_tests;
 mod impact_tests;
 mod landing_gear_tests;
+mod loose_tests;
 mod match_tests;
 mod motion_tests;
 mod multiplayer_tests;

@@ -21,6 +21,7 @@ use rapier2d::prelude::{
 };
 use serde::{Deserialize, Serialize};
 
+mod clearance;
 mod query_snapshot;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
@@ -1611,12 +1612,18 @@ impl PhysicsWorld {
             if polygon.len() < 3 || polygon.iter().any(|v| !finite_vec2(*v)) {
                 return vec![false; polygons.len()];
             }
-            let center =
-                polygon.iter().copied().fold(Vec2::ZERO, |a, b| a + b) / polygon.len() as f32;
+            let center = Vec2::new(
+                (polygon.iter().map(|v| f64::from(v.x)).sum::<f64>() / polygon.len() as f64) as f32,
+                (polygon.iter().map(|v| f64::from(v.y)).sum::<f64>() / polygon.len() as f64) as f32,
+            );
             let vertices: Vec<_> = polygon.iter().map(|v| to_rapier(*v - center)).collect();
-            let Some(shape) = SharedShape::convex_hull(&vertices) else {
+            if vertices
+                .iter()
+                .any(|v| !v.x.is_finite() || !v.y.is_finite())
+            {
                 return vec![false; polygons.len()];
-            };
+            }
+            let shape = clearance::polygon_shape(&vertices);
             shapes.push((
                 Pose::new(to_rapier(position + center.rotate_radians(angle)), angle),
                 shape,

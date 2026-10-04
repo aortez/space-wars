@@ -44,6 +44,9 @@ struct Args {
     seconds: u32,
     #[arg(long, default_value_t = 192, value_parser = clap::value_parser!(u32).range(1..=4096))]
     limit: u32,
+    /// Emit per-second material/settling diagnostics to stderr, outside timing.
+    #[arg(long)]
+    diagnostics: bool,
 }
 
 fn percentile(values: &mut [f64], fraction: f64) -> f64 {
@@ -106,6 +109,14 @@ fn main() {
                 frames.push(start.elapsed().as_secs_f64() * 1000.0);
                 if tick % 60 == 0 {
                     let audit = state.terrain_diagnostics();
+                    if args.diagnostics {
+                        eprintln!(
+                            "{}",
+                            serde_json::json!({"scene":scene,"mode":mode.label(),
+                            "tick":tick + 1,"grains":audit.loose_cells,"deposited":audit.deposited_cells,
+                            "rejected":audit.rejected_releases,"settling":audit.settling})
+                        );
+                    }
                     assert!(audit.issues.is_empty(), "{:?}", audit.issues);
                     assert_eq!(
                         initial,
