@@ -1,0 +1,188 @@
+# Scorched Earth
+
+Choose **scorched-earth** in the launcher, or launch directly:
+
+```sh
+cargo run --locked --release -p engine-client -- --scenario scorched-earth --seed 42
+```
+
+This first playable slice of [#25](https://github.com/aortez/space-wars/issues/25)
+puts two physical tanks on seeded hills with downward gravity. Aim and fire at
+the opponent, or undermine its footing. The other tank returns fire every five
+seconds. The first tank reduced to zero health loses; **Reset** starts again on
+the same hills. A simultaneous destruction is a draw.
+
+![Angular dirt after repeated shell impacts on the Picade](screenshots/scorched-earth/picade-angular-impact.png)
+
+## Controls
+
+| Action | Keyboard | Controller |
+| --- | --- | --- |
+| Lower / raise elevation | Left / Right, A / D | D-pad left / right, right-stick X |
+| Lower / raise power | Down / Up, S / W | D-pad down / up, right-stick Y |
+| Fire (hold to repeat) | Space | Bottom face, left shoulder, right trigger |
+| Take control of the other tank | Tab | Left face |
+| Toggle the scripted CPU duel | V | Right shoulder |
+| Switch Angular / Round dirt and reset | T | Top face |
+| Restart with defaults and the same seed | R | Pause → Restart |
+| Pause | Esc | Start |
+
+The on-screen controls also adjust aim/power, fire, select a tank, toggle Demo,
+switch dirt, and reset. The on-screen **Reset** retains the current dirt shape
+and Demo choice. Camera framing fits the entire battlefield in landscape and
+narrow windows. The host provides the normal launcher, pause, and renderer controls.
+
+**Angular** is the initial dirt choice. **Demo** drives both tanks with the same
+seeded aiming sweep used by the headless runner. It estimates ballistic range
+but varies its aim; intervening terrain and loose grains can intercept shots.
+Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
+Human shots have a 1.25-second cooldown. The tanks currently cannot drive.
+
+## Shared mechanics
+
+The scenario owns hills, gravity, tanks, shell trajectories, health and controls.
+It calls the existing [shared loose-terrain layer](shared-loose-terrain.md):
+
+1. A shell sweeps through the canonical physics world each fixed update, so
+   fast shots collide with terrain, tanks and loose grains.
+2. At impact, `PreparedRelease` plans the affected fields before changing them.
+   Admission covers the complete event. `LooseTerrain::commit` transfers removed
+   cells into conserved grains and detached material fields.
+3. `RadialImpulse` throws nearby loose material and kicks tank hulls. Rapier
+   supplies gravity and contact response in the same world as the terrain.
+4. `LooseTerrain::settle` returns eligible quiet groups to existing terrain
+   through the ordinary deposit boundary. Published geometry and collision
+   shapes update together, with actor clearance checked by the shared layer.
+
+There is no second soil solver or Scorched-specific deposition algorithm. New
+improvements to the shared layer can benefit this scene, the lab and Spacewars.
+The flat scene is also a small consumer to exercise before adding the Clock
+event in [#132](https://github.com/aortez/space-wars/issues/132).
+
+The default pool is 192 grains; the headless runner accepts 1–512. Detached fields
+are capped at 64. A release that cannot fit is rejected atomically and reported
+on screen. Existing material is retained, including offscreen dirt. Combat damage
+and tank knockback still apply, so a full pool does not make tanks invulnerable.
+
+This is bounded rigid-grain behavior, not a calibrated soil model. Whole-cell
+deposition can leave ledges, a settled pile may remain loose, and sustained fire
+can exhaust the pool. Cohesion, slope relaxation, shock propagation, compression,
+fluids and napalm remain later work. Tank traction/driving, weapons, sound and
+broader round progression are also outside this first slice.
+
+## Repeatable development
+
+```sh
+cargo test --locked --profile ci -p scenario-scorched-earth
+cargo test --locked --profile ci -p engine-client --bin engine-client \
+  client_scenarios::scorched_earth
+cargo test --locked --profile ci -p scenario-spacewars deposited_flag_footing
+
+cargo run --locked --release -p scenario-scorched-earth \
+  --example scorched_benchmark -- --shape angular --seconds 30 --seed 42 --replay
+cargo run --locked --release -p scenario-scorched-earth \
+  --example scorched_benchmark -- --shape round --seconds 30 --seed 42 --replay
+
+SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \
+  cargo test --locked --profile ci -p engine-client --test ui_control_functional \
+  scorched_earth_launch_pause_restart_and_both_renderers -- --ignored --nocapture
+```
+
+The duel runner emits JSON with whole-step mean/P95/maximum time, body/contact
+and grain peaks, shots, impacts, rejected releases, deposition and material
+balance. Audits, observation hashing, replay and rendering are outside the timer.
+`--replay` repeats the full seeded run and compares observation hashes every
+second. The result describes this workload; it is not a rendered FPS claim or a
+guarantee of cross-platform physics lockstep. After a tank loses, existing shells
+and material continue simulating but the tanks stop firing; a longer duration
+therefore measures the same duel followed by settling, not endless combat.
+
+Simulation tests cover both grain shapes, repeated release/deposition, clone
+continuation, capacity rejection, loss of tank support, fast swept shells, reset,
+bad input and the full `u64` seed range. Client tests cover keyboard/controller
+parity, disconnection, narrow-window framing and both render paths. The display
+test launches, fires, verifies visible displaced dirt, pauses, restarts and
+returns to the launcher on both renderers.
+
+The accompanying Spacewars regression completes the flag lifecycle from #51:
+claim a deposited footing, blast it away, observe neutralization, let material
+return, then require a fresh full claim. Returning dirt never restores ownership
+by itself. Both Round and Angular exercise that path.
+
+## Picade deployment and presentation
+
+The scene was deployed and exercised on `sw-picade.local` on 2026-10-04. Live
+checks covered launcher selection, both grain shapes, repeated firing, taking
+control of the second tank, aim/power, Demo, pause and restart. The final device
+state is a fresh Angular round in the pause menu, with Demo off. The service was
+healthy with zero restarts after deployment.
+
+Runtime source is `43d1128`. The deployed client SHA-256 is
+`e892a13133466a97f8bae911fb45e029a096acc57599cf67e25d701aa31731a3`;
+the CLI is `970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5`.
+The client was built before committing those sources, so its embedded revision
+is `83a0fca0604c-dirty`; the deployed binary hash is the exact identity used for
+these live checks.
+
+The [live timing snapshot](data/scorched-earth-picade-live-20261004.txt) reports
+26.1 submitted FPS and 59.9 simulation updates/sec at a 1024×768 viewport with
+the existing **2× raster scale** (2048×1536 internal image). Its 120-sample window
+averages 6.13 ms of simulation per callback (2.08 updates/callback), 1.01 ms of
+scene creation and 16.16 ms of render preparation; these units differ from the
+one-update headless measurements. Detailed KMS profiling was enabled on the
+device. The screenshots and CLI checks are a short live smoke run, not a
+steady-state rendered benchmark. This scene does not yet achieve 60 rendered
+frames/sec with these settings; rendering and impact spikes remain work to do.
+
+![Round dirt on the same Picade hills](screenshots/scorched-earth/picade-round-impact.png)
+
+## Simulation baseline — 2026-10-04
+
+[Raw results and build/host metadata](data/scorched-earth-20261004.json) retain all
+16 runs. Both executables use Rust 1.89.0, release/fat LTO and one codegen unit
+from source `43d1128`. Desktop is a Ryzen 7 9800X3D; the Picade is a Raspberry Pi
+4 Model B Rev 1.4. The AArch64 runner uses static CRT linkage:
+
+```sh
+cargo +1.89.0 build --locked --release -p scenario-scorched-earth \
+  --example scorched_benchmark
+RUSTFLAGS='-C target-feature=+crt-static' cargo +1.89.0 build --locked --release \
+  --target aarch64-unknown-linux-gnu -p scenario-scorched-earth --example scorched_benchmark
+```
+
+Each run simulates 30 seconds at 60 Hz with a 192-grain budget and replay enabled.
+Seed 42 has three repetitions per host/shape, alternating Round/Angular order;
+seed 4242 has one per host/shape. Runs are serial. The table reports the median
+of run means and P95s, and the worst individual step across repetitions, all in
+milliseconds. The one-run seed 4242 values are smoke measurements.
+
+| Host | Seed | Shape | Runs | Mean | P95 | Worst step |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Desktop | 42 | Round | 3 | 0.266 | 0.720 | 4.922 |
+| Desktop | 42 | Angular | 3 | 0.409 | 1.181 | 5.061 |
+| Desktop | 4242 | Round | 1 | 0.396 | 1.430 | 4.391 |
+| Desktop | 4242 | Angular | 1 | 0.471 | 1.958 | 4.008 |
+| Picade | 42 | Round | 3 | 2.862 | 7.556 | 41.958 |
+| Picade | 42 | Angular | 3 | 4.128 | 11.366 | 40.352 |
+| Picade | 4242 | Round | 1 | 4.152 | 12.405 | 37.146 |
+| Picade | 4242 | Angular | 1 | 4.738 | 16.374 | 35.040 |
+
+The kiosk remained paused throughout the retained Picade runs, verified before
+and after every run. Earlier measurements with an idle launcher were discarded:
+its 30-second autostart policy could add bot-game load. Target temperature
+endpoints were 67.7/73.5°C, CPU0 frequency 1.5 GHz, undervoltage alarm 0 at both
+endpoints. These endpoint probes do not rule out intervening thermal changes.
+
+All retained runs preserve every material cell, pass same-build replay, and
+produce matching desktop/Picade final observation hashes for all four seed/shape
+cases. None reject a blast in this 30-second workload. At seed 42, Round returns
+159 cells and ends with 71 loose; Angular returns 135 and ends with 131 loose.
+Both produce 11 impacts. Round costs less for this evolving duel, which does not
+isolate per-contact shape cost: the piles and later collisions differ.
+
+This workload is smaller than the existing multi-planet Spacewars stress run;
+its lower mean is not evidence that the shared solver became faster. No shared
+physics implementation changed in this branch. The earlier
+[existing-benchmark comparison](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
+remains the integration baseline. The Picade's occasional 35–42 ms steps and
+the live rendering cost above are explicit follow-up performance targets.

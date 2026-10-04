@@ -21,6 +21,7 @@ members = [
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
+    "scenarios/scorched-earth",
     "scenarios/spaceling-lab",
     "scenarios/terrain-lab",
     "scenarios/spacewars",
@@ -84,6 +85,7 @@ scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
+scenario-scorched-earth = { path = "scenarios/scorched-earth" }
 scenario-spaceling-lab = { path = "scenarios/spaceling-lab" }
 scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }

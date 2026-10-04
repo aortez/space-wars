@@ -155,6 +155,9 @@ grain shapes lose actor support correctly when that ground is blasted again;
 pilot continuation also replays identically. Precision regressions use captured
 three-planet slivers, including completely coincident points, and confirm that
 even tiny newly inserted obstacles still block growth before a broadphase update.
+A combined flag regression claims deposited ground, destroys the flag footing,
+waits for material to return without restoring ownership, then requires a fresh
+claim. Round and Angular both exercise the complete lifecycle.
 Native functional checks exercise launcher settings,
 restart/persistence and vector/raster rendering.
 

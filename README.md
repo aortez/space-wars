@@ -106,6 +106,10 @@ The local launcher includes the following scenarios and presets:
   grains, drop a physical box onto the pile, and blast it again. Compare round,
   grippy and angular grains on flat, sloped and moving planetary ground. See
   [Live granular terrain](docs/granular-terrain-lab.md).
+- **Scorched Earth** — two physical tanks on seeded hills, with adjustable
+  elevation/power and a returning-fire opponent. Shells displace conserved dirt
+  through the same release and deposition layer as Spacewars. Compare Round and
+  Angular dirt or run a repeatable CPU duel. See [Scorched Earth](docs/scorched-earth.md).
 - **Spacewars Terrain** — the Expedition loop on destructible ground: land, exit,
   claim with a surface flag, mine material, and rebuild after ship loss. Destroyed
   flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).

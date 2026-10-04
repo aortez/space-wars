@@ -1495,6 +1495,7 @@ dependencies = [
  "scenario-null",
  "scenario-pizza",
  "scenario-rover-lab",
+ "scenario-scorched-earth",
  "scenario-spaceling-lab",
  "scenario-spacewars",
  "scenario-terrain-lab",
@@ -4671,6 +4672,19 @@ dependencies = [
  "engine-core",
  "engine-gravity",
  "engine-rapier",
+]
+
+[[package]]
+name = "scenario-scorched-earth"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "engine-common",
+ "engine-core",
+ "engine-rapier",
+ "engine-terrain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
