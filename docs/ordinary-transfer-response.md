@@ -318,3 +318,8 @@ not resolve response selection or make the warning screen a collision predictor.
 Broader independent activated cases and a separately specified response-choice
 rule would be needed before considering a default change. Probe mode remains
 `none`, default scope remains `escape`, and nothing was pushed or deployed.
+
+The closing [selector comparison](projectile-response-selection.md) diagnoses
+the retained braking regression, freezes one brake-or-native rule and tests new
+worlds in both seats. The [branch review guide](bot-route-evidence-checkpoint.md)
+places these experiments within the complete mission-execution checkpoint.

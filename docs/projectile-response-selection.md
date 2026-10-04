@@ -155,11 +155,14 @@ do not silently change the policy, thresholds, defaults or experiment scope.
 
 ## Legacy audit correction before independent trials
 
-The three legacy simulations ran first. Clear-entry brake and speed-limited
-left reproduced their old response, capture and projectile streams byte-for-byte,
-but their final Python comparison failed: in-memory visit tables use integer
-seat keys, whereas archived JSON uses strings. Round, visits and allocation
-are identical after JSON normalization. The P2 observe replay passed directly.
+The three legacy simulations ran first. All three reproduced their old response,
+capture and projectile streams byte-for-byte, but their final Python comparison
+failed: in-memory visit tables use integer seat keys, whereas archived JSON uses
+strings. Round, visits and allocation are identical after JSON normalization.
+P2 observe also passed its existing native replay checks before that final
+comparison. The original correction note at `94683e3` was written while the
+third result was arriving and described only the first two failures; the
+preserved completed summary and correction record retain all three.
 
 Correct only that archive comparison and retain a regression test that still
 rejects changed physical visit ticks. Resume the declared plan using the same
@@ -168,3 +171,157 @@ original failed summary, tracebacks and hashes, recheck the existing files and
 normalized results, and record the audit correction's commit/tool hashes. No
 independent-world simulation ran before this correction, and no decision rule,
 case, seed, duration or physical result changes.
+
+## Complete results and activation coverage
+
+All **52 declared full matches pass** their physical, planner-work, projectile
+and response audits. The implementation and plan were frozen at `532462e`;
+the archive-key audit correction is `94683e3`. The three completed legacy
+simulations were retained, and the remaining 49 simulations ran once. No seed,
+configuration or outcome was replaced.
+
+Across **33 selector runs**, seven encounter a warning: two select brake and
+five abstain because entry is sooner than the existing pulse duration. The
+other 26 encounter no eligible warning. All 31 inactive/abstaining runs retain
+complete native action/observation and projectile parity with their controls.
+Both selected brakes retain exact native/projectile streams, complete rounds,
+visits and allocation from their old unconditional-brake runs. All three legacy
+response logs also remain byte-for-byte identical. Selector runs include
+139,569 eligible ticks in total; that count includes changed continuations.
+
+The selected brakes are only the already known, correlated world-1 P1 primary
+and health cases at tick 8837. They apply the full 30 ticks. The clear-entry
+primary and health cases abstain at 9160 and reproduce observe exactly, avoiding
+the earlier destruction caused by the unconditional brake. They still lose
+their ships later as in the controls; this is not a saved match.
+
+All five physical abstentions are decided by the duration guard before the
+direction calculation. Thus this matrix does not isolate an incremental benefit
+from the direction guard or physically exercise its rejection path. Its
+opposing-motion, conflicting-warning and stronger-native-command refusals are
+covered by unit tests, not newly activated full-match evidence.
+
+The new health world-0 warning at 13515 and the historical fresh world-3 warning
+at 12087 also abstain, as declared. The health case remains a loss with 3/3
+captures/departures, forgoing unconditional brake's 6/6. The world-3 case remains
+a loss with 1/1, forgoing the earlier maneuvers' wins. The stricter rule is not a
+claim that those beneficial interventions were impossible.
+
+## Independent worlds
+
+All **16 new selector matches** retain their disabled controls' complete native
+and projectile streams, physical outcomes and planner allocations. Fifteen
+never encounter an eligible warning. Only quiet world-0 P1 warns, at **19148**,
+on missile 100054 launched at 19147 with **0.173 seconds** projected entry. The
+selector abstains and the native priority/episode changes at 19161. No matching
+contact from that missile is recorded through match end. The ship is later
+lost aboard at 19305 to cannon damage, and the pilot dies at 19752; the evaluated
+seat loses with two complete capture/departure cycles and no rebuild.
+
+Every P2 candidate has ordinary-transfer eligibility but no warning in this
+set. There is consequently **no new activated braking trajectory and no
+physical P2 braking validation**. These worlds validate compatibility and the
+declared abstention behavior, not response effectiveness. No extra worlds were
+selected to increase activation coverage.
+
+Each cell is the evaluated v13 seat's outcome and physical captures/departures;
+control and selector are identical in every cell. Asteroid interval is 3 seconds.
+
+| New world | Evaluated seat | Quiet, control = selector | Asteroids, control = selector |
+| --- | --- | --- | --- |
+| 0 | P1 | Loss, 2/2 | Loss, 2/2 |
+| 0 | P2 | Win, 4/4 | Win, 3/3 |
+| 1 | P1 | Loss, 2/2 | Win, 6/6 |
+| 1 | P2 | Win, 5/5 | Loss, 3/3 |
+| 2 | P1 | Win, 1/1 | Win, 3/3 |
+| 2 | P2 | Loss, 1/1 | Loss, 1/1 |
+| 3 | P1 | Win, 6/6 | Win, 3/3 |
+| 3 | P2 | Win, 5/5 | Loss, 1/1 |
+
+## Cohort outcomes
+
+Each outcome cell is **wins / captures / departures**. Legacy parity replays
+are excluded. Full per-case outcomes, pilot deaths, ship losses, rebuilds and
+paired deltas remain in the manifest.
+
+| Cohort | Cases | Control | Selector | Brake selections |
+| --- | ---: | ---: | ---: | ---: |
+| Historical retained primary | 8 | 2 / 26 / 25 | 3 / 32 / 30 | 1 |
+| Historical health | 3 | 0 / 7 / 7 | 0 / 12 / 11 | 1 |
+| Historical worlds 2–3 | 4 | 2 / 9 / 9 | 2 / 9 / 9 | 0 |
+| Historical clear-entry primary/health | 2 | 0 / 2 / 2 | 0 / 2 / 2 | 0 |
+| New quiet worlds | 8 | 5 / 26 / 26 | 5 / 26 / 26 | 0 |
+| New asteroid worlds | 8 | 4 / 22 / 22 | 4 / 22 / 22 | 0 |
+
+The historical primary and health gains are replays of the same previously
+measured braking trajectory, not additional successful geometries. They also
+retain later loss/recovery costs: historical primary ship losses/rebuilds change
+from 6/1 to 7/3, and health from 3/0 to 4/1, over complete matches. Pilot deaths
+decrease from four to three and three to two respectively. The stronger earlier
+no-escape primary reference remains **2 wins / 28 captures / 27 departures**.
+Do not pool these results with independent worlds or replace the earlier
+unconditional-brake/steering outcomes with the selector's narrower coverage.
+
+## Verification and reproduction
+
+All **1,103 Rust tests** and **775 Python tests** pass. Formatting, strict AI
+Clippy and both profiled and ordinary release builds pass. New checks cover the
+rotating motor frame, approaching/receding geometry, a stronger native command,
+conflicting warnings including own projectiles, exact pulse-duration admission,
+unsupported inputs and an abstention consuming the only attempt. Independent
+audits verify every chosen action and all priority/deadline stops. Tests also
+cover archived seat-key normalization and seat-aware cohort reporting.
+
+All **2,221,634 projectile rows** pass their physical-frame, identity, ordering
+and capacity audits. Observed maxima are four retained/in-range projectiles
+and 73 scanned debris entries, with no unavailable shell or sample truncation.
+The frozen plan's single-pass wording was too narrow: the selector performs
+several bounded passes over the retained sample in one invocation. It uses no
+additional world query or future simulation. That reporting clarification does
+not change the implementation or assert a whole-frame latency bound.
+
+Frozen binary: `target/projectile-selection/surface_mission_soak-532462e`, SHA-256
+`bfed13d163a38a5cb4d1c390bc46a8110b6c89162bf848880af74662a70905c2`.
+Completed summary: `target/projectile-selection/v1/summary.json`, SHA-256
+`ca5ec19deb0a097182af44ed2e03746464e9aac49c6952a55a010976130eccfb`.
+
+The [manifest](data/projectile-selection-v1.json) includes all 52 outcomes,
+33 control/selector comparisons, six separate cohort totals, selection reasons,
+compatibility checks, source/tool/binary hashes and **800 raw-file hashes**.
+The [compressed archive](data/projectile-selection-v1.json.gz) preserves the
+complete runner summary, physical visit audits, response/selection witnesses,
+projectile tracks and final reports/checkpoints. The initial failed legacy
+audit summary and its hash, exact tracebacks and correction provenance remain
+in the record. Full raw reports and streams remain at their hashed local paths.
+
+```sh
+python3 tools/validate-projectile-selection.py \
+  --ordinary target/ordinary-transfer-response/v1/summary.json \
+  --original target/projectile-response/v1/summary.json \
+  --binary target/projectile-selection/surface_mission_soak-532462e \
+  --out /tmp/projectile-selection
+python3 tools/analyze-projectile-selection.py \
+  --summary /tmp/projectile-selection/summary.json \
+  --out /tmp/projectile-selection-results.json
+```
+
+Use fresh output paths and a clean checkout. The corrected runner needs no
+resume flag for a new reproduction. The one-time recorded continuation used
+`--resume-audit-correction` on the original output directory after preserving
+and verifying its three completed legacy runs.
+
+## Closing decision
+
+**Retain the selector as an opt-in laboratory candidate; do not promote it.**
+The braking regression is explained well enough to reject that intervention
+using current observations, and the selector preserves the known useful brake.
+The independent worlds add no activated response evidence, while the duration
+guard deliberately gives up useful short-warning mitigation. Neither direction
+alone nor this duration gate establishes a general response-choice policy.
+
+This completes the declared stopping point. The [branch review guide](bot-route-evidence-checkpoint.md)
+packages the broader execution work and remaining policy-quality/device gates.
+Leave new motion prediction, threshold changes and additional seed searches for
+a separately scoped effort. Default probe mode is still `none`, default scope
+is still `escape`, and no interactive choice, device default or remote state
+changes. All work remains local.
