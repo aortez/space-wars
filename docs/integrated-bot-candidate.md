@@ -216,3 +216,20 @@ and use a fresh output directory with `--previous PATH/summary.json`. That mode
 verifies and re-audits every prior raw file before continuing the same unrun
 cases. It does not silently overwrite or rerun recorded games. Qualification
 regressions remain in the final decision; only validity failures stop collection.
+
+### Legacy audit correction
+
+The first execution (`evaluation-v1`, auditor commit `75321ba`) audited all 16
+qualification cases, then stopped after the first fresh v9 pair. Both games
+completed, but their audit raised `KeyError: planning`. The retained v9 survey's
+Rust serializer intentionally omits `ObjectivePlanning::Legacy`; the reused
+publication auditor had previously seen only explicit joint/powered identities.
+
+The correction expands this documented wire default only when the actor's
+expected policy is v9. Actor, current-tick/native-survey, expiry and route checks
+remain unchanged; a missing identity on a newer policy still fails. A regression
+test also rejects wrong actors, stale native ticks and non-legacy identities.
+The failed summary, logs and raw hashes remain at `evaluation-v1`. Re-audit all
+18 recorded games into `evaluation-v2` with `--previous`, then continue the same
+94 unrun fresh cases. No binary, control, seed, horizon or acceptance condition
+changes with this audit correction.

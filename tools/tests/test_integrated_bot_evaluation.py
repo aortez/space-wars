@@ -39,6 +39,22 @@ def complete_results():
 
 
 class IntegratedEvaluationTests(unittest.TestCase):
+    def test_legacy_wire_default_preserves_actor_and_freshness_checks(self):
+        row = dict(pilot=dict(tick=1845, owner='player_2', planet=dict(index=1)),
+                   landing_objective=dict(version=1, actor='player_2', tick=1845,
+                       objective=dict(planet=1), sites=[], actual=None),
+                   objective_work=None, objective_evidence=None)
+        before = copy.deepcopy(row)
+        self.assertEqual(M.audit_publication(row, 'legacy'), dict(age=0, powered=0))
+        self.assertEqual(row, before)
+        with self.assertRaises(KeyError):
+            M.audit_publication(row, 'joint_round_trip')
+        for key, value in (('actor', 'player_1'), ('tick', 1844), ('planning', 'joint_round_trip')):
+            bad = copy.deepcopy(row)
+            bad['landing_objective'][key] = value
+            with self.assertRaises(AssertionError):
+                M.audit_publication(bad, 'legacy')
+
     def test_frozen_commands_and_per_seat_identities_cannot_be_overridden(self):
         manifest = json.loads((ROOT / 'docs/data/integrated-bot-candidate-v1.json').read_text())
         with gzip.open(ROOT / manifest['archive']['path'], 'rt') as stream:

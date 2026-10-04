@@ -51,6 +51,17 @@ def verify_plan(plan, manifest):
                   'per-seat or host identity changed')
 
 
+def audit_publication(row, planning):
+    survey = row.get('landing_objective')
+    if survey is not None and planning == 'legacy':
+        # LandingObjectiveSurvey deliberately omits the default Legacy enum.
+        # Normalize that wire representation only for the retained v9 actor;
+        # keep all original actor, age, validation and route checks unchanged.
+        assert survey.get('planning', 'legacy') == 'legacy'
+        row = dict(row, landing_objective=dict(survey, planning='legacy'))
+    return M.audit_publication(row, planning)
+
+
 def audit_dense(rows, report, item):
     """Reuse physical/flight auditors in one pass through the large capture stream."""
     visits = {s: [dict(planet=v['planet'], selected_tick=v['selected_tick'], recorded=v,
@@ -85,7 +96,7 @@ def audit_dense(rows, report, item):
             policy = report['policy_configuration'][seat]['policy']
             planning = ('jetpack_round_trip' if enabled[seat] else
                         'legacy' if policy == 'material_mission_v9' else 'joint_round_trip')
-            publication = M.audit_publication(row, planning)
+            publication = audit_publication(row, planning)
             if publication:
                 max_age = max(max_age, publication['age'])
                 publications[seat] += 1
