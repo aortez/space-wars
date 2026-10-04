@@ -1,10 +1,54 @@
 # Laser opportunities during pursuit clearance
 
-This is an opt-in v13 experiment following the
+The bounded comparison is complete: the candidate's known loss becomes a draw,
+and the control retains its win. Keep this as an opt-in v13 experiment for a
+broader comparison. This follows the
 [integrated regression diagnosis](integrated-bot-regression.md). The frozen
 integrated candidate and runtime defaults remain unchanged. Its profile is
 `pursuit_climb_laser_v1`; the soak runner enables it with
 `--pursuit-climb-laser-seats none|0|1|both` (default `none`).
+
+## Results
+
+These are four games in the **same known world**, including two exact replays.
+They are not independent strength samples.
+
+| P1 configuration | Climb laser | Outcome | Finished tick | Completed departures | Ships lost | Pilot health |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Control | Off | Win | 25,483 | 6 | 0 | 100% |
+| Control | On | Win | 25,078 | 6 | 0 | 100% |
+| Integrated candidate | Off | Loss | 17,831 | 4 | 2 | 0% |
+| Integrated candidate | On | Draw | 36,000 | 4 | 1 | 97.14% |
+
+Both option-off games reproduce all ten non-timing raw streams byte for byte,
+including dense observations, actions and native impacts. Non-timing reports,
+sensor counts and charged planning ledgers also agree exactly with the prior
+diagnostic replays. The new disabled path does not alter either recorded game.
+
+The candidate first changes an action at **16,949**, exactly at the diagnosed
+combat-climb opportunity. All prior observations/actions and the first changed
+tick's observation and flight commands agree exactly. The first three added
+requests produce native laser contacts at **16,950–16,952**: the opponent's ship
+falls from 0.17409% hull to 0.10344%, then 0.03264%, then is destroyed. The later
+second P1 ship loss and fatal pilot impact do not occur. The first P1 ship loss
+at 9,749 is unchanged, as is the pursuit timeout at 18,357. P1 finishes with
+72.70% ship hull and 97.14% pilot health.
+
+The enabled candidate makes **18** extra laser requests across **929** climb
+checks. These are requests, not 18 hits; the new trajectory also includes the
+opponent's protected pod. The control first changes at **21,653**, makes **30**
+extra requests across **1,063** checks and retains six completed departures,
+zero ship losses and full pilot health. It wins 405 ticks (6.75 seconds) earlier.
+Its second opposing ship loss changes from a laser kill at 22,947 to a cannon
+kill at 22,926; whole-game hit totals are not comparable accuracy measures.
+
+The candidate still makes no additional claim or departure after 15,781. After
+the second pursuit expires, its planet-0 approach loses the destination frame
+at 24,426. The retry exhausts its capture approach budget at 34,181, and the
+match ends while it starts traveling to planet 2. The opponent also remains
+in blocked recovery. Survival exposes unfinished landing/recovery work; the
+climb change does not solve it or reverse the full integrated evaluation's
+retain decision.
 
 ## Frozen implementation and qualification plan
 
@@ -68,3 +112,38 @@ test covers losses during the trace and on the final step. The original games,
 runtime binary and failed summary are retained. To re-audit all four saved games
 without executing any simulation, use `--previous` instead of `--binary` and a
 new output directory; commands, raw files and logs must retain their hashes.
+
+## Verification and retained evidence
+
+The runtime, tests and plan were frozen at `b729cd8` before the four games.
+The corrected audit is `58c12f8`. The binary SHA-256 is
+`34661b5ce5311e38b4ba054a507b2c980a00667357ce5a895a3f4dc884eacc16`.
+No simulation was rerun for the schema correction.
+
+All **590 AI Rust tests** and **826 Python tests** pass, as do formatting and
+Clippy with warnings denied. Seven focused Rust tests cover both climb entry
+points, exact flight/sensor preservation, an active scheduled break followed by
+its deadline, firing refusals, excluded actors/tasks, defaults, repeat ticks,
+clone/reset and configuration timing. Ten auditor tests cover action isolation,
+observations, refusal gates, geometry, counters, frozen commands, trajectory
+prefixes and correct native ship-loss provenance.
+
+All four original physical/configuration/route/budget audits pass. Both enabled
+games have complete dense coverage: **122,156 pilot rows**, **1,992 climb checks**
+and **91,756 native impact rows**, with zero control overrides. Every check's
+flight, wing and cannon action matches its recorded native climb action.
+All 52 raw files and 40 tool inputs were hash-verified. Diagnostic serialization
+adds work outside planner charges; this is not a device performance result.
+
+The [manifest](data/pursuit-climb-laser-v1.json) contains the comparison and
+validation counts. The [evidence archive](data/pursuit-climb-laser-v1.json.gz)
+retains exact summaries (including the initial failed audit), the frozen plan,
+four physical audits, every full climb-check witness, native loss receipts,
+selected observations/impacts, report excerpts and validation logs. Full raw
+streams remain hash-bound under `target/pursuit-climb-laser/qualification-v1`;
+the completed re-audit is in `qualification-v2`.
+
+The next strength step is a separately frozen comparison across both seats,
+opponents and asteroid conditions, with fresh worlds. Keep the newly exposed
+landing failures as a separate investigation and preserve this small option's
+identity. No defaults, PR, deployment or remote branch changed in this step.
