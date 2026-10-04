@@ -170,3 +170,29 @@ fn full_width_seed_can_drive_both_tanks() {
     step(&mut state, &[]);
     state.audit().unwrap();
 }
+
+#[test]
+fn bombardment_ignores_tank_deaths_and_stops_launching_at_the_tail() {
+    let mut state = ScorchedState::new(
+        ScorchedConfig {
+            bombardment_seconds: 6,
+            ..Default::default()
+        },
+        42,
+    );
+    state.tanks.iter_mut().for_each(|t| t.health = 0.0);
+    for _ in 0..600 {
+        step(&mut state, &[]);
+    }
+    assert_eq!(state.shots, 3);
+    assert_eq!(state.impacts, 3);
+    assert!(state.shells.is_empty());
+    let hash = state.observation_hash();
+    let mut replay = ScorchedState::new(state.config, 42);
+    replay.tanks.iter_mut().for_each(|t| t.health = 0.0);
+    for _ in 0..600 {
+        step(&mut replay, &[]);
+    }
+    assert_eq!(hash, replay.observation_hash());
+    state.audit().unwrap();
+}

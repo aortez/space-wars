@@ -41,6 +41,9 @@ pub struct ScorchedConfig {
     pub shape: GrainShape,
     pub max_grains: usize,
     pub demo: bool,
+    /// Zero selects the normal duel. Otherwise rain scripted shells for this
+    /// duration, then keep solving the altered world without new impacts.
+    pub bombardment_seconds: u32,
 }
 impl Default for ScorchedConfig {
     fn default() -> Self {
@@ -48,6 +51,7 @@ impl Default for ScorchedConfig {
             shape: GrainShape::Hexagon,
             max_grains: 192,
             demo: false,
+            bombardment_seconds: 0,
         }
     }
 }
@@ -108,6 +112,7 @@ fn hill(x: f32, seed: u64) -> f32 {
 impl ScorchedState {
     pub fn new(mut config: ScorchedConfig, seed: u64) -> Self {
         config.max_grains = config.max_grains.clamp(1, 512);
+        config.bombardment_seconds = config.bombardment_seconds.min(600);
         let field = Terrain::generate(
             193,
             129,
@@ -237,6 +242,9 @@ impl ScorchedState {
     pub fn deposited_cells(&self) -> u64 {
         self.loose.deposited_cells()
     }
+    pub fn settling_diagnostics(&self) -> engine_rapier::terrain::SettlingDiagnostics {
+        self.loose.settling_diagnostics()
+    }
     pub fn body_count(&self) -> usize {
         self.physics.body_count()
     }
@@ -260,7 +268,8 @@ impl ScorchedState {
         (pivot, pivot + tank.direction() * 2.8)
     }
     fn fire(&mut self, player: usize) {
-        if !self.fighting()
+        if self.config.bombardment_seconds > 0
+            || !self.fighting()
             || self.tick < self.tanks[player].next_shot
             || self.shells.len() >= MAX_SHELLS
         {
@@ -321,7 +330,23 @@ impl ScorchedState {
         self.tanks[player].speed = (speed * (0.93 + phase as f32 * 0.025)).clamp(12.0, 48.0);
     }
     fn advance(&mut self) {
-        if self.fighting() {
+        if self.config.bombardment_seconds > 0 {
+            // Health-independent rain exercises the real swept-shell impact
+            // path. Later shots encounter the already deformed terrain.
+            if self.tick < u64::from(self.config.bombardment_seconds) * u64::from(FIXED_HZ)
+                && self.tick % 120 == 0
+                && self.shells.len() < MAX_SHELLS
+            {
+                let phase = (self.shots % 9 + self.seed % 9) % 9;
+                self.shells.push(Shell {
+                    owner: (self.shots % 2) as usize,
+                    position: Vec2::new(-24.0 + phase as f32 * 6.0, 24.0),
+                    velocity: Vec2::new(0.0, -8.0),
+                    age: 10,
+                });
+                self.shots += 1;
+            }
+        } else if self.fighting() {
             for player in 0..2 {
                 if (self.config.demo || player != self.selected)
                     && self.tick >= self.tanks[player].next_shot
@@ -482,6 +507,8 @@ impl Scenario for ScorchedScenario {
         Observation { payload: serde_json::to_vec(&serde_json::json!({
             "seed": state.seed, "tick": state.tick, "shape": format!("{:?}", state.config.shape),
             "limit": state.config.max_grains, "demo": state.config.demo, "selected": state.selected,
+            "bombardment_seconds": state.config.bombardment_seconds,
+            "settling_hash": state.loose.settling_hash(), "next_id": state.next_id,
             "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
             "deposited": state.deposited_cells(), "fields": fields, "grains": grains,
             "tanks": tanks, "shells": state.shells,
