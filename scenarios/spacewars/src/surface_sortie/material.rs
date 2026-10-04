@@ -522,9 +522,17 @@ impl SurfaceSortieState {
 impl SurfaceSortieState {
     /// Opt the ordinary material scenario into the bounded dirt trial before play.
     pub fn enable_loose_terrain(&mut self) {
-        self.world
-            .enable_loose_terrain(engine_rapier::terrain::LooseTerrainConfig::default())
+        self.enable_loose_terrain_with_config(engine_rapier::terrain::LooseTerrainConfig::default())
             .expect("initial loose terrain configuration");
+    }
+
+    /// Configure a release experiment before play. The ordinary launcher keeps
+    /// its default preset; benchmark callers can compare contact shapes/limits.
+    pub fn enable_loose_terrain_with_config(
+        &mut self,
+        config: engine_rapier::terrain::LooseTerrainConfig,
+    ) -> Result<(), engine_terrain::TerrainError> {
+        self.world.enable_loose_terrain(config)
     }
 }
 

@@ -128,6 +128,11 @@ repeat impacts, inherited moving-surface velocity, and the curved seed map.
 
 ## Recorded results (2026-10-03)
 
+The later [paired Picade benchmark review](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
+repeats all three models three times alongside the shared-terrain integration
+and existing terrain benchmarks. The results below preserve the original
+single-run experiment and its different background load.
+
 The seed-42, ten-second runs retained every sample and its material mass in
 all 18 cases. All desktop cases replayed exactly. The Pi benchmark audited each
 step but deliberately omitted replay and capture.

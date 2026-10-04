@@ -104,6 +104,11 @@ directly rather than calculating a stress or fracture threshold.
 
 ## Repeatable workload and timing
 
+The [paired Picade benchmark review](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
+compares this workload before and after the shared release lifecycle, explains
+the changed trajectories, and records three repetitions alongside the MPM and
+ordinary Spacewars comparisons.
+
 ```sh
 cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox -- \
   --verify-replay > target/granular-sandbox.json
