@@ -34,9 +34,13 @@ fn main() {
             let mut times = Vec::new();
             let mut frames = Vec::new();
             for tick in 0..3600 {
+                if state.match_outcome().is_some() {
+                    break;
+                }
                 let start = Instant::now();
                 SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
                 times.push(start.elapsed().as_secs_f64() * 1000.0);
+                assert_eq!(state.observation(0).tick, tick + 1);
                 let start = Instant::now();
                 black_box(SurfaceSortieScenario::render_frame(&state));
                 frames.push(start.elapsed().as_secs_f64() * 1000.0);

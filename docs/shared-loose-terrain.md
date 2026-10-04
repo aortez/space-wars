@@ -90,10 +90,13 @@ support loss, repeated hits on loose material, capacity rejection, conservation
 and clone continuation. Native functional checks exercise launcher settings,
 restart/persistence and vector/raster rendering.
 
-The benchmark runs 3,600 fixed updates per case with seed 42 and heavy asteroids
+The benchmark runs up to 3,600 fixed updates per case with seed 42 and heavy asteroids
 arriving about once per second. The ordinary combat and three-planet match
 scenarios include their actors; no bots are driven. It audits conservation and
 world/cache ownership once per simulated second, outside the timing interval.
+It stops at a match outcome and verifies that each timed call advanced a tick;
+the steps column reports active updates. All four cases reached 3,600 active
+updates on a second Picade verification run.
 Frame time measures primitive construction, not final rasterization/display.
 On/Off cases diverge physically after the first release, so these are workload
 costs rather than a controlled solver-only comparison.
