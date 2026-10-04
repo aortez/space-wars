@@ -56,6 +56,14 @@ def next_step(trace, attempt):
 
 
 class AcquisitionDefenseTests(unittest.TestCase):
+    def test_persisted_seat_keys_normalize_without_hiding_count_changes(self):
+        prior = dict.fromkeys(('players', 'allocation', 'continuation', 'prediction_outcomes', 'retry'), {})
+        prior['route_summary'] = dict(publications={'0': 5, '1': 7})
+        current = dict(prior, route_summary=dict(publications={0: 5, 1: 7}))
+        A.retained_results(prior, current)
+        current['route_summary']['publications'][1] = 8
+        with self.assertRaises(AssertionError): A.retained_results(prior, current)
+
     def test_matrix_has_four_known_pairs_and_two_fresh_worlds(self):
         priors = {g: dict(record=dict(item=dict(seat=0), command=['bin', A.L.FLAG, '0'])) for g, _, _ in A.KNOWN}
         cases = A.cases(priors)

@@ -110,10 +110,16 @@ def replay_parity(prior, run, oldroot):
     with (oldroot / 'live-planning.csv').open() as a, (root / 'live-planning.csv').open() as b:
         left, right = [[D.timing_free(r) for r in csv.DictReader(f)] for f in (a, b)]
     assert left == right
-    for key in ('players', 'allocation', 'continuation', 'route_summary', 'prediction_outcomes', 'retry'):
-        assert prior[key] == run[key], key
+    retained_results(prior, run)
     return dict(exact_streams=exact, sensor_rows=sensors, planning_rows=len(left),
                 non_timing_report=True, physical_and_planning_results=True)
+
+
+def retained_results(prior, run):
+    # Live audit counters use integer seat keys; persisted JSON uses strings.
+    # Compare their wire representation without dropping any fields or counts.
+    for key in ('players', 'allocation', 'continuation', 'route_summary', 'prediction_outcomes', 'retry'):
+        assert prior[key] == json.loads(json.dumps(run[key], allow_nan=False)), key
 
 
 def prefix(before, after, first):
@@ -484,14 +490,22 @@ def audit_impact(root, report):
     return dict(rows=count, overrides=0, losses_before_window=initial_losses, losses=losses, final=final)
 
 
-def run_case(job, plan):
+def run_case(job, plan, previous=None):
     result = copy.deepcopy(job); root = L.root_of(job); out = root.parent.parent
     log = out / 'logs' / (root.name + '.log')
     try:
-        assert not root.exists()
-        with log.open('x') as stream:
-            subprocess.run(job['command'], stdout=stream, stderr=stream, check=True, timeout=1800)
-        result['hashes'] = I.raw_hashes(root)
+        if previous is None:
+            assert not root.exists()
+            with log.open('x') as stream:
+                subprocess.run(job['command'], stdout=stream, stderr=stream, check=True, timeout=1800)
+            result['hashes'] = I.raw_hashes(root)
+        else:
+            assert previous['item'] == job['item'] and previous['command'] == job['command']
+            assert P.digest(log) == previous['log_sha256']
+            if not root.exists(): B.unpack(previous['archive'], root)
+            assert all(P.digest(root / k) == v for k, v in previous['hashes'].items())
+            result['hashes'] = previous['hashes']
+            result['reused_raw'] = True
         result.update(I.analyze(root, job, root))
         report = json.loads((root / 'report.json').read_text())
         result['defense'] = audit(root, job['item'], report)
@@ -501,7 +515,7 @@ def run_case(job, plan):
             prior = plan['sources'][job['item']['group']]['record']
             extracted = 'archive' in prior
             oldroot = out / 'inputs' / job['item']['group'] if extracted else L.root_of(prior)
-            if extracted: B.unpack(prior['archive'], oldroot)
+            if extracted and not oldroot.exists(): B.unpack(prior['archive'], oldroot)
             assert all(P.digest(oldroot / name) == digest for name, digest in prior['hashes'].items())
             result['retention'] = replay_parity(prior, result, oldroot)
             if extracted: shutil.rmtree(oldroot)
@@ -533,26 +547,60 @@ def freeze(out):
     print('Frozen 24 games / 12 pairs', flush=True)
 
 
-def execute(path):
+def execute(path, reaudit=False):
     plan = json.loads(path.read_text()); out = path.parent
     assert plan['profile'] == PROFILE and plan['namespace'] == NAMESPACE
-    assert plan['inputs'] == inputs() and P.digest(plan['binary']['path']) == plan['binary']['sha256']
+    current_inputs = inputs()
+    if reaudit:
+        allowed = {'tools/validate-acquisition-defense.py', 'tools/tests/test_acquisition_defense.py'}
+        assert set(plan['inputs']) == set(current_inputs)
+        assert all(v == current_inputs[k] for k, v in plan['inputs'].items() if k not in allowed)
+    else:
+        assert plan['inputs'] == current_inputs
+    assert P.digest(plan['binary']['path']) == plan['binary']['sha256']
     assert all(P.digest(k) == v for k, v in plan['source_hashes'].items())
     assert plan['jobs'] == jobs(Path(plan['binary']['path']), out, plan['sources'])
     summary_path = out / 'summary.json'
+    cached = {}
     if summary_path.exists():
         summary = json.loads(summary_path.read_text())
-        assert summary['plan_sha256'] == P.digest(path) and not summary.get('error')
-        assert all(r.get('audited') and 'error' not in r for r in summary['runs'].values())
-        for r in summary['runs'].values():
+        assert summary['plan_sha256'] == P.digest(path)
+        if reaudit:
+            revision = P.digest(summary_path)
+            backup = out / ('summary-before-reaudit-' + revision[:12] + '.json')
+            assert not backup.exists()
+            shutil.copy2(summary_path, backup)
+            cached = summary['runs']
+            # A second concurrent game may finish after another audit fails.
+            # Bind its native outputs and log before re-auditing, never rerun it.
+            for job in plan['jobs']:
+                name = job['item']['name']; root = L.root_of(job)
+                if name not in cached and root.exists():
+                    assert (root / 'report.json').exists(), 'incomplete native game'
+                    raw = {p.name: P.digest(p) for p in root.iterdir()
+                           if p.is_file() and not p.name.endswith('-audit.json')}
+                    cached[name] = dict(job, hashes=raw,
+                        log_sha256=P.digest(out / 'logs' / (name + '.log')))
+            receipt = out / ('reaudit-inputs-' + revision[:12] + '.json')
+            I.write(receipt, dict(prior_summary=dict(path=str(backup), sha256=revision),
+                                 current_inputs=current_inputs, cached=cached))
+            summary = dict(summary, complete=False, inputs=current_inputs, runs={}, pairs=[],
+                           reaudit_receipt=dict(path=str(receipt), sha256=P.digest(receipt)))
+            summary.pop('error', None)
+            summary.pop('screen', None)
+        else:
+            assert not summary.get('error')
+            assert all(r.get('audited') and 'error' not in r for r in summary['runs'].values())
+        for r in list(summary['runs'].values()) + list(cached.values()):
             if 'archive' in r: B.verify_archive(r['archive'])
             else: assert all(P.digest(L.root_of(r) / k) == v for k, v in r['hashes'].items())
     else:
         summary = dict(schema=1, profile=PROFILE, complete=False, plan_sha256=P.digest(path),
-                       binary=plan['binary'], source_commit=plan['source_commit'], inputs=plan['inputs'], runs={}, pairs=[])
+                       binary=plan['binary'], source_commit=plan['source_commit'], inputs=current_inputs, runs={}, pairs=[])
     def save(): I.write(summary_path, summary)
     def run_batch(pool, batch):
-        pending = {j['item']['name']: pool.submit(run_case, j, plan) for j in batch if j['item']['name'] not in summary['runs']}
+        pending = {j['item']['name']: pool.submit(run_case, j, plan, cached.get(j['item']['name']))
+                   for j in batch if j['item']['name'] not in summary['runs']}
         for name, future in pending.items():
             summary['runs'][name] = future.result(); save()
             assert 'error' not in summary['runs'][name], summary['runs'][name].get('error')
@@ -574,7 +622,7 @@ def execute(path):
                 summary['pairs'].append(comparison); save()
                 print(group, comparison['outcome_transition'], comparison['benefits'], flush=True)
         summary['screen'] = screen(summary['runs'], summary['pairs'])
-        assert plan['inputs'] == inputs() and P.digest(plan['binary']['path']) == plan['binary']['sha256']
+        assert current_inputs == inputs() and P.digest(plan['binary']['path']) == plan['binary']['sha256']
         assert all(P.digest(k) == v for k, v in plan['source_hashes'].items())
         summary['complete'] = True
     except Exception:
@@ -588,10 +636,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('plan').add_argument('--out', type=Path, required=True)
-    sub.add_parser('run').add_argument('--plan', type=Path, required=True)
+    run = sub.add_parser('run')
+    run.add_argument('--plan', type=Path, required=True)
+    run.add_argument('--reaudit', action='store_true', help='preserve failed audit and recheck cached games without rerunning')
     args = parser.parse_args()
     if args.action == 'plan': freeze(args.out.resolve())
-    else: execute(args.plan.resolve())
+    else: execute(args.plan.resolve(), args.reaudit)
 
 
 if __name__ == '__main__':
