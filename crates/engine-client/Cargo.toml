@@ -25,6 +25,7 @@ scenario-pizza = { workspace = true }
 scenario-rover-lab = { workspace = true }
 scenario-spaceling-lab = { workspace = true }
 scenario-terrain-lab = { workspace = true }
+scenario-scorched-earth = { workspace = true }
 scenario-spacewars = { workspace = true }
 clap = { workspace = true }
 cpal = { workspace = true }

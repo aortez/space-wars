@@ -234,3 +234,124 @@ fn ship_lands_on_deposited_cells_and_revalidates_after_they_are_blasted() {
         assert_conserved(&state, initial);
     }
 }
+
+#[test]
+fn deposited_flag_footing_must_be_claimed_again_after_destruction_and_return() {
+    for shape in [GrainShape::Round, GrainShape::Hexagon] {
+        let (mut state, released, initial) = rebuilt_pad(shape);
+        let spec = SurfaceSortieState::spec();
+        let hit = ground(&state, 0.0);
+        let standing = hit.point + Vec2::Y * (spec.half_height() + 0.05);
+        state.pilots[0].body = Some(
+            SpacelingAssembly::insert(
+                &mut state.world.physics.world,
+                pilot_physics_id(PlayerId::PLAYER_1),
+                standing,
+                0.0,
+                spec,
+            )
+            .unwrap(),
+        );
+        state.pilots[0].controls_armed = true;
+        idle(&mut state, 360);
+        let claim = state.claim_observation(0, 0).unwrap();
+        assert_eq!(
+            claim.owner,
+            Some(PlayerId::PLAYER_1),
+            "{shape:?}: {claim:?}"
+        );
+        assert_eq!(claim.captures, 1);
+        let flag = claim.flag.unwrap();
+        let planet = state.world.planets[0];
+        let terrain = &state.world.terrain.planets[&0];
+        let cell = terrain
+            .geometry
+            .contact_cell(
+                &terrain.field,
+                (flag.position - planet.position).rotate_radians(-planet.wrapper_angle),
+                flag.normal.rotate_radians(-planet.wrapper_angle),
+            )
+            .unwrap();
+        assert!(
+            released.contains(&cell),
+            "claim must stand on deposited material"
+        );
+        let local = terrain.field.cell_center(cell);
+        let returned = state.terrain_diagnostics().deposited_cells;
+
+        // Keep the claimant away while material returns: deposition must never
+        // restore ownership merely because the old flag's footing reappears.
+        let body = state.pilots[0].body.as_ref().unwrap().body();
+        state
+            .world
+            .physics
+            .world
+            .set_pose(body, planet.position + Vec2::Y * 1000.0, 0.0, true);
+        state
+            .world
+            .physics
+            .world
+            .set_velocity(body, Vec2::ZERO, 0.0, true);
+        state.world.queue_test_blast(
+            TerrainEdit {
+                brush: Brush::Circle {
+                    center: cell,
+                    radius: 0,
+                },
+                mode: EditMode::Remove,
+            },
+            RadialImpulse {
+                center: local,
+                radius: 2.0,
+                speed: 0.0,
+            },
+        );
+        idle(&mut state, 1);
+        let destroyed = state.claim_observation(0, 0).unwrap();
+        assert_eq!(destroyed.owner, None);
+        assert!(destroyed.flag.is_none());
+        assert_eq!(destroyed.neutralizations, 1);
+        for _ in 0..600 {
+            idle(&mut state, 1);
+            let claim = state.claim_observation(0, 0).unwrap();
+            assert_eq!(claim.owner, None, "{shape:?}: {claim:?}");
+            assert!(claim.flag.is_none());
+        }
+        assert!(state.terrain_diagnostics().deposited_cells > returned);
+        assert_ne!(
+            state
+                .world
+                .planet_terrain(0)
+                .unwrap()
+                .cell(cell)
+                .unwrap()
+                .material,
+            MaterialId::VOID
+        );
+        assert_conserved(&state, initial);
+
+        state
+            .world
+            .physics
+            .world
+            .set_pose(body, standing, 0.0, true);
+        state
+            .world
+            .physics
+            .world
+            .set_velocity(body, Vec2::ZERO, 0.0, true);
+        idle(&mut state, 60);
+        assert_eq!(state.claim_observation(0, 0).unwrap().owner, None);
+        idle(&mut state, 300);
+        let reclaimed = state.claim_observation(0, 0).unwrap();
+        assert_eq!(
+            reclaimed.owner,
+            Some(PlayerId::PLAYER_1),
+            "{shape:?}: {reclaimed:?}"
+        );
+        assert_eq!(reclaimed.captures, 2);
+        assert_eq!(reclaimed.neutralizations, 1);
+        assert_eq!(reclaimed.flag.unwrap().raised_fraction, 1.0);
+        assert_conserved(&state, initial);
+    }
+}
