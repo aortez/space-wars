@@ -1,5 +1,9 @@
 # Integrated mission candidate: frozen configuration and comparison plan
 
+The [completed comparison](integrated-bot-results.md) retains this candidate as
+experimental. The definition and validation history below preserve the original
+configuration, acceptance criteria and pre-outcome state.
+
 `mission_execution_candidate_v1` is a named headless configuration of **v13**
 after [the merged execution checkpoint](bot-route-evidence-checkpoint.md).
 It combines conditional destination costs, capture-failure memory, powered
