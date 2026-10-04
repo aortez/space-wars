@@ -128,6 +128,53 @@ fn full_pool_rejects_damage_atomically_but_keeps_mining_operational() {
 }
 
 #[test]
+fn settled_cells_reenter_the_rotating_planet_and_retired_grains_leave_every_registry() {
+    let mut state = enabled(TerrainSurface::Interpolated, 1);
+    state.planets[0].wrapper_omega = 0.04;
+    let initial = material(&state);
+    let center = state
+        .planet_terrain(0)
+        .unwrap()
+        .local_to_cell(Vec2::ZERO)
+        .unwrap();
+    let original = state.planet_terrain(0).unwrap().cell(center).unwrap();
+    for cycle in 1..=3 {
+        state.terrain.pending.push(PendingEdit {
+            body: physics::planet_entity(0),
+            edit: TerrainEdit {
+                brush: Brush::Circle { center, radius: 0 },
+                mode: EditMode::Remove,
+            },
+            blast: Some(RadialImpulse {
+                center: Vec2::ZERO,
+                radius: 2.0,
+                speed: 0.0,
+            }),
+        });
+        step(&mut state);
+        let id = state.loose_terrain().unwrap().iter().next().unwrap().id();
+        let mut replay = state.clone();
+        for _ in 0..120 {
+            step(&mut state);
+            step(&mut replay);
+            assert_eq!(observation(&state).payload, observation(&replay).payload);
+        }
+        assert_eq!(state.loose_terrain().unwrap().deposited_cells(), cycle);
+        assert!(state.loose_terrain().unwrap().is_empty());
+        assert!(!state.physics.terrain_fragments.contains(&id.value()));
+        assert!(!state.physics.world.contains_entity(id));
+        assert_eq!(
+            state.planet_terrain(0).unwrap().cell(center),
+            Some(original)
+        );
+        assert_eq!(material(&state), initial);
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+        assert_eq!(audit.removed_cells, 0);
+    }
+}
+
+#[test]
 fn ordered_mining_and_impact_share_one_split_and_do_not_double_count() {
     for mining_first in [true, false] {
         let mut state = enabled(TerrainSurface::Interpolated, 192);

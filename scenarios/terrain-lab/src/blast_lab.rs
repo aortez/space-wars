@@ -95,6 +95,9 @@ pub struct BlastLabConfig {
     pub pulse_ticks: u32,
     pub grain_shape: GrainShape,
     pub cell_size: f32,
+    /// Enable the shared return-to-terrain lifecycle. Raw model comparisons
+    /// leave this off so grain/contact behavior remains independently measurable.
+    pub deposition: bool,
 }
 
 impl Default for BlastLabConfig {
@@ -109,6 +112,7 @@ impl Default for BlastLabConfig {
             pulse_ticks: 6,
             grain_shape: GrainShape::Round,
             cell_size: 0.5,
+            deposition: false,
         }
     }
 }
@@ -612,7 +616,34 @@ impl BlastLab {
             }
         }
         self.last_physics = self.physics.step(DT);
+        if self.config.deposition {
+            let commits = self
+                .grains
+                .settle(
+                    &mut self.physics,
+                    self.bodies.iter_mut().map(|body| TerrainBodyMut {
+                        terrain: &mut body.terrain,
+                        geometry: &mut body.geometry,
+                        assembly: &mut body.assembly,
+                    }),
+                    DT,
+                )
+                .expect("valid lab deposition");
+            for commit in commits {
+                let body = self
+                    .bodies
+                    .iter_mut()
+                    .find(|b| b.assembly.body() == commit.body)
+                    .unwrap();
+                body.hash = body.terrain.hash();
+                body.edited_chunks = commit.dirty_chunks;
+            }
+        }
         self.tick += 1;
+    }
+
+    pub fn deposited_cells(&self) -> u64 {
+        self.grains.deposited_cells()
     }
 
     /// Audit outside the timed step. Cell counts preserve material identity;
@@ -699,6 +730,9 @@ impl BlastLab {
         };
         for value in [self.tick, self.next_id, self.blasts, self.rejected_blasts] {
             write(value);
+        }
+        if self.config.deposition {
+            write(self.grains.settling_hash());
         }
         if let Some(probe) = self.probe_snapshot() {
             write(2);

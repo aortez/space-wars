@@ -125,6 +125,7 @@ fn run(config: GranularLabConfig, ticks: u32, verify: bool) -> Value {
         "blasts":state.lab.blasts,"rejected_blasts":state.lab.rejected_blasts,
         "box_supported_frames":box_supported_frames,"ground_cells":balance.ground,
         "loose_cells":balance.loose,"conserved_cells":balance.initial,"removed_cells":balance.removed,
+        "deposited_cells":state.lab.deposited_cells(),
         "native_update":stats(steps),"event_update":stats(events),"frame_construction":stats(frames),
         "same_build_replay_verified":verify,"final_hash":format!("{:016x}",state.lab.content_motion_hash())})
 }

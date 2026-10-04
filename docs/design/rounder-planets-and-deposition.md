@@ -151,9 +151,15 @@ the ordinary generated match after the combined physical tests pass.
 
 ## How #51 can build on that foundation
 
+The first whole-cell return path is now implemented in the
+[shared loose-terrain lifecycle](../shared-loose-terrain.md), with conservation,
+moving-frame settling, clearance checks and a Picade evaluation. The proposal
+below records the starting point of this investigation; finer sediment transport
+and smoothing remain future work.
+
 Treat deposition as material transfer through the same edit boundary, not as
-permanent visual effects. `EditMode` currently supports only removal and damage;
-there is no addition, fill fraction or granular state. A future deposit operation
+permanent visual effects. At the time of this investigation, `EditMode` supported
+only removal and damage; there was no addition, fill fraction or granular state. A deposit operation
 needs a defined material quantity and destination and must atomically debit the
 source and credit the terrain, without overlapping an actor or double-counting
 material.

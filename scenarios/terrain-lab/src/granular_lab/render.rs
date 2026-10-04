@@ -189,10 +189,11 @@ pub(super) fn frame(state: &GranularLabState) -> RenderFrame {
         &mut frame,
         center - Vec2::Y * h * 0.34,
         format!(
-            "{} / {} loose bodies · {} supported and slow · {}",
+            "{} / {} loose · {} resting · {} settled · {}",
             state.lab.loose_body_count(),
             state.config.max_loose_bodies,
             state.motion.supported_slow_cells,
+            state.lab.deposited_cells(),
             probe
         ),
         14.0,

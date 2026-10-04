@@ -197,6 +197,7 @@ impl GranularLabState {
         }
         config.max_loose_bodies = config.max_loose_bodies.clamp(1, 512);
         let lab = BlastLab::new(BlastLabConfig {
+            deposition: true,
             fixture: config.fixture,
             mode: BlastMode::Grains,
             seed,

@@ -8,7 +8,8 @@ across restart; old settings files default to Off.
 Use cannon impacts or enable asteroid arrivals to break ground into moving dirt.
 The trial uses round, one-world-unit cells, friction 0.6 and a 192-grain limit.
 The HUD shows `Dirt n/192` when no higher-priority actor message is needed.
-`Dirt limit · restart` means an impact could not fit. Restart clears the trial.
+The HUD also reports cumulative settled cells. Settling returns budget slots;
+an impact that still cannot fit leaves its material intact.
 Mining keeps its existing removal behavior. Lasers keep their existing rules.
 
 ## Ownership and the tick boundary
@@ -23,6 +24,9 @@ flowchart LR
   D --> G[Existing Rapier world]
   E --> G
   F --> G
+  G --> I[Supported and quiet dirt]
+  I --> J[Validate vacant cells and clearance]
+  J --> D
   H[Ships, pilots, rovers] --> G
 ```
 
@@ -54,7 +58,25 @@ additional solver or gravity step is introduced.
 Diagnostics report solid cells, loose cells and removed cells separately:
 `initial = solid + loose + removed`. Released cells are never also counted as
 destroyed or mined. Observations include loose material, motion, settings and
-queued impulses, allowing clone continuation checks.
+queued impulses and settling timers, allowing clone continuation checks.
+
+`Terrain::deposit_cells` is the representation-independent return boundary.
+It admits whole cells of matching size into vacant coordinates, preserving
+material and remaining durability. Invalid, duplicate or occupied destinations
+reject the batch without changing the field. Interpolated surfaces get a fresh
+midpoint sample for each added cell; adjacent geometry caches refresh normally.
+An eventual MPM adapter can accumulate cell quantities and use the same API.
+
+`LooseTerrain::settle` requires a direct terrain contact and 0.5 seconds of low
+relative speed/spin, with little drift in the supporting body's local frame.
+Translation and rotation are included in the reference velocity. A candidate
+must fit a nearby, vacant, face-connected cell of the same material scale.
+Clearance checks include current collider edits and protect actors and grains
+that remain loose. Blocked placements retry after another quiet interval.
+At most 32 grains transfer per tick. Each destination publishes material and
+geometry and retires its accepted grain bodies at the same boundary. Dynamic
+destinations receive the grains' linear and angular momentum; prescribed
+terrain retains its commanded motion. Deposited cells can be blasted loose again.
 
 The lab also uses `LooseTerrain`, while retaining its own fixture choices,
 probe box, blast pulse and aggregate grain-plus-fragment budget. Clock and
@@ -63,18 +85,21 @@ not been changed in this slice.
 
 ## Limits and next work
 
-This remains a trial: there is no deposition, merging, offscreen deletion or
-unlimited population fallback. A 192-grain limit can reject a batch before every
+This remains a trial: there is no field expansion, solid-fragment merging,
+offscreen deletion or unlimited population fallback. A 192-grain limit can reject a batch before every
 slot is filled. Disconnected solid fragments retain Spacewars' existing policy.
 Contact circles have pore space; nominal cell quantity and mass are conserved,
 not the exact area covered by collision proxies. The radial kick is a gameplay
 parameter, not a calibrated blast-pressure model.
 
-Conserved settling/deposition belongs to [#51](https://github.com/aortez/space-wars/issues/51).
-It must prepare an addition in the destination's moving frame, validate space
-and material quantity, then publish the field and retire the loose bodies at
-one boundary. That return path and performance tuning are prerequisites for
-enabling this in ordinary games by default.
+This implements the initial conserved return path for
+[#51](https://github.com/aortez/space-wars/issues/51). Only grains with direct
+terrain support pack; upper layers can follow as the surface grows. Dense piles,
+incompatible materials/sizes, field edges and nearby actors can prevent packing.
+Contour/interpolated surfaces use a conservative neighboring-cell clearance
+band. Blocked and orbiting grains remain physical and continue counting against
+the budget. This is cell packing, not calibrated soil compaction or cohesion.
+The trial remains Off by default while those limits and terrain growth are explored.
 
 ## Verification
 
@@ -91,7 +116,11 @@ cargo run --locked --release -p scenario-spacewars --example loose_terrain_bench
 Tests exercise real cannon and asteroid contacts, all three terrain surfaces,
 moving/rotating sources, ore damage thresholds, mining mixed with release,
 support loss, repeated hits on loose material, capacity rejection, conservation
-and clone continuation. Native functional checks exercise launcher settings,
+and clone continuation. Deposition tests cover repeated release/settle/release
+with a one-grain budget, damage retention, all three surfaces and both shapes,
+stationary and translating/rotating ground, dynamic momentum, obstructed growth,
+airborne/sliding rejection, registry retirement and real lab blast cycles.
+Native functional checks exercise launcher settings,
 restart/persistence and vector/raster rendering.
 
 The benchmark runs up to 3,600 fixed updates per case with seed 42 and heavy asteroids
@@ -107,7 +136,42 @@ Frame time measures primitive construction, not final rasterization/display.
 On/Off cases diverge physically after the first release, so these are workload
 costs rather than a controlled solver-only comparison.
 
+## Deposition check on Picade (2026-10-03)
+
+697 library tests across the terrain, Rapier, lab and Spacewars crates pass,
+including fair admission when blocked grains outnumber the per-tick budget.
+The native granular launcher/pause/restart workflow passes with both renderers.
+All nine 600-tick sandbox cases on Picade conserve material and reproduce their
+observations on replay. They return 6–10 cells to terrain per run; dense piles
+still retain most of their grains under the conservative clearance rule.
+The deployed Picade client was also exercised with a blast and a box drop;
+[the live capture](screenshots/granular-terrain/picade-deposition.png) shows five
+returned cells and the new settled counter. The application was returned to
+Spacewars and paused after verification.
+
+A focused 1,800-tick comparison uses the prior archived binary and this return
+path, Rust 1.89.0, the same release/static-CRT configuration, seed 42 and limit
+192. The kiosk remains paused throughout. This is one run per version/case,
+not a repeated regression study. Raw results, binary hashes and commands are in
+[the deposition report](data/terrain-deposition-picade-20261003.json).
+
+| Workload | p95 before | p95 with deposition | Cells returned | Rejected releases before → after |
+| --- | ---: | ---: | ---: | ---: |
+| Combat, round | 4.69 ms | 5.77 ms | 23 | 1 → 0 |
+| Combat, angular | 5.37 ms | 7.17 ms | 16 | 2 → 1 |
+| Three planets, round | 14.43 ms | 15.70 ms | 3 | 8 → 9 |
+| Three planets, angular | 15.26 ms | 16.54 ms | 9 | 9 → 9 |
+
+Deposition recycles capacity but is not yet a performance improvement. Changed
+ground and accepted impacts also change subsequent solver work, so these deltas
+do not isolate admission cost. The Off cases retain identical final hashes and
+p95 remains approximately 0.42 ms / 1.68 ms. The post-run temperature was 80.3°C
+and sysfs reported 1.5 GHz; no firmware throttle telemetry was available. Further
+packing/performance work is needed before enabling the trial by default.
+
 ## Picade benchmark comparison (2026-10-03)
+
+This earlier release-only comparison precedes the deposition change above.
 
 The review ran on `sw-picade.local`, Raspberry Pi 4 Model B Rev 1.4, with the
 kiosk running and its game already paused. Baseline `8d7427b` precedes the shared

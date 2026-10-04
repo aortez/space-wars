@@ -4,6 +4,9 @@ use super::*;
 use engine_terrain::{DetachedCell, MaterialId, TerrainEdit, TerrainError};
 use std::collections::BTreeMap;
 
+mod deposition;
+pub use deposition::DepositCommit;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LooseTerrainConfig {
     pub max_grains: usize,
@@ -151,6 +154,8 @@ pub struct MaterialQuantity {
 pub struct LooseTerrain {
     config: LooseTerrainConfig,
     grains: Vec<TerrainGrain>,
+    settling: BTreeMap<PhysicsId, deposition::SettlingState>,
+    deposited_cells: u64,
 }
 
 impl LooseTerrain {
@@ -166,6 +171,8 @@ impl LooseTerrain {
         Ok(Self {
             config,
             grains: Vec::new(),
+            settling: BTreeMap::new(),
+            deposited_cells: 0,
         })
     }
     pub fn config(&self) -> LooseTerrainConfig {

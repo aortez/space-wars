@@ -1,6 +1,106 @@
 use super::*;
 
 #[test]
+fn deposit_roundtrip_preserves_damaged_material_and_refreshes_neighbor_surfaces() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let mut terrain = field().with_surface_distances(|_| 0.3).unwrap();
+        let coordinate = CellCoord::new(31, 31);
+        terrain
+            .apply(TerrainEdit {
+                brush: Brush::Circle {
+                    center: coordinate,
+                    radius: 0,
+                },
+                mode: EditMode::Damage(37),
+            })
+            .unwrap();
+        let original = terrain.cells().to_vec();
+        let released = terrain.extract_individual_cells(&[coordinate]).unwrap();
+        let mut geometry = TerrainGeometry::with_surface(&terrain, surface);
+        terrain
+            .deposit_cells(&[CellDeposit {
+                coordinate,
+                cell: released[0].cell,
+                cell_size: released[0].cell_size,
+            }])
+            .unwrap();
+        assert_eq!(terrain.cells(), original);
+        terrain.validate().unwrap();
+        let dirty = geometry.refresh(&terrain);
+        assert!(dirty.contains(&ChunkId(0)));
+        if surface != TerrainSurface::Blocks {
+            assert!(dirty.contains(&ChunkId(1)) && dirty.contains(&ChunkId(3)));
+        }
+        let fresh = TerrainGeometry::with_surface(&terrain, surface);
+        for (cached, rebuilt) in geometry.chunks().iter().zip(fresh.chunks()) {
+            assert_eq!(cached.rectangles, rebuilt.rectangles);
+            assert_eq!(cached.polygons, rebuilt.polygons);
+        }
+        let again = terrain.extract_individual_cells(&[coordinate]).unwrap();
+        assert_eq!(again, released);
+    }
+}
+
+#[test]
+fn invalid_deposit_batches_leave_every_cell_revision_and_sample_unchanged() {
+    let mut terrain = field();
+    let coordinate = CellCoord::new(32, 4);
+    let released = terrain.extract_individual_cells(&[coordinate]).unwrap()[0];
+    let valid = CellDeposit {
+        coordinate,
+        cell: released.cell,
+        cell_size: released.cell_size,
+    };
+    let original = terrain.clone();
+    for invalid in [
+        valid,
+        CellDeposit {
+            coordinate: CellCoord::new(-1, 0),
+            ..valid
+        },
+        CellDeposit {
+            coordinate: CellCoord::new(0, 0),
+            ..valid
+        },
+        CellDeposit {
+            cell_size: 1.0,
+            ..valid
+        },
+        CellDeposit {
+            cell: Cell::VOID,
+            ..valid
+        },
+        CellDeposit {
+            cell: Cell {
+                material: MaterialId(99),
+                durability: 1,
+            },
+            ..valid
+        },
+        CellDeposit {
+            cell: Cell {
+                durability: 101,
+                ..valid.cell
+            },
+            ..valid
+        },
+    ] {
+        assert!(terrain.deposit_cells(&[valid, invalid]).is_err());
+        assert_eq!(terrain, original);
+    }
+    terrain.deposit_cells(&[]).unwrap();
+    assert_eq!(terrain, original);
+    terrain.revision = u64::MAX;
+    let exhausted = terrain.clone();
+    assert!(terrain.deposit_cells(&[valid]).is_err());
+    assert_eq!(terrain, exhausted);
+}
+
+#[test]
 fn releasing_damage_retains_the_departing_cells_and_the_normal_cut_surface() {
     let mut source = field().with_surface_distances(|_| 0.3).unwrap();
     let mut reference = source.clone();

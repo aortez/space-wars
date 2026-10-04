@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(a.asteroid_pressure().spawned, spawned);
     }
     #[test]
-    fn conserved_asteroid_impacts_share_the_actor_world_and_hit_the_limit_without_loss() {
+    fn conserved_asteroid_impacts_share_the_actor_world_and_recycle_settled_material() {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         state.enable_loose_terrain();
         state.set_asteroid_pressure(MaterialAsteroidSettings {
@@ -137,7 +137,7 @@ mod tests {
         }
         let audit = state.terrain_diagnostics();
         assert!(audit.loose_cells > 0 && audit.loose_cells <= 192);
-        assert!(audit.rejected_releases > 0);
+        assert!(audit.deposited_cells > 0);
         let mut replay = state.clone();
         for _ in 0..120 {
             SurfaceSortieScenario::step(&mut state, &[], DT);

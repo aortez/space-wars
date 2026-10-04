@@ -14,6 +14,7 @@ pub struct TerrainDiagnostics {
     pub removed_cells: u64,
     pub fragments: usize,
     pub loose_cells: usize,
+    pub deposited_cells: u64,
     pub loose_limit: usize,
     pub rejected_releases: u64,
     pub terrain_colliders: usize,
@@ -46,6 +47,11 @@ impl SpacewarsState {
             removed_cells: self.terrain.removed_cells,
             fragments: self.terrain.fragments.len(),
             loose_cells: self.terrain.loose.as_ref().map_or(0, LooseTerrain::len),
+            deposited_cells: self
+                .terrain
+                .loose
+                .as_ref()
+                .map_or(0, LooseTerrain::deposited_cells),
             loose_limit: self
                 .terrain
                 .loose

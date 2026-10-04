@@ -244,11 +244,62 @@ pub(super) fn commit_releases(
     ordinary
 }
 
+pub(super) fn commit_deposits(state: &mut SpacewarsState) {
+    let terrain = &mut state.terrain;
+    let Some(pool) = terrain.loose.as_mut() else {
+        return;
+    };
+    let fields = terrain
+        .planets
+        .values_mut()
+        .map(|planet| TerrainBodyMut {
+            terrain: &mut planet.field,
+            geometry: &mut planet.geometry,
+            assembly: &mut planet.assembly,
+        })
+        .chain(
+            terrain
+                .fragments
+                .values_mut()
+                .map(|fragment| TerrainBodyMut {
+                    terrain: &mut fragment.terrain,
+                    geometry: &mut fragment.geometry,
+                    assembly: &mut fragment.assembly,
+                }),
+        );
+    // Spacewars' material boundary runs once per 60 Hz simulation tick. Pending
+    // damage/blasts have already resolved, so a new impulse resets quiet time.
+    let commits = pool
+        .settle(&mut state.physics.world, fields, 1.0 / 60.0)
+        .expect("valid Spacewars deposition");
+    for commit in commits {
+        state.physics.material_queries_dirty = true;
+        for id in commit.retired_grains {
+            state.physics.terrain_fragments.remove(&id.value());
+        }
+        if let Some(fragment) = terrain.fragments.get_mut(&commit.body.entity.value()) {
+            fragment.hash = fragment.terrain.hash();
+            fragment.edited_chunks = commit.dirty_chunks;
+        } else if let Some(planet) =
+            physics::planet_index(commit.body.entity).and_then(|i| terrain.planets.get_mut(&i))
+        {
+            planet.hash = planet.field.hash();
+            planet.supported = planet.footing.iter().all(|c| {
+                planet
+                    .field
+                    .cell(*c)
+                    .is_some_and(|c| c.material != MaterialId::VOID)
+            });
+        }
+    }
+}
+
 pub(super) fn observe(state: &SpacewarsState, payload: &mut Vec<u8>) {
     let Some(pool) = &state.terrain.loose else {
         return;
     };
-    payload.extend(b"loose-v1");
+    payload.extend(b"loose-v2");
+    payload.extend(pool.settling_hash().to_le_bytes());
     payload.extend((pool.config().max_grains as u64).to_le_bytes());
     payload.extend([pool.config().shape as u8]);
     payload.extend(pool.config().friction.to_le_bytes());

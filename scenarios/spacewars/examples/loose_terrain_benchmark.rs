@@ -54,7 +54,7 @@ fn percentile(values: &mut [f64], fraction: f64) -> f64 {
 fn main() {
     let args = Args::parse();
     println!(
-        "scene,mode,seed,limit,steps,grains,fragments,blocked,removed,step_mean_ms,step_p50_ms,step_p95_ms,step_p99_ms,step_max_ms,frame_p95_ms,state_hash"
+        "scene,mode,seed,limit,steps,grains,fragments,blocked,removed,deposited,step_mean_ms,step_p50_ms,step_p95_ms,step_p99_ms,step_max_ms,frame_p95_ms,state_hash"
     );
     let scenes = match args.scene {
         Scene::All => vec!["combat", "match"],
@@ -138,7 +138,7 @@ fn main() {
                     (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
                 });
             println!(
-                "{scene},{},{},{},{},{},{},{},{},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{hash:016x}",
+                "{scene},{},{},{},{},{},{},{},{},{},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{hash:016x}",
                 mode.label(),
                 args.seed,
                 args.limit,
@@ -147,6 +147,7 @@ fn main() {
                 audit.fragments,
                 audit.rejected_releases,
                 audit.removed_cells,
+                audit.deposited_cells,
                 times.iter().sum::<f64>() / times.len() as f64,
                 percentile(&mut times, 0.5),
                 percentile(&mut times, 0.95),

@@ -58,7 +58,10 @@ Material remaining outside the camera still exists and counts toward the limit.
 
 “Supported and slow” requires an upward contact path to the ground and low
 relative speed/spin. A grain can be supported through another grain or the box.
-This is a diagnostic; it never freezes, deletes or deposits material. “Box on
+This is a diagnostic. Separately, directly supported grains that remain quiet
+for half a second can return to terrain when there is room for a cell. The HUD
+shows cumulative settled cells; their loose-body slots become available again.
+Blocked placements retain their grains. “Box on
 loose dirt” reports an upward grain contact, not a guarantee of permanent rest.
 
 ## Integration with the terrain engine
@@ -89,12 +92,13 @@ for cannon and asteroid impacts through the existing scenarios' **Loose dirt
 these APIs without importing the lab's fixture or controls. Their adapters and
 explosion policies remain future work.
 
-The return path belongs to conserved deposition
-[#51](https://github.com/aortez/space-wars/issues/51): select supported, quiet
-material; prepare an addition in the destination field's moving local frame;
-check space/material quantities; then atomically add that material and retire
-its loose bodies. Failed admission must leave the bodies intact. Update surface
-geometry/colliders at the same boundary. Deposition is not implemented here.
+The conserved return path for [#51](https://github.com/aortez/space-wars/issues/51)
+now uses `LooseTerrain::settle` and `Terrain::deposit_cells`. It works in the
+destination's moving frame, checks space/material quantities, then adds cells
+and retires their grain bodies together. See the [shared lifecycle](shared-loose-terrain.md)
+for admission rules and limits. The native sandbox enables it; the standalone
+`dirt_blast_lab` model comparison retains deposition disabled by default so its
+raw grain/contact experiments remain available.
 
 Counts and masses conserve nominal cell quantity (`cell_size²`, unit depth),
 not exact occupied contact area. Inscribed circles/hexagons introduce pore space;
@@ -108,6 +112,8 @@ The [paired Picade benchmark review](shared-loose-terrain.md#picade-benchmark-co
 compares this workload before and after the shared release lifecycle, explains
 the changed trajectories, and records three repetitions alongside the MPM and
 ordinary Spacewars comparisons.
+The subsequent [deposition check](shared-loose-terrain.md#deposition-check-on-picade-2026-10-03)
+records the return path's current cost and packing limits.
 
 ```sh
 cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox -- \
@@ -119,7 +125,7 @@ cargo run --locked --release -p scenario-terrain-lab --example granular_sandbox 
 
 The workload runs 600 fixed updates: blast at tick 0, drop the box at 180, blast
 below its actual position at 360, and blast fresh ground at 450. JSON records
-population, rejected events, conserved quantities, box support, timings and a
+population, rejected events, conserved quantities, deposited cells, box support, timings and a
 final fingerprint. Optional replay uses the exact recorded world-space actions
 and compares observations every tick within the same build. Each normal run
 audits per-material conservation, physical mass, collider geometry and finite

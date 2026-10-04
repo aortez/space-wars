@@ -14,6 +14,16 @@ pub struct DetachedCell {
     pub parent_offset: Vec2,
 }
 
+/// One cell's quantity and state returning to a field. The caller owns the
+/// departing representation and retires it only after this addition succeeds.
+/// Particle models can accumulate whole cell quantities at this same boundary.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CellDeposit {
+    pub coordinate: CellCoord,
+    pub cell: Cell,
+    pub cell_size: f32,
+}
+
 /// A damage edit's field changes and the material that left the field. The
 /// samples retain their state immediately before the releasing hit: that hit
 /// breaks their attachment, not their material identity or quantity. Surviving
@@ -26,6 +36,54 @@ pub struct ReleasedCells {
 }
 
 impl Terrain {
+    /// Add conserved material into vacant cells without changing its damage.
+    /// Sizes must match exactly: resampling, mixing and material conversion are
+    /// explicit caller policies. Duplicates, occupied/out-of-bounds destinations,
+    /// unknown materials and invalid durability reject the entire batch.
+    /// Refresh derived geometry after success. No revision changes on failure
+    /// or an empty batch; no mining/removal quantity is produced.
+    pub fn deposit_cells(&mut self, deposits: &[CellDeposit]) -> Result<(), TerrainError> {
+        if deposits.is_empty() {
+            return Ok(());
+        }
+        if self.revision == u64::MAX {
+            return Err(TerrainError("terrain revision exhausted"));
+        }
+        let mut indices = std::collections::BTreeSet::new();
+        for deposit in deposits {
+            if deposit.cell_size != self.cell_size
+                || self.cell(deposit.coordinate) != Some(Cell::VOID)
+                || deposit.cell.durability == 0
+                || self
+                    .material(deposit.cell.material)
+                    .is_none_or(|material| deposit.cell.durability > material.hardness)
+            {
+                return Err(TerrainError("invalid material deposit"));
+            }
+            let index =
+                deposit.coordinate.y as usize * self.width as usize + deposit.coordinate.x as usize;
+            if !indices.insert(index) {
+                return Err(TerrainError("duplicate material deposit"));
+            }
+        }
+        self.revision += 1;
+        for deposit in deposits {
+            let c = deposit.coordinate;
+            let index = c.y as usize * self.width as usize + c.x as usize;
+            self.cells[index] = deposit.cell;
+            // A newly packed cell has a midpoint boundary sample, independent
+            // of the old crater depth. Geometry dependencies include neighboring
+            // chunks, so their contours refresh without changing their material.
+            if let Some(distances) = &mut self.distances {
+                distances[index] = self.cell_size * 0.5;
+            }
+            let chunk =
+                c.y as u32 / CHUNK_SIZE * self.width.div_ceil(CHUNK_SIZE) + c.x as u32 / CHUNK_SIZE;
+            self.chunk_revisions[chunk as usize] = self.revision;
+        }
+        Ok(())
+    }
+
     /// Apply the ordinary damage/removal and surface-cut rules, retaining every
     /// departing cell as transferable material. Does not detach remaining
     /// islands; callers can do that once after a batch of edits.

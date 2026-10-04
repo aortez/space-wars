@@ -1552,6 +1552,62 @@ impl PhysicsWorld {
             .map(|entry| entry.parent)
     }
 
+    /// Conservative clearance for an infrequent terrain addition. Unlike the
+    /// completed-step query index, this checks current bodies and colliders,
+    /// including edits published earlier at this same tick boundary. The caller
+    /// supplies an envelope containing every changed surface patch.
+    pub fn current_cuboid_is_clear(
+        &self,
+        position: Vec2,
+        angle: f32,
+        half_extents: Vec2,
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> bool {
+        if !finite_vec2(position)
+            || !angle.is_finite()
+            || !finite_vec2(half_extents)
+            || half_extents.x <= 0.0
+            || half_extents.y <= 0.0
+        {
+            return false;
+        }
+        let shape = SharedShape::cuboid(half_extents.x, half_extents.y);
+        let pose = Pose::new(to_rapier(position), angle);
+        let bounds = shape.compute_aabb(&pose);
+        self.raw.colliders.iter().all(|(_, collider)| {
+            if !collider.is_enabled()
+                || collider.is_sensor()
+                || !collider.collision_groups().test(groups.to_rapier())
+                || decode_collider(collider.user_data)
+                    .is_some_and(|id| excluded.contains(&id.entity))
+            {
+                return true;
+            }
+            let other_pose = collider
+                .parent()
+                .and_then(|handle| self.raw.bodies.get(handle))
+                .map_or(*collider.position(), |body| {
+                    *body.position() * collider.position_wrt_parent().copied().unwrap_or_default()
+                });
+            let other_bounds = collider.shape().compute_aabb(&other_pose);
+            if bounds.maxs.x <= other_bounds.mins.x
+                || bounds.mins.x >= other_bounds.maxs.x
+                || bounds.maxs.y <= other_bounds.mins.y
+                || bounds.mins.y >= other_bounds.maxs.y
+            {
+                return true;
+            }
+            !rapier2d::parry::query::intersection_test(
+                &pose,
+                shape.as_ref(),
+                &other_pose,
+                collider.shape(),
+            )
+            .unwrap_or(true)
+        })
+    }
+
     /// Sweep an existing collider along a world direction, excluding its entity
     /// and sensors. Returns available travel, or None for invalid input. As with
     /// ray queries, call against the last completed physics step.

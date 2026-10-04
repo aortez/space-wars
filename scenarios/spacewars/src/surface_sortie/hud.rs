@@ -121,11 +121,12 @@ impl SurfaceSortieState {
                 "Reload needs 25%".into()
             }
         } else if let Some(pool) = &self.world.terrain.loose {
-            if self.world.terrain.rejected_releases > 0 {
-                "Dirt limit · restart".into()
-            } else {
-                format!("Dirt {}/{}", pool.len(), pool.config().max_grains)
-            }
+            format!(
+                "Dirt {}/{} · {} settled",
+                pool.len(),
+                pool.config().max_grains,
+                pool.deposited_cells()
+            )
         } else if self.has_material_ground() {
             let flight = self.flight_observation(player);
             format!("{} {:.0} u/s", flight.label(), flight.relative_speed)

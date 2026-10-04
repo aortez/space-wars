@@ -4,6 +4,83 @@ const FIXTURES: [Fixture; 3] = [Fixture::Flat, Fixture::Slope, Fixture::MovingPl
 const MODES: [BlastMode; 2] = [BlastMode::Grains, BlastMode::GrainPulse];
 
 #[test]
+fn conserved_deposition_and_reblasts_work_in_real_stationary_and_moving_fixtures() {
+    for fixture in [Fixture::Flat, Fixture::MovingPlanet] {
+        for grain_shape in [GrainShape::Round, GrainShape::Hexagon] {
+            let mut lab = BlastLab::new(BlastLabConfig {
+                fixture,
+                grain_shape,
+                mode: BlastMode::Grains,
+                deposition: true,
+                max_loose_bodies: 64,
+                ..Default::default()
+            })
+            .unwrap();
+            let mut replay = lab.clone();
+            let mut total_released = 0;
+            let mut aim = (lab.surface_point(0.0, 0.25) - lab.ground_motion().position)
+                .rotate_radians(-lab.ground_motion().angle);
+            let mut aiming_at_deposit = false;
+            let mut reblasted_deposit = false;
+            for _ in 0..4 {
+                let blast = Blast {
+                    center: lab.ground_motion().position
+                        + aim.rotate_radians(lab.ground_motion().angle),
+                    radius: 0.75,
+                    speed: 6.0,
+                };
+                let result = lab.blast(blast).unwrap();
+                assert_eq!(result, replay.blast(blast).unwrap());
+                assert!(result.admitted, "{fixture:?} {grain_shape:?}: {result:?}");
+                if aiming_at_deposit {
+                    assert!(result.spawned_grains > 0);
+                    reblasted_deposit = true;
+                }
+                total_released += result.spawned_grains as u64;
+                let after_blast = lab.bodies[0].terrain.clone();
+                for _ in 0..300 {
+                    lab.step();
+                    replay.step();
+                    assert_eq!(lab.content_motion_hash(), replay.content_motion_hash());
+                    assert_eq!(lab.audit().unwrap().removed, 0);
+                    assert!(lab.loose_body_count() <= 64);
+                }
+                let ground = &lab.bodies[0].terrain;
+                let deposited = ground
+                    .cells()
+                    .iter()
+                    .zip(after_blast.cells())
+                    .enumerate()
+                    .filter(|(_, (now, before))| {
+                        now.material != MaterialId::VOID && before.material == MaterialId::VOID
+                    })
+                    .map(|(i, _)| {
+                        ground.cell_center(CellCoord::new(
+                            (i as u32 % ground.width()) as i32,
+                            (i as u32 / ground.width()) as i32,
+                        ))
+                    })
+                    .min_by(|a, b| a.distance_to(aim).total_cmp(&b.distance_to(aim)));
+                aiming_at_deposit = deposited.is_some();
+                if let Some(position) = deposited {
+                    aim = position;
+                }
+            }
+            assert!(
+                lab.deposited_cells() > 0,
+                "{fixture:?} {grain_shape:?}: no deposition"
+            );
+            assert!(lab.deposited_cells() < total_released || lab.loose_body_count() == 0);
+            assert_eq!(lab.rejected_blasts, 0);
+            assert!(
+                reblasted_deposit,
+                "{fixture:?} {grain_shape:?}: no deposited cell reblasted"
+            );
+        }
+    }
+}
+
+#[test]
 fn one_tick_pulse_has_the_same_motion_as_the_instantaneous_kick() {
     let config = BlastLabConfig {
         mode: BlastMode::Grains,

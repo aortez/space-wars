@@ -395,6 +395,7 @@ pub(super) fn commit(state: &mut SpacewarsState) {
             state.terrain.fragments.insert(id, fragment);
         }
     }
+    loose::commit_deposits(state);
     reconcile_support(state);
 }
 
