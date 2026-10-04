@@ -12,6 +12,8 @@ the opponent, or undermine its footing. The other tank returns fire every five
 seconds. The first tank reduced to zero health loses; **Reset** starts again on
 the same hills. A simultaneous destruction is a draw.
 
+![Angular dirt after repeated shell impacts on the Picade](screenshots/scorched-earth/picade-angular-impact.png)
+
 ## Controls
 
 | Action | Keyboard | Controller |
@@ -106,3 +108,81 @@ The accompanying Spacewars regression completes the flag lifecycle from #51:
 claim a deposited footing, blast it away, observe neutralization, let material
 return, then require a fresh full claim. Returning dirt never restores ownership
 by itself. Both Round and Angular exercise that path.
+
+## Picade deployment and presentation
+
+The scene was deployed and exercised on `sw-picade.local` on 2026-10-04. Live
+checks covered launcher selection, both grain shapes, repeated firing, taking
+control of the second tank, aim/power, Demo, pause and restart. The final device
+state is a fresh Angular round in the pause menu, with Demo off. The service was
+healthy with zero restarts after deployment.
+
+Runtime source is `43d1128`. The deployed client SHA-256 is
+`e892a13133466a97f8bae911fb45e029a096acc57599cf67e25d701aa31731a3`;
+the CLI is `970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5`.
+The client was built before committing those sources, so its embedded revision
+is `83a0fca0604c-dirty`; the deployed binary hash is the exact identity used for
+these live checks.
+
+The [live timing snapshot](data/scorched-earth-picade-live-20261004.txt) reports
+26.1 submitted FPS and 59.9 simulation updates/sec at a 1024×768 viewport with
+the existing **2× raster scale** (2048×1536 internal image). Its 120-sample window
+averages 6.13 ms of simulation per callback (2.08 updates/callback), 1.01 ms of
+scene creation and 16.16 ms of render preparation; these units differ from the
+one-update headless measurements. Detailed KMS profiling was enabled on the
+device. The screenshots and CLI checks are a short live smoke run, not a
+steady-state rendered benchmark. This scene does not yet achieve 60 rendered
+frames/sec with these settings; rendering and impact spikes remain work to do.
+
+![Round dirt on the same Picade hills](screenshots/scorched-earth/picade-round-impact.png)
+
+## Simulation baseline — 2026-10-04
+
+[Raw results and build/host metadata](data/scorched-earth-20261004.json) retain all
+16 runs. Both executables use Rust 1.89.0, release/fat LTO and one codegen unit
+from source `43d1128`. Desktop is a Ryzen 7 9800X3D; the Picade is a Raspberry Pi
+4 Model B Rev 1.4. The AArch64 runner uses static CRT linkage:
+
+```sh
+cargo +1.89.0 build --locked --release -p scenario-scorched-earth \
+  --example scorched_benchmark
+RUSTFLAGS='-C target-feature=+crt-static' cargo +1.89.0 build --locked --release \
+  --target aarch64-unknown-linux-gnu -p scenario-scorched-earth --example scorched_benchmark
+```
+
+Each run simulates 30 seconds at 60 Hz with a 192-grain budget and replay enabled.
+Seed 42 has three repetitions per host/shape, alternating Round/Angular order;
+seed 4242 has one per host/shape. Runs are serial. The table reports the median
+of run means and P95s, and the worst individual step across repetitions, all in
+milliseconds. The one-run seed 4242 values are smoke measurements.
+
+| Host | Seed | Shape | Runs | Mean | P95 | Worst step |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Desktop | 42 | Round | 3 | 0.266 | 0.720 | 4.922 |
+| Desktop | 42 | Angular | 3 | 0.409 | 1.181 | 5.061 |
+| Desktop | 4242 | Round | 1 | 0.396 | 1.430 | 4.391 |
+| Desktop | 4242 | Angular | 1 | 0.471 | 1.958 | 4.008 |
+| Picade | 42 | Round | 3 | 2.862 | 7.556 | 41.958 |
+| Picade | 42 | Angular | 3 | 4.128 | 11.366 | 40.352 |
+| Picade | 4242 | Round | 1 | 4.152 | 12.405 | 37.146 |
+| Picade | 4242 | Angular | 1 | 4.738 | 16.374 | 35.040 |
+
+The kiosk remained paused throughout the retained Picade runs, verified before
+and after every run. Earlier measurements with an idle launcher were discarded:
+its 30-second autostart policy could add bot-game load. Target temperature
+endpoints were 67.7/73.5°C, CPU0 frequency 1.5 GHz, undervoltage alarm 0 at both
+endpoints. These endpoint probes do not rule out intervening thermal changes.
+
+All retained runs preserve every material cell, pass same-build replay, and
+produce matching desktop/Picade final observation hashes for all four seed/shape
+cases. None reject a blast in this 30-second workload. At seed 42, Round returns
+159 cells and ends with 71 loose; Angular returns 135 and ends with 131 loose.
+Both produce 11 impacts. Round costs less for this evolving duel, which does not
+isolate per-contact shape cost: the piles and later collisions differ.
+
+This workload is smaller than the existing multi-planet Spacewars stress run;
+its lower mean is not evidence that the shared solver became faster. No shared
+physics implementation changed in this branch. The earlier
+[existing-benchmark comparison](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
+remains the integration baseline. The Picade's occasional 35–42 ms steps and
+the live rendering cost above are explicit follow-up performance targets.
