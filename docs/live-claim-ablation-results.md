@@ -120,8 +120,9 @@ fix described below. There was no runtime rebuild or game retry.
   was made. Exact commands and both logs are retained.
 - Physical visit, route, fuel/continuation, planning allocation, prediction,
   retry, disabled-combat and native-recovery audits passed. Per-seat options
-  were checked in the report and every mission/capture-ground trace. No jetpack
-  crossing was flown in this selected matrix.
+  were checked in the report and every mission/capture-ground trace. No
+  vehicle-continuation flights were observed. The opposing P2 completed two
+  existing ground-gap crossings in the no-stop rescue game.
 
 After the first three games passed, the archive worker could not pickle a
 function imported through the dynamic factor module. Commit `f829ee6` moved
