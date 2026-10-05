@@ -1,0 +1,832 @@
+{
+  "schema": 1,
+  "complete": true,
+  "observational_only": true,
+  "default_changes": false,
+  "group": "fresh-world2-v10-asteroids0-p1-candidate",
+  "runner_commit": "993314a4ba599495faaa61b4080ddd9114e601ca",
+  "runtime_source_commit": "b729cd89adb4a75dfdb167aab5077c0d0dcdd4e3",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/fresh-v1/surface_mission_soak",
+    "sha256": "34661b5ce5311e38b4ba054a507b2c980a00667357ce5a895a3f4dc884eacc16"
+  },
+  "prior_summary": {
+    "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/fresh-v1/summary.json",
+    "sha256": "7b431c39b779113be8638dd840f6a03cbc8550f2df8ecd9bd14b755e0d45f162"
+  },
+  "replay_summary": {
+    "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/lost-win-v1/replay/summary.json",
+    "sha256": "65a1d80389a93cbabfc447be1ff19c6ab9aae62fbed48c6b32eef08dc90caa11"
+  },
+  "review_archive": {
+    "path": "docs/data/pursuit-climb-laser-loss-v1.json.gz",
+    "sha256": "90d6e3a399fbd945a922a05fa6af2c55af8f6685bb01d2e0f67cd62141503d02",
+    "bytes": 1836011,
+    "exact_documents": 71
+  },
+  "validation": {
+    "python_tests": 845,
+    "new_tests": 9,
+    "python_exit_code": 0,
+    "test_log_sha256": "0c82abf8469409dd881d221b86ff350b381ecde0fd96ac9bbbaee2e816fd3043",
+    "frozen_inputs": 46,
+    "exact_source_streams_per_game": 9,
+    "dense_impact_rows": 136536,
+    "overrides": 0,
+    "parity_games": 2,
+    "policy_changes": false,
+    "game_reruns": 0,
+    "auditor_corrections": 0,
+    "archived_files": 32,
+    "raw_bytes": 4120446655,
+    "compressed_bytes": 533725126,
+    "all_archive_members_verified": true,
+    "all_review_documents_verified": true
+  },
+  "original_archives": {
+    "fresh-world2-v10-asteroids0-p1-candidate-off": {
+      "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/fresh-v1/archives/fresh-world2-v10-asteroids0-p1-candidate-off.audit-b8d2b51e3519.tar.gz",
+      "sha256": "f3f778a6aa80c834b03c859af17adebed25ae5254fa1c131ecffe21a1afc201a",
+      "bytes": 229014299,
+      "raw_bytes": 1555472168,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "cd2c023fdc29cb7709a90a305d431db415ce70279529876b3ce5e34164e72e76",
+          "bytes": 387976448
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "db9db55d5079924619276bd3d562ff0ffbcc2488cd086649f606bfbf4ebddcfc",
+          "bytes": 28329270
+        },
+        "destination-cover.jsonl": {
+          "sha256": "eca965e42db977b959a304bcc065fd5d71097ce7bd3da0cd64a1254ed6ea1d56",
+          "bytes": 2270940
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "a722584f34dcfa9f02611583dd54cb0b6d4eea8f620690747267cb73ffa76523",
+          "bytes": 7574345
+        },
+        "flag-survey.jsonl": {
+          "sha256": "69a147a5bdf08bb545f5d26a2446b4bc6e353a3eb89e8462a8c33e31eb28a9da",
+          "bytes": 27013
+        },
+        "fresh-world2-v10-asteroids0-p1-candidate-off-audit.json": {
+          "sha256": "a850999177b8725f6a12842f89b5d51e407dd71ea149addce7c0451930b375aa",
+          "bytes": 342417
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "laser-audit.json": {
+          "sha256": "21d56a8b532f376c14e0422f9cb4b3eed20dd34e2339c70ca88cf2f8feefc62d",
+          "bytes": 264
+        },
+        "live-planning.csv": {
+          "sha256": "3426cc6a5e564ab9cca1bea831d125f17634d4eb766acb945db2967de0d5621e",
+          "bytes": 1039558
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "abac8110848d06b1584c19c6215774e867958b4bdda3693df954c826d0afc19b",
+          "bytes": 5928267
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "cb3c1198a11fbbaa147d5f03df97b2d5b5d6b1f2202cda1f1ea1d40958b30c6d",
+          "bytes": 18596701
+        },
+        "report.json": {
+          "sha256": "755c1b753a27c4a9d9424484b5db0fa0219eeed4f915cbda7b9668f0ce164dae",
+          "bytes": 32833692
+        },
+        "sensors.jsonl": {
+          "sha256": "2533bde98185e9a249f7ca7f119390b87b4d3844f11222b985311493d98b5ba4",
+          "bytes": 82588321
+        },
+        "trace.jsonl": {
+          "sha256": "64c7255d5a5d6fa8f8d10db377b9691bdce9a7912a820db12629447e92d804ef",
+          "bytes": 987964932
+        }
+      }
+    },
+    "fresh-world2-v10-asteroids0-p1-candidate-on": {
+      "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/fresh-v1/archives/fresh-world2-v10-asteroids0-p1-candidate-on.audit-b8d2b51e3519.tar.gz",
+      "sha256": "6e7d2113209dbb5c0923f33bf895a3abea9f506cb82cbd16ada3a251dc806035",
+      "bytes": 204489955,
+      "raw_bytes": 1394485518,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "f1753b5db55f0c8ff607cc7add7d75e74f23a16729c526dc991da28f1676ea0d",
+          "bytes": 359086402
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "7b97a7b6c62b3917e24e32f2f755ede158c88015cc7b70cefb0f71a93f9e25f2",
+          "bytes": 25378143
+        },
+        "destination-cover.jsonl": {
+          "sha256": "eca965e42db977b959a304bcc065fd5d71097ce7bd3da0cd64a1254ed6ea1d56",
+          "bytes": 2270940
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "024cc4130097d47abcb536d266f24ae676f71ae81416fd98cc8611cf872446f3",
+          "bytes": 6813837
+        },
+        "flag-survey.jsonl": {
+          "sha256": "fed198f0e26ab36ed590ed19fa15e72c90f454f4f110fdd1512cb9a955ae4105",
+          "bytes": 28661
+        },
+        "fresh-world2-v10-asteroids0-p1-candidate-on-audit.json": {
+          "sha256": "dc932742457c49ee0480d7740a853b8b552f0005974bb955e76a8a45f447a5a7",
+          "bytes": 334214
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "laser-audit.json": {
+          "sha256": "3d71bf7ec9dca40b80ae3274b2d7995ad37ddb9a4d53a6b2ae9d485ef61d315d",
+          "bytes": 92386
+        },
+        "live-planning.csv": {
+          "sha256": "4e2ef9f548e5cc7c0e46f801c1b4296b38636feaa0d8af7c401e5d2ffd0056ff",
+          "bytes": 702196
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "f56ad7d0ed08459bedc58008ee2f51f21c646f69b577d2d8d3096f9b6e91edcb",
+          "bytes": 5312701
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "ce694971d04ed2130db3ed7b04419248a0a2d25db96c20fb7b9e0dc23961601d",
+          "bytes": 20135341
+        },
+        "report.json": {
+          "sha256": "d0722b870bdb2eedac6e7ac7da5ac381a2e6f478045020e3dc97d51f1b4b720a",
+          "bytes": 28577188
+        },
+        "sensors.jsonl": {
+          "sha256": "f2f359705065c4697e23e5ab53e6aa70f45cb39ee40b48c2c75f3513c64cd57e",
+          "bytes": 73967637
+        },
+        "trace.jsonl": {
+          "sha256": "67bdbedcde93e1957eaf4c68850dbbac587d47feff376505a0a8d282747e501f",
+          "bytes": 871785872
+        }
+      }
+    }
+  },
+  "diagnostic_archives": {
+    "fresh-world2-v10-asteroids0-p1-candidate-off": {
+      "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/lost-win-v1/archives/fresh-world2-v10-asteroids0-p1-candidate-off.tar.gz",
+      "sha256": "787a45e856e1a14cb266d0d9cf3bf46f30700c0d0582706b803a65c8a446ae21",
+      "bytes": 281245608,
+      "raw_bytes": 2172470479,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "cd2c023fdc29cb7709a90a305d431db415ce70279529876b3ce5e34164e72e76",
+          "bytes": 387976448
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "db9db55d5079924619276bd3d562ff0ffbcc2488cd086649f606bfbf4ebddcfc",
+          "bytes": 28329270
+        },
+        "destination-cover.jsonl": {
+          "sha256": "eca965e42db977b959a304bcc065fd5d71097ce7bd3da0cd64a1254ed6ea1d56",
+          "bytes": 2270940
+        },
+        "diagnostics.json": {
+          "sha256": "d8dc220f182c4d0d20672230916886b65fa62b2f75e48283466fd79ce61e22a6",
+          "bytes": 422335479
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "a722584f34dcfa9f02611583dd54cb0b6d4eea8f620690747267cb73ffa76523",
+          "bytes": 7574345
+        },
+        "flag-survey.jsonl": {
+          "sha256": "69a147a5bdf08bb545f5d26a2446b4bc6e353a3eb89e8462a8c33e31eb28a9da",
+          "bytes": 27013
+        },
+        "impact.jsonl": {
+          "sha256": "595465fd08019fad6dbdacbf8d028937ed9ca72864b712f345580ab146d57716",
+          "bytes": 194753267
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "laser-audit.json": {
+          "sha256": "68a5dc625fa83ba23fb62fdea4d40893af35a3dfd58f9ca937e6f431a6f43060",
+          "bytes": 248
+        },
+        "live-planning.csv": {
+          "sha256": "870208831f0b53abb2af9a74467c4089bcdd25fc3c9328d252021ba96edbbf9f",
+          "bytes": 1039558
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "abac8110848d06b1584c19c6215774e867958b4bdda3693df954c826d0afc19b",
+          "bytes": 5928267
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "cb3c1198a11fbbaa147d5f03df97b2d5b5d6b1f2202cda1f1ea1d40958b30c6d",
+          "bytes": 18596701
+        },
+        "physical-audit.json": {
+          "sha256": "a850999177b8725f6a12842f89b5d51e407dd71ea149addce7c0451930b375aa",
+          "bytes": 342417
+        },
+        "report.json": {
+          "sha256": "cbe63ac97685819eacece7a7bdaf6e4471480b7bf1911700e83a5069d24ad4f3",
+          "bytes": 32833731
+        },
+        "sensors.jsonl": {
+          "sha256": "18147634c57639257db2dd02f05709f222d287f284e0974928b620722bb929ab",
+          "bytes": 82497863
+        },
+        "trace.jsonl": {
+          "sha256": "64c7255d5a5d6fa8f8d10db377b9691bdce9a7912a820db12629447e92d804ef",
+          "bytes": 987964932
+        }
+      }
+    },
+    "fresh-world2-v10-asteroids0-p1-candidate-on": {
+      "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/lost-win-v1/archives/fresh-world2-v10-asteroids0-p1-candidate-on.tar.gz",
+      "sha256": "672c594c60cc3b0fc6c98ec1cea7e72c6ce47976ca997f0c21eb8d9cefc49c43",
+      "bytes": 252479518,
+      "raw_bytes": 1947976176,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "f1753b5db55f0c8ff607cc7add7d75e74f23a16729c526dc991da28f1676ea0d",
+          "bytes": 359086402
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "7b97a7b6c62b3917e24e32f2f755ede158c88015cc7b70cefb0f71a93f9e25f2",
+          "bytes": 25378143
+        },
+        "destination-cover.jsonl": {
+          "sha256": "eca965e42db977b959a304bcc065fd5d71097ce7bd3da0cd64a1254ed6ea1d56",
+          "bytes": 2270940
+        },
+        "diagnostics.json": {
+          "sha256": "64a4c6844bf220297ea6a92c2812c02305db84012c8a81ffaef54699dfd10627",
+          "bytes": 380039548
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "024cc4130097d47abcb536d266f24ae676f71ae81416fd98cc8611cf872446f3",
+          "bytes": 6813837
+        },
+        "flag-survey.jsonl": {
+          "sha256": "fed198f0e26ab36ed590ed19fa15e72c90f454f4f110fdd1512cb9a955ae4105",
+          "bytes": 28661
+        },
+        "impact.jsonl": {
+          "sha256": "4d843ca8b8400b172925b5f7e76001e7220b8dd240101807d8296cd1d2bacc77",
+          "bytes": 173444367
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "laser-audit.json": {
+          "sha256": "b08d8dcc793674d294d29f3b7ab38d6b924160cb3e0c94d8b36b144e5b53627a",
+          "bytes": 92370
+        },
+        "live-planning.csv": {
+          "sha256": "dd58c60698fa233d4b622099b84dfb6d4e4604562b9b61fa30734516b6dea350",
+          "bytes": 702196
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "f56ad7d0ed08459bedc58008ee2f51f21c646f69b577d2d8d3096f9b6e91edcb",
+          "bytes": 5312701
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "ce694971d04ed2130db3ed7b04419248a0a2d25db96c20fb7b9e0dc23961601d",
+          "bytes": 20135341
+        },
+        "physical-audit.json": {
+          "sha256": "dc932742457c49ee0480d7740a853b8b552f0005974bb955e76a8a45f447a5a7",
+          "bytes": 334214
+        },
+        "report.json": {
+          "sha256": "62e2ed556da8a9e44b1fe9aba3b106e0a6351a65dc2138ee476b9cc09fee9eca",
+          "bytes": 28577216
+        },
+        "sensors.jsonl": {
+          "sha256": "f69a2a1f375652cd5bc9b8ee993ec4a27b3144961da91bdf9d473572c7f02a90",
+          "bytes": 73974368
+        },
+        "trace.jsonl": {
+          "sha256": "67bdbedcde93e1957eaf4c68850dbbac587d47feff376505a0a8d282747e501f",
+          "bytes": 871785872
+        }
+      }
+    }
+  },
+  "first_difference_ticks": {
+    "p1:action": 3995,
+    "p1:supply": 3996,
+    "p1:weapons": 14946,
+    "p1:target_hull": 14946,
+    "p2:pilot_health": 14946,
+    "p2:weapons": 14946,
+    "p2:hull": 26902,
+    "p2:ship": 28129,
+    "p2:recovery": 28129,
+    "p2:mode": 28129,
+    "p2:goal": 28129,
+    "p1:pursuit": 28132,
+    "p2:non_laser_actions": 28157,
+    "p2:controls": 28157,
+    "p1:non_laser_actions": 28158,
+    "p1:controls": 28158,
+    "p2:actor": 28158,
+    "p1:ship": 28159,
+    "p1:mode": 29204,
+    "p1:goal": 29883,
+    "p1:target_form": 30793,
+    "p2:location": 30793,
+    "p2:pursuit": 30795,
+    "p2:action": 31348,
+    "p2:supply": 31349,
+    "p1:hull": 31361,
+    "p2:target_hull": 31361,
+    "p1:form": 31605,
+    "p1:recovery": 31605,
+    "p2:target_form": 31605,
+    "p1:pilot_health": 31785
+  },
+  "common_departures": [
+    2585,
+    6940,
+    18575,
+    26526
+  ],
+  "site_acquisition": {
+    "start": 30905,
+    "end": 31605,
+    "goals": {
+      "survey": 700
+    },
+    "supported_feet_counts": {
+      "0": 700
+    },
+    "reasons": {
+      "scan_deferred": 676,
+      "candidates_rejected": 23
+    }
+  },
+  "cases": {
+    "off": {
+      "elapsed_ticks": 36000,
+      "outcome": "win",
+      "losses": {
+        "0": [],
+        "1": [
+          {
+            "tick": 3220,
+            "source": "cannon",
+            "amount": 18.701892852783203,
+            "spawn_tick": 3208,
+            "contact_age_ticks": 12,
+            "cannon_request_seats_at_spawn": [
+              0
+            ]
+          },
+          {
+            "tick": 28861,
+            "source": "cannon",
+            "amount": 0.06508255004882812,
+            "spawn_tick": 28831,
+            "contact_age_ticks": 30,
+            "cannon_request_seats_at_spawn": [
+              0
+            ]
+          }
+        ]
+      },
+      "stuck_after_rebuild": {
+        "start": 21948,
+        "end": 28861,
+        "ticks": 6913
+      },
+      "p2_rebuild_ticks": [
+        21948
+      ],
+      "p2_hull_before_28129": 42.132171630859375,
+      "p2_hull_at_28129": 0.06508255004882812
+    },
+    "on": {
+      "elapsed_ticks": 32268,
+      "outcome": "loss",
+      "losses": {
+        "0": [
+          {
+            "tick": 31605,
+            "source": "cannon",
+            "amount": 12.939849853515625,
+            "spawn_tick": 31590,
+            "contact_age_ticks": 15,
+            "cannon_request_seats_at_spawn": [
+              1
+            ]
+          }
+        ],
+        "1": [
+          {
+            "tick": 3220,
+            "source": "cannon",
+            "amount": 18.701892852783203,
+            "spawn_tick": 3208,
+            "contact_age_ticks": 12,
+            "cannon_request_seats_at_spawn": [
+              0
+            ]
+          },
+          {
+            "tick": 28129,
+            "source": "cannon",
+            "amount": 41.86855697631836,
+            "spawn_tick": 28099,
+            "contact_age_ticks": 30,
+            "cannon_request_seats_at_spawn": [
+              0
+            ]
+          }
+        ]
+      },
+      "stuck_after_rebuild": {
+        "start": 21948,
+        "end": 28129,
+        "ticks": 6181
+      },
+      "p2_rebuild_ticks": [
+        21948,
+        30718
+      ],
+      "p2_hull_before_28129": 41.86855697631836,
+      "p2_hull_at_28129": 0.0,
+      "capture_under_fire": {
+        "start": 31361,
+        "end": 31605,
+        "ticks": 244,
+        "first_hull": 99.93390655517578,
+        "last_hull": 12.939849853515625,
+        "ready_aim_ticks": {
+          "laser": [
+            31491,
+            31492,
+            31603,
+            31604
+          ],
+          "cannon": [
+            31491,
+            31492,
+            31603,
+            31604
+          ]
+        }
+      },
+      "pod": {
+        "first": 31605,
+        "last": 32267,
+        "armed_braking_ticks": 662,
+        "samples": [
+          {
+            "tick": 31605,
+            "metrics": {
+              "speed": 35.969214870462885,
+              "relative_speed": 21.183508662837124,
+              "frame_speed": 16.87896908182196,
+              "spin": 1.979327917098999,
+              "origin_velocity_difference": 0.989560690091782,
+              "radial_clearance": 427.8116208968644,
+              "outward_speed": 17.96934586517669,
+              "distance_to_wall_along_velocity": 567.042936040235,
+              "ideal_braking_distance": 16.172305229969105,
+              "ideal_outward_braking_distance": 4.036217385279284,
+              "spin_arrest_seconds": 0.2506173051272829
+            },
+            "controls": {
+              "brake": false,
+              "interact": false,
+              "thrust": false,
+              "turn": 0.0
+            },
+            "armed": false,
+            "vitals": {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31606,
+            "metrics": {
+              "speed": 35.95098065339051,
+              "relative_speed": 21.16766693712244,
+              "frame_speed": 16.87882732952675,
+              "spin": 1.954327940940857,
+              "origin_velocity_difference": 0.9770931927297692,
+              "radial_clearance": 427.5122625395034,
+              "outward_speed": 17.98623287085621,
+              "distance_to_wall_along_velocity": 566.5161983052424,
+              "ideal_braking_distance": 16.155912624255734,
+              "ideal_outward_braking_distance": 4.043807161058355,
+              "spin_arrest_seconds": 0.24645094076792398
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -0.6838588118553162
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31784,
+            "metrics": {
+              "speed": 16.387038474448307,
+              "relative_speed": 0.8313300331516351,
+              "frame_speed": 17.19304899800678,
+              "spin": 1.3756240606307983,
+              "origin_velocity_difference": 0.6878306501153482,
+              "radial_clearance": 414.51147835759224,
+              "outward_speed": 2.5826601692755258,
+              "distance_to_wall_along_velocity": 687.9722936730057,
+              "ideal_braking_distance": 3.356687874538114,
+              "ideal_outward_braking_distance": 0.08337666937452859,
+              "spin_arrest_seconds": 0.14999999602635702
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -0.7642356157302856
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31785,
+            "metrics": {
+              "speed": 16.382091596668698,
+              "relative_speed": 0.8324248953087654,
+              "frame_speed": 17.19463985312427,
+              "spin": 1.3756240606307983,
+              "origin_velocity_difference": 0.687774015986754,
+              "radial_clearance": 414.4684673932974,
+              "outward_speed": 2.5679006494909493,
+              "distance_to_wall_along_velocity": 688.3163374885548,
+              "ideal_braking_distance": 3.3546615635205392,
+              "ideal_outward_braking_distance": 0.0824264218207005,
+              "spin_arrest_seconds": 0.14999999602635702
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -0.7642356157302856
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 99.90772247314453,
+              "last_damage": {
+                "amount": 0.09228117763996124,
+                "cause": "laser",
+                "contact": null,
+                "tick": 31785
+              },
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31835,
+            "metrics": {
+              "speed": 16.587385587505292,
+              "relative_speed": 0.8565008092655252,
+              "frame_speed": 17.24622375588564,
+              "spin": 1.3756239414215088,
+              "origin_velocity_difference": 0.68779528780278,
+              "radial_clearance": 412.6469094953668,
+              "outward_speed": 1.8705755868582157,
+              "distance_to_wall_along_velocity": 706.7288210986952,
+              "ideal_braking_distance": 3.4392670078572287,
+              "ideal_outward_braking_distance": 0.043738162826874476,
+              "spin_arrest_seconds": 0.14999997584770122
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -0.7642356157302856
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 95.3041000366211,
+              "last_damage": {
+                "amount": 0.09189386665821075,
+                "cause": "laser",
+                "contact": null,
+                "tick": 31835
+              },
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31847,
+            "metrics": {
+              "speed": 16.755338708273346,
+              "relative_speed": 0.7962956551756928,
+              "frame_speed": 17.25237705249465,
+              "spin": 1.0440644025802612,
+              "origin_velocity_difference": 0.5220274596444364,
+              "radial_clearance": 412.28304345096166,
+              "outward_speed": 1.8070822101982704,
+              "distance_to_wall_along_velocity": 708.7144059595796,
+              "ideal_braking_distance": 3.5092671903620394,
+              "ideal_outward_braking_distance": 0.040819326430188325,
+              "spin_arrest_seconds": 0.09473975468426943
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -0.5555316805839539
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 94.38239288330078,
+              "last_damage": {
+                "amount": 0.0910591408610344,
+                "cause": "laser",
+                "contact": null,
+                "tick": 31847
+              },
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31848,
+            "metrics": {
+              "speed": 186.86605279684764,
+              "relative_speed": 172.93091818381177,
+              "frame_speed": 17.276967911039232,
+              "spin": -104.55492401123047,
+              "origin_velocity_difference": 52.27384209877384,
+              "radial_clearance": 411.26980613297036,
+              "outward_speed": 127.3274523082869,
+              "distance_to_wall_along_velocity": 493.4802124417798,
+              "ideal_braking_distance": 436.48652109842817,
+              "ideal_outward_braking_distance": 202.65350139148842,
+              "spin_arrest_seconds": 17.338424682617188
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -1.0
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 54.2913818359375,
+              "last_damage": {
+                "amount": 40.0,
+                "cause": "missile",
+                "contact": {
+                  "actor_motion": {
+                    "angle": 1.514591097831726,
+                    "position": {
+                      "x": 910.264404296875,
+                      "y": 1401.68115234375
+                    },
+                    "spin": 0.9999570250511169,
+                    "velocity": {
+                      "x": 16.683433532714844,
+                      "y": 1.7081787586212158
+                    }
+                  },
+                  "closing_speed": 298.94305419921875,
+                  "impulse": 163.73367309570312,
+                  "normal": {
+                    "x": -0.4178292453289032,
+                    "y": -0.9085255265235901
+                  },
+                  "on_foot": false,
+                  "other_id": 100069,
+                  "other_kind": "missile",
+                  "other_motion": {
+                    "angle": 1.6751006841659546,
+                    "position": {
+                      "x": 906.91552734375,
+                      "y": 1398.5555419921875
+                    },
+                    "spin": 2.0,
+                    "velocity": {
+                      "x": 102.54046630859375,
+                      "y": 289.5675048828125
+                    }
+                  },
+                  "point": {
+                    "x": 908.0682373046875,
+                    "y": 1401.527587890625
+                  }
+                },
+                "tick": 31848
+              },
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 31916,
+            "metrics": {
+              "speed": 142.06929388501055,
+              "relative_speed": 128.426419739947,
+              "frame_speed": 20.272421592058095,
+              "spin": -97.75503540039062,
+              "origin_velocity_difference": 48.87519373862223,
+              "radial_clearance": 271.02783858914916,
+              "outward_speed": 115.04654621317006,
+              "distance_to_wall_along_velocity": 311.6863224149714,
+              "ideal_braking_distance": 252.2960533123187,
+              "ideal_outward_braking_distance": 165.44634744473842,
+              "spin_arrest_seconds": 16.205109914454322
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -1.0
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 53.68912887573242,
+              "last_damage": {
+                "amount": 0.03294791281223297,
+                "cause": "laser",
+                "contact": null,
+                "tick": 31916
+              },
+              "protected_until_tick": 31785
+            }
+          },
+          {
+            "tick": 32267,
+            "metrics": {
+              "speed": 27.40007547734512,
+              "relative_speed": 6.006261242448311,
+              "frame_speed": 26.546988164293943,
+              "spin": -62.65557098388672,
+              "origin_velocity_difference": 31.328282986803277,
+              "radial_clearance": 1.510805605737005,
+              "outward_speed": 9.651926088330423,
+              "distance_to_wall_along_velocity": 4.263981668714628,
+              "ideal_braking_distance": 9.384551702052617,
+              "ideal_outward_braking_distance": 1.1644959651824178,
+              "spin_arrest_seconds": 10.35519947639356
+            },
+            "controls": {
+              "brake": true,
+              "interact": false,
+              "thrust": false,
+              "turn": -1.0
+            },
+            "armed": true,
+            "vitals": {
+              "death_tick": null,
+              "health": 53.68912887573242,
+              "last_damage": {
+                "amount": 0.03294791281223297,
+                "cause": "laser",
+                "contact": null,
+                "tick": 31916
+              },
+              "protected_until_tick": 31785
+            }
+          }
+        ],
+        "pilot_damage_counts": {
+          "laser": 76,
+          "missile": 1,
+          "impact": 1
+        }
+      }
+    }
+  },
+  "disposition": "retain_experimental",
+  "next_hypothesis": "bounded defensive handoff on fresh hostile damage while airborne before first capture site",
+  "separate_correctness_finding": "blocked recovery ignores newly rebuilt full ship until a later loss resets the task"
+}

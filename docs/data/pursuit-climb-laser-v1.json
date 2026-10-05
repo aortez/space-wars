@@ -1,0 +1,710 @@
+{
+  "schema": 1,
+  "complete": true,
+  "profile": "pursuit_climb_laser_v1",
+  "runtime_source_commit": "b729cd89adb4a75dfdb167aab5077c0d0dcdd4e3",
+  "audit_source_commit": "58c12f8aea0cdd25a47cc0f89c05a8e2781b7ced",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/pursuit-climb-laser/qualification-v1/surface_mission_soak",
+    "sha256": "34661b5ce5311e38b4ba054a507b2c980a00667357ce5a895a3f4dc884eacc16"
+  },
+  "prior_summary": {
+    "path": "target/integrated-bot/regression-v1/summary.json",
+    "sha256": "63fb78d8400a904414b6df1f1b0b82f257f5cbe135e723fabe089d237bddcc0a"
+  },
+  "qualification_summary": {
+    "path": "target/pursuit-climb-laser/qualification-v2/summary.json",
+    "sha256": "2372367a8e7d81924c36ed285ae599448a5913929180c28b9cb2d224315ae95c"
+  },
+  "first_analysis_summary": {
+    "path": "target/pursuit-climb-laser/qualification-v1/summary.json",
+    "sha256": "e18a7be7fa05a53a08b7a725c92ec3b156684ed69f10b881bcc06c85040ddc1d"
+  },
+  "scope": "Four known qualification games in one existing world; two exact option-off replays, then one laser-enabled control and candidate. No independent strength sample or default promotion.",
+  "decision": "retain_opt_in_for_broader_comparison",
+  "validation": {
+    "rust_tests_passed": 590,
+    "python_tests_passed": 826,
+    "focused_rust_tests": 7,
+    "python_laser_auditor_tests": 10,
+    "fmt_passed": true,
+    "clippy_warnings_denied": true,
+    "exact_disabled_replays": 2,
+    "enabled_cases_audited": 2,
+    "enabled_dense_rows": 122156,
+    "enabled_climb_checks": 1992,
+    "enabled_added_requests": 48,
+    "enabled_impact_rows": 91756,
+    "control_overrides": 0,
+    "raw_files_verified": 52,
+    "raw_bytes_verified": 4456144912,
+    "tool_inputs_verified": 40,
+    "defaults_changed": false
+  },
+  "runs": {
+    "control-retained": {
+      "elapsed_ticks": 25483,
+      "players": [
+        {
+          "outcome": "win",
+          "completed_departures": 6,
+          "ships_lost": 0,
+          "pilot_deaths": 0,
+          "pilot_health": 100.0,
+          "owned_planets": 2,
+          "claims": 6,
+          "abandoned_visits": 2,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 29,
+            "laser_hit_ticks": 1130,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 25463,
+            "shells_fired": 21
+          },
+          "progress": {
+            "distance_observed_ticks": 19660,
+            "eligible_ticks": 20484,
+            "excluded_ticks": 4999,
+            "longest_no_progress_ticks": 559,
+            "progress_ticks": 5557,
+            "ticks_after_20s_without_progress": 0,
+            "ticks_without_progress": 14927
+          }
+        },
+        {
+          "outcome": "loss",
+          "completed_departures": 3,
+          "ships_lost": 2,
+          "pilot_deaths": 1,
+          "pilot_health": 0.0,
+          "owned_planets": 1,
+          "claims": 3,
+          "abandoned_visits": 1,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 2,
+            "laser_hit_ticks": 7,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 25483,
+            "shells_fired": 2
+          },
+          "progress": {
+            "distance_observed_ticks": 15892,
+            "eligible_ticks": 23545,
+            "excluded_ticks": 1938,
+            "longest_no_progress_ticks": 2536,
+            "progress_ticks": 4028,
+            "ticks_after_20s_without_progress": 2221,
+            "ticks_without_progress": 19517
+          }
+        }
+      ],
+      "parity": {
+        "exact_streams": [
+          "capture-evidence.jsonl",
+          "destination-behavior.jsonl",
+          "destination-cover.jsonl",
+          "flag-survey-work.jsonl",
+          "flag-survey.jsonl",
+          "impact.jsonl",
+          "landing-handoffs.jsonl",
+          "mission-evaluation-work.jsonl",
+          "mission-evaluations.jsonl",
+          "trace.jsonl"
+        ],
+        "non_timing_report": true,
+        "sensor_rows": 50966,
+        "planning_rows": 14652,
+        "exact_players_and_allocation": true
+      }
+    },
+    "candidate-retained": {
+      "elapsed_ticks": 17831,
+      "players": [
+        {
+          "outcome": "loss",
+          "completed_departures": 4,
+          "ships_lost": 2,
+          "pilot_deaths": 1,
+          "pilot_health": 0.0,
+          "owned_planets": 1,
+          "claims": 4,
+          "abandoned_visits": 2,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 11,
+            "laser_hit_ticks": 941,
+            "last_hit_source": "laser",
+            "last_hit_taken_tick": 17738,
+            "shells_fired": 11
+          },
+          "progress": {
+            "distance_observed_ticks": 12629,
+            "eligible_ticks": 14689,
+            "excluded_ticks": 3142,
+            "longest_no_progress_ticks": 1003,
+            "progress_ticks": 3227,
+            "ticks_after_20s_without_progress": 0,
+            "ticks_without_progress": 11462
+          }
+        },
+        {
+          "outcome": "win",
+          "completed_departures": 3,
+          "ships_lost": 0,
+          "pilot_deaths": 0,
+          "pilot_health": 100.0,
+          "owned_planets": 1,
+          "claims": 3,
+          "abandoned_visits": 2,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 18,
+            "laser_hit_ticks": 664,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 17649,
+            "shells_fired": 12
+          },
+          "progress": {
+            "distance_observed_ticks": 12644,
+            "eligible_ticks": 14745,
+            "excluded_ticks": 3086,
+            "longest_no_progress_ticks": 1254,
+            "progress_ticks": 3542,
+            "ticks_after_20s_without_progress": 54,
+            "ticks_without_progress": 11203
+          }
+        }
+      ],
+      "parity": {
+        "exact_streams": [
+          "capture-evidence.jsonl",
+          "destination-behavior.jsonl",
+          "destination-cover.jsonl",
+          "flag-survey-work.jsonl",
+          "flag-survey.jsonl",
+          "impact.jsonl",
+          "landing-handoffs.jsonl",
+          "mission-evaluation-work.jsonl",
+          "mission-evaluations.jsonl",
+          "trace.jsonl"
+        ],
+        "non_timing_report": true,
+        "sensor_rows": 35662,
+        "planning_rows": 10251,
+        "exact_players_and_allocation": true
+      }
+    },
+    "control-laser": {
+      "elapsed_ticks": 25078,
+      "players": [
+        {
+          "outcome": "win",
+          "completed_departures": 6,
+          "ships_lost": 0,
+          "pilot_deaths": 0,
+          "pilot_health": 100.0,
+          "owned_planets": 2,
+          "claims": 6,
+          "abandoned_visits": 2,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 28,
+            "laser_hit_ticks": 1065,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 25058,
+            "shells_fired": 20
+          },
+          "progress": {
+            "distance_observed_ticks": 19660,
+            "eligible_ticks": 20484,
+            "excluded_ticks": 4594,
+            "longest_no_progress_ticks": 559,
+            "progress_ticks": 5559,
+            "ticks_after_20s_without_progress": 0,
+            "ticks_without_progress": 14925
+          }
+        },
+        {
+          "outcome": "loss",
+          "completed_departures": 3,
+          "ships_lost": 2,
+          "pilot_deaths": 1,
+          "pilot_health": 0.0,
+          "owned_planets": 1,
+          "claims": 3,
+          "abandoned_visits": 1,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 2,
+            "laser_hit_ticks": 7,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 25078,
+            "shells_fired": 2
+          },
+          "progress": {
+            "distance_observed_ticks": 15892,
+            "eligible_ticks": 23161,
+            "excluded_ticks": 1917,
+            "longest_no_progress_ticks": 2152,
+            "progress_ticks": 4028,
+            "ticks_after_20s_without_progress": 1837,
+            "ticks_without_progress": 19133
+          }
+        }
+      ],
+      "laser": {
+        "counters": {
+          "checks": 1063,
+          "last": {
+            "break_until_tick": null,
+            "decision": "aim_or_range",
+            "distance": 33.058441162109375,
+            "heading_error": 2.562939167022705,
+            "native_actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    12,
+                    98,
+                    180,
+                    188,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ],
+            "source": "mission",
+            "tick": 22556
+          },
+          "requested_ticks": 30
+        },
+        "decisions": {
+          "occluded": 12,
+          "aim_or_range": 961,
+          "unready": 60,
+          "requested": 30
+        },
+        "sources": {
+          "mission": 1063
+        },
+        "request_ticks": [
+          21653,
+          21654,
+          21655,
+          21656,
+          21657,
+          21658,
+          21659,
+          22348,
+          22349,
+          22350,
+          22351,
+          22352,
+          22353,
+          22354,
+          22355,
+          22356,
+          22357,
+          22358,
+          22359,
+          22360,
+          22361,
+          22362,
+          22363,
+          22364,
+          22365,
+          22366,
+          22367,
+          22368,
+          22369,
+          22370
+        ],
+        "dense_rows": 50156
+      },
+      "first_difference": {
+        "tick": 21653,
+        "seat": 0,
+        "exact_prefix_rows": 43306,
+        "native_actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                128,
+                63,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "issued_actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                128,
+                63,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                1,
+                0
+              ]
+            }
+          }
+        ],
+        "same_observation_and_guidance": true
+      },
+      "impact": {
+        "rows": 34956,
+        "overrides": 0,
+        "losses": {
+          "0": [],
+          "1": [
+            {
+              "tick": 8504,
+              "source": "cannon",
+              "amount": 28.2830867767334,
+              "spawn_tick": 8487,
+              "contact_age_ticks": 17
+            },
+            {
+              "tick": 22926,
+              "source": "cannon",
+              "amount": 26.09488296508789,
+              "spawn_tick": 22911,
+              "contact_age_ticks": 15
+            }
+          ]
+        }
+      },
+      "weapon_free_break_ticks": {
+        "flyby / weapons off": 409
+      }
+    },
+    "candidate-laser": {
+      "elapsed_ticks": 36000,
+      "players": [
+        {
+          "outcome": "draw",
+          "completed_departures": 4,
+          "ships_lost": 1,
+          "pilot_deaths": 0,
+          "pilot_health": 97.1395492553711,
+          "owned_planets": 1,
+          "claims": 4,
+          "abandoned_visits": 4,
+          "unfinished_visits": 1,
+          "combat": {
+            "cannon_hits": 12,
+            "laser_hit_ticks": 944,
+            "last_hit_source": "cannon",
+            "last_hit_taken_tick": 17805,
+            "shells_fired": 12
+          },
+          "progress": {
+            "distance_observed_ticks": 16516,
+            "eligible_ticks": 28340,
+            "excluded_ticks": 7660,
+            "longest_no_progress_ticks": 8653,
+            "progress_ticks": 3702,
+            "ticks_after_20s_without_progress": 7453,
+            "ticks_without_progress": 24638
+          }
+        },
+        {
+          "outcome": "draw",
+          "completed_departures": 3,
+          "ships_lost": 1,
+          "pilot_deaths": 0,
+          "pilot_health": 100.0,
+          "owned_planets": 1,
+          "claims": 3,
+          "abandoned_visits": 2,
+          "unfinished_visits": 0,
+          "combat": {
+            "cannon_hits": 11,
+            "laser_hit_ticks": 452,
+            "last_hit_source": "laser",
+            "last_hit_taken_tick": 16952,
+            "shells_fired": 8
+          },
+          "progress": {
+            "distance_observed_ticks": 18045,
+            "eligible_ticks": 33793,
+            "excluded_ticks": 2207,
+            "longest_no_progress_ticks": 11635,
+            "progress_ticks": 3948,
+            "ticks_after_20s_without_progress": 11426,
+            "ticks_without_progress": 29845
+          }
+        }
+      ],
+      "laser": {
+        "counters": {
+          "checks": 929,
+          "last": {
+            "break_until_tick": null,
+            "decision": "aim_or_range",
+            "distance": 135.0270538330078,
+            "heading_error": -2.8951315879821777,
+            "native_actions": [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    7,
+                    123,
+                    124,
+                    62,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ],
+            "source": "mission",
+            "tick": 18263
+          },
+          "requested_ticks": 18
+        },
+        "decisions": {
+          "requested": 18,
+          "occluded": 8,
+          "aim_or_range": 903
+        },
+        "sources": {
+          "combat": 2,
+          "mission": 927
+        },
+        "request_ticks": [
+          16949,
+          16950,
+          16951,
+          16952,
+          16957,
+          17825,
+          17826,
+          17827,
+          17828,
+          17829,
+          17830,
+          17831,
+          17832,
+          17833,
+          17834,
+          17835,
+          17836,
+          17837
+        ],
+        "dense_rows": 72000
+      },
+      "first_difference": {
+        "tick": 16949,
+        "seat": 0,
+        "exact_prefix_rows": 33898,
+        "native_actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                128,
+                63,
+                0,
+                0,
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "issued_actions": [
+          {
+            "Scenario": {
+              "kind": 1398079490,
+              "payload": [
+                0,
+                0,
+                128,
+                63,
+                0,
+                0,
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079491,
+              "payload": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "Scenario": {
+              "kind": 1398079493,
+              "payload": [
+                0,
+                1,
+                0
+              ]
+            }
+          }
+        ],
+        "same_observation_and_guidance": true
+      },
+      "impact": {
+        "rows": 56800,
+        "overrides": 0,
+        "losses": {
+          "0": [
+            {
+              "tick": 9749,
+              "source": "cannon",
+              "amount": 16.452777862548828,
+              "spawn_tick": 9734,
+              "contact_age_ticks": 15
+            }
+          ],
+          "1": [
+            {
+              "tick": 16952,
+              "source": "laser",
+              "amount": 0.032641492784023285
+            }
+          ]
+        }
+      },
+      "weapon_free_break_ticks": {
+        "flyby / weapons off": 480
+      }
+    }
+  },
+  "limitations": [
+    "Candidate survives to a draw but completes no additional captures after tick 15781.",
+    "Both post-pursuit planet-0 capture attempts fail; no claim that the integrated evaluation now passes.",
+    "Runtime source and binary were frozen before outcomes; corrected ship-loss schema audit reuses the original four games."
+  ],
+  "archive": {
+    "path": "docs/data/pursuit-climb-laser-v1.json.gz",
+    "sha256": "7c24035b35f3c102eb5d86bfd2a9ec260b54807b0d80ad291f0caa50141e5e25",
+    "bytes": 2720977,
+    "documents": 20,
+    "verified_document_hashes": 20,
+    "scope": "Exact summaries, frozen plan, four physical audits, all 1992 full check witnesses, native loss receipts, selected full observations/impacts, report excerpts, rollup and logs. All raw streams remain hash-bound under target."
+  }
+}

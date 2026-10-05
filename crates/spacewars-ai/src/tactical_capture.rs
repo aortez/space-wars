@@ -43,6 +43,7 @@ pub struct TacticalCapturePilot {
     telemetry: CaptureTelemetry,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
+    site_committed: bool,
 }
 impl TacticalCapturePilot {
     pub(crate) fn selected_approach(&self) -> Option<(f32, bool)> {
@@ -73,6 +74,7 @@ impl TacticalCapturePilot {
             },
             previous_tick: None,
             previous_intent: CombatIntent::default(),
+            site_committed: false,
         }
     }
     fn policy(planning: ObjectivePlanning) -> &'static str {
@@ -147,12 +149,20 @@ impl TacticalCapturePilot {
         self.telemetry.flag_approach = None;
         self.previous_tick = None;
         self.previous_intent = CombatIntent::default();
+        self.site_committed = false;
     }
     pub fn combat_telemetry(&self) -> &crate::combat_pilot::CombatPilotTelemetry {
         self.base.combat_telemetry()
     }
     pub fn telemetry(&self) -> &CaptureTelemetry {
         &self.telemetry
+    }
+    pub(crate) fn awaiting_first_site(&self) -> bool {
+        !self.site_committed
+            && self.telemetry.site.is_none()
+            && self.telemetry.goal == crate::tactical_sortie::TacticalGoal::Survey
+            && self.telemetry.failed_tick.is_none()
+            && self.telemetry.completed_tick.is_none()
     }
     pub(crate) fn landing_choice_comparison(
         &self,
@@ -192,6 +202,9 @@ impl TacticalCapturePilot {
         if self.previous_tick == Some(p.tick) {
             return self.previous_intent;
         }
+        self.site_committed |= p.location == PilotLocation::OnFoot
+            || p.landing.supported_feet > 0
+            || self.telemetry.site.is_some();
         if !self.planning.is_legacy() {
             if let Some(reason) = o.landing_objective.as_ref().and_then(|s| {
                 if s.planning != self.planning {
@@ -258,6 +271,8 @@ impl TacticalCapturePilot {
         let mut intent = self.base.intent(o);
         self.telemetry.sortie = self.base.telemetry().clone();
         self.telemetry.sortie.policy = Self::policy(self.planning);
+        self.site_committed |=
+            self.telemetry.site.is_some() || self.telemetry.landing.landed_tick.is_some();
         if self.telemetry.completed_tick.is_none()
             && self.telemetry.failed_tick.is_none()
             && o.combat.recovery.flight.flight.enabled
@@ -363,6 +378,49 @@ mod tests {
             },
             o,
         )
+    }
+
+    #[test]
+    fn first_site_wait_cannot_reopen_after_a_site_or_surface_commitment() {
+        use scenario_spacewars::surface_sortie::pilot::LandingSiteQuery;
+        for commitment in 0..3 {
+            let mut state = SurfaceSortieScenario::init_material_combat(42);
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+            let mut o = state.tactical_sortie_observation(0, None);
+            let p = &mut o.combat.recovery.flight.pilot;
+            let context = BrainReset {
+                actor: p.owner,
+                episode_seed: 42,
+            };
+            p.controls_armed = true;
+            p.queries_ready = true;
+            if commitment == 1 {
+                p.location = PilotLocation::OnFoot;
+                p.actor = Some(p.ship);
+            } else if commitment == 2 {
+                p.landing.supported_feet = 1;
+            }
+            let mut task = TacticalCapturePilot::new(context, CombatBreakSettings::default());
+            assert!(task.awaiting_first_site());
+            task.intent(&o);
+            if commitment == 0 {
+                assert!(task.site_request().is_some());
+            }
+            assert!(!task.awaiting_first_site());
+            task.reject_solar_approach(2);
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = 3;
+            p.location = PilotLocation::Aboard(p.vehicle);
+            p.actor = None;
+            p.landing.supported_feet = 0;
+            p.sites.clear();
+            p.site_query = LandingSiteQuery::Deferred { next_tick: 15 };
+            task.intent(&o);
+            assert!(!task.awaiting_first_site(), "commitment {commitment}");
+            task.reset(context);
+            task.intent(&o);
+            assert!(task.awaiting_first_site(), "reset starts a new capture");
+        }
     }
 
     #[test]

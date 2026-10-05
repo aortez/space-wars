@@ -409,6 +409,351 @@ fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain()
     assert_eq!(task.telemetry().status, TaskStatus::Blocked);
 }
 
+fn exhausted_rebuild_relocations() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    for relocation in 0..4 {
+        let tick = 3220 + relocation * 2;
+        o.flight.pilot.tick = tick;
+        o.rebuild.as_mut().unwrap().tick = tick;
+        o.ground.as_mut().unwrap().tick = tick;
+        task.step(&o);
+        assert_eq!(task.telemetry().relocations, relocation as u32 + 1);
+        o.flight.pilot.tick += 1;
+        o.flight.pilot.actor.as_mut().unwrap().position.x = 4.0;
+        o.ground.as_mut().unwrap().tick += 1;
+        task.step(&o);
+        assert!(task.telemetry().relocation_site.is_none());
+    }
+    // The recorded native failure starts at 3220, exhausts four relocations
+    // at 8328, and physically rebuilds much later, at 21948.
+    o.flight.pilot.tick = 8328;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("no accessible rebuild after four measured relocations")
+    );
+    (task, o)
+}
+
+fn observe_completed_rebuild(o: &mut RecoveryTaskObservationV1) {
+    let p = &mut o.flight.pilot;
+    p.tick = 21948;
+    p.ship_form = ShipForm::Ship;
+    p.ship_available = true;
+    p.controls_armed = false; // Native rebuilding requires a neutral rearm.
+    p.recovery.as_mut().unwrap().rebuilds += 1;
+    p.recovery.as_mut().unwrap().status =
+        scenario_spacewars::surface_sortie::SurfaceRecoveryStatus::ShipAvailable;
+}
+
+#[test]
+fn native_rebuild_releases_exhausted_recovery_after_the_original_deadline() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().goal, RecoveryGoal::Board);
+    assert_eq!(task.telemetry().started_tick, Some(3220));
+    assert_eq!(task.telemetry().relocations, 4);
+    assert!(task.telemetry().ground.is_none());
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    o.flight.pilot.transfer = TransferResult::Ready;
+    assert!(task.step(&o).controls.interact_held);
+    let telemetry = task.telemetry().clone();
+    assert!(task.step(&o).controls.interact_held);
+    assert_eq!(task.telemetry(), &telemetry);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.location = PilotLocation::Aboard(o.flight.pilot.vehicle);
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Succeeded);
+    assert_eq!(task.telemetry().completed_tick, Some(21950));
+}
+
+#[test]
+fn recovery_requires_a_new_full_rebuild_not_availability_or_counter_replay() {
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    o.flight.pilot.recovery.as_mut().unwrap().rebuilds = 0;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    // A counter without a full available ship is not a completed rebuild.
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.ship_form = ShipForm::EscapePod;
+    o.flight.pilot.recovery.as_mut().unwrap().rebuilds = 1;
+    task.step(&o);
+    o.flight.pilot.ship_form = ShipForm::Ship;
+    for count in [1, 0, 1] {
+        o.flight.pilot.tick += 1;
+        o.flight.pilot.recovery.as_mut().unwrap().rebuilds = count;
+        task.step(&o);
+        assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+        assert!(task.telemetry().rebuild_boarding.is_none());
+    }
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.recovery.as_mut().unwrap().rebuilds = 2;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::Board);
+}
+
+#[test]
+fn rebuilt_ship_boarding_has_one_deadline_including_unarmed_and_dirty_ticks() {
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    o.flight.pilot.queries_ready = false;
+    task.step(&o);
+    let receipt = task.telemetry().rebuild_boarding.clone().unwrap();
+    assert_eq!(receipt.started_tick, 21948);
+    assert_eq!(receipt.deadline_tick, 21948 + 90 * 60);
+    for tick in [21949, receipt.deadline_tick] {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.controls_armed = true;
+        assert_eq!(task.step(&o), FlightIntent::default());
+        assert_eq!(task.telemetry().status, TaskStatus::Running);
+        assert_eq!(task.telemetry().rebuild_boarding.as_ref(), Some(&receipt));
+    }
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = false;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("rebuilt ship boarding exceeded ninety seconds")
+    );
+    // Even another counter advance cannot extend this task's one opportunity.
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    o.flight.pilot.queries_ready = true;
+    o.flight.pilot.recovery.as_mut().unwrap().rebuilds += 1;
+    o.flight.pilot.transfer = scenario_spacewars::surface_sortie::TransferResult::Ready;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(task.telemetry().rebuild_boarding.as_ref(), Some(&receipt));
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    task.step(&o);
+    assert!(task.telemetry().rebuild_boarding.is_none());
+}
+
+#[test]
+fn native_rebuild_respects_observation_identity_versions_and_monotonic_ticks() {
+    let (task, original) = exhausted_rebuild_relocations();
+    for fault in 0..6 {
+        let mut task = task.clone();
+        let mut o = original.clone();
+        match fault {
+            0 => o.version += 1,
+            1 => o.flight.version += 1,
+            2 => o.flight.pilot.version += 1,
+            3 => o.flight.pilot.owner = PlayerId::PLAYER_2,
+            4 => o.flight.pilot.vehicle.0 += 1,
+            _ => o.flight.pilot.tick -= 1,
+        }
+        assert_eq!(task.step(&o), FlightIntent::default());
+        let reason = task.telemetry().reason;
+        let mut o = original.clone();
+        observe_completed_rebuild(&mut o);
+        assert_eq!(task.step(&o), FlightIntent::default());
+        assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+        assert_eq!(task.telemetry().reason, reason);
+        assert!(task.telemetry().rebuild_boarding.is_none());
+    }
+}
+
+#[test]
+fn rebuilt_ship_boarding_accepts_physical_completion_at_the_deadline_and_latches_bad_identity() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    task.step(&o);
+    o.flight.pilot.tick = task
+        .telemetry()
+        .rebuild_boarding
+        .as_ref()
+        .unwrap()
+        .deadline_tick;
+    o.flight.pilot.controls_armed = true;
+    o.flight.pilot.transfer = TransferResult::Ready;
+    // Keep the existing no-progress check satisfied while isolating the final
+    // deadline edge; dirty queries have no bearing on physical completion.
+    o.flight.pilot.queries_ready = false;
+    task.step(&o);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.location = PilotLocation::Aboard(o.flight.pilot.vehicle);
+    o.flight.pilot.controls_armed = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Succeeded);
+
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    task.step(&o);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    o.flight.pilot.transfer = TransferResult::Ready;
+    assert!(task.step(&o).controls.interact_held);
+    let mut bad = o.clone();
+    bad.flight.pilot.owner = PlayerId::PLAYER_2;
+    assert_eq!(task.step(&bad), FlightIntent::default());
+    assert_eq!(
+        task.step(&o),
+        FlightIntent::default(),
+        "do not replay cached input after invalid identity"
+    );
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.location = PilotLocation::Aboard(o.flight.pilot.vehicle);
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+}
+
+#[test]
+fn rebuild_budget_only_extends_an_exhausted_task_and_stops_if_ship_is_lost() {
+    for expired in [false, true] {
+        let (mut task, mut o) = rebuild_relocation_fixture();
+        task.step(&o);
+        observe_completed_rebuild(&mut o);
+        o.flight.pilot.tick = if expired { 120 * 60 + 1 } else { 1 };
+        task.step(&o);
+        assert_eq!(task.telemetry().rebuild_boarding.is_some(), expired);
+        o.flight.pilot.tick += 1;
+        o.flight.pilot.controls_armed = true;
+        o.flight.pilot.transfer = scenario_spacewars::surface_sortie::TransferResult::Ready;
+        assert!(task.step(&o).controls.interact_held);
+        if expired {
+            o.flight.pilot.tick += 1;
+            o.flight.pilot.ship_available = false;
+            assert_eq!(task.step(&o), FlightIntent::default());
+            assert_eq!(
+                task.telemetry().reason,
+                Some("rebuilt ship no longer available")
+            );
+        } else {
+            o.flight.pilot.tick = 120 * 60 + 1;
+            task.step(&o);
+            assert_eq!(
+                task.telemetry().reason,
+                Some("recovery exceeded two-minute task budget")
+            );
+        }
+    }
+}
+
+#[test]
+fn rebuilt_ship_boarding_keeps_stall_checks_and_cannot_start_another_replacement() {
+    let (mut task, mut o) = ship_on_other_planet();
+    let started = o.flight.pilot.tick;
+    task.step(&o);
+    o.flight.pilot.tick += 181;
+    o.flight.pilot.ship_available = false;
+    task.step(&o);
+    o.flight.pilot.tick = started + 120 * 60 + 1;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(task.telemetry().scuttle_attempts, 1);
+    let scuttled = task.telemetry().scuttled_tick;
+    observe_completed_rebuild(&mut o);
+    task.step(&o);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(
+        task.telemetry().reason,
+        Some("rebuilt ship has no accessible return")
+    );
+    assert_eq!(task.telemetry().scuttle_attempts, 1);
+    assert_eq!(task.telemetry().scuttled_tick, scuttled);
+    assert_eq!(task.telemetry().started_tick, Some(started));
+
+    let (mut task, mut o) = exhausted_rebuild_relocations();
+    observe_completed_rebuild(&mut o);
+    task.step(&o);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    o.flight.pilot.transfer = scenario_spacewars::surface_sortie::TransferResult::ShipNotSettled;
+    o.flight.pilot.boarding_hatches = [None, None];
+    task.step(&o);
+    o.flight.pilot.tick += 901;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert!(
+        o.flight.pilot.tick
+            < task
+                .telemetry()
+                .rebuild_boarding
+                .as_ref()
+                .unwrap()
+                .deadline_tick
+    );
+    assert_eq!(task.telemetry().scuttle_attempts, 0);
+}
+
+#[test]
+fn both_hosts_resume_after_a_native_rebuild_without_a_new_loss() {
+    use engine_common::CombatBreakSettings;
+    use spacewars_ai::mission_pilot::MaterialMissionPilot;
+    let (_, mut o) = airborne_pod();
+    o.flight.pilot.tick = 3220;
+    o.flight.pilot.ship_available = false;
+    o.flight.pilot.recovery.as_mut().unwrap().ships_lost = 1;
+    let context = BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    };
+    let state = SurfaceSortieScenario::init_material_travel(42, false);
+    let mut mission_o = state.mission_observation(0, None);
+    let mut mission = MaterialMissionPilot::new(context, CombatBreakSettings::default());
+    let mut sortie = RulePilotV3::new(context);
+    mission_o.local.combat.recovery = o.clone();
+    mission.intent(&mission_o);
+    sortie.intent(&o);
+    assert_eq!(
+        mission.telemetry().recovery.as_ref().unwrap().status,
+        TaskStatus::Blocked
+    );
+    assert_eq!(
+        sortie.telemetry().recovery.as_ref().unwrap().status,
+        TaskStatus::Blocked
+    );
+    observe_completed_rebuild(&mut o);
+    o.flight.pilot.location = PilotLocation::OnFoot;
+    for (tick, location, armed) in [
+        (21948, PilotLocation::OnFoot, false),
+        (21949, PilotLocation::OnFoot, true),
+        (21950, PilotLocation::Aboard(o.flight.pilot.vehicle), true),
+    ] {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.location = location;
+        o.flight.pilot.controls_armed = armed;
+        o.flight.pilot.transfer = scenario_spacewars::surface_sortie::TransferResult::Ready;
+        mission_o.local.combat.recovery = o.clone();
+        mission.intent(&mission_o);
+        sortie.intent(&o);
+        let mission_recovery = mission.telemetry().recovery.as_ref();
+        // The mission host retires a completed task; the sortie host retains
+        // its final receipt. Both publish one completion below.
+        assert_eq!(mission_recovery.is_some(), tick != 21950);
+        for t in mission_recovery
+            .into_iter()
+            .chain(sortie.telemetry().recovery.as_ref())
+        {
+            assert_eq!(t.started_tick, Some(3220));
+            assert_eq!(t.rebuild_boarding.as_ref().unwrap().started_tick, 21948);
+            assert_eq!(
+                t.goal,
+                if tick == 21950 {
+                    RecoveryGoal::Complete
+                } else {
+                    RecoveryGoal::Board
+                }
+            );
+        }
+    }
+    assert_eq!(mission.telemetry().completed_recoveries, 1);
+    assert_eq!(sortie.telemetry().completed_recoveries, 1);
+}
+
 #[test]
 fn progressing_high_spin_pod_can_take_longer_than_fifteen_seconds() {
     for turn_acceleration in [3.0, 6.0] {

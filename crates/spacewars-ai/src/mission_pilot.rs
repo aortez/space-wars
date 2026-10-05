@@ -20,8 +20,14 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_acquisition_defense.rs"]
+mod acquisition_defense;
 #[path = "mission_capture_escape.rs"]
 mod capture_escape;
+pub use acquisition_defense::{
+    ACQUISITION_CLEARANCE_PROFILE, ACQUISITION_DEFENSE_PROFILE, AcquisitionClearance,
+    AcquisitionClearanceCheck, AcquisitionDefense, AcquisitionDefenseAttempt,
+};
 #[path = "mission_escape_travel.rs"]
 mod escape_travel;
 pub use escape_travel::{ESCAPE_TRAVEL_PROFILE, EscapeTravel, EscapeTravelAttempt};
@@ -38,6 +44,12 @@ mod pursuit_health;
 pub use capture_escape::{CAPTURE_ESCAPE_PROFILE, CaptureEscape, CaptureEscapeAttempt};
 pub use pursuit_health::{
     PURSUIT_HEALTH_PROFILE, PursuitHealthCheck, PursuitHealthDecision, PursuitHealthTelemetry,
+};
+#[path = "mission_pursuit_climb_laser.rs"]
+mod pursuit_climb_laser;
+pub use pursuit_climb_laser::{
+    PURSUIT_CLIMB_LASER_PROFILE, PursuitClimbLaserCheck, PursuitClimbLaserDecision,
+    PursuitClimbLaserSource, PursuitClimbLaserTelemetry,
 };
 
 #[path = "mission_destination.rs"]
@@ -169,6 +181,8 @@ pub struct MissionTelemetry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pursuit_health: Option<PursuitHealthTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pursuit_climb_laser: Option<PursuitClimbLaserTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub disengagement: Option<MissionDisengagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_planning: Option<DestinationPlanningTelemetry>,
@@ -176,6 +190,10 @@ pub struct MissionTelemetry {
     pub destination_retry: Option<DestinationRetryTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capture_escape: Option<CaptureEscape>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition_defense: Option<AcquisitionDefense>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition_clearance: Option<AcquisitionClearance>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub escape_travel: Option<EscapeTravel>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,12 +293,15 @@ impl MaterialMissionPilot {
                 combat: None,
                 pursuit: None,
                 pursuit_health: None,
+                pursuit_climb_laser: None,
                 disengagement: None,
                 destination_planning: policy
                     .selects_destination()
                     .then(DestinationPlanningTelemetry::default),
                 destination_retry: None,
                 capture_escape: None,
+                acquisition_defense: None,
+                acquisition_clearance: None,
                 escape_travel: None,
                 transfer_approach: None,
                 transfer_speed: None,
@@ -314,6 +335,7 @@ impl MaterialMissionPilot {
     }
     pub fn reset(&mut self, context: BrainReset) {
         let pursuit_health = self.telemetry.pursuit_health.is_some();
+        let pursuit_climb_laser = self.telemetry.pursuit_climb_laser.is_some();
         let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
@@ -321,6 +343,8 @@ impl MaterialMissionPilot {
         let initial_cover = self.initial_cover;
         let actual_route_recovery = self.actual_route_recovery;
         let capture_escape = self.telemetry.capture_escape.is_some();
+        let acquisition_defense = self.telemetry.acquisition_defense.is_some();
+        let acquisition_clearance = self.telemetry.acquisition_clearance.is_some();
         let escape_travel = self.telemetry.escape_travel.is_some();
         let transfer_approach = self.telemetry.transfer_approach.is_some();
         let transfer_speed = self.telemetry.transfer_speed.is_some();
@@ -334,12 +358,15 @@ impl MaterialMissionPilot {
             .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
         self.configure_pursuit_health(pursuit_health);
+        self.configure_pursuit_climb_laser(pursuit_climb_laser);
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
         self.configure_initial_cover(initial_cover);
         self.configure_actual_route_recovery(actual_route_recovery);
         self.configure_capture_escape(capture_escape);
+        self.configure_acquisition_defense(acquisition_defense);
+        self.configure_acquisition_clearance(acquisition_clearance);
         self.configure_escape_travel(escape_travel);
         self.configure_transfer_approach(transfer_approach);
         self.configure_transfer_speed(transfer_speed);
@@ -716,6 +743,7 @@ impl MaterialMissionPilot {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         self.update_capture_escape(o);
+        self.update_acquisition_defense(o);
         self.observe_escape_travel(o);
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
         let replacing = self.recovery.as_ref().is_some_and(|task| {
@@ -805,6 +833,9 @@ impl MaterialMissionPilot {
             return CombatIntent::default();
         }
         if let Some(intent) = self.capture_escape_intent(o) {
+            return intent;
+        }
+        if let Some(intent) = self.acquisition_defense_intent(o) {
             return intent;
         }
         self.prepare_escape_travel(o);
@@ -1014,7 +1045,7 @@ impl MaterialMissionPilot {
                 self.remember_capture_failure(o, &failure);
             }
             self.goal(MissionGoal::Capture, p.tick);
-            return intent;
+            return self.acquisition_defense_handoff(o, intent);
         }
         if p.tick.saturating_sub(self.selected_tick) > escape_travel::TRANSFER_TICKS
             || p.tick.saturating_sub(self.progress_tick) > escape_travel::TRANSFER_PROGRESS_TICKS
@@ -1197,12 +1228,14 @@ impl MaterialMissionPilot {
         }
         if let Some(index) = self.pursuit_climb {
             self.telemetry.reason = Some("climbing for a firing pass");
-            return self.guide(o, self.pursuit_climb_velocity(o, index));
+            let intent = self.guide(o, self.pursuit_climb_velocity(o, index));
+            return self.pursuit_climb_laser_intent(o, intent, PursuitClimbLaserSource::Mission);
         }
         if altitude < 70.0 + falling * falling / 50.0 {
             self.pursuit_climb = Some(p.planet.index);
             self.telemetry.reason = Some("climbing for a firing pass");
-            return self.guide(o, self.pursuit_climb_velocity(o, p.planet.index));
+            let intent = self.guide(o, self.pursuit_climb_velocity(o, p.planet.index));
+            return self.pursuit_climb_laser_intent(o, intent, PursuitClimbLaserSource::Mission);
         }
         if let Some(target) = c.target
             && !target.ground_occluded
@@ -1215,6 +1248,9 @@ impl MaterialMissionPilot {
             self.pursuit_climb =
                 (self.patrol.telemetry().goal == "climb clear of ground").then_some(p.planet.index);
             self.telemetry.combat = Some(self.patrol.telemetry().clone());
+            if self.pursuit_climb.is_some() {
+                return self.pursuit_climb_laser_intent(o, intent, PursuitClimbLaserSource::Combat);
+            }
             return intent;
         }
         // Approach the opponent's actual world position, including their
