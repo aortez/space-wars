@@ -22,6 +22,7 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
         for _ in 0..180 {
             duck.step();
             grounded += usize::from(duck.grounded());
+            assert!(!duck.feet_moving(), "riding a closing panel is not walking");
             assert_eq!(duck.physics_counts(), (4, 4));
             let p = duck.position().unwrap();
             let x = duck.render_position(p).x;

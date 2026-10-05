@@ -6,7 +6,7 @@ use super::{
 };
 
 pub(super) const SWIM_COOLDOWN_TICKS: u64 = 18;
-const SWIM_MIN_IMMERSION: f64 = 0.2;
+pub(super) const SWIM_MIN_IMMERSION: f64 = 0.2;
 // Extra downward acceleration shifts this 0.45-density hull's equilibrium
 // from 45% to about 79% immersed. Even fully submerged, buoyancy wins: holding
 // Dive cannot propel it indefinitely into the depths. Water drag damps the bob.
