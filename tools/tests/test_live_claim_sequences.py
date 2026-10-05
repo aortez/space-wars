@@ -49,6 +49,20 @@ def receipt(tick):
                 last_contact_tick=None,last_contact_source=None)
 
 
+def scuttle_before(tick):
+    impacts,traces,_=fixture();row,trace=impacts[0],traces[0]
+    row.update(tick=tick,controls=dict(thrust=True,interact=True,brake=True,turn=0),damage=receipt(tick-10))
+    trace['mission']['recovery']=dict(goal='scuttle',status='running',scuttle_started_tick=tick-179)
+    p=L.X.R.pilot(trace)
+    p.update(tick=tick,location='on_foot',ship_available=True,ship_health=100,
+        recovery=dict(ships_lost=1,pod_ejections=1,rebuilds=1,status='scuttling',
+                      scuttle_progress=179/180,scuttle_required_seconds=3))
+    after=copy.deepcopy(p)
+    after.update(tick=tick+1,ship_available=False,ship_health=0)
+    after['recovery'].update(ships_lost=2,scuttle_progress=0,status='rebuilding')
+    return (row,trace),after
+
+
 class LiveClaimSequencesTests(unittest.TestCase):
     def test_commands_only_add_observation_and_keep_distinct_evaluated_and_harness_seats(self):
         prior=source();jobs=L.jobs(prior,Path('/binary'),Path('/out'))
@@ -100,6 +114,43 @@ class LiveClaimSequencesTests(unittest.TestCase):
         self.assertEqual(L.observer_audit(impacts,traces,report,0)['losses'][0]['receipt']['tick'],1)
         L.X.R.pilot(traces[3])['recovery']['ships_lost']=2
         with self.assertRaises(AssertionError):L.observer_audit(impacts,traces,report,0)
+
+    def test_scuttle_requires_completed_native_progress_and_held_chord(self):
+        before,after=scuttle_before(11891)
+        row=dict(tick=11892,damage=before[0]['damage'])
+        result=L.lifecycle_loss(row,after,before)
+        self.assertEqual((result['source'],result['tick'],result['started_tick']),('scuttle',11892,11712))
+        mutations=[lambda b,a:b[0]['controls'].update(interact=False),
+            lambda b,a:b[0]['controls'].update(turn=.1),
+            lambda b,a:L.X.R.pilot(b[1])['recovery'].update(scuttle_progress=.98),
+            lambda b,a:b[1]['mission']['recovery'].update(scuttle_started_tick=11713),
+            lambda b,a:b[1]['mission']['recovery'].update(goal='land_pod'),
+            lambda b,a:a.update(ship_available=True),lambda b,a:a.update(ship_health=1),
+            lambda b,a:a.update(location={'aboard':0}),
+            lambda b,a:a['recovery'].update(pod_ejections=2),
+            lambda b,a:a['recovery'].update(scuttle_progress=1)]
+        for mutate in mutations:
+            b,a=copy.deepcopy((before,after));mutate(b,a)
+            with self.assertRaises(AssertionError):L.lifecycle_loss(row,a,b)
+        with self.assertRaises(AssertionError):L.lifecycle_loss(dict(row,damage=receipt(11890)),after,before)
+
+    def test_final_step_scuttle_is_reconciled_without_reusing_stale_damage(self):
+        impacts,traces,report=fixture()
+        before,after=scuttle_before(1)
+        impacts[2]['controls']=impacts[2]['bot_controls']=before[0]['controls']
+        impacts[2]['damage']=before[0]['damage']
+        for i in (0,2):
+            L.X.R.pilot(traces[i])['recovery']['ships_lost']=1
+        traces[2]['observation']=before[1]['observation']
+        traces[2]['mission']['recovery']=impacts[2]['recovery']=before[1]['mission']['recovery']
+        impacts[2]['location']='on_foot'
+        report['final_pilots'][0]=after;impacts[-1]['damage'][0]=before[0]['damage']
+        result=L.observer_audit(impacts,traces,report,0)
+        self.assertEqual(result['losses'][0]['receipt']['source'],'scuttle')
+        self.assertEqual(result['losses'][0]['receipt']['tick'],2)
+        impacts[-1]['damage'][0]=receipt(2)
+        result=L.observer_audit(impacts,traces,report,0)
+        self.assertEqual(result['losses'][0]['receipt']['source'],'cannon')
 
     def test_selected_archive_members_are_verified_against_both_hashes(self):
         with tempfile.TemporaryDirectory() as directory:

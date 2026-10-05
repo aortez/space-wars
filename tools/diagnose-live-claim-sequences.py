@@ -106,9 +106,41 @@ def original_hashes(hashes, prior):
     return {k: v for k, v in hashes.items() if k != 'impact.jsonl'}
 
 
+def lifecycle_loss(row, pilot, before):
+    """Damage receipts and completed on-foot scuttles have distinct provenance."""
+    tick, damage = row['tick'], row['damage']
+    if damage.get('last_damage_tick') == tick:
+        return D.loss_receipt(row, tick)
+    assert before is not None
+    old_row, old_trace = before; old = X.R.pilot(old_trace)
+    assert old_row['tick'] + 1 == tick
+    task = old_trace['mission']['recovery'] or {}
+    assert task.get('goal') == 'scuttle' and task.get('status') == 'running'
+    controls = old_row['controls']
+    assert all(controls[k] for k in ('thrust', 'interact', 'brake')) and abs(controls['turn']) < .01
+    assert old['location'] == pilot['location'] == 'on_foot'
+    assert old['ship_available'] and not pilot['ship_available']
+    assert old['ship_form'] == pilot['ship_form'] == 'ship'
+    assert old['ship_health'] > 0 and pilot['ship_health'] == 0
+    a, b = old['recovery'], pilot['recovery']
+    assert a['status'] == 'scuttling' and b['scuttle_progress'] == 0
+    assert a['ships_lost'] + 1 == b['ships_lost']
+    assert all(a[k] == b[k] for k in ('pod_ejections', 'rebuilds'))
+    required = a['scuttle_required_seconds']
+    assert required == b['scuttle_required_seconds'] == 3
+    # Progress is a normalized f32; this harness advances 16,666,667 ns per step.
+    assert math.isclose(a['scuttle_progress'] + .016666667 / required, 1, abs_tol=1e-6)
+    assert tick - task['scuttle_started_tick'] == 180
+    assert all(damage.get(k) == old_row['damage'].get(k) for k in
+               ('last_damage_tick', 'last_source', 'last_damage_percent', 'last_ship_lost'))
+    return dict(tick=tick, source='scuttle', started_tick=task['scuttle_started_tick'],
+                previous_progress=a['scuttle_progress'], required_seconds=required,
+                previous_controls=controls)
+
+
 def observer_audit(impact_rows, trace_rows, report, observer_seat):
     traces = iter(trace_rows); count = 0; final = None
-    initial, previous, losses = {}, {}, []
+    initial, previous, states, losses = {}, {}, {}, []
     for row in impact_rows:
         assert final is None, 'rows after native final record'
         assert row['schema'] == 1
@@ -131,7 +163,8 @@ def observer_audit(impact_rows, trace_rows, report, observer_seat):
         lost = (p.get('recovery') or {}).get('ships_lost', 0)
         initial.setdefault(seat, lost); old = previous.get(seat, lost)
         assert lost in (old, old + 1)
-        if lost > old: losses.append(dict(seat=seat, receipt=D.loss_receipt(row, tick)))
+        if lost > old: losses.append(dict(seat=seat, receipt=lifecycle_loss(row, p, states.get(seat))))
+        states[seat] = (row, trace)
         previous[seat] = lost; count += 1
     ticks = report['elapsed_ticks']
     assert count == ticks * 2 and next(traces, None) is None
@@ -142,8 +175,8 @@ def observer_audit(impact_rows, trace_rows, report, observer_seat):
         lost = (report['final_pilots'][seat].get('recovery') or {}).get('ships_lost', 0)
         assert lost in (previous[seat], previous[seat] + 1)
         if lost > previous[seat]:
-            losses.append(dict(seat=seat, receipt=D.loss_receipt(
-                dict(tick=ticks, damage=final['damage'][seat]), ticks)))
+            losses.append(dict(seat=seat, receipt=lifecycle_loss(
+                dict(tick=ticks, damage=final['damage'][seat]), report['final_pilots'][seat], states[seat])))
         assert initial[seat] + sum(v['seat'] == seat for v in losses) == lost
     return dict(rows=count, overrides=0, initial_losses=initial, losses=losses, final=final)
 
