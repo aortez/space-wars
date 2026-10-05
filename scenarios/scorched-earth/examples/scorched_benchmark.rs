@@ -30,6 +30,9 @@ struct Args {
     diagnostics: bool,
     #[arg(long)]
     slumping: bool,
+    /// Save frozen packing inputs after the run, outside all timers.
+    #[arg(long)]
+    packing_dir: Option<std::path::PathBuf>,
 }
 
 fn timing(values: &[f64]) -> serde_json::Value {
@@ -104,6 +107,23 @@ fn main() {
                 );
             }
         }
+    }
+    if let Some(directory) = &args.packing_dir {
+        std::fs::create_dir_all(directory).unwrap();
+        let before = state.observation_hash();
+        for (i, snapshot) in state.capture_packing().unwrap().iter().enumerate() {
+            std::fs::write(
+                directory.join(format!("case-{i}.packing")),
+                snapshot.to_bytes().unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                directory.join(format!("case-{i}.json")),
+                serde_json::to_vec_pretty(&snapshot.inspect().unwrap()).unwrap(),
+            )
+            .unwrap();
+        }
+        assert_eq!(before, state.observation_hash(), "inspection changed state");
     }
     if args.replay {
         let mut replay = ScorchedScenario::init(config, args.seed);

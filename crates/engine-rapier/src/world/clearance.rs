@@ -52,6 +52,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn obstacle_reports_match_clearance_and_keep_all_current_solid_identities() {
+        let mut world = PhysicsWorld::new(Default::default());
+        for id in [9, 2, 4] {
+            let id = PhysicsId::new(id);
+            let mut collider =
+                ColliderSpec::ball(ColliderId::new(id, ColliderRole::PRIMARY, 0), 0.2);
+            collider.sensor = id.value() == 4;
+            assert!(world.insert_body(
+                BodyId::new(id, BodyRole::PRIMARY),
+                BodySpec {
+                    kind: BodyKind::Fixed,
+                    ..Default::default()
+                },
+                &[collider]
+            ));
+        }
+        let patches = vec![vec![
+            Vec2::new(-0.5, -0.5),
+            Vec2::new(0.5, -0.5),
+            Vec2::new(0.0, 0.5),
+        ]];
+        let before = world.snapshot_bytes().unwrap();
+        let report =
+            world.current_polygon_obstacles(Vec2::ZERO, 0.0, &patches, CollisionGroups::ALL, &[]);
+        assert!(!report[0].0);
+        assert_eq!(
+            report[0]
+                .1
+                .iter()
+                .map(|id| id.entity.value())
+                .collect::<Vec<_>>(),
+            [2, 9]
+        );
+        assert_eq!(
+            world.current_polygons_clearance(Vec2::ZERO, 0.0, &patches, CollisionGroups::ALL, &[]),
+            [false]
+        );
+        let clear = world.current_polygon_obstacles(
+            Vec2::ZERO,
+            0.0,
+            &patches,
+            CollisionGroups::ALL,
+            &[PhysicsId::new(2), PhysicsId::new(9)],
+        );
+        assert_eq!(clear, [(true, Vec::new())]);
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+    }
+
+    #[test]
     fn slivers_are_clear_when_empty_and_still_block_growth_through_actors() {
         // Captured from the three-planet seed-42 run; these fail convex_hull.
         let patches = vec![

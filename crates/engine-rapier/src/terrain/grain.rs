@@ -11,7 +11,7 @@ use crate::world::{
     ColliderSpec, PhysicsId, PhysicsWorld,
 };
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum GrainShape {
     #[default]
     Round,
@@ -36,7 +36,7 @@ impl GrainShape {
 
 /// One conserved cell with a contact proxy inscribed in its old square.
 /// The proxy introduces pore space; it is not a volume-preserving soil model.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TerrainGrain {
     id: PhysicsId,
     cell: Cell,

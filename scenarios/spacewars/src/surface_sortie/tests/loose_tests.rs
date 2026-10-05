@@ -163,7 +163,10 @@ fn pilot_walks_across_rebuilt_ground_and_loses_blasted_support() {
             distance > 1.5 * spec.walk_speed * 0.8,
             "{shape:?}: distance={distance}, start={start:?}, end={walked:?}"
         );
-        assert!(walked.grounded());
+        assert!(
+            walked.grounded(),
+            "{shape:?} slumping={slumping}: {walked:?}"
+        );
         assert_eq!(walked.jumps, 0);
         idle(&mut state, 60);
         let before = state.spaceling_snapshot(0).unwrap();
@@ -212,7 +215,7 @@ fn ship_lands_on_deposited_cells_and_revalidates_after_they_are_blasted() {
         }
         assert!(
             state.vehicle_settled(0),
-            "{shape:?}: {:?}",
+            "{shape:?} slumping={slumping}: {:?}",
             state.observation(0)
         );
         let feet = state.material_footings()[0];

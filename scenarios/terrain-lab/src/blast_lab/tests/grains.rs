@@ -25,7 +25,13 @@ fn most_of_an_unobstructed_pile_returns_to_terrain_and_can_be_reblasted() {
                 assert_eq!(lab.audit().unwrap().removed, 0);
                 let d = lab.settling_diagnostics();
                 assert_eq!(
-                    d.unsupported + d.moving + d.waiting + d.no_room + d.obstructed + d.budget,
+                    d.unsupported
+                        + d.moving
+                        + d.waiting
+                        + d.no_room
+                        + d.obstructed
+                        + d.budget
+                        + d.unstable,
                     lab.grains.len()
                 );
             }
