@@ -98,7 +98,7 @@ fn main() {
                         "loose": state.loose_cells(), "deposited": state.deposited_cells(),
                         "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
                         "settling": state.settling_diagnostics(),
-            "slumping": state.slumping_diagnostics(),
+                        "slumping": state.slumping_diagnostics(),
                         "observation_hash": format!("{:016x}", state.observation_hash()),
                     })
                 );
