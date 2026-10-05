@@ -106,6 +106,64 @@ fn physical_cannon_releases_material_on_rotating_surfaces_and_replays() {
 }
 
 #[test]
+fn disturbed_rotating_planet_slumps_in_local_gravity_and_replays() {
+    for shape in [
+        engine_rapier::terrain::GrainShape::Round,
+        engine_rapier::terrain::GrainShape::Hexagon,
+    ] {
+        let mut state = SpacewarsScenario::init_terrain_fixture(42);
+        state
+            .enable_loose_terrain(LooseTerrainConfig {
+                shape,
+                slumping: Some(Default::default()),
+                ..Default::default()
+            })
+            .unwrap();
+        state.planets[0].wrapper_angle = 0.73;
+        step(&mut state);
+        let initial = material(&state);
+        let field = state.planet_terrain(0).unwrap();
+        let local = Vec2::new(14.0, 58.0);
+        let center = field.local_to_cell(local).unwrap();
+        state.queue_test_blast(
+            TerrainEdit {
+                brush: Brush::Circle { center, radius: 3 },
+                mode: EditMode::Remove,
+            },
+            RadialImpulse {
+                center: local,
+                radius: 5.0,
+                speed: 0.0,
+            },
+        );
+        step(&mut state);
+        let mut replay = state.clone();
+        for tick in 0..600 {
+            step(&mut state);
+            step(&mut replay);
+            if tick % 30 == 0 {
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                assert_eq!(material(&state), initial);
+                assert_eq!(observation(&state).payload, observation(&replay).payload);
+                assert_eq!(
+                    state.physics.snapshot_bytes(),
+                    replay.physics.snapshot_bytes()
+                );
+            }
+        }
+        assert!(
+            state
+                .loose_terrain()
+                .unwrap()
+                .slumping_diagnostics()
+                .released_cells
+                > 0
+        );
+    }
+}
+
+#[test]
 fn full_pool_rejects_damage_atomically_but_keeps_mining_operational() {
     let mut state = enabled(TerrainSurface::Blocks, 1);
     fire(&mut state);

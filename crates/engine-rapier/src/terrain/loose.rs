@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 mod deposition;
 pub use deposition::{DepositCommit, SettlingDiagnostics};
+mod slumping;
+pub use slumping::{SlumpCommit, SlumpingConfig, SlumpingDiagnostics};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LooseTerrainConfig {
@@ -13,6 +15,8 @@ pub struct LooseTerrainConfig {
     pub shape: GrainShape,
     pub friction: f32,
     pub restitution: f32,
+    /// Optional local surface-yield prototype. Undisturbed terrain is retained.
+    pub slumping: Option<SlumpingConfig>,
 }
 
 impl Default for LooseTerrainConfig {
@@ -22,6 +26,7 @@ impl Default for LooseTerrainConfig {
             shape: GrainShape::Round,
             friction: 0.6,
             restitution: 0.0,
+            slumping: None,
         }
     }
 }
@@ -157,6 +162,7 @@ pub struct LooseTerrain {
     settling: BTreeMap<PhysicsId, deposition::SettlingState>,
     deposited_cells: u64,
     settling_diagnostics: SettlingDiagnostics,
+    slumping: slumping::SlumpingState,
 }
 
 impl LooseTerrain {
@@ -166,6 +172,7 @@ impl LooseTerrain {
             || config.friction < 0.0
             || !config.restitution.is_finite()
             || !(0.0..=1.0).contains(&config.restitution)
+            || config.slumping.is_some_and(|c| !c.valid())
         {
             return Err(TerrainError("invalid loose material configuration"));
         }
@@ -175,6 +182,7 @@ impl LooseTerrain {
             settling: BTreeMap::new(),
             deposited_cells: 0,
             settling_diagnostics: SettlingDiagnostics::default(),
+            slumping: slumping::SlumpingState::default(),
         })
     }
     pub fn config(&self) -> LooseTerrainConfig {
@@ -248,6 +256,14 @@ impl LooseTerrain {
             return Err(invalid("material identity already exists"));
         }
         let new_grains = plan.grain_count();
+        let disturbed: Vec<_> = if self.config.slumping.is_some() {
+            plan.grains
+                .iter()
+                .filter_map(|g| source.terrain.local_to_cell(g.parent_offset))
+                .collect()
+        } else {
+            Vec::new()
+        };
         let mut fragments = Vec::new();
         let mut grains = Vec::new();
         let mut id = *next_id;
@@ -299,6 +315,7 @@ impl LooseTerrain {
         self.grains.extend(grains);
         self.settling_diagnostics.waiting += new_grains;
         *next_id = end;
+        self.disturb(source.assembly.body(), source.terrain, disturbed);
         Ok(ReleaseCommit {
             fragments,
             dirty_chunks,

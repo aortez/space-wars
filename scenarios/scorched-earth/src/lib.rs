@@ -44,6 +44,7 @@ pub struct ScorchedConfig {
     /// Zero selects the normal duel. Otherwise rain scripted shells for this
     /// duration, then keep solving the altered world without new impacts.
     pub bombardment_seconds: u32,
+    pub slumping: bool,
 }
 impl Default for ScorchedConfig {
     fn default() -> Self {
@@ -52,6 +53,7 @@ impl Default for ScorchedConfig {
             max_grains: 192,
             demo: false,
             bombardment_seconds: 0,
+            slumping: false,
         }
     }
 }
@@ -219,6 +221,7 @@ impl ScorchedState {
             loose: LooseTerrain::new(LooseTerrainConfig {
                 max_grains: config.max_grains,
                 shape: config.shape,
+                slumping: config.slumping.then(Default::default),
                 ..Default::default()
             })
             .expect("bounded loose material"),
@@ -334,7 +337,7 @@ impl ScorchedState {
             // Health-independent rain exercises the real swept-shell impact
             // path. Later shots encounter the already deformed terrain.
             if self.tick < u64::from(self.config.bombardment_seconds) * u64::from(FIXED_HZ)
-                && self.tick % 120 == 0
+                && self.tick.is_multiple_of(120)
                 && self.shells.len() < MAX_SHELLS
             {
                 let phase = (self.shots % 9 + self.seed % 9) % 9;
@@ -382,6 +385,7 @@ impl ScorchedState {
         for point in impacts {
             self.explode(point);
         }
+        self.slump();
         self.settle();
         for tank in &mut self.tanks {
             let position = self.physics.motion(tank.body).unwrap().position;
@@ -400,7 +404,26 @@ impl ScorchedState {
             Command::PowerUp => self.tanks[self.selected].speed += 1.0,
             Command::Fire => self.fire(self.selected),
             Command::Select => self.selected = 1 - self.selected,
-            Command::Demo => self.config.demo = !self.config.demo,
+            Command::Demo => {
+                self.config.demo = !self.config.demo;
+                if self.config.bombardment_seconds > 0 {
+                    self.config.bombardment_seconds = 0;
+                    *self = Self::new(self.config, self.seed);
+                }
+            }
+            Command::Collapse => {
+                self.config.slumping = !self.config.slumping;
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Barrage => {
+                self.config.bombardment_seconds = if self.config.bombardment_seconds == 0 {
+                    60
+                } else {
+                    0
+                };
+                self.config.demo = false;
+                *self = Self::new(self.config, self.seed);
+            }
             Command::Shape => {
                 self.config.shape = match self.config.shape {
                     GrainShape::Round => GrainShape::Hexagon,
@@ -461,6 +484,12 @@ impl Scenario for ScorchedScenario {
             (controls.select, state.previous.select, Command::Select),
             (controls.demo, state.previous.demo, Command::Demo),
             (controls.shape, state.previous.shape, Command::Shape),
+            (
+                controls.collapse,
+                state.previous.collapse,
+                Command::Collapse,
+            ),
+            (controls.barrage, state.previous.barrage, Command::Barrage),
         ] {
             if held && !before {
                 state.command(command)

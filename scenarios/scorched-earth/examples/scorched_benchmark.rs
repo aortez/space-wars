@@ -28,6 +28,8 @@ struct Args {
     /// Emit one audited sample per second to stderr, outside the timer.
     #[arg(long)]
     diagnostics: bool,
+    #[arg(long)]
+    slumping: bool,
 }
 
 fn timing(values: &[f64]) -> serde_json::Value {
@@ -51,6 +53,7 @@ fn main() {
     );
     let config = ScorchedConfig {
         demo: true,
+        slumping: args.slumping,
         bombardment_seconds: args.bombardment_seconds,
         max_grains: args.limit as usize,
         shape: match args.shape {
@@ -95,6 +98,7 @@ fn main() {
                         "loose": state.loose_cells(), "deposited": state.deposited_cells(),
                         "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
                         "settling": state.settling_diagnostics(),
+            "slumping": state.slumping_diagnostics(),
                         "observation_hash": format!("{:016x}", state.observation_hash()),
                     })
                 );
@@ -121,6 +125,7 @@ fn main() {
         "{}",
         serde_json::json!({
             "workload": if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else { "scorched-earth-scripted-duel-v2" },
+            "slumping_enabled": args.slumping,
             "seed": args.seed, "ticks": ticks, "bombardment_seconds": args.bombardment_seconds,
             "shape": match args.shape { Shape::Round => "round", Shape::Angular => "angular" },
             "grain_limit": args.limit, "shots": state.shots, "impacts": state.impacts,
@@ -133,6 +138,7 @@ fn main() {
             "winner": state.winner().map(|p| p + 1),
             "phases": { "active": timing(&active), "tail": timing(&tail) },
             "settling": state.settling_diagnostics(),
+            "slumping": state.slumping_diagnostics(),
         })
     );
 }

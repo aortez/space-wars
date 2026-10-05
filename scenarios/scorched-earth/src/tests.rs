@@ -196,3 +196,76 @@ fn bombardment_ignores_tank_deaths_and_stops_launching_at_the_tail() {
     assert_eq!(hash, replay.observation_hash());
     state.audit().unwrap();
 }
+
+#[test]
+fn collapse_and_barrage_toggle_once_when_held_and_reset_comparisons() {
+    let mut state = ScorchedState::new(ScorchedConfig::default(), 42);
+    let controls = ScorchedAction::Controls(Controls {
+        collapse: true,
+        barrage: true,
+        ..Default::default()
+    })
+    .encode();
+    for _ in 0..60 {
+        step(&mut state, std::slice::from_ref(&controls));
+    }
+    assert!(state.config.slumping);
+    assert_eq!(state.config.bombardment_seconds, 60);
+    assert_eq!(state.tick, 60);
+    assert_eq!(state.shots, 1);
+    state.command(Command::Shape);
+    assert!(state.config.slumping);
+    assert_eq!(state.config.bombardment_seconds, 60);
+    assert_eq!(state.tick, 0);
+    state.command(Command::Demo);
+    assert!(state.config.demo);
+    assert_eq!(state.config.bombardment_seconds, 0);
+    // Existing recordings keep their twelve-byte continuous input payload.
+    let Action::Scenario { kind, mut payload } = controls else {
+        unreachable!()
+    };
+    payload.truncate(12);
+    assert_eq!(
+        ScorchedAction::decode(&Action::scenario(kind, payload)),
+        Some(ScorchedAction::Controls(Controls::default()))
+    );
+}
+
+#[test]
+fn sustained_collapse_conserves_and_quiet_tail_stops_releasing_for_both_shapes() {
+    for shape in [GrainShape::Round, GrainShape::Hexagon] {
+        let mut state = ScorchedState::new(
+            ScorchedConfig {
+                shape,
+                slumping: true,
+                bombardment_seconds: 60,
+                ..Default::default()
+            },
+            42,
+        );
+        let mut released_at_90 = 0;
+        for tick in 1..=7200 {
+            step(&mut state, &[]);
+            if tick % 60 == 0 {
+                state.audit().unwrap();
+            }
+            if tick == 5400 {
+                released_at_90 = state.slumping_diagnostics().released_cells;
+            }
+        }
+        assert_eq!(state.shots, 30);
+        assert_eq!(state.impacts, 30);
+        assert!(released_at_90 > 0);
+        assert_eq!(
+            state.slumping_diagnostics().released_cells,
+            released_at_90,
+            "quiet tail must not keep recycling banks"
+        );
+        let mut replay = state.clone();
+        for _ in 0..120 {
+            step(&mut state, &[]);
+            step(&mut replay, &[]);
+        }
+        assert_eq!(state.observation_hash(), replay.observation_hash());
+    }
+}

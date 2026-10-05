@@ -20,16 +20,18 @@ the same hills. A simultaneous destruction is a draw.
 | --- | --- | --- |
 | Lower / raise elevation | Left / Right, A / D | D-pad left / right, right-stick X |
 | Lower / raise power | Down / Up, S / W | D-pad down / up, right-stick Y |
-| Fire (hold to repeat) | Space | Bottom face, left shoulder, right trigger |
+| Fire (hold to repeat) | Space | Bottom face, right trigger |
 | Take control of the other tank | Tab | Left face |
 | Toggle the scripted CPU duel | V | Right shoulder |
 | Switch Angular / Round dirt and reset | T | Top face |
+| Toggle bank collapse and reset | K | Right face |
+| Switch barrage / duel and reset | J | Left shoulder |
 | Restart with defaults and the same seed | R | Pause → Restart |
 | Pause | Esc | Start |
 
 The on-screen controls also adjust aim/power, fire, select a tank, toggle Demo,
 switch dirt, and reset. The on-screen **Reset** retains the current dirt shape
-and Demo choice. Camera framing fits the entire battlefield in landscape and
+and Demo, collapse and barrage choices. Camera framing fits the entire battlefield in landscape and
 narrow windows. The host provides the normal launcher, pause, and renderer controls.
 
 **Angular** is the initial dirt choice. **Demo** drives both tanks with the same
@@ -37,6 +39,55 @@ seeded aiming sweep used by the headless runner. It estimates ballistic range
 but varies its aim; intervening terrain and loose grains can intercept shots.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown. The tanks currently cannot drive.
+
+## Bank-collapse comparison
+
+**Collapse** (K / right face) enables the shared bank-yield prototype and resets
+on the same seed. It starts **off**. **Barrage** (J / left shoulder) resets into
+60 seconds of falling shells, one every two seconds, followed by unlimited rest.
+It keeps firing after tank deaths. Press **Duel** to leave this mode; **Demo** also
+returns to the duel. Switching dirt or collapse restarts the current comparison.
+The header shows the choices; the status line shows time and released bank cells.
+
+For an easy comparison, choose **Round**, enable **Collapse**, then **Barrage**.
+Watch the crater rims during the barrage and the ground during the quiet tail.
+Repeat with collapse off or Angular dirt. These changes alter later impacts and
+pile shapes, so equal seeds do not imply identical contact workloads.
+
+The shared layer peels exposed tops with a steep adjacent drop in the direction
+of gravity. It watches a two-cell neighborhood of material release/deposition,
+waits 0.35 seconds, and can release up to four cells from one field per 0.1 seconds.
+It checks at most 64 queued candidates per scan and tracks at most 4,096.
+Automatic shedding pauses if it would take the total loose population above 48;
+impacts retain access to the normal 192-grain pool. Refusals retain the dirt and
+retry later. Removed cells inherit the source's velocity and spin without a kick.
+
+The 50° repose setting is a grid-sampled threshold, not a measured soil angle.
+This prototype applies equally to eligible materials; it has no hardness-based
+cohesion or internal stress. It leaves undisturbed terrain alone. Blocked deposits
+can still leave piles permanently loose, especially with Angular grains. Collapse
+is optional because it can increase obstruction, saturation and update cost.
+
+The same `LooseTerrain::slump` call is wired into Spacewars' existing edit boundary,
+using its point/spherical gravity solver and body poses. Released grains and
+fragments join the ordinary actor/query registries; base/flag support is reconciled
+with the new geometry. Spacewars enables it through `LooseTerrainConfig::slumping`
+and the headless runner's `--slumping` switch. Launcher loose-dirt settings retain
+their existing behavior. Terrain Lab retains the default with collapse off.
+
+```sh
+cargo run --locked --release -p scenario-scorched-earth --example scorched_benchmark -- \
+  --shape round --seconds 120 --bombardment-seconds 60 --slumping --replay --diagnostics
+cargo run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
+  --mode angular --scene combat --seconds 60 --slumping --diagnostics
+```
+
+Omit `--slumping` to compare the existing behavior. The bombardment runner reports
+active and tail timings separately, with per-second samples on stderr. The tail
+begins when launches stop; an already airborne shell can still land in it.
+Slumping diagnostics include pending checks, releases, tracking overflow and
+cumulative capacity/fragment refusals; rejection counts are attempts, not lost cells.
+All auditing, hashing and replay remain outside the timed update.
 
 ## Shared mechanics
 
@@ -66,7 +117,7 @@ and tank knockback still apply, so a full pool does not make tanks invulnerable.
 
 This is bounded rigid-grain behavior, not a calibrated soil model. Whole-cell
 deposition can leave ledges, a settled pile may remain loose, and sustained fire
-can exhaust the pool. Cohesion, slope relaxation, shock propagation, compression,
+can exhaust the pool. Cohesion, stress-based slope failure, shock propagation, compression,
 fluids and napalm remain later work. Tank traction/driving, weapons, sound and
 broader round progression are also outside this first slice.
 
@@ -182,7 +233,7 @@ isolate per-contact shape cost: the piles and later collisions differ.
 
 This workload is smaller than the existing multi-planet Spacewars stress run;
 its lower mean is not evidence that the shared solver became faster. No shared
-physics implementation changed in this branch. The earlier
+physics implementation changed in that initial Scorched Earth baseline. The earlier
 [existing-benchmark comparison](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
 remains the integration baseline. The Picade's occasional 35–42 ms steps and
 the live rendering cost above are explicit follow-up performance targets.

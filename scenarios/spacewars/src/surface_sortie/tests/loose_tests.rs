@@ -52,7 +52,7 @@ fn footing(state: &SurfaceSortieState, hit: engine_rapier::world::RayHit) -> Cel
         .unwrap()
 }
 
-fn rebuilt_pad(shape: GrainShape) -> (SurfaceSortieState, Vec<CellCoord>, u64) {
+fn rebuilt_pad(shape: GrainShape, slumping: bool) -> (SurfaceSortieState, Vec<CellCoord>, u64) {
     let mut state =
         SurfaceSortieScenario::init_material_surface(42, 1, TerrainSurface::Interpolated);
     state.world.planets[0].wrapper_omega = 0.0;
@@ -60,6 +60,7 @@ fn rebuilt_pad(shape: GrainShape) -> (SurfaceSortieState, Vec<CellCoord>, u64) {
     state
         .enable_loose_terrain_with_config(LooseTerrainConfig {
             shape,
+            slumping: slumping.then(Default::default),
             ..Default::default()
         })
         .unwrap();
@@ -121,8 +122,11 @@ fn assert_conserved(state: &SurfaceSortieState, initial: u64) {
 
 #[test]
 fn pilot_walks_across_rebuilt_ground_and_loses_blasted_support() {
-    for shape in [GrainShape::Round, GrainShape::Hexagon] {
-        let (mut state, released, initial) = rebuilt_pad(shape);
+    for (shape, slumping) in [GrainShape::Round, GrainShape::Hexagon]
+        .into_iter()
+        .flat_map(|shape| [false, true].map(|enabled| (shape, enabled)))
+    {
+        let (mut state, released, initial) = rebuilt_pad(shape, slumping);
         state.world.ships[0].dead = true;
         state.world.ships[0].fragmented = true;
         let hit = ground(&state, -4.0);
@@ -188,8 +192,11 @@ fn pilot_walks_across_rebuilt_ground_and_loses_blasted_support() {
 
 #[test]
 fn ship_lands_on_deposited_cells_and_revalidates_after_they_are_blasted() {
-    for shape in [GrainShape::Round, GrainShape::Hexagon] {
-        let (mut state, released, initial) = rebuilt_pad(shape);
+    for (shape, slumping) in [GrainShape::Round, GrainShape::Hexagon]
+        .into_iter()
+        .flat_map(|shape| [false, true].map(|enabled| (shape, enabled)))
+    {
+        let (mut state, released, initial) = rebuilt_pad(shape, slumping);
         let point = ground(&state, 0.0).point;
         let ship = &mut state.world.ships[0];
         ship.position = point + Vec2::Y * 18.0 - SHIP_PIVOT;
@@ -237,8 +244,11 @@ fn ship_lands_on_deposited_cells_and_revalidates_after_they_are_blasted() {
 
 #[test]
 fn deposited_flag_footing_must_be_claimed_again_after_destruction_and_return() {
-    for shape in [GrainShape::Round, GrainShape::Hexagon] {
-        let (mut state, released, initial) = rebuilt_pad(shape);
+    for (shape, slumping) in [GrainShape::Round, GrainShape::Hexagon]
+        .into_iter()
+        .flat_map(|shape| [false, true].map(|enabled| (shape, enabled)))
+    {
+        let (mut state, released, initial) = rebuilt_pad(shape, slumping);
         let spec = SurfaceSortieState::spec();
         let hit = ground(&state, 0.0);
         let standing = hit.point + Vec2::Y * (spec.half_height() + 0.05);

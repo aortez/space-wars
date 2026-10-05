@@ -151,6 +151,17 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 minimum_scene_pixels,
             );
             if scenario == "scorched-earth" {
+                for button in [
+                    spacewars_control::InputButton::East,
+                    spacewars_control::InputButton::LeftShoulder,
+                ] {
+                    let request = spacewars_control::InputPressRequest::new(&state, button);
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(4))
+                        .unwrap()
+                        .state;
+                }
                 for _ in 0..2 {
                     let mut request = spacewars_control::InputPressRequest::new(
                         &state,
