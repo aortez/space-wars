@@ -173,12 +173,16 @@ source to each ship loss.
 The primary comparison also retains shared-host effects: in World 1/P2 with
 asteroids, ordinary → no-stop first changes the opponent's action at 9,542.
 This experiment does not isolate the evaluated bot from planning availability
-shared with its opponent. The 48 fresh games have no jetpack crossing launches
-or completions. The known no-stop rescue replay retains the opponent's two
-existing ground-gap crossings, completed at 19,321 and 19,667. There are no
-vehicle-continuation flights in either stage. This corrects the earlier
-ablation report's overly broad statement that no crossings occurred; the
-original archived counters already recorded both crossings.
+shared with its opponent. The **capture-task** route audit records no jetpack
+launches or completions in the 48 fresh games; it does not inspect
+`mission.recovery.ground`. The known no-stop rescue replay retains the
+opponent's two capture-task ground-gap completions at 19,321 and 19,667.
+No vehicle-continuation flights were recorded in either stage. These counters
+do not establish an absence of recovery flights: the subsequent
+[sequence diagnosis](live-claim-sequences-results.md) found four reported
+ground-gap completions during World 1/P2 no-stop recovery, including one
+completion at the wrong endpoint. This narrows the earlier wording without
+changing the archived counters or promotion decision.
 
 ## Verification and evidence
 
