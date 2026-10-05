@@ -81,6 +81,8 @@ pub struct GroundTelemetry {
     pub policy: &'static str,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub continuous_walk: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub live_claim_stopping_disabled: bool,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -156,6 +158,7 @@ impl GroundNavigationTask {
             telemetry: GroundTelemetry {
                 policy: "ground_navigation_v10",
                 continuous_walk: false,
+                live_claim_stopping_disabled: false,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -219,9 +222,15 @@ impl GroundNavigationTask {
     pub fn set_continuous_walk(&mut self, enabled: bool) {
         self.telemetry.continuous_walk = enabled;
     }
+    /// Diagnostic ablation of stopping during a supported native flag raise.
+    /// Route planning, continuous walking and flight checks remain independent.
+    pub fn set_live_claim_stopping(&mut self, enabled: bool) {
+        self.telemetry.live_claim_stopping_disabled = !enabled;
+    }
     pub fn reset(&mut self, context: BrainReset) {
         let active_flight_checks = self.active_flight_checks;
         let continuous_walk = self.telemetry.continuous_walk;
+        let live_claim_stopping_disabled = self.telemetry.live_claim_stopping_disabled;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
         } else if self.powered_flag {
@@ -230,6 +239,7 @@ impl GroundNavigationTask {
             Self::new(context, self.telemetry.destination)
         };
         self.telemetry.continuous_walk = continuous_walk;
+        self.telemetry.live_claim_stopping_disabled = live_claim_stopping_disabled;
         self.active_flight_checks = active_flight_checks;
     }
     pub fn is_crossing(&self) -> bool {

@@ -435,6 +435,39 @@ fn powered_planner_finishes_its_own_raise_without_walking_to_a_new_endpoint() {
 }
 
 #[test]
+fn live_claim_ablation_walks_to_the_endpoint_and_survives_clone_and_reset() {
+    let (mut task, mut o) = raising_flag_fixture(true);
+    task.set_continuous_walk(true);
+    task.set_live_claim_stopping(false);
+    let mut copy = task.clone();
+    assert_eq!(task.step(&o), copy.step(&o));
+    advance(&mut o, 2);
+    let action = task.step(&o);
+    assert!(action.horizontal < 0.0);
+    assert_eq!(action, copy.step(&o));
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().flag_approach.is_some());
+    assert!(task.telemetry().continuous_walk);
+    assert_eq!(task.telemetry().policy, "ground_navigation_v12");
+
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert!(task.telemetry().live_claim_stopping_disabled);
+    assert!(task.telemetry().continuous_walk);
+    task.step(&o);
+    advance(&mut o, 3);
+    assert!(task.step(&o).horizontal < 0.0);
+
+    // Restoring only this rule stops at the same supported native raise.
+    task.set_live_claim_stopping(true);
+    advance(&mut o, 4);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+}
+
+#[test]
 fn own_raise_does_not_override_support_flag_hatch_or_task_deadline_checks() {
     use scenario_spacewars::surface_sortie::{PlanetClaimPhase, PlanetClaimStatus};
     for fault in 0..5 {

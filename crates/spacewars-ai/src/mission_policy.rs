@@ -144,6 +144,11 @@ impl MissionBot {
         self.0.configure_active_flight_checks(enabled);
         self
     }
+    /// Diagnostic ablation only; powered sensors and planning stay enabled.
+    pub fn with_live_claim_stopping(mut self, enabled: bool) -> Self {
+        self.0.configure_live_claim_stopping(enabled);
+        self
+    }
     /// Opt-in hull comparison for new ownership-based pursuits.
     pub fn with_pursuit_health(mut self, enabled: bool) -> Self {
         self.0.configure_pursuit_health(enabled);
@@ -260,6 +265,72 @@ mod tests {
     use engine_common::Scenario;
     use scenario_spacewars::{PlayerId, surface_sortie::SurfaceSortieScenario};
     use std::time::Duration;
+
+    #[test]
+    fn live_claim_ablation_preserves_powered_sensing_and_reset_configuration() {
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let powered = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
+            .with_powered_capture(true)
+            .with_active_flight_checks(true);
+        assert!(!powered.telemetry().live_claim_stopping_disabled);
+        assert!(
+            serde_json::to_value(powered.telemetry())
+                .unwrap()
+                .get("live_claim_stopping_disabled")
+                .is_none()
+        );
+        let mut ablated = powered.clone().with_live_claim_stopping(false);
+        assert_eq!(
+            serde_json::to_value(ablated.descriptor()).unwrap(),
+            serde_json::to_value(powered.descriptor()).unwrap(),
+        );
+        let request = ablated.sensor_request();
+        assert_eq!(
+            request.objective_planning,
+            powered.sensor_request().objective_planning
+        );
+        assert!(request.vehicle_flight.is_none() && request.destination_cover.is_none());
+        assert_eq!(request.site, powered.sensor_request().site);
+        assert!(request.last_survey.is_none());
+        assert_eq!(
+            ablated.objective_planning(),
+            ObjectivePlanning::JetpackRoundTrip
+        );
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let observation =
+            state.mission_observation_with_cadence(0, ablated.sensor_request(), Default::default());
+        let mut copy = ablated.clone();
+        assert_eq!(ablated.intent(&observation), copy.intent(&observation));
+        ablated.reset(context);
+        assert!(ablated.telemetry().powered_capture);
+        assert!(ablated.telemetry().live_claim_stopping_disabled);
+        let request = ablated.sensor_request();
+        assert_eq!(
+            request.objective_planning,
+            powered.sensor_request().objective_planning
+        );
+        assert!(request.vehicle_flight.is_none() && request.destination_cover.is_none());
+        assert_eq!(request.site, powered.sensor_request().site);
+        assert!(request.last_survey.is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn live_claim_ablation_requires_powered_capture() {
+        MissionBot::new(
+            MissionPolicy::ValuePlanner,
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            Default::default(),
+        )
+        .with_live_claim_stopping(false);
+    }
 
     #[test]
     fn identity_sensor_profile_clone_and_reset_remain_bound_to_selection() {

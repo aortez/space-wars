@@ -295,6 +295,12 @@ fn main() {
         "true" => true,
         _ => panic!("--active-flight-checks must be true or false"),
     };
+    let live_claim_stopping = match arg("--live-claim-stopping", "true").as_str() {
+        "false" => false,
+        "true" => true,
+        _ => panic!("--live-claim-stopping must be true or false"),
+    };
+    assert!(live_claim_stopping || powered_capture_seats.contains(&true));
     let pursuit_health_seats = match arg("--pursuit-health-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -468,6 +474,7 @@ fn main() {
         )
         .with_powered_capture(powered_capture_seats[i])
         .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
+        .with_live_claim_stopping(live_claim_stopping || !powered_capture_seats[i])
         .with_pursuit_health(pursuit_health_seats[i])
         .with_pursuit_climb_laser(pursuit_climb_laser_seats[i])
         .with_acquisition_defense(acquisition_defense_seats[i])
@@ -1143,6 +1150,7 @@ fn main() {
         report["powered_capture"] = json!({
             "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,
             "enabled_seats": powered_capture_seats,
+            "live_claim_stopping_enabled_seats": powered_capture_seats.map(|enabled| enabled && live_claim_stopping),
             "scope": "Opt-in v13 native powered landing routes and on-foot controller. The configured live planner allowance and all forecast validity gates remain in force; other sensors retain their synchronous work.",
         });
     }
