@@ -1,0 +1,3319 @@
+{
+  "runtime_revision": "b1c6a5891339e277c73fec56c234ab3889c03722",
+  "baseline_revision": "9327948",
+  "rust": "1.89.0",
+  "profile": "release / fat LTO / one codegen unit",
+  "picade_target": "aarch64-unknown-linux-gnu",
+  "picade_rustflags": "-C target-feature=+crt-static",
+  "desktop": "AMD Ryzen 7 9800X3D",
+  "picade": "Raspberry Pi 4 Model B Rev 1.4",
+  "notes": [
+    "Three serial desktop repetitions for each Scorched mode; one serial Picade run per mode. Spacewars and existing benchmark timings are single-run smoke comparisons.",
+    "Scorched runs use seed 42, 120 simulated seconds, 60 seconds of health-independent bombardment and a 60-second tail, 192 grains, and full replay with per-second hashes.",
+    "The tail begins when launches stop; existing shells can still impact. Timing excludes audit, observation, replay and rendering.",
+    "Picade kiosk stayed paused, checked before and after each run. Telemetry samples are temperature millidegrees C, scaling_cur_freq kHz and undervoltage alarm; endpoint probes cannot rule out intervening throttling.",
+    "Final bank shedding watches a 2-cell halo; default repose 50 degrees, yield delay .35s, scan cadence .1s, 64 candidates, 4096 tracked, 4 releases/transaction, and automatic-shedding population ceiling 48. It never raises the 192-grain impact pool.",
+    "Baseline shared code is pre-slumping; its Scorched harness already includes the bombardment fixture and stronger observation hash from 9327948.",
+    "Binaries were copied into separate baseline/current directories. A Cargo cache collision after sharing a target directory was resolved by cleaning and rebuilding affected release packages; final binaries were checked for new options/diagnostics before measurement."
+  ],
+  "runs": [
+    {
+      "host": "desktop",
+      "name": "scorched-round-False-0",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.2845077514648438,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 934,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 36,
+          "solid": 10357
+        },
+        "max_ms": 5.04324,
+        "mean_ms": 0.2264427665277773,
+        "observation_hash": "359a8de23b435b64",
+        "p95_ms": 0.879162,
+        "peak_bodies": 179,
+        "peak_contacts": 327,
+        "peak_loose": 176,
+        "phases": {
+          "active": {
+            "max_ms": 5.04324,
+            "mean_ms": 0.3656272883333327,
+            "p95_ms": 1.2155770000000001,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.303252,
+            "mean_ms": 0.08725824472222223,
+            "p95_ms": 0.236387,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 36,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/scorched-round-False-0",
+        "count": 120
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-round-True-0",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.6499526500701904,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 1030,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 0,
+          "solid": 10393
+        },
+        "max_ms": 6.718685000000001,
+        "mean_ms": 0.24827196138888874,
+        "observation_hash": "e7eeaa237bb31cdc",
+        "p95_ms": 0.806774,
+        "peak_bodies": 189,
+        "peak_contacts": 339,
+        "peak_loose": 186,
+        "phases": {
+          "active": {
+            "max_ms": 6.718685000000001,
+            "mean_ms": 0.48171368805555526,
+            "p95_ms": 1.694792,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.0675670000000004,
+            "mean_ms": 0.014830234722222219,
+            "p95_ms": 0.12138,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 412,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 45,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/scorched-round-True-0",
+        "count": 120
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-False-0",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.763031005859375,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 973,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 52,
+          "solid": 10341
+        },
+        "max_ms": 3.686696,
+        "mean_ms": 0.260340942222222,
+        "observation_hash": "7a66d5a4472680ee",
+        "p95_ms": 0.8206910000000001,
+        "peak_bodies": 165,
+        "peak_contacts": 262,
+        "peak_loose": 162,
+        "phases": {
+          "active": {
+            "max_ms": 3.505524,
+            "mean_ms": 0.37413313138888893,
+            "p95_ms": 1.057889,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 3.686696,
+            "mean_ms": 0.14654875305555545,
+            "p95_ms": 0.325806,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 52,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/scorched-angular-False-0",
+        "count": 120
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-True-0",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 7.51116943359375,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 801,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 163,
+          "solid": 10230
+        },
+        "max_ms": 5.7172730000000005,
+        "mean_ms": 0.5156221618055564,
+        "observation_hash": "87ea9eb00b670a35",
+        "p95_ms": 2.29663,
+        "peak_bodies": 196,
+        "peak_contacts": 328,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 5.7172730000000005,
+            "mean_ms": 0.5310704088888888,
+            "p95_ms": 1.770586,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.5317229999999995,
+            "mean_ms": 0.5001739147222222,
+            "p95_ms": 2.7978069999999997,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 1,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 163,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 920,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 9,
+          "released_cells": 23,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/scorched-angular-True-0",
+        "count": 120
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-False-1",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.6723685264587402,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 973,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 52,
+          "solid": 10341
+        },
+        "max_ms": 3.4978190000000002,
+        "mean_ms": 0.2517084091666669,
+        "observation_hash": "7a66d5a4472680ee",
+        "p95_ms": 0.793459,
+        "peak_bodies": 165,
+        "peak_contacts": 262,
+        "peak_loose": 162,
+        "phases": {
+          "active": {
+            "max_ms": 3.4978190000000002,
+            "mean_ms": 0.36275584861111115,
+            "p95_ms": 1.061095,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 3.217019,
+            "mean_ms": 0.14066096972222222,
+            "p95_ms": 0.31181,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 52,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-True-1",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 7.4952392578125,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 801,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 163,
+          "solid": 10230
+        },
+        "max_ms": 5.831289,
+        "mean_ms": 0.5175903980555552,
+        "observation_hash": "87ea9eb00b670a35",
+        "p95_ms": 2.325244,
+        "peak_bodies": 196,
+        "peak_contacts": 328,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 5.831289,
+            "mean_ms": 0.5345936833333328,
+            "p95_ms": 1.7825790000000001,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.690253,
+            "mean_ms": 0.5005871127777777,
+            "p95_ms": 2.790393,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 1,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 163,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 920,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 9,
+          "released_cells": 23,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-round-False-1",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.2495832443237305,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 934,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 36,
+          "solid": 10357
+        },
+        "max_ms": 5.004307000000001,
+        "mean_ms": 0.2230425500000004,
+        "observation_hash": "359a8de23b435b64",
+        "p95_ms": 0.8753740000000001,
+        "peak_bodies": 179,
+        "peak_contacts": 327,
+        "peak_loose": 176,
+        "phases": {
+          "active": {
+            "max_ms": 5.004307000000001,
+            "mean_ms": 0.3598944338888892,
+            "p95_ms": 1.190329,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.2887649999999997,
+            "mean_ms": 0.08619066611111113,
+            "p95_ms": 0.230165,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 36,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-round-True-1",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.7663352489471436,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 1030,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 0,
+          "solid": 10393
+        },
+        "max_ms": 6.622984,
+        "mean_ms": 0.24689701472222225,
+        "observation_hash": "e7eeaa237bb31cdc",
+        "p95_ms": 0.80436,
+        "peak_bodies": 189,
+        "peak_contacts": 339,
+        "peak_loose": 186,
+        "phases": {
+          "active": {
+            "max_ms": 6.622984,
+            "mean_ms": 0.4790702080555554,
+            "p95_ms": 1.6943819999999998,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.0593310000000002,
+            "mean_ms": 0.014723821388888909,
+            "p95_ms": 0.119616,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 412,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 45,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-round-False-2",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.3553647994995117,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 934,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 36,
+          "solid": 10357
+        },
+        "max_ms": 5.018513,
+        "mean_ms": 0.22738284513888865,
+        "observation_hash": "359a8de23b435b64",
+        "p95_ms": 0.910911,
+        "peak_bodies": 179,
+        "peak_contacts": 327,
+        "peak_loose": 176,
+        "phases": {
+          "active": {
+            "max_ms": 5.018513,
+            "mean_ms": 0.3677542569444444,
+            "p95_ms": 1.223141,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.291249,
+            "mean_ms": 0.08701143333333336,
+            "p95_ms": 0.23279,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 36,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-round-True-2",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.5980169773101807,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 1030,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 0,
+          "solid": 10393
+        },
+        "max_ms": 6.610641,
+        "mean_ms": 0.2466605781944444,
+        "observation_hash": "e7eeaa237bb31cdc",
+        "p95_ms": 0.805311,
+        "peak_bodies": 189,
+        "peak_contacts": 339,
+        "peak_loose": 186,
+        "phases": {
+          "active": {
+            "max_ms": 6.610641,
+            "mean_ms": 0.47861022083333304,
+            "p95_ms": 1.6925690000000002,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.087304,
+            "mean_ms": 0.014710935555555554,
+            "p95_ms": 0.119736,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 412,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 45,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-False-2",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 3.6761488914489746,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 973,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 52,
+          "solid": 10341
+        },
+        "max_ms": 3.572691,
+        "mean_ms": 0.2520586833333331,
+        "observation_hash": "7a66d5a4472680ee",
+        "p95_ms": 0.778,
+        "peak_bodies": 165,
+        "peak_contacts": 262,
+        "peak_loose": 162,
+        "phases": {
+          "active": {
+            "max_ms": 3.572691,
+            "mean_ms": 0.36208547944444364,
+            "p95_ms": 1.0501340000000001,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 3.227379,
+            "mean_ms": 0.1420318872222223,
+            "p95_ms": 0.310717,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 52,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "scorched-angular-True-2",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "7bc5d7cca6a8884cba07b83d1215251de80126c27eff677251da6173ef5266ed",
+      "wall_seconds": 7.649034023284912,
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 801,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 163,
+          "solid": 10230
+        },
+        "max_ms": 5.744364,
+        "mean_ms": 0.5182446381944444,
+        "observation_hash": "87ea9eb00b670a35",
+        "p95_ms": 2.31284,
+        "peak_bodies": 196,
+        "peak_contacts": 328,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 5.744364,
+            "mean_ms": 0.5331547816666673,
+            "p95_ms": 1.798168,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.803176000000001,
+            "mean_ms": 0.5033344947222225,
+            "p95_ms": 2.817333,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 1,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 163,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 920,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 9,
+          "released_cells": 23,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-terrain_benchmark",
+      "build": "baseline",
+      "exe": "terrain_benchmark",
+      "args": [],
+      "sha256": "d4a672b990d819c29e9db65c1c938ae576002bc92f277feccb7247013a761c67",
+      "wall_seconds": 0.03475689888000488,
+      "rows": [
+        {
+          "cell_size": "1",
+          "workload": "craters",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "0.185",
+          "initial_geometry_ms": "0.207",
+          "initial_physics_ms": "0.199",
+          "edit_p95_ms": "0.001",
+          "geometry_p95_ms": "0.007",
+          "collider_p95_ms": "0.013",
+          "step_p95_ms": "0.023",
+          "commit_max_ms": "0.022",
+          "final_quads": "1565",
+          "hash": "a9e2c3374e5dc511"
+        },
+        {
+          "cell_size": "1",
+          "workload": "tunnels",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "0.176",
+          "initial_geometry_ms": "0.196",
+          "initial_physics_ms": "0.149",
+          "edit_p95_ms": "0.012",
+          "geometry_p95_ms": "0.028",
+          "collider_p95_ms": "0.031",
+          "step_p95_ms": "0.026",
+          "commit_max_ms": "0.076",
+          "final_quads": "1241",
+          "hash": "104c38370dfb4891"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "craters",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "0.738",
+          "initial_geometry_ms": "0.741",
+          "initial_physics_ms": "0.504",
+          "edit_p95_ms": "0.002",
+          "geometry_p95_ms": "0.012",
+          "collider_p95_ms": "0.023",
+          "step_p95_ms": "0.070",
+          "commit_max_ms": "0.041",
+          "final_quads": "3851",
+          "hash": "fe4d036fc5ab14c7"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "tunnels",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "0.730",
+          "initial_geometry_ms": "0.753",
+          "initial_physics_ms": "0.487",
+          "edit_p95_ms": "0.030",
+          "geometry_p95_ms": "0.055",
+          "collider_p95_ms": "0.067",
+          "step_p95_ms": "0.079",
+          "commit_max_ms": "0.158",
+          "final_quads": "3147",
+          "hash": "9c6dbdd9ca65c35f"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-fragment_benchmark",
+      "build": "baseline",
+      "exe": "fragment_benchmark",
+      "args": [],
+      "sha256": "0298278c3f6f56a564607eb75ee4e11ae08b6fd772ef487ef745ac55ebcee9ea",
+      "wall_seconds": 0.3949723243713379,
+      "rows": [
+        {
+          "case": "equator",
+          "radius": "20",
+          "fragments": "1",
+          "cut_step_ms": "0.112",
+          "connectivity_ms": "0.036",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.061",
+          "frame_p95_ms": "0.006",
+          "frame_max_ms": "0.018",
+          "colliders": "12",
+          "cell_kib": "18.4",
+          "hash": "786b49d223d830e3"
+        },
+        {
+          "case": "blocks",
+          "radius": "20",
+          "fragments": "87",
+          "cut_step_ms": "0.284",
+          "connectivity_ms": "0.054",
+          "step_p95_ms": "0.311",
+          "step_max_ms": "0.637",
+          "frame_p95_ms": "0.010",
+          "frame_max_ms": "0.031",
+          "colliders": "89",
+          "cell_kib": "20.6",
+          "hash": "a4e33cfd1aac8dd7"
+        },
+        {
+          "case": "equator",
+          "radius": "150",
+          "fragments": "1",
+          "cut_step_ms": "4.200",
+          "connectivity_ms": "2.070",
+          "step_p95_ms": "0.311",
+          "step_max_ms": "0.689",
+          "frame_p95_ms": "0.077",
+          "frame_max_ms": "0.107",
+          "colliders": "321",
+          "cell_kib": "1051.8",
+          "hash": "332e05461c93c06b"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-mining_benchmark",
+      "build": "baseline",
+      "exe": "mining_benchmark",
+      "args": [],
+      "sha256": "ccbd6c3f0a7dd688a505e8032acae9eea2414e46157886fe2da3b43ec3ea2049",
+      "wall_seconds": 0.5359735488891602,
+      "rows": [
+        {
+          "tool": "Precision",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "160",
+          "step_p95_ms": "0.045",
+          "step_max_ms": "0.064",
+          "frame_build_p95_ms": "0.005",
+          "frame_build_max_ms": "0.021",
+          "peak_primitives": "143",
+          "rock_cells": "29",
+          "ore_cells": "1",
+          "hash": "1f0a66f2279f27de"
+        },
+        {
+          "tool": "Drill",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "76",
+          "step_p95_ms": "0.018",
+          "step_max_ms": "0.085",
+          "frame_build_p95_ms": "0.007",
+          "frame_build_max_ms": "0.025",
+          "peak_primitives": "171",
+          "rock_cells": "82",
+          "ore_cells": "9",
+          "hash": "4f519df94f86cadb"
+        },
+        {
+          "tool": "Excavator",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "40",
+          "step_p95_ms": "0.020",
+          "step_max_ms": "0.058",
+          "frame_build_p95_ms": "0.007",
+          "frame_build_max_ms": "0.008",
+          "peak_primitives": "190",
+          "rock_cells": "180",
+          "ore_cells": "31",
+          "hash": "b07ebce2e83d45c7"
+        },
+        {
+          "tool": "Precision",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "160",
+          "step_p95_ms": "0.635",
+          "step_max_ms": "2.346",
+          "frame_build_p95_ms": "0.060",
+          "frame_build_max_ms": "0.119",
+          "peak_primitives": "2512",
+          "rock_cells": "16",
+          "ore_cells": "8",
+          "hash": "2b3846397aae2d5a"
+        },
+        {
+          "tool": "Drill",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "79",
+          "step_p95_ms": "0.636",
+          "step_max_ms": "2.302",
+          "frame_build_p95_ms": "0.055",
+          "frame_build_max_ms": "0.122",
+          "peak_primitives": "2531",
+          "rock_cells": "52",
+          "ore_cells": "27",
+          "hash": "7202e9da24c2ae7c"
+        },
+        {
+          "tool": "Excavator",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "40",
+          "step_p95_ms": "0.634",
+          "step_max_ms": "2.325",
+          "frame_build_p95_ms": "0.056",
+          "frame_build_max_ms": "0.097",
+          "peak_primitives": "2570",
+          "rock_cells": "133",
+          "ore_cells": "51",
+          "hash": "213b4d5b6268000e"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-impact_benchmark",
+      "build": "baseline",
+      "exe": "impact_benchmark",
+      "args": [],
+      "sha256": "c0d841264bb035f8194c3f495a53a97805d2a775ac89daa47fdd690ac6ff50c2",
+      "wall_seconds": 2.8717570304870605,
+      "rows": [
+        {
+          "case": "equator",
+          "radius": "20",
+          "impacts_enabled": "false",
+          "cut_ms": "0.128",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.064",
+          "frame_p95_ms": "0.005",
+          "frame_max_ms": "0.028",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "0",
+          "destroyed_cells": "0",
+          "budget_skips": "0",
+          "peak_colliders": "12",
+          "hash": "786b49d223d830e3"
+        },
+        {
+          "case": "equator",
+          "radius": "20",
+          "impacts_enabled": "true",
+          "cut_ms": "0.108",
+          "step_p95_ms": "0.020",
+          "step_max_ms": "0.083",
+          "frame_p95_ms": "0.005",
+          "frame_max_ms": "0.020",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "1",
+          "destroyed_cells": "12",
+          "budget_skips": "0",
+          "peak_colliders": "12",
+          "hash": "217970dc9efc425c"
+        },
+        {
+          "case": "blocks",
+          "radius": "20",
+          "impacts_enabled": "true",
+          "cut_ms": "0.279",
+          "step_p95_ms": "0.414",
+          "step_max_ms": "0.712",
+          "frame_p95_ms": "0.019",
+          "frame_max_ms": "0.043",
+          "peak_fragments": "87",
+          "final_fragments": "87",
+          "impacts": "74",
+          "destroyed_cells": "609",
+          "budget_skips": "68",
+          "peak_colliders": "89",
+          "hash": "4c69f862a0589784"
+        },
+        {
+          "case": "blocks",
+          "radius": "40",
+          "impacts_enabled": "true",
+          "cut_ms": "1.068",
+          "step_p95_ms": "1.681",
+          "step_max_ms": "2.224",
+          "frame_p95_ms": "0.049",
+          "frame_max_ms": "0.154",
+          "peak_fragments": "332",
+          "final_fragments": "332",
+          "impacts": "158",
+          "destroyed_cells": "1938",
+          "budget_skips": "413",
+          "peak_colliders": "334",
+          "hash": "99e6c3e1d17c1b46"
+        },
+        {
+          "case": "equator",
+          "radius": "150",
+          "impacts_enabled": "true",
+          "cut_ms": "4.208",
+          "step_p95_ms": "0.303",
+          "step_max_ms": "2.737",
+          "frame_p95_ms": "0.065",
+          "frame_max_ms": "0.112",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "1",
+          "destroyed_cells": "12",
+          "budget_skips": "0",
+          "peak_colliders": "321",
+          "hash": "2d0d771fcee21c56"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-spacewars_terrain_benchmark",
+      "build": "baseline",
+      "exe": "spacewars_terrain_benchmark",
+      "args": [],
+      "sha256": "b549f33c8a07c07e397069b79ba8da9c2032fe9f12721accf2827c24d8a2d1a3",
+      "wall_seconds": 1.7072911262512207,
+      "rows": [
+        {
+          "case": "fixture",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.014",
+          "step_p95_ms": "0.104",
+          "step_max_ms": "0.248",
+          "draw_p95_ms": "0.058",
+          "draw_max_ms": "0.107",
+          "peak_fragments": "0",
+          "peak_contacts": "5",
+          "cannon_hits": "7",
+          "removed_cells": "304"
+        },
+        {
+          "case": "tunnel",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.230",
+          "step_p95_ms": "0.294",
+          "step_max_ms": "0.612",
+          "draw_p95_ms": "0.047",
+          "draw_max_ms": "0.080",
+          "peak_fragments": "1",
+          "peak_contacts": "13",
+          "cannon_hits": "5",
+          "removed_cells": "3659"
+        },
+        {
+          "case": "blocks",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.438",
+          "step_p95_ms": "1.194",
+          "step_max_ms": "2.405",
+          "draw_p95_ms": "0.067",
+          "draw_max_ms": "0.174",
+          "peak_fragments": "89",
+          "peak_contacts": "234",
+          "cannon_hits": "6",
+          "removed_cells": "1859"
+        },
+        {
+          "case": "multi_planet",
+          "planets": "6",
+          "initial_cells": "192346",
+          "cut_ms": "0.052",
+          "step_p95_ms": "0.261",
+          "step_max_ms": "0.742",
+          "draw_p95_ms": "0.226",
+          "draw_max_ms": "0.322",
+          "peak_fragments": "2",
+          "peak_contacts": "6",
+          "cannon_hits": "13",
+          "removed_cells": "587"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "baseline-loose",
+      "build": "baseline",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--diagnostics"
+      ],
+      "sha256": "849a003a50fb724ad3ed6a149023b48b4b5691cfc41ddd3467a842271ed004e6",
+      "wall_seconds": 4.386284351348877,
+      "rows": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.025",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.036",
+          "step_p99_ms": "0.049",
+          "step_max_ms": "0.162",
+          "frame_p95_ms": "0.012",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "26",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "200",
+          "step_mean_ms": "0.064",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.224",
+          "step_p99_ms": "0.315",
+          "step_max_ms": "0.800",
+          "frame_p95_ms": "0.017",
+          "state_hash": "7bf14f96a1cdaa85"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "17",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "217",
+          "step_mean_ms": "0.136",
+          "step_p50_ms": "0.027",
+          "step_p95_ms": "0.546",
+          "step_p99_ms": "0.752",
+          "step_max_ms": "1.297",
+          "frame_p95_ms": "0.022",
+          "state_hash": "5a7daf448b8d54ba"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.084",
+          "step_p50_ms": "0.072",
+          "step_p95_ms": "0.119",
+          "step_p99_ms": "0.160",
+          "step_max_ms": "1.360",
+          "frame_p95_ms": "0.222",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "105",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "379",
+          "step_mean_ms": "0.690",
+          "step_p50_ms": "0.551",
+          "step_p95_ms": "1.788",
+          "step_p99_ms": "2.863",
+          "step_max_ms": "4.231",
+          "frame_p95_ms": "0.248",
+          "state_hash": "be6e37585b41adcc"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "87",
+          "fragments": "1",
+          "blocked": "1",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "0.708",
+          "step_p50_ms": "0.595",
+          "step_p95_ms": "1.923",
+          "step_p99_ms": "2.776",
+          "step_max_ms": "4.223",
+          "frame_p95_ms": "0.247",
+          "state_hash": "8b78618eee8442e8"
+        }
+      ],
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/baseline-loose",
+        "count": 180
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "current-terrain_benchmark",
+      "build": "current",
+      "exe": "terrain_benchmark",
+      "args": [],
+      "sha256": "dfbc16be1b0ac277fa51295c01c295ef658f82a8e88a2ed15ae3f2d6892b00f0",
+      "wall_seconds": 0.03435111045837402,
+      "rows": [
+        {
+          "cell_size": "1",
+          "workload": "craters",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "0.185",
+          "initial_geometry_ms": "0.202",
+          "initial_physics_ms": "0.194",
+          "edit_p95_ms": "0.001",
+          "geometry_p95_ms": "0.007",
+          "collider_p95_ms": "0.012",
+          "step_p95_ms": "0.024",
+          "commit_max_ms": "0.021",
+          "final_quads": "1565",
+          "hash": "a9e2c3374e5dc511"
+        },
+        {
+          "cell_size": "1",
+          "workload": "tunnels",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "0.175",
+          "initial_geometry_ms": "0.200",
+          "initial_physics_ms": "0.151",
+          "edit_p95_ms": "0.012",
+          "geometry_p95_ms": "0.028",
+          "collider_p95_ms": "0.032",
+          "step_p95_ms": "0.026",
+          "commit_max_ms": "0.084",
+          "final_quads": "1241",
+          "hash": "104c38370dfb4891"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "craters",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "0.715",
+          "initial_geometry_ms": "0.737",
+          "initial_physics_ms": "0.507",
+          "edit_p95_ms": "0.002",
+          "geometry_p95_ms": "0.013",
+          "collider_p95_ms": "0.023",
+          "step_p95_ms": "0.071",
+          "commit_max_ms": "0.040",
+          "final_quads": "3851",
+          "hash": "fe4d036fc5ab14c7"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "tunnels",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "0.695",
+          "initial_geometry_ms": "0.761",
+          "initial_physics_ms": "0.493",
+          "edit_p95_ms": "0.030",
+          "geometry_p95_ms": "0.055",
+          "collider_p95_ms": "0.068",
+          "step_p95_ms": "0.078",
+          "commit_max_ms": "0.156",
+          "final_quads": "3147",
+          "hash": "9c6dbdd9ca65c35f"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "current-fragment_benchmark",
+      "build": "current",
+      "exe": "fragment_benchmark",
+      "args": [],
+      "sha256": "885200377b0eff745ce69ab3f404dc1a15c1341fbdecb9328e7936b0ba292414",
+      "wall_seconds": 0.3874828815460205,
+      "rows": [
+        {
+          "case": "equator",
+          "radius": "20",
+          "fragments": "1",
+          "cut_step_ms": "0.112",
+          "connectivity_ms": "0.035",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.062",
+          "frame_p95_ms": "0.006",
+          "frame_max_ms": "0.018",
+          "colliders": "12",
+          "cell_kib": "18.4",
+          "hash": "786b49d223d830e3"
+        },
+        {
+          "case": "blocks",
+          "radius": "20",
+          "fragments": "87",
+          "cut_step_ms": "0.271",
+          "connectivity_ms": "0.053",
+          "step_p95_ms": "0.301",
+          "step_max_ms": "0.357",
+          "frame_p95_ms": "0.008",
+          "frame_max_ms": "0.021",
+          "colliders": "89",
+          "cell_kib": "20.6",
+          "hash": "a4e33cfd1aac8dd7"
+        },
+        {
+          "case": "equator",
+          "radius": "150",
+          "fragments": "1",
+          "cut_step_ms": "4.314",
+          "connectivity_ms": "2.130",
+          "step_p95_ms": "0.300",
+          "step_max_ms": "0.312",
+          "frame_p95_ms": "0.056",
+          "frame_max_ms": "0.091",
+          "colliders": "321",
+          "cell_kib": "1051.8",
+          "hash": "332e05461c93c06b"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "current-mining_benchmark",
+      "build": "current",
+      "exe": "mining_benchmark",
+      "args": [],
+      "sha256": "be2bcb39f947bdfbe39b0539ba18706cfb9f73539afc540bb4c97cebddf93521",
+      "wall_seconds": 0.5248100757598877,
+      "rows": [
+        {
+          "tool": "Precision",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "160",
+          "step_p95_ms": "0.045",
+          "step_max_ms": "0.061",
+          "frame_build_p95_ms": "0.005",
+          "frame_build_max_ms": "0.021",
+          "peak_primitives": "143",
+          "rock_cells": "29",
+          "ore_cells": "1",
+          "hash": "1f0a66f2279f27de"
+        },
+        {
+          "tool": "Drill",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "76",
+          "step_p95_ms": "0.018",
+          "step_max_ms": "0.059",
+          "frame_build_p95_ms": "0.005",
+          "frame_build_max_ms": "0.007",
+          "peak_primitives": "171",
+          "rock_cells": "82",
+          "ore_cells": "9",
+          "hash": "4f519df94f86cadb"
+        },
+        {
+          "tool": "Excavator",
+          "radius": "20",
+          "ticks": "600",
+          "edit_ticks": "40",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.056",
+          "frame_build_p95_ms": "0.006",
+          "frame_build_max_ms": "0.007",
+          "peak_primitives": "190",
+          "rock_cells": "180",
+          "ore_cells": "31",
+          "hash": "b07ebce2e83d45c7"
+        },
+        {
+          "tool": "Precision",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "160",
+          "step_p95_ms": "0.635",
+          "step_max_ms": "2.233",
+          "frame_build_p95_ms": "0.051",
+          "frame_build_max_ms": "0.107",
+          "peak_primitives": "2512",
+          "rock_cells": "16",
+          "ore_cells": "8",
+          "hash": "2b3846397aae2d5a"
+        },
+        {
+          "tool": "Drill",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "79",
+          "step_p95_ms": "0.627",
+          "step_max_ms": "2.063",
+          "frame_build_p95_ms": "0.051",
+          "frame_build_max_ms": "0.056",
+          "peak_primitives": "2531",
+          "rock_cells": "52",
+          "ore_cells": "27",
+          "hash": "7202e9da24c2ae7c"
+        },
+        {
+          "tool": "Excavator",
+          "radius": "150",
+          "ticks": "600",
+          "edit_ticks": "40",
+          "step_p95_ms": "0.630",
+          "step_max_ms": "2.001",
+          "frame_build_p95_ms": "0.053",
+          "frame_build_max_ms": "0.071",
+          "peak_primitives": "2570",
+          "rock_cells": "133",
+          "ore_cells": "51",
+          "hash": "213b4d5b6268000e"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "current-impact_benchmark",
+      "build": "current",
+      "exe": "impact_benchmark",
+      "args": [],
+      "sha256": "66e1d86319e6c4afb91eed6c3bf23eb1a08769184ab131a34b2d52f9181ad259",
+      "wall_seconds": 2.860121488571167,
+      "rows": [
+        {
+          "case": "equator",
+          "radius": "20",
+          "impacts_enabled": "false",
+          "cut_ms": "0.114",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.062",
+          "frame_p95_ms": "0.005",
+          "frame_max_ms": "0.024",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "0",
+          "destroyed_cells": "0",
+          "budget_skips": "0",
+          "peak_colliders": "12",
+          "hash": "786b49d223d830e3"
+        },
+        {
+          "case": "equator",
+          "radius": "20",
+          "impacts_enabled": "true",
+          "cut_ms": "0.105",
+          "step_p95_ms": "0.019",
+          "step_max_ms": "0.078",
+          "frame_p95_ms": "0.005",
+          "frame_max_ms": "0.007",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "1",
+          "destroyed_cells": "12",
+          "budget_skips": "0",
+          "peak_colliders": "12",
+          "hash": "217970dc9efc425c"
+        },
+        {
+          "case": "blocks",
+          "radius": "20",
+          "impacts_enabled": "true",
+          "cut_ms": "0.267",
+          "step_p95_ms": "0.396",
+          "step_max_ms": "0.487",
+          "frame_p95_ms": "0.015",
+          "frame_max_ms": "0.023",
+          "peak_fragments": "87",
+          "final_fragments": "87",
+          "impacts": "74",
+          "destroyed_cells": "609",
+          "budget_skips": "68",
+          "peak_colliders": "89",
+          "hash": "4c69f862a0589784"
+        },
+        {
+          "case": "blocks",
+          "radius": "40",
+          "impacts_enabled": "true",
+          "cut_ms": "1.051",
+          "step_p95_ms": "1.643",
+          "step_max_ms": "2.083",
+          "frame_p95_ms": "0.047",
+          "frame_max_ms": "0.071",
+          "peak_fragments": "332",
+          "final_fragments": "332",
+          "impacts": "158",
+          "destroyed_cells": "1938",
+          "budget_skips": "413",
+          "peak_colliders": "334",
+          "hash": "99e6c3e1d17c1b46"
+        },
+        {
+          "case": "equator",
+          "radius": "150",
+          "impacts_enabled": "true",
+          "cut_ms": "4.203",
+          "step_p95_ms": "0.311",
+          "step_max_ms": "3.033",
+          "frame_p95_ms": "0.064",
+          "frame_max_ms": "0.170",
+          "peak_fragments": "1",
+          "final_fragments": "1",
+          "impacts": "1",
+          "destroyed_cells": "12",
+          "budget_skips": "0",
+          "peak_colliders": "321",
+          "hash": "2d0d771fcee21c56"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "current-spacewars_terrain_benchmark",
+      "build": "current",
+      "exe": "spacewars_terrain_benchmark",
+      "args": [],
+      "sha256": "fc1ca543de4139c37972699ba1641a9681c7dac214189af512d5687ac16bba1b",
+      "wall_seconds": 1.7224502563476562,
+      "rows": [
+        {
+          "case": "fixture",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.014",
+          "step_p95_ms": "0.102",
+          "step_max_ms": "0.213",
+          "draw_p95_ms": "0.054",
+          "draw_max_ms": "0.133",
+          "peak_fragments": "0",
+          "peak_contacts": "5",
+          "cannon_hits": "7",
+          "removed_cells": "304"
+        },
+        {
+          "case": "tunnel",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.216",
+          "step_p95_ms": "0.285",
+          "step_max_ms": "0.632",
+          "draw_p95_ms": "0.046",
+          "draw_max_ms": "0.066",
+          "peak_fragments": "1",
+          "peak_contacts": "13",
+          "cannon_hits": "5",
+          "removed_cells": "3659"
+        },
+        {
+          "case": "blocks",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.429",
+          "step_p95_ms": "1.190",
+          "step_max_ms": "2.348",
+          "draw_p95_ms": "0.067",
+          "draw_max_ms": "0.139",
+          "peak_fragments": "89",
+          "peak_contacts": "234",
+          "cannon_hits": "6",
+          "removed_cells": "1859"
+        },
+        {
+          "case": "multi_planet",
+          "planets": "6",
+          "initial_cells": "192346",
+          "cut_ms": "0.053",
+          "step_p95_ms": "0.261",
+          "step_max_ms": "0.688",
+          "draw_p95_ms": "0.261",
+          "draw_max_ms": "0.313",
+          "peak_fragments": "2",
+          "peak_contacts": "6",
+          "cannon_hits": "13",
+          "removed_cells": "587"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "name": "current-loose",
+      "build": "current",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--diagnostics"
+      ],
+      "sha256": "372f8456e8e2052c666790dec29908896d46e0e99811007d73371e8562c82361",
+      "wall_seconds": 4.358421325683594,
+      "rows": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.026",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.037",
+          "step_p99_ms": "0.070",
+          "step_max_ms": "0.155",
+          "frame_p95_ms": "0.013",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "26",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "200",
+          "step_mean_ms": "0.064",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.222",
+          "step_p99_ms": "0.313",
+          "step_max_ms": "0.817",
+          "frame_p95_ms": "0.017",
+          "state_hash": "7bf14f96a1cdaa85"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "17",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "217",
+          "step_mean_ms": "0.132",
+          "step_p50_ms": "0.026",
+          "step_p95_ms": "0.525",
+          "step_p99_ms": "0.728",
+          "step_max_ms": "1.303",
+          "frame_p95_ms": "0.022",
+          "state_hash": "5a7daf448b8d54ba"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.082",
+          "step_p50_ms": "0.071",
+          "step_p95_ms": "0.111",
+          "step_p99_ms": "0.156",
+          "step_max_ms": "1.188",
+          "frame_p95_ms": "0.218",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "105",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "379",
+          "step_mean_ms": "0.687",
+          "step_p50_ms": "0.553",
+          "step_p95_ms": "1.769",
+          "step_p99_ms": "2.882",
+          "step_max_ms": "4.237",
+          "frame_p95_ms": "0.249",
+          "state_hash": "be6e37585b41adcc"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "87",
+          "fragments": "1",
+          "blocked": "1",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "0.705",
+          "step_p50_ms": "0.595",
+          "step_p95_ms": "1.913",
+          "step_p99_ms": "2.763",
+          "step_max_ms": "4.199",
+          "frame_p95_ms": "0.245",
+          "state_hash": "8b78618eee8442e8"
+        }
+      ],
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/current-loose",
+        "count": 180
+      }
+    },
+    {
+      "host": "desktop",
+      "name": "current-loose-slumping",
+      "build": "current",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "372f8456e8e2052c666790dec29908896d46e0e99811007d73371e8562c82361",
+      "wall_seconds": 4.576841115951538,
+      "rows": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.025",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.035",
+          "step_p99_ms": "0.043",
+          "step_max_ms": "0.149",
+          "frame_p95_ms": "0.012",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "66",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "227",
+          "step_mean_ms": "0.079",
+          "step_p50_ms": "0.026",
+          "step_p95_ms": "0.242",
+          "step_p99_ms": "0.347",
+          "step_max_ms": "0.525",
+          "frame_p95_ms": "0.017",
+          "state_hash": "ffe3fedec2d75ab0"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "9",
+          "fragments": "2",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "289",
+          "step_mean_ms": "0.109",
+          "step_p50_ms": "0.032",
+          "step_p95_ms": "0.401",
+          "step_p99_ms": "0.551",
+          "step_max_ms": "1.940",
+          "frame_p95_ms": "0.021",
+          "state_hash": "f7ca6db5c8bd6b41"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.082",
+          "step_p50_ms": "0.070",
+          "step_p95_ms": "0.110",
+          "step_p99_ms": "0.154",
+          "step_max_ms": "1.180",
+          "frame_p95_ms": "0.214",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "110",
+          "fragments": "0",
+          "blocked": "3",
+          "removed": "0",
+          "deposited": "340",
+          "step_mean_ms": "0.646",
+          "step_p50_ms": "0.569",
+          "step_p95_ms": "1.574",
+          "step_p99_ms": "2.668",
+          "step_max_ms": "3.693",
+          "frame_p95_ms": "0.246",
+          "state_hash": "bffcb5fd4051140e"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "48",
+          "fragments": "1",
+          "blocked": "3",
+          "removed": "0",
+          "deposited": "392",
+          "step_mean_ms": "0.874",
+          "step_p50_ms": "0.778",
+          "step_p95_ms": "2.016",
+          "step_p99_ms": "3.191",
+          "step_max_ms": "4.942",
+          "frame_p95_ms": "0.251",
+          "state_hash": "57c8cad5430baaec"
+        }
+      ],
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "desktop/current-loose-slumping",
+        "count": 180
+      }
+    },
+    {
+      "host": "picade",
+      "name": "baseline-spacewars_terrain_benchmark",
+      "build": "baseline",
+      "exe": "spacewars_terrain_benchmark",
+      "args": [],
+      "sha256": "3c31fa96a56af049ca61c72f36d6a777a050f4466529660c968ee6039957ffa3",
+      "wall_seconds": 15.311951637268066,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "71088",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "73523",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "case": "fixture",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.112",
+          "step_p95_ms": "0.990",
+          "step_max_ms": "1.635",
+          "draw_p95_ms": "0.548",
+          "draw_max_ms": "1.310",
+          "peak_fragments": "0",
+          "peak_contacts": "5",
+          "cannon_hits": "7",
+          "removed_cells": "304"
+        },
+        {
+          "case": "tunnel",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "1.500",
+          "step_p95_ms": "1.944",
+          "step_max_ms": "4.541",
+          "draw_p95_ms": "0.491",
+          "draw_max_ms": "1.029",
+          "peak_fragments": "1",
+          "peak_contacts": "13",
+          "cannon_hits": "5",
+          "removed_cells": "3659"
+        },
+        {
+          "case": "blocks",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "3.863",
+          "step_p95_ms": "8.375",
+          "step_max_ms": "16.990",
+          "draw_p95_ms": "1.225",
+          "draw_max_ms": "1.872",
+          "peak_fragments": "89",
+          "peak_contacts": "234",
+          "cannon_hits": "6",
+          "removed_cells": "1859"
+        },
+        {
+          "case": "multi_planet",
+          "planets": "6",
+          "initial_cells": "192346",
+          "cut_ms": "0.513",
+          "step_p95_ms": "2.837",
+          "step_max_ms": "6.828",
+          "draw_p95_ms": "3.295",
+          "draw_max_ms": "5.216",
+          "peak_fragments": "2",
+          "peak_contacts": "6",
+          "cannon_hits": "13",
+          "removed_cells": "587"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "name": "baseline-terrain_benchmark",
+      "build": "baseline",
+      "exe": "terrain_benchmark",
+      "args": [],
+      "sha256": "dbe0ee020fc7a89455bedf8ca6c8b838e72b06c3bd4d18696f79118d0fe93b71",
+      "wall_seconds": 0.5561332702636719,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "70114",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "71088",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "cell_size": "1",
+          "workload": "craters",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "1.483",
+          "initial_geometry_ms": "1.619",
+          "initial_physics_ms": "1.308",
+          "edit_p95_ms": "0.008",
+          "geometry_p95_ms": "0.051",
+          "collider_p95_ms": "0.083",
+          "step_p95_ms": "0.157",
+          "commit_max_ms": "0.165",
+          "final_quads": "1565",
+          "hash": "a9e2c3374e5dc511"
+        },
+        {
+          "cell_size": "1",
+          "workload": "tunnels",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "1.464",
+          "initial_geometry_ms": "1.665",
+          "initial_physics_ms": "0.923",
+          "edit_p95_ms": "0.241",
+          "geometry_p95_ms": "0.227",
+          "collider_p95_ms": "0.230",
+          "step_p95_ms": "0.376",
+          "commit_max_ms": "0.679",
+          "final_quads": "1241",
+          "hash": "104c38370dfb4891"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "craters",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "6.074",
+          "initial_geometry_ms": "6.896",
+          "initial_physics_ms": "3.331",
+          "edit_p95_ms": "0.030",
+          "geometry_p95_ms": "0.143",
+          "collider_p95_ms": "0.442",
+          "step_p95_ms": "1.091",
+          "commit_max_ms": "1.008",
+          "final_quads": "3851",
+          "hash": "fe4d036fc5ab14c7"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "tunnels",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "5.367",
+          "initial_geometry_ms": "6.510",
+          "initial_physics_ms": "3.289",
+          "edit_p95_ms": "0.449",
+          "geometry_p95_ms": "0.540",
+          "collider_p95_ms": "0.667",
+          "step_p95_ms": "1.082",
+          "commit_max_ms": "1.910",
+          "final_quads": "3147",
+          "hash": "9c6dbdd9ca65c35f"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "name": "current-spacewars_terrain_benchmark",
+      "build": "current",
+      "exe": "spacewars_terrain_benchmark",
+      "args": [],
+      "sha256": "b47848e8766a316d2916df2b375b9cbe41897f8200c04f64331be37fab6bf090",
+      "wall_seconds": 15.457188844680786,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "75471",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "76445",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "case": "fixture",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "0.112",
+          "step_p95_ms": "1.007",
+          "step_max_ms": "2.757",
+          "draw_p95_ms": "0.533",
+          "draw_max_ms": "1.503",
+          "peak_fragments": "0",
+          "peak_contacts": "5",
+          "cannon_hits": "7",
+          "removed_cells": "304"
+        },
+        {
+          "case": "tunnel",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "1.534",
+          "step_p95_ms": "2.028",
+          "step_max_ms": "4.021",
+          "draw_p95_ms": "0.481",
+          "draw_max_ms": "0.690",
+          "peak_fragments": "1",
+          "peak_contacts": "13",
+          "cannon_hits": "5",
+          "removed_cells": "3659"
+        },
+        {
+          "case": "blocks",
+          "planets": "1",
+          "initial_cells": "11069",
+          "cut_ms": "5.311",
+          "step_p95_ms": "8.343",
+          "step_max_ms": "17.012",
+          "draw_p95_ms": "1.117",
+          "draw_max_ms": "2.492",
+          "peak_fragments": "89",
+          "peak_contacts": "234",
+          "cannon_hits": "6",
+          "removed_cells": "1859"
+        },
+        {
+          "case": "multi_planet",
+          "planets": "6",
+          "initial_cells": "192346",
+          "cut_ms": "0.548",
+          "step_p95_ms": "2.878",
+          "step_max_ms": "7.599",
+          "draw_p95_ms": "3.467",
+          "draw_max_ms": "5.742",
+          "peak_fragments": "2",
+          "peak_contacts": "6",
+          "cannon_hits": "13",
+          "removed_cells": "587"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "name": "current-terrain_benchmark",
+      "build": "current",
+      "exe": "terrain_benchmark",
+      "args": [],
+      "sha256": "60fb0afc9188f50b4ec147c1c61d3810d7a3c9b495ad0ffede61ee8c3909aaa0",
+      "wall_seconds": 0.5477383136749268,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "75471",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "74984",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "cell_size": "1",
+          "workload": "craters",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "1.521",
+          "initial_geometry_ms": "1.586",
+          "initial_physics_ms": "1.338",
+          "edit_p95_ms": "0.008",
+          "geometry_p95_ms": "0.050",
+          "collider_p95_ms": "0.087",
+          "step_p95_ms": "0.163",
+          "commit_max_ms": "0.167",
+          "final_quads": "1565",
+          "hash": "a9e2c3374e5dc511"
+        },
+        {
+          "cell_size": "1",
+          "workload": "tunnels",
+          "cells": "90601",
+          "cell_kib": "177.0",
+          "initial_quads": "775",
+          "generation_ms": "1.346",
+          "initial_geometry_ms": "1.539",
+          "initial_physics_ms": "0.944",
+          "edit_p95_ms": "0.171",
+          "geometry_p95_ms": "0.225",
+          "collider_p95_ms": "0.217",
+          "step_p95_ms": "0.168",
+          "commit_max_ms": "0.691",
+          "final_quads": "1241",
+          "hash": "104c38370dfb4891"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "craters",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "6.200",
+          "initial_geometry_ms": "6.948",
+          "initial_physics_ms": "3.354",
+          "edit_p95_ms": "0.029",
+          "geometry_p95_ms": "0.117",
+          "collider_p95_ms": "0.274",
+          "step_p95_ms": "0.999",
+          "commit_max_ms": "1.129",
+          "final_quads": "3851",
+          "hash": "fe4d036fc5ab14c7"
+        },
+        {
+          "cell_size": "0.5",
+          "workload": "tunnels",
+          "cells": "361201",
+          "cell_kib": "705.5",
+          "initial_quads": "2491",
+          "generation_ms": "6.045",
+          "initial_geometry_ms": "6.691",
+          "initial_physics_ms": "3.296",
+          "edit_p95_ms": "0.452",
+          "geometry_p95_ms": "0.528",
+          "collider_p95_ms": "0.624",
+          "step_p95_ms": "1.109",
+          "commit_max_ms": "2.512",
+          "final_quads": "3147",
+          "hash": "9c6dbdd9ca65c35f"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "name": "scorched-angular-False",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "caf277273d4a7126aa3257609cb5e73fdae168a3fd3fbb105ccddbcf7aa0d6bb",
+      "wall_seconds": 36.53421926498413,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "74984",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "75471",
+        "1500000",
+        "0"
+      ],
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 973,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 52,
+          "solid": 10341
+        },
+        "max_ms": 28.935509000000003,
+        "mean_ms": 2.491158980833333,
+        "observation_hash": "7a66d5a4472680ee",
+        "p95_ms": 7.668169,
+        "peak_bodies": 165,
+        "peak_contacts": 262,
+        "peak_loose": 162,
+        "phases": {
+          "active": {
+            "max_ms": 28.935509000000003,
+            "mean_ms": 3.653504825277779,
+            "p95_ms": 9.236042999999999,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 26.557105,
+            "mean_ms": 1.3288131363888882,
+            "p95_ms": 3.2559519999999997,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 52,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/scorched-angular-False",
+        "count": 120
+      }
+    },
+    {
+      "host": "picade",
+      "name": "scorched-angular-True",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "caf277273d4a7126aa3257609cb5e73fdae168a3fd3fbb105ccddbcf7aa0d6bb",
+      "wall_seconds": 71.93845415115356,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "76445",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "75958",
+        "1500000",
+        "0"
+      ],
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 801,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 163,
+          "solid": 10230
+        },
+        "max_ms": 47.022491,
+        "mean_ms": 4.945894156111119,
+        "observation_hash": "87ea9eb00b670a35",
+        "p95_ms": 19.435893999999998,
+        "peak_bodies": 196,
+        "peak_contacts": 328,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 47.022491,
+            "mean_ms": 5.263514333333332,
+            "p95_ms": 15.058861,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 39.350988,
+            "mean_ms": 4.628273978888886,
+            "p95_ms": 22.392904,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 1,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 163,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 920,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 9,
+          "released_cells": 23,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/scorched-angular-True",
+        "count": 120
+      }
+    },
+    {
+      "host": "picade",
+      "name": "scorched-round-False",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics"
+      ],
+      "sha256": "caf277273d4a7126aa3257609cb5e73fdae168a3fd3fbb105ccddbcf7aa0d6bb",
+      "wall_seconds": 33.27067160606384,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "70601",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "74010",
+        "1500000",
+        "0"
+      ],
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 934,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 36,
+          "solid": 10357
+        },
+        "max_ms": 40.745211000000005,
+        "mean_ms": 2.2614591306944454,
+        "observation_hash": "359a8de23b435b64",
+        "p95_ms": 8.249274,
+        "peak_bodies": 179,
+        "peak_contacts": 327,
+        "peak_loose": 176,
+        "phases": {
+          "active": {
+            "max_ms": 40.745211000000005,
+            "mean_ms": 3.6989734200000024,
+            "p95_ms": 11.205933,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 21.07434,
+            "mean_ms": 0.8239448413888887,
+            "p95_ms": 2.577253,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 36,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/scorched-round-False",
+        "count": 120
+      }
+    },
+    {
+      "host": "picade",
+      "name": "scorched-round-True",
+      "build": "current",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--replay",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "caf277273d4a7126aa3257609cb5e73fdae168a3fd3fbb105ccddbcf7aa0d6bb",
+      "wall_seconds": 37.3916597366333,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "73523",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "74984",
+        "1500000",
+        "0"
+      ],
+      "result": {
+        "bombardment_seconds": 60,
+        "deposited_cells": 1030,
+        "grain_limit": 192,
+        "impacts": 30,
+        "material": {
+          "initial": 10393,
+          "loose": 0,
+          "solid": 10393
+        },
+        "max_ms": 54.996283,
+        "mean_ms": 2.543435009999999,
+        "observation_hash": "e7eeaa237bb31cdc",
+        "p95_ms": 8.596716,
+        "peak_bodies": 189,
+        "peak_contacts": 339,
+        "peak_loose": 186,
+        "phases": {
+          "active": {
+            "max_ms": 54.996283,
+            "mean_ms": 4.935069899444447,
+            "p95_ms": 15.144730000000001,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 20.077165,
+            "mean_ms": 0.15180012055555553,
+            "p95_ms": 1.2826549999999999,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 412,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 45,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      },
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/scorched-round-True",
+        "count": 120
+      }
+    },
+    {
+      "host": "picade",
+      "name": "spacewars-loose-False",
+      "build": "current",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--diagnostics"
+      ],
+      "sha256": "b0b2382c6edb1979b32fd6e312b836af4a2e1171baaa876e4b55fab02a77c53f",
+      "wall_seconds": 52.561980962753296,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "76932",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "76932",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.227",
+          "step_p50_ms": "0.203",
+          "step_p95_ms": "0.365",
+          "step_p99_ms": "0.951",
+          "step_max_ms": "1.342",
+          "frame_p95_ms": "0.110",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "26",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "200",
+          "step_mean_ms": "0.581",
+          "step_p50_ms": "0.219",
+          "step_p95_ms": "2.038",
+          "step_p99_ms": "3.076",
+          "step_max_ms": "5.890",
+          "frame_p95_ms": "0.182",
+          "state_hash": "7bf14f96a1cdaa85"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "17",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "217",
+          "step_mean_ms": "1.172",
+          "step_p50_ms": "0.248",
+          "step_p95_ms": "4.539",
+          "step_p99_ms": "6.993",
+          "step_max_ms": "12.219",
+          "frame_p95_ms": "0.240",
+          "state_hash": "5a7daf448b8d54ba"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "1.258",
+          "step_p50_ms": "1.145",
+          "step_p95_ms": "1.676",
+          "step_p99_ms": "3.225",
+          "step_max_ms": "9.037",
+          "frame_p95_ms": "4.276",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "105",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "379",
+          "step_mean_ms": "7.671",
+          "step_p50_ms": "6.257",
+          "step_p95_ms": "17.957",
+          "step_p99_ms": "27.197",
+          "step_max_ms": "40.422",
+          "frame_p95_ms": "4.971",
+          "state_hash": "be6e37585b41adcc"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "87",
+          "fragments": "1",
+          "blocked": "1",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "7.330",
+          "step_p50_ms": "6.316",
+          "step_p95_ms": "18.287",
+          "step_p99_ms": "25.198",
+          "step_max_ms": "41.747",
+          "frame_p95_ms": "4.912",
+          "state_hash": "8b78618eee8442e8"
+        }
+      ],
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/spacewars-loose-False",
+        "count": 180
+      }
+    },
+    {
+      "host": "picade",
+      "name": "spacewars-loose-True",
+      "build": "current",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--diagnostics",
+        "--slumping"
+      ],
+      "sha256": "b0b2382c6edb1979b32fd6e312b836af4a2e1171baaa876e4b55fab02a77c53f",
+      "wall_seconds": 54.91159224510193,
+      "before": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "after": {
+        "screen": "pause.main",
+        "paused": true,
+        "active_scenario": "terrain-grains",
+        "scenario_revision": 5,
+        "error": null
+      },
+      "telemetry_before": [
+        "75958",
+        "1500000",
+        "0"
+      ],
+      "telemetry_after": [
+        "76932",
+        "1500000",
+        "0"
+      ],
+      "rows": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.230",
+          "step_p50_ms": "0.203",
+          "step_p95_ms": "0.383",
+          "step_p99_ms": "0.996",
+          "step_max_ms": "1.368",
+          "frame_p95_ms": "0.110",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "66",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "227",
+          "step_mean_ms": "0.713",
+          "step_p50_ms": "0.221",
+          "step_p95_ms": "2.201",
+          "step_p99_ms": "3.409",
+          "step_max_ms": "4.582",
+          "frame_p95_ms": "0.190",
+          "state_hash": "ffe3fedec2d75ab0"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "9",
+          "fragments": "2",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "289",
+          "step_mean_ms": "0.965",
+          "step_p50_ms": "0.317",
+          "step_p95_ms": "3.514",
+          "step_p99_ms": "5.434",
+          "step_max_ms": "14.210",
+          "frame_p95_ms": "0.225",
+          "state_hash": "f7ca6db5c8bd6b41"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "1.261",
+          "step_p50_ms": "1.145",
+          "step_p95_ms": "1.705",
+          "step_p99_ms": "3.044",
+          "step_max_ms": "9.104",
+          "frame_p95_ms": "4.256",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "110",
+          "fragments": "0",
+          "blocked": "3",
+          "removed": "0",
+          "deposited": "340",
+          "step_mean_ms": "7.214",
+          "step_p50_ms": "6.360",
+          "step_p95_ms": "15.947",
+          "step_p99_ms": "24.385",
+          "step_max_ms": "37.187",
+          "frame_p95_ms": "4.969",
+          "state_hash": "bffcb5fd4051140e"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "48",
+          "fragments": "1",
+          "blocked": "3",
+          "removed": "0",
+          "deposited": "392",
+          "step_mean_ms": "8.992",
+          "step_p50_ms": "8.257",
+          "step_p95_ms": "19.022",
+          "step_p99_ms": "29.853",
+          "step_max_ms": "42.281",
+          "frame_p95_ms": "5.108",
+          "state_hash": "57c8cad5430baaec"
+        }
+      ],
+      "diagnostic_samples": {
+        "artifact": "dirt-slumping-traces-20261004.jsonl.gz",
+        "key": "picade/spacewars-loose-True",
+        "count": 180
+      }
+    }
+  ],
+  "comparisons": {
+    "desktop-terrain_benchmark": {
+      "rows": 4,
+      "non_timing_results_match": true
+    },
+    "desktop-fragment_benchmark": {
+      "rows": 3,
+      "non_timing_results_match": true
+    },
+    "desktop-mining_benchmark": {
+      "rows": 6,
+      "non_timing_results_match": true
+    },
+    "desktop-impact_benchmark": {
+      "rows": 5,
+      "non_timing_results_match": true
+    },
+    "desktop-spacewars_terrain_benchmark": {
+      "rows": 4,
+      "non_timing_results_match": true
+    },
+    "desktop-loose": {
+      "rows": 6,
+      "non_timing_results_match": true
+    },
+    "picade-terrain_benchmark": {
+      "rows": 4,
+      "non_timing_results_match": true
+    },
+    "picade-spacewars_terrain_benchmark": {
+      "rows": 4,
+      "non_timing_results_match": true
+    }
+  }
+}
