@@ -197,6 +197,11 @@ def diagnosis(runs, pairs, source):
         historical_runtime_parity=False)
 
 
+def pack(run, out, reaudit):
+    # Process-pool entry points must belong to this importable main module.
+    return Q.pack(run, out, reaudit)
+
+
 def execute(path, reaudit):
     plan = json.loads(path.read_text()); out = path.parent
     source = verify_plan(plan, out, reaudit); target = out / 'summary.json'
@@ -224,7 +229,7 @@ def execute(path, reaudit):
                 pairs = compare_group(runs)
                 I.write(out / (group + '-comparisons.json'), pairs)
                 summary['comparisons'].extend(pairs); I.write(target, summary)
-                futures = [pool.submit(Q.pack, r, out, reaudit) for r in runs.values()]
+                futures = [pool.submit(pack, r, out, reaudit) for r in runs.values()]
                 for future in futures:
                     run = future.result(); summary['runs'][run['item']['name']] = run; I.write(target, summary)
                 print(group, 'compared and archived;', len(summary['runs']), '/ 12 games', flush=True)
