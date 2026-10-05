@@ -47,6 +47,8 @@ struct Args {
     /// Emit per-second material/settling diagnostics to stderr, outside timing.
     #[arg(long)]
     diagnostics: bool,
+    #[arg(long)]
+    slumping: bool,
 }
 
 fn percentile(values: &mut [f64], fraction: f64) -> f64 {
@@ -56,6 +58,13 @@ fn percentile(values: &mut [f64], fraction: f64) -> f64 {
 
 fn main() {
     let args = Args::parse();
+    assert!(
+        !args.slumping || args.mode != Mode::Off,
+        "slumping requires loose terrain"
+    );
+    if args.slumping {
+        eprintln!("slumping enabled for loose modes");
+    }
     println!(
         "scene,mode,seed,limit,steps,grains,fragments,blocked,removed,deposited,step_mean_ms,step_p50_ms,step_p95_ms,step_p99_ms,step_max_ms,frame_p95_ms,state_hash"
     );
@@ -85,6 +94,7 @@ fn main() {
                             GrainShape::Round
                         },
                         max_grains: args.limit as usize,
+                        slumping: args.slumping.then(Default::default),
                         ..Default::default()
                     })
                     .unwrap();
@@ -114,7 +124,8 @@ fn main() {
                             "{}",
                             serde_json::json!({"scene":scene,"mode":mode.label(),
                             "tick":tick + 1,"grains":audit.loose_cells,"deposited":audit.deposited_cells,
-                            "rejected":audit.rejected_releases,"settling":audit.settling})
+                            "rejected":audit.rejected_releases,"settling":audit.settling,
+                            "slumping_enabled":args.slumping && loose,"slumping":audit.slumping})
                         );
                     }
                     assert!(audit.issues.is_empty(), "{:?}", audit.issues);

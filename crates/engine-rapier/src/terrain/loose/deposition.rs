@@ -92,6 +92,7 @@ impl LooseTerrain {
                 write(u64::from(v.to_bits()));
             }
         }
+        self.hash_slumping(&mut write);
         hash
     }
 
@@ -244,6 +245,7 @@ impl LooseTerrain {
                 self.settling.remove(id);
             }
             self.deposited_cells += retired_grains.len() as u64;
+            self.disturb(body, field.terrain, plan.changed);
             retired.extend(accepted);
             commits.push(DepositCommit {
                 body,

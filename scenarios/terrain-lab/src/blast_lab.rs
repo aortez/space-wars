@@ -288,6 +288,7 @@ impl BlastLab {
                 shape: config.grain_shape,
                 friction: config.friction,
                 restitution: 0.0,
+                ..Default::default()
             })?,
             pulses: Vec::new(),
             physics,

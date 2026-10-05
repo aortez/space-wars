@@ -126,6 +126,47 @@ impl ScorchedState {
         .apply(&mut self.physics, self.tanks.iter().map(|t| t.body));
     }
 
+    pub fn slumping_diagnostics(&self) -> engine_rapier::terrain::SlumpingDiagnostics {
+        self.loose.slumping_diagnostics()
+    }
+
+    pub(super) fn slump(&mut self) {
+        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+        let commit = self
+            .loose
+            .slump(
+                &mut self.physics,
+                self.terrain.iter_mut().map(|body| TerrainBodyMut {
+                    terrain: &mut body.terrain,
+                    geometry: &mut body.geometry,
+                    assembly: &mut body.assembly,
+                }),
+                |_, _| Vec2::new(0.0, -GRAVITY),
+                &mut self.next_id,
+                capacity,
+                DT,
+            )
+            .expect("valid shared slumping");
+        if let Some(commit) = commit {
+            let body = self
+                .terrain
+                .iter_mut()
+                .find(|b| b.assembly.body() == commit.body)
+                .unwrap();
+            body.hash = body.terrain.hash();
+            body.edited_chunks = commit.release.dirty_chunks;
+            self.terrain.retain(|body| {
+                if body.id != GROUND && body.geometry.shape_count() == 0 {
+                    self.physics.remove_entity(body.id);
+                    false
+                } else {
+                    true
+                }
+            });
+            self.terrain.extend(commit.release.fragments);
+        }
+    }
+
     pub(super) fn settle(&mut self) {
         let commits = self
             .loose

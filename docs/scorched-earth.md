@@ -20,16 +20,18 @@ the same hills. A simultaneous destruction is a draw.
 | --- | --- | --- |
 | Lower / raise elevation | Left / Right, A / D | D-pad left / right, right-stick X |
 | Lower / raise power | Down / Up, S / W | D-pad down / up, right-stick Y |
-| Fire (hold to repeat) | Space | Bottom face, left shoulder, right trigger |
+| Fire (hold to repeat) | Space | Bottom face, right trigger |
 | Take control of the other tank | Tab | Left face |
 | Toggle the scripted CPU duel | V | Right shoulder |
 | Switch Angular / Round dirt and reset | T | Top face |
+| Toggle bank collapse and reset | K | Right face |
+| Switch barrage / duel and reset | J | Left shoulder |
 | Restart with defaults and the same seed | R | Pause → Restart |
 | Pause | Esc | Start |
 
 The on-screen controls also adjust aim/power, fire, select a tank, toggle Demo,
 switch dirt, and reset. The on-screen **Reset** retains the current dirt shape
-and Demo choice. Camera framing fits the entire battlefield in landscape and
+and Demo, collapse and barrage choices. Camera framing fits the entire battlefield in landscape and
 narrow windows. The host provides the normal launcher, pause, and renderer controls.
 
 **Angular** is the initial dirt choice. **Demo** drives both tanks with the same
@@ -37,6 +39,148 @@ seeded aiming sweep used by the headless runner. It estimates ballistic range
 but varies its aim; intervening terrain and loose grains can intercept shots.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown. The tanks currently cannot drive.
+
+## Bank-collapse comparison
+
+**Collapse** (K / right face) enables the shared bank-yield prototype and resets
+on the same seed. It starts **off**. **Barrage** (J / left shoulder) resets into
+60 seconds of falling shells, one every two seconds, followed by unlimited rest.
+It keeps firing after tank deaths. Press **Duel** to leave this mode; **Demo** also
+returns to the duel. Switching dirt or collapse restarts the current comparison.
+The header shows the choices; the status line shows time and released bank cells.
+
+For an easy comparison, choose **Round**, enable **Collapse**, then **Barrage**.
+Watch the crater rims during the barrage and the ground during the quiet tail.
+Repeat with collapse off or Angular dirt. These changes alter later impacts and
+pile shapes, so equal seeds do not imply identical contact workloads.
+
+The shared layer peels exposed tops with a steep adjacent drop in the direction
+of gravity. It watches a two-cell neighborhood of material release/deposition,
+waits 0.35 seconds, and can release up to four cells from one field per 0.1 seconds.
+It checks at most 64 queued candidates per scan and tracks at most 4,096.
+Automatic shedding pauses if it would take the total loose population above 48;
+impacts retain access to the normal 192-grain pool. Refusals retain the dirt and
+retry later. Removed cells inherit the source's velocity and spin without a kick.
+
+The 50° repose setting is a grid-sampled threshold, not a measured soil angle.
+This prototype applies equally to eligible materials; it has no hardness-based
+cohesion or internal stress. It leaves undisturbed terrain alone. Blocked deposits
+can still leave piles permanently loose, especially with Angular grains. Collapse
+is optional because it can increase obstruction, saturation and update cost.
+
+The same `LooseTerrain::slump` call is wired into Spacewars' existing edit boundary,
+using its point/spherical gravity solver and body poses. Released grains and
+fragments join the ordinary actor/query registries; base/flag support is reconciled
+with the new geometry. Spacewars enables it through `LooseTerrainConfig::slumping`
+and the headless runner's `--slumping` switch. Launcher loose-dirt settings retain
+their existing behavior. Terrain Lab retains the default with collapse off.
+
+```sh
+cargo run --locked --release -p scenario-scorched-earth --example scorched_benchmark -- \
+  --shape round --seconds 120 --bombardment-seconds 60 --slumping --replay --diagnostics
+cargo run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
+  --mode angular --scene combat --seconds 60 --slumping --diagnostics
+```
+
+Omit `--slumping` to compare the existing behavior. The bombardment runner reports
+active and tail timings separately, with per-second samples on stderr. The tail
+begins when launches stop; an already airborne shell can still land in it.
+Slumping diagnostics include pending checks, releases, tracking overflow and
+cumulative capacity/fragment refusals; rejection counts are attempts, not lost cells.
+All auditing, hashing and replay remain outside the timed update.
+
+## Collapse measurements — 2026-10-04
+
+[Raw data, binary hashes and paused-device checks](data/dirt-slumping-20261004.json)
+and [per-second diagnostic traces](data/dirt-slumping-traces-20261004.jsonl.gz)
+retain 35 runner executions from runtime `b1c6a58`, with pre-slumping comparison
+source `9327948`. Both use Rust 1.89.0/release/fat LTO; the Pi runner uses the static
+CRT command below. Scorched Earth runs seed 42 for 120 seconds: 60 seconds of
+bombardment and 60 seconds of rest, with full replay. Desktop values are medians
+of three serial runs (worst is the largest step); Picade values are single-run
+smoke measurements. All times are milliseconds per simulation update.
+
+| Host | Dirt | Collapse | Runs | Mean | P95 | Worst | Tail mean | Final loose |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Desktop | Round | Off | 3 | 0.226 | 0.879 | 5.043 | 0.087 | 36 |
+| Desktop | Round | On | 3 | 0.247 | 0.805 | 6.719 | 0.015 | 0 |
+| Desktop | Angular | Off | 3 | 0.252 | 0.793 | 3.687 | 0.142 | 52 |
+| Desktop | Angular | On | 3 | 0.518 | 2.313 | 5.831 | 0.501 | 163 |
+| Picade | Round | Off | 1 | 2.261 | 8.249 | 40.745 | 0.824 | 36 |
+| Picade | Round | On | 1 | 2.543 | 8.597 | 54.996 | 0.152 | 0 |
+| Picade | Angular | Off | 1 | 2.491 | 7.668 | 28.936 | 1.329 | 52 |
+| Picade | Angular | On | 1 | 4.946 | 19.436 | 47.022 | 4.628 | 163 |
+
+All four modes conserve 10,393 cells and reproduce their final hashes on desktop
+and Picade. Round with collapse sheds 45 bank cells, returns 1,030 cells in total
+(including cells released more than once), and finishes with no loose material.
+Angular sheds 23 bank cells, returns 801, and finishes with 163 obstructed grains
+and nine pending bank checks. It rejects one impact; the other modes reject none.
+Neither enabled mode releases further bank cells in the final 30 seconds. Angular
+therefore exposes a packing/clearance stall rather than perpetual yielding. The
+48-cell shedding ceiling defers 412 Round and 920 Angular transactions across the
+run; those are retry counts, not material loss.
+
+This is useful visual and diagnostic progress, **not a general performance or
+settling win**. Angular's Picade P95 exceeds the 16.7 ms update budget; peak steps
+reach 55 ms even for Round. Changed terrain also changes subsequent impacts and
+contacts, so these are whole-workload comparisons, not isolated grain-shape costs.
+Collapse remains off by default. Next tuning should address obstructed angular
+packing and impact/edit spikes without growing the grain budget or deleting dirt.
+
+Spacewars' existing 30-second combat/match runner also conserves material with
+both shapes and both settings. In the combat case, collapse changes final loose
+counts from 26→66 (Round) and 17→9 (Angular); in the match case, 105→110 and 87→48.
+Its Picade mean/P95 changes from 0.581/2.038→0.713/2.201 ms for Round combat,
+1.172/4.539→0.965/3.514 for Angular combat, 7.671/17.957→7.214/15.947 for Round
+match, and 7.330/18.287→8.992/19.022 for Angular match. These single runs reinforce
+that the tradeoff depends on the evolving scene. Full rows and diagnostics are
+in the raw data; these timings exclude frame rasterization.
+
+With collapse disabled, all non-timing results match the pre-change build in
+28 desktop cases across repeated edits, fragments, mining, impacts, existing
+Spacewars terrain and loose-terrain benchmarks. The eight repeated-edit and
+Spacewars terrain cases repeated on the Pi also match. Single-run timing noise
+prevents a strong unchanged-performance claim. Pi temperature endpoints span
+70.1–76.9°C, reported CPU0 frequency stays at 1.5 GHz, and undervoltage reads zero;
+endpoint probes do not exclude intervening throttling. The kiosk stayed paused.
+
+Validation passed: 120 engine-rapier tests, 61 Terrain Lab tests, nine Scorched
+Earth tests, 18 Spacewars terrain tests, three actor/flag lifecycle tests with
+collapse both on and off, three client tests, and the display test on both
+renderers. Strict Clippy for engine-rapier/Scorched Earth and workspace formatting
+passed. Bank tests cover local gravity, source motion, damage conservation,
+fragment/pool admission, bounded tracking, clone continuation and a quiet tail.
+
+## Current Picade review build
+
+Runtime `b1c6a58` is deployed to `sw-picade.local`, verified after the live checks
+with service PID 2346, active state and zero restarts. Client SHA-256:
+`9bf8925b0672c6e8151394ecbb164c6c8ce43ec03b37927e9c22f52d07bcf3f1`;
+CLI SHA-256: `970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5`.
+
+The live pass exercised both shapes, collapse and barrage, a completed barrage
+and resting tail, return to the ordinary duel, and host restart. It leaves a
+fresh **Round / collapse on / barrage** comparison paused; Resume starts it.
+Changing shape/collapse restarts the same scenario seed. Host Restart restores
+the defaults. [Paused review state](screenshots/scorched-earth/picade-collapse-ready.png)
+and [return to the ordinary duel](screenshots/scorched-earth/picade-collapse-off-duel.png)
+are captured too.
+
+![Angular during the live barrage](screenshots/scorched-earth/picade-collapse-angular.png)
+
+![Round during the live barrage](screenshots/scorched-earth/picade-collapse-round.png)
+
+![Round at 28 seconds into rest](screenshots/scorched-earth/picade-collapse-rest.png)
+
+The live smoke run uses launcher-selected terrain, without pinning the headless
+benchmark seed. It still has 81 loose cells after 28 seconds of rest: complete
+settling is not a general result. The existing 2× raster setting is retained;
+[three live status snapshots](data/dirt-slumping-picade-live-20261004.txt) report
+17.9, 19.4 and 28.3 submitted FPS during Angular fire, Round fire and Round rest,
+respectively, at 59.6–60.1 simulation updates/sec. These short snapshots
+include rendering and are distinct from headless timings. Rendering and blocked
+packing both remain follow-up work.
 
 ## Shared mechanics
 
@@ -66,7 +210,7 @@ and tank knockback still apply, so a full pool does not make tanks invulnerable.
 
 This is bounded rigid-grain behavior, not a calibrated soil model. Whole-cell
 deposition can leave ledges, a settled pile may remain loose, and sustained fire
-can exhaust the pool. Cohesion, slope relaxation, shock propagation, compression,
+can exhaust the pool. Cohesion, stress-based slope failure, shock propagation, compression,
 fluids and napalm remain later work. Tank traction/driving, weapons, sound and
 broader round progression are also outside this first slice.
 
@@ -109,7 +253,7 @@ claim a deposited footing, blast it away, observe neutralization, let material
 return, then require a fresh full claim. Returning dirt never restores ownership
 by itself. Both Round and Angular exercise that path.
 
-## Picade deployment and presentation
+## Initial Picade deployment and presentation
 
 The scene was deployed and exercised on `sw-picade.local` on 2026-10-04. Live
 checks covered launcher selection, both grain shapes, repeated firing, taking
@@ -182,7 +326,7 @@ isolate per-contact shape cost: the piles and later collisions differ.
 
 This workload is smaller than the existing multi-planet Spacewars stress run;
 its lower mean is not evidence that the shared solver became faster. No shared
-physics implementation changed in this branch. The earlier
+physics implementation changed in that initial Scorched Earth baseline. The earlier
 [existing-benchmark comparison](shared-loose-terrain.md#picade-benchmark-comparison-2026-10-03)
 remains the integration baseline. The Picade's occasional 35–42 ms steps and
 the live rendering cost above are explicit follow-up performance targets.

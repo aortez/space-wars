@@ -80,12 +80,12 @@ fn circle(frame: &mut RenderFrame, at: Vec2, radius: f32, color: RenderColor) {
     );
 }
 fn button_center(index: usize) -> Vec2 {
-    Vec2::new((index as f32 - 4.0) * 9.5, -26.0)
+    Vec2::new((index as f32 - 5.0) * 8.5, -26.0)
 }
 pub(super) fn button_at(at: Vec2) -> Option<Command> {
     Command::ALL.into_iter().enumerate().find_map(|(i, c)| {
         let d = at - button_center(i);
-        (d.x.abs() <= 4.35 && d.y.abs() <= 1.8).then_some(c)
+        (d.x.abs() <= 4.0 && d.y.abs() <= 1.8).then_some(c)
     })
 }
 
@@ -251,16 +251,34 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         &mut frame,
         Vec2::new(0.0, 24.0),
         format!(
-            "Tank {}   ·   angle {:.0}°   ·   power {:.0}   ·   {} dirt",
+            "Tank {}   ·   angle {:.0}°   ·   power {:.0}   ·   {} dirt   ·   collapse {}",
             state.selected + 1,
             tank.elevation.to_degrees(),
             tank.speed,
-            shape
+            shape,
+            if state.config.slumping { "ON" } else { "off" }
         ),
         15.0,
         TEAMS[state.selected],
     );
-    let result = if let Some(winner) = state.winner() {
+    let result = if state.config.bombardment_seconds > 0 {
+        let elapsed = state.tick / u64::from(FIXED_HZ);
+        let duration = u64::from(state.config.bombardment_seconds);
+        if elapsed < duration {
+            format!(
+                "Barrage: {}s remaining · {} bank cells released",
+                duration - elapsed,
+                state.slumping_diagnostics().released_cells
+            )
+        } else {
+            format!(
+                "Rest: {}s · {} bank cells released · {} pending checks",
+                elapsed - duration,
+                state.slumping_diagnostics().released_cells,
+                state.slumping_diagnostics().pending
+            )
+        }
+    } else if let Some(winner) = state.winner() {
         format!("Tank {} wins — Reset to replay the same hills", winner + 1)
     } else if !state.fighting() {
         "Both tanks destroyed — Reset to replay".into()
@@ -299,6 +317,12 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         if state.config.demo { "Demo ON" } else { "Demo" },
         "Dirt",
         "Reset",
+        "Collapse",
+        if state.config.bombardment_seconds > 0 {
+            "Duel"
+        } else {
+            "Barrage"
+        },
     ]
     .into_iter()
     .enumerate()
@@ -307,20 +331,23 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         rect(
             &mut frame,
             18,
-            center - Vec2::new(4.35, 1.8),
-            center + Vec2::new(4.35, 1.8),
-            if i == 4 {
+            center - Vec2::new(4.0, 1.8),
+            center + Vec2::new(4.0, 1.8),
+            if i == 4
+                || (i == 9 && state.config.slumping)
+                || (i == 10 && state.config.bombardment_seconds > 0)
+            {
                 RenderColor::rgb(0.28, 0.36, 0.27)
             } else {
                 RenderColor::rgb(0.14, 0.21, 0.25)
             },
         );
-        text(&mut frame, center - Vec2::Y * 0.4, label, 12.0, INK);
+        text(&mut frame, center - Vec2::Y * 0.4, label, 11.0, INK);
     }
     text(
         &mut frame,
         Vec2::new(0.0, -30.0),
-        "←/→ angle · ↑/↓ power · Space fire · Tab tank · V demo · T dirt/reset · R restart",
+        "Arrows aim/power · Space fire · Tab tank · V demo · T dirt · K collapse · J barrage · R restart",
         11.0,
         INK,
     );

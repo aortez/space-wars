@@ -7,6 +7,7 @@ pub(super) struct PreparedDeposit {
     pub geometry: TerrainGeometry,
     pub dirty_chunks: Vec<ChunkId>,
     pub accepted: Vec<usize>,
+    pub changed: Vec<CellCoord>,
     pub remaining_reason: Reason,
 }
 
@@ -96,6 +97,7 @@ pub(super) fn prepare(
             geometry,
             dirty_chunks,
             accepted: active,
+            changed,
             remaining_reason,
         });
     }

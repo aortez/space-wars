@@ -195,39 +195,7 @@ pub(super) fn commit_releases(
             Err(e) => panic!("valid material release failed: {e}"),
         };
         terrain.removed_cells += discarded;
-        state.physics.material_queries_dirty |= committed.rebuilt_chunks > 0
-            || committed.new_grains > 0
-            || !committed.fragments.is_empty();
-        state
-            .physics
-            .terrain_fragments
-            .extend(pool.iter().skip(previous).map(|g| g.id().value()));
-        if let Some(fragment) = terrain.fragments.get_mut(&id.value()) {
-            fragment.edited_chunks = committed.dirty_chunks;
-            fragment.hash = fragment.terrain.hash();
-            if fragment.geometry.shape_count() == 0 {
-                state.physics.world.remove_entity(id);
-                state.physics.terrain_fragments.remove(&id.value());
-                terrain.fragments.remove(&id.value());
-            }
-        } else {
-            let planet = terrain
-                .planets
-                .get_mut(&physics::planet_index(id).unwrap())
-                .unwrap();
-            planet.hash = planet.field.hash();
-            planet.supported = planet.footing.iter().all(|c| {
-                planet
-                    .field
-                    .cell(*c)
-                    .is_some_and(|c| c.material != MaterialId::VOID)
-            });
-        }
-        for fragment in committed.fragments {
-            let id = fragment.id().value();
-            state.physics.terrain_fragments.insert(id);
-            terrain.fragments.insert(id, fragment);
-        }
+        register_release(state, id, previous, committed);
         blasts.extend(pending_blasts);
     }
     // Snapshot every source motion before applying any blast. All material and
@@ -242,6 +210,135 @@ pub(super) fn commit_releases(
         blast.apply(&mut state.physics.world, bodies.iter().copied());
     }
     ordinary
+}
+
+// The same registry, query-cache and support boundary handles both causes.
+fn register_release(
+    state: &mut SpacewarsState,
+    id: PhysicsId,
+    previous: usize,
+    committed: engine_rapier::terrain::ReleaseCommit,
+) {
+    let terrain = &mut state.terrain;
+    let pool = terrain.loose.as_ref().unwrap();
+    state.physics.material_queries_dirty |=
+        committed.rebuilt_chunks > 0 || committed.new_grains > 0 || !committed.fragments.is_empty();
+    state
+        .physics
+        .terrain_fragments
+        .extend(pool.iter().skip(previous).map(|g| g.id().value()));
+    if let Some(fragment) = terrain.fragments.get_mut(&id.value()) {
+        fragment.edited_chunks = committed.dirty_chunks;
+        fragment.hash = fragment.terrain.hash();
+        if fragment.geometry.shape_count() == 0 {
+            state.physics.world.remove_entity(id);
+            state.physics.terrain_fragments.remove(&id.value());
+            terrain.fragments.remove(&id.value());
+        }
+    } else {
+        let planet = terrain
+            .planets
+            .get_mut(&physics::planet_index(id).unwrap())
+            .unwrap();
+        planet.hash = planet.field.hash();
+        planet.supported = planet.footing.iter().all(|c| {
+            planet
+                .field
+                .cell(*c)
+                .is_some_and(|c| c.material != MaterialId::VOID)
+        });
+    }
+    for fragment in committed.fragments {
+        let id = fragment.id().value();
+        state.physics.terrain_fragments.insert(id);
+        terrain.fragments.insert(id, fragment);
+    }
+}
+
+pub(super) fn commit_slumping(state: &mut SpacewarsState) {
+    if !state
+        .terrain
+        .loose
+        .as_ref()
+        .is_some_and(|pool| pool.config().slumping.is_some())
+    {
+        return;
+    }
+    // Sample the same point/spherical law as loose-grain gravity, at completed
+    // body poses. The solver retains its own scratch; no force is applied here.
+    let mut sources = Vec::new();
+    if let Some(sun) = state.sun {
+        sources.push(GravityParticipant::direct_source(
+            GravityId::new(0),
+            sun.position,
+            sun.mass,
+        ));
+    }
+    for (index, planet) in state.planets.iter().enumerate() {
+        let position = state
+            .physics
+            .world
+            .motion(state.physics.planet_body(index))
+            .map_or(planet.position, |m| m.position);
+        let id = GravityId::new(index as u64 + 1);
+        sources.push(if state.terrain.planets.contains_key(&index) {
+            GravityParticipant::spherical_source(id, position, planet.mass, planet.radius)
+        } else {
+            GravityParticipant::direct_source(id, position, planet.mass)
+        });
+    }
+    sources.push(GravityParticipant::target(
+        GravityId::new(u64::MAX),
+        Vec2::ZERO,
+        1.0,
+    ));
+    let mut gravity = GravitySolver::new();
+    let capacity = 64usize.saturating_sub(state.terrain.fragments.len());
+    let terrain = &mut state.terrain;
+    let pool = terrain.loose.as_mut().unwrap();
+    let previous = pool.len();
+    let fields = terrain
+        .planets
+        .values_mut()
+        .map(|p| TerrainBodyMut {
+            terrain: &mut p.field,
+            geometry: &mut p.geometry,
+            assembly: &mut p.assembly,
+        })
+        .chain(terrain.fragments.values_mut().map(|f| TerrainBodyMut {
+            terrain: &mut f.terrain,
+            geometry: &mut f.geometry,
+            assembly: &mut f.assembly,
+        }));
+    let committed = pool
+        .slump(
+            &mut state.physics.world,
+            fields,
+            |_, position| {
+                sources.last_mut().unwrap().position = position;
+                gravity
+                    .solve(
+                        &sources,
+                        GravityConfig {
+                            backend: GravityBackend::BarnesHut { theta: 0.7 },
+                            softening: GRAVITY_SOFTENING,
+                            interaction_scale: GRAVITY,
+                        },
+                    )
+                    .expect("valid slumping gravity")
+                    .iter()
+                    .find(|o| o.id == GravityId::new(u64::MAX))
+                    .unwrap()
+                    .velocity_delta
+            },
+            &mut terrain.next_fragment,
+            capacity,
+            1.0 / 60.0,
+        )
+        .expect("valid Spacewars slumping");
+    if let Some(committed) = committed {
+        register_release(state, committed.body.entity, previous, committed.release);
+    }
 }
 
 pub(super) fn commit_deposits(state: &mut SpacewarsState) {

@@ -526,3 +526,24 @@ The final CLI also accepts short durations/tiny budgets that release no grains;
 its end-of-run assertions still verify the configured limit and conservation.
 Those assertion-only refinements are outside the timed regions and are stored
 separately from the patch used to build the measured executable.
+
+## Optional bank yielding (#170)
+
+`LooseTerrainConfig::slumping = Some(SlumpingConfig::default())` enables the local
+surface-yield prototype. Call `slump` at the existing material-edit boundary,
+before `settle`, and register its `ReleaseCommit` exactly as an impact release.
+The caller supplies world-space gravity samples, its shared identity allocator,
+and remaining fragment capacity. The layer never steps physics or applies its
+own gravity law. Release/deposition automatically enqueue nearby occupied cells;
+`disturb` is available for an explicit caller-owned disturbance.
+
+The queue, yield delay, work limits, headroom policy, and retry continuation are
+cloned and included in `settling_hash`. With the option absent, the original
+settling hash and physical path are retained. The unchanged lab consumer opts out.
+Scorched Earth exposes a live toggle and health-independent barrage; Spacewars
+registers yielded material through the same path as cannon releases, invalidates
+material queries and reconciles support before actors observe the next world.
+
+See [the comparison controls and limits](scorched-earth.md#bank-collapse-comparison)
+for the grid-sampled slope rule, explicit bounds, and reproducible runners. This
+is an opt-in approximation awaiting review, not a universal settling improvement.

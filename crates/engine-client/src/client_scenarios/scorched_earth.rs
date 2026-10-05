@@ -78,7 +78,7 @@ impl ClientScenario for ScorchedClient {
     }
 }
 fn controls(input: &ClientInput) -> Controls {
-    let (horizontal, fire, _) = input.spaceling_gamepad_input(0);
+    let (horizontal, fire, collapse) = input.spaceling_gamepad_input(0);
     let (stick, trigger, vertical) = input.terrain_gamepad_mining();
     let tools = input.terrain_gamepad_tools();
     let pressed = |a, b| input.is_pressed(a) || input.is_pressed(b);
@@ -99,7 +99,11 @@ fn controls(input: &ClientInput) -> Controls {
             pressed(GameKey::P1Thrust, GameKey::NesUp),
             if stick.y != 0.0 { stick.y } else { vertical },
         ),
-        fire: fire || trigger || input.is_pressed(GameKey::P1Laser),
+        fire: fire
+            || (trigger && !input.scorched_gamepad_barrage())
+            || input.is_pressed(GameKey::P1Laser),
+        collapse: collapse || input.is_pressed(GameKey::P1Cannon),
+        barrage: input.scorched_gamepad_barrage() || input.is_pressed(GameKey::P1Wing),
         select: tools.tunnel || input.is_pressed(GameKey::NesSelect),
         shape: tools.cycle_tool || input.is_pressed(GameKey::TerrainTool),
         demo: tools.cycle_view || input.is_pressed(GameKey::TerrainView),
@@ -120,6 +124,8 @@ mod tests {
             GamepadSeatInput {
                 connected: true,
                 south: true,
+                east: true,
+                left_bumper: true,
                 west: true,
                 north: true,
                 right_bumper: true,
@@ -129,7 +135,7 @@ mod tests {
             },
         );
         let c = controls(&input);
-        assert!(c.fire && c.select && c.shape && c.demo);
+        assert!(c.fire && c.select && c.shape && c.demo && c.collapse && c.barrage);
         assert!(c.aim > 0.0 && c.power > 0.0);
         pads.borrow_mut().set_seat(0, GamepadSeatInput::default());
         assert_eq!(controls(&input), Controls::default());
