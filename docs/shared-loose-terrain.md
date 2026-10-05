@@ -85,7 +85,15 @@ Clearance checks the actual added surface against current colliders, including
 edits already published at the same boundary. Contour/interpolated growth uses
 a clipped polygon difference against the previous surface. If only part of a
 group fits, omitted grains become obstacles again and the smaller plan is
-revalidated. Every accepted cell and its retired grain publish together.
+revalidated. Successful ordinary placements are retained. If that plan fails and
+the whole group has stayed quiet for 1.5 seconds, recovery can try up to three
+alternative assignments, excluding cells implicated in rejected surface patches.
+This avoids the cascade where each dropped grain blocks the next, smaller plan,
+without rearranging a surface while ordinary settling can still finish. A group
+gets at most eight surface reconstructions across the ordinary and recovery
+passes. The 64-grain candidate budget and movement radius are unchanged; this is
+still a bounded local search, not an exhaustive packing solver. Every accepted
+cell and its retired grain publish together.
 Dynamic destinations receive the grains' linear and angular momentum;
 prescribed terrain retains its commanded motion. Deposits can be blasted loose
 again, freeing and reusing the same bounded pool.
@@ -98,14 +106,55 @@ changes the visible/collision surface. This also avoids the hull constructor's
 degenerate-point panic. Actual obstructions still use the bounded retry policy.
 
 `SettlingDiagnostics` partitions surviving grains into waiting, moving,
-unsupported, no room, obstructed and deferred by the per-tick budget. A rejection
+unsupported, no room, obstructed, unstable and deferred by a work budget. A rejection
 remains visible while waiting for a retry. These counts exclude rigid fragments
 and are available in both scenario adapters; the native lab displays them.
 
+When collapse is enabled, proposed cells must also satisfy its repose rule.
+Otherwise deposition can rebuild the bank that just yielded, repeatedly releasing
+and redepositing the same dirt. `settle` samples the world's uniform gravity;
+`settle_with_gravity` accepts a custom force law. Spacewars passes its canonical
+point/spherical gravity law, sampling candidate cells in world coordinates and
+testing the slope in the destination body's local frame. Samples are cached for
+one group attempt, outside the solver. This gate is inactive when collapse is off.
+
 The lab also uses `LooseTerrain`, while retaining its own fixture choices,
-probe box, blast pulse and aggregate grain-plus-fragment budget. Clock and
-Scorched Earth can provide adapters to these same APIs; their game rules have
-not been changed in this slice.
+probe box, blast pulse and aggregate grain-plus-fragment budget. Scorched Earth
+uses the same release, collapse and deposition APIs with downward gravity.
+
+## Frozen packing inspection — #172
+
+Capture a quiet pile after a benchmark without changing its world, timers, or
+observations. Inspection and serialization run outside measured steps:
+
+```sh
+cargo run --locked --release -p scenario-scorched-earth --example scorched_benchmark -- \
+  --shape angular --seconds 120 --bombardment-seconds 60 --slumping \
+  --packing-dir target/packing/scorched
+cargo run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
+  --scene match --mode angular --seconds 30 --slumping \
+  --packing-dir target/packing/spacewars
+
+# This shared inspector accepts a capture from either game.
+cargo run --locked --release -p scenario-scorched-earth --example packing_inspector -- \
+  crates/engine-rapier/tests/fixtures/scorched-angular-pile.packing \
+  --output target/packing-example
+```
+
+The inspector writes JSON plus an SVG for each attempted placement. Purple marks
+candidate cells, green/red marks clear/blocked added surface, gold marks cells
+that would yield again, and pink identifies blocking bodies by their world-axis
+bounds and stable IDs. JSON lists exact collider IDs for every blocked patch;
+the bounds are identification aids, not the collision query geometry. Blocks
+also report rejected square candidates. A no-room result can have no proposed
+surface and thus no SVG; the JSON retains the reason and candidate grains.
+
+`LooseTerrain::capture_packing` captures up to the next 64 quiet, grounded grains,
+ignoring retry and recovery delay for inspection only. The custom-gravity version matches
+`settle_with_gravity`. The files contain terrain, selected grains, current physics
+colliders and optional repose samples. They replay only the packing decision,
+not the whole match or its future dynamics. These development files are tied to
+the physics snapshot format; they are not a save-game compatibility promise.
 
 ## Limits and next work
 

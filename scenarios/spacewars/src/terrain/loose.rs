@@ -59,6 +59,31 @@ impl SpacewarsState {
     pub fn loose_terrain(&self) -> Option<&LooseTerrain> {
         self.terrain.loose.as_ref()
     }
+
+    /// Development capture using the same planetary force law as deposition.
+    pub fn capture_loose_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, TerrainError> {
+        let mut gravity = material_gravity(self);
+        let terrain = &mut self.terrain;
+        let Some(pool) = terrain.loose.as_ref() else {
+            return Ok(Vec::new());
+        };
+        let fields = terrain
+            .planets
+            .values_mut()
+            .map(|p| TerrainBodyMut {
+                terrain: &mut p.field,
+                geometry: &mut p.geometry,
+                assembly: &mut p.assembly,
+            })
+            .chain(terrain.fragments.values_mut().map(|f| TerrainBodyMut {
+                terrain: &mut f.terrain,
+                geometry: &mut f.geometry,
+                assembly: &mut f.assembly,
+            }));
+        pool.capture_packing_with_gravity(&self.physics.world, fields, &mut gravity)
+    }
 }
 
 pub(super) enum ContactHit {
@@ -255,15 +280,9 @@ fn register_release(
     }
 }
 
-pub(super) fn commit_slumping(state: &mut SpacewarsState) {
-    if !state
-        .terrain
-        .loose
-        .as_ref()
-        .is_some_and(|pool| pool.config().slumping.is_some())
-    {
-        return;
-    }
+fn material_gravity(
+    state: &SpacewarsState,
+) -> impl FnMut(engine_rapier::world::BodyId, Vec2) -> Vec2 + use<> {
     // Sample the same point/spherical law as loose-grain gravity, at completed
     // body poses. The solver retains its own scratch; no force is applied here.
     let mut sources = Vec::new();
@@ -292,7 +311,36 @@ pub(super) fn commit_slumping(state: &mut SpacewarsState) {
         Vec2::ZERO,
         1.0,
     ));
-    let mut gravity = GravitySolver::new();
+    let mut solver = GravitySolver::new();
+    move |_, position| {
+        sources.last_mut().unwrap().position = position;
+        solver
+            .solve(
+                &sources,
+                GravityConfig {
+                    backend: GravityBackend::BarnesHut { theta: 0.7 },
+                    softening: GRAVITY_SOFTENING,
+                    interaction_scale: GRAVITY,
+                },
+            )
+            .expect("valid material gravity")
+            .iter()
+            .find(|o| o.id == GravityId::new(u64::MAX))
+            .unwrap()
+            .velocity_delta
+    }
+}
+
+pub(super) fn commit_slumping(state: &mut SpacewarsState) {
+    if !state
+        .terrain
+        .loose
+        .as_ref()
+        .is_some_and(|pool| pool.config().slumping.is_some())
+    {
+        return;
+    }
+    let mut gravity = material_gravity(state);
     let capacity = 64usize.saturating_sub(state.terrain.fragments.len());
     let terrain = &mut state.terrain;
     let pool = terrain.loose.as_mut().unwrap();
@@ -314,23 +362,7 @@ pub(super) fn commit_slumping(state: &mut SpacewarsState) {
         .slump(
             &mut state.physics.world,
             fields,
-            |_, position| {
-                sources.last_mut().unwrap().position = position;
-                gravity
-                    .solve(
-                        &sources,
-                        GravityConfig {
-                            backend: GravityBackend::BarnesHut { theta: 0.7 },
-                            softening: GRAVITY_SOFTENING,
-                            interaction_scale: GRAVITY,
-                        },
-                    )
-                    .expect("valid slumping gravity")
-                    .iter()
-                    .find(|o| o.id == GravityId::new(u64::MAX))
-                    .unwrap()
-                    .velocity_delta
-            },
+            &mut gravity,
             &mut terrain.next_fragment,
             capacity,
             1.0 / 60.0,
@@ -342,6 +374,12 @@ pub(super) fn commit_slumping(state: &mut SpacewarsState) {
 }
 
 pub(super) fn commit_deposits(state: &mut SpacewarsState) {
+    let mut gravity = state
+        .terrain
+        .loose
+        .as_ref()
+        .filter(|p| p.config().slumping.is_some())
+        .map(|_| material_gravity(state));
     let terrain = &mut state.terrain;
     let Some(pool) = terrain.loose.as_mut() else {
         return;
@@ -367,7 +405,12 @@ pub(super) fn commit_deposits(state: &mut SpacewarsState) {
     // Spacewars' material boundary runs once per 60 Hz simulation tick. Pending
     // damage/blasts have already resolved, so a new impulse resets quiet time.
     let commits = pool
-        .settle(&mut state.physics.world, fields, 1.0 / 60.0)
+        .settle_with_gravity(
+            &mut state.physics.world,
+            fields,
+            |body, position| gravity.as_mut().map_or(Vec2::ZERO, |g| g(body, position)),
+            1.0 / 60.0,
+        )
         .expect("valid Spacewars deposition");
     for commit in commits {
         state.physics.material_queries_dirty = true;

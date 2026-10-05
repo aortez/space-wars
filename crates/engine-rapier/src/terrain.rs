@@ -17,8 +17,9 @@ pub use grain::{GrainSeed, GrainShape, TerrainGrain};
 mod loose;
 pub use loose::{
     DepositCommit, LooseTerrain, LooseTerrainConfig, MaterialEdit, MaterialQuantity,
-    PreparedRelease, RadialImpulse, ReleaseCommit, ReleaseError, SettlingDiagnostics, SlumpCommit,
-    SlumpingConfig, SlumpingDiagnostics, TerrainBodyMut,
+    PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch,
+    PackingSnapshot, PreparedRelease, RadialImpulse, ReleaseCommit, ReleaseError,
+    SettlingDiagnostics, SlumpCommit, SlumpingConfig, SlumpingDiagnostics, TerrainBodyMut,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

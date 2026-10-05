@@ -10,6 +10,20 @@ pub struct MaterialBalance {
 }
 
 impl ScorchedState {
+    /// Development capture, outside simulation timing. No scenario state changes.
+    pub fn capture_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, TerrainError> {
+        self.loose.capture_packing(
+            &self.physics,
+            self.terrain.iter_mut().map(|body| TerrainBodyMut {
+                terrain: &mut body.terrain,
+                geometry: &mut body.geometry,
+                assembly: &mut body.assembly,
+            }),
+        )
+    }
+
     fn release_material(&mut self, point: Vec2) -> bool {
         let mut plans = Vec::new();
         let mut grains = 0;

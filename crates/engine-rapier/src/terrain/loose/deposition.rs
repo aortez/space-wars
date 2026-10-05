@@ -3,13 +3,18 @@ use super::*;
 use engine_terrain::{Cell, CellCoord, CellDeposit};
 use std::collections::BTreeSet;
 
+mod inspection;
 mod packing;
 mod support;
+pub use inspection::{
+    PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch, PackingSnapshot,
+};
 
 const QUIET_SECONDS: f32 = 0.5;
+const REPACK_SECONDS: f32 = 1.5;
 const MAX_DEPOSITS: usize = 64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 enum Reason {
     Unsupported,
     Moving,
@@ -17,6 +22,7 @@ enum Reason {
     NoRoom,
     Obstructed,
     Budget,
+    Unstable,
 }
 
 /// Current reasons that surviving grains have not returned to terrain. These
@@ -29,6 +35,7 @@ pub struct SettlingDiagnostics {
     pub no_room: usize,
     pub obstructed: usize,
     pub budget: usize,
+    pub unstable: usize,
 }
 impl SettlingDiagnostics {
     fn count(&mut self, reason: Reason) {
@@ -39,6 +46,7 @@ impl SettlingDiagnostics {
             Reason::NoRoom => &mut self.no_room,
             Reason::Obstructed => &mut self.obstructed,
             Reason::Budget => &mut self.budget,
+            Reason::Unstable => &mut self.unstable,
         } += 1;
     }
 }
@@ -106,6 +114,19 @@ impl LooseTerrain {
         &mut self,
         world: &mut PhysicsWorld,
         destinations: impl IntoIterator<Item = TerrainBodyMut<'a>>,
+        dt: f32,
+    ) -> Result<Vec<DepositCommit>, TerrainError> {
+        let gravity = world.gravity();
+        self.settle_with_gravity(world, destinations, |_, _| gravity, dt)
+    }
+
+    /// Custom-gravity counterpart to `settle`. When collapse is enabled, new
+    /// cells must obey its repose rule under this same local force law.
+    pub fn settle_with_gravity<'a>(
+        &mut self,
+        world: &mut PhysicsWorld,
+        destinations: impl IntoIterator<Item = TerrainBodyMut<'a>>,
+        mut gravity: impl FnMut(BodyId, Vec2) -> Vec2,
         dt: f32,
     ) -> Result<Vec<DepositCommit>, TerrainError> {
         if !dt.is_finite() || dt <= 0.0 || dt > 0.25 {
@@ -213,7 +234,18 @@ impl LooseTerrain {
             let body = graph.destination[seed].unwrap();
             let field = fields.get_mut(&body).unwrap();
             let grains: Vec<_> = group.iter().map(|&i| &self.grains[i]).collect();
-            let plan = packing::prepare(world, field, &grains);
+            let mut packing_field = packing::Field::from(&*field).with_repose(
+                world,
+                &grains,
+                self.config.slumping,
+                &mut gravity,
+            );
+            // Give ordinary settling and neighboring moving grains time to
+            // finish before attempting a more extensive redistribution.
+            packing_field.repacking = grains
+                .iter()
+                .all(|g| self.settling[&g.id()].seconds >= REPACK_SECONDS);
+            let plan = packing::prepare(world, &packing_field, &grains, None);
             let reason = match &plan {
                 Ok(plan) => plan.remaining_reason,
                 Err(reason) => *reason,

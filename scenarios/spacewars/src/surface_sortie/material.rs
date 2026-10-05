@@ -159,6 +159,12 @@ impl SurfaceSortieState {
         self.world.terrain_diagnostics()
     }
 
+    pub fn capture_loose_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, engine_terrain::TerrainError> {
+        self.world.capture_loose_packing()
+    }
+
     pub fn mining_observation(&self, player: usize) -> Option<SurfaceMiningObservation> {
         let seat = self.mining.as_ref()?.seats.get(player)?;
         Some(SurfaceMiningObservation {

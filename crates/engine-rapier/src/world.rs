@@ -238,7 +238,7 @@ pub struct CompoundChild {
     pub angle: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CollisionGroups {
     pub memberships: u32,
     pub filter: u32,
@@ -1604,6 +1604,46 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
     ) -> Vec<bool> {
+        self.polygons_clearance(position, angle, polygons, groups, excluded, None)
+    }
+
+    /// Development query: the same conservative clearance test, retaining all
+    /// blocking collider identities per patch. Empty identities with `false`
+    /// mean invalid geometry, rather than a confirmed obstacle. No world state
+    /// or completed-step query index is changed.
+    pub fn current_polygon_obstacles(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> Vec<(bool, Vec<ColliderId>)> {
+        let mut obstacles = vec![Vec::new(); polygons.len()];
+        let clear = self.polygons_clearance(
+            position,
+            angle,
+            polygons,
+            groups,
+            excluded,
+            Some(&mut obstacles),
+        );
+        for ids in &mut obstacles {
+            ids.sort();
+            ids.dedup();
+        }
+        clear.into_iter().zip(obstacles).collect()
+    }
+
+    fn polygons_clearance(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+        obstacles: Option<&mut Vec<Vec<ColliderId>>>,
+    ) -> Vec<bool> {
         if !finite_vec2(position) || !angle.is_finite() {
             return vec![false; polygons.len()];
         }
@@ -1629,7 +1669,7 @@ impl PhysicsWorld {
                 shape,
             ));
         }
-        self.current_shapes_clearance(&shapes, groups, excluded, false)
+        self.current_shapes_clearance(&shapes, groups, excluded, false, obstacles)
     }
 
     fn current_shapes_are_clear(
@@ -1638,7 +1678,7 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
     ) -> bool {
-        self.current_shapes_clearance(shapes, groups, excluded, true)
+        self.current_shapes_clearance(shapes, groups, excluded, true, None)
             .into_iter()
             .all(|clear| clear)
     }
@@ -1649,6 +1689,7 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
         stop_on_first: bool,
+        mut obstacles: Option<&mut Vec<Vec<ColliderId>>>,
     ) -> Vec<bool> {
         let bounds: Vec<_> = shapes.iter().map(|(p, s)| s.compute_aabb(p)).collect();
         let Some(mut envelope) = bounds.first().copied() else {
@@ -1686,8 +1727,10 @@ impl PhysicsWorld {
             {
                 continue;
             }
-            for (((pose, shape), bounds), clear) in shapes.iter().zip(&bounds).zip(&mut results) {
-                if !*clear
+            for (i, (((pose, shape), bounds), clear)) in
+                shapes.iter().zip(&bounds).zip(&mut results).enumerate()
+            {
+                if (!*clear && obstacles.is_none())
                     || bounds.maxs.x <= other_bounds.mins.x
                     || bounds.mins.x >= other_bounds.maxs.x
                     || bounds.maxs.y <= other_bounds.mins.y
@@ -1695,13 +1738,21 @@ impl PhysicsWorld {
                 {
                     continue;
                 }
-                *clear = !rapier2d::parry::query::intersection_test(
+                let blocked = rapier2d::parry::query::intersection_test(
                     pose,
                     shape.as_ref(),
                     &other_pose,
                     collider.shape(),
                 )
                 .unwrap_or(true);
+                if blocked {
+                    *clear = false;
+                    if let Some(ref mut obstacles) = obstacles
+                        && let Some(id) = decode_collider(collider.user_data)
+                    {
+                        obstacles[i].push(id);
+                    }
+                }
                 if stop_on_first && !*clear {
                     return results;
                 }

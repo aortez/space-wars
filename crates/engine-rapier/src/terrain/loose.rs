@@ -5,7 +5,10 @@ use engine_terrain::{DetachedCell, MaterialId, TerrainEdit, TerrainError};
 use std::collections::BTreeMap;
 
 mod deposition;
-pub use deposition::{DepositCommit, SettlingDiagnostics};
+pub use deposition::{
+    DepositCommit, PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch,
+    PackingSnapshot, SettlingDiagnostics,
+};
 mod slumping;
 pub use slumping::{SlumpCommit, SlumpingConfig, SlumpingDiagnostics};
 

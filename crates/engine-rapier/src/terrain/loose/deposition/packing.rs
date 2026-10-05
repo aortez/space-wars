@@ -2,6 +2,77 @@
 //! retains exactly one cell; no material mixing or field expansion is implicit.
 use super::*;
 
+pub(super) struct Field<'a> {
+    pub terrain: &'a Terrain,
+    pub geometry: &'a TerrainGeometry,
+    pub body: BodyId,
+    pub groups: CollisionGroups,
+    pub repose: Option<Repose>,
+    pub repacking: bool,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub(super) struct Repose {
+    degrees: f32,
+    gravity: BTreeMap<(i32, i32), Vec2>,
+}
+
+impl Field<'_> {
+    pub fn with_repose(
+        mut self,
+        world: &PhysicsWorld,
+        grains: &[&TerrainGrain],
+        config: Option<SlumpingConfig>,
+        gravity: &mut impl FnMut(BodyId, Vec2) -> Vec2,
+    ) -> Self {
+        if let Some(config) = config {
+            let motion = world.motion(self.body).unwrap();
+            let mut samples = BTreeMap::new();
+            for grain in grains {
+                let local = (world.motion(grain.body()).unwrap().position - motion.position)
+                    .rotate_radians(-motion.angle);
+                if let Some(cell) = self.terrain.local_to_cell(local) {
+                    for y in cell.y - 2..=cell.y + 2 {
+                        for x in cell.x - 2..=cell.x + 2 {
+                            let c = CellCoord::new(x, y);
+                            if self.terrain.cell(c) == Some(Cell::VOID) {
+                                samples.entry((y, x)).or_insert_with(|| {
+                                    gravity(
+                                        self.body,
+                                        motion.position
+                                            + self
+                                                .terrain
+                                                .cell_center(c)
+                                                .rotate_radians(motion.angle),
+                                    )
+                                    .rotate_radians(-motion.angle)
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            self.repose = Some(Repose {
+                degrees: config.repose_degrees,
+                gravity: samples,
+            });
+        }
+        self
+    }
+}
+impl<'a> From<&'a TerrainBodyMut<'_>> for Field<'a> {
+    fn from(field: &'a TerrainBodyMut<'_>) -> Self {
+        Self {
+            terrain: field.terrain,
+            geometry: field.geometry,
+            body: field.assembly.body(),
+            groups: field.assembly.spec.collision_groups,
+            repose: None,
+            repacking: true,
+        }
+    }
+}
+
 pub(super) struct PreparedDeposit {
     pub terrain: Terrain,
     pub geometry: TerrainGeometry,
@@ -13,14 +84,43 @@ pub(super) struct PreparedDeposit {
 
 pub(super) fn prepare(
     world: &PhysicsWorld,
-    field: &TerrainBodyMut<'_>,
+    field: &Field<'_>,
     grains: &[&TerrainGrain],
+    mut trace: Option<&mut Vec<PackingAttempt>>,
+) -> Result<PreparedDeposit, Reason> {
+    // Preserve an ordinary successful placement. Only recover a failed plan,
+    // and bound expensive surface reconstructions across both passes.
+    let mut remaining_plans = 8;
+    let result = plan(
+        world,
+        field,
+        grains,
+        0,
+        &mut remaining_plans,
+        trace.as_deref_mut(),
+    );
+    if result.is_ok() || !field.repacking {
+        return result;
+    }
+    plan(world, field, grains, 3, &mut remaining_plans, trace)
+}
+
+fn plan(
+    world: &PhysicsWorld,
+    field: &Field<'_>,
+    grains: &[&TerrainGrain],
+    max_replans: usize,
+    remaining_plans: &mut usize,
+    mut trace: Option<&mut Vec<PackingAttempt>>,
 ) -> Result<PreparedDeposit, Reason> {
     let mut active: Vec<_> = (0..grains.len()).collect();
     let mut remaining_reason = Reason::NoRoom;
+    let mut forbidden = BTreeMap::new();
+    let mut replans = 0;
     loop {
         let selected: Vec<_> = active.iter().map(|&i| grains[i]).collect();
-        let (deposits, accepted, reason) = assign(world, field, &selected);
+        let (deposits, accepted, reason) =
+            assign(world, field, &selected, &forbidden, trace.as_deref_mut());
         if deposits.is_empty() {
             return Err(reason);
         }
@@ -31,6 +131,10 @@ pub(super) fn prepare(
             active = accepted.iter().map(|&i| active[i]).collect();
             continue;
         }
+        if *remaining_plans == 0 {
+            return Err(Reason::Budget);
+        }
+        *remaining_plans -= 1;
         let mut terrain = field.terrain.clone();
         terrain
             .deposit_cells(&deposits)
@@ -40,7 +144,7 @@ pub(super) fn prepare(
             .geometry
             .surface()
             .added_surface(field.terrain, &terrain, &changed);
-        let body = field.assembly.body();
+        let body = field.body;
         let motion = world.motion(body).unwrap();
         let excluded: Vec<_> = std::iter::once(body.entity)
             .chain(selected.iter().map(|g| g.id()))
@@ -49,10 +153,39 @@ pub(super) fn prepare(
             motion.position,
             motion.angle,
             &patches,
-            field.assembly.spec.collision_groups,
+            field.groups,
             &excluded,
         );
-        if clear.iter().any(|clear| !clear) {
+        let unstable: Vec<_> = changed
+            .iter()
+            .copied()
+            .filter(|c| {
+                field.repose.as_ref().is_some_and(|r| {
+                    super::super::slumping::oversteep(
+                        &terrain,
+                        *c,
+                        r.gravity[&(c.y, c.x)],
+                        r.degrees,
+                    )
+                })
+            })
+            .collect();
+        if let Some(ref mut trace) = trace {
+            let mut attempt = inspection::attempt(
+                world,
+                field,
+                &selected,
+                &changed,
+                &patches,
+                "surface additions",
+            );
+            attempt.unstable_centers = unstable
+                .iter()
+                .map(|&c| motion.position + terrain.cell_center(c).rotate_radians(motion.angle))
+                .collect();
+            trace.push(attempt);
+        }
+        if !unstable.is_empty() || clear.iter().any(|clear| !clear) {
             // A contour edit also grows neighboring cells. Remove every
             // placement near an obstructed patch, then recheck the smaller plan.
             // Patches are clipped to cell tiles. Attribute an obstructed tile
@@ -72,22 +205,50 @@ pub(super) fn prepare(
                 })
                 .collect();
             let halo = i32::from(field.geometry.surface() != TerrainSurface::Blocks);
+            let reason = if blocked.is_empty() {
+                Reason::Unstable
+            } else {
+                Reason::Obstructed
+            };
+            // Keep the group intact while trying different local cells. Dropping
+            // grains immediately turns them into new obstacles and can reject
+            // an otherwise packable pile in a cascade of shrinking plans.
+            if replans < max_replans {
+                for deposit in &deposits {
+                    if blocked.iter().any(|tile| {
+                        (tile.x - deposit.coordinate.x).abs() <= halo
+                            && (tile.y - deposit.coordinate.y).abs() <= halo
+                    }) {
+                        forbidden.insert(
+                            (deposit.coordinate.y, deposit.coordinate.x),
+                            Reason::Obstructed,
+                        );
+                    }
+                }
+                for cell in &unstable {
+                    forbidden.insert((cell.y, cell.x), Reason::Unstable);
+                }
+                replans += 1;
+                remaining_reason = reason;
+                continue;
+            }
             let clear: Vec<_> = deposits
                 .iter()
                 .enumerate()
                 .filter_map(|(i, deposit)| {
-                    (!blocked.iter().any(|tile| {
-                        (tile.x - deposit.coordinate.x).abs() <= halo
-                            && (tile.y - deposit.coordinate.y).abs() <= halo
-                    }))
+                    (!unstable.contains(&deposit.coordinate)
+                        && !blocked.iter().any(|tile| {
+                            (tile.x - deposit.coordinate.x).abs() <= halo
+                                && (tile.y - deposit.coordinate.y).abs() <= halo
+                        }))
                     .then_some(active[i])
                 })
                 .collect();
             if clear.is_empty() || clear.len() == active.len() {
-                return Err(Reason::Obstructed);
+                return Err(reason);
             }
             active = clear;
-            remaining_reason = Reason::Obstructed;
+            remaining_reason = reason;
             continue;
         }
         let mut geometry = field.geometry.clone();
@@ -105,10 +266,12 @@ pub(super) fn prepare(
 
 fn assign(
     world: &PhysicsWorld,
-    field: &TerrainBodyMut<'_>,
+    field: &Field<'_>,
     grains: &[&TerrainGrain],
+    forbidden: &BTreeMap<(i32, i32), Reason>,
+    trace: Option<&mut Vec<PackingAttempt>>,
 ) -> (Vec<CellDeposit>, Vec<usize>, Reason) {
-    let body = field.assembly.body();
+    let body = field.body;
     let motion = world.motion(body).unwrap();
     let size = field.terrain.cell_size();
     let excluded: Vec<_> = std::iter::once(body.entity)
@@ -116,7 +279,7 @@ fn assign(
         .collect();
     let mut clearance = BTreeMap::new();
     let mut candidates = Vec::new();
-    let mut obstructed = false;
+    let mut reason = Reason::NoRoom;
     for grain in grains {
         let local = (world.motion(grain.body()).unwrap().position - motion.position)
             .rotate_radians(-motion.angle);
@@ -136,6 +299,10 @@ fn assign(
                 if field.terrain.cell(coordinate) != Some(Cell::VOID) || distance > size * reach {
                     continue;
                 }
+                if let Some(&blocked) = forbidden.get(&(y, x)) {
+                    reason = blocked;
+                    continue;
+                }
                 // Redistribution cannot carry material through an existing wall.
                 if [0.25, 0.5, 0.75].into_iter().any(|t| {
                     field
@@ -151,12 +318,12 @@ fn assign(
                             motion.position + center.rotate_radians(motion.angle),
                             motion.angle,
                             Vec2::new(size * 0.5, size * 0.5),
-                            field.assembly.spec.collision_groups,
+                            field.groups,
                             &excluded,
                         )
                     });
                     if !clear {
-                        obstructed = true;
+                        reason = Reason::Obstructed;
                         continue;
                     }
                 }
@@ -164,6 +331,37 @@ fn assign(
             }
         }
         candidates.push(options);
+    }
+    if let Some(trace) = trace {
+        let rejected: Vec<_> = clearance
+            .iter()
+            .filter_map(|(&(y, x), &clear)| (!clear).then_some(CellCoord::new(x, y)))
+            .collect();
+        if !rejected.is_empty() {
+            let patches: Vec<_> = rejected
+                .iter()
+                .map(|&c| {
+                    let center = field.terrain.cell_center(c);
+                    [
+                        Vec2::new(-0.5, -0.5),
+                        Vec2::new(0.5, -0.5),
+                        Vec2::new(0.5, 0.5),
+                        Vec2::new(-0.5, 0.5),
+                    ]
+                    .into_iter()
+                    .map(|p| center + p * size)
+                    .collect()
+                })
+                .collect();
+            trace.push(inspection::attempt(
+                world,
+                field,
+                grains,
+                &rejected,
+                &patches,
+                "blocked candidate cells",
+            ));
+        }
     }
     let mut cells = BTreeMap::<(i32, i32), Vec<(f32, usize)>>::new();
     for (i, options) in candidates.iter().enumerate() {
@@ -215,15 +413,7 @@ fn assign(
             });
         }
     }
-    (
-        deposits,
-        accepted,
-        if obstructed {
-            Reason::Obstructed
-        } else {
-            Reason::NoRoom
-        },
-    )
+    (deposits, accepted, reason)
 }
 
 // An augmenting path can move an earlier grain to another already selected

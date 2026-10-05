@@ -288,7 +288,7 @@ fn occupied(terrain: &Terrain, coordinate: CellCoord) -> bool {
         .is_some_and(|c| c.material != MaterialId::VOID)
 }
 
-fn oversteep(terrain: &Terrain, cell: CellCoord, gravity: Vec2, degrees: f32) -> bool {
+pub(super) fn oversteep(terrain: &Terrain, cell: CellCoord, gravity: Vec2, degrees: f32) -> bool {
     if !occupied(terrain, cell)
         || !gravity.x.is_finite()
         || !gravity.y.is_finite()

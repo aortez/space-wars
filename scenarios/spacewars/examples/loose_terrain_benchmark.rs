@@ -49,6 +49,9 @@ struct Args {
     diagnostics: bool,
     #[arg(long)]
     slumping: bool,
+    /// Save frozen shared packing cases after each scene, outside timing.
+    #[arg(long)]
+    packing_dir: Option<std::path::PathBuf>,
 }
 
 fn percentile(values: &mut [f64], fraction: f64) -> f64 {
@@ -139,6 +142,22 @@ fn main() {
                 }
             }
             let audit = state.terrain_diagnostics();
+            if let Some(directory) = &args.packing_dir {
+                let before = SurfaceSortieScenario::observe(&state).payload;
+                std::fs::create_dir_all(directory).unwrap();
+                for (i, snapshot) in state.capture_loose_packing().unwrap().iter().enumerate() {
+                    std::fs::write(
+                        directory.join(format!("{scene}-{}-{i}.packing", mode.label())),
+                        snapshot.to_bytes().unwrap(),
+                    )
+                    .unwrap();
+                }
+                assert_eq!(
+                    before,
+                    SurfaceSortieScenario::observe(&state).payload,
+                    "inspection changed state"
+                );
+            }
             assert!(audit.issues.is_empty(), "{:?}", audit.issues);
             assert_eq!(
                 initial,

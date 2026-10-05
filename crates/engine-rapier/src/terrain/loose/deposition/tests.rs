@@ -223,6 +223,26 @@ fn occupied_space_blocks_addition_even_before_the_next_broadphase_update() {
     }
     assert_eq!(pool.len(), 1);
     assert_eq!(field.terrain, before);
+    let world_before = world.snapshot_bytes().unwrap();
+    let hash_before = pool.settling_hash();
+    let captures = pool.capture_packing(&world, [view(&mut field)]).unwrap();
+    assert_eq!(captures.len(), 1);
+    let inspection = PackingSnapshot::from_bytes(&captures[0].to_bytes().unwrap())
+        .unwrap()
+        .inspect()
+        .unwrap();
+    assert!(inspection.accepted.is_empty());
+    assert!(
+        inspection
+            .attempts
+            .iter()
+            .flat_map(|a| &a.patches)
+            .flat_map(|p| &p.blockers)
+            .any(|id| id.entity == blocker)
+    );
+    assert_eq!(world.snapshot_bytes().unwrap(), world_before);
+    assert_eq!(pool.settling_hash(), hash_before);
+    assert_eq!(field.terrain, before);
     world.remove_entity(blocker);
     for _ in 0..60 {
         step(&mut world, &mut field, &mut pool);

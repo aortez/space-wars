@@ -49,9 +49,9 @@ It keeps firing after tank deaths. Press **Duel** to leave this mode; **Demo** a
 returns to the duel. Switching dirt or collapse restarts the current comparison.
 The header shows the choices; the status line shows time and released bank cells.
 
-For an easy comparison, choose **Round**, enable **Collapse**, then **Barrage**.
-Watch the crater rims during the barrage and the ground during the quiet tail.
-Repeat with collapse off or Angular dirt. These changes alter later impacts and
+For a packing comparison, choose **Angular**, leave **Collapse off**, then **Barrage**.
+Watch the ground during the quiet tail and repeat with Round dirt. Enable collapse
+separately to compare crater-rim shedding. These changes alter later impacts and
 pile shapes, so equal seeds do not imply identical contact workloads.
 
 The shared layer peels exposed tops with a steep adjacent drop in the direction
@@ -65,7 +65,7 @@ retry later. Removed cells inherit the source's velocity and spin without a kick
 The 50° repose setting is a grid-sampled threshold, not a measured soil angle.
 This prototype applies equally to eligible materials; it has no hardness-based
 cohesion or internal stress. It leaves undisturbed terrain alone. Blocked deposits
-can still leave piles permanently loose, especially with Angular grains. Collapse
+can still leave piles permanently loose. Collapse
 is optional because it can increase obstruction, saturation and update cost.
 
 The same `LooseTerrain::slump` call is wired into Spacewars' existing edit boundary,
@@ -88,6 +88,76 @@ begins when launches stop; an already airborne shell can still land in it.
 Slumping diagnostics include pending checks, releases, tracking overflow and
 cumulative capacity/fragment refusals; rejection counts are attempts, not lost cells.
 All auditing, hashing and replay remain outside the timed update.
+
+## Packing recovery measurements — 2026-10-04
+
+[Full before/after runs and binary hashes](data/dirt-packing-20261004.json) and
+[per-second traces](data/dirt-packing-traces-20261004.jsonl.gz) cover 54 executions.
+The comparison is PR #171 runtime `b1c6a58` versus packing runtime `5d02c6d`, with
+Rust 1.89.0/release and the same seed-42, 60-second barrage plus 60-second tail.
+Desktop Scorched values use three serial repetitions; Picade and other benchmark
+timings are single-run comparisons. The kiosk was paused during device timing.
+
+After #171 merged, this work was rebased onto `main` at `08e730f`; its runtime
+commit is now `e0a262a`. The shared physics/terrain crates and the Scorched Earth,
+Spacewars, and Terrain Lab source trees are unchanged by that rebase. These
+measurements and the Picade deployment retain their original build revisions
+and binary hashes.
+
+Successful ordinary placements are preserved. A failed group that remains quiet
+for 1.5 seconds can try bounded alternative cells; an eight-surface-check limit
+caps work for that group. With collapse enabled, new deposits must also satisfy
+its local gravity/repose rule. That prevents a deposit/release cycle, but changes
+which piles can pack. [Shared-layer details and frozen inspection commands](shared-loose-terrain.md#frozen-packing-inspection--172).
+
+Picade whole physics-update measurements, milliseconds; all rows conserve 10,393
+cells and pass full replay with hashes matching the desktop:
+
+| Shape | Collapse | Loose before → after | Mean before → after | P95 before → after | Quiet-tail mean before → after |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Round | Off | 36 → 0 | 2.429 → 1.222 | 9.340 → 4.418 | 0.871 → 0.203 |
+| Angular | Off | 52 → 0 | 2.602 → 1.475 | 8.745 → 5.065 | 1.386 → 0.103 |
+| Round | On | 0 → 63 | 2.690 → 5.591 | 9.740 → 27.756 | 0.163 → 2.596 |
+| Angular | On | 163 → 48 | 5.152 → 4.461 | 20.082 → 15.516 | 4.805 → 2.061 |
+
+The collapse-off desktop means also improve: Round 0.223→0.112 ms and Angular
+0.252→0.138 ms. Standard packing is better in these scenes; collapse remains a
+mixed experiment. Round/collapse regresses, and the new collapse-on tails retain
+grains whose recovery searches hit their work limit. It would be incorrect to
+call this complete settling for all scenes or a general performance win.
+Worst Picade steps still reach 36.445 ms (Round/off), 32.616 ms (Angular/off),
+73.145 ms (Round/on), and 65.846 ms (Angular/on). These are physics-update costs,
+not rendered frame timings, and no 60-fps guarantee follows from the mean.
+
+Spacewars uses the same recovery planner. In its 30-second three-planet match,
+collapse-off leftovers improve from 105→64 Round and 87→45 Angular; ordinary
+combat retains 26 and 17. With collapse on, combat changes 66→35 Round and 9→72
+Angular, while the match changes 110→66 and 48→92. All retain their material and
+match desktop/Picade hashes. Existing terrain, fragment, mining, impact, and
+Spacewars terrain runners preserve all non-timing results in 22 desktop cases;
+the eight repeated-edit/Spacewars terrain cases also match on the Picade.
+
+The captured regression below isolates packing around a tank and excluded grains.
+Its original shrinking plan accepted none; the bounded recovery accepts 22 of
+64 without expanding through another body. The first attempted surface is shown
+above the later accepted subset. Pink boxes
+identify blockers; the actual added polygons determine clearance.
+
+![First attempted packing surface with blocked additions in red](screenshots/dirt-packing/first-plan.png)
+![Accepted subset with clear added surface in green](screenshots/dirt-packing/accepted-plan.png)
+
+Remaining work is better search under the repose constraint and fewer repeated
+checks of unchanged blocked piles. Keep the current work and grain limits while
+using the frozen cases to distinguish genuine lack of room from search failure.
+
+Runtime `5d02c6d` is deployed to `sw-picade.local`. The live check exercised both
+shapes, collapse on/off, a complete barrage, ordinary firing, and restart with
+the existing 2× raster renderer. Its different hills retained four loose grains
+18 seconds into the quiet tail; complete recovery above is a benchmark result,
+not a promise for every scene. [Live status samples and deployed hashes](data/dirt-packing-picade-live-20261004.txt).
+The device was left paused at a fresh Angular/collapse-off barrage for review.
+
+![Live Picade after the barrage and 18 seconds of quiet](screenshots/dirt-packing/picade-packing-rest.png)
 
 ## Collapse measurements — 2026-10-04
 
