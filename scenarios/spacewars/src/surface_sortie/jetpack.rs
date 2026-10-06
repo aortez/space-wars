@@ -3,6 +3,8 @@ use super::*;
 use engine_rapier::spaceling::jetpack as motor;
 use ground_navigation::GroundMap;
 
+#[cfg(any(test, feature = "sensor-profile"))]
+pub mod diagnostics;
 pub mod flight;
 pub mod forecast;
 

@@ -21,6 +21,9 @@ mod flag_survey;
 mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
+#[cfg(feature = "sensor-profile")]
+#[path = "support/high_ledge_probe.rs"]
+mod high_ledge_probe;
 #[path = "support/impact_probe.rs"]
 mod impact_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -209,6 +212,9 @@ fn main() {
     let mut projectile_trace = projectile_diagnostics::ProjectileTrace::from_args(&out);
     let mut projectile_response = projectile_response::ResponseProbe::from_args(&out, seat);
     let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
+    assert!(cfg!(feature = "sensor-profile") || arg("--probe-high-ledge", "none") == "none");
+    #[cfg(feature = "sensor-profile")]
+    let mut high_ledge_probe = high_ledge_probe::HighLedgeProbe::from_args();
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -765,6 +771,10 @@ fn main() {
                     .as_ref()
                     .and_then(|c| c.ground.as_ref())
                     .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
+                #[cfg(feature = "sensor-profile")]
+                if let Some(probe) = &mut high_ledge_probe {
+                    probe.observe(&state, i, &o.local.combat.recovery, ground);
+                }
                 if !probed_ground_start && i == seat
                     && (probe_ground_tick == Some(tick)
                         || probe_ground_start && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting)))
@@ -989,6 +999,10 @@ fn main() {
         if let Some(trace) = &mut projectile_trace {
             trace.observe(&state);
         }
+        #[cfg(feature = "sensor-profile")]
+        if let Some(probe) = &mut high_ledge_probe {
+            probe.record_step(&state, &actions);
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -1107,6 +1121,10 @@ fn main() {
     }
     if let Some(probe) = projectile_response {
         probe.finish(&state);
+    }
+    #[cfg(feature = "sensor-profile")]
+    if let Some(probe) = high_ledge_probe {
+        probe.finish(&out, seed);
     }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
