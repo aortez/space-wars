@@ -1,0 +1,1439 @@
+{
+  "schema": 1,
+  "decision": "no_existing_measured_fallback",
+  "runtime_changed": false,
+  "fresh_games": 0,
+  "replayed_games": 0,
+  "default_promotion": false,
+  "fixture_sha256": "978e50eeb28fb36453101081def930213e0d671382bc5711d4e4723ee52725f3",
+  "source_bundle_sha256": "875b9e5160d89362494900a7bbbc46fae73a145474283dda46c03711829691f7",
+  "verified_predecessor_inputs": 931,
+  "predecessor_runtime_source_commit": "fd054579e8df518b1dcd8cf157a148f7aade1d7d",
+  "predecessor_binary_sha256": "a38633e18aacc47271fb3759753a7d01ffde5293467198c4ccef8f97cb14bafa",
+  "verified_source_trace": {
+    "sha256": "612c956e6409bdb9d070228550d8d80e4d3b4ba0fb37555ab5741a49eba2df39",
+    "bytes": 777096934
+  },
+  "native_log_sha256": "8656be70701d9e439b6671786e71fa399719f9bdbfafa69f91a21439ad3a4489",
+  "sources": {
+    "scenarios/spacewars/src/surface_sortie/jetpack.rs": "aff8a8eba513fcc258f084f077342ee9724efa7180dcba8e7d0a614b6ffab608",
+    "scenarios/spacewars/src/surface_sortie/ground_navigation.rs": "8d50aa9c16f9b6022813fab78f21ab5677fefd5b59f486e07a7946a83335786e",
+    "scenarios/spacewars/src/surface_sortie/ground_navigation/routes.rs": "dc4ed2cc40e16a1efc89ae4e867b01bc4926f95d542a20ea7b782115fa97459d",
+    "scenarios/spacewars/src/surface_sortie/jetpack/forecast.rs": "9a62dfdeb085ef3a0d067d59d108b81e961999d6cbb39e428f35410b4012dfd1",
+    "crates/spacewars-ai/src/ground_task.rs": "a6592ca1b0d43ff3c9d0f091a19f72e6b3830c9898c0c5016fe894e4d8775bb1",
+    "crates/spacewars-ai/src/ground_task/jetpack.rs": "e57db72cfce1f3e2df32674db6a3b561a05f14c53b40347085baabe49c52ed0a",
+    "crates/spacewars-ai/src/recovery_task.rs": "97568d8b004aed8b4beb5ad3fc7d3832ecf03b14fc6f89a7917d8e230c1010b9"
+  },
+  "auditor_sha256": "6e831aec8d21cdc5a6708182b28fca2fafbeba1a2f0603c7c055ecbbeb5697b1",
+  "native_test_sha256": "31190a63cb737a0962d29470de3ac8ae9f4994080d7ca525a87de0062dca4f3c",
+  "geometry": [
+    {
+      "tick": 22575,
+      "gap": [
+        276,
+        282
+      ],
+      "gap_rank": 2,
+      "examined_in_first_eight": true,
+      "endpoint_margins": [
+        {
+          "margin": 0,
+          "from_node": 276,
+          "to_node": 282,
+          "from_radius": 24.962778756388737,
+          "to_radius": 36.04256167019767,
+          "endpoint_distance": 11.297679727973186,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.079782913808934,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.079782913808934,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.079782913808934,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 1,
+          "from_node": 275,
+          "to_node": 283,
+          "from_radius": 24.798587271388964,
+          "to_radius": 36.14765504073583,
+          "endpoint_distance": 11.723204324887089,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.349067769346863,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.349067769346863,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.349067769346863,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 2,
+          "from_node": 274,
+          "to_node": 284,
+          "from_radius": 24.669693795164928,
+          "to_radius": 36.2035847328631,
+          "endpoint_distance": 12.102270171847907,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.533890937698171,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.53389093769817,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.53389093769817,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 3,
+          "from_node": 273,
+          "to_node": 285,
+          "from_radius": 24.545797184744416,
+          "to_radius": 36.20265944366506,
+          "endpoint_distance": 12.454658344909904,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.656862258920647,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.656862258920647,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.656862258920647,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 4,
+          "from_node": 272,
+          "to_node": 286,
+          "from_radius": 24.508348671271765,
+          "to_radius": 36.204988274581304,
+          "endpoint_distance": 12.764691017916938,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.696639603309539,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.69663960330954,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.69663960330954,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 5,
+          "from_node": 271,
+          "to_node": 287,
+          "from_radius": 24.503541867247705,
+          "to_radius": 36.201495573439246,
+          "endpoint_distance": 13.074055010949504,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.69795370619154,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.69795370619154,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.69795370619154,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 6,
+          "from_node": 270,
+          "to_node": 288,
+          "from_radius": 24.502525418277596,
+          "to_radius": 36.20334819868789,
+          "endpoint_distance": 13.41699582531788,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.700822780410295,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.700822780410295,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.700822780410295,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 7,
+          "from_node": 269,
+          "to_node": 289,
+          "from_radius": 24.54751593702559,
+          "to_radius": 36.202497101847484,
+          "endpoint_distance": 13.75151503865811,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.654981164821894,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.654981164821894,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.654981164821894,
+              "result": "rise_over_10"
+            }
+          ]
+        }
+      ],
+      "pre_clearance_rejections": 24,
+      "charge": 0.7999990582466125,
+      "ground_budget_remaining_ticks": 1103
+    },
+    {
+      "tick": 22965,
+      "gap": [
+        276,
+        282
+      ],
+      "gap_rank": 1,
+      "examined_in_first_eight": true,
+      "endpoint_margins": [
+        {
+          "margin": 0,
+          "from_node": 276,
+          "to_node": 282,
+          "from_radius": 24.962932049983564,
+          "to_radius": 36.04268752399973,
+          "endpoint_distance": 11.297637996354647,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.079755474016167,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.079755474016167,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.079755474016167,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 1,
+          "from_node": 275,
+          "to_node": 283,
+          "from_radius": 24.79858516072241,
+          "to_radius": 36.147658490085206,
+          "endpoint_distance": 11.723224264611986,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.349073329362795,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.349073329362795,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.349073329362795,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 2,
+          "from_node": 274,
+          "to_node": 284,
+          "from_radius": 24.66971241796911,
+          "to_radius": 36.20361545179378,
+          "endpoint_distance": 12.102260965622333,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.533903033824672,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.53390303382467,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.53390303382467,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 3,
+          "from_node": 273,
+          "to_node": 285,
+          "from_radius": 24.545793255242977,
+          "to_radius": 36.2026595084222,
+          "endpoint_distance": 12.454677902930806,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.656866253179224,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.656866253179224,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.656866253179224,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 4,
+          "from_node": 272,
+          "to_node": 286,
+          "from_radius": 24.508373145980055,
+          "to_radius": 36.20505475548174,
+          "endpoint_distance": 12.764741933887578,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.696681609501685,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.696681609501685,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.696681609501685,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 5,
+          "from_node": 271,
+          "to_node": 287,
+          "from_radius": 24.503597329947542,
+          "to_radius": 36.201530622895596,
+          "endpoint_distance": 13.074141039459082,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.697933292948054,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.697933292948054,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.697933292948054,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 6,
+          "from_node": 270,
+          "to_node": 288,
+          "from_radius": 24.50254469159205,
+          "to_radius": 36.2033168555017,
+          "endpoint_distance": 13.416956240649496,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.700772163909647,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.700772163909647,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.700772163909647,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 7,
+          "from_node": 269,
+          "to_node": 289,
+          "from_radius": 24.547544085596748,
+          "to_radius": 36.202395414530194,
+          "endpoint_distance": 13.75133517652766,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.654851328933447,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.654851328933447,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.654851328933447,
+              "result": "rise_over_10"
+            }
+          ]
+        }
+      ],
+      "pre_clearance_rejections": 24,
+      "charge": 1.0,
+      "ground_budget_remaining_ticks": 713
+    },
+    {
+      "tick": 23205,
+      "gap": [
+        276,
+        282
+      ],
+      "gap_rank": 1,
+      "examined_in_first_eight": true,
+      "endpoint_margins": [
+        {
+          "margin": 0,
+          "from_node": 276,
+          "to_node": 282,
+          "from_radius": 24.962878054225584,
+          "to_radius": 36.0426852278506,
+          "endpoint_distance": 11.297674638906868,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.079807173625014,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.079807173625014,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.079807173625014,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 1,
+          "from_node": 275,
+          "to_node": 283,
+          "from_radius": 24.798593186419694,
+          "to_radius": 36.14761186454494,
+          "endpoint_distance": 11.723178946118486,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.349018678125248,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.349018678125248,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.349018678125248,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 2,
+          "from_node": 274,
+          "to_node": 284,
+          "from_radius": 24.669684189475227,
+          "to_radius": 36.20360768340816,
+          "endpoint_distance": 12.102275334269683,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.533923493932932,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.53392349393293,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.53392349393293,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 3,
+          "from_node": 273,
+          "to_node": 285,
+          "from_radius": 24.54589889969826,
+          "to_radius": 36.202621281678965,
+          "endpoint_distance": 12.4545122346367,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.656722381980707,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.656722381980707,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.656722381980707,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 4,
+          "from_node": 272,
+          "to_node": 286,
+          "from_radius": 24.508340545925023,
+          "to_radius": 36.205057971341795,
+          "endpoint_distance": 12.76483324779004,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.696717425416772,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.69671742541677,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.69671742541677,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 5,
+          "from_node": 271,
+          "to_node": 287,
+          "from_radius": 24.503629437812634,
+          "to_radius": 36.20150228951775,
+          "endpoint_distance": 13.074032398618089,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.697872851705114,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.697872851705114,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.697872851705114,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 6,
+          "from_node": 270,
+          "to_node": 288,
+          "from_radius": 24.50255971703306,
+          "to_radius": 36.20336263953446,
+          "endpoint_distance": 13.41705625977201,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.700802922501403,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.700802922501403,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.700802922501403,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 7,
+          "from_node": 269,
+          "to_node": 289,
+          "from_radius": 24.54750473526038,
+          "to_radius": 36.202452905331434,
+          "endpoint_distance": 13.751506187929694,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.654948170071055,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.654948170071055,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.654948170071055,
+              "result": "rise_over_10"
+            }
+          ]
+        }
+      ],
+      "pre_clearance_rejections": 24,
+      "charge": 1.0,
+      "ground_budget_remaining_ticks": 473
+    },
+    {
+      "tick": 23655,
+      "gap": [
+        276,
+        282
+      ],
+      "gap_rank": 1,
+      "examined_in_first_eight": true,
+      "endpoint_margins": [
+        {
+          "margin": 0,
+          "from_node": 276,
+          "to_node": 282,
+          "from_radius": 24.962833812944513,
+          "to_radius": 36.042680934857415,
+          "endpoint_distance": 11.297731675629157,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.079847121912902,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.079847121912902,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.079847121912902,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 1,
+          "from_node": 275,
+          "to_node": 283,
+          "from_radius": 24.798709436655372,
+          "to_radius": 36.14769723330835,
+          "endpoint_distance": 11.723161271470989,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.348987796652978,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.348987796652978,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.348987796652978,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 2,
+          "from_node": 274,
+          "to_node": 284,
+          "from_radius": 24.669861585474894,
+          "to_radius": 36.20370509598248,
+          "endpoint_distance": 12.102191393852898,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.533843510507584,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.533843510507584,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.533843510507584,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 3,
+          "from_node": 273,
+          "to_node": 285,
+          "from_radius": 24.5459887427297,
+          "to_radius": 36.20267089996736,
+          "endpoint_distance": 12.454510298886518,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.656682157237658,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.656682157237658,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.656682157237658,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 4,
+          "from_node": 272,
+          "to_node": 286,
+          "from_radius": 24.508397451917332,
+          "to_radius": 36.20509433815433,
+          "endpoint_distance": 12.764843407001068,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.696696886237,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.696696886237,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.696696886237,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 5,
+          "from_node": 271,
+          "to_node": 287,
+          "from_radius": 24.503703781225276,
+          "to_radius": 36.20162236306442,
+          "endpoint_distance": 13.074097515114858,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.697918581839147,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.697918581839147,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.697918581839147,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 6,
+          "from_node": 270,
+          "to_node": 288,
+          "from_radius": 24.502635467053647,
+          "to_radius": 36.20353670873771,
+          "endpoint_distance": 13.417064886020766,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.700901241684061,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.70090124168406,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.70090124168406,
+              "result": "rise_over_10"
+            }
+          ]
+        },
+        {
+          "margin": 7,
+          "from_node": 269,
+          "to_node": 289,
+          "from_radius": 24.54759910826505,
+          "to_radius": 36.202573981093785,
+          "endpoint_distance": 13.751475984406218,
+          "heights": [
+            {
+              "height": 3,
+              "required_rise": 14.654974872828735,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 5,
+              "required_rise": 16.654974872828735,
+              "result": "rise_over_10"
+            },
+            {
+              "height": 7,
+              "required_rise": 18.654974872828735,
+              "result": "rise_over_10"
+            }
+          ]
+        }
+      ],
+      "pre_clearance_rejections": 24,
+      "charge": 1.0,
+      "ground_budget_remaining_ticks": 23
+    }
+  ],
+  "native_routes": [
+    {
+      "combined_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582798957824707,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4983994662761688,
+          "partial": false,
+          "reachable_nodes": 163,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": []
+      },
+      "combined_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 11.131165504455566,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4542241394519806,
+          "partial": false,
+          "reachable_nodes": 163,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": []
+      },
+      "ground_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582798957824707,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4983994662761688,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": []
+      },
+      "ground_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 55.08204650878906,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4542241394519806,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": []
+      },
+      "partial_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582798957824707,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 0,
+          "jumps": 1,
+          "length": 10.930583953857422,
+          "nearest_destination_distance": 0.4983994662761688,
+          "partial": true,
+          "reachable_nodes": 163,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": [
+          242,
+          243,
+          244,
+          245,
+          246,
+          247,
+          248,
+          249,
+          255,
+          256,
+          257,
+          258,
+          259,
+          260,
+          261,
+          262,
+          263,
+          264,
+          265,
+          266,
+          267,
+          268,
+          269,
+          270,
+          271,
+          272,
+          273,
+          274,
+          275,
+          276
+        ]
+      },
+      "synthetic_bridge_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 2.4894039630889893,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 1,
+          "jumps": 1,
+          "length": 28.906660079956055,
+          "nearest_destination_distance": 0.4983994662761688,
+          "partial": false,
+          "reachable_nodes": 54,
+          "start_distance": 0.17596335709095,
+          "start_node": 242
+        },
+        "path": [
+          242,
+          243,
+          244,
+          245,
+          246,
+          247,
+          248,
+          249,
+          255,
+          256,
+          257,
+          258,
+          259,
+          260,
+          261,
+          262,
+          263,
+          264,
+          265,
+          266,
+          267,
+          268,
+          269,
+          270,
+          271,
+          272,
+          273,
+          274,
+          275,
+          276,
+          282,
+          283,
+          284,
+          285,
+          286,
+          287,
+          288,
+          289,
+          290,
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297
+        ]
+      },
+      "tick": 22575
+    },
+    {
+      "combined_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.5825834274292,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49846404790878296,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "combined_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 24.916034698486328,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4528592526912689,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "ground_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.5825834274292,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49846404790878296,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "ground_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 55.08557891845703,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4528592526912689,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "partial_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.5825834274292,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49846404790878296,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "synthetic_bridge_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 2.4893853664398193,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 1,
+          "jumps": 0,
+          "length": 18.978891372680664,
+          "nearest_destination_distance": 0.49846404790878296,
+          "partial": false,
+          "reachable_nodes": 50,
+          "start_distance": 0.13968820869922638,
+          "start_node": 273
+        },
+        "path": [
+          273,
+          274,
+          275,
+          276,
+          282,
+          283,
+          284,
+          285,
+          286,
+          287,
+          288,
+          289,
+          290,
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297
+        ]
+      },
+      "tick": 22965
+    },
+    {
+      "combined_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582684516906738,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49833136796951294,
+          "partial": false,
+          "reachable_nodes": 139,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": []
+      },
+      "combined_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 24.922849655151367,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4521149694919586,
+          "partial": false,
+          "reachable_nodes": 139,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": []
+      },
+      "ground_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582684516906738,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49833136796951294,
+          "partial": false,
+          "reachable_nodes": 33,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": []
+      },
+      "ground_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 55.088436126708984,
+          "destination_nodes": 19,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4521149694919586,
+          "partial": false,
+          "reachable_nodes": 33,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": []
+      },
+      "partial_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582684516906738,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 0,
+          "jumps": 0,
+          "length": 1.306283712387085,
+          "nearest_destination_distance": 0.49833136796951294,
+          "partial": true,
+          "reachable_nodes": 139,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": [
+          272,
+          273,
+          274,
+          275,
+          276
+        ]
+      },
+      "synthetic_bridge_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 2.4893927574157715,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 1,
+          "jumps": 0,
+          "length": 19.28232192993164,
+          "nearest_destination_distance": 0.49833136796951294,
+          "partial": false,
+          "reachable_nodes": 51,
+          "start_distance": 0.14509432017803192,
+          "start_node": 272
+        },
+        "path": [
+          272,
+          273,
+          274,
+          275,
+          276,
+          282,
+          283,
+          284,
+          285,
+          286,
+          287,
+          288,
+          289,
+          290,
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297
+        ]
+      },
+      "tick": 23205
+    },
+    {
+      "combined_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582740783691406,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49855631589889526,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "combined_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 24.930864334106445,
+          "destination_nodes": 20,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4512690603733063,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "ground_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582740783691406,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49855631589889526,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "ground_hatches": {
+        "diagnostics": {
+          "closest_reachable_distance": 55.091670989990234,
+          "destination_nodes": 20,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.4512690603733063,
+          "partial": false,
+          "reachable_nodes": 34,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "partial_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 14.582740783691406,
+          "destination_nodes": 12,
+          "failure": "disconnected",
+          "flights": 0,
+          "jumps": 0,
+          "length": 0.0,
+          "nearest_destination_distance": 0.49855631589889526,
+          "partial": false,
+          "reachable_nodes": 140,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": []
+      },
+      "synthetic_bridge_flag": {
+        "diagnostics": {
+          "closest_reachable_distance": 2.489516258239746,
+          "destination_nodes": 12,
+          "failure": null,
+          "flights": 1,
+          "jumps": 0,
+          "length": 18.978851318359375,
+          "nearest_destination_distance": 0.49855631589889526,
+          "partial": false,
+          "reachable_nodes": 50,
+          "start_distance": 0.021078800782561302,
+          "start_node": 273
+        },
+        "path": [
+          273,
+          274,
+          275,
+          276,
+          282,
+          283,
+          284,
+          285,
+          286,
+          287,
+          288,
+          289,
+          290,
+          291,
+          292,
+          293,
+          294,
+          295,
+          296,
+          297
+        ]
+      },
+      "tick": 23655
+    }
+  ],
+  "limitations": [
+    "Physical clearance and powered flight above the existing envelope were not measured.",
+    "The synthetic edge is a graph diagnostic, not an authorized crossing.",
+    "No complete flag or pod route exists in these four consumed maps; unmeasured routes may exist.",
+    "The arrival candidate remains unqualified after its recorded survival regression."
+  ]
+}
