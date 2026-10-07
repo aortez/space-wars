@@ -3,6 +3,7 @@
 import argparse
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
 import subprocess
@@ -70,6 +71,12 @@ def freeze(out,binary):
     print('Frozen three staging modes: three original prefixes, six continuations.',flush=True)
 
 
+def endpoint_matches(a,b):
+    # The native route accepts endpoints within 0.01. Structs and nested JSON
+    # values can serialize the same f32 with different final decimal digits.
+    return math.hypot(a['x']-b['x'],a['y']-b['y'])<=.010001
+
+
 def audit_execution(root,fork,mode):
     walk,handoff=MODES[mode];seeds=[];continuous_ticks=[];stage_ticks=[];first_path=None
     for row in D.rows(root/('rebuild-'+fork+'.jsonl')):
@@ -100,7 +107,7 @@ def audit_execution(root,fork,mode):
                 route=ground['route'];assert route['failure'] is None and not route['partial']
                 assert route['jumps']==route['flights']==0 and 2<=route['length']<=4
                 nodes={n['id']:n for n in survey['staging_map']['nodes']}
-                assert nodes[ground['path'][-1]]['position']==stage['proposal']['position']
+                assert endpoint_matches(nodes[ground['path'][-1]]['position'],stage['proposal']['position'])
                 edges={(e['from'],e['to']):e for e in survey['staging_map']['edges']}
                 assert all(edges[a,b]['kind']=='walk' for a,b in zip(ground['path'],ground['path'][1:]))
                 seeds.append(row)

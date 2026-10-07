@@ -7,6 +7,14 @@ W=importlib.util.module_from_spec(spec);spec.loader.exec_module(W)
 
 
 class StagingWalkTest(unittest.TestCase):
+    def test_endpoint_audit_uses_native_tolerance_across_json_float_encodings(self):
+        a=dict(x=18.99285125732422,y=-30.823528289794922)
+        b=dict(x=18.99285125732422,y=-30.82352828979492)
+        self.assertNotEqual(a,b)
+        self.assertTrue(W.endpoint_matches(a,b))
+        self.assertTrue(W.endpoint_matches(a,dict(a,x=a['x']+.005)))
+        self.assertFalse(W.endpoint_matches(a,dict(a,x=a['x']+.011)))
+
     def test_three_modes_change_only_the_two_execution_switches(self):
         prior={'commands':{'staged':['old','--out','old','--rebuild-refinement','true','--rebuild-staging','true']}}
         commands={n:W.command(prior,Path('/binary'),Path('/raw'),n) for n in W.MODES}
