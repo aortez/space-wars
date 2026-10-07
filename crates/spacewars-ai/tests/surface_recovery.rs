@@ -375,6 +375,7 @@ fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) 
         refinement: None,
         search: None,
         staging: None,
+        staging_map: None,
     });
     (task, o)
 }
@@ -465,6 +466,7 @@ fn staged_rebuild_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) {
         started_tick: 0,
         visited: vec![2],
         preferred: None,
+        include_staging_map: false,
     });
     task.step(&o); // The original missing-site allowance begins here.
     o.flight.pilot.tick = 90;
@@ -619,6 +621,241 @@ fn native_build_takes_precedence_over_an_expired_staging_proposal() {
             .unwrap()
             .invalidated_tick,
         Some(301)
+    );
+}
+
+#[cfg(feature = "sensor-profile")]
+fn staging_walk_fixture(handoff: bool) -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    use scenario_spacewars::surface_sortie::ground_navigation::{
+        GroundEdge, GroundEdgeKind, GroundNode,
+    };
+    let (mut task, mut o) = staged_rebuild_fixture();
+    task.set_staging_execution(true, handoff);
+    let map = o.ground.as_mut().unwrap();
+    map.tick = o.flight.pilot.tick;
+    map.nodes = (0..=4)
+        .map(|id| GroundNode {
+            id,
+            position: Vec2::new(f32::from(id), 60.0),
+            normal: Vec2::Y,
+        })
+        .collect();
+    map.edges = (0..4)
+        .map(|from| GroundEdge {
+            from,
+            to: from + 1,
+            kind: GroundEdgeKind::Walk,
+            length: 1.0,
+        })
+        .collect();
+    let survey = o.rebuild.as_mut().unwrap();
+    survey.staging.as_mut().unwrap().target_bearing = 4;
+    survey.staging_map = Some(map.clone());
+    (task, o)
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn continuous_staging_changes_only_route_interiors_and_preserves_supported_arrival() {
+    let (mut task, mut o) = staging_walk_fixture(false);
+    let mut control = task.clone();
+    control.set_staging_execution(false, false);
+    task.step(&o);
+    control.step(&o);
+    o.rebuild = None;
+    for (tick, x) in [
+        (91, 0.0),
+        (92, 0.0),
+        (93, 1.2),
+        (94, 1.5),
+        (95, 2.02),
+        (96, 2.02),
+    ] {
+        o.flight.pilot.tick = tick;
+        o.ground.as_mut().unwrap().tick = tick;
+        o.flight.pilot.actor.as_mut().unwrap().position.x = x;
+        o.flight.pilot.supported_planet = (tick != 95).then_some(o.flight.pilot.planet.index);
+        let action = task.step(&o);
+        let old = control.step(&o);
+        if tick == 92 {
+            assert_eq!(action.controls.horizontal, 1.0);
+            assert!(old.controls.horizontal > 0.0 && old.controls.horizontal < 1.0);
+        } else {
+            assert_eq!(action, old);
+        }
+        if tick == 94 {
+            assert!(action.controls.horizontal > 0.0 && action.controls.horizontal < 1.0);
+        }
+        assert_eq!(
+            task.telemetry()
+                .rebuild_staging
+                .as_ref()
+                .unwrap()
+                .arrived_tick,
+            (tick == 96).then_some(96)
+        );
+    }
+    o.flight.pilot.tick = 97;
+    o.rebuild = rebuild_relocation_fixture().1.rebuild;
+    let survey = o.rebuild.as_mut().unwrap();
+    survey.tick = 97;
+    survey.site.as_mut().unwrap().precise = true;
+    task.step(&o);
+    assert_eq!(task.telemetry().relocations, 2);
+    o.rebuild = None;
+    o.flight.pilot.tick = 98;
+    o.ground.as_mut().unwrap().tick = 98;
+    task.step(&o);
+    assert!(!task.telemetry().ground.as_ref().unwrap().continuous_walk);
+    assert!(task.telemetry().ground.as_ref().unwrap().precise_rebuild);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn staging_handoff_walks_before_the_next_survey_and_keeps_task_state_and_deadlines() {
+    let (mut task, mut o) = staging_walk_fixture(true);
+    o.jetpack = Some(
+        scenario_spacewars::surface_sortie::jetpack::JetpackNavigationObservation {
+            terrain_flight: None,
+            vehicle_continuation: None,
+            vehicle_forecast: None,
+            reference_velocity: Vec2::ZERO,
+            charge: 1.0,
+            burning: false,
+            burn_seconds: 0.0,
+            gravity: -Vec2::Y * 18.0,
+            surveyed: false,
+            crossing: None,
+            terrain_crossings: Vec::new(),
+        },
+    );
+    let mut control = task.clone();
+    control.set_staging_execution(true, false);
+    task.step(&o);
+    control.step(&o);
+    let ground = task.telemetry().ground.as_ref().unwrap();
+    assert_eq!(ground.staging_seed_tick, Some(90));
+    assert_eq!(ground.started_tick, None);
+    assert_eq!(ground.path, vec![0, 1, 2]);
+    assert_eq!(ground.route.as_ref().unwrap().jumps, 0);
+    let mut copy = task.clone();
+    o.rebuild = None;
+    o.ground = None;
+    for tick in 91..=92 {
+        o.flight.pilot.tick = tick;
+        let action = task.step(&o);
+        assert_eq!(action, copy.step(&o));
+        assert_eq!(task.telemetry(), copy.telemetry());
+        let before = task.telemetry().clone();
+        assert_eq!(task.step(&o), action);
+        assert_eq!(task.telemetry(), &before);
+        assert_eq!(control.step(&o), FlightIntent::default());
+        if tick == 92 {
+            assert_eq!(action.controls.horizontal, 1.0);
+        }
+    }
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().started_tick,
+        Some(91)
+    );
+    o.flight.pilot.tick = 301;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("rebuild staging exceeded the original search deadline")
+    );
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 7,
+    });
+    let request = task.rebuild_search_request().unwrap();
+    assert!(request.include_staging_map && request.visited.is_empty());
+    assert!(task.telemetry().ground.is_none());
+    let (_, fresh) = staging_walk_fixture(true);
+    task.step(&fresh);
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().staging_seed_tick,
+        Some(90)
+    );
+    assert!(task.telemetry().ground.as_ref().unwrap().continuous_walk);
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn staging_handoff_rejects_stale_identity_geometry_and_nonwalking_routes() {
+    use scenario_spacewars::surface_sortie::ground_navigation::GroundEdgeKind;
+    for fault in 0..12 {
+        let (mut task, mut o) = staging_walk_fixture(true);
+        let map = o.rebuild.as_mut().unwrap().staging_map.as_mut().unwrap();
+        match fault {
+            0 => map.tick -= 1,
+            1 => map.tick += 1,
+            2 => map.actor = PlayerId::from_index(1).unwrap(),
+            3 => map.planet += 1,
+            4 => map.revision += 1,
+            5 => map.version += 1,
+            6 => map.nodes[1].position.x = f32::NAN,
+            7 => map.nodes[1].id = map.nodes[0].id,
+            8 => map.edges[0].kind = GroundEdgeKind::Jump,
+            9 => map.edges[0].kind = GroundEdgeKind::Jetpack,
+            10 => map.edges[0].length = f32::INFINITY,
+            11 => map.edges.clear(),
+            _ => unreachable!(),
+        }
+        task.step(&o);
+        assert_eq!(task.telemetry().relocations, 1, "fault {fault}");
+        assert!(
+            task.telemetry()
+                .ground
+                .as_ref()
+                .is_none_or(|g| g.staging_seed_tick.is_none()),
+            "fault {fault}"
+        );
+        o.rebuild = None;
+        o.ground = None;
+        o.flight.pilot.tick = 91;
+        assert_eq!(task.step(&o), FlightIntent::default());
+        assert_eq!(task.telemetry().status, TaskStatus::Running);
+    }
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn seeded_staging_honors_dirty_queries_and_invalidates_with_terrain() {
+    let (mut task, mut o) = staging_walk_fixture(true);
+    task.step(&o);
+    o.rebuild = None;
+    o.ground = None;
+    o.flight.pilot.tick = 91;
+    o.flight.pilot.queries_ready = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(
+        task.telemetry()
+            .rebuild_staging
+            .as_ref()
+            .unwrap()
+            .arrived_tick,
+        None
+    );
+    o.flight.pilot.tick = 92;
+    o.flight.pilot.queries_ready = true;
+    o.flight.pilot.planet.revision += 1;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(
+        task.telemetry()
+            .rebuild_staging
+            .as_ref()
+            .unwrap()
+            .invalidated_tick,
+        Some(92)
+    );
+    o.flight.pilot.tick = 301;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("no reachable standing site with hatch access")
     );
 }
 

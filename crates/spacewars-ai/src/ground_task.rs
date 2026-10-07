@@ -21,6 +21,7 @@ pub use flag_approach::FlagApproach;
 mod jetpack;
 mod posture;
 mod rejoin;
+mod staging;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -85,6 +86,8 @@ pub struct GroundTelemetry {
     pub live_claim_stopping_disabled: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub precise_rebuild: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging_seed_tick: Option<u64>,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -170,6 +173,7 @@ impl GroundNavigationTask {
                 continuous_walk: false,
                 live_claim_stopping_disabled: false,
                 precise_rebuild: false,
+                staging_seed_tick: None,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -270,6 +274,7 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.telemetry.staging_seed_tick = None;
         self.telemetry.precise_rebuild = false;
         self.telemetry.flag_approach = None;
         self.joint_flag = false;

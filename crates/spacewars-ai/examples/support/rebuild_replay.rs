@@ -220,6 +220,12 @@ fn fork(
         assert_eq!(crate::arg("--rebuild-refinement", "false"), "true");
         task.set_rebuild_search(true);
     }
+    let staging_walk = crate::arg("--rebuild-staging-walk", "false") == "true";
+    let staging_handoff = crate::arg("--rebuild-staging-handoff", "false") == "true";
+    if staging_walk || staging_handoff {
+        assert_eq!(crate::arg("--rebuild-staging", "false"), "true");
+        task.set_staging_execution(staging_walk, staging_handoff);
+    }
     let name = if live { "live" } else { "recorded" };
     let mut tape = BufReader::new(fs::File::open(tape_path).unwrap());
     tape.seek(SeekFrom::Start(offset)).unwrap();

@@ -97,6 +97,8 @@ pub struct RebuildRelocationSurvey {
     /// A measured walking step toward a preview, not a buildable standing site.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staging: Option<RebuildStagingProposal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging_map: Option<GroundMap>,
 }
 pub(super) struct RebuildPose {
     pub center: Vec2,
@@ -454,6 +456,7 @@ impl SurfaceSortieState {
                 .then(Default::default),
             search: None,
             staging: None,
+            staging_map: None,
         };
         // Fixed bearing offsets can all miss viable standing material after a
         // crater. Spread the bounded previews over actual nearby footing.
@@ -561,6 +564,14 @@ impl SurfaceSortieState {
             } else {
                 self.refine_rebuild_survey(player, &map, &base, &promising, &mut survey);
             }
+        }
+        if survey.staging.is_some() && search.is_some_and(|s| s.include_staging_map) {
+            // Keep the actual survey tick and geometry. The staging leg has
+            // already passed its walk-only check; powered edges belong to the
+            // onward preview, not to the ordinary ground controller's map.
+            map.edges
+                .retain(|e| e.kind != ground_navigation::GroundEdgeKind::Jetpack);
+            survey.staging_map = Some(map);
         }
         Some(survey)
     }

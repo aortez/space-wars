@@ -16,6 +16,9 @@ pub struct RebuildSearchProgress {
     /// Recheck this measured target after a real staging arrival. It grants no
     /// placement or route validity in the new survey.
     pub preferred: Option<u16>,
+    /// Include the measured walking map when a staging move is proposed.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub include_staging_map: bool,
 }
 
 impl RebuildSearchProgress {
@@ -39,6 +42,7 @@ impl RebuildSearchProgress {
             started_tick: map.tick,
             visited: Vec::new(),
             preferred: current.then_some(self.preferred).flatten(),
+            include_staging_map: self.include_staging_map,
         }
     }
 }
@@ -279,6 +283,12 @@ mod tests {
         assert!(previous.refreshed(&map, foot + Vec2::X).visited.is_empty());
         let mut preferred = previous.clone();
         preferred.preferred = Some(25);
+        preferred.include_staging_map = true;
+        assert!(
+            preferred
+                .refreshed(&map, foot + Vec2::X)
+                .include_staging_map
+        );
         assert_eq!(
             preferred.refreshed(&map, foot + Vec2::X).preferred,
             Some(25)
@@ -286,6 +296,7 @@ mod tests {
         map.revision += 1;
         assert!(previous.refreshed(&map, foot).visited.is_empty());
         assert_eq!(preferred.refreshed(&map, foot).preferred, None);
+        assert!(preferred.refreshed(&map, foot).include_staging_map);
         map.revision -= 1;
         map.tick += SEARCH_LIFETIME + 1;
         assert!(previous.refreshed(&map, foot).visited.is_empty());

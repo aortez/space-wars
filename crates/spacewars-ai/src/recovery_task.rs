@@ -179,6 +179,8 @@ pub struct RecoverShipTask {
     seen_rebuilds: Option<(VehicleId, u64)>,
     invalid_observation: bool,
     rebuild_search_enabled: bool,
+    continuous_staging: bool,
+    staging_route_handoff: bool,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
@@ -235,12 +237,18 @@ impl RecoverShipTask {
             seen_rebuilds: None,
             invalid_observation: false,
             rebuild_search_enabled: false,
+            continuous_staging: false,
+            staging_route_handoff: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
         let rebuild_search_enabled = self.rebuild_search_enabled;
+        let continuous_staging = self.continuous_staging;
+        let staging_route_handoff = self.staging_route_handoff;
         *self = Self::new(context);
         self.rebuild_search_enabled = rebuild_search_enabled;
+        self.continuous_staging = continuous_staging;
+        self.staging_route_handoff = staging_route_handoff;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)
@@ -589,7 +597,7 @@ impl RecoverShipTask {
                         self.relocation_missing_since = None;
                         self.ground_task = None;
                     } else if self.rebuild_search_enabled {
-                        self.accept_staging(survey, p, since);
+                        self.accept_staging(survey, o, since);
                     }
                 }
                 if self.telemetry.relocation_site.is_none() && p.tick.saturating_sub(since) > 5 * 60
@@ -785,7 +793,10 @@ impl RecoverShipTask {
                 self.ground_task = Some(GroundNavigationTask::new(self.context, destination));
             }
         }
+        let continuous_staging = self.continuous_staging
+            && self.staging_destination(&o.flight.pilot) == Some(destination);
         let task = self.ground_task.as_mut().unwrap();
+        task.set_continuous_walk(continuous_staging);
         task.set_precise_rebuild(
             self.telemetry
                 .relocation_site

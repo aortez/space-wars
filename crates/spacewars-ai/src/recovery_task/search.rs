@@ -21,6 +21,13 @@ impl RebuildStagingTelemetry {
 }
 
 impl RecoverShipTask {
+    /// Independently opt in to faster staging interiors and measured-map reuse.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_staging_execution(&mut self, continuous_walk: bool, route_handoff: bool) {
+        self.continuous_staging = continuous_walk;
+        self.staging_route_handoff = route_handoff;
+    }
+
     /// Opt-in search scheduling for controlled native experiments.
     #[cfg(feature = "sensor-profile")]
     pub fn set_rebuild_search(&mut self, enabled: bool) {
@@ -35,6 +42,7 @@ impl RecoverShipTask {
     pub fn rebuild_search_request(&self) -> Option<RebuildSearchProgress> {
         self.rebuild_search_enabled.then(|| {
             let mut request = self.telemetry.rebuild_search.clone().unwrap_or_default();
+            request.include_staging_map = self.staging_route_handoff;
             request.preferred = self.staged_search_pending().then(|| {
                 self.telemetry
                     .rebuild_staging
@@ -89,9 +97,10 @@ impl RecoverShipTask {
     pub(super) fn accept_staging(
         &mut self,
         survey: &RebuildRelocationSurvey,
-        p: &PilotObservationV1,
+        o: &RecoveryTaskObservationV1,
         since: u64,
     ) {
+        let p = &o.flight.pilot;
         // One staged move per recovery, counted in the existing four moves.
         if self.telemetry.rebuild_staging.is_some() || self.telemetry.relocations >= 4 {
             return;
@@ -122,6 +131,15 @@ impl RecoverShipTask {
             invalidated_tick: None,
         });
         self.ground_task = None;
+        if self.staging_route_handoff
+            && let Some(map) = &survey.staging_map
+            && let Some(mut task) =
+                GroundNavigationTask::from_staging_map(self.context, stage.position, o, map)
+        {
+            task.set_continuous_walk(self.continuous_staging);
+            self.telemetry.ground = Some(task.telemetry().clone());
+            self.ground_task = Some(task);
+        }
         // The missing-site timer keeps running during this walk and after
         // arrival. A preview or staging proposal cannot buy another five seconds.
     }
