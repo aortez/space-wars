@@ -1,0 +1,6151 @@
+{
+  "schema": 1,
+  "profile": "bounded_high_terrain_flight_v1",
+  "complete": true,
+  "decision": "not_qualified",
+  "runtime_source_commit": "e46f5a587308ef39d2c5ea599c62d6e733d2d1d3",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/surface_mission_soak",
+    "sha256": "3cfa50e7f41c54c577ccf76ec7183d4440ac072de966d1b897bf778709521447"
+  },
+  "frozen_inputs": 945,
+  "fresh_games": 0,
+  "main_replays": 5,
+  "game_retries": 0,
+  "audit_resumes": 0,
+  "default_promotion": false,
+  "screen": {
+    "decision": "not_qualified",
+    "forecast_matches_native": false,
+    "controls_retained": true,
+    "complete_recovery": false,
+    "survival_retained": false,
+    "native_receipt_ticks": {
+      "claim": 23767,
+      "rebuild": 25498,
+      "boarding": null
+    },
+    "default_promotion": false
+  },
+  "runs": {
+    "forecast-probe": {
+      "elapsed_ticks": 29596,
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "completed_recoveries": [
+        1,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        1
+      ],
+      "ships_lost": [
+        2,
+        1
+      ],
+      "retained_physics": true,
+      "retained_non_timing_report": true,
+      "exact_streams": [
+        "capture-evidence.jsonl",
+        "destination-behavior.jsonl",
+        "destination-cover.jsonl",
+        "flag-survey-work.jsonl",
+        "flag-survey.jsonl",
+        "impact.jsonl",
+        "landing-handoffs.jsonl",
+        "mission-evaluation-work.jsonl",
+        "mission-evaluations.jsonl",
+        "trace.jsonl"
+      ],
+      "observer_rows": 59192,
+      "observer_overrides": 0,
+      "terrain_surveys": 0,
+      "terrain_approvals": 0,
+      "launches": {},
+      "comparison": {
+        "common_rows": 59192,
+        "first_observation": null,
+        "first_action": null,
+        "first_native": null,
+        "first_behavior": null
+      },
+      "sensor_cost": {
+        "measured_surveys": 0,
+        "mean_ms": null,
+        "p95_ms": null,
+        "max_ms": null,
+        "over_16_67_ms": 0,
+        "graph_work_max": 0,
+        "query_work_max": 0,
+        "work_exhaustions": 0
+      }
+    },
+    "new-world1-p2-asteroids3-integrated": {
+      "elapsed_ticks": 13337,
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "completed_recoveries": [
+        1,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        1
+      ],
+      "ships_lost": [
+        1,
+        1
+      ],
+      "retained_physics": true,
+      "retained_non_timing_report": true,
+      "exact_streams": [
+        "destination-behavior.jsonl",
+        "destination-cover.jsonl",
+        "flag-survey-work.jsonl",
+        "flag-survey.jsonl",
+        "impact.jsonl",
+        "landing-handoffs.jsonl",
+        "mission-evaluation-work.jsonl",
+        "mission-evaluations.jsonl"
+      ],
+      "observer_rows": 26674,
+      "observer_overrides": 0,
+      "terrain_surveys": 17,
+      "terrain_approvals": 17,
+      "launches": {},
+      "comparison": {
+        "common_rows": 26674,
+        "first_observation": {
+          "tick": 5910,
+          "seat": 0
+        },
+        "first_action": null,
+        "first_native": null,
+        "first_behavior": null
+      },
+      "sensor_cost": {
+        "measured_surveys": 17,
+        "mean_ms": 0.4112770588235294,
+        "p95_ms": 0.424302,
+        "max_ms": 0.424302,
+        "over_16_67_ms": 0,
+        "graph_work_max": 1689,
+        "query_work_max": 1704,
+        "work_exhaustions": 0
+      }
+    },
+    "new-world3-p1-asteroids3-integrated": {
+      "elapsed_ticks": 21833,
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        1
+      ],
+      "ships_lost": [
+        0,
+        1
+      ],
+      "retained_physics": true,
+      "retained_non_timing_report": true,
+      "exact_streams": [
+        "capture-evidence.jsonl",
+        "destination-behavior.jsonl",
+        "destination-cover.jsonl",
+        "flag-survey-work.jsonl",
+        "flag-survey.jsonl",
+        "impact.jsonl",
+        "landing-handoffs.jsonl",
+        "mission-evaluation-work.jsonl",
+        "mission-evaluations.jsonl",
+        "trace.jsonl"
+      ],
+      "observer_rows": 43666,
+      "observer_overrides": 0,
+      "terrain_surveys": 0,
+      "terrain_approvals": 0,
+      "launches": {},
+      "comparison": {
+        "common_rows": 43666,
+        "first_observation": null,
+        "first_action": null,
+        "first_native": null,
+        "first_behavior": null
+      },
+      "sensor_cost": {
+        "measured_surveys": 0,
+        "mean_ms": null,
+        "p95_ms": null,
+        "max_ms": null,
+        "over_16_67_ms": 0,
+        "graph_work_max": 0,
+        "query_work_max": 0,
+        "work_exhaustions": 0
+      }
+    },
+    "new-world3-p1-asteroids3-no-stop": {
+      "elapsed_ticks": 11509,
+      "outcomes": [
+        "loss",
+        "win"
+      ],
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "pilot_deaths": [
+        1,
+        0
+      ],
+      "ships_lost": [
+        1,
+        0
+      ],
+      "retained_physics": true,
+      "retained_non_timing_report": true,
+      "exact_streams": [
+        "capture-evidence.jsonl",
+        "destination-behavior.jsonl",
+        "destination-cover.jsonl",
+        "flag-survey-work.jsonl",
+        "flag-survey.jsonl",
+        "impact.jsonl",
+        "landing-handoffs.jsonl",
+        "mission-evaluation-work.jsonl",
+        "mission-evaluations.jsonl",
+        "trace.jsonl"
+      ],
+      "observer_rows": 23018,
+      "observer_overrides": 0,
+      "terrain_surveys": 0,
+      "terrain_approvals": 0,
+      "launches": {},
+      "comparison": {
+        "common_rows": 23018,
+        "first_observation": null,
+        "first_action": null,
+        "first_native": null,
+        "first_behavior": null
+      },
+      "sensor_cost": {
+        "measured_surveys": 0,
+        "mean_ms": null,
+        "p95_ms": null,
+        "max_ms": null,
+        "over_16_67_ms": 0,
+        "graph_work_max": 0,
+        "query_work_max": 0,
+        "work_exhaustions": 0
+      }
+    },
+    "new-world1-p2-asteroids3-no-stop": {
+      "elapsed_ticks": 36000,
+      "outcomes": [
+        "loss",
+        "win"
+      ],
+      "completed_recoveries": [
+        1,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        0
+      ],
+      "ships_lost": [
+        2,
+        2
+      ],
+      "retained_physics": false,
+      "retained_non_timing_report": false,
+      "exact_streams": [
+        "destination-cover.jsonl",
+        "flag-survey.jsonl",
+        "landing-handoffs.jsonl"
+      ],
+      "observer_rows": 72000,
+      "observer_overrides": 0,
+      "terrain_surveys": 239,
+      "terrain_approvals": 181,
+      "launches": {
+        "1:18278:22883": {
+          "tick": 22932,
+          "seat": 1,
+          "ground_deadline": 23678,
+          "forecast": {
+            "flights": [
+              {
+                "arrival_speed": 3.4190826416015625,
+                "burn_seconds": 1.66666579246521,
+                "seconds": 4.800000190734863
+              },
+              {
+                "arrival_speed": 2.934702157974243,
+                "burn_seconds": 1.7666656970977783,
+                "seconds": 5.150000095367432
+              }
+            ],
+            "launch_until_tick": 22935,
+            "measured_tick": 22905,
+            "nodes": [
+              273,
+              285
+            ],
+            "plan": {
+              "anchor": {
+                "GroundGap": {
+                  "from": 276,
+                  "to": 282
+                }
+              },
+              "cruise_radius": 39.20267868041992,
+              "destination": {
+                "x": 12.613750457763672,
+                "y": -33.93416213989258
+              },
+              "direction": "Left",
+              "planet": 0,
+              "revision": 21,
+              "start": {
+                "x": 5.0838303565979,
+                "y": -24.013723373413086
+              }
+            },
+            "version": 1
+          },
+          "plan": {
+            "anchor": {
+              "GroundGap": {
+                "from": 276,
+                "to": 282
+              }
+            },
+            "cruise_radius": 39.20267868041992,
+            "destination": {
+              "x": 12.613750457763672,
+              "y": -33.93416213989258
+            },
+            "direction": "Left",
+            "planet": 0,
+            "revision": 21,
+            "start": {
+              "x": 5.0838303565979,
+              "y": -24.013723373413086
+            }
+          },
+          "minimum_charge": 0.4444429874420166,
+          "completed_tick": 23226
+        }
+      },
+      "comparison": {
+        "common_rows": 59192,
+        "first_observation": {
+          "tick": 5910,
+          "seat": 0
+        },
+        "first_action": {
+          "tick": 22883,
+          "seat": 1
+        },
+        "first_native": {
+          "tick": 22884,
+          "seat": 1
+        },
+        "first_behavior": {
+          "tick": 20745,
+          "seat": 1
+        }
+      },
+      "sensor_cost": {
+        "measured_surveys": 239,
+        "mean_ms": 0.621655079497908,
+        "p95_ms": 1.031248,
+        "max_ms": 1.6144,
+        "over_16_67_ms": 0,
+        "graph_work_max": 6505,
+        "query_work_max": 7837,
+        "work_exhaustions": 0
+      }
+    }
+  },
+  "native_receipts": {
+    "launch_tick": 22932,
+    "completed_tick": 23226,
+    "launch_forecast": {
+      "flights": [
+        {
+          "arrival_speed": 3.4190826416015625,
+          "burn_seconds": 1.66666579246521,
+          "seconds": 4.800000190734863
+        },
+        {
+          "arrival_speed": 2.934702157974243,
+          "burn_seconds": 1.7666656970977783,
+          "seconds": 5.150000095367432
+        }
+      ],
+      "launch_until_tick": 22935,
+      "measured_tick": 22905,
+      "nodes": [
+        273,
+        285
+      ],
+      "plan": {
+        "anchor": {
+          "GroundGap": {
+            "from": 276,
+            "to": 282
+          }
+        },
+        "cruise_radius": 39.20267868041992,
+        "destination": {
+          "x": 12.613750457763672,
+          "y": -33.93416213989258
+        },
+        "direction": "Left",
+        "planet": 0,
+        "revision": 21,
+        "start": {
+          "x": 5.0838303565979,
+          "y": -24.013723373413086
+        }
+      },
+      "version": 1
+    },
+    "launch_age_ticks": 27,
+    "initial_charge": 1.0,
+    "minimum_charge": 0.4444429874420166,
+    "predicted_seconds": 4.800000190734863,
+    "actual_seconds": 4.9,
+    "predicted_burn_seconds": 1.66666579246521,
+    "actual_burn_seconds": 1.6666569709777832,
+    "feet_from_destination": 0.0717163376674196,
+    "relative_speed": 0.4229105879883566,
+    "original_ground_started": 18278,
+    "ground_deadline": 23678,
+    "walk_arrival_tick": 23421,
+    "claim_tick": 23767,
+    "rebuild_ticks": [
+      25498,
+      27060
+    ],
+    "first_boarding_failure_tick": 26400,
+    "final_recovery_failure_tick": 27962,
+    "boarded": false,
+    "completed_recoveries": 0
+  },
+  "probe": {
+    "results": [
+      {
+        "tick": 22575,
+        "survey": {
+          "attempts": [
+            {
+              "height": 3.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 3,
+              "nodes": [
+                273,
+                285
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 3,
+              "nodes": [
+                273,
+                285
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 3,
+              "nodes": [
+                273,
+                285
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 4,
+              "nodes": [
+                272,
+                286
+              ],
+              "rejection": null
+            }
+          ],
+          "forecast": {
+            "flights": [
+              {
+                "arrival_speed": 3.4129655361175537,
+                "burn_seconds": 1.7166657447814941,
+                "seconds": 4.950000286102295
+              },
+              {
+                "arrival_speed": 2.952807664871216,
+                "burn_seconds": 1.8166656494140625,
+                "seconds": 5.316667079925537
+              }
+            ],
+            "launch_until_tick": 22605,
+            "measured_tick": 22575,
+            "nodes": [
+              272,
+              286
+            ],
+            "plan": {
+              "anchor": {
+                "GroundGap": {
+                  "from": 276,
+                  "to": 282
+                }
+              },
+              "cruise_radius": 39.204986572265625,
+              "destination": {
+                "x": 13.029970169067383,
+                "y": -33.77900314331055
+              },
+              "direction": "Left",
+              "planet": 0,
+              "revision": 21,
+              "start": {
+                "x": 4.781407356262207,
+                "y": -24.03741455078125
+              }
+            },
+            "version": 1
+          },
+          "graph_work": 3778,
+          "query_work": 5214
+        },
+        "same_native_plan": false,
+        "launch_forecast": {
+          "flights": [
+            {
+              "arrival_speed": 3.399263858795166,
+              "burn_seconds": 1.66666579246521,
+              "seconds": 4.800000190734863
+            },
+            {
+              "arrival_speed": 3.1490931510925293,
+              "burn_seconds": 1.7666656970977783,
+              "seconds": 5.1666669845581055
+            }
+          ],
+          "launch_until_tick": 22965,
+          "measured_tick": 22935,
+          "nodes": [
+            273,
+            285
+          ],
+          "plan": {
+            "anchor": {
+              "GroundGap": {
+                "from": 276,
+                "to": 282
+              }
+            },
+            "cruise_radius": 39.20258331298828,
+            "destination": {
+              "x": 12.6137056350708,
+              "y": -33.93407440185547
+            },
+            "direction": "Left",
+            "planet": 0,
+            "revision": 21,
+            "start": {
+              "x": 5.083761692047119,
+              "y": -24.013708114624023
+            }
+          },
+          "version": 1
+        },
+        "flight_rows_exact": 648,
+        "measurements": [
+          {
+            "tick": 22575,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4129655361175537,
+                    "burn_seconds": 1.7166657447814941,
+                    "seconds": 4.950000286102295
+                  },
+                  {
+                    "arrival_speed": 2.952807664871216,
+                    "burn_seconds": 1.8166656494140625,
+                    "seconds": 5.316667079925537
+                  }
+                ],
+                "launch_until_tick": 22605,
+                "measured_tick": 22575,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.204986572265625,
+                  "destination": {
+                    "x": 13.029970169067383,
+                    "y": -33.77900314331055
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781407356262207,
+                    "y": -24.03741455078125
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3778,
+              "query_work": 5214
+            }
+          },
+          {
+            "tick": 22605,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4367856979370117,
+                    "burn_seconds": 1.7166657447814941,
+                    "seconds": 4.950000286102295
+                  },
+                  {
+                    "arrival_speed": 2.940711259841919,
+                    "burn_seconds": 1.8166656494140625,
+                    "seconds": 5.316667079925537
+                  }
+                ],
+                "launch_until_tick": 22635,
+                "measured_tick": 22605,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20515823364258,
+                  "destination": {
+                    "x": 13.030050277709961,
+                    "y": -33.779151916503906
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.78141975402832,
+                    "y": -24.03743553161621
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3790,
+              "query_work": 5226
+            }
+          },
+          {
+            "tick": 22635,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3829967975616455,
+                    "burn_seconds": 1.7166657447814941,
+                    "seconds": 4.933333396911621
+                  },
+                  {
+                    "arrival_speed": 2.964341878890991,
+                    "burn_seconds": 1.8166656494140625,
+                    "seconds": 5.316667079925537
+                  }
+                ],
+                "launch_until_tick": 22665,
+                "measured_tick": 22635,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20515823364258,
+                  "destination": {
+                    "x": 13.030038833618164,
+                    "y": -33.77915954589844
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781312942504883,
+                    "y": -24.037433624267578
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3786,
+              "query_work": 5222
+            }
+          },
+          {
+            "tick": 22665,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3798139095306396,
+                    "burn_seconds": 1.7166657447814941,
+                    "seconds": 4.933333396911621
+                  },
+                  {
+                    "arrival_speed": 2.9302010536193848,
+                    "burn_seconds": 1.8333323001861572,
+                    "seconds": 5.350000381469727
+                  }
+                ],
+                "launch_until_tick": 22695,
+                "measured_tick": 22665,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20506286621094,
+                  "destination": {
+                    "x": 13.03005599975586,
+                    "y": -33.779048919677734
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781325817108154,
+                    "y": -24.037456512451172
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3803,
+              "query_work": 5239
+            }
+          },
+          {
+            "tick": 22695,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3392908573150635,
+                    "burn_seconds": 1.7166657447814941,
+                    "seconds": 4.933333396911621
+                  },
+                  {
+                    "arrival_speed": 2.9762399196624756,
+                    "burn_seconds": 1.8333323001861572,
+                    "seconds": 5.350000381469727
+                  }
+                ],
+                "launch_until_tick": 22725,
+                "measured_tick": 22695,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.205169677734375,
+                  "destination": {
+                    "x": 13.030017852783203,
+                    "y": -33.779178619384766
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781338691711426,
+                    "y": -24.03748321533203
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3822,
+              "query_work": 5258
+            }
+          },
+          {
+            "tick": 22725,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5245466232299805,
+                    "burn_seconds": 1.7333323955535889,
+                    "seconds": 4.983333587646484
+                  },
+                  {
+                    "arrival_speed": 2.9926764965057373,
+                    "burn_seconds": 1.8333323001861572,
+                    "seconds": 5.350000381469727
+                  }
+                ],
+                "launch_until_tick": 22755,
+                "measured_tick": 22725,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.205074310302734,
+                  "destination": {
+                    "x": 13.030035018920898,
+                    "y": -33.77907180786133
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781352519989014,
+                    "y": -24.037513732910156
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3832,
+              "query_work": 5268
+            }
+          },
+          {
+            "tick": 22755,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3594706058502197,
+                    "burn_seconds": 1.7333323955535889,
+                    "seconds": 4.9666666984558105
+                  },
+                  {
+                    "arrival_speed": 2.987069606781006,
+                    "burn_seconds": 1.849998950958252,
+                    "seconds": 5.383333683013916
+                  }
+                ],
+                "launch_until_tick": 22785,
+                "measured_tick": 22755,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20508575439453,
+                  "destination": {
+                    "x": 13.030027389526367,
+                    "y": -33.77908706665039
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781393527984619,
+                    "y": -24.037425994873047
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3850,
+              "query_work": 5286
+            }
+          },
+          {
+            "tick": 22785,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5820815563201904,
+                    "burn_seconds": 1.7333323955535889,
+                    "seconds": 4.983333587646484
+                  },
+                  {
+                    "arrival_speed": 2.932812213897705,
+                    "burn_seconds": 1.849998950958252,
+                    "seconds": 5.383333683013916
+                  }
+                ],
+                "launch_until_tick": 22815,
+                "measured_tick": 22785,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20500183105469,
+                  "destination": {
+                    "x": 13.030047416687012,
+                    "y": -33.778987884521484
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781288146972656,
+                    "y": -24.037429809570312
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3866,
+              "query_work": 5302
+            }
+          },
+          {
+            "tick": 22815,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.308852195739746,
+                    "burn_seconds": 1.7333323955535889,
+                    "seconds": 4.9666666984558105
+                  },
+                  {
+                    "arrival_speed": 2.931849241256714,
+                    "burn_seconds": 1.8666656017303467,
+                    "seconds": 5.4166669845581055
+                  }
+                ],
+                "launch_until_tick": 22845,
+                "measured_tick": 22815,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20512008666992,
+                  "destination": {
+                    "x": 13.03001594543457,
+                    "y": -33.77912902832031
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781303882598877,
+                    "y": -24.03746795654297
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3869,
+              "query_work": 5305
+            }
+          },
+          {
+            "tick": 22845,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 4,
+                  "nodes": [
+                    272,
+                    286
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.309126853942871,
+                    "burn_seconds": 1.7333323955535889,
+                    "seconds": 4.9666666984558105
+                  },
+                  {
+                    "arrival_speed": 2.8130688667297363,
+                    "burn_seconds": 1.8666656017303467,
+                    "seconds": 5.4166669845581055
+                  }
+                ],
+                "launch_until_tick": 22875,
+                "measured_tick": 22845,
+                "nodes": [
+                  272,
+                  286
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20514678955078,
+                  "destination": {
+                    "x": 13.030012130737305,
+                    "y": -33.77915573120117
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 4.781437873840332,
+                    "y": -24.03753089904785
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3881,
+              "query_work": 5317
+            }
+          },
+          {
+            "tick": 22875,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5619406700134277,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 2.805429697036743,
+                    "burn_seconds": 1.7499990463256836,
+                    "seconds": 5.116666793823242
+                  }
+                ],
+                "launch_until_tick": 22905,
+                "measured_tick": 22875,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20271682739258,
+                  "destination": {
+                    "x": 12.613678932189941,
+                    "y": -33.934226989746094
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.0837812423706055,
+                    "y": -24.013713836669922
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2104,
+              "query_work": 3083
+            }
+          },
+          {
+            "tick": 22905,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4190826416015625,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 2.934702157974243,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.150000095367432
+                  }
+                ],
+                "launch_until_tick": 22935,
+                "measured_tick": 22905,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20267868041992,
+                  "destination": {
+                    "x": 12.613750457763672,
+                    "y": -33.93416213989258
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.0838303565979,
+                    "y": -24.013723373413086
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2105,
+              "query_work": 3084
+            }
+          },
+          {
+            "tick": 22935,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.399263858795166,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.1490931510925293,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.1666669845581055
+                  }
+                ],
+                "launch_until_tick": 22965,
+                "measured_tick": 22935,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20258331298828,
+                  "destination": {
+                    "x": 12.6137056350708,
+                    "y": -33.93407440185547
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083761692047119,
+                    "y": -24.013708114624023
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2115,
+              "query_work": 3094
+            }
+          },
+          {
+            "tick": 22965,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3800830841064453,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.1465327739715576,
+                    "burn_seconds": 1.7499990463256836,
+                    "seconds": 5.133333683013916
+                  }
+                ],
+                "launch_until_tick": 22995,
+                "measured_tick": 22965,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202659606933594,
+                  "destination": {
+                    "x": 12.613752365112305,
+                    "y": -33.934139251708984
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083719253540039,
+                    "y": -24.013574600219727
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2112,
+              "query_work": 3091
+            }
+          },
+          {
+            "tick": 22995,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3414132595062256,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.0957143306732178,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.200000286102295
+                  }
+                ],
+                "launch_until_tick": 23025,
+                "measured_tick": 22995,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202667236328125,
+                  "destination": {
+                    "x": 12.613683700561523,
+                    "y": -33.934173583984375
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083743095397949,
+                    "y": -24.013708114624023
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2118,
+              "query_work": 3097
+            }
+          },
+          {
+            "tick": 23025,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3147101402282715,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 2.957693338394165,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.1666669845581055
+                  }
+                ],
+                "launch_until_tick": 23055,
+                "measured_tick": 23025,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.2026481628418,
+                  "destination": {
+                    "x": 12.613759994506836,
+                    "y": -33.93412399291992
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083675384521484,
+                    "y": -24.01369857788086
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2124,
+              "query_work": 3103
+            }
+          },
+          {
+            "tick": 23055,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5291640758514404,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.816667079925537
+                  },
+                  {
+                    "arrival_speed": 3.0834903717041016,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.183333396911621
+                  }
+                ],
+                "launch_until_tick": 23085,
+                "measured_tick": 23055,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20266342163086,
+                  "destination": {
+                    "x": 12.613689422607422,
+                    "y": -33.934165954589844
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083726406097412,
+                    "y": -24.013717651367188
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2129,
+              "query_work": 3108
+            }
+          },
+          {
+            "tick": 23085,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5325024127960205,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.850000381469727
+                  },
+                  {
+                    "arrival_speed": 3.084974527359009,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23115,
+                "measured_tick": 23085,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.2026481628418,
+                  "destination": {
+                    "x": 12.61376953125,
+                    "y": -33.934120178222656
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083778381347656,
+                    "y": -24.01373863220215
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2139,
+              "query_work": 3118
+            }
+          },
+          {
+            "tick": 23115,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.1611416339874268,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.0000088214874268,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23145,
+                "measured_tick": 23115,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202674865722656,
+                  "destination": {
+                    "x": 12.613702774047852,
+                    "y": -33.934173583984375
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083738327026367,
+                    "y": -24.01361656188965
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2137,
+              "query_work": 3116
+            }
+          },
+          {
+            "tick": 23145,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5291364192962646,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.866666793823242
+                  },
+                  {
+                    "arrival_speed": 2.87827730178833,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23175,
+                "measured_tick": 23145,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20259475708008,
+                  "destination": {
+                    "x": 12.613665580749512,
+                    "y": -33.934104919433594
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083672523498535,
+                    "y": -24.013614654541016
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2151,
+              "query_work": 3130
+            }
+          },
+          {
+            "tick": 23175,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.452608108520508,
+                    "burn_seconds": 1.6999990940093994,
+                    "seconds": 4.883333683013916
+                  },
+                  {
+                    "arrival_speed": 2.8690133094787598,
+                    "burn_seconds": 1.7999989986419678,
+                    "seconds": 5.266666889190674
+                  }
+                ],
+                "launch_until_tick": 23205,
+                "measured_tick": 23175,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202693939208984,
+                  "destination": {
+                    "x": 12.613720893859863,
+                    "y": -33.93418884277344
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083725929260254,
+                    "y": -24.013641357421875
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2163,
+              "query_work": 3142
+            }
+          },
+          {
+            "tick": 23205,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4248838424682617,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.866666793823242
+                  },
+                  {
+                    "arrival_speed": 2.839998960494995,
+                    "burn_seconds": 1.7999989986419678,
+                    "seconds": 5.266666889190674
+                  }
+                ],
+                "launch_until_tick": 23235,
+                "measured_tick": 23205,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20262145996094,
+                  "destination": {
+                    "x": 12.613683700561523,
+                    "y": -33.93412399291992
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.0837788581848145,
+                    "y": -24.013669967651367
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3678,
+              "query_work": 4651
+            }
+          }
+        ],
+        "actual_launch_tick": 22952,
+        "actual_completion_tick": 23222,
+        "actual_minimum_charge": 0.45555412769317627,
+        "control_exact_ticks": 1104
+      },
+      {
+        "tick": 22965,
+        "survey": {
+          "attempts": [
+            {
+              "height": 3.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 0,
+              "nodes": [
+                276,
+                282
+              ],
+              "rejection": "corridor_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 1,
+              "nodes": [
+                275,
+                283
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 5.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 7.0,
+              "margin": 2,
+              "nodes": [
+                274,
+                284
+              ],
+              "rejection": "world_clearance"
+            },
+            {
+              "height": 3.0,
+              "margin": 3,
+              "nodes": [
+                273,
+                285
+              ],
+              "rejection": null
+            }
+          ],
+          "forecast": {
+            "flights": [
+              {
+                "arrival_speed": 3.3800830841064453,
+                "burn_seconds": 1.66666579246521,
+                "seconds": 4.800000190734863
+              },
+              {
+                "arrival_speed": 3.1465327739715576,
+                "burn_seconds": 1.7499990463256836,
+                "seconds": 5.133333683013916
+              }
+            ],
+            "launch_until_tick": 22995,
+            "measured_tick": 22965,
+            "nodes": [
+              273,
+              285
+            ],
+            "plan": {
+              "anchor": {
+                "GroundGap": {
+                  "from": 276,
+                  "to": 282
+                }
+              },
+              "cruise_radius": 39.202659606933594,
+              "destination": {
+                "x": 12.613752365112305,
+                "y": -33.934139251708984
+              },
+              "direction": "Left",
+              "planet": 0,
+              "revision": 21,
+              "start": {
+                "x": 5.083719253540039,
+                "y": -24.013574600219727
+              }
+            },
+            "version": 1
+          },
+          "graph_work": 2112,
+          "query_work": 3091
+        },
+        "same_native_plan": false,
+        "launch_forecast": {
+          "flights": [
+            {
+              "arrival_speed": 3.3800830841064453,
+              "burn_seconds": 1.66666579246521,
+              "seconds": 4.800000190734863
+            },
+            {
+              "arrival_speed": 3.1465327739715576,
+              "burn_seconds": 1.7499990463256836,
+              "seconds": 5.133333683013916
+            }
+          ],
+          "launch_until_tick": 22995,
+          "measured_tick": 22965,
+          "nodes": [
+            273,
+            285
+          ],
+          "plan": {
+            "anchor": {
+              "GroundGap": {
+                "from": 276,
+                "to": 282
+              }
+            },
+            "cruise_radius": 39.202659606933594,
+            "destination": {
+              "x": 12.613752365112305,
+              "y": -33.934139251708984
+            },
+            "direction": "Left",
+            "planet": 0,
+            "revision": 21,
+            "start": {
+              "x": 5.083719253540039,
+              "y": -24.013574600219727
+            }
+          },
+          "version": 1
+        },
+        "flight_rows_exact": 274,
+        "measurements": [
+          {
+            "tick": 22965,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3800830841064453,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.1465327739715576,
+                    "burn_seconds": 1.7499990463256836,
+                    "seconds": 5.133333683013916
+                  }
+                ],
+                "launch_until_tick": 22995,
+                "measured_tick": 22965,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202659606933594,
+                  "destination": {
+                    "x": 12.613752365112305,
+                    "y": -33.934139251708984
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083719253540039,
+                    "y": -24.013574600219727
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2112,
+              "query_work": 3091
+            }
+          },
+          {
+            "tick": 22995,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3414132595062256,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.0957143306732178,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.200000286102295
+                  }
+                ],
+                "launch_until_tick": 23025,
+                "measured_tick": 22995,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202667236328125,
+                  "destination": {
+                    "x": 12.613683700561523,
+                    "y": -33.934173583984375
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083743095397949,
+                    "y": -24.013708114624023
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2118,
+              "query_work": 3097
+            }
+          },
+          {
+            "tick": 23025,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3147101402282715,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 2.957693338394165,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.1666669845581055
+                  }
+                ],
+                "launch_until_tick": 23055,
+                "measured_tick": 23025,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.2026481628418,
+                  "destination": {
+                    "x": 12.613759994506836,
+                    "y": -33.93412399291992
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083675384521484,
+                    "y": -24.01369857788086
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2124,
+              "query_work": 3103
+            }
+          },
+          {
+            "tick": 23055,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5291640758514404,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.816667079925537
+                  },
+                  {
+                    "arrival_speed": 3.0834903717041016,
+                    "burn_seconds": 1.7666656970977783,
+                    "seconds": 5.183333396911621
+                  }
+                ],
+                "launch_until_tick": 23085,
+                "measured_tick": 23055,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20266342163086,
+                  "destination": {
+                    "x": 12.613689422607422,
+                    "y": -33.934165954589844
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083726406097412,
+                    "y": -24.013717651367188
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2129,
+              "query_work": 3108
+            }
+          },
+          {
+            "tick": 23085,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5325024127960205,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.850000381469727
+                  },
+                  {
+                    "arrival_speed": 3.084974527359009,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23115,
+                "measured_tick": 23085,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.2026481628418,
+                  "destination": {
+                    "x": 12.61376953125,
+                    "y": -33.934120178222656
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083778381347656,
+                    "y": -24.01373863220215
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2139,
+              "query_work": 3118
+            }
+          },
+          {
+            "tick": 23115,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.1611416339874268,
+                    "burn_seconds": 1.66666579246521,
+                    "seconds": 4.800000190734863
+                  },
+                  {
+                    "arrival_speed": 3.0000088214874268,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23145,
+                "measured_tick": 23115,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202674865722656,
+                  "destination": {
+                    "x": 12.613702774047852,
+                    "y": -33.934173583984375
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083738327026367,
+                    "y": -24.01361656188965
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2137,
+              "query_work": 3116
+            }
+          },
+          {
+            "tick": 23145,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.5291364192962646,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.866666793823242
+                  },
+                  {
+                    "arrival_speed": 2.87827730178833,
+                    "burn_seconds": 1.783332347869873,
+                    "seconds": 5.216667175292969
+                  }
+                ],
+                "launch_until_tick": 23175,
+                "measured_tick": 23145,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20259475708008,
+                  "destination": {
+                    "x": 12.613665580749512,
+                    "y": -33.934104919433594
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083672523498535,
+                    "y": -24.013614654541016
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2151,
+              "query_work": 3130
+            }
+          },
+          {
+            "tick": 23175,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.452608108520508,
+                    "burn_seconds": 1.6999990940093994,
+                    "seconds": 4.883333683013916
+                  },
+                  {
+                    "arrival_speed": 2.8690133094787598,
+                    "burn_seconds": 1.7999989986419678,
+                    "seconds": 5.266666889190674
+                  }
+                ],
+                "launch_until_tick": 23205,
+                "measured_tick": 23175,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202693939208984,
+                  "destination": {
+                    "x": 12.613720893859863,
+                    "y": -33.93418884277344
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083725929260254,
+                    "y": -24.013641357421875
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 2163,
+              "query_work": 3142
+            }
+          },
+          {
+            "tick": 23205,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4248838424682617,
+                    "burn_seconds": 1.6833324432373047,
+                    "seconds": 4.866666793823242
+                  },
+                  {
+                    "arrival_speed": 2.839998960494995,
+                    "burn_seconds": 1.7999989986419678,
+                    "seconds": 5.266666889190674
+                  }
+                ],
+                "launch_until_tick": 23235,
+                "measured_tick": 23205,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.20262145996094,
+                  "destination": {
+                    "x": 12.613683700561523,
+                    "y": -33.93412399291992
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.0837788581848145,
+                    "y": -24.013669967651367
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3678,
+              "query_work": 4651
+            }
+          },
+          {
+            "tick": 23235,
+            "survey": {
+              "attempts": [
+                {
+                  "height": 3.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 0,
+                  "nodes": [
+                    276,
+                    282
+                  ],
+                  "rejection": "corridor_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 1,
+                  "nodes": [
+                    275,
+                    283
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 5.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 7.0,
+                  "margin": 2,
+                  "nodes": [
+                    274,
+                    284
+                  ],
+                  "rejection": "world_clearance"
+                },
+                {
+                  "height": 3.0,
+                  "margin": 3,
+                  "nodes": [
+                    273,
+                    285
+                  ],
+                  "rejection": null
+                }
+              ],
+              "forecast": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.3359947204589844,
+                    "burn_seconds": 1.6999990940093994,
+                    "seconds": 4.900000095367432
+                  },
+                  {
+                    "arrival_speed": 2.898191213607788,
+                    "burn_seconds": 1.7999989986419678,
+                    "seconds": 5.283333778381348
+                  }
+                ],
+                "launch_until_tick": 23265,
+                "measured_tick": 23235,
+                "nodes": [
+                  273,
+                  285
+                ],
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 276,
+                      "to": 282
+                    }
+                  },
+                  "cruise_radius": 39.202659606933594,
+                  "destination": {
+                    "x": 12.613622665405273,
+                    "y": -33.93418502807617
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 21,
+                  "start": {
+                    "x": 5.083714485168457,
+                    "y": -24.013673782348633
+                  }
+                },
+                "version": 1
+              },
+              "graph_work": 3789,
+              "query_work": 4762
+            }
+          }
+        ],
+        "actual_launch_tick": 22969,
+        "actual_completion_tick": 23238,
+        "actual_minimum_charge": 0.4611096978187561,
+        "control_exact_ticks": 714
+      }
+    ],
+    "both_native_plans_forecast": false
+  },
+  "validation": {
+    "native_jetpack": {
+      "command": "cargo +1.89.0 test --locked -p scenario-spacewars --features sensor-profile surface_sortie::jetpack",
+      "scope": "final runtime",
+      "exit_code": 0,
+      "passed_tests": 13,
+      "sha256": "6037fed0e2e09f7aba1fae26022f4e3b22b3325f6a6711acf7decdac51b25a65"
+    },
+    "affected_bot_and_harness": {
+      "command": "cargo +1.89.0 test --locked -p spacewars-ai --test ground_navigation --test surface_recovery --example surface_mission_soak --features sensor-profile",
+      "scope": "final runtime; harness hook rechecked below",
+      "exit_code": 0,
+      "passed_tests": 133,
+      "sha256": "7ca31431726cac75ac910004ffb1010dad2112c5a44b2adc5fa2ad384bdb2d80"
+    },
+    "harness": {
+      "command": "cargo +1.89.0 test --locked -p spacewars-ai --example surface_mission_soak --features sensor-profile",
+      "scope": "frozen source",
+      "exit_code": 0,
+      "passed_tests": 60,
+      "sha256": "ebb8f6dde75a2fb4694eb24d618027fec1c8bc398b2d6f007050cd6a509cf3e2"
+    },
+    "python": {
+      "command": "python3 -m unittest discover -s tools/tests",
+      "scope": "frozen source",
+      "exit_code": 0,
+      "passed_tests": 941,
+      "sha256": "68f571bf7e07ea334585b3a715a688787e76eca6cbbdb9931fa3f1d74b1f45ae"
+    },
+    "clippy": {
+      "command": "cargo +1.89.0 clippy --locked -p spacewars-ai --lib --tests --features sensor-profile --no-deps -- -D warnings",
+      "scope": "bot-scoped final runtime; unchanged existing scenario-wide lint failures are outside this invocation",
+      "exit_code": 0,
+      "passed_tests": null,
+      "sha256": "8893bb83cca1aeac3dd7bf0eb5400f95c3e5d3d3002bd63aad92e587c65bf8b2"
+    },
+    "format": {
+      "command": "cargo +1.89.0 fmt --all -- --check",
+      "scope": "frozen source",
+      "exit_code": 0,
+      "passed_tests": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "command": "cargo +1.89.0 build --release --locked -p spacewars-ai --example surface_mission_soak --features sensor-profile",
+      "scope": "frozen source",
+      "exit_code": 0,
+      "passed_tests": null,
+      "sha256": "0d1c963fa430b0593c2683461ae393616c907ca4dc45d16fbbb179c857963702"
+    },
+    "broader_development_bot": {
+      "command": "cargo +1.89.0 test --locked -p spacewars-ai --lib --tests --features sensor-profile",
+      "scope": "development build before final scoped guard refinement; final affected tests rerun separately",
+      "exit_code": 0,
+      "passed_tests": 560,
+      "sha256": "6a785f00e688df019542571832d19143cfadd60c3e609d87d040a444894b0a72"
+    }
+  },
+  "archives": {
+    "forecast-probe": {
+      "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/forecast-probe.tar.gz",
+      "sha256": "591e78622bbcb51fe514064de2746f7a21177398dd5c9b9298bc0580a817e64e",
+      "bytes": 199989751,
+      "raw_bytes": 1432383276,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "9ed12d4ee4247c20414b79e84af58c3292ab366801377590a991e68eccc0eeaf",
+          "bytes": 130
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "d1b3dec186ba67a5075e1d4a38f864ce3931f6306d0755430efecd2b43e68340",
+          "bytes": 313079352
+        },
+        "clearance-audit.json": {
+          "sha256": "46e6dd3e00402dfd79fb3ff8988c848cd802adfa9add18e11ded6a5f5a29a167",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "258f4bbbaa7dc73afdd907dc146ddf9cabfd616a0fd42a329c0cd695cb672755",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "b091d1e2e8104804d18f3324d014ec797f6f50ab49e61a8273079d1dce4d2b5b",
+          "bytes": 23224136
+        },
+        "destination-cover.jsonl": {
+          "sha256": "5cdb128715ad4fa286a6f23b61da533dd02abfba5f77d635919dc149fae6bfcd",
+          "bytes": 1612734
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "0129243097edd573e8b2ad2174472a000a399e1fb18cd73aaefc8ec6dd19502d",
+          "bytes": 6778711
+        },
+        "flag-survey.jsonl": {
+          "sha256": "a6449dd63233e756b5fa638beec86a606084f6d019e9ea4835cb27d1e8a257fe",
+          "bytes": 12024
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "f2ba85f822c2f1dbd7f869e30fafb3936d79db578190e545ad32563f91a96fd2",
+          "bytes": 3225913
+        },
+        "high-ledge-flight-22575.jsonl": {
+          "sha256": "614f73290484ed57aa7bedb937207884d89991d8f87ed3740b7153d92c48b264",
+          "bytes": 5333145
+        },
+        "high-ledge-flight-22965.jsonl": {
+          "sha256": "a4338bacf1c2edc6561dd0f9ae7770e07543cfa845afa44c6840fb81635d4209",
+          "bytes": 2288155
+        },
+        "high-ledge-probe.json": {
+          "sha256": "55d1a2bca397e168e69ab45acc85575e9cd3ec08a491a8b2fdf7f7a4bd61d2a3",
+          "bytes": 691420
+        },
+        "high-ledge-reference.jsonl": {
+          "sha256": "03b38dbbf0b0f9236ff449123e4c175f0d0167972240315d4596592d0b4054e8",
+          "bytes": 5490796
+        },
+        "impact.jsonl": {
+          "sha256": "e26c1bd985dedb4d785fab2fe5b859f4f6bd3d08ed0f87ff2a7273dc4439e044",
+          "bytes": 174875284
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "49866f00b2749c2774b4374ca4d4e26e58f3bc09584b83920179309770289f37",
+          "bytes": 404915
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "34a7579517d1992dd34294aaa64403e3501b90a666cccbbb48fcc4328d3e2192",
+          "bytes": 4872017
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "0832c321d07392012283a8a0d504af722401a1f65a67c37866ca6c1dc9aa1d45",
+          "bytes": 16914446
+        },
+        "native-recovery-audit.json": {
+          "sha256": "1180d7cb0a4c9092c61fb0fa9939835e9c992b9b8cf5ff6ed49f1ce1e9ee0ede",
+          "bytes": 61
+        },
+        "new-world1-p2-asteroids3-no-stop-audit.json": {
+          "sha256": "fa9990136cd571aefdfec4046f23ad03d3e6831b0deda1b8819c97b12d66dc1f",
+          "bytes": 362326
+        },
+        "report.json": {
+          "sha256": "eaa9e9bc5706c3878c5f64724e54b22ff1c19b7c77b3087666c78b548976ef5c",
+          "bytes": 18366592
+        },
+        "sensors.jsonl": {
+          "sha256": "86c74485cda394eb36f563b0fd3884eb115041be24d00e189f06ed3256a8497e",
+          "bytes": 65864339
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "2fc2494834056cbe8a1c6d56834d734577796a3bba6c189dbd4af2583fbbe7ba",
+          "bytes": 11591961
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "570e0d7906effe1b6898029b563b2863a21754d7ddc09fed49a4523d71105973",
+          "bytes": 297497
+        },
+        "trace.jsonl": {
+          "sha256": "612c956e6409bdb9d070228550d8d80e4d3b4ba0fb37555ab5741a49eba2df39",
+          "bytes": 777096934
+        }
+      }
+    },
+    "new-world1-p2-asteroids3-integrated": {
+      "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/new-world1-p2-asteroids3-integrated.tar.gz",
+      "sha256": "fd68926d24ea58d6a1b7e04e08b26055948ed295fe959f8f103a7dc73fdbc7b1",
+      "bytes": 65585624,
+      "raw_bytes": 541079928,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "b4893f5dc808640e3099cbe450404c4d31d5db4468c598d8be0c79cd5be3ab2e",
+          "bytes": 808903
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "4cb3abccc5e4fdb8770f2d3a332a78b17eed4b58d9e6be62b73634056a4b7810",
+          "bytes": 146639423
+        },
+        "clearance-audit.json": {
+          "sha256": "d306a5a7b8a1d089d3a91faa8ab2bd349f6dff7573d496169ef19fe153ff587e",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "e9ca8bdb1e79eb5c6bed5d36946b54307cd3184764c4facac74cf4567da8342f",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "69d6dcf6decc7d786e0c27beacef30a02df9f397b478dff1d88012e0407f7faf",
+          "bytes": 10530945
+        },
+        "destination-cover.jsonl": {
+          "sha256": "cdb70ec20124af37ebb0a9b93b9fed93ceac7ddd1e760faee2ebca2ab717f5ba",
+          "bytes": 1607419
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "8edfcf829a25c38b94ce10f0b042406457d3c12c790fbc994b34fd96184b23dd",
+          "bytes": 3184519
+        },
+        "flag-survey.jsonl": {
+          "sha256": "476c2216033d03c46c6260a9a00918291645e746c74cf4c167774c54d76f270d",
+          "bytes": 14462
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "440f23171aead35c4b74e5dc56457a29135157f341843a45eba4c3fa3705a85d",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "d180b8128bf29adcf3bc6a2ad5b46a4e5938f670a2c2c9a1a89fecdf0f0735e1",
+          "bytes": 52539963
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "b61fe786095b18ff95bfa3ff9469fdb2ec3a5dd4e890c086c4e2283bd03c2f71",
+          "bytes": 348921
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "5c7d3ee0a1dd643864d6953b55385b80774bf27f48d83303bec5f4c404a4184f",
+          "bytes": 2189307
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "03733081ca2b8878cd2e5288e100830ad971c89a4fd4cbcc4720a1155fbd3d9d",
+          "bytes": 8512915
+        },
+        "native-recovery-audit.json": {
+          "sha256": "26b66f06e355f767265290b2bcd32ce1caa531ef59b2e7da4957429edf24773c",
+          "bytes": 61
+        },
+        "new-world1-p2-asteroids3-integrated-audit.json": {
+          "sha256": "38ea8ad6e1ba141848c49229efa06ef531fafc6966e8434dda78fb56ba4e8455",
+          "bytes": 392081
+        },
+        "report.json": {
+          "sha256": "77b8fef6ddaccc9601dcdc7d4538ef618549a0b15eec0b5e67865abbc6a053fe",
+          "bytes": 7114684
+        },
+        "sensors.jsonl": {
+          "sha256": "1918fb6e8f7c63d1c3c3f592d893270de5e8869611cd2a49ed84e56a8a50457d",
+          "bytes": 32087068
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "093a5fd8eec597b7ab789e0c297aade206a18a343443188c7050ee3cbc1b7f93",
+          "bytes": 9620847
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "40a33a31ad43e3cbd6a7cac7522f235a180a902aa91c2d422debff5fc3a83bd3",
+          "bytes": 335823
+        },
+        "trace.jsonl": {
+          "sha256": "7f0209792b01a2bc2c4accd584dc32e707c5a701c6c0650310820af4bf128252",
+          "bytes": 265152093
+        }
+      }
+    },
+    "new-world3-p1-asteroids3-integrated": {
+      "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/new-world3-p1-asteroids3-integrated.tar.gz",
+      "sha256": "b645b1d75ee4e6dc4271b19b56a9c3a41091fb24f9ac2f885b10d82165b31a2d",
+      "bytes": 120773931,
+      "raw_bytes": 959997485,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "a7933e627de61c09f9a82078d5a26f00702869f5f5dbd3ee14f8f6e699a177a1",
+          "bytes": 130
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "668cb82766522857db04974b3952c49f9c926fc12d890addb780a173616dcdeb",
+          "bytes": 262278370
+        },
+        "clearance-audit.json": {
+          "sha256": "cfb0169d2c0121676edb323e19bebf115ec6538b1d092fe0f8a4a2e62231d744",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "8d1e06d9c60ef360451b0762b27bf321aa8f886aa539c78eebf6cef76345f9d5",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "844b4f67d20d402456e5ee4f80f81216d6f4aad8d5cf901b102c0a9162340206",
+          "bytes": 17290785
+        },
+        "destination-cover.jsonl": {
+          "sha256": "860d3ea316a13796ac35ddc0324e21e74b6765091d31943b2ed42685fdcc936c",
+          "bytes": 1239609
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "c5d43dc0e2c4173997119a71c3023ad9d641adca199e26a29e56f3210ec1f312",
+          "bytes": 5190298
+        },
+        "flag-survey.jsonl": {
+          "sha256": "d9ffca46a891e0f9b6635d43d9290f8463a2fe9aa0f62a1529732ea73ee3b2de",
+          "bytes": 8775
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "4fc3b301c0f686cbe7bd797085e4850c67a41dab8db792cf75737f12284ad18e",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "7ee4b3e38b428ef650222251a5771278ead7983f0f17981fee7623419de0e73b",
+          "bytes": 85984913
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "447abee2b8ebd00f05346b503050b40b78441d2933f8a79a331e912f3db9c668",
+          "bytes": 1115194
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "90519bce483730173b3c113b41e9f6c84ad9f3bb35aaec9a805e1d1a1a5016df",
+          "bytes": 3590687
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "ca8537ec1d41f534af27c711b874cc769fe405861a2e2d0813d4eb4db3a19ad4",
+          "bytes": 7187314
+        },
+        "native-recovery-audit.json": {
+          "sha256": "41adabf8cc0ad2478938e31384aaa546e5026b267b8292f3d3c045c064f62fd5",
+          "bytes": 61
+        },
+        "new-world3-p1-asteroids3-integrated-audit.json": {
+          "sha256": "0a38ab9cd0cb970528c8b83b6cbcec01ea6d73ec04d313d33f59a2f701d1fcd9",
+          "bytes": 577273
+        },
+        "report.json": {
+          "sha256": "bd78fd625de39cd7e358271e5b1b080aa1eb1642cfb10926846539c203a3b4da",
+          "bytes": 19859812
+        },
+        "sensors.jsonl": {
+          "sha256": "3925046f76984b56d1e2d9f299ef8e8d0ec5353d4dd3ce54407bfc81fb08800d",
+          "bytes": 51682174
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "236d9628a6e8853a029c69fcf764c3bc3e67d8f30a995aa88c2cee92d921e0ed",
+          "bytes": 10441500
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "69f38fc8bd64345e5a889eedf107c02fa228b7d4831affb930265ba4d2c50c94",
+          "bytes": 308868
+        },
+        "trace.jsonl": {
+          "sha256": "b4739ea1ef53bb0dc4a5e3a0088dabf86b73429534ef4533b6e43ac79436b7b9",
+          "bytes": 493241228
+        }
+      }
+    },
+    "new-world3-p1-asteroids3-no-stop": {
+      "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/new-world3-p1-asteroids3-no-stop.tar.gz",
+      "sha256": "464a6e434423c1c55c194584f63e3ae02f556fa236e81cc5f70df6c7a0662eb7",
+      "bytes": 64521112,
+      "raw_bytes": 511214383,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "58a208078b81b42dd2946d59c064f50e01735df2bb8af488bf69e5a6de7842c6",
+          "bytes": 130
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "1f071e2cf80e976e0809e8d0217d1956b53bb45e0c21c0749813551bac601c18",
+          "bytes": 146451291
+        },
+        "clearance-audit.json": {
+          "sha256": "34c47e52d960912c964b283bdfdc4e32daf461bc3b7e2f62ac610161a6c315d4",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "0fd6ef65ddccedaf6674a74a3b573423ce09c9744e7d24d58e940947277c3bad",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "68c80377200a4810df1c61f195d7781e8448efb3e1be0ef0a122783a4c28a625",
+          "bytes": 9128528
+        },
+        "destination-cover.jsonl": {
+          "sha256": "860d3ea316a13796ac35ddc0324e21e74b6765091d31943b2ed42685fdcc936c",
+          "bytes": 1239609
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "1ae9823e57bfa866018e461f8dde1476135f9c1a01c560a473ced1e9b7c73f35",
+          "bytes": 2440794
+        },
+        "flag-survey.jsonl": {
+          "sha256": "ef5ecee758b101730e39ca09f79b4466e1b09fd436dd84e6403d155da525c8b9",
+          "bytes": 4492
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "2b02083de0f1502daffd6c9679b55d91eafdf6208d81ff24efd87eee4f7a32c8",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "93115b85f1d6decfaefd069d030f6ca48254ef8acca65fecfcbc73f0a6fbbc86",
+          "bytes": 44045529
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "51f9e8fac3f9c354bff1b1f093a788dba0c57586ae44afd255563891601e6b47",
+          "bytes": 512074
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "400bd20e7c619972eae4b77c0ce551757fe08934b2c7f6f05ee359b5de761f58",
+          "bytes": 1887578
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "c62dd8caa77508a933bf1bc6b3748962782c2209a8089c91dbd603c01313157a",
+          "bytes": 6240719
+        },
+        "native-recovery-audit.json": {
+          "sha256": "57582f47232004142161ed8eed208ffe25aee7d24a9b4c56759a760f38492770",
+          "bytes": 61
+        },
+        "new-world3-p1-asteroids3-no-stop-audit.json": {
+          "sha256": "4114b43d5e3f53c618ce0ad23121c830b38c61583d63d352f02cb3b873c67c9d",
+          "bytes": 535205
+        },
+        "report.json": {
+          "sha256": "237e678e5bc17feaf023b56064cf13a38a8c4dd0c315dd08eeb27afdafb9f303",
+          "bytes": 9126265
+        },
+        "sensors.jsonl": {
+          "sha256": "b3099ba2d2247a2771fb5c1f2a9a07a63750aaa2522cbb111f7656938e561be5",
+          "bytes": 28516819
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "b598704eb88235150bf706c9b4dc34b89e4caeccc5832821132a02cfaa2915fe",
+          "bytes": 5502186
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "f8fd07cdb8d94ae378357e7b2ef2b44517a7d7a49898dbc4ac71cfc9aad2564b",
+          "bytes": 245689
+        },
+        "trace.jsonl": {
+          "sha256": "f90b223108f42d876aedb79a1474a6827d16c1419563f5bcf36fdbd4751282dc",
+          "bytes": 255336920
+        }
+      }
+    },
+    "new-world1-p2-asteroids3-no-stop": {
+      "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/new-world1-p2-asteroids3-no-stop.tar.gz",
+      "sha256": "cc7e9943cfd530bdafae2fc776f29e5119874b4b0094ea90dfe67b2d618274b2",
+      "bytes": 250446289,
+      "raw_bytes": 1775025125,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "6241b3f6fd63d90f1121498a89dbbf853154891aef7af26dce9e546ff80200f4",
+          "bytes": 1714623
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "0f08dedbc5f73aaf19a47897b534eb817ff9ddc389b503b0c9d5927d8fc7a8aa",
+          "bytes": 371661778
+        },
+        "clearance-audit.json": {
+          "sha256": "a615c227fcae8c0045924db9d6b20818da0c0b98f073ed21f3a12c838674b109",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "dae8d8c74948cfb6496559b620e8d4df20379b97438403b496cd5ed4c1131601",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e70481f11de6e3dc0849c41201bfe6cb044f168a6d7db05ec35d658bb8ded003",
+          "bytes": 28144332
+        },
+        "destination-cover.jsonl": {
+          "sha256": "5cdb128715ad4fa286a6f23b61da533dd02abfba5f77d635919dc149fae6bfcd",
+          "bytes": 1612734
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "b5bf807980e7e3922578509541062e9f3e368f82bd35dfe2ec2816e667ce56fe",
+          "bytes": 8085127
+        },
+        "flag-survey.jsonl": {
+          "sha256": "a6449dd63233e756b5fa638beec86a606084f6d019e9ea4835cb27d1e8a257fe",
+          "bytes": 12024
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "be2a264b4262c44d954f6f20273a3f5553bd2d30ef00fbad2198b98e87eb7ee4",
+          "bytes": 3601460
+        },
+        "impact.jsonl": {
+          "sha256": "503e370bf259d0fb492aa6ad226b36f429d7998505b09b375b606517976fb157",
+          "bytes": 218660635
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "ad86802f85c3d6961234ee482ebcf3230d2ee085799146a3f005c34c6b535e00",
+          "bytes": 404915
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "49b01fb1beb026431fb790c454ead5dc6575b41217c149e923fcebd714c8d5cc",
+          "bytes": 5928677
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "bffcf38f12ebc4fbda2cb1c04283e60ff311cfa4c869a2d7b38ac3f55fc8c000",
+          "bytes": 18824931
+        },
+        "native-recovery-audit.json": {
+          "sha256": "8c1c3282158b63d79599ba89874232f0088368123e270fc9ce258c9db0a67520",
+          "bytes": 61
+        },
+        "new-world1-p2-asteroids3-no-stop-audit.json": {
+          "sha256": "f547f1dd651645abb3dda3d9781bbb6c60d0fc8afabad61e3993d79ae2571cf9",
+          "bytes": 362328
+        },
+        "report.json": {
+          "sha256": "b283b5a1cb18a111f9960a107dda0045821bf464c91849680aed0af64e0702ba",
+          "bytes": 21492526
+        },
+        "sensors.jsonl": {
+          "sha256": "9275ded8062eb3847aaa5d01ed7bb4d4e26a366ed3320825ce8bf1f5a8213456",
+          "bytes": 85709375
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "85dc971664031d6b2c97a0c52d54420f5b7c1c25e8ce5878c04786d1c832c469",
+          "bytes": 32674765
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "e15cfda1d42e5e6e32945af5acb89c216cd8c0142a10e76e9fb192e59340aa0c",
+          "bytes": 1037090
+        },
+        "trace.jsonl": {
+          "sha256": "8c313a24591f712433c7c01bee514e77ca7f46c808b2aee632bae0fa6e4cbdf1",
+          "bytes": 975097356
+        }
+      }
+    }
+  },
+  "review_bundle": {
+    "path": "docs/data/terrain-flight-forecast-v1.json.gz",
+    "sha256": "134738495855e20a57867e9899afcaa25e77efcb84478cc1941922c6e828e651",
+    "bytes": 8624665
+  },
+  "plan_sha256": "cb38dcde3a43bf492c8c1d2234abd0845700cec07eb5d005a054ddb5b6ae92d6",
+  "summary_sha256": "d602b8faaf7b7554bd4d05e3895c1f7ab69dff632e6707901d5fc48ed6179ee9"
+}
