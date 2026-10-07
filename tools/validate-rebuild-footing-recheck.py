@@ -117,7 +117,7 @@ def audit_recheck(root,fork,hold,recheck):
                 assert survey is not None and survey['site']==t['relocation_site']
                 assert survey['tick']==tick and survey['site']['revision']==p['planet']['revision']
                 pending['selected_tick']=tick;pending['site']=survey['site'];pending=None
-            elif p['ship_available'] or t['status']!='running':pending=None
+            elif p['ship_available'] and p['ship_form']=='ship' or t['status']!='running':pending=None
     result=dict(holding=hold,explicit_recheck=recheck,rechecks=rechecks,fresh_failures=failures,ignored_failures=ignored)
     path=root/(fork+'-recheck-audit.json');I.write(path,result)
     return dict(holding=hold,explicit_recheck=recheck,
@@ -163,7 +163,10 @@ def execute(path,reaudit=False):
                 assert all(P.digest(root/p)==v['sha256'] for p,v in previous['archive']['files'].items())
                 run['retained_files']=len(previous['archive']['files'])
             run['recheck']={f:audit_recheck(root,f,hold,recheck) for f in ('recorded','live')}
-            run['archive']=B.pack(root,out/'archives'/(name+'.tar.gz'))
+            # Retain the original frozen-auditor archives when repairing only
+            # verification. Runtime bytes are hash checked above, never rerun.
+            suffix='-reaudit-'+P.digest(ROOT/OWN[0])[:12] if reaudit else ''
+            run['archive']=B.pack(root,out/'archives'/(name+suffix+'.tar.gz'))
             I.write(out/(name+'-result.json'),run);summary['runs'][name]=run;I.write(out/'summary.json',summary)
             print(name,run['forks']['live']['reason'],'at',run['forks']['live']['last_tick'],flush=True)
         outcomes={}

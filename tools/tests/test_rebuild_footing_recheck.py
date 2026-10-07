@@ -43,5 +43,23 @@ class FootingRecheckTest(unittest.TestCase):
                 with self.assertRaises(AssertionError):F.audit_recheck(root,'live',True,True)
                 report[key]=old
 
+    def test_revalidation_survives_an_available_escape_pod_and_counts_the_new_site(self):
+        site=dict(planet=0,revision=4)
+        held=dict(started_tick=5,ended_tick=10,reason='terrain changed',site=dict(planet=0,revision=3),bearing=7)
+        pilot=dict(planet=dict(index=0,revision=4),ship_available=True,ship_form='escape_pod',recovery=dict(status='rebuilding'))
+        first=dict(tick=10,task=dict(rebuild_footing=held,relocations=1,relocation_site=None,status='running'),
+            pilots=[{},pilot],observation=dict(rebuild=None))
+        next_row=json.loads(json.dumps(first));next_row['tick']=15
+        next_row['task'].update(relocations=2,relocation_site=site)
+        next_row['observation']['rebuild']=dict(tick=15,site=site,search=dict(),refinement=dict(coarse_candidates=0),attempts=[dict(bearing=7)])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);p=root/'rebuild-live.jsonl'
+            p.write_text('\n'.join(map(json.dumps,[first,next_row]))+'\n')
+            result=F.audit_recheck(root,'live',True,True)
+            self.assertEqual(result['rechecks'],[dict(tick=10,bearing=7,survey_ticks=[15],selected_tick=15)])
+            next_row['task']['relocations']=1
+            p.write_text('\n'.join(map(json.dumps,[first,next_row]))+'\n')
+            with self.assertRaises(AssertionError):F.audit_recheck(root,'live',True,True)
+
 
 if __name__=='__main__':unittest.main()
