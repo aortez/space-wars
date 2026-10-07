@@ -46,6 +46,9 @@ mod planning_probe;
 mod projectile_diagnostics;
 #[path = "support/projectile_response.rs"]
 mod projectile_response;
+#[cfg(feature = "sensor-profile")]
+#[path = "support/rebuild_replay.rs"]
+mod rebuild_replay;
 #[path = "support/successor_continuation.rs"]
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
@@ -287,6 +290,13 @@ fn main() {
         interval_seconds: interval,
         severity: MaterialAsteroidSeverity::Mixed,
     });
+    assert!(cfg!(feature = "sensor-profile") || arg("--rebuild-replay-tape", "none") == "none");
+    #[cfg(feature = "sensor-profile")]
+    if arg("--rebuild-replay-tape", "none") != "none" {
+        assert!(mode == "duel" && match_rules && world_kind == "generated" && !strike);
+        rebuild_replay::run(state, &out, seed);
+        return;
+    }
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
     let powered_capture_seats = match arg("--powered-capture-seats", "none").as_str() {

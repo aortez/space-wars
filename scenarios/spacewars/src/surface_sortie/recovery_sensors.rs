@@ -20,6 +20,17 @@ pub struct RecoveryTaskObservationV1 {
     pub claim_footing: Option<claim_footing::ClaimFootingSurvey>,
 }
 impl SurfaceSortieState {
+    /// Read-only replay instrumentation: retain the recorded survey cadence
+    /// while reconstructing a controller from its original task start.
+    #[cfg(feature = "sensor-profile")]
+    pub fn recovery_observation_for_replay(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> RecoveryTaskObservationV1 {
+        self.recovery_task_observation_with_query(player, query)
+    }
+
     pub fn recovery_task_observation(
         &self,
         player: usize,
