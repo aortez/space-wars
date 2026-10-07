@@ -3,8 +3,10 @@
 import argparse
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
+import struct
 
 import subprocess
 import traceback
@@ -79,6 +81,15 @@ def freeze(out,binary):
     print('Frozen two retained controls, two holding cases, two explicit rechecks: six prefixes, twelve continuations.',flush=True)
 
 
+def same_native(a,b):
+    """Compare copied f32 site data despite f64 JSON serialization round trips."""
+    if isinstance(a,dict) and isinstance(b,dict):
+        return a.keys()==b.keys() and all(same_native(a[k],b[k]) for k in a)
+    if isinstance(a,float) and isinstance(b,float):
+        return math.isfinite(a) and math.isfinite(b) and struct.pack('<f',a)==struct.pack('<f',b)
+    return a==b
+
+
 def audit_recheck(root,fork,hold,recheck):
     pending=None;seen=set();rechecks=[];failures=[];ignored=[]
     for row in D.rows(root/('rebuild-'+fork+'.jsonl')):
@@ -114,10 +125,10 @@ def audit_recheck(root,fork,hold,recheck):
                 pending['surveys'].append(row)
             if t['relocation_site'] is not None:
                 assert t['relocations']==pending['relocations']+1
-                assert survey is not None and survey['site']==t['relocation_site']
+                assert survey is not None and same_native(survey['site'],t['relocation_site'])
                 assert survey['tick']==tick and survey['site']['revision']==p['planet']['revision']
                 pending['selected_tick']=tick;pending['site']=survey['site'];pending=None
-            elif p['ship_available'] and p['ship_form']=='ship' or t['status']!='running':pending=None
+            elif (p['ship_available'] and p['ship_form']=='ship') or t['status']!='running':pending=None
     result=dict(holding=hold,explicit_recheck=recheck,rechecks=rechecks,fresh_failures=failures,ignored_failures=ignored)
     path=root/(fork+'-recheck-audit.json');I.write(path,result)
     return dict(holding=hold,explicit_recheck=recheck,

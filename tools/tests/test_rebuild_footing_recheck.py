@@ -61,5 +61,14 @@ class FootingRecheckTest(unittest.TestCase):
             p.write_text('\n'.join(map(json.dumps,[first,next_row]))+'\n')
             with self.assertRaises(AssertionError):F.audit_recheck(root,'live',True,True)
 
+    def test_site_comparison_preserves_native_float_bits_and_exact_identity(self):
+        a=dict(planet=0,revision=22,position=dict(x=29.005197525024414,y=-15.964317321777344))
+        b=dict(a,position=dict(a['position'],x=29.005197525024418))
+        self.assertTrue(F.same_native(a,b))
+        b['position']['x']+=.00001
+        self.assertFalse(F.same_native(a,b))
+        self.assertFalse(F.same_native(a,dict(a,revision=23)))
+        self.assertFalse(F.same_native(a,dict(a,precise=True)))
+
 
 if __name__=='__main__':unittest.main()
