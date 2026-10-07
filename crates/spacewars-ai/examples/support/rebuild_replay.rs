@@ -222,6 +222,7 @@ fn fork(
     let mut first_task = None;
     let mut first_action = None;
     let mut audit_failures = Vec::new();
+    let coverage_tick: u64 = crate::arg("--rebuild-coverage-tick", "0").parse().unwrap();
     let initial =
         state.terrain_diagnostics().occupied_cells + state.terrain_diagnostics().removed_cells;
     loop {
@@ -263,6 +264,12 @@ fn fork(
             }
         }
         let telemetry = canonical(task.telemetry());
+        if live && row.tick == coverage_tick {
+            write(
+                &out.join("rebuild-coverage.json"),
+                &state.rebuild_coverage_diagnostics(seat),
+            );
+        }
         if first_task.is_none() && row.recovery.as_ref() != Some(&telemetry) {
             first_task = Some(json!({"tick":row.tick,"expected":row.recovery,"actual":telemetry}));
         }

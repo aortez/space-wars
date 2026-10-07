@@ -3,8 +3,12 @@
 use super::*;
 use ground_navigation::{GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
 
+#[cfg(feature = "sensor-profile")]
+mod coverage;
+
 const LOCAL_HALF_SPAN: i32 = 56;
 pub const MAX_REBUILD_WALK: f32 = 24.0;
+const REBUILD_OFFSETS: [f32; 4] = [-8.0, -14.0, 8.0, 14.0];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -148,6 +152,18 @@ impl SurfaceSortieState {
         up: Vec2,
         map: Option<&GroundMap>,
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        self.find_rebuild_placement_offsets(player, planet, point, up, map, &REBUILD_OFFSETS)
+    }
+
+    fn find_rebuild_placement_offsets(
+        &self,
+        player: usize,
+        planet: usize,
+        point: Vec2,
+        up: Vec2,
+        map: Option<&GroundMap>,
+        offsets: &[f32],
+    ) -> (Option<RebuildPose>, RebuildPlacementReport) {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("find_rebuild_placement");
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
@@ -206,7 +222,7 @@ impl SurfaceSortieState {
         };
         let mut best = None;
         let mut best_cost = f32::INFINITY;
-        for offset in [-8.0, -14.0, 8.0, 14.0] {
+        for &offset in offsets {
             let mut attempt = RebuildAttempt {
                 offset,
                 rejection: None,
