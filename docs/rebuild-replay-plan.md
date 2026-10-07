@@ -70,3 +70,10 @@ review bundle. Even success establishes only this isolated recovery sequence:
 P1 follows a tape and cannot react, and this probe does not return P2 to its
 mission controller after task completion. No full-match win or default bot
 promotion follows from this result.
+
+The v1 preflight stopped at tick zero in both builds, before any native step or
+fork: typed `f32` serialization used short decimals while the retained trace
+serialized through JSON `Value`. The v2 driver uses the same Value conversion
+and parser on both sides, with a regression test. This changes no tolerance,
+native rule, input, bound or qualification condition. Retain the v1 records and
+freeze new executables before executing v2.

@@ -46,6 +46,9 @@ fn read(reader: &mut BufReader<fs::File>) -> TapeRow {
 // Both sides pass through the same JSON parser, retaining exact comparison
 // without an epsilon or narrowing recorded floating-point numbers.
 fn canonical(value: impl Serialize) -> Value {
+    // The retained trace used json!/Value, which widens f32 before formatting.
+    // Directly serializing the typed observation uses shorter f32 decimals.
+    let value = serde_json::to_value(value).unwrap();
     serde_json::from_slice(&serde_json::to_vec(&value).unwrap()).unwrap()
 }
 
@@ -306,6 +309,15 @@ fn fork(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_native_floats_match_the_retained_value_serialization() {
+        for number in [954.807_4_f32, 0.953_343_3, 36.571_61, -0.0] {
+            let retained: Value = serde_json::from_str(&json!(number).to_string()).unwrap();
+            assert_eq!(canonical(number), retained);
+            assert_eq!(canonical(json!({"x":number}))["x"], retained);
+        }
+    }
 
     #[test]
     fn recorded_queries_preserve_deferred_ticks_and_selected_sites() {
