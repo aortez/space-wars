@@ -1,0 +1,2170 @@
+{
+  "schema": 1,
+  "profile": "retained_rebuild_staging_v1",
+  "complete": true,
+  "screen": {
+    "control_retained": true,
+    "isolated_recovery_complete": false,
+    "decision": "not_qualified",
+    "scored_match": false,
+    "default_promotion": false
+  },
+  "runtime_source_commit": "22b3740130730ffbdfb71d0c26877d8baf83e66c",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-staging/v1/surface_mission_soak",
+    "sha256": "636480b724b3ab5804270b97cf53d1cbd8987cfa62babc708495f3648eb41db2"
+  },
+  "frozen_inputs": 967,
+  "prefixes": 2,
+  "continuations": 4,
+  "fresh_games": 0,
+  "simulation_retries": 0,
+  "audit_resumes": 0,
+  "retained_control_files": 22,
+  "prefix": {
+    "verified": true,
+    "rows": 23768,
+    "task_steps": 6948,
+    "audit_samples": 396,
+    "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90"
+  },
+  "bounds": {
+    "coarse_candidates": 8,
+    "refined_candidates": 8,
+    "offset_checks": 240,
+    "extra_offsets": 22,
+    "neighborhood_radius": 2,
+    "max_route_length": 24,
+    "precise_route_range": 0.01,
+    "precise_arrival_range": 0.12,
+    "staging_moves": 1,
+    "staging_walk_min": 2,
+    "staging_walk_max": 4,
+    "combined_route_max": 28,
+    "remaining_route_max": 24,
+    "staging_route_checks": 16,
+    "missing_site_ticks": 300,
+    "search_history_ticks": 300,
+    "search_origin_range": 0.5
+  },
+  "diagnosis": {
+    "comparisons": {
+      "live": {
+        "rows": 782,
+        "first_differences": {
+          "observation": 24270,
+          "task": 24270,
+          "task_excluding_search_history": 24420,
+          "actions": 24437,
+          "generated_actions": 24437,
+          "pilots": 24438,
+          "audit": 24480
+        },
+        "changed_rows": {
+          "observation": 117,
+          "task": 279,
+          "actions": 108,
+          "generated_actions": 108,
+          "pilots": 111,
+          "audit": 3
+        },
+        "trace_sha256": {
+          "control": "5476e341a74c7a0c75df11b9ce0c80dcc81cbcb86e730cd8f229e60a8a578f76",
+          "staged": "0d16a81ab9030c0a275bf3b74cbf3acc26b9f9c8378581fea4857c41089dfcec"
+        },
+        "native_pilots_actions_generated_controls_landing_and_world_audits_identical": false
+      },
+      "recorded": {
+        "rows": 5655,
+        "first_differences": {
+          "observation": 24270,
+          "task": 24270
+        },
+        "changed_rows": {
+          "observation": 48,
+          "task": 5152
+        },
+        "trace_sha256": {
+          "control": "cfd58ce4cfd3cbb6e93fa7ae6461f754c590a4035c070d646f4f9e230c305af5",
+          "staged": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0"
+        },
+        "native_pilots_actions_generated_controls_landing_and_world_audits_identical": true
+      }
+    },
+    "search": {
+      "surveys": [
+        {
+          "tick": 24270,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": [],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": []
+          }
+        },
+        {
+          "tick": 24300,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 240,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            301,
+            291,
+            306,
+            286,
+            311,
+            316,
+            321,
+            324
+          ],
+          "refined": [
+            311,
+            324,
+            310,
+            325,
+            312,
+            326,
+            313,
+            329
+          ],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": [
+              311,
+              324,
+              310,
+              325,
+              312,
+              326,
+              313,
+              329
+            ]
+          }
+        },
+        {
+          "tick": 24330,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 220,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            276,
+            330,
+            269,
+            262,
+            336,
+            255,
+            341,
+            248
+          ],
+          "refined": [
+            330,
+            341,
+            331,
+            340,
+            332,
+            342,
+            333,
+            339
+          ],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": [
+              311,
+              324,
+              310,
+              325,
+              312,
+              326,
+              313,
+              329,
+              330,
+              341,
+              331,
+              340,
+              332,
+              342,
+              333,
+              339
+            ]
+          }
+        },
+        {
+          "tick": 24360,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": [],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": [
+              311,
+              324,
+              310,
+              325,
+              312,
+              326,
+              313,
+              329,
+              330,
+              341,
+              331,
+              340,
+              332,
+              342,
+              333,
+              339
+            ]
+          }
+        },
+        {
+          "tick": 24390,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 162,
+            "refined_candidates": 5
+          },
+          "coarse": [
+            291,
+            301,
+            286,
+            306,
+            311,
+            316,
+            321,
+            324
+          ],
+          "refined": [
+            309,
+            314,
+            308,
+            307,
+            315
+          ],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": [
+              311,
+              324,
+              310,
+              325,
+              312,
+              326,
+              313,
+              329,
+              330,
+              341,
+              331,
+              340,
+              332,
+              342,
+              333,
+              339,
+              309,
+              314,
+              308,
+              307,
+              315
+            ]
+          }
+        },
+        {
+          "tick": 24420,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 168,
+            "refined_candidates": 6,
+            "staging_route_checks": 2
+          },
+          "coarse": [
+            276,
+            330,
+            269,
+            262,
+            336,
+            255,
+            341,
+            248
+          ],
+          "refined": [
+            334,
+            343,
+            344,
+            338,
+            345,
+            337
+          ],
+          "search": {
+            "origin": {
+              "x": 17.067970275878906,
+              "y": -31.91722297668457
+            },
+            "planet": 0,
+            "preferred": null,
+            "revision": 21,
+            "started_tick": 24270,
+            "visited": [
+              311,
+              324,
+              310,
+              325,
+              312,
+              326,
+              313,
+              329,
+              330,
+              341,
+              331,
+              340,
+              332,
+              342,
+              333,
+              339,
+              309,
+              314,
+              308,
+              307,
+              315,
+              334,
+              343,
+              344,
+              338,
+              345,
+              337
+            ]
+          }
+        }
+      ],
+      "placement_valid_candidates": [
+        {
+          "tick": 24420,
+          "bearing": 343,
+          "route": {
+            "closest_reachable_distance": 0.0,
+            "destination_nodes": 1,
+            "failure": null,
+            "flights": 1,
+            "jumps": 3,
+            "length": 24.054161071777344,
+            "nearest_destination_distance": 0.0,
+            "partial": false,
+            "reachable_nodes": 57,
+            "start_distance": 0.022204875946044922,
+            "start_node": 296
+          },
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.02797645516693592
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -10.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -10.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": {
+                  "x": 42.47095489501953,
+                  "y": -7.108371734619141
+                },
+                "hatch": {
+                  "x": 33.70792007446289,
+                  "y": -12.737993240356445
+                },
+                "offset": -11.0,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.498645544052124,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 3.4902753829956055,
+                  "nearest_destination_distance": 2.498645544052124,
+                  "partial": false,
+                  "reachable_nodes": 16,
+                  "start_distance": 0.0,
+                  "start_node": 343
+                },
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": {
+                  "x": 42.562564849853516,
+                  "y": -6.517383098602295
+                },
+                "hatch": {
+                  "x": 34.051292419433594,
+                  "y": -12.295392036437988
+                },
+                "offset": -11.5,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.968287229537964,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 343
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.65122985839844,
+                  "y": -5.9261298179626465
+                },
+                "hatch": {
+                  "x": 33.68842697143555,
+                  "y": -12.758195877075195
+                },
+                "offset": -12.0,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.4744253158569336,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 3.4902753829956055,
+                  "nearest_destination_distance": 2.4744253158569336,
+                  "partial": false,
+                  "reachable_nodes": 16,
+                  "start_distance": 0.0,
+                  "start_node": 343
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.68981170654297,
+                  "y": -5.206932544708252
+                },
+                "hatch": {
+                  "x": 34.04804611206055,
+                  "y": -12.304280281066895
+                },
+                "offset": -12.5,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.9619266986846924,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 343
+                },
+                "settling_angle_degrees": 0.845341145992279
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.0,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 38.36833953857422
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.5,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 31.583030700683594
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.5,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 21,
+            "selected_offset": -11.0,
+            "standing": {
+              "x": 29.005252838134766,
+              "y": -15.964280128479004
+            },
+            "tick": 24420
+          },
+          "selected": {
+            "center": {
+              "x": 42.47095489501953,
+              "y": -7.108371734619141
+            },
+            "hatch": {
+              "x": 33.70792007446289,
+              "y": -12.737993240356445
+            },
+            "offset": -11.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 2.498645544052124,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 3.4902753829956055,
+              "nearest_destination_distance": 2.498645544052124,
+              "partial": false,
+              "reachable_nodes": 16,
+              "start_distance": 0.0,
+              "start_node": 343
+            },
+            "settling_angle_degrees": 0.01978234015405178
+          }
+        },
+        {
+          "tick": 24420,
+          "bearing": 344,
+          "route": {
+            "closest_reachable_distance": 0.0,
+            "destination_nodes": 1,
+            "failure": null,
+            "flights": 1,
+            "jumps": 3,
+            "length": 24.481672286987305,
+            "nearest_destination_distance": 0.0,
+            "partial": false,
+            "reachable_nodes": 58,
+            "start_distance": 0.022204875946044922,
+            "start_node": 296
+          },
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -10.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": {
+                  "x": 42.457176208496094,
+                  "y": -7.1914873123168945
+                },
+                "hatch": {
+                  "x": 33.648277282714844,
+                  "y": -12.799766540527344
+                },
+                "offset": -10.5,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.424811363220215,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 3.06276273727417,
+                  "nearest_destination_distance": 2.424811363220215,
+                  "partial": false,
+                  "reachable_nodes": 15,
+                  "start_distance": 0.0,
+                  "start_node": 344
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.5495719909668,
+                  "y": -6.603005886077881
+                },
+                "hatch": {
+                  "x": 34.02632141113281,
+                  "y": -12.363856315612793
+                },
+                "offset": -11.0,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.9197587966918945,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 344
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.63993453979492,
+                  "y": -6.011970520019531
+                },
+                "hatch": {
+                  "x": 33.62781524658203,
+                  "y": -12.820867538452148
+                },
+                "offset": -11.5,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.399688243865967,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 3.06276273727417,
+                  "nearest_destination_distance": 2.399688243865967,
+                  "partial": false,
+                  "reachable_nodes": 15,
+                  "start_distance": 0.0,
+                  "start_node": 344
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.68455505371094,
+                  "y": -5.311152935028076
+                },
+                "hatch": {
+                  "x": 34.02264404296875,
+                  "y": -12.3740234375
+                },
+                "offset": -12.0,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.912667751312256,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 344
+                },
+                "settling_angle_degrees": 0.7238871455192566
+              },
+              {
+                "center": {
+                  "x": 42.71748352050781,
+                  "y": -4.591988563537598
+                },
+                "hatch": {
+                  "x": 34.196022033691406,
+                  "y": -11.890166282653809
+                },
+                "offset": -12.5,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 3.271341562271118,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 344
+                },
+                "settling_angle_degrees": 1.5578367710113525
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.5,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 37.39031982421875
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.0,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 30.60161781311035
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.5,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 21,
+            "selected_offset": -10.5,
+            "standing": {
+              "x": 29.079458236694336,
+              "y": -15.543256759643555
+            },
+            "tick": 24420
+          },
+          "selected": {
+            "center": {
+              "x": 42.457176208496094,
+              "y": -7.1914873123168945
+            },
+            "hatch": {
+              "x": 33.648277282714844,
+              "y": -12.799766540527344
+            },
+            "offset": -10.5,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 2.424811363220215,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 3.06276273727417,
+              "nearest_destination_distance": 2.424811363220215,
+              "partial": false,
+              "reachable_nodes": 15,
+              "start_distance": 0.0,
+              "start_node": 344
+            },
+            "settling_angle_degrees": 0.0
+          }
+        },
+        {
+          "tick": 24420,
+          "bearing": 345,
+          "route": {
+            "closest_reachable_distance": 0.0,
+            "destination_nodes": 1,
+            "failure": null,
+            "flights": 1,
+            "jumps": 3,
+            "length": 24.905757904052734,
+            "nearest_destination_distance": 0.0,
+            "partial": false,
+            "reachable_nodes": 59,
+            "start_distance": 0.022204875946044922,
+            "start_node": 296
+          },
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.0,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -9.5,
+                "rejection": "no_hatch_footing",
+                "route": null,
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.4411506652832,
+                  "y": -7.280342102050781
+                },
+                "hatch": {
+                  "x": 33.5857048034668,
+                  "y": -12.864355087280273
+                },
+                "offset": -10.0,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.3482823371887207,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 2.6386773586273193,
+                  "nearest_destination_distance": 2.3482823371887207,
+                  "partial": false,
+                  "reachable_nodes": 13,
+                  "start_distance": 0.0,
+                  "start_node": 345
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.535587310791016,
+                  "y": -6.692785263061523
+                },
+                "hatch": {
+                  "x": 34.00012969970703,
+                  "y": -12.435354232788086
+                },
+                "offset": -10.5,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.870072364807129,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 345
+                },
+                "settling_angle_degrees": 0.01978234015405178
+              },
+              {
+                "center": {
+                  "x": 42.62620162963867,
+                  "y": -6.101747512817383
+                },
+                "hatch": {
+                  "x": 33.56438446044922,
+                  "y": -12.886443138122559
+                },
+                "offset": -11.0,
+                "rejection": null,
+                "route": {
+                  "closest_reachable_distance": 2.3224072456359863,
+                  "destination_nodes": 1,
+                  "failure": null,
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 2.6386773586273193,
+                  "nearest_destination_distance": 2.3224072456359863,
+                  "partial": false,
+                  "reachable_nodes": 13,
+                  "start_distance": 0.0,
+                  "start_node": 345
+                },
+                "settling_angle_degrees": 0.0
+              },
+              {
+                "center": {
+                  "x": 42.67911911010742,
+                  "y": -5.420348644256592
+                },
+                "hatch": {
+                  "x": 33.989871978759766,
+                  "y": -12.44627571105957
+                },
+                "offset": -11.5,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 2.856701135635376,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 345
+                },
+                "settling_angle_degrees": 0.5967608690261841
+              },
+              {
+                "center": {
+                  "x": 42.71306610107422,
+                  "y": -4.701113700866699
+                },
+                "hatch": {
+                  "x": 34.17124557495117,
+                  "y": -11.964136123657227
+                },
+                "offset": -12.0,
+                "rejection": "no_hatch_route",
+                "route": {
+                  "closest_reachable_distance": null,
+                  "destination_nodes": 0,
+                  "failure": "no_destination_footing",
+                  "flights": 0,
+                  "jumps": 0,
+                  "length": 0.0,
+                  "nearest_destination_distance": 3.2153213024139404,
+                  "partial": false,
+                  "reachable_nodes": 0,
+                  "start_distance": 0.0,
+                  "start_node": 345
+                },
+                "settling_angle_degrees": 1.432448148727417
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -12.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -13.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 9.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 10.5,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 41.57416534423828
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.0,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 36.36184310913086
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 11.5,
+                "rejection": "landing_misaligned",
+                "route": null,
+                "settling_angle_degrees": 29.576099395751953
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 12.5,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 13.5,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 21,
+            "selected_offset": -10.0,
+            "standing": {
+              "x": 29.15311050415039,
+              "y": -15.125616073608398
+            },
+            "tick": 24420
+          },
+          "selected": {
+            "center": {
+              "x": 42.4411506652832,
+              "y": -7.280342102050781
+            },
+            "hatch": {
+              "x": 33.5857048034668,
+              "y": -12.864355087280273
+            },
+            "offset": -10.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 2.3482823371887207,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 2.6386773586273193,
+              "nearest_destination_distance": 2.3482823371887207,
+              "partial": false,
+              "reachable_nodes": 13,
+              "start_distance": 0.0,
+              "start_node": 345
+            },
+            "settling_angle_degrees": 0.0
+          }
+        }
+      ],
+      "unique_refined_bearings": 27,
+      "max_offset_checks": 240,
+      "max_staging_route_checks": 2,
+      "stage": {
+        "arrived_tick": null,
+        "invalidated_tick": null,
+        "proposal": {
+          "hatch_walk_length": 3.4902753829956055,
+          "planet": 0,
+          "position": {
+            "x": 18.99285125732422,
+            "y": -30.82352828979492
+          },
+          "remaining_length": 21.832847595214844,
+          "revision": 21,
+          "target_bearing": 343,
+          "target_position": {
+            "x": 29.00525283813477,
+            "y": -15.964280128479004
+          },
+          "walk_length": 2.2213149070739746
+        },
+        "search_since": 24247,
+        "started_tick": 24420
+      },
+      "qualified_build_site_selected": false
+    },
+    "walk": {
+      "proposal_tick": 24420,
+      "first_new_ground_tick": 24421,
+      "first_measured_path_tick": 24435,
+      "first_walking_control_tick": 24437,
+      "first_native_difference_tick": 24438,
+      "stop_tick": 24548,
+      "search_since": 24247,
+      "last_search_control_tick": 24547,
+      "stage_rows": 129,
+      "supported_and_balanced_rows": 129,
+      "survey_rows": 16,
+      "initial": {
+        "tick": 24420,
+        "foot": {
+          "x": 17.044530895820646,
+          "y": -31.930069429866162
+        },
+        "distance": 2.2406216828638383,
+        "tangential_error": -2.240614911265426,
+        "normal_error": -0.0055275272487692595,
+        "horizontal": 0.0,
+        "ground_goal": "arrived",
+        "ground_destination": "flag",
+        "path": [],
+        "waypoint": 0,
+        "ground_started_tick": 18278,
+        "native_status": "clearance_blocked",
+        "rebuild_progress": 1.0,
+        "applied": true,
+        "stop": null
+      },
+      "closest": {
+        "tick": 24548,
+        "foot": {
+          "x": 18.878332379243282,
+          "y": -30.892004191821744
+        },
+        "distance": 0.13342984147222772,
+        "tangential_error": -0.13340924149132852,
+        "normal_error": 0.0023448542785913726,
+        "horizontal": 0.0,
+        "ground_goal": "walk",
+        "ground_destination": {
+          "rebuild": {
+            "planet": 0,
+            "position": {
+              "x": 18.99285125732422,
+              "y": -30.82352828979492
+            }
+          }
+        },
+        "path": [
+          296,
+          297,
+          298,
+          299,
+          300,
+          301
+        ],
+        "waypoint": 5,
+        "ground_started_tick": 24421,
+        "native_status": "rebuilding",
+        "rebuild_progress": 0.09791667014360428,
+        "applied": false,
+        "stop": "recovery_blocked"
+      },
+      "native_arrival_radius": 0.12,
+      "native_stage_arrived": false,
+      "reconstruction": "Foot and errors recomputed in f64 from recorded world pose, actor up, shared half-height 0.45, and planet frame. These are approximate diagnostics; the runtime uses f32 and its unchanged strict 0.12 arrival check.",
+      "final_health": 100.0,
+      "final_ships_lost": 1,
+      "native_rebuilds": 0,
+      "native_boardings": 0,
+      "task_reason": "rebuild staging exceeded the original search deadline",
+      "next_hypothesis": "Investigate the delay before walking and proportional slowdown during this short staging leg, preserving supported arrival, the original search deadline, and fresh placement checks. The onward flight/jump route and boarding remain untested."
+    },
+    "recorded": {
+      "all_native_and_applied_controls_identical_to_control": true,
+      "generated_controls_identical_to_control": true,
+      "task_difference_is_search_history_only": true,
+      "build_ticks": [
+        27819
+      ],
+      "boarding_ticks": [],
+      "staging_ticks": [],
+      "final_task_reason": "spaceling stopped making progress on ground route",
+      "qualification": "The same recorded-controls build and settling as the preceding refinement, with no new autonomous evidence."
+    }
+  },
+  "runs": {
+    "control": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "b6cd2eb3ecb3ddcec220484c2a925949326ff9dae697675ad60959ffd92938fe"
+        },
+        "live": {
+          "surveys": 10,
+          "relocation_ticks": [],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "9cecb80357ef685121f858c45c677076a665ab3411fde9819f20200cac18849e"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-staging/v1/archives/control.tar.gz",
+        "sha256": "bcf82c2fef11e68097b0258ae2ee07be0eb5a3e6958e49451c5d2b3f9ebd09ff",
+        "bytes": 38682860,
+        "raw_bytes": 256959297,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "a614309b6e9a5d21c2d689c631ff8b43e2dfe7d2bf46f086621cc3dfe08b1231",
+            "bytes": 103338
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-refinement-audit.json": {
+            "sha256": "eb1c69082481586604c05664c762a3b815505a4a9804f8ab70fcad26fef4c7f2",
+            "bytes": 599109
+          },
+          "live-staging-audit.json": {
+            "sha256": "9cecb80357ef685121f858c45c677076a665ab3411fde9819f20200cac18849e",
+            "bytes": 599150
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "5476e341a74c7a0c75df11b9ce0c80dcc81cbcb86e730cd8f229e60a8a578f76",
+            "bytes": 14947217
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "cfd58ce4cfd3cbb6e93fa7ae6461f754c590a4035c070d646f4f9e230c305af5",
+            "bytes": 109404186
+          },
+          "rebuild-replay.json": {
+            "sha256": "d81b42dc23d2b3f4e212b4eb051eb2ebbd1527e3da5565f8fa9d86121625442f",
+            "bytes": 84235
+          },
+          "recorded-audit.json": {
+            "sha256": "b540aaf3efc6782420cd95604818eb1dbf53cc58cb7e94706d14021df12d249a",
+            "bytes": 442172
+          },
+          "recorded-refinement-audit.json": {
+            "sha256": "b798d4493795a9e9dedbe1f999efee768bac1acf815fb123b37db333deb5fa7c",
+            "bytes": 1835594
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "b6cd2eb3ecb3ddcec220484c2a925949326ff9dae697675ad60959ffd92938fe",
+            "bytes": 1835635
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": [],
+          "first_native_difference": 25498,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347
+        },
+        "live": {
+          "last_tick": 24548,
+          "reason": "recovery_blocked",
+          "task_reason": "no reachable standing site with hatch access",
+          "build_ticks": [],
+          "boarding_ticks": [],
+          "first_native_difference": 24348,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347
+        }
+      }
+    },
+    "staged": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3"
+        },
+        "live": {
+          "surveys": 6,
+          "relocation_ticks": [
+            24420
+          ],
+          "staging_ticks": [
+            24420
+          ],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 2,
+          "sha256": "3a17c06cdd5520238dfc4f87d103c0dfb61580216b80730be39f42ec2037c977"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-staging/v1/archives/staged.tar.gz",
+        "sha256": "e3ec32ad226fe8cd4031c26202ffd0e68c6785abef189888d2b0bdba29d08cf6",
+        "bytes": 38589547,
+        "raw_bytes": 254978770,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "d4228b9016af5fbaa2ad0e3fd7aabbfb9374a1611b5fb565333b9473d9c968bb",
+            "bytes": 200132
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "3a17c06cdd5520238dfc4f87d103c0dfb61580216b80730be39f42ec2037c977",
+            "bytes": 549342
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "0d16a81ab9030c0a275bf3b74cbf3acc26b9f9c8378581fea4857c41089dfcec",
+            "bytes": 14430417
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0",
+            "bytes": 110311862
+          },
+          "rebuild-replay.json": {
+            "sha256": "c1cc0af385d2e5df591ab647cfd5ec59605f522c1ca073ae9cb385e984301aa9",
+            "bytes": 79554
+          },
+          "recorded-audit.json": {
+            "sha256": "a8e0bac693adb79c35a9f2698a55aa353fd0bb86f950708be171322ffa7e721a",
+            "bytes": 446753
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3",
+            "bytes": 1852049
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": [],
+          "first_native_difference": 25498,
+          "first_task_difference": 24270,
+          "first_action_difference": 24347
+        },
+        "live": {
+          "last_tick": 24548,
+          "reason": "recovery_blocked",
+          "task_reason": "rebuild staging exceeded the original search deadline",
+          "build_ticks": [],
+          "boarding_ticks": [],
+          "first_native_difference": 24348,
+          "first_task_difference": 24270,
+          "first_action_difference": 24347
+        }
+      }
+    }
+  },
+  "validation": {
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "rebuild_placement"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/native.log",
+      "log_sha256": "0f7f4cba2ac8ce9ac3ab595901a1ddb22eb56a8e7cc95f061ff02b013e0add90",
+      "tests": 6
+    },
+    "bot": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/bot.log",
+      "log_sha256": "1295856dc3da1045636206559cfc36c503774f8e2d8196f2954ac8e30d9b03f4",
+      "tests": 78
+    },
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/harness.log",
+      "log_sha256": "93f6573dce91e7e2d7d88a63630cd39ad7a7faacaaf8a4bd0fdb87318409f8a9",
+      "tests": 63
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/python.log",
+      "log_sha256": "1018b52ee9338fe73e11e3d44d1ae5fff7bb06f6d31d1e987d077e7e59f61f31",
+      "tests": 956
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "b1810283a85f27aac60eb6523ed43a1f064ce92359ed7eadbccf35d509102ed8"
+    },
+    "native_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-staging/v1/validation-logs/native_clippy.log",
+      "log_sha256": "9b2264941fe55e5c20f4e0ac9860d8ecacbe1580805105552c2e5f61f89673e3",
+      "diagnostics": 16,
+      "same_diagnostic_identities": true,
+      "diagnostic_identities": [
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/pilot.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/render.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie.rs"
+        },
+        {
+          "message": "this boolean expression can be simplified",
+          "file": "scenarios/spacewars/src/terrain/loose.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "items after a test module",
+          "file": "scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        }
+      ],
+      "baseline_log": {
+        "path": "target/rebuild-refinement/v1/validation-logs/native_clippy.log",
+        "sha256": "8c3635902601648af42af0ff877ba9ef778c56fd98b9eb38d9e9e9f6bbfe1e80"
+      },
+      "explanation": "Broad native Clippy still fails with the same 16 message/file diagnostics as the preceding refinement baseline. This is not a passing check."
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/release.log",
+      "log_sha256": "f0ea62b83a6df59d171e593e9e8eb96af9526a6376d01f27f9137637e6e464c3"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/default_check.log",
+      "log_sha256": "5cee33a90ce3752d6afe617079d02a9a2846479dff4b5ec06cd65506773e3e46"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-staging/v1/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "provenance": {
+    "previous_bundle": {
+      "path": "docs/data/rebuild-refinement-v1.json.gz",
+      "sha256": "97620c14654e6ecd796a6f9ef36ed4d91acf13c2f889ed04ceb749db39a51c36",
+      "bytes": 679118
+    },
+    "previous_refined_archive": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-refinement/v1/archives/refined.tar.gz",
+      "sha256": "cc6abb697f3e46a1e88993960e1a3ccceead8175d5dad8fcab9b20fac27f8360",
+      "bytes": 38487638,
+      "raw_bytes": 254524512,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "a614309b6e9a5d21c2d689c631ff8b43e2dfe7d2bf46f086621cc3dfe08b1231",
+          "bytes": 103338
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-refinement-audit.json": {
+          "sha256": "eb1c69082481586604c05664c762a3b815505a4a9804f8ab70fcad26fef4c7f2",
+          "bytes": 599109
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "5476e341a74c7a0c75df11b9ce0c80dcc81cbcb86e730cd8f229e60a8a578f76",
+          "bytes": 14947217
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "cfd58ce4cfd3cbb6e93fa7ae6461f754c590a4035c070d646f4f9e230c305af5",
+          "bytes": 109404186
+        },
+        "rebuild-replay.json": {
+          "sha256": "d81b42dc23d2b3f4e212b4eb051eb2ebbd1527e3da5565f8fa9d86121625442f",
+          "bytes": 84235
+        },
+        "recorded-audit.json": {
+          "sha256": "b540aaf3efc6782420cd95604818eb1dbf53cc58cb7e94706d14021df12d249a",
+          "bytes": 442172
+        },
+        "recorded-refinement-audit.json": {
+          "sha256": "b798d4493795a9e9dedbe1f999efee768bac1acf815fb123b37db333deb5fa7c",
+          "bytes": 1835594
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "tape": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-replay/v2/inputs/tape.jsonl",
+      "sha256": "c48c29b50b3c9b953305b0ac5fe9a2581040f654c5f2b9a5e84300d77b60d168",
+      "rows": 29422
+    }
+  },
+  "plan_sha256": "1894b0d6dd23c15344a0df9855f388293c8cf338c6a7d999c4fce24490b4133d",
+  "summary_sha256": "e6eb8f5bb64f4818e0f7f9c7a1448bde68937e970cc772d7738179636b38fb66",
+  "review_bundle": {
+    "path": "docs/data/rebuild-staging-v1.json.gz",
+    "sha256": "ac6e8984c90901bc6b06ddfadb94982649b1446f72656ca054736621f499b290",
+    "bytes": 774845
+  }
+}
