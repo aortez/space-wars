@@ -4,6 +4,8 @@ use super::*;
 use ground_navigation::{GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
 mod refinement;
 pub use refinement::RebuildRefinementWork;
+mod staging;
+pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
 
 #[cfg(feature = "sensor-profile")]
 mod coverage;
@@ -90,6 +92,11 @@ pub struct RebuildRelocationSurvey {
     pub site: Option<RebuildStandingSite>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refinement: Option<RebuildRefinementWork>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<RebuildSearchProgress>,
+    /// A measured walking step toward a preview, not a buildable standing site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging: Option<RebuildStagingProposal>,
 }
 pub(super) struct RebuildPose {
     pub center: Vec2,
@@ -390,6 +397,14 @@ impl SurfaceSortieState {
         &self,
         player: usize,
     ) -> Option<RebuildRelocationSurvey> {
+        self.rebuild_relocation_survey_with_search(player, None)
+    }
+
+    pub(super) fn rebuild_relocation_survey_with_search(
+        &self,
+        player: usize,
+        search: Option<&RebuildSearchProgress>,
+    ) -> Option<RebuildRelocationSurvey> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("rebuild_relocation_survey");
         // Alternate with the full ground survey. A relocation only needs this
@@ -401,10 +416,14 @@ impl SurfaceSortieState {
             return None;
         }
         let recovery = self.pilots[player].recovery.as_ref()?.observation();
-        if !matches!(
-            recovery.status,
-            SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
-        ) {
+        let staged_recheck =
+            self.pilots[player].rebuild_refinement && search.is_some_and(|s| s.preferred.is_some());
+        if !staged_recheck
+            && !matches!(
+                recovery.status,
+                SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
+            )
+        {
             return None;
         }
         let actor = self.spaceling_snapshot(player)?;
@@ -433,6 +452,8 @@ impl SurfaceSortieState {
             refinement: self.pilots[player]
                 .rebuild_refinement
                 .then(Default::default),
+            search: None,
+            staging: None,
         };
         // Fixed bearing offsets can all miss viable standing material after a
         // crater. Spread the bounded previews over actual nearby footing.
@@ -528,7 +549,18 @@ impl SurfaceSortieState {
             }
         }
         if survey.site.is_none() && survey.refinement.is_some() {
-            self.refine_rebuild_survey(player, &map, &base, &promising, &mut survey);
+            if let Some(search) = search {
+                self.progressive_rebuild_survey(
+                    player,
+                    &map,
+                    &base,
+                    &promising,
+                    search,
+                    &mut survey,
+                );
+            } else {
+                self.refine_rebuild_survey(player, &map, &base, &promising, &mut survey);
+            }
         }
         Some(survey)
     }

@@ -216,6 +216,10 @@ fn fork(
     if crate::arg("--rebuild-refinement", "false") == "true" {
         assert!(state.set_rebuild_refinement(seat, true));
     }
+    if crate::arg("--rebuild-staging", "false") == "true" {
+        assert_eq!(crate::arg("--rebuild-refinement", "false"), "true");
+        task.set_rebuild_search(true);
+    }
     let name = if live { "live" } else { "recorded" };
     let mut tape = BufReader::new(fs::File::open(tape_path).unwrap());
     tape.seek(SeekFrom::Start(offset)).unwrap();
@@ -231,7 +235,14 @@ fn fork(
     loop {
         let row = read(&mut tape);
         assert_eq!(row.tick, state.tick());
-        let mut o = if live {
+        let mut o = if let Some(search) = task.rebuild_search_request() {
+            let request = if live {
+                task.site_request().into()
+            } else {
+                query(&row.pilots[seat]["site_query"])
+            };
+            state.recovery_observation_with_rebuild_search(seat, request, &search)
+        } else if live {
             state.recovery_task_observation(seat, task.site_request())
         } else {
             state.recovery_observation_for_replay(seat, query(&row.pilots[seat]["site_query"]))

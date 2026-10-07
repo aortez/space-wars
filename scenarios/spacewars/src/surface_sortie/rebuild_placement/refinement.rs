@@ -13,6 +13,12 @@ pub struct RebuildRefinementWork {
     pub coarse_candidates: usize,
     pub refined_candidates: usize,
     pub offset_checks: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub staging_route_checks: usize,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 pub(super) fn promising(report: &RebuildPlacementReport) -> bool {
@@ -28,7 +34,12 @@ pub(super) fn promising(report: &RebuildPlacementReport) -> bool {
     })
 }
 
-fn neighbors<'a>(map: &'a GroundMap, foot: Vec2, seeds: &[&GroundNode]) -> Vec<&'a GroundNode> {
+pub(super) fn neighbors<'a>(
+    map: &'a GroundMap,
+    foot: Vec2,
+    seeds: &[&GroundNode],
+    visited: &[u16],
+) -> Vec<&'a GroundNode> {
     let mut queues = seeds
         .iter()
         .map(|seed| {
@@ -38,6 +49,7 @@ fn neighbors<'a>(map: &'a GroundMap, foot: Vec2, seeds: &[&GroundNode]) -> Vec<&
                 .filter(|node| {
                     node.position.distance_to(seed.position) <= 2.0
                         && node.position.distance_to(foot) <= MAX_REBUILD_WALK
+                        && !visited.contains(&node.id)
                 })
                 .collect::<Vec<_>>();
             nearby.sort_by(|a, b| {
@@ -90,7 +102,7 @@ impl SurfaceSortieState {
         let frame = motion::SurfaceFrame::read(&self.world.physics, map.planet);
         let foot = (actor.motion.position - actor.up * Self::spec().half_height() - frame.position)
             .rotate_radians(-frame.angle);
-        for node in neighbors(map, foot, seeds) {
+        for node in neighbors(map, foot, seeds, &[]) {
             survey.refinement.as_mut().unwrap().refined_candidates += 1;
             let route = map.route(foot, node.position, 0.01);
             survey.attempts.push(RebuildRelocationAttempt {
@@ -172,7 +184,7 @@ mod tests {
             edges: Vec::new(),
             rejected: Vec::new(),
         };
-        let selected = neighbors(&map, Vec2::ZERO, &[&map.nodes[5], &map.nodes[30]]);
+        let selected = neighbors(&map, Vec2::ZERO, &[&map.nodes[5], &map.nodes[30]], &[]);
         assert_eq!(selected.len(), 8);
         assert_eq!(selected[0].id, 5);
         assert_eq!(selected[1].id, 30);
@@ -184,6 +196,6 @@ mod tests {
                     .any(|&seed| node.position.distance_to(map.nodes[seed].position) <= 2.0)
             );
         }
-        assert!(neighbors(&map, Vec2::new(100.0, 0.0), &[&map.nodes[5]]).is_empty());
+        assert!(neighbors(&map, Vec2::new(100.0, 0.0), &[&map.nodes[5]], &[]).is_empty());
     }
 }

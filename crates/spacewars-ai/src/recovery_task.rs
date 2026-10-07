@@ -18,11 +18,13 @@ use scenario_spacewars::{
         LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
         TransferResult, VehicleId,
         pilot::{LandingSiteId, PilotLandingSite, PilotObservationV1},
-        rebuild_placement::RebuildStandingSite,
+        rebuild_placement::{RebuildSearchProgress, RebuildStandingSite},
         recovery_sensors::RecoveryTaskObservationV1,
     },
 };
 use serde::Serialize;
+mod search;
+pub use search::RebuildStagingTelemetry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -96,6 +98,10 @@ pub struct RecoveryTelemetry {
     /// the original recovery clock, relocation count, or replacement history.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rebuild_boarding: Option<RebuildBoardingTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_search: Option<RebuildSearchProgress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_staging: Option<RebuildStagingTelemetry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -172,6 +178,7 @@ pub struct RecoverShipTask {
     return_route_checked: Option<(usize, u64, u64, bool)>,
     seen_rebuilds: Option<(VehicleId, u64)>,
     invalid_observation: bool,
+    rebuild_search_enabled: bool,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
@@ -205,6 +212,8 @@ impl RecoverShipTask {
                 scuttled_tick: None,
                 scuttle_attempts: 0,
                 rebuild_boarding: None,
+                rebuild_search: None,
+                rebuild_staging: None,
             },
             site: None,
             stabilized: false,
@@ -225,10 +234,13 @@ impl RecoverShipTask {
             return_route_checked: None,
             seen_rebuilds: None,
             invalid_observation: false,
+            rebuild_search_enabled: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let rebuild_search_enabled = self.rebuild_search_enabled;
         *self = Self::new(context);
+        self.rebuild_search_enabled = rebuild_search_enabled;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)
@@ -370,6 +382,9 @@ impl RecoverShipTask {
         let Some(recovery) = &p.recovery else {
             return;
         };
+        if p.ship_available && p.ship_form == ShipForm::Ship {
+            self.invalidate_staging(p.tick);
+        }
         let previous = self.seen_rebuilds;
         self.seen_rebuilds = Some((
             p.vehicle,
@@ -418,6 +433,13 @@ impl RecoverShipTask {
             if !p.queries_ready {
                 return action;
             }
+            if self.staging_deadline_exceeded(p.tick) {
+                self.block(
+                    "rebuild staging exceeded the original search deadline",
+                    p.tick,
+                );
+                return action;
+            }
             if self.return_fallback_since.is_some() {
                 return self.replace_unreachable_ship(o);
             }
@@ -440,6 +462,8 @@ impl RecoverShipTask {
                         planet: site.planet,
                         position: site.position,
                     }
+                } else if let Some(destination) = self.staging_destination(p) {
+                    destination
                 } else {
                     GroundDestination::Flag
                 };
@@ -498,6 +522,9 @@ impl RecoverShipTask {
                 return action;
             }
             let recovery = p.recovery.as_ref().unwrap();
+            if let Some(action) = self.traverse_staging(o) {
+                return action;
+            }
             if let Some(site) = self.telemetry.relocation_site {
                 if site.planet != p.planet.index || site.revision != p.planet.revision {
                     self.telemetry.relocation_site = None;
@@ -528,7 +555,8 @@ impl RecoverShipTask {
             if matches!(
                 recovery.status,
                 SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
-            ) {
+            ) || self.staged_search_pending()
+            {
                 self.goal(RecoveryGoal::FindBuildSpace, p.tick);
                 let since = *self.relocation_missing_since.get_or_insert(p.tick);
                 if self.telemetry.relocations >= 4 {
@@ -544,6 +572,9 @@ impl RecoverShipTask {
                         return action;
                     }
                     self.telemetry.relocation_surveys += 1;
+                    if !self.remember_rebuild_search(survey, p) {
+                        return action;
+                    }
                     if let Some(site) = survey.site {
                         if site.planet != p.planet.index
                             || site.revision != p.planet.revision
@@ -557,6 +588,8 @@ impl RecoverShipTask {
                         self.telemetry.relocation_site = Some(site);
                         self.relocation_missing_since = None;
                         self.ground_task = None;
+                    } else if self.rebuild_search_enabled {
+                        self.accept_staging(survey, p, since);
                     }
                 }
                 if self.telemetry.relocation_site.is_none() && p.tick.saturating_sub(since) > 5 * 60
@@ -756,7 +789,12 @@ impl RecoverShipTask {
         task.set_precise_rebuild(
             self.telemetry
                 .relocation_site
-                .is_some_and(|site| site.precise),
+                .is_some_and(|site| site.precise)
+                || self
+                    .telemetry
+                    .rebuild_staging
+                    .as_ref()
+                    .is_some_and(|s| s.active()),
         );
         let action = task.step(o);
         self.telemetry.ground = Some(task.telemetry().clone());
