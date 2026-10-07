@@ -55,6 +55,13 @@ impl RecoverShipTask {
         }
     }
 
+    /// Preserve an explicit footing query across native search-history resets.
+    /// The next survey must still measure the route and placement from scratch.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_rebuild_footing_recheck(&mut self, enabled: bool) {
+        self.rebuild_footing_recheck = enabled;
+    }
+
     pub(super) fn retain_rebuild_footing(
         &mut self,
         site: RebuildStandingSite,
@@ -127,7 +134,23 @@ impl RecoverShipTask {
         if matches!(
             p.recovery.as_ref().unwrap().status,
             SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
-        ) {
+        ) && p
+            .recovery
+            .as_ref()
+            .unwrap()
+            .placement
+            .as_ref()
+            .is_some_and(|report| {
+                // Retry status can outlive the move to this footing. Only an
+                // actual failed attempt since arrival can reject the new hold.
+                report.tick >= held.started_tick
+                    && report.tick <= p.tick
+                    && report.planet == site.planet
+                    && report.revision == Some(site.revision)
+                    && report.revision == Some(p.planet.revision)
+                    && report.selected_offset.is_none()
+            })
+        {
             self.release_rebuild_footing("native placement rejected", p.tick);
             return None;
         }

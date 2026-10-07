@@ -43,6 +43,20 @@ impl RecoverShipTask {
         self.rebuild_search_enabled.then(|| {
             let mut request = self.telemetry.rebuild_search.clone().unwrap_or_default();
             request.include_staging_map = self.staging_route_handoff;
+            if self.rebuild_footing_recheck
+                && let Some((planet, _)) = self.footing_recheck
+                && request.planet != planet
+            {
+                // A request names a bearing on this planet, not geometry from
+                // a different planet's search history.
+                request = RebuildSearchProgress {
+                    planet,
+                    include_staging_map: self.staging_route_handoff,
+                    ..Default::default()
+                };
+            }
+            request.recheck_preferred =
+                self.rebuild_footing_recheck && self.footing_recheck.is_some();
             request.preferred = self
                 .footing_recheck
                 .map(|(_, bearing)| bearing)

@@ -466,6 +466,7 @@ fn staged_rebuild_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) {
         started_tick: 0,
         visited: vec![2],
         preferred: None,
+        recheck_preferred: false,
         include_staging_map: false,
     });
     task.step(&o); // The original missing-site allowance begins here.
@@ -1038,7 +1039,19 @@ fn held_footing_releases_large_displacements_and_native_placement_failures() {
         if displaced {
             o.flight.pilot.actor.as_mut().unwrap().position.x = 1.5;
         } else {
-            o.flight.pilot.recovery.as_mut().unwrap().status = SurfaceRecoveryStatus::HatchBlocked;
+            let site = task.telemetry().rebuild_footing.as_ref().unwrap().site;
+            let recovery = o.flight.pilot.recovery.as_mut().unwrap();
+            recovery.status = SurfaceRecoveryStatus::HatchBlocked;
+            recovery.placement = Some(
+                scenario_spacewars::surface_sortie::rebuild_placement::RebuildPlacementReport {
+                    tick: 3,
+                    planet: site.planet,
+                    revision: Some(site.revision),
+                    standing: site.position,
+                    selected_offset: None,
+                    attempts: Vec::new(),
+                },
+            );
         }
         assert_eq!(task.step(&o), FlightIntent::default());
         assert_eq!(
@@ -1056,6 +1069,123 @@ fn held_footing_releases_large_displacements_and_native_placement_failures() {
         assert_eq!(task.telemetry().relocations, 1);
         assert!(task.telemetry().relocation_site.is_none());
     }
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_ignores_latched_failures_until_a_current_attempt_rejects_it() {
+    use scenario_spacewars::surface_sortie::{
+        SurfaceRecoveryStatus, rebuild_placement::RebuildPlacementReport,
+    };
+    let (task, original) = held_rebuild_fixture();
+    let site = task.telemetry().rebuild_footing.as_ref().unwrap().site;
+    for status in [
+        SurfaceRecoveryStatus::ClearanceBlocked,
+        SurfaceRecoveryStatus::HatchBlocked,
+    ] {
+        for fault in 0..6 {
+            let mut task = task.clone();
+            let mut o = original.clone();
+            o.ground = None;
+            o.flight.pilot.tick = 10;
+            o.flight.pilot.actor.as_mut().unwrap().position.x = 3.8;
+            let recovery = o.flight.pilot.recovery.as_mut().unwrap();
+            recovery.status = status;
+            let mut report = RebuildPlacementReport {
+                tick: 9,
+                planet: site.planet,
+                revision: Some(site.revision),
+                standing: site.position,
+                selected_offset: None,
+                attempts: Vec::new(),
+            };
+            match fault {
+                0 => report.tick = 1,
+                1 => report.tick = 11,
+                2 => report.planet += 1,
+                3 => report.revision = Some(site.revision + 1),
+                4 => report.selected_offset = Some(-10.0),
+                _ => (),
+            }
+            recovery.placement = (fault != 5).then_some(report);
+            let mut copy = task.clone();
+            let action = task.step(&o);
+            assert!(action.controls.horizontal > 0.0, "{status:?}/{fault}");
+            assert_eq!(copy.step(&o), action);
+            assert_eq!(copy.telemetry(), task.telemetry());
+            assert_eq!(
+                task.telemetry()
+                    .rebuild_footing
+                    .as_ref()
+                    .unwrap()
+                    .ended_tick,
+                None
+            );
+            let before = task.telemetry().clone();
+            assert_eq!(task.step(&o), action);
+            assert_eq!(task.telemetry(), &before);
+            o.flight.pilot.tick = 11;
+            o.flight.pilot.recovery.as_mut().unwrap().placement = Some(RebuildPlacementReport {
+                tick: 11,
+                planet: site.planet,
+                revision: Some(site.revision),
+                standing: site.position,
+                selected_offset: None,
+                attempts: Vec::new(),
+            });
+            assert_eq!(task.step(&o), FlightIntent::default());
+            let held = task.telemetry().rebuild_footing.as_ref().unwrap();
+            assert_eq!(held.ended_tick, Some(11));
+            assert_eq!(held.reason, Some("native placement rejected"));
+            assert_eq!(task.telemetry().relocations, 1);
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn footing_recheck_is_explicit_until_a_new_counted_site_or_reset() {
+    let (mut task, mut o) = held_rebuild_fixture();
+    task.set_rebuild_footing_recheck(true);
+    assert!(!task.rebuild_search_request().unwrap().recheck_preferred);
+    o.ground = None;
+    o.flight.pilot.tick = 3;
+    o.flight.pilot.planet.revision += 1;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    let request = task.rebuild_search_request().unwrap();
+    assert!(request.recheck_preferred);
+    assert_eq!(request.preferred, Some(2));
+    assert_eq!(task.telemetry().relocations, 1);
+    let mut copy = task.clone();
+    assert_eq!(copy.rebuild_search_request(), task.rebuild_search_request());
+    o.flight.pilot.tick = 4;
+    assert_eq!(task.step(&o), copy.step(&o));
+    let mut expired = task.clone();
+    let mut late = o.clone();
+    late.flight.pilot.tick = 304;
+    expired.step(&late);
+    assert_eq!(
+        expired.telemetry().reason,
+        Some("no reachable standing site with hatch access")
+    );
+    o.flight.pilot.tick = 5;
+    o.rebuild = rebuild_relocation_fixture().1.rebuild;
+    let survey = o.rebuild.as_mut().unwrap();
+    survey.tick = 5;
+    survey.site.as_mut().unwrap().revision = o.flight.pilot.planet.revision;
+    task.step(&o);
+    assert_eq!(task.telemetry().relocations, 2);
+    assert!(!task.rebuild_search_request().unwrap().recheck_preferred);
+    assert_eq!(task.rebuild_search_request().unwrap().preferred, None);
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert!(!task.rebuild_search_request().unwrap().recheck_preferred);
+    assert!(task.telemetry().rebuild_footing.is_none());
+    copy.set_rebuild_footing_recheck(false);
+    assert!(!copy.rebuild_search_request().unwrap().recheck_preferred);
+    assert_eq!(copy.rebuild_search_request().unwrap().preferred, Some(2));
 }
 
 #[test]

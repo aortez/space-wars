@@ -186,6 +186,7 @@ pub struct RecoverShipTask {
     continuous_staging: bool,
     staging_route_handoff: bool,
     rebuild_footing_hold: bool,
+    rebuild_footing_recheck: bool,
     footing_recheck: Option<(usize, u16)>,
     selected_footing_bearing: Option<u16>,
 }
@@ -248,6 +249,7 @@ impl RecoverShipTask {
             continuous_staging: false,
             staging_route_handoff: false,
             rebuild_footing_hold: false,
+            rebuild_footing_recheck: false,
             footing_recheck: None,
             selected_footing_bearing: None,
         }
@@ -257,11 +259,13 @@ impl RecoverShipTask {
         let continuous_staging = self.continuous_staging;
         let staging_route_handoff = self.staging_route_handoff;
         let rebuild_footing_hold = self.rebuild_footing_hold;
+        let rebuild_footing_recheck = self.rebuild_footing_recheck;
         *self = Self::new(context);
         self.rebuild_search_enabled = rebuild_search_enabled;
         self.continuous_staging = continuous_staging;
         self.staging_route_handoff = staging_route_handoff;
         self.rebuild_footing_hold = rebuild_footing_hold;
+        self.rebuild_footing_recheck = rebuild_footing_recheck;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)

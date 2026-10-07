@@ -16,6 +16,10 @@ pub struct RebuildSearchProgress {
     /// Recheck this measured target after a real staging arrival. It grants no
     /// placement or route validity in the new survey.
     pub preferred: Option<u16>,
+    /// Explicit current request to remeasure a bearing even if history expires
+    /// or terrain changes. Consumed by one bounded survey; not a valid site.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub recheck_preferred: bool,
     /// Include the measured walking map when a staging move is proposed.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub include_staging_map: bool,
@@ -41,7 +45,14 @@ impl RebuildSearchProgress {
             origin: foot,
             started_tick: map.tick,
             visited: Vec::new(),
-            preferred: current.then_some(self.preferred).flatten(),
+            preferred: self.preferred.filter(|&id| {
+                usize::from(id) < GROUND_SAMPLES
+                    && (current
+                        || (self.recheck_preferred
+                            && self.planet == map.planet
+                            && map.tick >= self.started_tick))
+            }),
+            recheck_preferred: self.recheck_preferred,
             include_staging_map: self.include_staging_map,
         }
     }
@@ -134,6 +145,7 @@ impl SurfaceSortieState {
         let foot = (actor.motion.position - actor.up * Self::spec().half_height() - frame.position)
             .rotate_radians(-frame.angle);
         let mut search = previous.refreshed(map, foot);
+        search.recheck_preferred = false;
         let preferred = search.preferred.take().and_then(|id| {
             map.nodes
                 .iter()
@@ -300,6 +312,41 @@ mod tests {
         map.revision -= 1;
         map.tick += SEARCH_LIFETIME + 1;
         assert!(previous.refreshed(&map, foot).visited.is_empty());
+    }
+
+    #[test]
+    fn explicit_footing_recheck_discards_old_geometry_but_keeps_a_bounded_query_hint() {
+        let mut map = map();
+        let foot = map.nodes[0].position;
+        let prior = RebuildSearchProgress {
+            preferred: Some(25),
+            recheck_preferred: true,
+            visited: vec![25, 24],
+            ..RebuildSearchProgress::default().refreshed(&map, foot)
+        };
+        map.revision += 1;
+        map.tick += SEARCH_LIFETIME + 1;
+        let fresh = prior.refreshed(&map, foot + Vec2::X);
+        assert_eq!(fresh.preferred, Some(25));
+        assert!(fresh.visited.is_empty());
+        assert_eq!(fresh.started_tick, map.tick);
+        assert_eq!(fresh.origin, foot + Vec2::X);
+        assert_eq!(fresh.revision, map.revision);
+        // The same id can only request a new route and placement; the previous
+        // history remains unmodified and carries no validity into this map.
+        assert_eq!(prior.visited, vec![25, 24]);
+        let mut invalid = prior.clone();
+        invalid.preferred = Some(GROUND_SAMPLES as u16);
+        assert_eq!(invalid.refreshed(&map, foot).preferred, None);
+        invalid = prior.clone();
+        invalid.planet += 1;
+        assert_eq!(invalid.refreshed(&map, foot).preferred, None);
+        invalid = prior.clone();
+        invalid.started_tick = map.tick + 1;
+        assert_eq!(invalid.refreshed(&map, foot).preferred, None);
+        invalid = prior;
+        invalid.recheck_preferred = false;
+        assert_eq!(invalid.refreshed(&map, foot).preferred, None);
     }
 
     #[test]
