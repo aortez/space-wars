@@ -859,6 +859,285 @@ fn seeded_staging_honors_dirty_queries_and_invalidates_with_terrain() {
     );
 }
 
+#[cfg(feature = "sensor-profile")]
+fn held_rebuild_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    task.set_rebuild_search(true);
+    task.set_rebuild_footing_hold(true);
+    o.rebuild.as_mut().unwrap().site.as_mut().unwrap().precise = true;
+    task.step(&o);
+    o.rebuild = None;
+    o.flight.pilot.tick = 1;
+    o.ground.as_mut().unwrap().tick = 1;
+    task.step(&o);
+    o.flight.pilot.tick = 2;
+    o.ground.as_mut().unwrap().tick = 2;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 4.05;
+    o.flight.pilot.recovery.as_mut().unwrap().status =
+        scenario_spacewars::surface_sortie::SurfaceRecoveryStatus::Rebuilding;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry()
+            .rebuild_footing
+            .as_ref()
+            .unwrap()
+            .started_tick,
+        2
+    );
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().started_tick,
+        Some(1)
+    );
+    (task, o)
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn a_fresh_preview_already_at_the_foot_can_be_held_before_a_ground_route_is_needed() {
+    use scenario_spacewars::surface_sortie::rebuild_placement::{
+        RebuildPlacementReport, RebuildRelocationAttempt,
+    };
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    task.set_rebuild_search(true);
+    task.set_rebuild_footing_hold(true);
+    let survey = o.rebuild.as_mut().unwrap();
+    let site = survey.site.as_mut().unwrap();
+    site.precise = true;
+    survey.attempts.push(RebuildRelocationAttempt {
+        bearing: 2,
+        route: None,
+        placement: Some(RebuildPlacementReport {
+            tick: 0,
+            planet: site.planet,
+            revision: Some(site.revision),
+            standing: site.position,
+            selected_offset: Some(-10.0),
+            attempts: Vec::new(),
+        }),
+    });
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 4.02;
+    task.step(&o);
+    o.rebuild = None;
+    o.ground = None;
+    o.flight.pilot.tick = 1;
+    o.flight.pilot.recovery.as_mut().unwrap().status =
+        scenario_spacewars::surface_sortie::SurfaceRecoveryStatus::Rebuilding;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().rebuild_footing.as_ref().unwrap().bearing,
+        2
+    );
+    assert!(task.telemetry().ground.as_ref().unwrap().path.is_empty());
+    o.flight.pilot.tick = 2;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 3.8;
+    o.ground = rebuild_relocation_fixture().1.ground;
+    o.ground.as_mut().unwrap().tick = 2;
+    let action = task.step(&o);
+    assert!(action.controls.horizontal > 0.0);
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().started_tick,
+        Some(1)
+    );
+    assert_eq!(task.telemetry().relocations, 1);
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_corrects_supported_drift_and_keeps_arrival_and_ground_clocks() {
+    let (mut task, mut o) = held_rebuild_fixture();
+    let mut copy = task.clone();
+    o.ground = None;
+    o.flight.pilot.tick = 3;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 3.8;
+    let action = task.step(&o);
+    assert_eq!(action, copy.step(&o));
+    assert_eq!(task.telemetry(), copy.telemetry());
+    assert!(action.controls.horizontal > 0.0 && action.controls.horizontal < 0.1);
+    assert!(!action.controls.primary_held);
+    let before = task.telemetry().clone();
+    assert_eq!(task.step(&o), action);
+    assert_eq!(task.telemetry(), &before);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().started_tick,
+        Some(1)
+    );
+    assert!(task.telemetry().ground.as_ref().unwrap().precise_rebuild);
+    assert_eq!(task.telemetry().relocations, 1);
+    assert!(task.telemetry().relocation_site.is_none());
+    o.flight.pilot.tick = 4;
+    o.flight.pilot.supported_planet = None;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    o.flight.pilot.tick = 5;
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    o.flight.pilot.queries_ready = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    o.flight.pilot.tick = 6;
+    o.flight.pilot.queries_ready = true;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 4.02;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(
+        task.telemetry()
+            .rebuild_footing
+            .as_ref()
+            .unwrap()
+            .started_tick,
+        2
+    );
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().goal,
+        spacewars_ai::ground_task::GroundGoal::Arrived
+    );
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_revision_requires_a_fresh_counted_preview_with_a_fixed_search_deadline() {
+    let (mut task, mut o) = held_rebuild_fixture();
+    o.ground = None;
+    o.flight.pilot.tick = 3;
+    o.flight.pilot.planet.revision += 1;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    let held = task.telemetry().rebuild_footing.as_ref().unwrap();
+    assert_eq!(held.ended_tick, Some(3));
+    assert_eq!(held.reason, Some("terrain changed"));
+    assert_eq!(task.rebuild_search_request().unwrap().preferred, Some(2));
+    assert_eq!(task.telemetry().relocations, 1);
+    let mut missing = task.clone();
+    let mut absent = o.clone();
+    absent.flight.pilot.tick = 304;
+    missing.step(&absent);
+    assert_eq!(
+        missing.telemetry().reason,
+        Some("no reachable standing site with hatch access")
+    );
+    o.flight.pilot.tick = 4;
+    o.rebuild = rebuild_relocation_fixture().1.rebuild;
+    let survey = o.rebuild.as_mut().unwrap();
+    survey.tick = 4;
+    survey.site.as_mut().unwrap().revision = o.flight.pilot.planet.revision;
+    survey.site.as_mut().unwrap().precise = true;
+    task.step(&o);
+    assert_eq!(task.telemetry().relocations, 2);
+    assert_eq!(
+        task.telemetry().relocation_site.unwrap().revision,
+        o.flight.pilot.planet.revision
+    );
+    assert_eq!(task.rebuild_search_request().unwrap().preferred, None);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_releases_large_displacements_and_native_placement_failures() {
+    use scenario_spacewars::surface_sortie::SurfaceRecoveryStatus;
+    for displaced in [true, false] {
+        let (mut task, mut o) = held_rebuild_fixture();
+        o.flight.pilot.tick = 3;
+        o.ground = None;
+        if displaced {
+            o.flight.pilot.actor.as_mut().unwrap().position.x = 1.5;
+        } else {
+            o.flight.pilot.recovery.as_mut().unwrap().status = SurfaceRecoveryStatus::HatchBlocked;
+        }
+        assert_eq!(task.step(&o), FlightIntent::default());
+        assert_eq!(
+            task.telemetry().rebuild_footing.as_ref().unwrap().reason,
+            Some(if displaced {
+                "footing displaced"
+            } else {
+                "native placement rejected"
+            })
+        );
+        assert_eq!(
+            task.rebuild_search_request().unwrap().preferred,
+            displaced.then_some(2)
+        );
+        assert_eq!(task.telemetry().relocations, 1);
+        assert!(task.telemetry().relocation_site.is_none());
+    }
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_has_one_deadline_and_real_build_wins_on_a_disarmed_tick() {
+    let (mut task, mut o) = held_rebuild_fixture();
+    o.ground = None;
+    for tick in [3, 100, 1000, 1202] {
+        o.flight.pilot.tick = tick;
+        task.step(&o);
+        assert_eq!(task.telemetry().status, TaskStatus::Running);
+    }
+    let mut built = task.clone();
+    o.flight.pilot.tick = 1203;
+    o.flight.pilot.controls_armed = false;
+    o.flight.pilot.queries_ready = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(
+        task.telemetry().reason,
+        Some("rebuild footing exceeded twenty seconds")
+    );
+    o.flight.pilot.ship_available = true;
+    o.flight.pilot.ship_form = ShipForm::Ship;
+    o.flight.pilot.recovery.as_mut().unwrap().rebuilds = 1;
+    assert_eq!(built.step(&o), FlightIntent::default());
+    assert_eq!(built.telemetry().status, TaskStatus::Running);
+    assert_eq!(
+        built.telemetry().rebuild_footing.as_ref().unwrap().reason,
+        Some("ship available")
+    );
+    assert_eq!(built.rebuild_search_request().unwrap().preferred, None);
+}
+
+#[test]
+#[cfg(feature = "sensor-profile")]
+fn held_footing_reset_and_ownership_loss_clear_the_old_target() {
+    let (mut task, mut o) = held_rebuild_fixture();
+    let mut lost = task.clone();
+    o.flight.pilot.tick = 3;
+    o.ground.as_mut().unwrap().tick = 3;
+    o.flight.pilot.planet.claim.as_mut().unwrap().owner = None;
+    lost.step(&o);
+    assert_eq!(
+        lost.telemetry().rebuild_footing.as_ref().unwrap().reason,
+        Some("ownership changed")
+    );
+    assert_eq!(lost.rebuild_search_request().unwrap().preferred, None);
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert!(task.telemetry().rebuild_footing.is_none());
+    assert!(task.telemetry().ground.is_none());
+    assert_eq!(task.rebuild_search_request().unwrap().preferred, None);
+    let (_, mut fresh) = rebuild_relocation_fixture();
+    fresh
+        .rebuild
+        .as_mut()
+        .unwrap()
+        .site
+        .as_mut()
+        .unwrap()
+        .precise = true;
+    task.step(&fresh);
+    fresh.rebuild = None;
+    fresh.flight.pilot.tick = 1;
+    fresh.ground.as_mut().unwrap().tick = 1;
+    task.step(&fresh);
+    fresh.flight.pilot.tick = 2;
+    fresh.ground.as_mut().unwrap().tick = 2;
+    fresh.flight.pilot.actor.as_mut().unwrap().position.x = 4.05;
+    task.step(&fresh);
+    assert_eq!(
+        task.telemetry()
+            .rebuild_footing
+            .as_ref()
+            .unwrap()
+            .started_tick,
+        2
+    );
+}
+
 fn exhausted_rebuild_relocations() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     let (mut task, mut o) = rebuild_relocation_fixture();
     for relocation in 0..4 {

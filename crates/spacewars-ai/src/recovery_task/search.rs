@@ -43,14 +43,19 @@ impl RecoverShipTask {
         self.rebuild_search_enabled.then(|| {
             let mut request = self.telemetry.rebuild_search.clone().unwrap_or_default();
             request.include_staging_map = self.staging_route_handoff;
-            request.preferred = self.staged_search_pending().then(|| {
-                self.telemetry
-                    .rebuild_staging
-                    .as_ref()
-                    .unwrap()
-                    .proposal
-                    .target_bearing
-            });
+            request.preferred = self
+                .footing_recheck
+                .map(|(_, bearing)| bearing)
+                .or_else(|| {
+                    self.staged_search_pending().then(|| {
+                        self.telemetry
+                            .rebuild_staging
+                            .as_ref()
+                            .unwrap()
+                            .proposal
+                            .target_bearing
+                    })
+                });
             request
         })
     }

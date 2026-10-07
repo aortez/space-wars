@@ -25,6 +25,8 @@ use scenario_spacewars::{
 use serde::Serialize;
 mod search;
 pub use search::RebuildStagingTelemetry;
+mod footing;
+pub use footing::RebuildFootingTelemetry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -102,6 +104,8 @@ pub struct RecoveryTelemetry {
     pub rebuild_search: Option<RebuildSearchProgress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rebuild_staging: Option<RebuildStagingTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_footing: Option<RebuildFootingTelemetry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -181,6 +185,9 @@ pub struct RecoverShipTask {
     rebuild_search_enabled: bool,
     continuous_staging: bool,
     staging_route_handoff: bool,
+    rebuild_footing_hold: bool,
+    footing_recheck: Option<(usize, u16)>,
+    selected_footing_bearing: Option<u16>,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
@@ -216,6 +223,7 @@ impl RecoverShipTask {
                 rebuild_boarding: None,
                 rebuild_search: None,
                 rebuild_staging: None,
+                rebuild_footing: None,
             },
             site: None,
             stabilized: false,
@@ -239,16 +247,21 @@ impl RecoverShipTask {
             rebuild_search_enabled: false,
             continuous_staging: false,
             staging_route_handoff: false,
+            rebuild_footing_hold: false,
+            footing_recheck: None,
+            selected_footing_bearing: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
         let rebuild_search_enabled = self.rebuild_search_enabled;
         let continuous_staging = self.continuous_staging;
         let staging_route_handoff = self.staging_route_handoff;
+        let rebuild_footing_hold = self.rebuild_footing_hold;
         *self = Self::new(context);
         self.rebuild_search_enabled = rebuild_search_enabled;
         self.continuous_staging = continuous_staging;
         self.staging_route_handoff = staging_route_handoff;
+        self.rebuild_footing_hold = rebuild_footing_hold;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)
@@ -329,6 +342,7 @@ impl RecoverShipTask {
         }
         self.telemetry.started_tick.get_or_insert(p.tick);
         self.observe_rebuild(p);
+        self.check_footing_deadline(p.tick);
         if self.telemetry.status != TaskStatus::Succeeded
             && let Some(boarding) = &self.telemetry.rebuild_boarding
         {
@@ -392,6 +406,14 @@ impl RecoverShipTask {
         };
         if p.ship_available && p.ship_form == ShipForm::Ship {
             self.invalidate_staging(p.tick);
+            self.release_rebuild_footing("ship available", p.tick);
+            self.footing_recheck = None;
+        }
+        if self
+            .footing_recheck
+            .is_some_and(|(planet, _)| planet != p.planet.index)
+        {
+            self.footing_recheck = None;
         }
         let previous = self.seen_rebuilds;
         self.seen_rebuilds = Some((
@@ -472,6 +494,19 @@ impl RecoverShipTask {
                     }
                 } else if let Some(destination) = self.staging_destination(p) {
                     destination
+                } else if let Some(held) = &self.telemetry.rebuild_footing
+                    && held.active()
+                    && held.site.planet == p.planet.index
+                    && held.site.revision == p.planet.revision
+                    && p.planet
+                        .claim
+                        .as_ref()
+                        .is_some_and(|c| c.owner == Some(p.owner))
+                {
+                    GroundDestination::Rebuild {
+                        planet: held.site.planet,
+                        position: held.site.position,
+                    }
                 } else {
                     GroundDestination::Flag
                 };
@@ -500,6 +535,8 @@ impl RecoverShipTask {
             }
             let claim = p.planet.claim.as_ref();
             if claim.is_none_or(|c| c.owner != Some(p.owner)) {
+                self.release_rebuild_footing("ownership changed", p.tick);
+                self.footing_recheck = None;
                 self.goal(RecoveryGoal::Claim, p.tick);
                 if claim.is_some_and(|c| {
                     c.owner.is_some()
@@ -530,6 +567,9 @@ impl RecoverShipTask {
                 return action;
             }
             let recovery = p.recovery.as_ref().unwrap();
+            if let Some(action) = self.hold_rebuild_footing(o) {
+                return action;
+            }
             if let Some(action) = self.traverse_staging(o) {
                 return action;
             }
@@ -554,7 +594,9 @@ impl RecoverShipTask {
                         .is_some_and(|g| g.goal == GroundGoal::Arrived)
                     {
                         self.telemetry.relocation_site = None;
-                        self.ground_task = None;
+                        if !self.retain_rebuild_footing(site, o) {
+                            self.ground_task = None;
+                        }
                         self.telemetry.last_progress_tick = p.tick;
                     }
                     return action;
@@ -564,6 +606,7 @@ impl RecoverShipTask {
                 recovery.status,
                 SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
             ) || self.staged_search_pending()
+                || self.footing_recheck.is_some()
             {
                 self.goal(RecoveryGoal::FindBuildSpace, p.tick);
                 let since = *self.relocation_missing_since.get_or_insert(p.tick);
@@ -594,7 +637,9 @@ impl RecoverShipTask {
                         }
                         self.telemetry.relocations += 1;
                         self.telemetry.relocation_site = Some(site);
+                        self.remember_footing_bearing(survey, site);
                         self.relocation_missing_since = None;
+                        self.footing_recheck = None;
                         self.ground_task = None;
                     } else if self.rebuild_search_enabled {
                         self.accept_staging(survey, o, since);
@@ -805,7 +850,12 @@ impl RecoverShipTask {
                     .telemetry
                     .rebuild_staging
                     .as_ref()
-                    .is_some_and(|s| s.active()),
+                    .is_some_and(|s| s.active())
+                || self
+                    .telemetry
+                    .rebuild_footing
+                    .as_ref()
+                    .is_some_and(|f| f.active()),
         );
         let action = task.step(o);
         self.telemetry.ground = Some(task.telemetry().clone());

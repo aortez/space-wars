@@ -231,6 +231,21 @@ impl GroundNavigationTask {
     pub fn telemetry(&self) -> &GroundTelemetry {
         &self.telemetry
     }
+    /// Arrival can precede waypoint advancement after a displacement. Keep
+    /// subsequent footing corrections aimed at the measured final node.
+    pub(crate) fn retain_arrived_rebuild(&mut self) -> Option<u16> {
+        if self.telemetry.goal != GroundGoal::Arrived || !self.telemetry.precise_rebuild {
+            return None;
+        }
+        let target = self.telemetry.target?;
+        let id = *self.telemetry.path.last()?;
+        let node = self.map.as_ref()?.nodes.iter().find(|n| n.id == id)?;
+        if node.position.distance_to(target) > 0.01 {
+            return None;
+        }
+        self.telemetry.waypoint = self.telemetry.path.len() - 1;
+        Some(id)
+    }
     /// Maintain walking speed through ordinary route interiors. Endpoints,
     /// sharp turns, jumps and unsupported motion retain proportional steering.
     /// Like other control changes, this takes effect on the next uncached tick.
