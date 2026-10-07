@@ -2,6 +2,8 @@
 //! checked again by recovery at the actual build tick; it reserves no space.
 use super::*;
 use ground_navigation::{GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
+mod refinement;
+pub use refinement::RebuildRefinementWork;
 
 #[cfg(feature = "sensor-profile")]
 mod coverage;
@@ -64,6 +66,8 @@ impl RebuildPlacementReport {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct RebuildStandingSite {
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub precise: bool,
     pub planet: usize,
     pub revision: u64,
     pub position: Vec2,
@@ -84,6 +88,8 @@ pub struct RebuildRelocationSurvey {
     pub checked: usize,
     pub attempts: Vec<RebuildRelocationAttempt>,
     pub site: Option<RebuildStandingSite>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refinement: Option<RebuildRefinementWork>,
 }
 pub(super) struct RebuildPose {
     pub center: Vec2,
@@ -152,7 +158,25 @@ impl SurfaceSortieState {
         up: Vec2,
         map: Option<&GroundMap>,
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
-        self.find_rebuild_placement_offsets(player, planet, point, up, map, &REBUILD_OFFSETS)
+        let (pose, mut report) =
+            self.find_rebuild_placement_offsets(player, planet, point, up, map, &REBUILD_OFFSETS);
+        if pose.is_some()
+            || !self.pilots[player].rebuild_refinement
+            || self.world.physics.material_queries_dirty
+        {
+            return (pose, report);
+        }
+        let (pose, extra) = self.find_rebuild_placement_offsets(
+            player,
+            planet,
+            point,
+            up,
+            map,
+            &refinement::EXTRA_OFFSETS,
+        );
+        report.selected_offset = extra.selected_offset;
+        report.attempts.extend(extra.attempts);
+        (pose, report)
     }
 
     fn find_rebuild_placement_offsets(
@@ -406,6 +430,9 @@ impl SurfaceSortieState {
             checked: 0,
             attempts: Vec::new(),
             site: None,
+            refinement: self.pilots[player]
+                .rebuild_refinement
+                .then(Default::default),
         };
         // Fixed bearing offsets can all miss viable standing material after a
         // crater. Spread the bounded previews over actual nearby footing.
@@ -437,7 +464,11 @@ impl SurfaceSortieState {
         }
         let batches = candidates.len().div_ceil(8).max(1);
         let batch = (self.world.tick / ground_navigation::GROUND_REFRESH_TICKS) as usize % batches;
+        let mut promising = Vec::new();
         for node in candidates.into_iter().skip(batch * 8).take(8) {
+            if let Some(work) = &mut survey.refinement {
+                work.coarse_candidates += 1;
+            }
             let id = node.id;
             survey.attempts.push(RebuildRelocationAttempt {
                 bearing: id,
@@ -450,13 +481,20 @@ impl SurfaceSortieState {
                 continue;
             }
             survey.checked += 1;
-            let (pose, report) = self.find_rebuild_placement(
+            let (pose, report) = self.find_rebuild_placement_offsets(
                 player,
                 map.planet,
                 frame.position + node.position.rotate_radians(frame.angle),
                 node.normal.rotate_radians(frame.angle),
                 Some(&base),
+                &REBUILD_OFFSETS,
             );
+            if let Some(work) = &mut survey.refinement {
+                work.offset_checks += report.attempts.len();
+                if refinement::promising(&report) {
+                    promising.push(node);
+                }
+            }
             survey.attempts.last_mut().unwrap().placement = Some(report.clone());
             if pose.is_some() {
                 let attempt = report
@@ -477,6 +515,7 @@ impl SurfaceSortieState {
                     .map(|e| e.length)
                     .sum::<f32>();
                 survey.site = Some(RebuildStandingSite {
+                    precise: false,
                     planet: map.planet,
                     revision: map.revision,
                     position: node.position,
@@ -487,6 +526,9 @@ impl SurfaceSortieState {
                 });
                 break;
             }
+        }
+        if survey.site.is_none() && survey.refinement.is_some() {
+            self.refine_rebuild_survey(player, &map, &base, &promising, &mut survey);
         }
         Some(survey)
     }
@@ -571,6 +613,29 @@ mod tests {
             state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
         assert_eq!(report, repeat);
         assert_eq!(state.world.physics.snapshot_bytes(), before);
+        #[cfg(feature = "sensor-profile")]
+        {
+            assert!(state.set_rebuild_refinement(0, true));
+            let (refined_pose, refined) = state.find_rebuild_placement(
+                0,
+                planet,
+                support.position,
+                support.normal,
+                map.as_ref(),
+            );
+            assert!(refined_pose.is_some());
+            assert_eq!(refined, report, "an accepted old offset retains precedence");
+            let (_, cloned) = state.clone().find_rebuild_placement(
+                0,
+                planet,
+                support.position,
+                support.normal,
+                map.as_ref(),
+            );
+            assert_eq!(cloned, report);
+            assert!(!state.set_rebuild_refinement(99, true));
+            assert_eq!(state.world.physics.snapshot_bytes(), before);
+        }
         state.world.physics.material_queries_dirty = true;
         let (pose, report) =
             state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());

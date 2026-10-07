@@ -206,6 +206,7 @@ pub(super) struct SurfacePilot {
     landing_gear: landing_gear::LandingGear,
     pod_righting: pod_righting::PodRightingState,
     recovery: Option<recovery::SurfaceRecovery>,
+    rebuild_refinement: bool,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -253,6 +254,7 @@ impl SurfacePilot {
             landing_gear: landing_gear::LandingGear::default(),
             pod_righting: pod_righting::PodRightingState::default(),
             recovery: None,
+            rebuild_refinement: false,
         }
     }
 

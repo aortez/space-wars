@@ -213,6 +213,9 @@ fn fork(
     out: &Path,
 ) -> Value {
     let owner = PlayerId::from_index(seat).unwrap();
+    if crate::arg("--rebuild-refinement", "false") == "true" {
+        assert!(state.set_rebuild_refinement(seat, true));
+    }
     let name = if live { "live" } else { "recorded" };
     let mut tape = BufReader::new(fs::File::open(tape_path).unwrap());
     tape.seek(SeekFrom::Start(offset)).unwrap();

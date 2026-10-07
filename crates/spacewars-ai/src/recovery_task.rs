@@ -753,6 +753,11 @@ impl RecoverShipTask {
             }
         }
         let task = self.ground_task.as_mut().unwrap();
+        task.set_precise_rebuild(
+            self.telemetry
+                .relocation_site
+                .is_some_and(|site| site.precise),
+        );
         let action = task.step(o);
         self.telemetry.ground = Some(task.telemetry().clone());
         self.telemetry.last_progress_tick = self

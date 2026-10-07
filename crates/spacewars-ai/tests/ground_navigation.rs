@@ -89,6 +89,35 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
 }
 
 #[test]
+fn precise_rebuild_arrival_requires_footing_and_does_not_change_other_destinations() {
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    let destination = GroundDestination::Rebuild {
+        planet: o.flight.pilot.planet.index,
+        position: Vec2::new(6.0, 60.0),
+    };
+    let mut task = GroundNavigationTask::new(context, destination);
+    task.set_precise_rebuild(true);
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 5.6;
+    task.step(&o);
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert_eq!(task.telemetry().path.last(), Some(&3));
+    advance(&mut o, 1);
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 5.95;
+    o.flight.pilot.supported_planet = None;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    advance(&mut o, 2);
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    task.retarget(GroundDestination::Hatch);
+    task.set_precise_rebuild(true);
+    assert!(!task.telemetry().precise_rebuild);
+}
+
+#[test]
 fn continuous_walk_keeps_speed_in_both_directions_then_slows_for_the_hatch() {
     for direction in [-1.0, 1.0] {
         let (context, mut o) = fixture();

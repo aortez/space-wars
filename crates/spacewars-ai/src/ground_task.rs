@@ -83,6 +83,8 @@ pub struct GroundTelemetry {
     pub continuous_walk: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub live_claim_stopping_disabled: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub precise_rebuild: bool,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -167,6 +169,7 @@ impl GroundNavigationTask {
                 policy: "ground_navigation_v10",
                 continuous_walk: false,
                 live_claim_stopping_disabled: false,
+                precise_rebuild: false,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -235,10 +238,20 @@ impl GroundNavigationTask {
     pub fn set_live_claim_stopping(&mut self, enabled: bool) {
         self.telemetry.live_claim_stopping_disabled = !enabled;
     }
+    /// Refined placement needs the measured footing itself, rather than a
+    /// nearby endpoint already inside the ordinary rebuild arrival envelope.
+    pub fn set_precise_rebuild(&mut self, enabled: bool) {
+        self.telemetry.precise_rebuild = enabled
+            && matches!(
+                self.telemetry.destination,
+                GroundDestination::Rebuild { .. }
+            );
+    }
     pub fn reset(&mut self, context: BrainReset) {
         let active_flight_checks = self.active_flight_checks;
         let continuous_walk = self.telemetry.continuous_walk;
         let live_claim_stopping_disabled = self.telemetry.live_claim_stopping_disabled;
+        let precise_rebuild = self.telemetry.precise_rebuild;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
         } else if self.powered_flag {
@@ -248,6 +261,7 @@ impl GroundNavigationTask {
         };
         self.telemetry.continuous_walk = continuous_walk;
         self.telemetry.live_claim_stopping_disabled = live_claim_stopping_disabled;
+        self.set_precise_rebuild(precise_rebuild);
         self.active_flight_checks = active_flight_checks;
     }
     pub fn is_crossing(&self) -> bool {
@@ -256,6 +270,7 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.telemetry.precise_rebuild = false;
         self.telemetry.flag_approach = None;
         self.joint_flag = false;
         self.flag_survey_tick = None;
@@ -571,7 +586,12 @@ impl GroundNavigationTask {
                 return action;
             }
         }
-        if actor.position.distance_to(target) < range {
+        let arrived = if self.telemetry.precise_rebuild {
+            foot.distance_to(local(target)) < 0.12
+        } else {
+            actor.position.distance_to(target) < range
+        };
+        if arrived {
             self.telemetry.goal = if self.telemetry.claim_target.is_some() {
                 GroundGoal::Settle
             } else if self.telemetry.destination == GroundDestination::Hatch

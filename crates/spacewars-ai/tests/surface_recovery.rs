@@ -363,6 +363,7 @@ fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) 
         checked: 2,
         attempts: Vec::new(),
         site: Some(RebuildStandingSite {
+            precise: false,
             planet: p.planet.index,
             revision: p.planet.revision,
             position: Vec2::new(4.0, 60.0),
@@ -371,6 +372,7 @@ fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) 
             jetpack_flights: 0,
             hatch_walk_length: 0.0,
         }),
+        refinement: None,
     });
     (task, o)
 }
@@ -408,6 +410,40 @@ fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain()
     o.flight.pilot.tick = 305;
     assert_eq!(task.step(&o), FlightIntent::default());
     assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+}
+
+#[test]
+fn refined_rebuild_reaches_the_measured_footing_without_resetting_recovery() {
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    o.jetpack = None;
+    o.rebuild.as_mut().unwrap().site.as_mut().unwrap().precise = true;
+    task.step(&o);
+    o.rebuild = None;
+    o.flight.pilot.tick = 1;
+    o.ground.as_mut().unwrap().tick = 1;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 3.6;
+    let action = task.step(&o);
+    assert!(action.controls.horizontal > 0.0);
+    assert!(task.telemetry().relocation_site.is_some());
+    assert!(task.telemetry().ground.as_ref().unwrap().precise_rebuild);
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().path.last(),
+        Some(&2)
+    );
+    let before = task.telemetry().clone();
+    assert_eq!(task.step(&o), action);
+    assert_eq!(task.telemetry(), &before);
+    let mut copy = task.clone();
+    o.flight.pilot.tick = 2;
+    o.ground.as_mut().unwrap().tick = 2;
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 4.05;
+    assert_eq!(task.step(&o), copy.step(&o));
+    assert_eq!(task.telemetry(), copy.telemetry());
+    assert!(task.telemetry().relocation_site.is_none());
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    assert_eq!(task.telemetry().relocations, 1);
+    assert_eq!(task.telemetry().status, TaskStatus::Running);
+    assert_eq!(o.flight.pilot.recovery.as_ref().unwrap().rebuilds, 0);
 }
 
 fn exhausted_rebuild_relocations() -> (RecoverShipTask, RecoveryTaskObservationV1) {

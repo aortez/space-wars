@@ -80,8 +80,14 @@ impl SurfaceSortieState {
             let reports = eligible.then(|| {
                 let point = frame.position + node.position.rotate_radians(frame.angle);
                 let up = node.normal.rotate_radians(frame.angle);
-                let (_, legacy) =
-                    self.find_rebuild_placement(player, planet, point, up, Some(&base));
+                let (_, legacy) = self.find_rebuild_placement_offsets(
+                    player,
+                    planet,
+                    point,
+                    up,
+                    Some(&base),
+                    &REBUILD_OFFSETS,
+                );
                 let (_, dense) = self.find_rebuild_placement_offsets(
                     player,
                     planet,
@@ -136,6 +142,8 @@ mod tests {
         let before = state.world.physics.snapshot_bytes();
         let actor = state.spaceling_snapshot(0).unwrap();
         let report = state.rebuild_coverage_diagnostics(0);
+        assert_eq!(report, state.rebuild_coverage_diagnostics(0));
+        assert!(state.set_rebuild_refinement(0, true));
         assert_eq!(report, state.rebuild_coverage_diagnostics(0));
         assert_eq!(state.world.physics.snapshot_bytes(), before);
         assert_eq!(state.spaceling_snapshot(0), Some(actor));
