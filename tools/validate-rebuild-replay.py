@@ -73,8 +73,15 @@ def prepare(out):
     print('Prepared fixed tape and reference checkout. Build reference with its own target directory.',flush=True)
 
 
-def verify(plan,out):
-    assert plan['profile']==PROFILE and inputs()==plan['inputs']
+def check_inputs(expected,current,reaudit):
+    assert expected.keys()==current.keys()
+    changed={p for p in expected if expected[p]!=current[p]}
+    assert not changed or reaudit and changed<=set(OWN[:2]),changed
+
+
+def verify(plan,out,reaudit=False):
+    assert plan['profile']==PROFILE
+    check_inputs(plan['inputs'],inputs(),reaudit)
     assert P.digest(SOURCE)==plan['source_sha256'] and P.digest(PLACEMENT)==plan['placement_sha256']
     assert P.digest(plan['tape']['path'])==plan['tape']['sha256']
     old=json.loads(SOURCE.read_text());tree=Path(plan['reference_source'])
@@ -110,7 +117,7 @@ def freeze(out,binary,reference):
 def audit_prefix(root,tape,report):
     if report['prefix']['failure'] is not None:return dict(verified=False,failure=report['prefix']['failure'])
     count=0;steps=0;audits=0;witnesses=[]
-    expected=iter(D.rows(tape))
+    expected=iter(D.rows(Path(tape)))
     for row in D.rows(root/'rebuild-prefix.jsonl'):
         original=next(expected);tick=row['tick'];assert tick==original['tick']==count
         assert [project_pilot(p) for p in row['pilots']]==[project_pilot(p) for p in original['pilots']]
@@ -165,22 +172,36 @@ def audit_fork(root,name,report):
         sha256=P.digest(root/(name+'-audit.json')))
 
 
-def execute(path):
-    out=path.parent;plan=json.loads(path.read_text());verify(plan,out)
-    assert not (out/'summary.json').exists()
-    summary=dict(schema=1,profile=PROFILE,complete=False,plan_sha256=P.digest(path),runs={},default_promotion=False)
+def execute(path,reaudit=False):
+    out=path.parent;plan=json.loads(path.read_text());verify(plan,out,reaudit)
+    if (out/'summary.json').exists():
+        assert reaudit
+        backup=out/('summary-before-reaudit-'+P.digest(out/'summary.json')[:12]+'.json')
+        assert not backup.exists();shutil.copy2(out/'summary.json',backup)
+    summary=dict(schema=1,profile=PROFILE,complete=False,plan_sha256=P.digest(path),runs={},default_promotion=False,
+        reaudit=reaudit,auditor_inputs={p:P.digest(ROOT/p) for p in OWN[:2]})
     try:
         for name,command in plan['commands'].items():
-            root=out/'raw'/name;log=out/'logs'/(name+'.log');assert not root.exists() and not log.exists()
-            with log.open('x') as stream:subprocess.run(command,stdout=stream,stderr=stream,check=True,timeout=1800)
-            hashes=I.raw_hashes(root);report=json.loads((root/'rebuild-replay.json').read_text())
-            result=dict(command=command,hashes=hashes,report=report,log_sha256=P.digest(log))
-            I.write(out/(name+'-raw.json'),result)
+            root=out/'raw'/name;log=out/'logs'/(name+'.log');marker=out/(name+'-raw.json')
+            if marker.exists():
+                assert reaudit
+                result=json.loads(marker.read_text());assert result['command']==command and result['log_sha256']==P.digest(log)
+                if not root.exists():B.unpack(json.loads((out/(name+'-result.json')).read_text())['archive'],root)
+                hashes=result['hashes'];assert all(P.digest(root/p)==h for p,h in hashes.items())
+                result['reused_raw']=True
+            else:
+                assert not root.exists() and not log.exists(), 'partial replays are never retried'
+                with log.open('x') as stream:subprocess.run(command,stdout=stream,stderr=stream,check=True,timeout=1800)
+                hashes=I.raw_hashes(root);report=json.loads((root/'rebuild-replay.json').read_text())
+                result=dict(command=command,hashes=hashes,report=report,log_sha256=P.digest(log))
+                I.write(marker,result)
+            report=result['report']
             result['prefix']=audit_prefix(root,plan['tape']['path'],report)
             if result['prefix']['verified']:
                 result['forks']={f:audit_fork(root,f,report) for f in ('recorded','live')}
             assert all(P.digest(root/p)==h for p,h in hashes.items())
             result['archive']=B.pack(root,out/'archives'/(name+'.tar.gz'))
+            I.write(out/(name+'-result.json'),result)
             summary['runs'][name]=result;I.write(out/'summary.json',summary)
             print(name,'prefix',result['prefix']['verified'],'live',result.get('forks',{}).get('live',{}).get('reason'),flush=True)
         old,new=summary['runs']['reference'],summary['runs']['candidate']
@@ -191,7 +212,7 @@ def execute(path):
         if success:
             p=new['report']['forks']['live']['pilots'][1]
             success=p['recovery']['ships_lost']<=1 and new['report']['forks']['live']['round']['pilots'][1]['health']>0
-        verify(plan,out)
+        verify(plan,out,reaudit)
         summary.update(complete=True,screen=dict(reference_reproduced=control,isolated_recovery_complete=bool(success),
             decision='isolated_chain_validated' if success else 'not_qualified',scored_match=False,default_promotion=False))
     except BaseException:
@@ -205,8 +226,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='action',required=True)
     p=sub.add_parser('prepare');p.add_argument('--out',type=Path,required=True)
     p=sub.add_parser('plan');p.add_argument('--out',type=Path,required=True);p.add_argument('--binary',type=Path,required=True);p.add_argument('--reference',type=Path,required=True)
-    p=sub.add_parser('run');p.add_argument('--plan',type=Path,required=True)
+    p=sub.add_parser('run');p.add_argument('--plan',type=Path,required=True);p.add_argument('--reaudit',action='store_true')
     a=parser.parse_args()
     if a.action=='prepare':prepare(a.out.resolve())
     elif a.action=='plan':freeze(a.out.resolve(),a.binary.resolve(),a.reference.resolve())
-    else:execute(a.plan.resolve())
+    else:execute(a.plan.resolve(),a.reaudit)

@@ -2,12 +2,28 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('replay',Path(__file__).parents[1]/'validate-rebuild-replay.py')
 R=importlib.util.module_from_spec(spec);spec.loader.exec_module(R)
 
 
 class RebuildReplayTest(unittest.TestCase):
+    def test_audit_resume_cannot_change_runtime_or_drop_inputs(self):
+        expected={R.OWN[0]:'old',R.HARNESS[0]:'runtime'}
+        R.check_inputs(expected,dict(expected,**{R.OWN[0]:'new'}),True)
+        for current,reaudit in [(dict(expected,**{R.OWN[0]:'new'}),False),
+                               (dict(expected,**{R.HARNESS[0]:'changed'}),True),({},True)]:
+            with self.assertRaises(AssertionError):R.check_inputs(expected,current,reaudit)
+
+    def test_prefix_reader_normalizes_json_plan_paths(self):
+        seen=[]
+        def rows(path):
+            self.assertIsInstance(path,Path);seen.append(path);return iter([])
+        with patch.object(R.D,'rows',side_effect=rows),self.assertRaises(AssertionError):
+            R.audit_prefix(Path('/raw'),'/tape',{'prefix':{'failure':None}})
+        self.assertIn(Path('/tape'),seen)
+
     def test_replay_preserves_source_configuration_and_adds_explicit_bounds(self):
         source={'runs':{R.S.A.TARGET:dict(command=['old','--seed','17','--out','old','--terrain-flight-forecast','true'])}}
         command=R.command(source,Path('/binary'),Path('/output'),Path('/tape'))
