@@ -301,6 +301,11 @@ fn main() {
         "true" => true,
         _ => panic!("--active-flight-checks must be true or false"),
     };
+    let terrain_flight_forecast = match arg("--terrain-flight-forecast", "false").as_str() {
+        "true" => true,
+        "false" => false,
+        _ => panic!("--terrain-flight-forecast must be true or false"),
+    };
     let live_claim_stopping = match arg("--live-claim-stopping", "true").as_str() {
         "false" => false,
         "true" => true,
@@ -581,9 +586,10 @@ fn main() {
                 });
                 let clock = Instant::now();
                 let mut observe = || {
-                    if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i) && !request.objective_planning.is_legacy()
-                    }) {
+                    let mut observation = if let Some(live) =
+                        live_planning.as_mut().filter(|live| {
+                            live.enabled_for(i) && !request.objective_planning.is_legacy()
+                        }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
                         live.observe(&state, i, &mut o.local, request.objective_planning);
@@ -602,7 +608,12 @@ fn main() {
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
+                    };
+                    if terrain_flight_forecast {
+                        state
+                            .add_terrain_flight_forecast(i, &mut observation.local.combat.recovery);
                     }
+                    observation
                 };
                 #[cfg(not(feature = "sensor-profile"))]
                 let mut o = observe();
@@ -1164,6 +1175,13 @@ fn main() {
         evidence.finish();
     }
     report["policy_configuration"] = json!(pilots.each_ref().map(|p| p.descriptor()));
+    if terrain_flight_forecast {
+        report["terrain_flight_forecast"] = json!({
+            "profile":"bounded_high_terrain_flight_v1", "enabled_seats":[true,true],
+            "graph_work_limit":8192, "query_work_limit":8192,
+            "scope":"One nearest high gap per completed pod-recovery survey. Synchronous work outside the live objective planner quota; actual vehicle colliders retained. Both directions and three launch samples, fresh launch permission, 5% reserve and unchanged recovery deadline."
+        });
+    }
     if powered_capture_seats.contains(&true) {
         report["powered_capture"] = json!({
             "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,

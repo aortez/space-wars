@@ -116,6 +116,8 @@ pub struct JetpackNavigationObservation {
     pub vehicle_continuation: Option<forecast::VehicleFlightContinuation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vehicle_forecast: Option<forecast::VehicleCrossingForecast>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terrain_flight: Option<forecast::terrain::TerrainFlightSurvey>,
 
     pub charge: f32,
     pub reference_velocity: Vec2,
@@ -148,6 +150,13 @@ impl JetpackNavigationObservation {
                 .crossing
                 .iter()
                 .chain(&self.terrain_crossings)
+                .chain(
+                    self.terrain_flight
+                        .as_ref()
+                        .and_then(|s| s.forecast.as_ref())
+                        .filter(|f| f.valid_at(pilot.tick))
+                        .map(|f| &f.plan),
+                )
                 .flat_map(|plan| [*plan, plan.reversed()])
                 .find(|plan| selected.same_corridor(plan)),
         }
@@ -202,6 +211,7 @@ impl SurfaceSortieState {
         Some(JetpackNavigationObservation {
             vehicle_continuation: None,
             vehicle_forecast: None,
+            terrain_flight: None,
             charge,
             reference_velocity: pack.map_or(Vec2::ZERO, |p| p.reference_velocity),
             burning: pack.is_some_and(|p| p.active),

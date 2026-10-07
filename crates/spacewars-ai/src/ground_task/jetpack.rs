@@ -119,6 +119,28 @@ impl GroundNavigationTask {
                 flights.push((from, to, plan));
             }
         }
+        if !self.powered_flag
+            && let Some(forecast) = jetpack
+                .terrain_flight
+                .as_ref()
+                .and_then(|s| s.forecast)
+                .filter(|f| f.valid_for(map, p.tick))
+        {
+            for (edge, plan) in forecast
+                .edges()
+                .into_iter()
+                .zip([forecast.plan, forecast.plan.reversed()])
+            {
+                if !graph
+                    .edges
+                    .iter()
+                    .any(|e| e.from == edge.from && e.to == edge.to)
+                {
+                    graph.edges.push(edge);
+                    flights.push((edge.from, edge.to, plan));
+                }
+            }
+        }
         let routes = graph.routes();
         let mut combined = route(&routes);
         if combined.path.is_empty()
@@ -162,6 +184,48 @@ impl GroundNavigationTask {
             return self.interrupt_crossing(p.tick);
         }
         let old = *task.telemetry().plan.as_ref().unwrap();
+        // This permission belongs to the opt-in forecast edge. Historical
+        // low corridors and the offline physical-probe injection keep their
+        // existing execution contract.
+        let high_terrain = self.terrain_flight_required;
+        if high_terrain {
+            if jetpack.charge < scenario_spacewars::surface_sortie::jetpack::flight::LANDING_RESERVE
+                || self
+                    .terrain_launch_tick
+                    .is_some_and(|t| p.tick < t || p.tick - t >= 720)
+            {
+                return self.interrupt_crossing(p.tick);
+            }
+            if jetpack.surveyed
+                && jetpack
+                    .terrain_flight
+                    .as_ref()
+                    .and_then(|s| s.forecast)
+                    .is_none_or(|f| {
+                        !f.valid_at(p.tick)
+                            || f.plan.revision != p.planet.revision
+                            || !(old.same_corridor(&f.plan)
+                                || old.same_corridor(&f.plan.reversed()))
+                    })
+            {
+                return self.interrupt_crossing(p.tick);
+            }
+            if self.terrain_launch_tick.is_none()
+                && self.terrain_launch_forecast.is_none_or(|f| {
+                    !f.valid_at(p.tick)
+                        || f.plan.revision != old.revision
+                        || !(old.same_corridor(&f.plan) || old.same_corridor(&f.plan.reversed()))
+                })
+            {
+                // A route is not launch permission. Await a current survey at
+                // takeoff without extending the ground task's original timer.
+                if jetpack.surveyed {
+                    return self.interrupt_crossing(p.tick);
+                }
+                self.telemetry.goal = GroundGoal::Survey;
+                return SurfaceSortieAction::default();
+            }
+        }
         let active = self.vehicle_flight_request();
         if let Some(request) = active {
             if !request.valid_at(p.tick)
@@ -205,6 +269,9 @@ impl GroundNavigationTask {
         }
         let action = task.step(&observation);
         let t = task.telemetry().clone();
+        if high_terrain && t.goal == CrossingGoal::Lift && action.primary_held {
+            self.terrain_launch_tick.get_or_insert(p.tick);
+        }
         if self.active_flight_checks {
             let phase = match t.goal {
                 CrossingGoal::Lift => Some(FlightPhase::Lift),
@@ -248,6 +315,8 @@ impl GroundNavigationTask {
             CrossingGoal::Complete => {
                 self.telemetry.jetpack_crossings += 1;
                 self.crossing_task = None;
+                self.terrain_launch_tick = None;
+                self.terrain_launch_forecast = None;
                 self.active_flight = None;
                 self.launch_forecast = None;
                 self.last_flight_check = None;
@@ -264,6 +333,8 @@ impl GroundNavigationTask {
         self.telemetry.flight_interruptions += 1;
         self.telemetry.invalidations += 1;
         self.crossing_task = None;
+        self.terrain_launch_tick = None;
+        self.terrain_launch_forecast = None;
         self.active_flight = None;
         self.launch_forecast = None;
         self.last_flight_check = None;

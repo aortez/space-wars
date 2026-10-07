@@ -826,6 +826,7 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
         CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
     };
     o.jetpack = Some(JetpackNavigationObservation {
+        terrain_flight: None,
         vehicle_continuation: None,
         vehicle_forecast: None,
         reference_velocity: Vec2::ZERO,
@@ -850,6 +851,92 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
             },
         }),
     });
+}
+
+#[test]
+fn high_terrain_route_requires_a_current_forecast_and_retains_reserve_and_deadlines() {
+    use scenario_spacewars::surface_sortie::jetpack::{
+        CrossingAnchor,
+        forecast::{
+            FlightEstimate,
+            terrain::{TerrainCrossingForecast, TerrainFlightSurvey},
+        },
+    };
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 1.0);
+    let mut plan = o.jetpack.as_mut().unwrap().crossing.take().unwrap();
+    plan.destination = Vec2::new(6.0, 70.0);
+    plan.cruise_radius = 73.5;
+    plan.anchor = CrossingAnchor::GroundGap { from: 0, to: 3 };
+    let map = o.ground.as_mut().unwrap();
+    map.edges.clear();
+    map.nodes.retain(|n| n.id == 0 || n.id == 3);
+    map.nodes[1].position = plan.destination;
+    let f = TerrainCrossingForecast {
+        version: 1,
+        measured_tick: 0,
+        launch_until_tick: 30,
+        plan,
+        nodes: [0, 3],
+        flights: [FlightEstimate {
+            seconds: 5.0,
+            burn_seconds: 1.8,
+            arrival_speed: 2.0,
+        }; 2],
+    };
+    o.jetpack.as_mut().unwrap().terrain_flight = Some(TerrainFlightSurvey {
+        forecast: Some(f),
+        ..Default::default()
+    });
+    let destination = GroundDestination::Rebuild {
+        planet: plan.planet,
+        position: plan.destination,
+    };
+    for stale in [false, true] {
+        let mut trial = o.clone();
+        if stale {
+            trial
+                .jetpack
+                .as_mut()
+                .unwrap()
+                .terrain_flight
+                .as_mut()
+                .unwrap()
+                .forecast
+                .as_mut()
+                .unwrap()
+                .launch_until_tick = 0;
+        }
+        let mut task = GroundNavigationTask::new(context, destination);
+        task.step(&trial);
+        assert_eq!(
+            task.telemetry().route.as_ref().unwrap().flights,
+            usize::from(!stale)
+        );
+        if stale {
+            continue;
+        }
+        let mut ready = task.clone();
+        advance(&mut trial, 1);
+        ready.step(&trial);
+        assert_eq!(ready.telemetry().goal, GroundGoal::JetpackLift);
+        trial.jetpack.as_mut().unwrap().surveyed = false;
+        advance(&mut trial, 2);
+        assert!(ready.step(&trial).primary_held);
+        let mut deadline = ready.clone();
+        let mut reserve = trial.clone();
+        reserve.jetpack.as_mut().unwrap().charge = 0.04;
+        advance(&mut reserve, 3);
+        assert!(!ready.step(&reserve).primary_held);
+        assert_eq!(ready.telemetry().flight_interruptions, 1);
+        advance(&mut trial, 722);
+        assert!(!deadline.step(&trial).primary_held);
+        assert_eq!(deadline.telemetry().flight_interruptions, 1);
+        assert_eq!(deadline.telemetry().started_tick, Some(0));
+        advance(&mut trial, 5401);
+        deadline.step(&trial);
+        assert_eq!(deadline.telemetry().goal, GroundGoal::Blocked);
+    }
 }
 
 #[test]

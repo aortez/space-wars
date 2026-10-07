@@ -113,6 +113,11 @@ pub struct GroundTelemetry {
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
+    terrain_launch_forecast: Option<
+        scenario_spacewars::surface_sortie::jetpack::forecast::terrain::TerrainCrossingForecast,
+    >,
+    terrain_launch_tick: Option<u64>,
+    terrain_flight_required: bool,
     active_flight_checks: bool,
     active_flight:
         Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleFlightRequest>,
@@ -148,6 +153,9 @@ impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             active_flight_checks: false,
+            terrain_launch_forecast: None,
+            terrain_launch_tick: None,
+            terrain_flight_required: false,
             active_flight: None,
             launch_forecast: None,
             last_flight_check: None,
@@ -273,6 +281,17 @@ impl GroundNavigationTask {
     }
     pub fn step(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
+        if let Some(forecast) = o
+            .jetpack
+            .as_ref()
+            .and_then(|j| j.terrain_flight.as_ref())
+            .and_then(|s| s.forecast)
+            && o.ground
+                .as_ref()
+                .is_some_and(|map| forecast.valid_for(map, p.tick))
+        {
+            self.terrain_launch_forecast = Some(forecast);
+        }
         if self.active_flight_checks
             && let Some(forecast) = o.jetpack.as_ref().and_then(|j| j.vehicle_forecast)
             && forecast.valid_at(p.tick)
@@ -602,6 +621,15 @@ impl GroundNavigationTask {
                 self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
             self.telemetry.target = Some(selected_target);
             self.crossing_plan = crossing;
+            self.terrain_flight_required = crossing.is_some_and(|plan| {
+                o.jetpack
+                    .as_ref()
+                    .and_then(|j| j.terrain_flight.as_ref())
+                    .and_then(|s| s.forecast)
+                    .is_some_and(|f| {
+                        plan.same_corridor(&f.plan) || plan.same_corridor(&f.plan.reversed())
+                    })
+            });
             self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {
                 self.rejoin = None;
@@ -644,6 +672,7 @@ impl GroundNavigationTask {
             && p.balanced
         {
             self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, *plan));
+            self.terrain_launch_tick = None;
             self.active_flight = None;
             self.last_flight_check = None;
             return self.follow_crossing(o);

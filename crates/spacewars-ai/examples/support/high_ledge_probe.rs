@@ -158,11 +158,16 @@ impl HighLedgeProbe {
                 let selected = candidates
                     .iter()
                     .find(|c| !c.ordinary_height_allowed && c.corridor_clear == Some(true));
+                let terrain_forecast = (crate::arg("--probe-terrain-forecast", "false") == "true")
+                    .then(|| {
+                        s.state
+                            .forecast_terrain_gap(self.seat, &s.observation, self.from, self.to)
+                    });
                 let execution = selected.map(|candidate| self.execute(s, candidate, seed, out));
                 json!({"tick":s.state.tick(),"seat":self.seat,"ground":s.ground,
                 "observation":s.observation,"deadline":s.deadline,
                 "control_exact_ticks":checked,"candidates":candidates,
-                "selected":selected,"execution":execution})
+                "selected":selected,"execution":execution,"terrain_forecast":terrain_forecast})
             })
             .collect();
         fs::write(out.join("high-ledge-probe.json"), serde_json::to_vec_pretty(&json!({
@@ -194,8 +199,14 @@ impl HighLedgeProbe {
                 .unwrap();
         let mut launched = None;
         let mut lowest_charge = 1.0_f32;
+        let measure_forecast = crate::arg("--probe-terrain-forecast", "false") == "true";
         loop {
             let mut o = state.recovery_task_observation(self.seat, None);
+            // Diagnostic only: the local controller consumes the original
+            // observation. Compare each complete native flight with its retained
+            // receipt, and evaluate the forecast current at the actual launch.
+            let terrain_forecast = measure_forecast
+                .then(|| state.forecast_terrain_gap(self.seat, &o, self.from, self.to));
             let mut measurement = None;
             if let Some(map) = &o.ground {
                 measurement = state
@@ -283,7 +294,7 @@ impl HighLedgeProbe {
             writeln!(
                 trace,
                 "{}",
-                json!({"observation":receipt,"actions":actions,"applied":reason.is_none()})
+                json!({"observation":receipt,"actions":actions,"applied":reason.is_none(),"terrain_forecast":terrain_forecast})
             )
             .unwrap();
             if let Some(reason) = reason {
