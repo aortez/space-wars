@@ -207,6 +207,7 @@ pub(super) struct SurfacePilot {
     pod_righting: pod_righting::PodRightingState,
     recovery: Option<recovery::SurfaceRecovery>,
     rebuild_refinement: bool,
+    rebuild_contact_frame: bool,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -255,6 +256,7 @@ impl SurfacePilot {
             pod_righting: pod_righting::PodRightingState::default(),
             recovery: None,
             rebuild_refinement: false,
+            rebuild_contact_frame: false,
         }
     }
 

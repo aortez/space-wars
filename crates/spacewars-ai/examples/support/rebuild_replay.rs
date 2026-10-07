@@ -213,6 +213,9 @@ fn fork(
     out: &Path,
 ) -> Value {
     let owner = PlayerId::from_index(seat).unwrap();
+    if crate::arg("--rebuild-contact-frame", "false") == "true" {
+        assert!(state.set_rebuild_contact_frame(seat, true));
+    }
     if crate::arg("--rebuild-refinement", "false") == "true" {
         assert!(state.set_rebuild_refinement(seat, true));
     }
@@ -235,6 +238,11 @@ fn fork(
     tape.seek(SeekFrom::Start(offset)).unwrap();
     let mut trace =
         BufWriter::new(fs::File::create(out.join(format!("rebuild-{name}.jsonl"))).unwrap());
+    let mut contacts = (crate::arg("--rebuild-contact-probe", "false") == "true").then(|| {
+        BufWriter::new(
+            fs::File::create(out.join(format!("rebuild-{name}-contacts.jsonl"))).unwrap(),
+        )
+    });
     let mut first_native = None;
     let mut first_task = None;
     let mut first_action = None;
@@ -326,8 +334,14 @@ fn fork(
             "observation":o,"task":telemetry,"actions":actions,"recorded_actions":row.actions,
             "generated_actions":generated,"applied":stop.is_none(),"stop":stop,
             "landing_diagnostics":state.landing_diagnostics(seat,o.flight.pilot.sites.first()),"audit":audit})).unwrap();
+        if let Some(contacts) = &mut contacts {
+            writeln!(contacts, "{}", state.rebuild_contact_diagnostics(seat)).unwrap();
+        }
         if let Some(stop) = stop {
             trace.flush().unwrap();
+            if let Some(contacts) = &mut contacts {
+                contacts.flush().unwrap();
+            }
             return json!({"last_tick":row.tick,"reason":stop,"task":telemetry,"pilots":pilots,
                 "round":state.match_observation(),"first_native_difference":first_native,
                 "first_task_difference":first_task,"first_action_difference":first_action,

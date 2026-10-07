@@ -4,6 +4,9 @@
 use super::rebuild_placement::RebuildPlacementReport;
 use super::*;
 
+#[cfg(feature = "sensor-profile")]
+mod contact_frame;
+
 const SCUTTLE_TIME: Duration = Duration::from_secs(3);
 const REBUILD_TIME: Duration = Duration::from_secs(8);
 const PLACEMENT_RETRY: Duration = Duration::from_millis(500);
@@ -232,7 +235,18 @@ impl SurfaceSortieState {
         if self.world.planets[planet].owner_id != Some(self.pilots[player].owner.index()) {
             return Err(SurfaceRecoveryStatus::NeedOwnedPlanet);
         }
-        Ok((planet, support.position, support.normal))
+        if self.pilots[player].rebuild_contact_frame {
+            // Solver world contacts precede body integration. Attach placement
+            // rays to the completed planet pose, as the claim anchor already does.
+            let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+            Ok((
+                planet,
+                frame.position + support.local_surface.position.rotate_radians(frame.angle),
+                support.local_surface.normal.rotate_radians(frame.angle),
+            ))
+        } else {
+            Ok((planet, support.position, support.normal))
+        }
     }
 
     pub(super) fn update_recovery(&mut self, dt: Duration) {
