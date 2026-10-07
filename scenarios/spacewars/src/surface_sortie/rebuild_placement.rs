@@ -12,6 +12,7 @@ pub enum RebuildRejection {
     QueriesPending,
     NoGround,
     HullObstructed,
+    LandingMisaligned,
     NoHatchFooting,
     NoHatchRoute,
     HatchRouteTooLong,
@@ -25,6 +26,10 @@ pub struct RebuildAttempt {
     pub center: Option<Vec2>,
     pub hatch: Option<Vec2>,
     pub route: Option<GroundRouteDiagnostics>,
+    /// Alignment at the predicted resting ship origin, using the native
+    /// radial landing frame rather than the standing pilot's support normal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub settling_angle_degrees: Option<f32>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RebuildPlacementReport {
@@ -79,6 +84,14 @@ pub struct RebuildRelocationSurvey {
 pub(super) struct RebuildPose {
     pub center: Vec2,
     pub normal: Vec2,
+}
+
+fn settling_angle(normal: Vec2, center: Vec2, planet_center: Vec2) -> f32 {
+    normal
+        .dot((center - planet_center).normalized())
+        .clamp(-1.0, 1.0)
+        .acos()
+        .to_degrees()
 }
 
 impl SurfaceSortieState {
@@ -156,6 +169,7 @@ impl SurfaceSortieState {
                 center: None,
                 hatch: None,
                 route: None,
+                settling_angle_degrees: None,
             });
             return (None, report);
         }
@@ -199,9 +213,10 @@ impl SurfaceSortieState {
                 center: None,
                 hatch: None,
                 route: None,
+                settling_angle_degrees: None,
             };
             type Candidate = (RebuildPose, Option<Vec2>, Option<GroundRouteDiagnostics>);
-            let evaluate = || -> Result<Candidate, RebuildRejection> {
+            let mut evaluate = || -> Result<Candidate, RebuildRejection> {
                 let hit = ground(point + right * offset + up * 12.0, -up, 24.0)
                     .ok_or(RebuildRejection::NoGround)?;
                 if hit.normal.dot(up) < 0.8 {
@@ -227,6 +242,12 @@ impl SurfaceSortieState {
                     floor = left.point.midpoint(right_hit.point);
                 }
                 let center = floor + normal * (radius + 0.6);
+                let settled = floor + normal * 5.45;
+                let angle_degrees = settling_angle(normal, settled, frame.position);
+                attempt.settling_angle_degrees = Some(angle_degrees);
+                if !angle_degrees.is_finite() || angle_degrees >= landing::LANDED_ANGLE {
+                    return Err(RebuildRejection::LandingMisaligned);
+                }
                 if !self.world.physics.surface_vehicle_space_is_clear(
                     &replacement,
                     center,
@@ -267,7 +288,6 @@ impl SurfaceSortieState {
                 let Some(map) = map else {
                     return Ok((RebuildPose { center, normal }, None, None));
                 };
-                let settled = floor + normal * 5.45;
                 let angle = rotation_for_direction(normal);
                 let hatch = self
                     .material_access_at(
@@ -453,5 +473,95 @@ impl SurfaceSortieState {
             }
         }
         Some(survey)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn vector(v: &Value) -> Vec2 {
+        Vec2::new(
+            v["x"].as_f64().unwrap() as f32,
+            v["y"].as_f64().unwrap() as f32,
+        )
+    }
+
+    #[test]
+    fn retained_failed_builds_pass_the_old_support_gate_but_cannot_settle() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("tests/fixtures/rebuild-misalignment.json")).unwrap();
+        let state = SurfaceSortieScenario::init_material(42, 1);
+        let radius =
+            physics::SpacewarsPhysics::surface_vehicle_clearance_radius(&state.replacement_ship(0));
+        for sample in fixture["samples"].as_array().unwrap() {
+            let normal = Vec2::Y.rotate_radians(sample["ship"]["angle"].as_f64().unwrap() as f32);
+            let support = vector(&sample["standing_support"]["normal"]);
+            assert!(
+                normal.dot(support) >= 0.98,
+                "the standing-frame gate accepted this pose"
+            );
+            let center = vector(&sample["ship"]["position"]);
+            let origin = vector(&sample["frame"]["position"]);
+            let settled = center + normal * (5.45 - radius - 0.6);
+            assert!(settling_angle(normal, settled, origin) > landing::LANDED_ANGLE);
+            // Changing world translation/rotation cannot change admissibility.
+            for angle in [0.0, 0.7, -2.3] {
+                let offset = Vec2::new(-417.0, 631.0);
+                let transformed = settling_angle(
+                    normal.rotate_radians(angle),
+                    settled.rotate_radians(angle) + offset,
+                    origin.rotate_radians(angle) + offset,
+                );
+                assert!(transformed > landing::LANDED_ANGLE);
+            }
+        }
+    }
+
+    #[test]
+    fn accepted_native_placements_match_the_landing_frame_and_are_read_only() {
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        for _ in 0..120 {
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[SurfaceSortieAction {
+                interact_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1)],
+            Duration::from_nanos(16_666_667),
+        );
+        for _ in 0..30 {
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        let snapshot = state.spaceling_snapshot(0).unwrap();
+        let support = snapshot.support.unwrap();
+        let planet = physics::planet_surface_support_index(support.collider).unwrap();
+        let map = state.rebuild_ground_map(0, planet, support.position);
+        let before = state.world.physics.snapshot_bytes();
+        let (pose, report) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert!(pose.is_some(), "{report:?}");
+        let selected = report
+            .attempts
+            .iter()
+            .find(|a| Some(a.offset) == report.selected_offset)
+            .unwrap();
+        assert!(selected.settling_angle_degrees.unwrap() < landing::LANDED_ANGLE);
+        let (_, repeat) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert_eq!(report, repeat);
+        assert_eq!(state.world.physics.snapshot_bytes(), before);
+        state.world.physics.material_queries_dirty = true;
+        let (pose, report) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert!(pose.is_none());
+        assert_eq!(
+            report.attempts[0].rejection,
+            Some(RebuildRejection::QueriesPending)
+        );
     }
 }
