@@ -129,9 +129,10 @@ mod tests {
     #[test]
     fn rebuild_contact_frame_keeps_eligibility_and_full_build_interval() {
         let state = stranded(SurfaceMotionPreset::Orbit, 0.0);
-        for enabled in [false, true] {
+        for (enabled, radial) in [(false, false), (false, true), (true, false), (true, true)] {
             let mut s = state.clone();
             s.set_rebuild_contact_frame(0, enabled);
+            s.set_rebuild_radial_placement(0, radial);
             s.update_recovery(Duration::from_secs(4));
             assert!(!s.vehicle_available(0));
             assert!(s.observation(0).recovery.unwrap().rebuild_progress > 0.49);
@@ -160,6 +161,7 @@ mod tests {
                 .unwrap();
             let expected = (point - frame.position).rotate_radians(-frame.angle);
             assert!(report.standing.distance_to(expected) < 0.0001);
+            assert_eq!(report.radial_up.is_some(), radial);
             let snapshot = s.spaceling_snapshot(0).unwrap();
             let body = s.pilots[0].body.as_ref().unwrap().body();
             s.world.physics.world.set_velocity(
@@ -177,6 +179,7 @@ mod tests {
                     | SurfaceRecoveryStatus::NeedBalance)
             ));
             s.set_rebuild_contact_frame(0, !enabled);
+            s.set_rebuild_radial_placement(0, !radial);
             assert_eq!(s.rebuild_candidate(0), rejected);
             s.world.physics.world.set_pose(
                 body,

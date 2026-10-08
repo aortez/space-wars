@@ -208,6 +208,7 @@ pub(super) struct SurfacePilot {
     recovery: Option<recovery::SurfaceRecovery>,
     rebuild_refinement: bool,
     rebuild_contact_frame: bool,
+    rebuild_radial_placement: bool,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -257,6 +258,7 @@ impl SurfacePilot {
             recovery: None,
             rebuild_refinement: false,
             rebuild_contact_frame: false,
+            rebuild_radial_placement: false,
         }
     }
 

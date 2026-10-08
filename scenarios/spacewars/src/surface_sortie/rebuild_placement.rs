@@ -9,6 +9,8 @@ pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
 
 #[cfg(feature = "sensor-profile")]
 mod coverage;
+#[cfg(feature = "sensor-profile")]
+mod radial;
 
 const LOCAL_HALF_SPAN: i32 = 56;
 pub const MAX_REBUILD_WALK: f32 = 24.0;
@@ -45,6 +47,10 @@ pub struct RebuildPlacementReport {
     pub planet: usize,
     pub revision: Option<u64>,
     pub standing: Vec2,
+    /// Experimental query direction in the planet's local frame. The ship's
+    /// actual pose still comes from measured ground beneath both landing feet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radial_up: Option<Vec2>,
     pub selected_offset: Option<f32>,
     pub attempts: Vec<RebuildAttempt>,
 }
@@ -202,12 +208,22 @@ impl SurfaceSortieState {
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let local = |point: Vec2| (point - frame.position).rotate_radians(-frame.angle);
         let world_point = |point: Vec2| frame.position + point.rotate_radians(frame.angle);
+        // Preview ray normals and actual contact normals may describe different
+        // facets at almost the same point. Use one query frame for both, while
+        // retaining the measured landing pose and all placement guards below.
+        let radial = self.pilots[player].rebuild_radial_placement;
+        let up = if radial {
+            (point - frame.position).normalized()
+        } else {
+            up
+        };
         let material = self.world.terrain.planets.get(&planet);
         let mut report = RebuildPlacementReport {
             tick: self.world.tick,
             planet,
             revision: material.map(|t| t.field.revision()),
             standing: local(point),
+            radial_up: radial.then(|| up.rotate_radians(-frame.angle)),
             selected_offset: None,
             attempts: Vec::new(),
         };
