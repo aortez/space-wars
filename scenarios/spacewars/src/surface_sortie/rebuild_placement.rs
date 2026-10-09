@@ -10,7 +10,11 @@ pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
 #[cfg(feature = "sensor-profile")]
 mod coverage;
 #[cfg(feature = "sensor-profile")]
+mod probe;
+#[cfg(feature = "sensor-profile")]
 mod radial;
+#[cfg(feature = "sensor-profile")]
+pub use probe::RebuildPlacementProbeRequest;
 
 const LOCAL_HALF_SPAN: i32 = 56;
 pub const MAX_REBUILD_WALK: f32 = 24.0;

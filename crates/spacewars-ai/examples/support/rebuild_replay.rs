@@ -7,6 +7,7 @@ use scenario_spacewars::{
     surface_sortie::{
         SurfaceSortieScenario, SurfaceSortieState,
         pilot::{LandingSiteId, LandingSiteQuery},
+        rebuild_placement::RebuildPlacementProbeRequest,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -255,6 +256,10 @@ fn fork(
     let mut first_action = None;
     let mut audit_failures = Vec::new();
     let coverage_tick: u64 = crate::arg("--rebuild-coverage-tick", "0").parse().unwrap();
+    let probe_path = crate::arg("--rebuild-placement-probe", "none");
+    let probe_request: Option<RebuildPlacementProbeRequest> = (probe_path != "none")
+        .then(|| serde_json::from_slice(&fs::read(&probe_path).unwrap()).unwrap());
+    let mut probe_anchor = None;
     let initial =
         state.terrain_diagnostics().occupied_cells + state.terrain_diagnostics().removed_cells;
     loop {
@@ -303,6 +308,24 @@ fn fork(
             }
         }
         let telemetry = canonical(task.telemetry());
+        if let Some(request) = probe_request.as_ref().filter(|_| live) {
+            if row.tick == request.preview_tick {
+                let anchor = state
+                    .rebuild_placement_probe_anchor(seat, request)
+                    .expect("retained preview must reproduce before its probe");
+                write(
+                    &out.join("rebuild-placement-anchor.json"),
+                    &canonical(&anchor),
+                );
+                probe_anchor = Some(anchor);
+            }
+            if row.tick == request.tick {
+                write(
+                    &out.join("rebuild-placement-probe.json"),
+                    &state.rebuild_placement_probe(seat, probe_anchor.as_ref().unwrap()),
+                );
+            }
+        }
         if live && row.tick == coverage_tick {
             write(
                 &out.join("rebuild-coverage.json"),

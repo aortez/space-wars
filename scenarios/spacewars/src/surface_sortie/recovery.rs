@@ -206,7 +206,7 @@ impl SurfaceSortieState {
         true
     }
 
-    fn rebuild_candidate(
+    pub(super) fn rebuild_candidate(
         &self,
         player: usize,
     ) -> Result<(usize, Vec2, Vec2), SurfaceRecoveryStatus> {
