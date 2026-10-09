@@ -1,5 +1,11 @@
 # Predicted foot support uses the wrong reference frame
 
+**Follow-up:** the [support-alignment experiment](rebuild-support-alignment-results.md)
+found a real two-foot landing despite a sampled alignment of 0.62749. That
+counterexample disproves treating the sampled-normal test proposed below as a
+necessary condition for actual settling. The original probe measurements remain
+valid; its proposed hard gate is not qualified and stays disabled.
+
 The failed coarse placement already predicts a foot normal that cannot satisfy
 native landing support. Its old ray check accepts alignment **0.77485** against
 the standing pilot's query direction, above its 0.65 threshold. The same sampled
