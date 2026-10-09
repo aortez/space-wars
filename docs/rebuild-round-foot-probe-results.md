@@ -93,3 +93,8 @@ actual two-foot support and settling rules. A forecast must pass that comparison
 before it can inform placement. Complete coarse-site recovery, precise-position
 holding through construction and the earlier bearing-343 query mismatch remain
 unresolved. This is diagnostic evidence, not a scored match or a promotion.
+
+Follow-up: the [bounded native rollout](rebuild-native-forecast-results.md)
+reproduces all three retained contact and settling sequences, including this
+valid corner landing. Its complete-world simulation cost and information scope
+still prevent direct use as a placement sensor.
