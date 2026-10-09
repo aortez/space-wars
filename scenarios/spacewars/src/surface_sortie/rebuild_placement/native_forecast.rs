@@ -125,10 +125,12 @@ impl SurfaceSortieState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
-    fn fresh_build() -> SurfaceSortieState {
+    pub(in crate::surface_sortie::rebuild_placement) fn fresh_build(
+        local_forecast: bool,
+    ) -> SurfaceSortieState {
         let mut state = SurfaceSortieScenario::init_material(42, 1);
         assert!(state.rebuild_native_forecast(99)["unavailable"].is_string());
         assert!(state.rebuild_native_forecast(0)["unavailable"].is_string());
@@ -148,6 +150,9 @@ mod tests {
             SurfaceSortieScenario::step(&mut state, &[], DT);
         }
         state.enable_recovery();
+        if local_forecast {
+            state.enable_rebuild_local_forecasts();
+        }
         state.world.planets[0].owner_id = Some(0);
         state.set_rebuild_contact_frame(0, true);
         state.world.ships[0].translate_life(-state.world.ships[0].life_max);
@@ -169,7 +174,7 @@ mod tests {
 
     #[test]
     fn rebuild_native_forecast_is_bounded_repeatable_and_retains_live_physics() {
-        let mut state = fresh_build();
+        let mut state = fresh_build(false);
         let before = state.world.physics.snapshot_bytes();
         let observation = SurfaceSortieScenario::observe(&state);
         let mut result = state.rebuild_native_forecast(0);

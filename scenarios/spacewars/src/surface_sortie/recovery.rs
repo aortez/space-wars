@@ -307,14 +307,18 @@ impl SurfaceSortieState {
         let Some(pose) = pose else {
             return false;
         };
+        #[cfg(feature = "sensor-profile")]
+        if self.rebuild_local_forecasts.is_some() {
+            let forecast =
+                rebuild_placement::RebuildLocalForecast::new(self, player, planet, &pose);
+            self.rebuild_local_forecasts
+                .as_mut()
+                .unwrap()
+                .push(forecast);
+        }
         let center = pose.center;
-        let mut replacement = self.replacement_ship(player);
+        let replacement = self.replacement_ship_at(player, planet, &pose);
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
-        replacement.position = center - SHIP_PIVOT;
-        replacement.rotation_radians = rotation_for_direction(pose.normal);
-        replacement.direction = pose.normal;
-        replacement.velocity = motion::point_velocity(frame, center);
-        replacement.omega = physics::control_angular_velocity(&replacement, frame.angular_velocity);
         self.world.ships[index] = replacement;
         self.reconcile_recovery_vehicles();
         // Rapier stores COM velocity, while the surface frame is evaluated

@@ -7,7 +7,7 @@ use scenario_spacewars::{
     surface_sortie::{
         SurfaceSortieScenario, SurfaceSortieState,
         pilot::{LandingSiteId, LandingSiteQuery},
-        rebuild_placement::RebuildPlacementProbeRequest,
+        rebuild_placement::{RebuildLocalForecast, RebuildPlacementProbeRequest},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -248,6 +248,10 @@ fn fork(
         task.set_rebuild_precise_arrival(true);
     }
     let name = if live { "live" } else { "recorded" };
+    if crate::arg("--rebuild-local-forecast", "false") == "true" {
+        state.enable_rebuild_local_forecasts();
+    }
+    let mut forecasts: Vec<RebuildLocalForecast> = Vec::new();
     let mut tape = BufReader::new(fs::File::open(tape_path).unwrap());
     tape.seek(SeekFrom::Start(offset)).unwrap();
     let mut trace =
@@ -271,6 +275,29 @@ fn fork(
     loop {
         let row = read(&mut tape);
         assert_eq!(row.tick, state.tick());
+        forecasts.extend(
+            state
+                .take_rebuild_local_forecasts()
+                .into_iter()
+                .filter(|f| f.seat() == seat),
+        );
+        forecasts.retain_mut(|forecast| {
+            forecast.advance(4);
+            if forecast.is_complete() {
+                let mut value = forecast.diagnostics();
+                value["completed_at_tick"] = json!(row.tick);
+                write(
+                    &out.join(format!(
+                        "rebuild-local-forecast-{name}-{}.json",
+                        forecast.tick()
+                    )),
+                    &value,
+                );
+                false
+            } else {
+                true
+            }
+        });
         let mut o = if let Some(search) = task.rebuild_search_request() {
             let request = if live {
                 task.site_request().into()
@@ -412,6 +439,17 @@ fn fork(
             writeln!(contacts, "{}", state.rebuild_contact_diagnostics(seat)).unwrap();
         }
         if let Some(stop) = stop {
+            for forecast in forecasts.drain(..) {
+                let mut value = forecast.diagnostics();
+                value["harness_stopped_at_tick"] = json!(row.tick);
+                write(
+                    &out.join(format!(
+                        "rebuild-local-forecast-{name}-{}.json",
+                        forecast.tick()
+                    )),
+                    &value,
+                );
+            }
             trace.flush().unwrap();
             if let Some(contacts) = &mut contacts {
                 contacts.flush().unwrap();

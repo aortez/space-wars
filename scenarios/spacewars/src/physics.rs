@@ -253,7 +253,27 @@ impl SpacewarsPhysics {
         sun: Option<SunState>,
         planets: &[PlanetState],
     ) -> Self {
-        let mut physics = Self {
+        let mut physics = Self::empty(planets.len());
+        physics.world.reserve(
+            ships.len() + planets.len() + 2,
+            ships.len() + planets.len() * 3 + 2,
+            0,
+        );
+        let _ = physics.insert_world_boundary(universe_radius);
+        if let Some(sun) = sun {
+            let _ = physics.insert_sun(sun);
+        }
+        for (index, planet) in planets.iter().enumerate() {
+            let _ = physics.insert_planet(index, planet);
+        }
+        for (index, ship) in ships.iter().enumerate() {
+            let _ = physics.insert_ship(index, ship, false, false, false);
+        }
+        physics
+    }
+
+    fn empty(planet_count: usize) -> Self {
+        Self {
             world: PhysicsWorld::new(PhysicsWorldConfig {
                 gravity: Vec2::ZERO,
                 length_unit: 10.0,
@@ -274,27 +294,34 @@ impl SpacewarsPhysics {
             tick: 0,
             contact_last_seen: BTreeMap::new(),
             pre_step_motions: BTreeMap::new(),
-            planet_keys: vec![None; planets.len()],
+            planet_keys: vec![None; planet_count],
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
-        };
-        physics.world.reserve(
-            ships.len() + planets.len() + 2,
-            ships.len() + planets.len() * 3 + 2,
-            0,
-        );
-        let _ = physics.insert_world_boundary(universe_radius);
-        if let Some(sun) = sun {
-            let _ = physics.insert_sun(sun);
         }
-        for (index, planet) in planets.iter().enumerate() {
-            let _ = physics.insert_planet(index, planet);
+    }
+
+    #[cfg(feature = "sensor-profile")]
+    pub(super) fn rebuild_forecast_world(
+        &self,
+        planet: usize,
+        index: usize,
+        ship: &ShipState,
+    ) -> Option<Self> {
+        if self.material_queries_dirty || !self.material_planets.contains(&planet) {
+            return None;
         }
-        for (index, ship) in ships.iter().enumerate() {
-            let _ = physics.insert_ship(index, ship, false, false, false);
-        }
+        let world = self
+            .world
+            .copy_kinematic_body(self.planet_body(planet), 128, 16_384)?;
+        let mut physics = Self::empty(planet + 1);
+        physics.world = world;
+        physics.material_planets.insert(planet);
+        physics.surface_ships = Some(vec![index]);
+        physics.surface_recovery = self.surface_recovery;
         physics
+            .insert_ship(index, ship, false, false, false)
+            .then_some(physics)
     }
 
     pub fn reconcile(&mut self, input: PhysicsReconcileInput<'_>) -> PhysicsLifecycle {

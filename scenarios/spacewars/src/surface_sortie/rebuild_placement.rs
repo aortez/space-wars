@@ -13,7 +13,11 @@ mod coverage;
 #[cfg(feature = "sensor-profile")]
 mod footprint;
 #[cfg(feature = "sensor-profile")]
+mod local_forecast;
+#[cfg(feature = "sensor-profile")]
 mod native_forecast;
+#[cfg(feature = "sensor-profile")]
+pub use local_forecast::RebuildLocalForecast;
 #[cfg(feature = "sensor-profile")]
 mod probe;
 #[cfg(feature = "sensor-profile")]
@@ -147,6 +151,22 @@ impl SurfaceSortieState {
         if self.pilots[player].combat.is_some() {
             ship.enable_weapon_supply();
         }
+        ship
+    }
+
+    pub(super) fn replacement_ship_at(
+        &self,
+        player: usize,
+        planet: usize,
+        pose: &RebuildPose,
+    ) -> ShipState {
+        let mut ship = self.replacement_ship(player);
+        let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+        ship.position = pose.center - SHIP_PIVOT;
+        ship.rotation_radians = rotation_for_direction(pose.normal);
+        ship.direction = pose.normal;
+        ship.velocity = motion::point_velocity(frame, pose.center);
+        ship.omega = physics::control_angular_velocity(&ship, frame.angular_velocity);
         ship
     }
 

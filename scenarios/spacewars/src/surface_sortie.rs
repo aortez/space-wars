@@ -184,6 +184,8 @@ pub struct SurfaceSortieState {
     damage: impact::SurfaceDamageState,
     asteroids: asteroids::AsteroidPressure,
     round: Option<match_rules::MatchRound>,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_local_forecasts: Option<Vec<rebuild_placement::RebuildLocalForecast>>,
 }
 
 #[derive(Clone)]
@@ -963,6 +965,8 @@ impl SurfaceSortieScenario {
             damage: impact::SurfaceDamageState::default(),
             asteroids: asteroids::AsteroidPressure::default(),
             round: None,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_local_forecasts: None,
         }
     }
 
