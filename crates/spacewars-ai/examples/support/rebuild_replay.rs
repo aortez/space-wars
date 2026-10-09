@@ -340,6 +340,18 @@ fn fork(
                 &state.rebuild_round_foot_diagnostics(seat),
             );
         }
+        if crate::arg("--rebuild-native-forecast", "false") == "true"
+            && pilots[seat]
+                .recovery
+                .as_ref()
+                .and_then(|r| r.placement.as_ref())
+                .is_some_and(|p| p.tick == row.tick && p.selected_offset.is_some())
+        {
+            write(
+                &out.join(format!("rebuild-native-forecast-{name}-{}.json", row.tick)),
+                &state.rebuild_native_forecast(seat),
+            );
+        }
         if let Some(request) = probe_request.as_ref().filter(|_| live) {
             if row.tick == request.preview_tick {
                 let anchor = state

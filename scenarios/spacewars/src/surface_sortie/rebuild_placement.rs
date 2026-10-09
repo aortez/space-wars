@@ -13,6 +13,8 @@ mod coverage;
 #[cfg(feature = "sensor-profile")]
 mod footprint;
 #[cfg(feature = "sensor-profile")]
+mod native_forecast;
+#[cfg(feature = "sensor-profile")]
 mod probe;
 #[cfg(feature = "sensor-profile")]
 mod radial;
