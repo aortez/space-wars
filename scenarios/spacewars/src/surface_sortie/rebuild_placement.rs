@@ -10,6 +10,8 @@ pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
 #[cfg(feature = "sensor-profile")]
 mod coverage;
 #[cfg(feature = "sensor-profile")]
+mod footprint;
+#[cfg(feature = "sensor-profile")]
 mod probe;
 #[cfg(feature = "sensor-profile")]
 mod radial;
