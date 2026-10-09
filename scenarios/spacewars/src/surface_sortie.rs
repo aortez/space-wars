@@ -209,6 +209,7 @@ pub(super) struct SurfacePilot {
     rebuild_refinement: bool,
     rebuild_contact_frame: bool,
     rebuild_radial_placement: bool,
+    rebuild_support_alignment: bool,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -259,6 +260,7 @@ impl SurfacePilot {
             rebuild_refinement: false,
             rebuild_contact_frame: false,
             rebuild_radial_placement: false,
+            rebuild_support_alignment: false,
         }
     }
 

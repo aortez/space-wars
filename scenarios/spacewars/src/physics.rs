@@ -38,6 +38,7 @@ const LANDING_FOOT_ROLE: ColliderRole = ColliderRole::new(8);
 const OUTPOST_TERMINAL_ROLE: ColliderRole = ColliderRole::new(9);
 
 pub(super) const LANDING_FOOT_RADIUS: f32 = 0.45;
+pub(super) const LANDING_MIN_SUPPORT_ALIGNMENT: f32 = 0.7;
 pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0, -5.0)];
 const RECOVERY_BREAKUP_GRACE_TICKS: u64 = 30;
 pub(super) fn surface_landing_geometry(form: ShipForm) -> ([Vec2; 2], f32) {
@@ -757,7 +758,7 @@ impl SpacewarsPhysics {
         planet: usize,
         up: Vec2,
     ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
-        self.landing_contacts_with_alignment(index, planet, up, 0.7)
+        self.landing_contacts_with_alignment(index, planet, up, LANDING_MIN_SUPPORT_ALIGNMENT)
     }
 
     /// Keep an earned landing across small normal changes at round-foot/voxel

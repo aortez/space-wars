@@ -220,6 +220,9 @@ fn fork(
     if crate::arg("--rebuild-radial-placement", "false") == "true" {
         assert!(state.set_rebuild_radial_placement(seat, true));
     }
+    if crate::arg("--rebuild-support-alignment", "false") == "true" {
+        assert!(state.set_rebuild_support_alignment(seat, true));
+    }
     if crate::arg("--rebuild-refinement", "false") == "true" {
         assert!(state.set_rebuild_refinement(seat, true));
     }

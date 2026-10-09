@@ -5,6 +5,7 @@ use ground_navigation::{GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
 mod refinement;
 pub use refinement::RebuildRefinementWork;
 mod staging;
+mod support;
 pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
 
 #[cfg(feature = "sensor-profile")]
@@ -29,6 +30,7 @@ pub enum RebuildRejection {
     NoGround,
     HullObstructed,
     LandingMisaligned,
+    LandingUnsupported,
     NoHatchFooting,
     NoHatchRoute,
     HatchRouteTooLong,
@@ -46,6 +48,9 @@ pub struct RebuildAttempt {
     /// radial landing frame rather than the standing pilot's support normal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub settling_angle_degrees: Option<f32>,
+    /// Measured foot normals against radial up at the predicted resting origin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub support_alignments: Option<[f32; 2]>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RebuildPlacementReport {
@@ -241,6 +246,7 @@ impl SurfaceSortieState {
                 hatch: None,
                 route: None,
                 settling_angle_degrees: None,
+                support_alignments: None,
             });
             return (None, report);
         }
@@ -285,6 +291,7 @@ impl SurfaceSortieState {
                 hatch: None,
                 route: None,
                 settling_angle_degrees: None,
+                support_alignments: None,
             };
             type Candidate = (RebuildPose, Option<Vec2>, Option<GroundRouteDiagnostics>);
             let mut evaluate = || -> Result<Candidate, RebuildRejection> {
@@ -295,6 +302,7 @@ impl SurfaceSortieState {
                 }
                 let mut normal = hit.normal;
                 let mut floor = hit.point;
+                let mut foot_normals = None;
                 // Predict the resting pose from both actual feet, just as a
                 // landing survey does, instead of a single staircase normal.
                 if material.is_some() {
@@ -311,6 +319,7 @@ impl SurfaceSortieState {
                         return Err(RebuildRejection::NoGround);
                     }
                     floor = left.point.midpoint(right_hit.point);
+                    foot_normals = Some([left.normal, right_hit.normal]);
                 }
                 let center = floor + normal * (radius + 0.6);
                 let settled = floor + normal * 5.45;
@@ -318,6 +327,15 @@ impl SurfaceSortieState {
                 attempt.settling_angle_degrees = Some(angle_degrees);
                 if !angle_degrees.is_finite() || angle_degrees >= landing::LANDED_ANGLE {
                     return Err(RebuildRejection::LandingMisaligned);
+                }
+                if self.pilots[player].rebuild_support_alignment
+                    && let Some(normals) = foot_normals
+                {
+                    let alignments = support::alignments(normals, settled, frame.position);
+                    attempt.support_alignments = Some(alignments);
+                    if !support::supports_landing(alignments) {
+                        return Err(RebuildRejection::LandingUnsupported);
+                    }
                 }
                 if !self.world.physics.surface_vehicle_space_is_clear(
                     &replacement,
