@@ -241,6 +241,9 @@ fn fork(
         assert_eq!(crate::arg("--rebuild-footing-hold", "false"), "true");
         task.set_rebuild_footing_recheck(true);
     }
+    if crate::arg("--rebuild-precise-arrival", "false") == "true" {
+        task.set_rebuild_precise_arrival(true);
+    }
     let name = if live { "live" } else { "recorded" };
     let mut tape = BufReader::new(fs::File::open(tape_path).unwrap());
     tape.seek(SeekFrom::Start(offset)).unwrap();

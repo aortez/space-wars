@@ -416,6 +416,49 @@ fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain()
 }
 
 #[test]
+#[cfg(feature = "sensor-profile")]
+fn coarse_rebuild_precision_survives_reset_and_requires_actual_foot_arrival() {
+    for enabled in [false, true] {
+        let (mut task, mut o) = rebuild_relocation_fixture();
+        task.set_rebuild_precise_arrival(enabled);
+        task.reset(BrainReset {
+            actor: o.flight.pilot.owner,
+            episode_seed: 7,
+        });
+        o.jetpack = None;
+        task.step(&o);
+        assert!(!task.telemetry().relocation_site.unwrap().precise);
+        o.rebuild = None;
+        o.flight.pilot.tick = 1;
+        o.ground.as_mut().unwrap().tick = 1;
+        o.flight.pilot.actor.as_mut().unwrap().position.x = 3.6;
+        let action = task.step(&o);
+        assert_eq!(
+            task.telemetry().ground.as_ref().unwrap().precise_rebuild,
+            enabled
+        );
+        assert_eq!(task.telemetry().relocation_site.is_some(), enabled);
+        if enabled {
+            assert!(action.controls.horizontal > 0.0);
+            let before = task.telemetry().clone();
+            assert_eq!(task.step(&o), action);
+            assert_eq!(task.telemetry(), &before);
+            let mut copy = task.clone();
+            o.flight.pilot.tick = 2;
+            o.ground.as_mut().unwrap().tick = 2;
+            o.flight.pilot.actor.as_mut().unwrap().position.x = 4.05;
+            assert_eq!(task.step(&o), copy.step(&o));
+            assert_eq!(task.telemetry(), copy.telemetry());
+        }
+        assert!(task.telemetry().relocation_site.is_none());
+        assert!(task.telemetry().rebuild_footing.is_none());
+        assert_eq!(task.telemetry().started_tick, Some(0));
+        assert_eq!(task.telemetry().relocations, 1);
+        assert_eq!(o.flight.pilot.recovery.as_ref().unwrap().rebuilds, 0);
+    }
+}
+
+#[test]
 fn refined_rebuild_reaches_the_measured_footing_without_resetting_recovery() {
     let (mut task, mut o) = rebuild_relocation_fixture();
     o.jetpack = None;

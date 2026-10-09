@@ -187,6 +187,7 @@ pub struct RecoverShipTask {
     staging_route_handoff: bool,
     rebuild_footing_hold: bool,
     rebuild_footing_recheck: bool,
+    rebuild_precise_arrival: bool,
     footing_recheck: Option<(usize, u16)>,
     selected_footing_bearing: Option<u16>,
 }
@@ -250,6 +251,7 @@ impl RecoverShipTask {
             staging_route_handoff: false,
             rebuild_footing_hold: false,
             rebuild_footing_recheck: false,
+            rebuild_precise_arrival: false,
             footing_recheck: None,
             selected_footing_bearing: None,
         }
@@ -260,12 +262,20 @@ impl RecoverShipTask {
         let staging_route_handoff = self.staging_route_handoff;
         let rebuild_footing_hold = self.rebuild_footing_hold;
         let rebuild_footing_recheck = self.rebuild_footing_recheck;
+        let rebuild_precise_arrival = self.rebuild_precise_arrival;
         *self = Self::new(context);
         self.rebuild_search_enabled = rebuild_search_enabled;
         self.continuous_staging = continuous_staging;
         self.staging_route_handoff = staging_route_handoff;
         self.rebuild_footing_hold = rebuild_footing_hold;
         self.rebuild_footing_recheck = rebuild_footing_recheck;
+        self.rebuild_precise_arrival = rebuild_precise_arrival;
+    }
+    /// Require the measured foot position for coarse and refined rebuild sites.
+    /// This changes approach precision only, not holding or native construction.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_rebuild_precise_arrival(&mut self, enabled: bool) {
+        self.rebuild_precise_arrival = enabled;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)
@@ -849,7 +859,7 @@ impl RecoverShipTask {
         task.set_precise_rebuild(
             self.telemetry
                 .relocation_site
-                .is_some_and(|site| site.precise)
+                .is_some_and(|site| site.precise || self.rebuild_precise_arrival)
                 || self
                     .telemetry
                     .rebuild_staging
