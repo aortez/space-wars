@@ -98,3 +98,8 @@ failed live build and the successful recorded build as regression cases. Holding
 the precise coarse-site position through construction remains a separate
 controlled experiment. The earlier bearing-343 query-direction mismatch is also
 still open. This work stays local and changes no bot default or frontier choice.
+
+Follow-up: the [round-foot sweep comparison](rebuild-round-foot-probe-results.md)
+also rejects this valid recorded landing at the native threshold. Its actual
+descent drifts sideways into valid corner support before rotating onto both
+feet. The next predictor must account for that motion, not only the foot radius.
