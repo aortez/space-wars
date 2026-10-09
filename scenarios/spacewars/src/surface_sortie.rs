@@ -186,6 +186,8 @@ pub struct SurfaceSortieState {
     round: Option<match_rules::MatchRound>,
     #[cfg(feature = "sensor-profile")]
     rebuild_local_forecasts: Option<Vec<rebuild_placement::RebuildLocalForecast>>,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_selection: Option<rebuild_placement::selection::SelectionState>,
 }
 
 #[derive(Clone)]
@@ -967,6 +969,8 @@ impl SurfaceSortieScenario {
             round: None,
             #[cfg(feature = "sensor-profile")]
             rebuild_local_forecasts: None,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_selection: None,
         }
     }
 

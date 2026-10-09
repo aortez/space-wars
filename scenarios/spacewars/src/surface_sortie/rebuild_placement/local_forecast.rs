@@ -9,6 +9,7 @@ const MAX_STEPS_PER_CALL: usize = 4;
 const MAX_PLANETS: usize = 32;
 const MAX_LOCAL_TRAVEL: f32 = 16.0;
 const DT: Duration = Duration::from_nanos(16_666_667);
+pub(super) const START_DELAY: usize = 40;
 
 #[derive(Clone)]
 struct Model {
@@ -23,6 +24,13 @@ struct Model {
     solver: GravitySolver,
     participants: Vec<GravityParticipant>,
     initial_local: Vec2,
+    initial_normal: Vec2,
+}
+
+#[derive(Clone)]
+struct Launch {
+    planets: Vec<PlanetState>,
+    frame: motion::SurfaceFrame,
 }
 
 /// A frozen candidate, independent of future actions and live simulation state.
@@ -42,6 +50,9 @@ pub struct RebuildLocalForecast {
     setup_time: Duration,
     step_time: Duration,
     diagnostic_time: Duration,
+    delay: usize,
+    warmup: usize,
+    launch: Option<Launch>,
 }
 
 impl SurfaceSortieState {
@@ -72,7 +83,37 @@ impl RebuildLocalForecast {
             .observation()
             .placement
             .unwrap();
-        let model = Model::new(state, seat, planet, pose);
+        Self::from_candidate(state, seat, planet, pose, report, 0, start)
+    }
+
+    pub(super) fn candidate(
+        state: &SurfaceSortieState,
+        seat: usize,
+        pose: &RebuildPose,
+        report: RebuildPlacementReport,
+    ) -> Self {
+        Self::from_candidate(
+            state,
+            seat,
+            report.planet,
+            pose,
+            report,
+            START_DELAY,
+            Instant::now(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_candidate(
+        state: &SurfaceSortieState,
+        seat: usize,
+        planet: usize,
+        pose: &RebuildPose,
+        report: RebuildPlacementReport,
+        delay: usize,
+        start: Instant,
+    ) -> Self {
+        let model = Model::new_delayed(state, seat, planet, pose, delay > 0);
         let (model, stop) = match model {
             Ok(m) => (Some(m), None),
             Err(reason) => (None, Some(reason)),
@@ -96,15 +137,16 @@ impl RebuildLocalForecast {
             setup_time: start.elapsed(),
             step_time: Duration::ZERO,
             diagnostic_time: Duration::ZERO,
+            delay,
+            warmup: 0,
+            launch: None,
         };
         if let Some(model) = &result.model {
             result.input["bodies"] = json!(model.physics.world.body_count());
             result.input["colliders"] = json!(model.physics.world.collider_count());
-            let start = Instant::now();
-            result
-                .samples
-                .push(model.sample(result.tick, result.report.revision));
-            result.diagnostic_time += start.elapsed();
+            if delay == 0 {
+                result.record_launch();
+            }
         }
         result
     }
@@ -119,21 +161,113 @@ impl RebuildLocalForecast {
         self.stop.is_some()
     }
 
+    pub(super) fn predicts_settling(&self) -> Option<bool> {
+        (self.stop == Some("horizon")).then_some(self.first_settled.is_some())
+    }
+
+    pub(super) fn launch_matches(&self, state: &SurfaceSortieState, pose: &RebuildPose) -> bool {
+        let (Some(model), Some(launch)) = (&self.model, &self.launch) else {
+            return false;
+        };
+        if state.tick() != self.tick + self.delay as u64
+            || state.motion_preset != model.preset
+            || state.world.sun != model.sun
+            || state.world.planets.len() != launch.planets.len()
+        {
+            return false;
+        }
+        let physical = |p: &PlanetState| {
+            (
+                p.position,
+                p.radius,
+                p.mass,
+                p.orbit_radius,
+                p.orbit_angle,
+                p.orbit_omega,
+                p.wrapper_angle,
+                p.wrapper_omega,
+            )
+        };
+        if state
+            .world
+            .planets
+            .iter()
+            .zip(&launch.planets)
+            .enumerate()
+            .any(|(i, (a, b))| {
+                physical(a) != physical(b)
+                    || state.world.terrain.planets.contains_key(&i) != model.material[i]
+            })
+        {
+            return false;
+        }
+        let frame = motion::SurfaceFrame::read(&state.world.physics, self.report.planet);
+        let delta = frame.angle - launch.frame.angle;
+        let angle_error = delta.sin().atan2(delta.cos()).abs();
+        (pose.center - frame.position)
+            .rotate_radians(-frame.angle)
+            .distance_to(model.initial_local)
+            <= 0.002
+            && pose
+                .normal
+                .rotate_radians(-frame.angle)
+                .distance_to(model.initial_normal)
+                <= 0.0001
+            && frame.position.distance_to(launch.frame.position) <= 0.002
+            && angle_error <= 0.00001
+            && frame
+                .linear_velocity
+                .distance_to(launch.frame.linear_velocity)
+                <= 0.02
+            && (frame.angular_velocity - launch.frame.angular_velocity).abs() <= 0.001
+    }
+
+    fn record_launch(&mut self) {
+        let model = self.model.as_ref().unwrap();
+        self.launch = Some(Launch {
+            planets: model.planets.clone(),
+            frame: motion::SurfaceFrame::read(&model.physics, self.report.planet),
+        });
+        self.input["bodies"] = json!(model.physics.world.body_count());
+        self.input["colliders"] = json!(model.physics.world.collider_count());
+        let start = Instant::now();
+        self.samples
+            .push(model.sample(self.tick + self.delay as u64, self.report.revision));
+        self.diagnostic_time += start.elapsed();
+    }
+
     /// A work quota, not a wall-time deadline. Calling with zero does no work.
     pub fn advance(&mut self, budget: usize) -> usize {
         if self.is_complete() || budget == 0 {
             return 0;
         }
         let start = Instant::now();
-        let before = self.steps;
-        let model = self.model.as_mut().unwrap();
-        for _ in 0..budget.min(MAX_STEPS_PER_CALL).min(HORIZON - self.steps) {
+        let before = self.steps + self.warmup;
+        for _ in 0..budget
+            .min(MAX_STEPS_PER_CALL)
+            .min(HORIZON + self.delay - before)
+        {
+            if self.warmup < self.delay {
+                let step_start = Instant::now();
+                let model = self.model.as_mut().unwrap();
+                model.advance_without_ship();
+                self.warmup += 1;
+                if self.warmup == self.delay {
+                    model.spawn();
+                }
+                self.step_time += step_start.elapsed();
+                if self.warmup == self.delay {
+                    self.record_launch();
+                }
+                continue;
+            }
+            let model = self.model.as_mut().unwrap();
             let step_start = Instant::now();
             let valid = model.step();
             self.step_time += step_start.elapsed();
             self.steps += 1;
             let sample_start = Instant::now();
-            let tick = self.tick + self.steps as u64;
+            let tick = self.tick + self.delay as u64 + self.steps as u64;
             self.samples.push(model.sample(tick, self.report.revision));
             self.diagnostic_time += sample_start.elapsed();
             if !valid {
@@ -147,7 +281,7 @@ impl RebuildLocalForecast {
         if self.steps == HORIZON && self.stop.is_none() {
             self.stop = Some("horizon");
         }
-        let advanced = self.steps - before;
+        let advanced = self.steps + self.warmup - before;
         self.chunks.push(
             json!({"first_step":before + 1,"steps":advanced,"elapsed_ms":ms(start.elapsed())}),
         );
@@ -155,12 +289,9 @@ impl RebuildLocalForecast {
     }
 
     pub fn diagnostics(&self) -> Value {
-        let prediction = if self.stop == Some("horizon") {
-            Some(self.first_settled.is_some())
-        } else {
-            None
-        };
+        let prediction = self.predicts_settling();
         json!({"tick":self.tick,"seat":self.seat,"report":self.report,"input":self.input,
+            "launch_tick":self.tick+self.delay as u64,"start_delay":self.delay,"warmup_steps":self.warmup,
             "horizon_ticks":HORIZON,"max_steps_per_call":MAX_STEPS_PER_CALL,"step_nanoseconds":DT.as_nanos(),
             "max_planets":MAX_PLANETS,"max_planet_colliders":128,"max_shape_parts":16_384,
             "max_local_travel":MAX_LOCAL_TRAVEL,"steps":self.steps,"stop":self.stop,
@@ -180,11 +311,22 @@ fn ms(d: Duration) -> f64 {
 }
 
 impl Model {
+    #[cfg(test)]
     fn new(
         state: &SurfaceSortieState,
         seat: usize,
         planet: usize,
         pose: &RebuildPose,
+    ) -> Result<Self, &'static str> {
+        Self::new_delayed(state, seat, planet, pose, false)
+    }
+
+    fn new_delayed(
+        state: &SurfaceSortieState,
+        seat: usize,
+        planet: usize,
+        pose: &RebuildPose,
+        delayed: bool,
     ) -> Result<Self, &'static str> {
         if state.world.planets.len() > MAX_PLANETS || state.vehicle_available(seat) {
             return Err("source_limit_or_existing_vehicle");
@@ -194,17 +336,12 @@ impl Model {
         let mut physics = state
             .world
             .physics
-            .rebuild_forecast_world(planet, index, &ship)
+            .rebuild_forecast_world(planet, index, &ship, !delayed)
             .ok_or("planet_geometry_unavailable_or_over_limit")?;
         let frame = motion::SurfaceFrame::read(&physics, planet);
-        let body = physics.ship_body(index);
-        let origin_velocity = physics.world.velocity_at_point(body, pose.center).unwrap();
-        physics.world.apply_velocity_delta(
-            body,
-            motion::point_velocity(frame, pose.center) - origin_velocity,
-            true,
-        );
-        ship.velocity = physics.world.motion(body).unwrap().linear_velocity;
+        if !delayed {
+            correct_origin_velocity(&mut physics, index, &mut ship, frame, pose.center);
+        }
         // Only physical source/ephemeris fields cross into the model. No claims,
         // construction timers, opponents, debris, terrain evolution or RNG.
         let planets = state
@@ -257,7 +394,38 @@ impl Model {
             solver: GravitySolver::default(),
             participants: Vec::with_capacity(MAX_PLANETS + 2),
             initial_local: (pose.center - frame.position).rotate_radians(-frame.angle),
+            initial_normal: pose.normal.rotate_radians(-frame.angle),
         })
+    }
+
+    fn advance_without_ship(&mut self) {
+        let dt = DT.as_secs_f32();
+        for p in &mut self.planets {
+            self.preset.advance(p, self.sun, dt);
+        }
+        let planet = self.pilot.planet;
+        self.physics.world.set_next_kinematic_pose(
+            self.physics.planet_body(planet),
+            self.planets[planet].position,
+            self.planets[planet].wrapper_angle,
+        );
+        self.physics.step(dt);
+        for (i, p) in self.planets.iter().enumerate() {
+            self.source_positions[i] = p.position;
+        }
+        self.source_positions[planet] = motion::SurfaceFrame::read(&self.physics, planet).position;
+    }
+
+    fn spawn(&mut self) {
+        let frame = motion::SurfaceFrame::read(&self.physics, self.pilot.planet);
+        let pose = RebuildPose {
+            center: frame.position + self.initial_local.rotate_radians(frame.angle),
+            normal: self.initial_normal.rotate_radians(frame.angle),
+        };
+        position_replacement(&mut self.ship, frame, &pose);
+        let index = self.pilot.vehicle.0;
+        self.physics.reconcile_surface_vehicle(index, &self.ship);
+        correct_origin_velocity(&mut self.physics, index, &mut self.ship, frame, pose.center);
     }
 
     fn step(&mut self) -> bool {
@@ -370,6 +538,23 @@ impl Model {
             "revision":revision,"landing":self.pilot.landing,"contacts":contacts,
             "settled":self.pilot.landing.phase == LandingPhase::Landed})
     }
+}
+
+fn correct_origin_velocity(
+    physics: &mut physics::SpacewarsPhysics,
+    index: usize,
+    ship: &mut ShipState,
+    frame: motion::SurfaceFrame,
+    center: Vec2,
+) {
+    let body = physics.ship_body(index);
+    let velocity = physics.world.velocity_at_point(body, center).unwrap();
+    physics.world.apply_velocity_delta(
+        body,
+        motion::point_velocity(frame, center) - velocity,
+        true,
+    );
+    ship.velocity = physics.world.motion(body).unwrap().linear_velocity;
 }
 
 #[cfg(test)]

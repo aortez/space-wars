@@ -265,6 +265,8 @@ impl SurfaceSortieState {
                 Err(status) => {
                     recovery.reset_rebuild();
                     recovery.status = status;
+                    #[cfg(feature = "sensor-profile")]
+                    self.cancel_rebuild_selection(player, "recovery_precondition_lost");
                     continue;
                 }
             };
@@ -272,6 +274,8 @@ impl SurfaceSortieState {
             if recovery.planet != Some(planet) {
                 recovery.reset_rebuild();
                 recovery.planet = Some(planet);
+                #[cfg(feature = "sensor-profile")]
+                self.cancel_rebuild_selection(player, "recovery_planet_changed");
                 // Ownership/support must exist for a fresh full build interval.
                 continue;
             }
@@ -288,6 +292,10 @@ impl SurfaceSortieState {
                 continue;
             }
             if !self.try_rebuild_vehicle(player, planet, point, normal) {
+                #[cfg(feature = "sensor-profile")]
+                if self.rebuild_selection_pending(player) {
+                    continue;
+                }
                 let recovery = self.pilots[player].recovery.as_mut().unwrap();
                 recovery.status = recovery.placement.as_ref().map_or(
                     SurfaceRecoveryStatus::ClearanceBlocked,
@@ -301,8 +309,24 @@ impl SurfaceSortieState {
 
     fn try_rebuild_vehicle(&mut self, player: usize, planet: usize, point: Vec2, up: Vec2) -> bool {
         let index = self.pilots[player].vehicle.0;
-        let map = self.rebuild_ground_map(player, planet, point);
-        let (pose, report) = self.find_rebuild_placement(player, planet, point, up, map.as_ref());
+        #[cfg(feature = "sensor-profile")]
+        let selected = if self.rebuild_selection_enabled(player) {
+            let Some(selected) = self.select_forecast_rebuild(player, planet, point, up) else {
+                return false;
+            };
+            Some(selected)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "sensor-profile"))]
+        let selected: Option<(
+            Option<rebuild_placement::RebuildPose>,
+            RebuildPlacementReport,
+        )> = None;
+        let (pose, report) = selected.unwrap_or_else(|| {
+            let map = self.rebuild_ground_map(player, planet, point);
+            self.find_rebuild_placement(player, planet, point, up, map.as_ref())
+        });
         self.pilots[player].recovery.as_mut().unwrap().placement = Some(report);
         let Some(pose) = pose else {
             return false;

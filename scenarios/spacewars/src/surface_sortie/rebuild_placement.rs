@@ -17,6 +17,8 @@ mod local_forecast;
 #[cfg(feature = "sensor-profile")]
 mod native_forecast;
 #[cfg(feature = "sensor-profile")]
+pub(super) mod selection;
+#[cfg(feature = "sensor-profile")]
 pub use local_forecast::RebuildLocalForecast;
 #[cfg(feature = "sensor-profile")]
 mod probe;
@@ -42,6 +44,9 @@ pub enum RebuildRejection {
     NoHatchFooting,
     NoHatchRoute,
     HatchRouteTooLong,
+    ForecastRejected,
+    ForecastUnavailable,
+    ForecastStale,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -66,6 +71,9 @@ pub struct RebuildPlacementReport {
     pub planet: usize,
     pub revision: Option<u64>,
     pub standing: Vec2,
+    /// A retained query anchor; hatch routes still begin at `standing`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<Vec2>,
     /// Experimental query direction in the planet's local frame. The ship's
     /// actual pose still comes from measured ground beneath both landing feet.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -130,6 +138,21 @@ pub(super) struct RebuildPose {
     pub normal: Vec2,
 }
 
+struct PlacementOrigin {
+    point: Vec2,
+    up: Vec2,
+    standing: Vec2,
+    anchored: bool,
+}
+
+fn position_replacement(ship: &mut ShipState, frame: motion::SurfaceFrame, pose: &RebuildPose) {
+    ship.position = pose.center - SHIP_PIVOT;
+    ship.rotation_radians = rotation_for_direction(pose.normal);
+    ship.direction = pose.normal;
+    ship.velocity = motion::point_velocity(frame, pose.center);
+    ship.omega = physics::control_angular_velocity(ship, frame.angular_velocity);
+}
+
 fn settling_angle(normal: Vec2, center: Vec2, planet_center: Vec2) -> f32 {
     normal
         .dot((center - planet_center).normalized())
@@ -162,11 +185,7 @@ impl SurfaceSortieState {
     ) -> ShipState {
         let mut ship = self.replacement_ship(player);
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
-        ship.position = pose.center - SHIP_PIVOT;
-        ship.rotation_radians = rotation_for_direction(pose.normal);
-        ship.direction = pose.normal;
-        ship.velocity = motion::point_velocity(frame, pose.center);
-        ship.omega = physics::control_angular_velocity(&ship, frame.angular_velocity);
+        position_replacement(&mut ship, frame, pose);
         ship
     }
 
@@ -238,6 +257,34 @@ impl SurfaceSortieState {
         map: Option<&GroundMap>,
         offsets: &[f32],
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        self.find_rebuild_placement_from(
+            player,
+            planet,
+            PlacementOrigin {
+                point,
+                up,
+                standing: point,
+                anchored: false,
+            },
+            map,
+            offsets,
+        )
+    }
+
+    fn find_rebuild_placement_from(
+        &self,
+        player: usize,
+        planet: usize,
+        origin: PlacementOrigin,
+        map: Option<&GroundMap>,
+        offsets: &[f32],
+    ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        let PlacementOrigin {
+            point,
+            up,
+            standing: actual_standing,
+            anchored,
+        } = origin;
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("find_rebuild_placement");
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
@@ -257,7 +304,8 @@ impl SurfaceSortieState {
             tick: self.world.tick,
             planet,
             revision: material.map(|t| t.field.revision()),
-            standing: local(point),
+            standing: local(actual_standing),
+            anchor: anchored.then(|| local(point)),
             radial_up: radial.then(|| up.rotate_radians(-frame.angle)),
             selected_offset: None,
             attempts: Vec::new(),
@@ -372,7 +420,8 @@ impl SurfaceSortieState {
                 }
                 // Same-tick transfers/rebuilds are not in the completed index.
                 // Only this seat's replaced pod disappears in the proposed world.
-                let standing = point + (point - frame.position).normalized() * spec.half_height();
+                let standing = actual_standing
+                    + (actual_standing - frame.position).normalized() * spec.half_height();
                 let other_seat_occupied = self.pilots.iter().enumerate().any(|(seat, pilot)| {
                     if seat == player {
                         return false;
@@ -420,7 +469,7 @@ impl SurfaceSortieState {
                     preview_clear(world, axis, settled, angle)
                         && preview_clear(world, axis, center, angle)
                 });
-                let route = avoiding.route_to_hatch(local(point), local(hatch));
+                let route = avoiding.route_to_hatch(local(actual_standing), local(hatch));
                 Ok((
                     RebuildPose { center, normal },
                     Some(local(hatch)),

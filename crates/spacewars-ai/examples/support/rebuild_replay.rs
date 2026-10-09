@@ -248,6 +248,15 @@ fn fork(
         task.set_rebuild_precise_arrival(true);
     }
     let name = if live { "live" } else { "recorded" };
+    let selection = crate::arg("--rebuild-forecast-selection", "false") == "true";
+    if selection {
+        assert!(state.set_rebuild_forecast_selection(seat, true));
+    }
+    let mut selection_trace = selection.then(|| {
+        BufWriter::new(
+            fs::File::create(out.join(format!("rebuild-selection-{name}.jsonl"))).unwrap(),
+        )
+    });
     if crate::arg("--rebuild-local-forecast", "false") == "true" {
         state.enable_rebuild_local_forecasts();
     }
@@ -275,6 +284,11 @@ fn fork(
     loop {
         let row = read(&mut tape);
         assert_eq!(row.tick, state.tick());
+        if let Some(trace) = &mut selection_trace {
+            for event in state.take_rebuild_selection_events() {
+                writeln!(trace, "{event}").unwrap();
+            }
+        }
         forecasts.extend(
             state
                 .take_rebuild_local_forecasts()
@@ -439,6 +453,9 @@ fn fork(
             writeln!(contacts, "{}", state.rebuild_contact_diagnostics(seat)).unwrap();
         }
         if let Some(stop) = stop {
+            if let Some(trace) = &mut selection_trace {
+                trace.flush().unwrap();
+            }
             for forecast in forecasts.drain(..) {
                 let mut value = forecast.diagnostics();
                 value["harness_stopped_at_tick"] = json!(row.tick);

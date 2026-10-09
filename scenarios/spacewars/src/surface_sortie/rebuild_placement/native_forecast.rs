@@ -131,6 +131,26 @@ pub(super) mod tests {
     pub(in crate::surface_sortie::rebuild_placement) fn fresh_build(
         local_forecast: bool,
     ) -> SurfaceSortieState {
+        let mut state = preparing_build(local_forecast);
+        for _ in 0..900 {
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+            if state.pilots[0]
+                .recovery
+                .as_ref()
+                .unwrap()
+                .observation()
+                .rebuilds
+                > 0
+            {
+                return state;
+            }
+        }
+        panic!("native replacement did not build");
+    }
+
+    pub(in crate::surface_sortie::rebuild_placement) fn preparing_build(
+        local_forecast: bool,
+    ) -> SurfaceSortieState {
         let mut state = SurfaceSortieScenario::init_material(42, 1);
         assert!(state.rebuild_native_forecast(99)["unavailable"].is_string());
         assert!(state.rebuild_native_forecast(0)["unavailable"].is_string());
@@ -156,20 +176,7 @@ pub(super) mod tests {
         state.world.planets[0].owner_id = Some(0);
         state.set_rebuild_contact_frame(0, true);
         state.world.ships[0].translate_life(-state.world.ships[0].life_max);
-        for _ in 0..900 {
-            SurfaceSortieScenario::step(&mut state, &[], DT);
-            if state.pilots[0]
-                .recovery
-                .as_ref()
-                .unwrap()
-                .observation()
-                .rebuilds
-                > 0
-            {
-                return state;
-            }
-        }
-        panic!("native replacement did not build");
+        state
     }
 
     #[test]

@@ -307,6 +307,7 @@ impl SpacewarsPhysics {
         planet: usize,
         index: usize,
         ship: &ShipState,
+        spawn: bool,
     ) -> Option<Self> {
         if self.material_queries_dirty || !self.material_planets.contains(&planet) {
             return None;
@@ -319,9 +320,10 @@ impl SpacewarsPhysics {
         physics.material_planets.insert(planet);
         physics.surface_ships = Some(vec![index]);
         physics.surface_recovery = self.surface_recovery;
-        physics
-            .insert_ship(index, ship, false, false, false)
-            .then_some(physics)
+        if spawn && !physics.insert_ship(index, ship, false, false, false) {
+            return None;
+        }
+        Some(physics)
     }
 
     pub fn reconcile(&mut self, input: PhysicsReconcileInput<'_>) -> PhysicsLifecycle {
