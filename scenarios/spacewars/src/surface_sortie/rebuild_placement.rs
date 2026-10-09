@@ -74,6 +74,9 @@ pub struct RebuildPlacementReport {
     /// A retained query anchor; hatch routes still begin at `standing`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<Vec2>,
+    /// Query direction at a retained anchor, for read-only pose diagnostics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_up: Option<Vec2>,
     /// Experimental query direction in the planet's local frame. The ship's
     /// actual pose still comes from measured ground beneath both landing feet.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -306,6 +309,7 @@ impl SurfaceSortieState {
             revision: material.map(|t| t.field.revision()),
             standing: local(actual_standing),
             anchor: anchored.then(|| local(point)),
+            anchor_up: anchored.then(|| up.rotate_radians(-frame.angle)),
             radial_up: radial.then(|| up.rotate_radians(-frame.angle)),
             selected_offset: None,
             attempts: Vec::new(),

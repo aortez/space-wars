@@ -1,5 +1,25 @@
 # Compare future-start settling forecasts before native construction
 
+## Corrective batch v2
+
+The original v1 batch aborted at the first anchored build, recorded handoff tick
+27499. The old read-only footprint probe recomputed placement from current pilot
+footing rather than the fixed query anchor (0.055886 units apart), then asserted
+that this was the ship's spawn. Both controls finished; the live selector and
+coarse selector were never run. Preserve the failed summary, log, partial replay,
+forecast events and all archive hashes in `target/rebuild-forecast-selection/v1`.
+
+Repeat the fixed four-run batch once after repairing only this instrumentation:
+publish the anchored query direction, and use the recorded anchor and direction
+in the footprint probe. Extend the moving-footing fixture to exercise that probe.
+Keep the selector's decisions, thresholds, schedule, physics and action policies
+identical. Freeze a new executable and sources under `v2`; disclose this one
+diagnostic restart, with no gameplay tuning or retries within the corrective
+batch. This amendment supersedes the original no-retry rule only for that
+documented diagnostic repair. Any further simulation failure remains a failure.
+
+## Fixed experiment
+
 Test a default-off native placement selector on the two retained recovery paths.
 The preceding two-body model preserved all three settling classifications, but
 only observed candidates; this experiment may change actual construction. It
@@ -26,8 +46,9 @@ Keep each search's query anchor fixed in the planet frame. Cancel on lost native
 recovery conditions, changed planet or terrain revision, dirty queries, or pilot
 footing more than one unit from the anchor. Fresh hull/occupancy and hatch-route
 queries use the current world and actual pilot footing. Publish the optional
-anchor in placement reports so offsets are not misrepresented as relative to the
-current pilot. A pending forecast leaves native status `rebuilding`; it does not
+anchor and its query direction in placement reports so offsets are not
+misrepresented as relative to the current pilot. A pending forecast leaves native
+status `rebuilding`; it does not
 count as a failed placement or reset a task clock.
 
 Only a completed positive forecast may build. Re-run all placement checks on

@@ -952,6 +952,7 @@ fn a_fresh_preview_already_at_the_foot_can_be_held_before_a_ground_route_is_need
         route: None,
         placement: Some(RebuildPlacementReport {
             anchor: None,
+            anchor_up: None,
             tick: 0,
             planet: site.planet,
             revision: Some(site.revision),
@@ -1090,6 +1091,7 @@ fn held_footing_releases_large_displacements_and_native_placement_failures() {
             recovery.placement = Some(
                 scenario_spacewars::surface_sortie::rebuild_placement::RebuildPlacementReport {
                     anchor: None,
+                    anchor_up: None,
                     tick: 3,
                     planet: site.planet,
                     revision: Some(site.revision),
@@ -1140,6 +1142,7 @@ fn held_footing_ignores_latched_failures_until_a_current_attempt_rejects_it() {
             recovery.status = status;
             let mut report = RebuildPlacementReport {
                 anchor: None,
+                anchor_up: None,
                 tick: 9,
                 planet: site.planet,
                 revision: Some(site.revision),
@@ -1176,6 +1179,7 @@ fn held_footing_ignores_latched_failures_until_a_current_attempt_rejects_it() {
             o.flight.pilot.tick = 11;
             o.flight.pilot.recovery.as_mut().unwrap().placement = Some(RebuildPlacementReport {
                 anchor: None,
+                anchor_up: None,
                 tick: 11,
                 planet: site.planet,
                 revision: Some(site.revision),

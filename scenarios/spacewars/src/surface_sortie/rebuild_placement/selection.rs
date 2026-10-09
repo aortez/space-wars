@@ -310,6 +310,22 @@ mod tests {
             state.take_rebuild_selection_events()
         );
         assert_eq!(state.tick(), start + 40);
+        let placement = state.pilots[0]
+            .recovery
+            .as_ref()
+            .unwrap()
+            .observation()
+            .placement
+            .unwrap();
+        assert!(placement.anchor_up.is_some());
+        assert!(
+            placement.anchor.unwrap().distance_to(placement.standing) > 0.001,
+            "fixture must distinguish the retained anchor from current footing"
+        );
+        let before = state.world.physics.snapshot_bytes();
+        let round = state.rebuild_round_foot_diagnostics(0);
+        assert_eq!(round["physics_unchanged"], true, "{round}");
+        assert_eq!(state.world.physics.snapshot_bytes(), before);
         let motion = state
             .world
             .physics

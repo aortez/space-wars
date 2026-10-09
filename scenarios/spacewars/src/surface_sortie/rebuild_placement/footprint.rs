@@ -36,7 +36,13 @@ impl SurfaceSortieState {
         let local = |p: Vec2| (p - frame.position).rotate_radians(-frame.angle);
         let local_direction = |p: Vec2| p.rotate_radians(-frame.angle);
         assert!(local(point).distance_to(report.standing) < 0.001);
-        let up = if pilot.rebuild_radial_placement {
+        let query_point = report
+            .anchor
+            .map(|p| frame.position + p.rotate_radians(frame.angle))
+            .unwrap_or(point);
+        let up = if let Some(up) = report.anchor_up {
+            up.rotate_radians(frame.angle)
+        } else if pilot.rebuild_radial_placement {
             (point - frame.position).normalized()
         } else {
             contact_up
@@ -45,7 +51,7 @@ impl SurfaceSortieState {
         let ground = |origin, direction, length| {
             physics.material_ground_ray(planet, origin, direction, length)
         };
-        let hit = ground(point + right * offset + up * 12.0, -up, 24.0).unwrap();
+        let hit = ground(query_point + right * offset + up * 12.0, -up, 24.0).unwrap();
         let samples =
             [-3.0, 3.0].map(|side| ground(hit.point + right * side + up * 8.0, -up, 16.0).unwrap());
         let tangent = (samples[1].point - samples[0].point).normalized();

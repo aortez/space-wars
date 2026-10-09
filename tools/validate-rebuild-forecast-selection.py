@@ -14,7 +14,8 @@ N=importlib.util.module_from_spec(spec);spec.loader.exec_module(N)
 ROOT,P,I,B,D,L=N.ROOT,N.P,N.I,N.B,N.D,N.L
 same_native=N.same_native
 PRIOR=ROOT/'target/rebuild-local-forecast/v1'
-PROFILE='native_rebuild_forecast_selection_v1'
+ABORTED=ROOT/'target/rebuild-forecast-selection/v1'
+PROFILE='native_rebuild_forecast_selection_v2'
 S=N.N.R.S
 R,Q,F,C,H,W,A=S.R,S.Q,S.F,S.C,S.H,S.W,S.A
 MODES={'control_handoff':('control_handoff',False),'control_coarse':('control_coarse',False),
@@ -24,6 +25,7 @@ NEW=('scenarios/spacewars/src/surface_sortie/rebuild_placement/selection.rs',)
 CHANGED={*OWN,*NEW,'scenarios/spacewars/src/surface_sortie/rebuild_placement.rs',
     'scenarios/spacewars/src/surface_sortie/rebuild_placement/native_forecast.rs',
     'scenarios/spacewars/src/surface_sortie/rebuild_placement/local_forecast.rs',
+    'scenarios/spacewars/src/surface_sortie/rebuild_placement/footprint.rs',
     'scenarios/spacewars/src/surface_sortie/recovery.rs','scenarios/spacewars/src/surface_sortie.rs',
     'scenarios/spacewars/src/physics.rs','crates/spacewars-ai/tests/surface_recovery.rs',
     'crates/spacewars-ai/examples/support/rebuild_replay.rs'}
@@ -48,12 +50,33 @@ def check_inputs(expected,current,reaudit=False):
     assert not changed or reaudit and changed<=set(OWN[:2]),changed
 
 
+def repair_provenance():
+    old=json.loads((ABORTED/'plan.json').read_text());failed=json.loads((ABORTED/'failed-batch.json').read_text())
+    assert not failed['complete'] and not failed['selection_coarse_started']
+    assert failed['source_commit']==old['source_commit'] and failed['plan_sha256']==P.digest(ABORTED/'plan.json')
+    permitted={*OWN,'crates/spacewars-ai/tests/surface_recovery.rs',*NEW,
+        'scenarios/spacewars/src/surface_sortie/rebuild_placement.rs',
+        'scenarios/spacewars/src/surface_sortie/rebuild_placement/footprint.rs'}
+    current=inputs();assert old['inputs'].keys()==current.keys()
+    changed={p for p in current if old['inputs'][p]!=current[p]};assert changed<=permitted,changed
+    original=lambda p:subprocess.check_output(['git','show',old['source_commit']+':'+p],cwd=ROOT,text=True)
+    selection=NEW[0]
+    assert original(selection).split('#[cfg(test)]')[0]==(ROOT/selection).read_text().split('#[cfg(test)]')[0]
+    report='scenarios/spacewars/src/surface_sortie/rebuild_placement.rs'
+    metadata='    /// Query direction at a retained anchor, for read-only pose diagnostics.\n    #[serde(skip_serializing_if = "Option::is_none")]\n    pub anchor_up: Option<Vec2>,\n'
+    field='            anchor_up: anchored.then(|| up.rotate_radians(-frame.angle)),\n'
+    assert (ROOT/report).read_text().replace(metadata,'').replace(field,'')==original(report)
+    return dict(path=str(ABORTED/'failed-batch.json'),sha256=P.digest(ABORTED/'failed-batch.json'),
+        source_commit=old['source_commit'],changed_inputs=sorted(changed),diagnostic_restarts=1,selection_runtime_unchanged=True)
+
+
 def verify(plan,out,reaudit=False):
     check_inputs(plan['inputs'],inputs(),reaudit)
     for name in ('plan','summary'):
         assert P.digest(PRIOR/(name+'.json'))==plan['prior_'+name+'_sha256']
     assert P.digest(plan['tape']['path'])==plan['tape']['sha256']
     assert P.digest(plan['binary']['path'])==plan['binary']['sha256']
+    assert plan['aborted_batch']['sha256']==P.digest(plan['aborted_batch']['path'])
     prior=json.loads((PRIOR/'plan.json').read_text())
     assert set(plan['commands'])==set(MODES) and plan['horizon_ticks']==120 and plan['start_delay_ticks']==40
     for name,cmd in plan['commands'].items():
@@ -66,6 +89,7 @@ def freeze(out,binary):
     assert old['complete'] and old['screen']['all_paths_retained']
     current=inputs();assert prior['inputs'].keys()<=current.keys()
     changed={p for p in current if prior['inputs'].get(p)!=current[p]};assert changed<=CHANGED,changed
+    repair=repair_provenance()
     out.mkdir(parents=True,exist_ok=False)
     for name in ('logs','raw','archives'):(out/name).mkdir()
     frozen=out/'surface_mission_soak';shutil.copy2(binary,frozen);frozen.chmod(0o555)
@@ -73,7 +97,8 @@ def freeze(out,binary):
         inputs=current,changed_inputs=sorted(changed),binary=dict(path=str(frozen),sha256=P.digest(frozen)),tape=prior['tape'],
         prior_plan_sha256=P.digest(PRIOR/'plan.json'),prior_summary_sha256=P.digest(PRIOR/'summary.json'),
         commands={n:command(prior,frozen,out/'raw'/n,n) for n in MODES},horizon_ticks=120,start_delay_ticks=40,activation_tick=23767,seat=1,
-        task_start=16820,end=29421,fresh_games=0,default_promotion=False,bounds=prior['bounds'],build_command=prior['build_command'])
+        task_start=16820,end=29421,fresh_games=0,default_promotion=False,bounds=prior['bounds'],build_command=prior['build_command'],
+        aborted_batch=repair)
     verify(plan,out);I.write(out/'plan.json',plan)
     print('Frozen four prefixes and eight continuations; selector alone differs within each pair.',flush=True)
 
