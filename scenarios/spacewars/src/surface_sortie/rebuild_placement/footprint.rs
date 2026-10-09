@@ -116,6 +116,7 @@ mod tests {
         let mut state = SurfaceSortieScenario::init_material(42, 1);
         let dt = Duration::from_nanos(16_666_667);
         assert!(state.rebuild_footprint_diagnostics(99)["unavailable"].is_string());
+        assert!(state.rebuild_round_foot_diagnostics(99)["unavailable"].is_string());
         for _ in 0..120 {
             SurfaceSortieScenario::step(&mut state, &[], dt);
         }
@@ -136,6 +137,7 @@ mod tests {
         state.set_rebuild_contact_frame(0, true);
         state.world.ships[0].translate_life(-state.world.ships[0].life_max);
         assert!(state.rebuild_footprint_diagnostics(0)["unavailable"].is_string());
+        assert!(state.rebuild_round_foot_diagnostics(0)["unavailable"].is_string());
         for _ in 0..900 {
             SurfaceSortieScenario::step(&mut state, &[], dt);
             let report = state.pilots[0].recovery.as_ref().unwrap().observation();
@@ -149,11 +151,23 @@ mod tests {
             assert_eq!(state.world.physics.snapshot_bytes(), before);
             assert_eq!(result["poses"].as_array().unwrap().len(), 3);
             assert_eq!(result["sweeps"].as_array().unwrap().len(), 2);
+            let round = state.rebuild_round_foot_diagnostics(0);
+            assert_eq!(round["footprint"], result);
+            assert_eq!(round, state.rebuild_round_foot_diagnostics(0));
+            assert_eq!(state.world.physics.snapshot_bytes(), before);
+            for sweep in round["sweeps"].as_array().unwrap() {
+                for foot in sweep["feet"].as_array().unwrap() {
+                    assert_eq!(foot["status"], "Converged", "{round}");
+                    assert_eq!(foot["retained_surface"], true, "{round}");
+                }
+            }
             state.world.physics.material_queries_dirty = true;
             assert!(state.rebuild_footprint_diagnostics(0)["unavailable"].is_string());
+            assert!(state.rebuild_round_foot_diagnostics(0)["unavailable"].is_string());
             state.world.physics.material_queries_dirty = false;
             SurfaceSortieScenario::step(&mut state, &[], dt);
             assert!(state.rebuild_footprint_diagnostics(0)["unavailable"].is_string());
+            assert!(state.rebuild_round_foot_diagnostics(0)["unavailable"].is_string());
             return;
         }
         panic!("native replacement did not build");

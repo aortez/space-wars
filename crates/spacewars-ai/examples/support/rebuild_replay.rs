@@ -327,6 +327,19 @@ fn fork(
                 &state.rebuild_footprint_diagnostics(seat),
             );
         }
+        if crate::arg("--rebuild-round-foot-probe", "false") == "true"
+            && pilots[seat]
+                .recovery
+                .as_ref()
+                .and_then(|r| r.placement.as_ref())
+                .is_some_and(|p| p.tick == row.tick && p.selected_offset.is_some())
+        {
+            let fork = if live { "live" } else { "recorded" };
+            write(
+                &out.join(format!("rebuild-round-foot-{fork}-{}.json", row.tick)),
+                &state.rebuild_round_foot_diagnostics(seat),
+            );
+        }
         if let Some(request) = probe_request.as_ref().filter(|_| live) {
             if row.tick == request.preview_tick {
                 let anchor = state
