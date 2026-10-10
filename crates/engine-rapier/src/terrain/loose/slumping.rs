@@ -78,7 +78,7 @@ pub struct SlumpCommit {
 impl LooseTerrain {
     /// Watch only occupied cells within two cells of an edit. Release and
     /// deposition call this automatically. Out-of-field space is never vacant.
-    pub fn disturb(
+    pub(super) fn disturb_slopes(
         &mut self,
         body: BodyId,
         terrain: &Terrain,
@@ -160,6 +160,7 @@ impl LooseTerrain {
         fragment_capacity: usize,
         dt: f32,
     ) -> Result<Option<SlumpCommit>, ReleaseError> {
+        let _span = crate::profile::span("slump");
         let Some(config) = self.config.slumping else {
             return Ok(None);
         };
@@ -289,11 +290,22 @@ fn occupied(terrain: &Terrain, coordinate: CellCoord) -> bool {
 }
 
 pub(super) fn oversteep(terrain: &Terrain, cell: CellCoord, gravity: Vec2, degrees: f32) -> bool {
-    if !occupied(terrain, cell)
-        || !gravity.x.is_finite()
-        || !gravity.y.is_finite()
-        || gravity.length_squared() < 0.000001
-    {
+    occupied(terrain, cell)
+        && oversteep_with(terrain, cell, gravity, degrees, |c| {
+            terrain.cell(c) == Some(Cell::VOID)
+        })
+}
+
+/// Check a prospective occupied cell against the same local slope rule. The
+/// vacancy query can include other cells selected by an unpublished deposit.
+pub(super) fn oversteep_with(
+    terrain: &Terrain,
+    cell: CellCoord,
+    gravity: Vec2,
+    degrees: f32,
+    is_vacant: impl Fn(CellCoord) -> bool,
+) -> bool {
+    if !gravity.x.is_finite() || !gravity.y.is_finite() || gravity.length_squared() < 0.000001 {
         return false;
     }
     let up = -gravity.normalized();
@@ -302,8 +314,7 @@ pub(super) fn oversteep(terrain: &Terrain, cell: CellCoord, gravity: Vec2, degre
     let vacant = |offset: Vec2| {
         terrain
             .local_to_cell(center + offset * terrain.cell_size())
-            .and_then(|c| terrain.cell(c))
-            == Some(Cell::VOID)
+            .is_some_and(&is_vacant)
     };
     // Peel the exposed top of a bank. Releasing its buried face first can
     // detach a rigid slab and trap all of the loose material beneath it.

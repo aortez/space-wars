@@ -585,6 +585,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-combat-break-interval: "15";
     in-out property <string> launcher-combat-break-duration: "4";
     in-out property <bool> launcher-loose-dirt: false;
+    in-out property <string> launcher-dirt-mode: "Round grains";
     in-out property <string> launcher-combat-mission: "Dogfight";
     in-out property <string> launcher-combat-asteroid-interval: "Off";
     in-out property <string> launcher-combat-asteroid-strength: "Mixed";
@@ -2376,8 +2377,8 @@ export component MainWindow inherits Window {
                         y: root.launcher-material-match || root.launcher-material-combat ? 260px : 156px;
                         width: parent.width;
                         height: 48px;
-                        label: "Loose dirt (trial)";
-                        value: root.launcher-loose-dirt ? "On · 192 grains" : "Off";
+                        label: "Dirt physics (trial)";
+                        value: root.launcher-loose-dirt ? root.launcher-dirt-mode : "Off";
                         selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4);
                         previous => { root.launcher-settings-focus-index = root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4; root.ui-action(2); }
                         next => { root.launcher-settings-focus-index = root.launcher-material-match ? 9 : root.launcher-material-combat ? 7 : 4; root.ui-action(3); }

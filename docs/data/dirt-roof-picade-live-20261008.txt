@@ -1,0 +1,424 @@
+{
+  "schema_version": 1,
+  "revision": 2,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "5646929520743023791"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match · New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+scenario=spacewars
+scenario_revision=1
+paused=true
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=--
+ups=--
+frames_total=2166
+updates_total=5963
+fps_source=submitted-frames
+No active Spacewars diagnostics.
+
+No rule-bot flight history captured.
+match_seed=5646929520743023791
+match_tick=5963
+match_player_1=material_mission_v9
+match_player_2=material_mission_v10
+match_remaining_seconds=800.617
+match_owned_planets=0,1
+match_finish_reason=None
+match_result=in_progress
+mission_profile_version=2
+mission_profile_samples=120
+mission_profile_first_tick=5844
+mission_profile_last_tick=5963
+mission_sensor_p1_avg_ms=1.186
+mission_sensor_p1_p95_ms=0.388
+mission_sensor_p1_max_ms=25.984
+mission_sensor_p2_avg_ms=0.227
+mission_sensor_p2_p95_ms=0.258
+mission_sensor_p2_max_ms=0.351
+mission_policy_p1_avg_ms=0.034
+mission_policy_p1_p95_ms=0.036
+mission_policy_p1_max_ms=0.067
+mission_policy_p2_avg_ms=0.014
+mission_policy_p2_p95_ms=0.015
+mission_policy_p2_max_ms=0.056
+mission_scenario_avg_ms=16.508
+mission_scenario_p95_ms=22.456
+mission_scenario_max_ms=29.267
+mission_planning_avg_ms=0.032
+mission_planning_p95_ms=0.044
+mission_planning_max_ms=0.045
+mission_total_avg_ms=18.007
+mission_total_p95_ms=26.168
+mission_total_max_ms=46.143
+mission_world_physics_avg_ms=12.273
+mission_world_physics_p95_ms=13.718
+mission_world_physics_max_ms=14.236
+mission_world_lifecycle_avg_ms=2.520
+mission_world_lifecycle_p95_ms=8.674
+mission_world_lifecycle_max_ms=13.619
+mission_world_workload_avg_ms=0.783
+mission_world_workload_p95_ms=0.874
+mission_world_workload_max_ms=0.942
+mission_world_gravity_avg_ms=0.182
+mission_world_gravity_p95_ms=0.290
+mission_world_gravity_max_ms=0.394
+mission_world_collision_avg_ms=0.595
+mission_world_collision_p95_ms=0.704
+mission_world_collision_max_ms=0.746
+mission_sortie_outside_world_avg_ms=0.156
+mission_sortie_outside_world_p95_ms=0.194
+mission_sortie_outside_world_max_ms=0.319
+mission_p1_bot_observations=120
+mission_p1_full_survey_requests=0
+mission_p1_deferred_surveys=0
+mission_p1_selected_site_requests=120
+mission_p1_site_query=Selected(LandingSiteId { planet: 0, bearing: 29 })
+mission_p1_location=Aboard(VehicleId(0))
+mission_p1_form=Ship
+mission_p1_planet=0
+mission_p1_site_request=Some(LandingSiteId { planet: 0, bearing: 29 })
+mission_p1_landing_sites=1
+mission_p1_recovery_sites=1
+mission_p1_ground_nodes=0
+mission_p1_objective_survey=false
+mission_p1_task=Planet 0: settling on rear feet
+mission_p2_bot_observations=120
+mission_p2_full_survey_requests=0
+mission_p2_deferred_surveys=0
+mission_p2_selected_site_requests=120
+mission_p2_site_query=Selected(LandingSiteId { planet: 2, bearing: 30 })
+mission_p2_location=Aboard(VehicleId(1))
+mission_p2_form=Ship
+mission_p2_planet=2
+mission_p2_site_request=Some(LandingSiteId { planet: 2, bearing: 30 })
+mission_p2_landing_sites=1
+mission_p2_recovery_sites=1
+mission_p2_ground_nodes=0
+mission_p2_objective_survey=false
+mission_p2_task=Planet 2: approaching landing site
+mission_evaluation_models=["capture_mission_reference_v1","capture_mission_reference_v1"]
+mission_evaluation_work=2581
+mission_evaluation_p1=null
+mission_evaluation_p2=null
+mission_alternative_survey={"submitted":67,"cancelled":67,"checks":358,"measured":263,"no_landing":95,"incomplete":0,"physics_queries":16995,"deferred":{},"max_retained":2}
+mission_flag_survey=null
+mission_flag_value_shadow={"charged":0,"completed":0,"deferred_source_observations":0,"model":"capture_flag_value_shadow_v1","observational":true,"p1":null,"p2":null}
+spaceling_p1_present=false
+spaceling_p2_present=false
+
+performance_overlay_enabled=true
+performance_overlay_text=Paused
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=4859
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=16496.601
+kms_dirty_pixels_window=94371840
+kms_draws_total=2200
+kms_draws_window=120
+kms_flip_submissions_total=2199
+kms_flip_submissions_window=120
+kms_flip_completions_total=2198
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=2167
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1704198144
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=16496.601
+kms_loop_wall_avg_ms=137.472
+kms_loop_wall_p95_ms=194.721
+kms_loop_wall_max_ms=222.961
+kms_loop_cpu_total_ms=16444.742
+kms_loop_cpu_avg_ms=137.040
+kms_loop_cpu_p95_ms=194.368
+kms_loop_cpu_max_ms=222.290
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=14828.319
+kms_timers_wall_avg_ms=123.569
+kms_timers_wall_p95_ms=182.965
+kms_timers_wall_max_ms=203.084
+kms_timers_cpu_total_ms=14786.781
+kms_timers_cpu_avg_ms=123.223
+kms_timers_cpu_p95_ms=182.469
+kms_timers_cpu_max_ms=202.529
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.243
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.240
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.003
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1662.415
+kms_render_wall_avg_ms=13.853
+kms_render_wall_p95_ms=19.851
+kms_render_wall_max_ms=71.221
+kms_render_cpu_total_ms=1653.012
+kms_render_cpu_avg_ms=13.775
+kms_render_cpu_p95_ms=19.806
+kms_render_cpu_max_ms=71.122
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.236
+kms_dispatch_wall_avg_ms=0.027
+kms_dispatch_wall_p95_ms=0.028
+kms_dispatch_wall_max_ms=0.056
+kms_dispatch_cpu_total_ms=3.227
+kms_dispatch_cpu_avg_ms=0.027
+kms_dispatch_cpu_p95_ms=0.028
+kms_dispatch_cpu_max_ms=0.036
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=8.837
+kms_map_wall_avg_ms=0.074
+kms_map_wall_p95_ms=0.076
+kms_map_wall_max_ms=0.137
+kms_map_cpu_total_ms=8.884
+kms_map_cpu_avg_ms=0.074
+kms_map_cpu_p95_ms=0.077
+kms_map_cpu_max_ms=0.116
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1622.915
+kms_draw_wall_avg_ms=13.524
+kms_draw_wall_p95_ms=19.584
+kms_draw_wall_max_ms=70.871
+kms_draw_cpu_total_ms=1620.117
+kms_draw_cpu_avg_ms=13.501
+kms_draw_cpu_p95_ms=19.539
+kms_draw_cpu_max_ms=70.845
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.506
+kms_unmap_wall_avg_ms=0.071
+kms_unmap_wall_p95_ms=0.076
+kms_unmap_wall_max_ms=0.098
+kms_unmap_cpu_total_ms=8.592
+kms_unmap_cpu_avg_ms=0.072
+kms_unmap_cpu_p95_ms=0.076
+kms_unmap_cpu_max_ms=0.099
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.286
+kms_flip_wait_wall_avg_ms=0.011
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.029
+kms_flip_wait_cpu_total_ms=1.290
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.029
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=18.433
+kms_submit_wall_avg_ms=0.154
+kms_submit_wall_p95_ms=0.186
+kms_submit_wall_max_ms=0.208
+kms_submit_cpu_total_ms=12.167
+kms_submit_cpu_avg_ms=0.101
+kms_submit_cpu_p95_ms=0.117
+kms_submit_cpu_max_ms=0.136
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=481.846
+kms_rgb_blit_wall_avg_ms=4.015
+kms_rgb_blit_wall_p95_ms=4.173
+kms_rgb_blit_wall_max_ms=4.444
+kms_rgb_blit_cpu_total_ms=480.688
+kms_rgb_blit_cpu_avg_ms=4.006
+kms_rgb_blit_cpu_p95_ms=4.160
+kms_rgb_blit_cpu_max_ms=4.441
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1621.554
+kms_draw_rgb_wall_avg_ms=13.513
+kms_draw_rgb_wall_p95_ms=19.572
+kms_draw_rgb_wall_max_ms=70.861
+kms_draw_rgb_cpu_total_ms=1619.497
+kms_draw_rgb_cpu_avg_ms=13.496
+kms_draw_rgb_cpu_p95_ms=19.534
+kms_draw_rgb_cpu_max_ms=70.840
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1621.321
+kms_core_render_wall_avg_ms=13.511
+kms_core_render_wall_p95_ms=19.570
+kms_core_render_wall_max_ms=70.859
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=0.782
+kms_core_prepare_wall_avg_ms=0.007
+kms_core_prepare_wall_p95_ms=0.007
+kms_core_prepare_wall_max_ms=0.008
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=187.011
+kms_core_dirty_wall_avg_ms=1.558
+kms_core_dirty_wall_p95_ms=6.430
+kms_core_dirty_wall_max_ms=8.078
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1419.092
+kms_core_items_wall_avg_ms=11.826
+kms_core_items_wall_p95_ms=13.019
+kms_core_items_wall_max_ms=68.053
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=485.046
+kms_core_image_wall_avg_ms=4.042
+kms_core_image_wall_p95_ms=4.199
+kms_core_image_wall_max_ms=4.472
+kms_core_texture_calls=37024
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=734.975
+kms_core_texture_wall_avg_ms=6.125
+kms_core_texture_wall_p95_ms=6.561
+kms_core_texture_wall_max_ms=8.006
+kms_core_fallback_calls=36904
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=241.994
+kms_core_fallback_wall_avg_ms=2.017
+kms_core_fallback_wall_p95_ms=2.448
+kms_core_fallback_wall_max_ms=3.713
+kms_core_rectangle_calls=2983
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=86.291
+kms_core_rectangle_wall_avg_ms=0.719
+kms_core_rectangle_wall_p95_ms=0.302
+kms_core_rectangle_wall_max_ms=52.490
+kms_core_text_calls=2984
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=529.638
+kms_core_text_wall_avg_ms=4.414
+kms_core_text_wall_p95_ms=5.308
+kms_core_text_wall_max_ms=7.153
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.078
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2984
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=16.080
+kms_core_text_font_wall_avg_ms=0.134
+kms_core_text_font_wall_p95_ms=0.152
+kms_core_text_font_wall_max_ms=0.191
+kms_core_text_glyph_run_calls=2984
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=274.864
+kms_core_text_glyph_run_wall_avg_ms=2.291
+kms_core_text_glyph_run_wall_p95_ms=2.772
+kms_core_text_glyph_run_wall_max_ms=4.385
+kms_core_text_texture_calls=36904
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=251.527
+kms_core_text_texture_wall_avg_ms=2.096
+kms_core_text_texture_wall_p95_ms=2.542
+kms_core_text_texture_wall_max_ms=3.840
+kms_core_text_fallback_calls=36904
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=241.994
+kms_core_text_fallback_wall_avg_ms=2.017
+kms_core_text_fallback_wall_p95_ms=2.448
+kms_core_text_fallback_wall_max_ms=3.713
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=paused
+autostart_session=automatic
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=spacewars
+launch_stage=starting_scenario
+launch_elapsed_ms=225
+launch_save_ms=0
+launch_asset_ms=0
+launch_start_ms=112
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+MainPID=2450
+NRestarts=0
+ActiveState=active

@@ -741,6 +741,7 @@ fn show_launcher(
         },
     ));
     window.set_launcher_loose_dirt(settings.material_combat.loose_dirt);
+    window.set_launcher_dirt_mode(settings.material_combat.dirt_mode.label().into());
     let asteroids = settings.material_combat.asteroids.normalized();
     window.set_launcher_combat_asteroid_interval(SharedString::from(
         if asteroids.interval_seconds == 0 {
@@ -1540,7 +1541,19 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         _ => None,
     };
     if loose_focus == Some(focus) {
-        window.set_launcher_loose_dirt(!window.get_launcher_loose_dirt());
+        let current = if window.get_launcher_loose_dirt() {
+            window.get_launcher_dirt_mode()
+        } else {
+            "Off".into()
+        };
+        let labels: Vec<_> = std::iter::once("Off")
+            .chain(engine_common::DirtMode::ALL.map(|mode| mode.label()))
+            .collect();
+        let next = cycle_label(current.as_str(), &labels, delta);
+        window.set_launcher_loose_dirt(next != "Off");
+        if next != "Off" {
+            window.set_launcher_dirt_mode(next.into());
+        }
         return;
     }
     match window.get_launcher_scenario().as_str() {
@@ -2289,6 +2302,10 @@ fn launcher_selections_from_window(
     ) {
         engine_common::MaterialCombatSettings {
             loose_dirt: window.get_launcher_loose_dirt(),
+            dirt_mode: engine_common::DirtMode::ALL
+                .into_iter()
+                .find(|mode| mode.label() == window.get_launcher_dirt_mode().as_str())
+                .ok_or_else(|| "Unknown dirt mode.".to_owned())?,
             asteroids: engine_common::MaterialAsteroidSettings {
                 interval_seconds: match window.get_launcher_combat_asteroid_interval().as_str() {
                     "Off" => 0,
@@ -3141,6 +3158,31 @@ mod tests {
 
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
         let window = MainWindow::new().unwrap();
+        // The same row in match, combat and travel must cycle in both directions.
+        for (scenario, focus) in [
+            ("spacewars", 9),
+            ("spacewars-terrain-combat", 7),
+            ("spacewars-terrain-travel", 4),
+        ] {
+            window.set_launcher_scenario(scenario.into());
+            window.set_launcher_settings_focus_index(focus);
+            window.set_launcher_loose_dirt(false);
+            adjust_launcher_setting(&window, 1);
+            assert!(window.get_launcher_loose_dirt());
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Round grains");
+            for _ in 0..3 {
+                adjust_launcher_setting(&window, 1);
+            }
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Weak · Angular");
+            for _ in 0..4 {
+                adjust_launcher_setting(&window, -1);
+            }
+            assert!(!window.get_launcher_loose_dirt());
+            adjust_launcher_setting(&window, -1);
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Strong · Angular");
+            adjust_launcher_setting(&window, 1);
+            assert!(!window.get_launcher_loose_dirt());
+        }
         window.set_launcher_visible(true);
         window.set_launcher_settings_visible(true);
         window.set_launcher_controls_visible(true);
@@ -3222,6 +3264,7 @@ mod tests {
             spacewars_match: engine_common::MatchSettings::default(),
             material_combat: engine_common::MaterialCombatSettings {
                 loose_dirt: true,
+                dirt_mode: engine_common::DirtMode::WeakAngular,
                 mission: engine_common::MaterialCombatMission::Capture,
                 asteroids: engine_common::MaterialAsteroidSettings {
                     interval_seconds: 3,

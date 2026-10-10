@@ -36,10 +36,12 @@ rotation about the center of mass. It does not enable CCD or motion clamping on
 the prescribed ground. The earlier [kinematic subdivision correction](terrain-chunk-compounds.md#prescribed-motion-during-ccd)
 remains in place.
 
-The workspace vendors and pins the existing Rapier 0.34.0 release. Only this
-writeback predicate and its comment differ from the published Rust source.
+The workspace vendors and pins the existing Rapier 0.34.0 release. At this
+checkpoint only this writeback predicate and its comment differed from the published Rust source.
 [Vendor notes](../vendor/rapier2d/SPACEWARS_PATCH.md) record the original package
 checksum, license, tests and removal condition.
+The later [compound CCD pruning](compound-ccd-pruning.md) adds timing and
+dispatcher-restoration support while retaining this velocity correction.
 
 An initial experiment changed `TOIEntry::body_motion` instead. It passed the
 walking reduction but delayed genuine impacts against a receding wall, because

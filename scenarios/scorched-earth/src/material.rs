@@ -63,10 +63,16 @@ impl ScorchedState {
             emptied += usize::from(body.id != GROUND && plan.source_empty());
             plans.push((index, plan));
         }
-        // Admit the entire event before touching any field, loose grain or ID.
-        if !self.loose.can_admit(grains) || self.terrain.len() - 1 - emptied + fragments > 64 {
+        // Admit the whole material transfer before touching any field or ID.
+        // The caller still applies the impact to existing bodies if it cannot fit.
+        let capacity = self.loose.release_capacity(grains);
+        if !capacity.fits() || self.terrain.len() - 1 - emptied + fragments > 64 {
+            if !capacity.fits() {
+                self.last_capacity_rejection = Some(capacity);
+            }
             self.rejected_blasts += 1;
-            self.status = "Dirt capacity reached; material retained. Tanks still take damage.";
+            self.status =
+                "Dirt capacity reached; ground retained. Loose dirt and tanks still react.";
             return false;
         }
         let mut new_fragments = Vec::new();
@@ -98,6 +104,16 @@ impl ScorchedState {
             }
         });
         self.terrain.extend(new_fragments);
+        self.status = "Impact: displaced dirt falls, piles up and returns to the ground.";
+        true
+    }
+
+    pub(super) fn explode(&mut self, point: Vec2) {
+        self.impacts += 1;
+        self.flashes.push((point, self.tick));
+        self.release_material(point);
+        // A refused crater retains its cells, but cannot shield existing dirt.
+        // Apply once after admission so newly released bodies share the impulse.
         let bodies: Vec<_> = self
             .loose
             .iter()
@@ -115,14 +131,6 @@ impl ScorchedState {
             speed: 16.0,
         }
         .apply(&mut self.physics, bodies);
-        self.status = "Impact: displaced dirt falls, piles up and returns to the ground.";
-        true
-    }
-
-    pub(super) fn explode(&mut self, point: Vec2) {
-        self.impacts += 1;
-        self.flashes.push((point, self.tick));
-        self.release_material(point);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
         for tank in &mut self.tanks {
@@ -144,6 +152,62 @@ impl ScorchedState {
         self.loose.slumping_diagnostics()
     }
 
+    pub fn cohesion_diagnostics(&self) -> engine_rapier::terrain::CohesionDiagnostics {
+        self.loose.cohesion_diagnostics()
+    }
+
+    pub fn impact_diagnostics(&self) -> engine_rapier::terrain::ImpactFractureDiagnostics {
+        self.loose.impact_diagnostics()
+    }
+
+    pub(super) fn fracture_impacts(&mut self) {
+        if self.loose.config().impact_fracture.is_none() {
+            return;
+        }
+        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+        let commit = self
+            .loose
+            .fracture_impacts(
+                &mut self.physics,
+                self.terrain.iter_mut().map(|body| TerrainBodyMut {
+                    terrain: &mut body.terrain,
+                    geometry: &mut body.geometry,
+                    assembly: &mut body.assembly,
+                }),
+                &mut self.next_id,
+                capacity,
+            )
+            .expect("valid shared impact fracture");
+        if let Some(commit) = commit {
+            self.register_yield(commit);
+        }
+    }
+
+    pub(super) fn fracture_banks(&mut self) {
+        if self.loose.config().cohesion.is_none() {
+            return;
+        }
+        let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
+        let commit = self
+            .loose
+            .fracture_banks(
+                &mut self.physics,
+                self.terrain.iter_mut().map(|body| TerrainBodyMut {
+                    terrain: &mut body.terrain,
+                    geometry: &mut body.geometry,
+                    assembly: &mut body.assembly,
+                }),
+                |_, _| Vec2::new(0.0, -GRAVITY),
+                &mut self.next_id,
+                capacity,
+                DT,
+            )
+            .expect("valid shared bank failure");
+        if let Some(commit) = commit {
+            self.register_yield(commit);
+        }
+    }
+
     pub(super) fn slump(&mut self) {
         let capacity = 64usize.saturating_sub(self.terrain.len() - 1);
         let commit = self
@@ -162,23 +226,27 @@ impl ScorchedState {
             )
             .expect("valid shared slumping");
         if let Some(commit) = commit {
-            let body = self
-                .terrain
-                .iter_mut()
-                .find(|b| b.assembly.body() == commit.body)
-                .unwrap();
-            body.hash = body.terrain.hash();
-            body.edited_chunks = commit.release.dirty_chunks;
-            self.terrain.retain(|body| {
-                if body.id != GROUND && body.geometry.shape_count() == 0 {
-                    self.physics.remove_entity(body.id);
-                    false
-                } else {
-                    true
-                }
-            });
-            self.terrain.extend(commit.release.fragments);
+            self.register_yield(commit);
         }
+    }
+
+    fn register_yield(&mut self, commit: engine_rapier::terrain::SlumpCommit) {
+        let body = self
+            .terrain
+            .iter_mut()
+            .find(|b| b.assembly.body() == commit.body)
+            .unwrap();
+        body.hash = body.terrain.hash();
+        body.edited_chunks = commit.release.dirty_chunks;
+        self.terrain.retain(|body| {
+            if body.id != GROUND && body.geometry.shape_count() == 0 {
+                self.physics.remove_entity(body.id);
+                false
+            } else {
+                true
+            }
+        });
+        self.terrain.extend(commit.release.fragments);
     }
 
     pub(super) fn settle(&mut self) {

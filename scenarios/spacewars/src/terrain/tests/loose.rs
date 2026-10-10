@@ -1,5 +1,202 @@
 use super::*;
 
+#[test]
+fn cannon_quarry_runs_the_complete_lifecycle() {
+    for mode in [
+        engine_common::DirtMode::WeakRound,
+        engine_common::DirtMode::WeakAngular,
+    ] {
+        let mut state = SpacewarsScenario::init_destruction_fixture(42, mode);
+        let initial = material(&state);
+        let mut supported_before_break = false;
+        for tick in 0..1200 {
+            let actions = if tick == 0 {
+                vec![SpacewarsAction::set_cannon(0, true)]
+            } else if tick == 1 {
+                vec![SpacewarsAction::set_cannon(0, false)]
+            } else {
+                vec![]
+            };
+            SpacewarsScenario::step(&mut state, &actions, Duration::from_secs_f64(1.0 / 60.0));
+            if state
+                .loose_terrain()
+                .unwrap()
+                .cohesion_diagnostics()
+                .failures
+                == 0
+            {
+                supported_before_break |= state
+                    .physics
+                    .world
+                    .collider_ids()
+                    .filter(|c| c.entity == state.physics.ship_body(1).entity)
+                    .any(|c| {
+                        state.physics.world.surface_contacts(c).any(|contact| {
+                            contact.collider.entity == physics::planet_entity(0)
+                                && contact.normal.y > 0.5
+                        })
+                    });
+            }
+            if tick % 60 == 0 {
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                assert_eq!(initial, material(&state));
+            }
+        }
+        let audit = state.terrain_diagnostics();
+        assert!(audit.cannon_hits > 0);
+        assert!(audit.cohesion.failures > 0);
+        assert!(audit.cohesion.irregular_failures > 0);
+        assert!(audit.impact_fracture.failures > 0);
+        assert!(audit.deposited_cells > 0);
+        assert!(
+            supported_before_break,
+            "ship must first contact the unbroken bank"
+        );
+        assert!(
+            state.ships[1]
+                .position
+                .distance_to(state.planets[0].position)
+                < 50.0,
+            "ship must reach the lower surface after the bank fails"
+        );
+    }
+}
+
+#[test]
+fn ordinary_cannon_craters_on_curved_planets_are_inspected_and_replay() {
+    for mode in [
+        engine_common::DirtMode::WeakRound,
+        engine_common::DirtMode::WeakAngular,
+    ] {
+        let mut state = SpacewarsScenario::init_curved_destruction_fixture(42, mode);
+        let initial = material(&state);
+        let mut replay = state.clone();
+        for tick in 0..1800 {
+            let actions = if [0, 480, 960].contains(&tick) {
+                vec![SpacewarsAction::set_cannon(0, true)]
+            } else if [1, 481, 961].contains(&tick) {
+                vec![SpacewarsAction::set_cannon(0, false)]
+            } else {
+                vec![]
+            };
+            for state in [&mut state, &mut replay] {
+                SpacewarsScenario::step(state, &actions, Duration::from_secs_f64(1.0 / 60.0));
+            }
+            if tick % 60 == 0 {
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                assert_eq!(material(&state), initial);
+                assert_eq!(audit.motion_hash, replay.terrain_diagnostics().motion_hash);
+                assert_eq!(
+                    SpacewarsScenario::observe(&state).payload,
+                    SpacewarsScenario::observe(&replay).payload
+                );
+            }
+        }
+        let audit = state.terrain_diagnostics();
+        assert_eq!(audit.cannon_hits, 3);
+        assert!(audit.cohesion.irregular_held_checks > 0);
+        // A detected undercut is not automatically a failure: these short
+        // crater roofs carry too little moment in the planet's lower gravity.
+        assert_eq!(audit.cohesion.failures, 0);
+    }
+}
+
+#[test]
+fn clump_impact_uses_next_material_boundary_and_replays_on_a_rotating_planet() {
+    use engine_rapier::{terrain::ImpactFractureConfig, world::BodyMotion};
+    use engine_terrain::DetachedTerrain;
+    for shape in [
+        engine_rapier::terrain::GrainShape::Round,
+        engine_rapier::terrain::GrainShape::Hexagon,
+    ] {
+        let mut state = SpacewarsScenario::init_terrain_fixture(42);
+        state
+            .enable_loose_terrain(LooseTerrainConfig {
+                shape,
+                impact_fracture: Some(ImpactFractureConfig::default()),
+                ..Default::default()
+            })
+            .unwrap();
+        state.planets[0].wrapper_omega = 0.04;
+        step(&mut state);
+        let normal = Vec2::new(-0.8, 0.6);
+        let planet = &state.planets[0];
+        let position = planet.position + normal * (planet.radius + 10.0);
+        let id = PhysicsId::new(state.terrain.next_fragment);
+        state.terrain.next_fragment += 1;
+        let terrain = Terrain::generate(
+            12,
+            8,
+            1.0,
+            vec![Material {
+                id: ROCK,
+                hardness: 100,
+            }],
+            |c| {
+                if (2..10).contains(&c.x) && (2..6).contains(&c.y) {
+                    ROCK
+                } else {
+                    MaterialId::VOID
+                }
+            },
+        )
+        .unwrap();
+        let fragment = TerrainFragment::insert(
+            &mut state.physics.world,
+            id,
+            DetachedTerrain {
+                terrain,
+                parent_offset: Vec2::ZERO,
+            },
+            BodyMotion {
+                position,
+                angle: normal.y.atan2(normal.x) - std::f32::consts::FRAC_PI_2,
+                linear_velocity: -normal * 30.0,
+                angular_velocity: 0.0,
+            },
+            position,
+            engine_rapier::terrain::TerrainSpec {
+                surface: state.terrain.surface,
+                ..physics::terrain_spec()
+            },
+        )
+        .unwrap();
+        state.terrain.fragments.insert(id.value(), fragment);
+        state.physics.terrain_fragments.insert(id.value());
+        state.physics.material_queries_dirty = true;
+        let initial = material(&state);
+        for _ in 0..120 {
+            step(&mut state);
+            if state.loose_terrain().unwrap().impact_diagnostics().pending > 0 {
+                break;
+            }
+        }
+        let d = state.loose_terrain().unwrap().impact_diagnostics();
+        assert!(d.pending > 0, "real planetary impact: {d:?}");
+        assert_eq!(d.failures, 0, "publish on the next tick");
+        let mut replay = state.clone();
+        for _ in 0..90 {
+            step(&mut state);
+            step(&mut replay);
+            assert_eq!(observation(&state).payload, observation(&replay).payload);
+            assert_eq!(
+                state.physics.snapshot_bytes(),
+                replay.physics.snapshot_bytes()
+            );
+            assert_eq!(material(&state), initial);
+            let audit = state.terrain_diagnostics();
+            assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+        }
+        assert!(state.loose_terrain().unwrap().impact_diagnostics().failures > 0);
+        assert!(
+            !state.physics.material_queries_dirty,
+            "ordinary queries refreshed"
+        );
+    }
+}
+
 fn material(state: &SpacewarsState) -> BTreeMap<MaterialId, u64> {
     let mut quantities = BTreeMap::new();
     for field in state
@@ -23,7 +220,147 @@ fn material(state: &SpacewarsState) -> BTreeMap<MaterialId, u64> {
     quantities
 }
 
+#[test]
+fn undercut_rotating_planet_uses_shared_cohesion_and_registry_for_blasts_and_mining() {
+    use engine_rapier::terrain::{CohesionConfig, GrainShape};
+    for surface in [TerrainSurface::Blocks, TerrainSurface::Interpolated] {
+        for (shape, strength, mining) in [
+            (GrainShape::Round, 0.0, false),
+            (GrainShape::Hexagon, 0.0, true),
+            (GrainShape::Round, 1_000_000.0, false),
+        ] {
+            let mut state = SpacewarsScenario::init_terrain_fixture(42);
+            state
+                .enable_loose_terrain(LooseTerrainConfig {
+                    shape,
+                    cohesion: Some(CohesionConfig {
+                        strength,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .unwrap();
+            state.planets[0].wrapper_angle = 0.73;
+            state.planets[0].wrapper_omega = 0.04;
+            let planet = state.terrain.planets.get_mut(&0).unwrap();
+            planet.field = Terrain::generate(
+                129,
+                129,
+                1.0,
+                vec![Material {
+                    id: ROCK,
+                    hardness: 100,
+                }],
+                |c| {
+                    let x = c.x - 64;
+                    let y = c.y - 64;
+                    if x * x + y * y <= 49 * 49
+                        || ((-10..=0).contains(&x) && (0..=55).contains(&y))
+                        || ((1..=8).contains(&x) && (52..=55).contains(&y))
+                        || ((7..=8).contains(&x) && (0..=51).contains(&y))
+                    {
+                        ROCK
+                    } else {
+                        MaterialId::VOID
+                    }
+                },
+            )
+            .unwrap();
+            state.physics.world.remove_entity(physics::planet_entity(0));
+            state.terrain.surface = surface;
+            planet.geometry = TerrainGeometry::with_surface(&planet.field, surface);
+            planet.assembly = TerrainAssembly::insert(
+                &mut state.physics.world,
+                physics::planet_entity(0),
+                BodySpec {
+                    kind: BodyKind::KinematicPosition,
+                    position: state.planets[0].position,
+                    angle: state.planets[0].wrapper_angle,
+                    ..Default::default()
+                },
+                &planet.field,
+                &planet.geometry,
+                engine_rapier::terrain::TerrainSpec {
+                    surface,
+                    ..physics::terrain_spec()
+                },
+            )
+            .unwrap();
+            planet.hash = planet.field.hash();
+            // This isolated ledge has no service footing or actor load.
+            planet.footing = [CellCoord::new(64, 64); 3];
+            planet.supported = true;
+            state.physics.add_spaceport_sensor(0, &state.planets[0]);
+            state.physics.material_queries_dirty = true;
+            step(&mut state);
+            let initial = state.terrain_diagnostics().occupied_cells;
+            for x in 7..=8 {
+                let edit = TerrainEdit {
+                    brush: Brush::Capsule {
+                        start: CellCoord::new(x + 64, 49 + 64),
+                        end: CellCoord::new(x + 64, 51 + 64),
+                        radius: 0,
+                    },
+                    mode: EditMode::Remove,
+                };
+                if mining {
+                    state.queue_planet_edit(0, edit).unwrap();
+                } else {
+                    state.queue_test_blast(
+                        edit,
+                        RadialImpulse {
+                            center: Vec2::new(7.0, 50.0),
+                            radius: 1.0,
+                            speed: 0.0,
+                        },
+                    );
+                }
+            }
+            step(&mut state);
+            let mut replay = state.clone();
+            for tick in 0..180 {
+                step(&mut state);
+                step(&mut replay);
+                if tick % 30 == 0 {
+                    let audit = state.terrain_diagnostics();
+                    assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                    assert_eq!(
+                        initial,
+                        audit.occupied_cells + audit.loose_cells as u64 + audit.removed_cells
+                    );
+                    assert_eq!(observation(&state).payload, observation(&replay).payload);
+                    assert_eq!(
+                        state.physics.snapshot_bytes(),
+                        replay.physics.snapshot_bytes()
+                    );
+                }
+            }
+            let audit = state.terrain_diagnostics();
+            assert_eq!(
+                audit.cohesion.failures,
+                u64::from(strength == 0.0),
+                "{surface:?} {shape:?} {audit:?}"
+            );
+            if strength == 0.0 {
+                assert_eq!(audit.cohesion.released_cells, 32);
+                assert!(audit.fragments > 0);
+            } else {
+                assert!(audit.cohesion.held_checks > 0);
+            }
+            assert_eq!(audit.removed_cells, if mining { 6 } else { 0 });
+        }
+    }
+}
+
 fn enabled(surface: TerrainSurface, limit: usize) -> SpacewarsState {
+    enabled_shape(surface, limit, engine_rapier::terrain::GrainShape::Round)
+}
+
+fn enabled_shape(
+    surface: TerrainSurface,
+    limit: usize,
+    shape: engine_rapier::terrain::GrainShape,
+) -> SpacewarsState {
     let mut state = fixture();
     state.physics.world.remove_entity(physics::planet_entity(0));
     state.terrain.planets.clear();
@@ -32,6 +369,7 @@ fn enabled(surface: TerrainSurface, limit: usize) -> SpacewarsState {
     state
         .enable_loose_terrain(LooseTerrainConfig {
             max_grains: limit,
+            shape,
             ..Default::default()
         })
         .unwrap();
@@ -183,6 +521,136 @@ fn full_pool_rejects_damage_atomically_but_keeps_mining_operational() {
     assert_eq!(state.terrain.rejected_releases, 2);
     assert!(state.loose_terrain().unwrap().is_empty());
     assert!(state.terrain_diagnostics().issues.is_empty());
+}
+
+#[test]
+fn saturated_crater_keeps_each_impulse_in_rotating_world_coordinates() {
+    use engine_rapier::terrain::GrainShape;
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        for shape in [GrainShape::Round, GrainShape::Hexagon] {
+            for free_slots in [0, 1] {
+                let mut state = enabled_shape(surface, 5 + free_slots, shape);
+                state.planets[0].wrapper_angle = 0.73;
+                state.planets[0].wrapper_omega = 0.04;
+                step(&mut state);
+                let initial = material(&state);
+                let center = state
+                    .planet_terrain(0)
+                    .unwrap()
+                    .local_to_cell(Vec2::ZERO)
+                    .unwrap();
+                state.queue_test_blast(
+                    TerrainEdit {
+                        brush: Brush::Circle { center, radius: 1 },
+                        mode: EditMode::Remove,
+                    },
+                    RadialImpulse {
+                        center: Vec2::ZERO,
+                        radius: 5.0,
+                        speed: 0.0,
+                    },
+                );
+                commit(&mut state);
+                assert_eq!(state.loose_terrain().unwrap().len(), 5);
+                let local = Vec2::new(14.0, 58.0);
+                let planet = state
+                    .physics
+                    .world
+                    .motion(state.physics.planet_body(0))
+                    .unwrap();
+                let point = planet.position + local.rotate_radians(planet.angle);
+                let up = Vec2::Y.rotate_radians(planet.angle);
+                let bodies = state
+                    .loose_terrain()
+                    .unwrap()
+                    .iter()
+                    .map(|g| g.body())
+                    .collect::<Vec<_>>();
+                for (i, &body) in bodies.iter().enumerate() {
+                    let offset = if i == 4 { 10.0 } else { 1.0 + i as f32 };
+                    state
+                        .physics
+                        .world
+                        .set_pose(body, point + up * offset, 0.0, true);
+                    state
+                        .physics
+                        .world
+                        .set_velocity(body, Vec2::ZERO, 0.0, true);
+                }
+                let center = state
+                    .planet_terrain(0)
+                    .unwrap()
+                    .local_to_cell(local)
+                    .unwrap();
+                // Two distinct impacts in one batch: both impulses survive a
+                // refused transfer, while overlapping cells are counted once.
+                for _ in 0..2 {
+                    state.queue_test_blast(
+                        TerrainEdit {
+                            brush: Brush::Circle { center, radius: 3 },
+                            mode: EditMode::Remove,
+                        },
+                        RadialImpulse {
+                            center: local,
+                            radius: 5.0,
+                            speed: 10.0,
+                        },
+                    );
+                }
+                let field = state.planet_terrain(0).unwrap().clone();
+                let next_id = state.terrain.next_fragment;
+                let registry = state.physics.terrain_fragments.clone();
+                let before = bodies
+                    .iter()
+                    .map(|&b| state.physics.world.motion(b).unwrap())
+                    .collect::<Vec<_>>();
+                let mut replay = state.clone();
+                commit(&mut state);
+                commit(&mut replay);
+                assert_eq!(state.terrain.rejected_releases, 2);
+                let capacity = state.terrain_diagnostics().last_capacity_rejection.unwrap();
+                assert_eq!(capacity.available, free_slots);
+                assert!(!capacity.fits());
+                assert_eq!(state.terrain_diagnostics().loose_available, free_slots);
+                assert_eq!(state.planet_terrain(0).unwrap(), &field);
+                assert_eq!(state.terrain.next_fragment, next_id);
+                assert_eq!(state.physics.terrain_fragments, registry);
+                assert_eq!(material(&state), initial);
+                for (i, &body) in bodies.iter().enumerate() {
+                    let after = state.physics.world.motion(body).unwrap();
+                    assert_eq!(after.position, before[i].position);
+                    assert_eq!(after.angle, before[i].angle);
+                    if i == 4 {
+                        assert_eq!(after, before[i]);
+                    } else {
+                        let offset = state.physics.world.center_of_mass(body).unwrap() - point;
+                        let expected =
+                            offset / offset.length() * (20.0 * (1.0 - offset.length() / 5.0));
+                        assert!(
+                            after.linear_velocity.distance_to(expected) < 0.0001,
+                            "{shape:?} {surface:?}: {after:?}"
+                        );
+                    }
+                }
+                for _ in 0..30 {
+                    step(&mut state);
+                    step(&mut replay);
+                }
+                assert_eq!(observation(&state).payload, observation(&replay).payload);
+                assert_eq!(
+                    state.physics.snapshot_bytes(),
+                    replay.physics.snapshot_bytes()
+                );
+                assert_eq!(material(&state), initial);
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+            }
+        }
+    }
 }
 
 #[test]
@@ -340,4 +808,74 @@ fn real_shell_hitting_loose_dirt_is_consumed_and_reblasts_existing_material() {
     }
     assert_eq!(state.terrain_cannon_hits(), 2);
     assert!(state.terrain_diagnostics().issues.is_empty());
+}
+
+#[test]
+fn rotating_roof_cannon_cut_uses_shared_strength_and_retains_all_material() {
+    use engine_common::DirtMode;
+    for (mode, weak, enabled) in [
+        (DirtMode::Round, false, false),
+        (DirtMode::Angular, false, false),
+        (DirtMode::WeakRound, true, true),
+        (DirtMode::WeakAngular, true, true),
+        (DirtMode::StrongRound, false, true),
+        (DirtMode::StrongAngular, false, true),
+    ] {
+        let mut state = SpacewarsScenario::init_roof_fixture(42, mode);
+        let initial = material(&state);
+        let sound = state.terrain.planets[&0]
+            .field
+            .roof_span(CellCoord::new(72, 124), Vec2::new(0.0, -11.3), 500.0)
+            .unwrap();
+        assert!(!sound.overloaded(), "uncut weak roof holds");
+        let mut quiet_samples = 0;
+        let mut grain_samples = 0;
+        for tick in 0..1800 {
+            let actions = match tick {
+                0 => vec![SpacewarsAction::set_cannon(0, true)],
+                1 => vec![SpacewarsAction::set_cannon(0, false)],
+                _ => vec![],
+            };
+            SpacewarsScenario::step(&mut state, &actions, Duration::from_secs_f64(1.0 / 60.0));
+            if tick % 60 == 0 {
+                let audit = state.terrain_diagnostics();
+                assert!(audit.issues.is_empty(), "{:?}", audit.issues);
+                assert_eq!(initial, material(&state));
+            }
+            if weak && tick >= 1200 && tick % 60 == 59 {
+                let world = &state.physics.world;
+                let ground = state.terrain.planets[&0].assembly.body();
+                let spin = world.motion(ground).unwrap().angular_velocity;
+                for grain in state.loose_terrain().unwrap().iter() {
+                    let motion = world.motion(grain.body()).unwrap();
+                    let support_velocity = world.velocity_at_point(ground, motion.position).unwrap();
+                    let threshold = grain.cell_size() * 0.2;
+                    grain_samples += 1;
+                    quiet_samples += usize::from(
+                        motion.linear_velocity.distance_to(support_velocity) <= threshold
+                            && (motion.angular_velocity - spin).abs() * grain.radius() <= threshold,
+                    );
+                }
+            }
+        }
+        let audit = state.terrain_diagnostics();
+        assert_eq!(audit.cannon_hits, 1);
+        if weak {
+            assert_eq!(audit.cohesion.roof_failures, 1);
+            assert!(audit.cohesion.failures > audit.cohesion.roof_failures);
+            assert!(audit.impact_fracture.failures > 0);
+            // The loaded pile must become quiet in the rotating ground's frame.
+            // Packing may still reject it, so this does not force deposition.
+            assert!(grain_samples > 0);
+            assert!(
+                quiet_samples * 100 > grain_samples * 90,
+                "{mode:?}: {quiet_samples}/{grain_samples}"
+            );
+        } else {
+            assert_eq!(audit.cohesion.failures, 0);
+            if enabled {
+                assert!(audit.cohesion.roof_held_checks > 0);
+            }
+        }
+    }
 }

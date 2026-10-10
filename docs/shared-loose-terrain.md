@@ -1,16 +1,32 @@
 # Shared loose terrain — #165
 
-Terrain Lab and Spacewars now use the same material-release lifecycle. In the
-launcher, choose **Space-Wars → Settings → Loose dirt (trial): On**. The setting
-also applies to the existing combat/duel, travel and arena scenarios. It persists
-across restart; old settings files default to Off.
+Terrain Lab, Scorched Earth and Spacewars use the same material-release lifecycle.
+In the launcher, choose **Space-Wars → Settings → Dirt physics (trial)**. The row
+cycles Off, Round grains, Angular grains, Weak · Round, Weak · Angular,
+Strong · Round and Strong · Angular. It also applies to combat/duel, travel and
+arena scenarios. Choices persist across restart. Existing saves with loose dirt
+on keep plain Round grains; old saves without the setting remain Off.
+
+Plain grains enable conserved blast debris and deposition. Weak/Strong also
+enable surface shedding, bank failure and clump impact chipping using the shared
+`DirtStrength` preset. Weak uses bank strength 500 and impact yield speed 6;
+Strong uses 4000 and 24. Both use the existing 50° surface repose rule. These
+are comparison presets, not calibrated soil materials. Shape and a 192-grain
+limit remain independent of the strength thresholds.
 
 Use cannon impacts or enable asteroid arrivals to break ground into moving dirt.
-The trial uses round, one-world-unit cells, friction 0.6 and a 192-grain limit.
+Spacewars uses one-world-unit cells and grain friction 0.6.
 The HUD shows `Dirt n/192` when no higher-priority actor message is needed.
 The HUD also reports cumulative settled cells. Settling returns budget slots;
 an impact that still cannot fit leaves its material intact.
 Mining keeps its existing removal behavior. Lasers keep their existing rules.
+
+![Shared dirt presets in the Picade launcher](screenshots/dirt-gameplay/picade-dirt-settings.png)
+
+The [playable hillside and cannon-quarry checks](scorched-earth.md#hillside-encounter-and-shared-physics-presets)
+exercise a weapon undermining a bank, the falling clump chipping on contact, and
+some debris returning to terrain. They also check tank/ship support and material
+conservation. Ordinary Spacewars maps use their existing terrain generation.
 
 ## Ownership and the tick boundary
 
@@ -18,12 +34,14 @@ Mining keeps its existing removal behavior. Lasers keep their existing rules.
 flowchart LR
   A[Weapon contact] --> B[Queue local damage]
   B --> C[Prepare and admit next tick]
+  B --> K[Sample blast in world space]
   C --> D[Retained terrain and collider cache]
   C --> E[Disconnected solid fragments]
   C --> F[Conserved loose grains]
   D --> G[Existing Rapier world]
   E --> G
   F --> G
+  K --> G
   G --> I[Supported and quiet dirt]
   I --> J[Validate vacant cells and clearance]
   J --> D
@@ -46,11 +64,19 @@ translation and rotation. The shared component owns the loose-body handles and
 per-material quantities; it never steps physics, applies gravity or awards yield.
 
 Spacewars groups the preceding tick's edits by their sampled source, preserving
-order within each source. Over-capacity impact batches leave that field and its
-existing loose velocities unchanged; independent mining edits still proceed.
+order within each source. Over-capacity impact batches retain that field and
+allocate no new bodies or IDs; independent mining edits still proceed.
 After accepted releases, the adapter registers solid fragments and grains in
-the existing material-body registry and applies bounded radial velocity changes.
-Previously released dirt can receive later blasts, including direct shell hits.
+the existing material-body registry. Every queued blast then applies its bounded
+radial velocity change once, whether or not its material transfer fitted.
+Previously released dirt and fragments still react when the pool is full,
+including direct shell hits. Source-local blast centers are sampled in world
+coordinates before any impulses, including on translating/rotating planets.
+Scorched Earth uses the same separation between atomic transfer and blast response;
+its tank damage also remains independent of admission. The low-level
+`LooseTerrain::commit` failure contract is unchanged: it never changes existing
+motion. The scenario applies the impulse separately. Terrain Lab retains its
+separate experimental pressure-pulse admission policy.
 Gravity, collision queries, ships, spacelings and renderers use the same world.
 Base/flag support is invalidated through the existing terrain lifecycle. No
 additional solver or gravity step is introduced.
@@ -81,6 +107,18 @@ redistribution accommodates the extra volume of square cells relative to their
 inscribed contact proxies. Material and remaining durability stay with each
 grain. Failed attempts retain quiet eligibility and retry after half a second.
 
+A retry can reuse a failed decision when all its inputs are unchanged: ordered
+grain membership, terrain revision/surface, recovery eligibility, gravity samples,
+and the exact current poses and shape identities of nearby solid colliders.
+The dependency query reads current parent poses, including edits made before the
+next physics step. Moving, entering, removed or replaced obstacles invalidate it.
+Successful placements always perform fresh clearance checks. This memoization
+retains at most 64 failed groups and 256 nearby colliders per group; larger local
+regions opt out. It keeps the normal half-second retry cadence and candidate
+allowance, and clearing it does not change simulation results. Exact motion
+comparison is intentionally conservative: rotating or still-moving scenes may
+receive no reuse benefit.
+
 Clearance checks the actual added surface against current colliders, including
 edits already published at the same boundary. Contour/interpolated growth uses
 a clipped polygon difference against the previous surface. If only part of a
@@ -88,9 +126,28 @@ group fits, omitted grains become obstacles again and the smaller plan is
 revalidated. Successful ordinary placements are retained. If that plan fails and
 the whole group has stayed quiet for 1.5 seconds, recovery can try up to three
 alternative assignments, excluding cells implicated in rejected surface patches.
+If that recovery is incomplete and has budget left, a second search excludes
+only the closest edit to each blocked tile instead of its entire reconstruction
+halo. It can try up to three alternatives and replaces an already valid recovery
+only when it returns more grains. Every chosen surface still passes full clearance
+and repose checks. Identical cell assignments with identical retiring grains reuse
+their surface assessment within this immutable query, while still consuming a
+plan slot. Nothing from that assessment survives the call.
+Within that same call, `SurfaceAdditionPreview` retains the unchanged source's
+clipped tiles across alternative proposals. Each immutable field reconstructs
+an owner's polygons only once per preview, even when several tiles inspect it.
+Proposed fields have separate caches; patch order and clipping arithmetic are
+unchanged. Block terrain batches the possible candidate cuboids into one scan
+of current colliders, retaining all blocking identities per cell. Each assignment
+excludes exactly its retiring grains; dropped grains immediately block again.
+Unknown collider identities always block. This evidence is reusable across
+different grain memberships only within the immutable query. It does not use
+the previous physics step's spatial index. All caches disappear when the query
+returns. Cell priorities are sorted once per assignment; connectivity and the
+visited grains of each augmenting path are still checked as the pile grows.
 This avoids the cascade where each dropped grain blocks the next, smaller plan,
 without rearranging a surface while ordinary settling can still finish. A group
-gets at most eight surface reconstructions across the ordinary and recovery
+gets at most eight surface-plan checks across the ordinary and recovery
 passes. The 64-grain candidate budget and movement radius are unchanged; this is
 still a bounded local search, not an exhaustive packing solver. Every accepted
 cell and its retired grain publish together.
@@ -110,6 +167,27 @@ unsupported, no room, obstructed, unstable and deferred by a work budget. A reje
 remains visible while waiting for a retry. These counts exclude rigid fragments
 and are available in both scenario adapters; the native lab displays them.
 
+Both headless runners' `--diagnostics` output also reports `available_slots`
+and `last_capacity_rejection: { requested, available }`. The latter is the
+most recent failed request, sampled **before** its blast response, and remains
+visible after slots become free. Spacewars reports the ordered per-source batch;
+Scorched totals one impact's requests across all affected fields.
+It is `null` until a grain-capacity refusal;
+Scorched's separate solid-fragment limit does not populate it. Settling reasons
+describe the latest completed settling pass, not the instant of that refusal.
+These inspection fields do not drive physics or enter canonical state hashes.
+
+The `saturated_crater` regression fixtures fill a five-grain pool exactly, then
+repeat with one spare slot: the next crater still requires more than will fit.
+They cover Round and Angular dirt, nearby/far motion, conserved material/IDs,
+Scorched tank damage, Spacewars' three rotating surface representations and
+multiple impacts in one batch, followed by clone continuation. Reproduce with:
+
+```sh
+cargo test --locked --profile ci -p scenario-scorched-earth -p scenario-spacewars \
+  --lib saturated_crater
+```
+
 When collapse is enabled, proposed cells must also satisfy its repose rule.
 Otherwise deposition can rebuild the bank that just yielded, repeatedly releasing
 and redepositing the same dirt. `settle` samples the world's uniform gravity;
@@ -117,10 +195,51 @@ and redepositing the same dirt. `settle` samples the world's uniform gravity;
 point/spherical gravity law, sampling candidate cells in world coordinates and
 testing the slope in the destination body's local frame. Samples are cached for
 one group attempt, outside the solver. This gate is inactive when collapse is off.
+Recovery builds its candidate frontier from cells that already satisfy that rule
+against terrain and earlier selected cells. This fills supported vacancies before
+committing to an overhanging top, while retaining the final whole-plan clearance
+and slope checks. Successful ordinary placement retains its existing order.
+
+`LooseTerrain::settling_work` separately reports actual attempted groups/grains
+and reused failures for the latest call. Both scenario benchmark runners collect
+these counters outside their timers; grain-reason diagnostics remain a partition
+of the surviving loose pool.
 
 The lab also uses `LooseTerrain`, while retaining its own fixture choices,
 probe box, blast pulse and aggregate grain-plus-fragment budget. Scorched Earth
 uses the same release, collapse and deposition APIs with downward gravity.
+
+## Optional stage timings
+
+Both game runners accept `--profile`, which emits one JSON record per tick to
+stderr. It separates world stepping, release preparation/commit, settling,
+support-graph construction, packing assignments (candidate filtering and cell
+matching), batched block-cell clearance, surface preview, final surface clearance,
+geometry refresh, collider synchronization,
+and collapse. Scorched also reports Rapier's existing broad/narrow-phase and
+solver counters. These spans are inclusive: packing belongs to settling, and
+surface preview belongs to packing. Do not add all stage times together.
+
+```sh
+cargo +1.89.0 run --locked --release -p scenario-scorched-earth --example scorched_benchmark -- \
+  --shape round --seconds 120 --bombardment-seconds 60 --slumping --replay --profile \
+  > target/scorched-profile.json 2> target/scorched-profile.jsonl
+cargo +1.89.0 run --locked --release -p scenario-spacewars --example loose_terrain_benchmark -- \
+  --seconds 30 --slumping --profile \
+  > target/spacewars-profile.csv 2> target/spacewars-profile.jsonl
+```
+
+Collection is opt-in and thread-local; disabled spans do not read a clock.
+Formatting/writing the trace is outside the outer step timer, but enabled clock
+reads and accumulation are inside it. Use separate runs without `--profile` for
+before/after performance comparisons. Timings are diagnostic data, never part
+of observations, snapshots, solver decisions or work budgets.
+
+`packing_inspector --profile-repeats 10` repeats an identical frozen query,
+asserts identical reports, and emits the same stage timings. Its enclosing
+packing span also includes detailed inspection work; the named surface-preview
+and assignment spans isolate those operations. Snapshot loading, drawing and
+report comparison are outside those spans.
 
 ## Frozen packing inspection — #172
 
@@ -139,6 +258,11 @@ cargo run --locked --release -p scenario-spacewars --example loose_terrain_bench
 cargo run --locked --release -p scenario-scorched-earth --example packing_inspector -- \
   crates/engine-rapier/tests/fixtures/scorched-angular-pile.packing \
   --output target/packing-example
+
+# Inspect exactly the same captured pile with tank 11 omitted from the query.
+cargo run --locked --release -p scenario-scorched-earth --example packing_inspector -- \
+  crates/engine-rapier/tests/fixtures/scorched-angular-actor.packing \
+  --omit-body 11 --output target/packing-without-tank
 ```
 
 The inspector writes JSON plus an SVG for each attempted placement. Purple marks
@@ -148,6 +272,23 @@ bounds and stable IDs. JSON lists exact collider IDs for every blocked patch;
 the bounds are identification aids, not the collision query geometry. Blocks
 also report rejected square candidates. A no-room result can have no proposed
 surface and thus no SVG; the JSON retains the reason and candidate grains.
+`selected_attempt` identifies the chosen plan (a zero-based JSON index); later
+exploratory attempts can fail while an earlier valid plan is retained. SVGs mark
+the chosen attempt. `omitted_bodies` records any `--omit-body` comparison; unknown
+IDs, the destination and selected grains cannot be omitted. Omitting an obstacle
+changes only the offline query, never a running game.
+
+The small crater tests enumerate all placements and subsets of three grains,
+including actual surface clearance, connectivity, movement limits and optional
+planetary repose samples. They distinguish a missed legal placement from a bay
+with no legal whole-cell return. This exhaustive search is test-only. A runtime
+`NoRoom` result still describes a bounded search, not a proof of impossibility.
+
+```sh
+cargo test --locked --profile ci -p engine-rapier small_crater_recovers
+cargo test --locked --profile ci -p engine-rapier exhaustive_search_distinguishes
+cargo test --locked --profile ci -p engine-rapier moving_an_actor_reopens
+```
 
 `LooseTerrain::capture_packing` captures up to the next 64 quiet, grounded grains,
 ignoring retry and recovery delay for inspection only. The custom-gravity version matches
@@ -596,3 +737,163 @@ material queries and reconciles support before actors observe the next world.
 See [the comparison controls and limits](scorched-earth.md#bank-collapse-comparison)
 for the grid-sampled slope rule, explicit bounds, and reproducible runners. This
 is an opt-in approximation awaiting review, not a universal settling improvement.
+
+## Local bank strength
+
+The shared compound-collider sweep filter also reduces the cost of falling
+terrain fragments contacting the ground. See [CCD profiling and pruning](compound-ccd-pruning.md)
+for its conservative bounds, replay checks and desktop/Picade measurements.
+It changes collision-query cost without changing this bank-strength model.
+
+`LooseTerrainConfig::cohesion` independently enables `CohesionConfig`. The pure
+`Terrain::cantilever` query recognizes short, fully observed one-sided ledges,
+including stepped undersides and varying thickness. It follows connected cell
+intervals in columns along the dominant local gravity axis, looking for one
+downward bearing bank and one free end. A complete perimeter check rejects
+second supports, unknown field edges and branches outside the selected ledge.
+The earlier flat-underside query remains a fallback for shallow bearing banks.
+
+The full sampled gravity vector now contributes signed cell torques about the
+center of the root face. Their summed magnitude is compared with
+`strength * height² / 6`; tangential gravity can load or relieve a sloping ledge.
+Gravity is still sampled once per query, not integrated across the whole bank.
+Strength is a uniform experimental beam threshold, not blast hardness or a
+calibrated soil property. The query considers at most 16 unsupported columns and
+eight cells of thickness; incomplete boundaries and extra attachments retain
+material. It does not solve general arches, actor loads, or rotational loading.
+Contour tracing needs a bearing interval thicker than eight cells and extending
+below the adjoining ledge; irregular geometry without this observed bearing
+is retained unless the flat query can independently prove a smaller ledge.
+Both searches have fixed column/cell limits. This remains a local beam model,
+not a general stress or arbitrary-angle fracture solver.
+
+`Terrain::roof_span` uses the same bounded contour inspection for a span with
+**two** observed, full bearing faces. It balances unit-density cell weights
+against two reactions, then checks bending moment at each column center. The
+column with the highest moment divided by thickness squared is the crack point;
+strength uses the same section modulus as a cantilever. Equal sections resolve
+in a fixed field order. Sampled gravity includes both local components. Unknown
+attachments, oversized spans and geometry requiring a tensile bearing reaction
+are retained. This is a simply supported beam approximation, not an arch model.
+
+A roof failure releases only that column as grains. Normal connectivity handles
+any resulting disconnected material; attached sides are inspected later as
+cantilevers. A floor joining both banks can keep the source connected after the
+first crack, so that transaction does not require a fragment slot. Actual
+fragment or grain capacity failures are still atomic and retryable. The
+`roof_failures` and `roof_held_checks` counters are subsets of the existing total
+failure/held counters. See [roof comparisons](roof-collapse.md) for the tank and
+rotating-planet cannon scenes, checks, and measurements.
+
+The pool watches occupied cells within two cells of release/deposition edits;
+Spacewars also notifies it of discarded mining cuts, including mixed impact/mining
+batches. Defaults track at most 2,048 candidates, check at most 32 per scan, wait
+0.5 seconds after disturbance, and publish at most one fracture per 0.1 seconds.
+A held root is revisited so a change in sampled gravity can overload it. Geometry
+outside the recognized local model is retained. Only fixed/kinematic fields are
+eligible; dynamic fragments are not fractured by uniform free-fall acceleration.
+
+Failure explicitly extracts a root seam as grains and the identified hanging
+cells as a solid fragment. This retains the bearing bank even when it is smaller
+than the ledge. The ordinary atomic release transaction checks grain/fragment
+capacity and IDs, transfers cell durability, refreshes collision geometry, and
+inherits source translation/spin. Refusals retain material and retry. Scenario
+adapters register the result through their existing release paths before
+settling/support reconciliation. No new solver or gravity step is introduced.
+With contact breakup disabled, fallen chunks remain rigid terrain fragments;
+their loose seam samples use the existing return path. The queue, timing and configuration participate in replay
+hashes only when enabled; diagnostics do not control physics.
+
+Scorched Earth's **Bank test** compares 500 (weak) and 4,000 (strong) using an
+identical timed support cut. Spacewars exposes the same configuration to its
+existing adapter and benchmark (`--cohesion 500`); its launcher default remains
+off. Tests cover rotated gravity and moving sources, conservative boundaries,
+strong/weak/thickness comparisons, conservation of damaged material, refusal and
+retry, bounded work, clone continuation, and blast/mining integration with
+Blocks and Interpolated planets.
+
+The filled **Hillside** encounter now makes its undercut through three ordinary
+tank shots. The rotating Spacewars quarry has an uneven lip, and the separate
+`destruction_benchmark --curved` fixture fires three shots into an initially
+solid, uneven circular planet. Short crater roofs can legitimately hold under
+the planet's lower gravity. `irregular_failures` and `irregular_held_checks`
+distinguish traced, non-flat undersides from the existing flat ledges; these
+diagnostic counters do not drive simulation or enter its replay hash.
+
+
+## Clump breakup on impact
+
+`LooseTerrainConfig::impact_fracture` independently enables contact-local chipping
+of dynamic terrain fragments. It defaults to `None`. Scorched Earth's bank/drop
+controls enable it; Spacewars exposes the same option through its existing loose
+terrain configuration and `loose_terrain_benchmark --impact-yield-speed 6`.
+Launcher defaults and the Terrain Lab consumer remain unchanged.
+
+The lifecycle brackets the **single existing physics step**:
+
+1. `capture_impact_motion` records eligible source revisions/masses and incoming
+   body motion. Position-driven supports use their prescribed timestep velocity,
+   including rotation about the center of mass.
+2. `sample_impact_contacts` consumes the world's deduplicated solver/CCD events.
+   Incoming relative speed must exceed the material threshold before a contact
+   contributes impulse. For each clump, severity is the smaller of maximum
+   closing speed and summed normal impulse divided by source mass. Thus resting
+   support/correction forces and fast, insignificant hits cannot qualify merely
+   by having a large impulse or a large speed respectively.
+3. `fracture_impacts` attempts one contact patch at the normal material boundary,
+   before deposition. Scorched does this after the solve; Spacewars publishes on
+   the following tick after queued blasts/mining. A changed source revision
+   invalidates the old local hit. The cloned pool owns queued hits so transient
+   CCD contacts survive a scenario clone even if the world rebuilds its contacts.
+
+A qualifying hit cuts a radius-one-cell capsule up to three cells inward from
+its strongest contact, releasing at most 16 cells by default. Any disconnected
+pieces remain ordinary terrain fragments. The atomic `PreparedRelease` path
+preserves cell durability, material quantity and post-collision point velocity;
+it adds no explosion impulse. New geometry/IDs and scenario registries use the
+same transaction as existing releases. A full grain pool or fragment registry
+retains all material and consumes the hit: freeing capacity later cannot cause
+a delayed fracture of a resting clump.
+
+Defaults examine at most 512 sorted contact events, attempt at most one patch
+(including refusals) per material boundary, and give the fractured source/new
+fragments a 0.35-second cooldown. Other simultaneous candidates are consumed.
+Diagnostics expose scan overflow, skipped candidates, refusals, stale hits and
+released cells. Pre-step snapshots cover the existing world bodies only while
+eligible fragments exist; connectivity work for the one patch can span its
+source field. Configuration, pending hits and cooldowns participate in the
+continuation hash only when enabled.
+
+This is a bounded gameplay fracture model, with uniform thresholds of 6 (weak)
+and 24 (strong) in the drop comparison. It is not an energy-conserving crack or
+soil-stress solver. It does not chip fixed planets directly, accumulate fatigue,
+model per-material fracture strength, or guarantee that released grains will
+find a valid deposition slot. The bank self-weight rule remains independent.
+
+## Gravity integration in Space Wars
+
+Loose-material worlds distribute the existing per-tick gravity change as a
+continuous Rapier force for both rubble and actors. This prevents resting ships
+from continually shaking grain piles. Settling and packing criteria are
+unchanged; worlds without a loose-material pool retain their prior integration.
+See [the diagnosis, regression checks and benchmark results](loose-gravity-integration.md).
+
+The [packing preview follow-up](packing-preview-reuse.md) adds frozen captures
+for the quiet cave and curved-planet packing spike. Query-local caches reuse
+identical surface tiles and geometric candidates while retaining placement and
+clearance decisions.
+
+A [test-only exhaustive cave search](cave-packing-oracle.md) now distinguishes
+missed local assignments from obstructed geometry in small frozen captures.
+Six complete searches and four searches limited to deposits of up to three
+grains find no clear placement with the actual obstacles retained. Actor-removal
+controls verify successful deposits and expose one counterfactual case where
+the bounded planner accepts fewer grains than the oracle. Runtime packing is
+unchanged; larger coordinated deposits remain unproven.
+
+The [longer-match review](late-match-dirt-review.md) exercises ordinary combat,
+mixed asteroid pressure, sustained bombardment, and capture with both grain
+shapes across three seeds. The bot combat runner now accepts the launcher dirt
+presets and audits loose material. Normal and mixed-pressure runs retain useful
+capacity and physical recovery; extreme pressure can leave a bot blocked even
+while dirt continues cycling. Runtime terrain rules remain unchanged.

@@ -612,4 +612,5 @@ fn chunk_culling_preserves_visible_geometry_after_rotation_edits_and_detachment(
     assert!(rejected > 0, "test must exercise culling");
 }
 
+mod gravity;
 mod loose;

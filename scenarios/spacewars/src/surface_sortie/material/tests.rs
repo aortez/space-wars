@@ -1143,3 +1143,40 @@ fn corner_contacts_only_preserve_an_earned_landing_with_two_live_feet() {
     assert_ne!(landing.phase, LandingPhase::Landed);
     assert!(!landing.corner_support);
 }
+
+#[test]
+fn launcher_dirt_modes_share_failure_thresholds_and_keep_the_grain_limit() {
+    use engine_common::DirtMode;
+    use engine_rapier::terrain::GrainShape;
+    for mode in DirtMode::ALL {
+        let config = dirt_config(mode);
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        state.enable_dirt_mode(mode);
+        assert_eq!(state.world.loose_terrain().unwrap().config(), config);
+        assert_eq!(config.max_grains, 192);
+        match mode {
+            DirtMode::Round | DirtMode::Angular => {
+                assert!(config.slumping.is_none());
+                assert!(config.cohesion.is_none());
+                assert!(config.impact_fracture.is_none());
+            }
+            DirtMode::WeakRound | DirtMode::WeakAngular => {
+                assert!(config.slumping.is_some());
+                assert_eq!(config.cohesion.unwrap().strength, 500.0);
+                assert_eq!(config.impact_fracture.unwrap().yield_speed, 6.0);
+            }
+            _ => {
+                assert!(config.slumping.is_some());
+                assert_eq!(config.cohesion.unwrap().strength, 4000.0);
+                assert_eq!(config.impact_fracture.unwrap().yield_speed, 24.0);
+            }
+        }
+        assert_eq!(
+            config.shape == GrainShape::Hexagon,
+            matches!(
+                mode,
+                DirtMode::Angular | DirtMode::WeakAngular | DirtMode::StrongAngular
+            )
+        );
+    }
+}

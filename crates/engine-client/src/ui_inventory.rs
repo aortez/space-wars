@@ -114,6 +114,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
     pub(crate) loose_dirt: bool,
+    pub(crate) dirt_mode: String,
     pub(crate) combat_mission: String,
     pub(crate) combat_asteroid_interval: String,
     pub(crate) combat_asteroid_strength: String,
@@ -445,7 +446,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 &mut controls,
                 "launcher.settings.match.loose-dirt",
                 if context.loose_dirt {
-                    "On · 192 grains"
+                    &context.dirt_mode
                 } else {
                     "Off"
                 },
@@ -551,7 +552,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 &mut controls,
                 "launcher.settings.combat.loose-dirt",
                 if context.loose_dirt {
-                    "On · 192 grains"
+                    &context.dirt_mode
                 } else {
                     "Off"
                 },
@@ -596,7 +597,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 &mut controls,
                 "launcher.settings.travel.loose-dirt",
                 if context.loose_dirt {
-                    "On · 192 grains"
+                    &context.dirt_mode
                 } else {
                     "Off"
                 },

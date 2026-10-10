@@ -1,0 +1,4704 @@
+spacewars-cli ui state --json
+{
+  "schema_version": 1,
+  "revision": 6,
+  "screen": "gameplay",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": null,
+  "controls": [],
+  "actions": [],
+  "scenario_revision": 1,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 7,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "15966127745208199270"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match \u00b7 New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main --json
+{
+  "schema_version": 1,
+  "revision": 8,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true,
+      "value": "12616578969279246616"
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    },
+    {
+      "id": "launcher.new-match",
+      "label": "Play New World",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 9,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-classic",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-classic"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-classic"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 10,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "surface-sortie",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "surface-sortie"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "surface-sortie"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 11,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "surface-sortie-orbit",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "surface-sortie-orbit"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "surface-sortie-orbit"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 12,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "surface-sortie-generated",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "surface-sortie-generated"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "surface-sortie-generated"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 13,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "surface-sortie-world",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "surface-sortie-world"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "surface-sortie-world"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 14,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "surface-expedition",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "surface-expedition"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "surface-expedition"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 15,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 16,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-surface-blocks",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-surface-blocks"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-surface-blocks"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 17,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-surface-contour",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-surface-contour"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-surface-contour"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 18,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-surface-round",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-surface-round"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-surface-round"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 19,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-ai",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-ai"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-ai"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 20,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-recovery",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-recovery"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-recovery"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 21,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-jetpack",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-jetpack"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-jetpack"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 22,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-combat",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-combat"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-combat"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 23,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-duel"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-duel"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.start --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 24,
+  "screen": "launcher.busy",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": null,
+  "controls": [
+    {
+      "id": "launcher.busy.stage",
+      "label": "Launch stage",
+      "enabled": false,
+      "value": "preparing"
+    },
+    {
+      "id": "launcher.busy.elapsed",
+      "label": "Elapsed",
+      "enabled": false,
+      "value": "0.0 s"
+    }
+  ],
+  "actions": [],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui wait --screen gameplay --scenario spacewars-terrain-duel --timeout 15s --json
+{
+  "schema_version": 1,
+  "revision": 25,
+  "screen": "gameplay",
+  "active_scenario": "spacewars-terrain-duel",
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": null,
+  "controls": [],
+  "actions": [],
+  "scenario_revision": 2,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-impact-combat.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-impact-combat.png
+
+spacewars-cli status
+scenario=spacewars-terrain-duel
+scenario_revision=2
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=50.4
+ups=60.3
+frames_total=413
+updates_total=481
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=431
+host_updates_per_callback=1.250
+host_interval_avg_ms=20.793
+host_interval_p95_ms=24.683
+host_interval_max_ms=40.664
+host_step_avg_ms=1.962
+host_step_p95_ms=3.946
+host_step_max_ms=5.026
+host_scene_avg_ms=0.506
+host_scene_p95_ms=0.724
+host_scene_max_ms=0.830
+host_prepare_avg_ms=7.533
+host_prepare_p95_ms=9.840
+host_prepare_max_ms=10.273
+host_callback_avg_ms=10.012
+host_callback_p95_ms=13.697
+host_callback_max_ms=14.578
+host_raster_buffers_avg_ms=0.002
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.003
+host_raster_clear_avg_ms=3.049
+host_raster_clear_p95_ms=3.396
+host_raster_clear_max_ms=4.253
+host_raster_player_avg_ms=2.335
+host_raster_player_p95_ms=4.453
+host_raster_player_max_ms=4.873
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.905
+host_raster_player_sun_planets_p95_ms=1.185
+host_raster_player_sun_planets_max_ms=1.259
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.163
+host_raster_player_effects_p95_ms=0.223
+host_raster_player_effects_max_ms=0.371
+host_raster_player_ships_avg_ms=0.263
+host_raster_player_ships_p95_ms=0.288
+host_raster_player_ships_max_ms=0.362
+host_raster_player_debris_avg_ms=0.055
+host_raster_player_debris_p95_ms=0.095
+host_raster_player_debris_max_ms=0.099
+host_raster_player_particles_avg_ms=0.901
+host_raster_player_particles_p95_ms=2.673
+host_raster_player_particles_max_ms=3.098
+host_raster_player_other_avg_ms=0.042
+host_raster_player_other_p95_ms=0.072
+host_raster_player_other_max_ms=0.115
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.179
+host_raster_overview_live_p95_ms=0.212
+host_raster_overview_live_max_ms=0.289
+host_raster_overview_blit_avg_ms=1.053
+host_raster_overview_blit_p95_ms=1.136
+host_raster_overview_blit_max_ms=1.180
+host_raster_other_frames_avg_ms=0.400
+host_raster_other_frames_p95_ms=0.480
+host_raster_other_frames_max_ms=0.549
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.001
+host_raster_image_max_ms=0.002
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 50 | UPS 60
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=6637
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=2486.962
+kms_dirty_pixels_window=94371840
+kms_draws_total=1383
+kms_draws_window=120
+kms_flip_submissions_total=1382
+kms_flip_submissions_window=120
+kms_flip_completions_total=1381
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=1300
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1022361600
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=2486.962
+kms_loop_wall_avg_ms=20.725
+kms_loop_wall_p95_ms=24.706
+kms_loop_wall_max_ms=43.193
+kms_loop_cpu_total_ms=2463.463
+kms_loop_cpu_avg_ms=20.529
+kms_loop_cpu_p95_ms=24.612
+kms_loop_cpu_max_ms=43.171
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=1229.306
+kms_timers_wall_avg_ms=10.244
+kms_timers_wall_p95_ms=13.808
+kms_timers_wall_max_ms=31.515
+kms_timers_cpu_total_ms=1225.118
+kms_timers_cpu_avg_ms=10.209
+kms_timers_cpu_p95_ms=13.803
+kms_timers_cpu_max_ms=31.502
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.225
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.215
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.002
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1251.928
+kms_render_wall_avg_ms=10.433
+kms_render_wall_p95_ms=12.256
+kms_render_wall_max_ms=14.754
+kms_render_cpu_total_ms=1233.484
+kms_render_cpu_avg_ms=10.279
+kms_render_cpu_p95_ms=11.846
+kms_render_cpu_max_ms=13.038
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.039
+kms_dispatch_wall_avg_ms=0.025
+kms_dispatch_wall_p95_ms=0.027
+kms_dispatch_wall_max_ms=0.042
+kms_dispatch_cpu_total_ms=3.051
+kms_dispatch_cpu_avg_ms=0.025
+kms_dispatch_cpu_p95_ms=0.027
+kms_dispatch_cpu_max_ms=0.042
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=9.719
+kms_map_wall_avg_ms=0.081
+kms_map_wall_p95_ms=0.088
+kms_map_wall_max_ms=0.118
+kms_map_cpu_total_ms=9.828
+kms_map_cpu_avg_ms=0.082
+kms_map_cpu_p95_ms=0.088
+kms_map_cpu_max_ms=0.134
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1202.761
+kms_draw_wall_avg_ms=10.023
+kms_draw_wall_p95_ms=11.637
+kms_draw_wall_max_ms=12.772
+kms_draw_cpu_total_ms=1200.299
+kms_draw_cpu_avg_ms=10.002
+kms_draw_cpu_p95_ms=11.583
+kms_draw_cpu_max_ms=12.748
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.197
+kms_unmap_wall_avg_ms=0.068
+kms_unmap_wall_p95_ms=0.070
+kms_unmap_wall_max_ms=0.101
+kms_unmap_cpu_total_ms=8.273
+kms_unmap_cpu_avg_ms=0.069
+kms_unmap_cpu_p95_ms=0.071
+kms_unmap_cpu_max_ms=0.103
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=14.143
+kms_flip_wait_wall_avg_ms=0.118
+kms_flip_wait_wall_p95_ms=0.013
+kms_flip_wait_wall_max_ms=3.884
+kms_flip_wait_cpu_total_ms=1.322
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.013
+kms_flip_wait_cpu_max_ms=0.032
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=14.738
+kms_submit_wall_avg_ms=0.123
+kms_submit_wall_p95_ms=0.175
+kms_submit_wall_max_ms=0.191
+kms_submit_cpu_total_ms=11.681
+kms_submit_cpu_avg_ms=0.097
+kms_submit_cpu_p95_ms=0.115
+kms_submit_cpu_max_ms=0.129
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=502.970
+kms_rgb_blit_wall_avg_ms=4.191
+kms_rgb_blit_wall_p95_ms=4.594
+kms_rgb_blit_wall_max_ms=5.531
+kms_rgb_blit_cpu_total_ms=502.060
+kms_rgb_blit_cpu_avg_ms=4.184
+kms_rgb_blit_cpu_p95_ms=4.595
+kms_rgb_blit_cpu_max_ms=5.535
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1201.485
+kms_draw_rgb_wall_avg_ms=10.012
+kms_draw_rgb_wall_p95_ms=11.629
+kms_draw_rgb_wall_max_ms=12.761
+kms_draw_rgb_cpu_total_ms=1199.674
+kms_draw_rgb_cpu_avg_ms=9.997
+kms_draw_rgb_cpu_p95_ms=11.578
+kms_draw_rgb_cpu_max_ms=12.743
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1201.253
+kms_core_render_wall_avg_ms=10.010
+kms_core_render_wall_p95_ms=11.627
+kms_core_render_wall_max_ms=12.759
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=0.947
+kms_core_prepare_wall_avg_ms=0.008
+kms_core_prepare_wall_p95_ms=0.008
+kms_core_prepare_wall_max_ms=0.046
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=109.092
+kms_core_dirty_wall_avg_ms=0.909
+kms_core_dirty_wall_p95_ms=2.404
+kms_core_dirty_wall_max_ms=3.240
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1080.106
+kms_core_items_wall_avg_ms=9.001
+kms_core_items_wall_p95_ms=9.597
+kms_core_items_wall_max_ms=10.970
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=506.278
+kms_core_image_wall_avg_ms=4.219
+kms_core_image_wall_p95_ms=4.622
+kms_core_image_wall_max_ms=5.573
+kms_core_texture_calls=17280
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=655.282
+kms_core_texture_wall_avg_ms=5.461
+kms_core_texture_wall_p95_ms=5.863
+kms_core_texture_wall_max_ms=6.980
+kms_core_fallback_calls=17160
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=145.608
+kms_core_fallback_wall_avg_ms=1.213
+kms_core_fallback_wall_p95_ms=1.331
+kms_core_fallback_wall_max_ms=1.545
+kms_core_rectangle_calls=2040
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=34.370
+kms_core_rectangle_wall_avg_ms=0.286
+kms_core_rectangle_wall_p95_ms=0.310
+kms_core_rectangle_wall_max_ms=0.352
+kms_core_text_calls=2040
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=329.100
+kms_core_text_wall_avg_ms=2.742
+kms_core_text_wall_p95_ms=2.976
+kms_core_text_wall_max_ms=3.700
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.078
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2040
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=12.771
+kms_core_text_font_wall_avg_ms=0.106
+kms_core_text_font_wall_p95_ms=0.131
+kms_core_text_font_wall_max_ms=0.215
+kms_core_text_glyph_run_calls=2040
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=163.040
+kms_core_text_glyph_run_wall_avg_ms=1.359
+kms_core_text_glyph_run_wall_p95_ms=1.490
+kms_core_text_glyph_run_wall_max_ms=1.756
+kms_core_text_texture_calls=17160
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=150.632
+kms_core_text_texture_wall_avg_ms=1.255
+kms_core_text_texture_wall_p95_ms=1.373
+kms_core_text_texture_wall_max_ms=1.593
+kms_core_text_fallback_calls=17160
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=145.608
+kms_core_text_fallback_wall_avg_ms=1.213
+kms_core_text_fallback_wall_p95_ms=1.331
+kms_core_text_fallback_wall_max_ms=1.545
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=spacewars-terrain-duel
+launch_stage=starting_scenario
+launch_elapsed_ms=184
+launch_save_ms=9
+launch_asset_ms=0
+launch_start_ms=64
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli ui state --json
+{
+  "schema_version": 1,
+  "revision": 25,
+  "screen": "gameplay",
+  "active_scenario": "spacewars-terrain-duel",
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": null,
+  "controls": [],
+  "actions": [],
+  "scenario_revision": 2,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 26,
+  "screen": "pause.main",
+  "active_scenario": "spacewars-terrain-duel",
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 2,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main --json
+{
+  "schema_version": 1,
+  "revision": 27,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-duel",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-duel"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-duel"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 28,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-travel",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-travel"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-travel"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 29,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-travel-duel",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-travel-duel"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-travel-duel"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 30,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-arena",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-arena"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-arena"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 31,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "spacewars-terrain-arena-duel",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "spacewars-terrain-arena-duel"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "spacewars-terrain-arena-duel"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 32,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "clock",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "clock"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "clock"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 33,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "falling",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "falling"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "falling"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 34,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "nes",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "nes"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "nes"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": false
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 35,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "pizza",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "pizza"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "pizza"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 36,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "rover-lab",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "rover-lab"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "rover-lab"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.scenario.next --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 37,
+  "screen": "launcher.main",
+  "active_scenario": null,
+  "selected_scenario": "scorched-earth",
+  "selected_control": "launcher.scenario",
+  "controls": [
+    {
+      "id": "launcher.scenario.previous",
+      "label": "\u2039",
+      "enabled": true,
+      "value": "scorched-earth"
+    },
+    {
+      "id": "launcher.scenario.next",
+      "label": "\u203a",
+      "enabled": true,
+      "value": "scorched-earth"
+    },
+    {
+      "id": "launcher.start",
+      "label": "Play",
+      "enabled": true
+    },
+    {
+      "id": "launcher.settings",
+      "label": "Scenario Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "launcher.sound",
+      "label": "App Settings",
+      "enabled": true
+    },
+    {
+      "id": "launcher.quit",
+      "label": "Quit",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui activate launcher.start --expect-screen launcher.main --json
+{
+  "schema_version": 1,
+  "revision": 38,
+  "screen": "launcher.busy",
+  "active_scenario": null,
+  "selected_scenario": "scorched-earth",
+  "selected_control": null,
+  "controls": [
+    {
+      "id": "launcher.busy.stage",
+      "label": "Launch stage",
+      "enabled": false,
+      "value": "preparing"
+    },
+    {
+      "id": "launcher.busy.elapsed",
+      "label": "Elapsed",
+      "enabled": false,
+      "value": "0.0 s"
+    }
+  ],
+  "actions": [],
+  "scenario_revision": null,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli ui wait --screen gameplay --scenario scorched-earth --timeout 15s --json
+{
+  "schema_version": 1,
+  "revision": 39,
+  "screen": "gameplay",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": null,
+  "controls": [],
+  "actions": [],
+  "scenario_revision": 3,
+  "paused": false,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-drop-low-weak-angular.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-drop-low-weak-angular.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=32.0
+ups=59.2
+frames_total=283
+updates_total=549
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=1106
+host_updates_per_callback=1.875
+host_interval_avg_ms=31.378
+host_interval_p95_ms=32.554
+host_interval_max_ms=36.087
+host_step_avg_ms=0.728
+host_step_p95_ms=1.164
+host_step_max_ms=1.642
+host_scene_avg_ms=0.519
+host_scene_p95_ms=0.639
+host_scene_max_ms=0.722
+host_prepare_avg_ms=16.100
+host_prepare_p95_ms=16.616
+host_prepare_max_ms=18.318
+host_callback_avg_ms=17.356
+host_callback_p95_ms=18.098
+host_callback_max_ms=19.217
+host_raster_buffers_avg_ms=0.001
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.002
+host_raster_clear_avg_ms=3.133
+host_raster_clear_p95_ms=3.244
+host_raster_clear_max_ms=4.185
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=12.464
+host_raster_other_frames_p95_ms=12.921
+host_raster_other_frames_max_ms=13.806
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.001
+host_raster_image_max_ms=0.002
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 32 | UPS 59
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=7274
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=3823.861
+kms_dirty_pixels_window=94371840
+kms_draws_total=1742
+kms_draws_window=120
+kms_flip_submissions_total=1741
+kms_flip_submissions_window=120
+kms_flip_completions_total=1740
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=1645
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1293680640
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=3823.861
+kms_loop_wall_avg_ms=31.866
+kms_loop_wall_p95_ms=34.472
+kms_loop_wall_max_ms=59.418
+kms_loop_cpu_total_ms=3762.079
+kms_loop_cpu_avg_ms=31.351
+kms_loop_cpu_p95_ms=33.221
+kms_loop_cpu_max_ms=58.656
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2133.865
+kms_timers_wall_avg_ms=17.782
+kms_timers_wall_p95_ms=18.717
+kms_timers_wall_max_ms=45.652
+kms_timers_cpu_total_ms=2098.716
+kms_timers_cpu_avg_ms=17.489
+kms_timers_cpu_p95_ms=18.254
+kms_timers_cpu_max_ms=45.003
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.234
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.004
+kms_callbacks_cpu_total_ms=0.243
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.018
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1683.914
+kms_render_wall_avg_ms=14.033
+kms_render_wall_p95_ms=15.379
+kms_render_wall_max_ms=19.053
+kms_render_cpu_total_ms=1658.349
+kms_render_cpu_avg_ms=13.820
+kms_render_cpu_p95_ms=14.946
+kms_render_cpu_max_ms=17.049
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.136
+kms_dispatch_wall_avg_ms=0.026
+kms_dispatch_wall_p95_ms=0.028
+kms_dispatch_wall_max_ms=0.058
+kms_dispatch_cpu_total_ms=3.147
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.028
+kms_dispatch_cpu_max_ms=0.059
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=11.358
+kms_map_wall_avg_ms=0.095
+kms_map_wall_p95_ms=0.137
+kms_map_wall_max_ms=0.241
+kms_map_cpu_total_ms=11.224
+kms_map_cpu_avg_ms=0.094
+kms_map_cpu_p95_ms=0.113
+kms_map_cpu_max_ms=0.241
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1642.061
+kms_draw_wall_avg_ms=13.684
+kms_draw_wall_p95_ms=15.031
+kms_draw_wall_max_ms=18.717
+kms_draw_cpu_total_ms=1623.569
+kms_draw_cpu_avg_ms=13.530
+kms_draw_cpu_p95_ms=14.667
+kms_draw_cpu_max_ms=16.784
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.305
+kms_unmap_wall_avg_ms=0.069
+kms_unmap_wall_p95_ms=0.073
+kms_unmap_wall_max_ms=0.128
+kms_unmap_cpu_total_ms=8.364
+kms_unmap_cpu_avg_ms=0.070
+kms_unmap_cpu_p95_ms=0.074
+kms_unmap_cpu_max_ms=0.129
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.284
+kms_flip_wait_wall_avg_ms=0.011
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.073
+kms_flip_wait_cpu_total_ms=1.285
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.073
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=18.595
+kms_submit_wall_avg_ms=0.155
+kms_submit_wall_p95_ms=0.209
+kms_submit_wall_max_ms=0.360
+kms_submit_cpu_total_ms=11.813
+kms_submit_cpu_avg_ms=0.098
+kms_submit_cpu_p95_ms=0.127
+kms_submit_cpu_max_ms=0.160
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=565.365
+kms_rgb_blit_wall_avg_ms=4.711
+kms_rgb_blit_wall_p95_ms=5.258
+kms_rgb_blit_wall_max_ms=6.364
+kms_rgb_blit_cpu_total_ms=556.738
+kms_rgb_blit_cpu_avg_ms=4.639
+kms_rgb_blit_cpu_p95_ms=5.137
+kms_rgb_blit_cpu_max_ms=5.604
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1640.919
+kms_draw_rgb_wall_avg_ms=13.674
+kms_draw_rgb_wall_p95_ms=15.020
+kms_draw_rgb_wall_max_ms=18.704
+kms_draw_rgb_cpu_total_ms=1622.982
+kms_draw_rgb_cpu_avg_ms=13.525
+kms_draw_rgb_cpu_p95_ms=14.661
+kms_draw_rgb_cpu_max_ms=16.777
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1640.684
+kms_core_render_wall_avg_ms=13.672
+kms_core_render_wall_p95_ms=15.018
+kms_core_render_wall_max_ms=18.702
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=0.974
+kms_core_prepare_wall_avg_ms=0.008
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.014
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=20.778
+kms_core_dirty_wall_avg_ms=0.173
+kms_core_dirty_wall_p95_ms=0.279
+kms_core_dirty_wall_max_ms=0.554
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1603.115
+kms_core_items_wall_avg_ms=13.359
+kms_core_items_wall_p95_ms=14.691
+kms_core_items_wall_max_ms=18.348
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=569.387
+kms_core_image_wall_avg_ms=4.745
+kms_core_image_wall_p95_ms=5.291
+kms_core_image_wall_max_ms=6.393
+kms_core_texture_calls=48240
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=950.544
+kms_core_texture_wall_avg_ms=7.921
+kms_core_texture_wall_p95_ms=8.576
+kms_core_texture_wall_max_ms=9.997
+kms_core_fallback_calls=48120
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=370.267
+kms_core_fallback_wall_avg_ms=3.086
+kms_core_fallback_wall_p95_ms=3.402
+kms_core_fallback_wall_max_ms=4.284
+kms_core_rectangle_calls=2760
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=49.399
+kms_core_rectangle_wall_avg_ms=0.412
+kms_core_rectangle_wall_p95_ms=0.471
+kms_core_rectangle_wall_max_ms=0.555
+kms_core_text_calls=2760
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=688.334
+kms_core_text_wall_avg_ms=5.736
+kms_core_text_wall_p95_ms=6.301
+kms_core_text_wall_max_ms=8.770
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.084
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2760
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=16.974
+kms_core_text_font_wall_avg_ms=0.141
+kms_core_text_font_wall_p95_ms=0.256
+kms_core_text_font_wall_max_ms=0.289
+kms_core_text_glyph_run_calls=2760
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=414.684
+kms_core_text_glyph_run_wall_avg_ms=3.456
+kms_core_text_glyph_run_wall_p95_ms=3.873
+kms_core_text_glyph_run_wall_max_ms=4.900
+kms_core_text_texture_calls=48120
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=383.083
+kms_core_text_texture_wall_avg_ms=3.192
+kms_core_text_texture_wall_p95_ms=3.519
+kms_core_text_texture_wall_max_ms=4.426
+kms_core_text_fallback_calls=48120
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=370.267
+kms_core_text_fallback_wall_avg_ms=3.086
+kms_core_text_fallback_wall_p95_ms=3.402
+kms_core_text_fallback_wall_max_ms=4.284
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-weak-angular.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-weak-angular.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=30.0
+ups=61.0
+frames_total=504
+updates_total=975
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=1103
+host_updates_per_callback=1.917
+host_interval_avg_ms=31.889
+host_interval_p95_ms=34.581
+host_interval_max_ms=52.419
+host_step_avg_ms=1.467
+host_step_p95_ms=3.162
+host_step_max_ms=4.133
+host_scene_avg_ms=0.477
+host_scene_p95_ms=0.620
+host_scene_max_ms=0.676
+host_prepare_avg_ms=15.999
+host_prepare_p95_ms=17.127
+host_prepare_max_ms=18.564
+host_callback_avg_ms=17.954
+host_callback_p95_ms=19.769
+host_callback_max_ms=21.708
+host_raster_buffers_avg_ms=0.003
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.138
+host_raster_clear_avg_ms=3.101
+host_raster_clear_p95_ms=3.333
+host_raster_clear_max_ms=4.387
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=12.364
+host_raster_other_frames_p95_ms=13.517
+host_raster_other_frames_max_ms=14.182
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.001
+host_raster_image_max_ms=0.003
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 30 | UPS 61
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=7488
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=3883.079
+kms_dirty_pixels_window=94371840
+kms_draws_total=1956
+kms_draws_window=120
+kms_flip_submissions_total=1955
+kms_flip_submissions_window=120
+kms_flip_completions_total=1954
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=1859
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1461977088
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=3883.079
+kms_loop_wall_avg_ms=32.359
+kms_loop_wall_p95_ms=36.165
+kms_loop_wall_max_ms=56.583
+kms_loop_cpu_total_ms=3823.685
+kms_loop_cpu_avg_ms=31.864
+kms_loop_cpu_p95_ms=35.538
+kms_loop_cpu_max_ms=55.689
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2231.374
+kms_timers_wall_avg_ms=18.595
+kms_timers_wall_p95_ms=21.246
+kms_timers_wall_max_ms=42.912
+kms_timers_cpu_total_ms=2192.567
+kms_timers_cpu_avg_ms=18.271
+kms_timers_cpu_p95_ms=20.583
+kms_timers_cpu_max_ms=42.135
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.239
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.232
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.003
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1645.720
+kms_render_wall_avg_ms=13.714
+kms_render_wall_p95_ms=14.855
+kms_render_wall_max_ms=18.259
+kms_render_cpu_total_ms=1626.146
+kms_render_cpu_avg_ms=13.551
+kms_render_cpu_p95_ms=14.444
+kms_render_cpu_max_ms=17.224
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.133
+kms_dispatch_wall_avg_ms=0.026
+kms_dispatch_wall_p95_ms=0.027
+kms_dispatch_wall_max_ms=0.097
+kms_dispatch_cpu_total_ms=3.144
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.027
+kms_dispatch_cpu_max_ms=0.097
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=10.959
+kms_map_wall_avg_ms=0.091
+kms_map_wall_p95_ms=0.101
+kms_map_wall_max_ms=0.270
+kms_map_cpu_total_ms=10.804
+kms_map_cpu_avg_ms=0.090
+kms_map_cpu_p95_ms=0.102
+kms_map_cpu_max_ms=0.271
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1604.622
+kms_draw_wall_avg_ms=13.372
+kms_draw_wall_p95_ms=14.537
+kms_draw_wall_max_ms=17.839
+kms_draw_cpu_total_ms=1591.786
+kms_draw_cpu_avg_ms=13.265
+kms_draw_cpu_p95_ms=14.197
+kms_draw_cpu_max_ms=16.895
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.453
+kms_unmap_wall_avg_ms=0.070
+kms_unmap_wall_p95_ms=0.082
+kms_unmap_wall_max_ms=0.165
+kms_unmap_cpu_total_ms=8.481
+kms_unmap_cpu_avg_ms=0.071
+kms_unmap_cpu_p95_ms=0.083
+kms_unmap_cpu_max_ms=0.148
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.193
+kms_flip_wait_wall_avg_ms=0.010
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.014
+kms_flip_wait_cpu_total_ms=1.194
+kms_flip_wait_cpu_avg_ms=0.010
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.014
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=17.913
+kms_submit_wall_avg_ms=0.149
+kms_submit_wall_p95_ms=0.183
+kms_submit_wall_max_ms=0.222
+kms_submit_cpu_total_ms=11.510
+kms_submit_cpu_avg_ms=0.096
+kms_submit_cpu_p95_ms=0.109
+kms_submit_cpu_max_ms=0.191
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=547.791
+kms_rgb_blit_wall_avg_ms=4.565
+kms_rgb_blit_wall_p95_ms=4.983
+kms_rgb_blit_wall_max_ms=5.728
+kms_rgb_blit_cpu_total_ms=542.927
+kms_rgb_blit_cpu_avg_ms=4.524
+kms_rgb_blit_cpu_p95_ms=4.887
+kms_rgb_blit_cpu_max_ms=5.196
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1603.445
+kms_draw_rgb_wall_avg_ms=13.362
+kms_draw_rgb_wall_p95_ms=14.529
+kms_draw_rgb_wall_max_ms=17.814
+kms_draw_rgb_cpu_total_ms=1591.186
+kms_draw_rgb_cpu_avg_ms=13.260
+kms_draw_rgb_cpu_p95_ms=14.193
+kms_draw_rgb_cpu_max_ms=16.882
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1603.215
+kms_core_render_wall_avg_ms=13.360
+kms_core_render_wall_p95_ms=14.527
+kms_core_render_wall_max_ms=17.811
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=1.122
+kms_core_prepare_wall_avg_ms=0.009
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.197
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=25.379
+kms_core_dirty_wall_avg_ms=0.211
+kms_core_dirty_wall_p95_ms=0.415
+kms_core_dirty_wall_max_ms=1.774
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1560.575
+kms_core_items_wall_avg_ms=13.005
+kms_core_items_wall_p95_ms=13.695
+kms_core_items_wall_max_ms=17.519
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=551.505
+kms_core_image_wall_avg_ms=4.596
+kms_core_image_wall_p95_ms=5.013
+kms_core_image_wall_max_ms=5.758
+kms_core_texture_calls=46408
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=914.696
+kms_core_texture_wall_avg_ms=7.622
+kms_core_texture_wall_p95_ms=8.099
+kms_core_texture_wall_max_ms=9.341
+kms_core_fallback_calls=46288
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=352.300
+kms_core_fallback_wall_avg_ms=2.936
+kms_core_fallback_wall_p95_ms=3.100
+kms_core_fallback_wall_max_ms=3.477
+kms_core_rectangle_calls=2760
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=48.758
+kms_core_rectangle_wall_avg_ms=0.406
+kms_core_rectangle_wall_p95_ms=0.489
+kms_core_rectangle_wall_max_ms=0.598
+kms_core_text_calls=2760
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=662.378
+kms_core_text_wall_avg_ms=5.520
+kms_core_text_wall_p95_ms=5.840
+kms_core_text_wall_max_ms=7.406
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.165
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.089
+kms_core_text_font_calls=2760
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=16.178
+kms_core_text_font_wall_avg_ms=0.135
+kms_core_text_font_wall_p95_ms=0.170
+kms_core_text_font_wall_max_ms=0.364
+kms_core_text_glyph_run_calls=2760
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=395.333
+kms_core_text_glyph_run_wall_avg_ms=3.294
+kms_core_text_glyph_run_wall_p95_ms=3.459
+kms_core_text_glyph_run_wall_max_ms=4.005
+kms_core_text_texture_calls=46288
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=364.947
+kms_core_text_texture_wall_avg_ms=3.041
+kms_core_text_texture_wall_p95_ms=3.204
+kms_core_text_texture_wall_max_ms=3.599
+kms_core_text_fallback_calls=46288
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=352.300
+kms_core_text_fallback_wall_avg_ms=2.936
+kms_core_text_fallback_wall_p95_ms=3.100
+kms_core_text_fallback_wall_max_ms=3.477
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli input press east --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-strong-angular.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-strong-angular.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=32.0
+ups=60.0
+frames_total=730
+updates_total=1400
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=1106
+host_updates_per_callback=1.850
+host_interval_avg_ms=30.851
+host_interval_p95_ms=31.910
+host_interval_max_ms=50.724
+host_step_avg_ms=0.517
+host_step_p95_ms=1.072
+host_step_max_ms=1.113
+host_scene_avg_ms=0.524
+host_scene_p95_ms=0.614
+host_scene_max_ms=0.656
+host_prepare_avg_ms=15.930
+host_prepare_p95_ms=16.835
+host_prepare_max_ms=17.418
+host_callback_avg_ms=16.981
+host_callback_p95_ms=17.703
+host_callback_max_ms=18.296
+host_raster_buffers_avg_ms=0.001
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.002
+host_raster_clear_avg_ms=3.066
+host_raster_clear_p95_ms=3.240
+host_raster_clear_max_ms=3.593
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=12.343
+host_raster_other_frames_p95_ms=13.238
+host_raster_other_frames_max_ms=13.493
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.001
+host_raster_image_max_ms=0.003
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 32 | UPS 60
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=7702
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=3700.828
+kms_dirty_pixels_window=94371840
+kms_draws_total=2170
+kms_draws_window=120
+kms_flip_submissions_total=2169
+kms_flip_submissions_window=120
+kms_flip_completions_total=2168
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=2073
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1630273536
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=3700.828
+kms_loop_wall_avg_ms=30.840
+kms_loop_wall_p95_ms=31.874
+kms_loop_wall_max_ms=52.486
+kms_loop_cpu_total_ms=3665.085
+kms_loop_cpu_avg_ms=30.542
+kms_loop_cpu_p95_ms=31.543
+kms_loop_cpu_max_ms=52.486
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2071.425
+kms_timers_wall_avg_ms=17.262
+kms_timers_wall_p95_ms=17.908
+kms_timers_wall_max_ms=39.398
+kms_timers_cpu_total_ms=2050.299
+kms_timers_cpu_avg_ms=17.086
+kms_timers_cpu_p95_ms=17.751
+kms_timers_cpu_max_ms=39.403
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.233
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.226
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.003
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1623.523
+kms_render_wall_avg_ms=13.529
+kms_render_wall_p95_ms=14.233
+kms_render_wall_max_ms=15.787
+kms_render_cpu_total_ms=1609.806
+kms_render_cpu_avg_ms=13.415
+kms_render_cpu_p95_ms=14.181
+kms_render_cpu_max_ms=15.643
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.098
+kms_dispatch_wall_avg_ms=0.026
+kms_dispatch_wall_p95_ms=0.027
+kms_dispatch_wall_max_ms=0.045
+kms_dispatch_cpu_total_ms=3.108
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.027
+kms_dispatch_cpu_max_ms=0.045
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=10.826
+kms_map_wall_avg_ms=0.090
+kms_map_wall_p95_ms=0.095
+kms_map_wall_max_ms=0.193
+kms_map_cpu_total_ms=10.796
+kms_map_cpu_avg_ms=0.090
+kms_map_cpu_p95_ms=0.095
+kms_map_cpu_max_ms=0.180
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1583.068
+kms_draw_wall_avg_ms=13.192
+kms_draw_wall_p95_ms=13.885
+kms_draw_wall_max_ms=15.238
+kms_draw_cpu_total_ms=1575.185
+kms_draw_cpu_avg_ms=13.127
+kms_draw_cpu_p95_ms=13.885
+kms_draw_cpu_max_ms=15.238
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.369
+kms_unmap_wall_avg_ms=0.070
+kms_unmap_wall_p95_ms=0.072
+kms_unmap_wall_max_ms=0.131
+kms_unmap_cpu_total_ms=8.420
+kms_unmap_cpu_avg_ms=0.070
+kms_unmap_cpu_p95_ms=0.074
+kms_unmap_cpu_max_ms=0.132
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.331
+kms_flip_wait_wall_avg_ms=0.011
+kms_flip_wait_wall_p95_ms=0.012
+kms_flip_wait_wall_max_ms=0.068
+kms_flip_wait_cpu_total_ms=1.334
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.012
+kms_flip_wait_cpu_max_ms=0.068
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=17.529
+kms_submit_wall_avg_ms=0.146
+kms_submit_wall_p95_ms=0.187
+kms_submit_wall_max_ms=0.329
+kms_submit_cpu_total_ms=11.914
+kms_submit_cpu_avg_ms=0.099
+kms_submit_cpu_p95_ms=0.119
+kms_submit_cpu_max_ms=0.187
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=535.069
+kms_rgb_blit_wall_avg_ms=4.459
+kms_rgb_blit_wall_p95_ms=4.907
+kms_rgb_blit_wall_max_ms=5.671
+kms_rgb_blit_cpu_total_ms=531.554
+kms_rgb_blit_cpu_avg_ms=4.430
+kms_rgb_blit_cpu_p95_ms=4.845
+kms_rgb_blit_cpu_max_ms=5.672
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1581.843
+kms_draw_rgb_wall_avg_ms=13.182
+kms_draw_rgb_wall_p95_ms=13.875
+kms_draw_rgb_wall_max_ms=15.212
+kms_draw_rgb_cpu_total_ms=1574.568
+kms_draw_rgb_cpu_avg_ms=13.121
+kms_draw_rgb_cpu_p95_ms=13.880
+kms_draw_rgb_cpu_max_ms=15.225
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1581.609
+kms_core_render_wall_avg_ms=13.180
+kms_core_render_wall_p95_ms=13.872
+kms_core_render_wall_max_ms=15.209
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=1.056
+kms_core_prepare_wall_avg_ms=0.009
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.117
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=20.220
+kms_core_dirty_wall_avg_ms=0.168
+kms_core_dirty_wall_p95_ms=0.278
+kms_core_dirty_wall_max_ms=0.434
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1545.301
+kms_core_items_wall_avg_ms=12.878
+kms_core_items_wall_p95_ms=13.552
+kms_core_items_wall_max_ms=14.887
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=538.681
+kms_core_image_wall_avg_ms=4.489
+kms_core_image_wall_p95_ms=4.938
+kms_core_image_wall_max_ms=5.703
+kms_core_texture_calls=48120
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=911.611
+kms_core_texture_wall_avg_ms=7.597
+kms_core_texture_wall_p95_ms=8.108
+kms_core_texture_wall_max_ms=8.831
+kms_core_fallback_calls=48000
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=362.248
+kms_core_fallback_wall_avg_ms=3.019
+kms_core_fallback_wall_p95_ms=3.183
+kms_core_fallback_wall_max_ms=3.594
+kms_core_rectangle_calls=2760
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=48.676
+kms_core_rectangle_wall_avg_ms=0.406
+kms_core_rectangle_wall_p95_ms=0.453
+kms_core_rectangle_wall_max_ms=0.598
+kms_core_text_calls=2760
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=669.880
+kms_core_text_wall_avg_ms=5.582
+kms_core_text_wall_p95_ms=5.934
+kms_core_text_wall_max_ms=6.625
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.081
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2760
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=15.646
+kms_core_text_font_wall_avg_ms=0.130
+kms_core_text_font_wall_p95_ms=0.156
+kms_core_text_font_wall_max_ms=0.212
+kms_core_text_glyph_run_calls=2760
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=405.293
+kms_core_text_glyph_run_wall_avg_ms=3.377
+kms_core_text_glyph_run_wall_p95_ms=3.559
+kms_core_text_glyph_run_wall_max_ms=4.058
+kms_core_text_texture_calls=48000
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=374.739
+kms_core_text_texture_wall_avg_ms=3.123
+kms_core_text_texture_wall_p95_ms=3.290
+kms_core_text_texture_wall_max_ms=3.711
+kms_core_text_fallback_calls=48000
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=362.248
+kms_core_text_fallback_wall_avg_ms=3.019
+kms_core_text_fallback_wall_p95_ms=3.183
+kms_core_text_fallback_wall_max_ms=3.594
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli input press east --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press east --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press north --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "north",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-weak-round.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-drop-high-weak-round.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=32.1
+ups=60.3
+frames_total=962
+updates_total=1827
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=1094
+host_updates_per_callback=1.817
+host_interval_avg_ms=30.251
+host_interval_p95_ms=32.065
+host_interval_max_ms=36.603
+host_step_avg_ms=0.911
+host_step_p95_ms=1.627
+host_step_max_ms=2.305
+host_scene_avg_ms=0.469
+host_scene_p95_ms=0.528
+host_scene_max_ms=0.573
+host_prepare_avg_ms=15.528
+host_prepare_p95_ms=15.991
+host_prepare_max_ms=17.616
+host_callback_avg_ms=16.918
+host_callback_p95_ms=17.855
+host_callback_max_ms=19.745
+host_raster_buffers_avg_ms=0.001
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.002
+host_raster_clear_avg_ms=3.017
+host_raster_clear_p95_ms=3.093
+host_raster_clear_max_ms=4.055
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=12.009
+host_raster_other_frames_p95_ms=12.499
+host_raster_other_frames_max_ms=13.094
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.002
+host_raster_image_max_ms=0.003
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 32 | UPS 60
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=7956
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=3726.866
+kms_dirty_pixels_window=94371840
+kms_draws_total=2424
+kms_draws_window=120
+kms_flip_submissions_total=2423
+kms_flip_submissions_window=120
+kms_flip_completions_total=2422
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=2327
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=1830027264
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=3726.866
+kms_loop_wall_avg_ms=31.057
+kms_loop_wall_p95_ms=33.845
+kms_loop_wall_max_ms=59.103
+kms_loop_cpu_total_ms=3695.672
+kms_loop_cpu_avg_ms=30.797
+kms_loop_cpu_p95_ms=33.351
+kms_loop_cpu_max_ms=58.784
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2123.449
+kms_timers_wall_avg_ms=17.695
+kms_timers_wall_p95_ms=19.846
+kms_timers_wall_max_ms=44.529
+kms_timers_cpu_total_ms=2106.472
+kms_timers_cpu_avg_ms=17.554
+kms_timers_cpu_p95_ms=19.774
+kms_timers_cpu_max_ms=44.302
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.238
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.228
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.003
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1597.319
+kms_render_wall_avg_ms=13.311
+kms_render_wall_p95_ms=14.533
+kms_render_wall_max_ms=18.264
+kms_render_cpu_total_ms=1584.276
+kms_render_cpu_avg_ms=13.202
+kms_render_cpu_p95_ms=14.065
+kms_render_cpu_max_ms=18.014
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.261
+kms_dispatch_wall_avg_ms=0.027
+kms_dispatch_wall_p95_ms=0.027
+kms_dispatch_wall_max_ms=0.216
+kms_dispatch_cpu_total_ms=3.086
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.027
+kms_dispatch_cpu_max_ms=0.048
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=10.605
+kms_map_wall_avg_ms=0.088
+kms_map_wall_p95_ms=0.093
+kms_map_wall_max_ms=0.132
+kms_map_cpu_total_ms=10.654
+kms_map_cpu_avg_ms=0.089
+kms_map_cpu_p95_ms=0.093
+kms_map_cpu_max_ms=0.132
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1557.921
+kms_draw_wall_avg_ms=12.983
+kms_draw_wall_p95_ms=14.257
+kms_draw_wall_max_ms=17.965
+kms_draw_cpu_total_ms=1550.294
+kms_draw_cpu_avg_ms=12.919
+kms_draw_cpu_p95_ms=13.791
+kms_draw_cpu_max_ms=17.715
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.287
+kms_unmap_wall_avg_ms=0.069
+kms_unmap_wall_p95_ms=0.071
+kms_unmap_wall_max_ms=0.128
+kms_unmap_cpu_total_ms=8.339
+kms_unmap_cpu_avg_ms=0.069
+kms_unmap_cpu_p95_ms=0.072
+kms_unmap_cpu_max_ms=0.101
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.274
+kms_flip_wait_wall_avg_ms=0.011
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.018
+kms_flip_wait_cpu_total_ms=1.277
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.018
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=16.877
+kms_submit_wall_avg_ms=0.141
+kms_submit_wall_p95_ms=0.181
+kms_submit_wall_max_ms=0.228
+kms_submit_cpu_total_ms=11.637
+kms_submit_cpu_avg_ms=0.097
+kms_submit_cpu_p95_ms=0.113
+kms_submit_cpu_max_ms=0.146
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=533.502
+kms_rgb_blit_wall_avg_ms=4.446
+kms_rgb_blit_wall_p95_ms=5.105
+kms_rgb_blit_wall_max_ms=6.601
+kms_rgb_blit_cpu_total_ms=530.490
+kms_rgb_blit_cpu_avg_ms=4.421
+kms_rgb_blit_cpu_p95_ms=4.930
+kms_rgb_blit_cpu_max_ms=6.456
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1556.650
+kms_draw_rgb_wall_avg_ms=12.972
+kms_draw_rgb_wall_p95_ms=14.247
+kms_draw_rgb_wall_max_ms=17.955
+kms_draw_rgb_cpu_total_ms=1549.682
+kms_draw_rgb_cpu_avg_ms=12.914
+kms_draw_rgb_cpu_p95_ms=13.787
+kms_draw_rgb_cpu_max_ms=17.709
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1556.419
+kms_core_render_wall_avg_ms=12.970
+kms_core_render_wall_p95_ms=14.245
+kms_core_render_wall_max_ms=17.952
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=1.015
+kms_core_prepare_wall_avg_ms=0.008
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.071
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=22.285
+kms_core_dirty_wall_avg_ms=0.186
+kms_core_dirty_wall_p95_ms=0.255
+kms_core_dirty_wall_max_ms=1.711
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1518.193
+kms_core_items_wall_avg_ms=12.652
+kms_core_items_wall_p95_ms=13.455
+kms_core_items_wall_max_ms=17.602
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=537.244
+kms_core_image_wall_avg_ms=4.477
+kms_core_image_wall_p95_ms=5.136
+kms_core_image_wall_max_ms=6.632
+kms_core_texture_calls=46226
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=892.465
+kms_core_texture_wall_avg_ms=7.437
+kms_core_texture_wall_p95_ms=8.179
+kms_core_texture_wall_max_ms=10.286
+kms_core_fallback_calls=46106
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=345.001
+kms_core_fallback_wall_avg_ms=2.875
+kms_core_fallback_wall_p95_ms=3.011
+kms_core_fallback_wall_max_ms=3.552
+kms_core_rectangle_calls=2760
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=48.537
+kms_core_rectangle_wall_avg_ms=0.404
+kms_core_rectangle_wall_p95_ms=0.448
+kms_core_rectangle_wall_max_ms=0.522
+kms_core_text_calls=2760
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=646.156
+kms_core_text_wall_avg_ms=5.385
+kms_core_text_wall_p95_ms=5.732
+kms_core_text_wall_max_ms=6.818
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.079
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2760
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=15.805
+kms_core_text_font_wall_avg_ms=0.132
+kms_core_text_font_wall_p95_ms=0.153
+kms_core_text_font_wall_max_ms=0.336
+kms_core_text_glyph_run_calls=2760
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=386.868
+kms_core_text_glyph_run_wall_avg_ms=3.224
+kms_core_text_glyph_run_wall_p95_ms=3.388
+kms_core_text_glyph_run_wall_max_ms=4.029
+kms_core_text_texture_calls=46106
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=357.091
+kms_core_text_texture_wall_avg_ms=2.976
+kms_core_text_texture_wall_p95_ms=3.122
+kms_core_text_texture_wall_max_ms=3.669
+kms_core_text_fallback_calls=46106
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=345.001
+kms_core_text_fallback_wall_avg_ms=2.875
+kms_core_text_fallback_wall_p95_ms=3.011
+kms_core_text_fallback_wall_max_ms=3.552
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press north --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "north",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-bank-breakup-angular.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-bank-breakup-angular.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=25.5
+ups=59.8
+frames_total=1281
+updates_total=2500
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=1335
+host_updates_per_callback=2.233
+host_interval_avg_ms=37.192
+host_interval_p95_ms=44.323
+host_interval_max_ms=55.989
+host_step_avg_ms=5.787
+host_step_p95_ms=13.196
+host_step_max_ms=21.943
+host_scene_avg_ms=0.552
+host_scene_p95_ms=0.686
+host_scene_max_ms=0.757
+host_prepare_avg_ms=17.104
+host_prepare_p95_ms=18.492
+host_prepare_max_ms=19.577
+host_callback_avg_ms=23.454
+host_callback_p95_ms=30.601
+host_callback_max_ms=39.678
+host_raster_buffers_avg_ms=0.002
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.003
+host_raster_clear_avg_ms=3.002
+host_raster_clear_p95_ms=3.358
+host_raster_clear_max_ms=3.958
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=13.515
+host_raster_other_frames_p95_ms=14.598
+host_raster_other_frames_max_ms=15.414
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.002
+host_raster_image_max_ms=0.004
+No active Spacewars diagnostics.
+performance_overlay_enabled=true
+performance_overlay_text=FPS 25 | UPS 60
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=8253
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=4461.856
+kms_dirty_pixels_window=94371840
+kms_draws_total=2721
+kms_draws_window=120
+kms_flip_submissions_total=2720
+kms_flip_submissions_window=120
+kms_flip_completions_total=2719
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=2624
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=2063597568
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=4461.856
+kms_loop_wall_avg_ms=37.182
+kms_loop_wall_p95_ms=44.286
+kms_loop_wall_max_ms=61.828
+kms_loop_cpu_total_ms=4437.565
+kms_loop_cpu_avg_ms=36.980
+kms_loop_cpu_p95_ms=44.163
+kms_loop_cpu_max_ms=61.753
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2848.834
+kms_timers_wall_avg_ms=23.740
+kms_timers_wall_p95_ms=31.175
+kms_timers_wall_max_ms=48.924
+kms_timers_cpu_total_ms=2832.683
+kms_timers_cpu_avg_ms=23.606
+kms_timers_cpu_p95_ms=31.134
+kms_timers_cpu_max_ms=48.912
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.225
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.003
+kms_callbacks_cpu_total_ms=0.216
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.002
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1607.103
+kms_render_wall_avg_ms=13.393
+kms_render_wall_p95_ms=14.249
+kms_render_wall_max_ms=16.206
+kms_render_cpu_total_ms=1599.953
+kms_render_cpu_avg_ms=13.333
+kms_render_cpu_p95_ms=14.188
+kms_render_cpu_max_ms=16.122
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.054
+kms_dispatch_wall_avg_ms=0.025
+kms_dispatch_wall_p95_ms=0.026
+kms_dispatch_wall_max_ms=0.041
+kms_dispatch_cpu_total_ms=3.063
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.026
+kms_dispatch_cpu_max_ms=0.041
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=10.591
+kms_map_wall_avg_ms=0.088
+kms_map_wall_p95_ms=0.093
+kms_map_wall_max_ms=0.135
+kms_map_cpu_total_ms=10.643
+kms_map_cpu_avg_ms=0.089
+kms_map_cpu_p95_ms=0.094
+kms_map_cpu_max_ms=0.135
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1567.747
+kms_draw_wall_avg_ms=13.065
+kms_draw_wall_p95_ms=13.909
+kms_draw_wall_max_ms=15.886
+kms_draw_cpu_total_ms=1565.652
+kms_draw_cpu_avg_ms=13.047
+kms_draw_cpu_p95_ms=13.906
+kms_draw_cpu_max_ms=15.886
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.301
+kms_unmap_wall_avg_ms=0.069
+kms_unmap_wall_p95_ms=0.071
+kms_unmap_wall_max_ms=0.092
+kms_unmap_cpu_total_ms=8.382
+kms_unmap_cpu_avg_ms=0.070
+kms_unmap_cpu_p95_ms=0.072
+kms_unmap_cpu_max_ms=0.093
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.251
+kms_flip_wait_wall_avg_ms=0.010
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.012
+kms_flip_wait_cpu_total_ms=1.254
+kms_flip_wait_cpu_avg_ms=0.010
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.012
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=16.705
+kms_submit_wall_avg_ms=0.139
+kms_submit_wall_p95_ms=0.181
+kms_submit_wall_max_ms=0.187
+kms_submit_cpu_total_ms=11.860
+kms_submit_cpu_avg_ms=0.099
+kms_submit_cpu_p95_ms=0.113
+kms_submit_cpu_max_ms=0.119
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=533.323
+kms_rgb_blit_wall_avg_ms=4.444
+kms_rgb_blit_wall_p95_ms=4.827
+kms_rgb_blit_wall_max_ms=5.547
+kms_rgb_blit_cpu_total_ms=532.910
+kms_rgb_blit_cpu_avg_ms=4.441
+kms_rgb_blit_cpu_p95_ms=4.795
+kms_rgb_blit_cpu_max_ms=5.547
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1566.509
+kms_draw_rgb_wall_avg_ms=13.054
+kms_draw_rgb_wall_p95_ms=13.901
+kms_draw_rgb_wall_max_ms=15.872
+kms_draw_rgb_cpu_total_ms=1565.043
+kms_draw_rgb_cpu_avg_ms=13.042
+kms_draw_rgb_cpu_p95_ms=13.901
+kms_draw_rgb_cpu_max_ms=15.878
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1566.278
+kms_core_render_wall_avg_ms=13.052
+kms_core_render_wall_p95_ms=13.899
+kms_core_render_wall_max_ms=15.870
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=1.052
+kms_core_prepare_wall_avg_ms=0.009
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.072
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=28.898
+kms_core_dirty_wall_avg_ms=0.241
+kms_core_dirty_wall_p95_ms=0.846
+kms_core_dirty_wall_max_ms=1.632
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1521.630
+kms_core_items_wall_avg_ms=12.680
+kms_core_items_wall_p95_ms=13.146
+kms_core_items_wall_max_ms=15.543
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=536.816
+kms_core_image_wall_avg_ms=4.473
+kms_core_image_wall_p95_ms=4.857
+kms_core_image_wall_max_ms=5.584
+kms_core_texture_calls=46925
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=894.979
+kms_core_texture_wall_avg_ms=7.458
+kms_core_texture_wall_p95_ms=7.839
+kms_core_texture_wall_max_ms=9.135
+kms_core_fallback_calls=46805
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=347.747
+kms_core_fallback_wall_avg_ms=2.898
+kms_core_fallback_wall_p95_ms=2.954
+kms_core_fallback_wall_max_ms=3.459
+kms_core_rectangle_calls=2760
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=48.058
+kms_core_rectangle_wall_avg_ms=0.400
+kms_core_rectangle_wall_p95_ms=0.424
+kms_core_rectangle_wall_max_ms=0.486
+kms_core_text_calls=2760
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=647.977
+kms_core_text_wall_avg_ms=5.400
+kms_core_text_wall_p95_ms=5.517
+kms_core_text_wall_max_ms=6.494
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.078
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2760
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=15.389
+kms_core_text_font_wall_avg_ms=0.128
+kms_core_text_font_wall_p95_ms=0.146
+kms_core_text_font_wall_max_ms=0.170
+kms_core_text_glyph_run_calls=2760
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=390.037
+kms_core_text_glyph_run_wall_avg_ms=3.250
+kms_core_text_glyph_run_wall_p95_ms=3.320
+kms_core_text_glyph_run_wall_max_ms=3.899
+kms_core_text_texture_calls=46805
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=359.964
+kms_core_text_texture_wall_avg_ms=3.000
+kms_core_text_texture_wall_p95_ms=3.056
+kms_core_text_texture_wall_max_ms=3.571
+kms_core_text_fallback_calls=46805
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=347.747
+kms_core_text_fallback_wall_avg_ms=2.898
+kms_core_text_fallback_wall_p95_ms=2.954
+kms_core_text_fallback_wall_max_ms=3.459
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli input press left-shoulder --hold-ms 150 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "left-shoulder",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 39,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 3,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 40,
+  "screen": "pause.main",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 3,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+spacewars-cli screenshot /tmp/dirt-impact-review.nNNoOGYf/picade-impact-ready.png
+screenshot saved to /tmp/dirt-impact-review.nNNoOGYf/picade-impact-ready.png
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=3
+paused=true
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=12.1
+ups=0.0
+frames_total=1339
+updates_total=2590
+fps_source=submitted-frames
+No active Spacewars diagnostics.
+
+No rule-bot flight history captured.
+performance_overlay_enabled=true
+performance_overlay_text=Paused
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=8310
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=4964.024
+kms_dirty_pixels_window=94371840
+kms_draws_total=2778
+kms_draws_window=120
+kms_flip_submissions_total=2777
+kms_flip_submissions_window=120
+kms_flip_completions_total=2776
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=2681
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=2108424192
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=4964.024
+kms_loop_wall_avg_ms=41.367
+kms_loop_wall_p95_ms=86.739
+kms_loop_wall_max_ms=119.876
+kms_loop_cpu_total_ms=4938.978
+kms_loop_cpu_avg_ms=41.158
+kms_loop_cpu_p95_ms=86.312
+kms_loop_cpu_max_ms=119.569
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=2604.304
+kms_timers_wall_avg_ms=21.703
+kms_timers_wall_p95_ms=31.175
+kms_timers_wall_max_ms=48.924
+kms_timers_cpu_total_ms=2588.057
+kms_timers_cpu_avg_ms=21.567
+kms_timers_cpu_p95_ms=31.134
+kms_timers_cpu_max_ms=48.912
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.236
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.005
+kms_callbacks_cpu_total_ms=0.227
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.005
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=2353.556
+kms_render_wall_avg_ms=19.613
+kms_render_wall_p95_ms=70.091
+kms_render_wall_max_ms=73.001
+kms_render_cpu_total_ms=2345.887
+kms_render_cpu_avg_ms=19.549
+kms_render_cpu_p95_ms=69.937
+kms_render_cpu_max_ms=72.834
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.069
+kms_dispatch_wall_avg_ms=0.026
+kms_dispatch_wall_p95_ms=0.029
+kms_dispatch_wall_max_ms=0.043
+kms_dispatch_cpu_total_ms=3.077
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.029
+kms_dispatch_cpu_max_ms=0.044
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=10.577
+kms_map_wall_avg_ms=0.088
+kms_map_wall_p95_ms=0.096
+kms_map_wall_max_ms=0.135
+kms_map_cpu_total_ms=10.633
+kms_map_cpu_avg_ms=0.089
+kms_map_cpu_p95_ms=0.096
+kms_map_cpu_max_ms=0.135
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=2314.087
+kms_draw_wall_avg_ms=19.284
+kms_draw_wall_p95_ms=69.741
+kms_draw_wall_max_ms=72.640
+kms_draw_cpu_total_ms=2311.675
+kms_draw_cpu_avg_ms=19.264
+kms_draw_cpu_p95_ms=69.651
+kms_draw_cpu_max_ms=72.548
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.196
+kms_unmap_wall_avg_ms=0.068
+kms_unmap_wall_p95_ms=0.071
+kms_unmap_wall_max_ms=0.092
+kms_unmap_cpu_total_ms=8.276
+kms_unmap_cpu_avg_ms=0.069
+kms_unmap_cpu_p95_ms=0.072
+kms_unmap_cpu_max_ms=0.093
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.235
+kms_flip_wait_wall_avg_ms=0.010
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.012
+kms_flip_wait_cpu_total_ms=1.238
+kms_flip_wait_cpu_avg_ms=0.010
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.012
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=17.014
+kms_submit_wall_avg_ms=0.142
+kms_submit_wall_p95_ms=0.183
+kms_submit_wall_max_ms=0.198
+kms_submit_cpu_total_ms=11.961
+kms_submit_cpu_avg_ms=0.100
+kms_submit_cpu_p95_ms=0.116
+kms_submit_cpu_max_ms=0.131
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=538.061
+kms_rgb_blit_wall_avg_ms=4.484
+kms_rgb_blit_wall_p95_ms=4.944
+kms_rgb_blit_wall_max_ms=5.549
+kms_rgb_blit_cpu_total_ms=537.325
+kms_rgb_blit_cpu_avg_ms=4.478
+kms_rgb_blit_cpu_p95_ms=4.942
+kms_rgb_blit_cpu_max_ms=5.547
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=2312.847
+kms_draw_rgb_wall_avg_ms=19.274
+kms_draw_rgb_wall_p95_ms=69.732
+kms_draw_rgb_wall_max_ms=72.629
+kms_draw_rgb_cpu_total_ms=2311.061
+kms_draw_rgb_cpu_avg_ms=19.259
+kms_draw_rgb_cpu_p95_ms=69.647
+kms_draw_rgb_cpu_max_ms=72.542
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=2312.611
+kms_core_render_wall_avg_ms=19.272
+kms_core_render_wall_p95_ms=69.730
+kms_core_render_wall_max_ms=72.627
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=0.948
+kms_core_prepare_wall_avg_ms=0.008
+kms_core_prepare_wall_p95_ms=0.009
+kms_core_prepare_wall_max_ms=0.013
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=81.166
+kms_core_dirty_wall_avg_ms=0.676
+kms_core_dirty_wall_p95_ms=1.748
+kms_core_dirty_wall_max_ms=3.268
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=2214.794
+kms_core_items_wall_avg_ms=18.457
+kms_core_items_wall_p95_ms=68.383
+kms_core_items_wall_max_ms=71.442
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=541.460
+kms_core_image_wall_avg_ms=4.512
+kms_core_image_wall_p95_ms=4.969
+kms_core_image_wall_max_ms=5.584
+kms_core_texture_calls=47958
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=915.665
+kms_core_texture_wall_avg_ms=7.631
+kms_core_texture_wall_p95_ms=8.610
+kms_core_texture_wall_max_ms=9.946
+kms_core_fallback_calls=47838
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=363.306
+kms_core_fallback_wall_avg_ms=3.028
+kms_core_fallback_wall_p95_ms=3.925
+kms_core_fallback_wall_max_ms=4.248
+kms_core_rectangle_calls=2844
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=687.888
+kms_core_rectangle_wall_avg_ms=5.732
+kms_core_rectangle_wall_p95_ms=53.382
+kms_core_rectangle_wall_max_ms=56.176
+kms_core_text_calls=2844
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=667.524
+kms_core_text_wall_avg_ms=5.563
+kms_core_text_wall_p95_ms=7.052
+kms_core_text_wall_max_ms=7.671
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.079
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2844
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=15.858
+kms_core_text_font_wall_avg_ms=0.132
+kms_core_text_font_wall_p95_ms=0.194
+kms_core_text_font_wall_max_ms=0.227
+kms_core_text_glyph_run_calls=2844
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=407.726
+kms_core_text_glyph_run_wall_avg_ms=3.398
+kms_core_text_glyph_run_wall_p95_ms=4.400
+kms_core_text_glyph_run_wall_max_ms=4.772
+kms_core_text_texture_calls=47838
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=375.932
+kms_core_text_texture_wall_avg_ms=3.133
+kms_core_text_texture_wall_p95_ms=4.058
+kms_core_text_texture_wall_max_ms=4.383
+kms_core_text_fallback_calls=47838
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=363.306
+kms_core_text_fallback_wall_avg_ms=3.028
+kms_core_text_fallback_wall_p95_ms=3.925
+kms_core_text_fallback_wall_max_ms=4.248
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=inactive
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=scorched-earth
+launch_stage=starting_scenario
+launch_elapsed_ms=203
+launch_save_ms=10
+launch_asset_ms=0
+launch_start_ms=84
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false

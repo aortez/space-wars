@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 
 mod inspection;
 mod packing;
+mod retry;
+pub(super) use retry::Failure;
 mod support;
 pub use inspection::{
     PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch, PackingSnapshot,
@@ -13,6 +15,15 @@ pub use inspection::{
 const QUIET_SECONDS: f32 = 0.5;
 const REPACK_SECONDS: f32 = 1.5;
 const MAX_DEPOSITS: usize = 64;
+
+/// Packing work in the latest settling call, separate from the grain-reason
+/// partition. A reused failure still consumes the normal candidate allowance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+pub struct SettlingWork {
+    pub attempted_groups: usize,
+    pub attempted_grains: usize,
+    pub reused_failures: usize,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 enum Reason {
@@ -75,6 +86,9 @@ impl LooseTerrain {
     pub fn settling_diagnostics(&self) -> SettlingDiagnostics {
         self.settling_diagnostics
     }
+    pub fn settling_work(&self) -> SettlingWork {
+        self.settling_work
+    }
 
     /// Continuation state for scenario observations. Local anchors, quiet time
     /// and retry state affect future transfers even when current motion matches.
@@ -101,6 +115,8 @@ impl LooseTerrain {
             }
         }
         self.hash_slumping(&mut write);
+        self.hash_cohesion(&mut write);
+        self.hash_impacts(&mut write);
         hash
     }
 
@@ -132,7 +148,9 @@ impl LooseTerrain {
         if !dt.is_finite() || dt <= 0.0 || dt > 0.25 {
             return Err(TerrainError("invalid settling timestep"));
         }
+        let _span = crate::profile::span("settle");
         self.settling_diagnostics = SettlingDiagnostics::default();
+        self.settling_work = SettlingWork::default();
         if self.is_empty() {
             return Ok(Vec::new());
         }
@@ -245,7 +263,41 @@ impl LooseTerrain {
             packing_field.repacking = grains
                 .iter()
                 .all(|g| self.settling[&g.id()].seconds >= REPACK_SECONDS);
-            let plan = packing::prepare(world, &packing_field, &grains, None);
+            let key = grains[0].id();
+            let mut inputs = self
+                .failed_packing
+                .contains_key(&key)
+                .then(|| retry::Inputs::capture(world, &packing_field, &grains))
+                .flatten();
+            let cached = inputs.as_ref().and_then(|inputs| {
+                self.failed_packing
+                    .get(&key)
+                    .filter(|failure| failure.inputs == *inputs)
+                    .map(|failure| failure.reason)
+            });
+            let plan = if let Some(reason) = cached {
+                self.settling_work.reused_failures += 1;
+                Err(reason)
+            } else {
+                self.settling_work.attempted_groups += 1;
+                self.settling_work.attempted_grains += group.len();
+                packing::prepare(world, &packing_field, &grains, None)
+            };
+            if let Err(&reason) = plan.as_ref()
+                && let Some(inputs) = inputs
+                    .take()
+                    .or_else(|| retry::Inputs::capture(world, &packing_field, &grains))
+            {
+                if !self.failed_packing.contains_key(&key)
+                    && self.failed_packing.len() == retry::MAX_FAILURES
+                {
+                    self.failed_packing.pop_first();
+                }
+                self.failed_packing
+                    .insert(key, retry::Failure { inputs, reason });
+            } else {
+                self.failed_packing.remove(&key);
+            }
             let reason = match &plan {
                 Ok(plan) => plan.remaining_reason,
                 Err(reason) => *reason,
@@ -257,6 +309,7 @@ impl LooseTerrain {
                 reasons[i] = reason;
             }
             let Ok(plan) = plan else { continue };
+            let _span = crate::profile::span("deposit_commit");
             let accepted: Vec<_> = plan.accepted.iter().map(|&i| group[i]).collect();
             let grains: Vec<_> = accepted.iter().map(|&i| &self.grains[i]).collect();
             let mut momentum = Momentum::default();
@@ -302,6 +355,8 @@ impl LooseTerrain {
             i += 1;
             keep
         });
+        self.failed_packing
+            .retain(|_, failure| failure.inputs.retained(&self.settling));
         Ok(commits)
     }
 }

@@ -215,6 +215,8 @@ pub(super) struct SpacewarsPhysics {
     pub(super) world: PhysicsWorld,
     pub(super) terrain_fragments: BTreeSet<u64>,
     pub(super) material_planets: BTreeSet<usize>,
+    /// Derived from the loose-material setting at the start of the gravity step.
+    pub(super) distributed_gravity: bool,
     // Newly replaced/inserted terrain is indexed by the next ordinary step.
     // Until then no spatial query may authorize a transfer or placement.
     pub(super) material_queries_dirty: bool,
@@ -263,6 +265,7 @@ impl SpacewarsPhysics {
             }),
             terrain_fragments: BTreeSet::new(),
             material_planets: BTreeSet::new(),
+            distributed_gravity: false,
             material_queries_dirty: false,
             disabled_spaceports: BTreeSet::new(),
             sun_radius: None,
@@ -893,6 +896,28 @@ impl SpacewarsPhysics {
         (-(velocity_b - velocity_a).dot(normal)).max(0.0)
     }
 
+    /// The legacy gravity law supplies a velocity delta per fixed tick. In a
+    /// loose-material world, distribute that same delta over Rapier's substeps: a
+    /// single kick makes loaded grain contacts continually rebound. Apply this
+    /// to actors as well as rubble, since actors transmit their load to a pile.
+    /// Other worlds retain their historical integration.
+    pub(super) fn apply_gravity_delta(
+        &mut self,
+        body: PhysicsBodyId,
+        delta_velocity: Vec2,
+        dt: f32,
+    ) -> bool {
+        if !dt.is_finite() || dt <= 0.0 {
+            return false;
+        }
+        if !self.distributed_gravity {
+            self.world.apply_velocity_delta(body, delta_velocity, true)
+        } else {
+            self.world.apply_acceleration(body, delta_velocity / dt, true)
+        }
+    }
+
+    #[cfg(test)]
     pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
         let entity = match entity {
             MechanicalEntity::Ship(index) => ship_entity(index),
@@ -932,11 +957,12 @@ impl SpacewarsPhysics {
             .try_fold(0.0, |total, body| Some(total + self.world.body_mass(body)?))
     }
 
-    pub fn apply_rover_velocity_delta(
+    pub fn apply_rover_gravity_delta(
         &mut self,
         id: u64,
         body_index: usize,
         delta_velocity: Vec2,
+        dt: f32,
     ) -> bool {
         let Some(body) = self
             .rovers
@@ -945,7 +971,7 @@ impl SpacewarsPhysics {
         else {
             return false;
         };
-        self.world.apply_velocity_delta(body, delta_velocity, true)
+        self.apply_gravity_delta(body, delta_velocity, dt)
     }
 
     #[cfg(test)]

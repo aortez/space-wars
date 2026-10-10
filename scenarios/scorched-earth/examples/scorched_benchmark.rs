@@ -1,14 +1,27 @@
 //! Whole-scene timing; auditing, observations and replay are outside the timer.
 use clap::{Parser, ValueEnum};
 use engine_common::Scenario;
-use engine_rapier::terrain::GrainShape;
-use scenario_scorched_earth::{FIXED_HZ, ScorchedConfig, ScorchedScenario};
+use engine_rapier::terrain::{GrainShape, SettlingWork};
+use scenario_scorched_earth::{
+    BankStrength, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario,
+};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Shape {
     Round,
     Angular,
+}
+#[derive(Clone, Copy, ValueEnum)]
+enum Cohesion {
+    Off,
+    Weak,
+    Strong,
+}
+#[derive(Clone, Copy, ValueEnum)]
+enum Drop {
+    Low,
+    High,
 }
 #[derive(Parser)]
 struct Args {
@@ -28,8 +41,28 @@ struct Args {
     /// Emit one audited sample per second to stderr, outside the timer.
     #[arg(long)]
     diagnostics: bool,
+    /// Emit inclusive shared-stage timings for each tick to stderr.
+    #[arg(long)]
+    profile: bool,
     #[arg(long)]
     slumping: bool,
+    #[arg(long, value_enum, default_value = "off")]
+    cohesion: Cohesion,
+    #[arg(long)]
+    undercut: bool,
+    #[arg(long)]
+    hillside: bool,
+    #[arg(long, conflicts_with_all = ["hillside", "undercut", "drop"])]
+    roof: bool,
+    #[arg(long, requires = "roof")]
+    require_roof: bool,
+    /// Fail if this run misses bank failure, impact chipping or deposition.
+    #[arg(long, requires = "hillside")]
+    require_lifecycle: bool,
+    #[arg(long)]
+    breakup: bool,
+    #[arg(long, value_enum)]
+    drop: Option<Drop>,
     /// Save frozen packing inputs after the run, outside all timers.
     #[arg(long)]
     packing_dir: Option<std::path::PathBuf>,
@@ -48,6 +81,11 @@ fn timing(values: &[f64]) -> serde_json::Value {
         "max_ms": values.last(),
     })
 }
+fn add_work(sum: &mut SettlingWork, work: SettlingWork) {
+    sum.attempted_groups += work.attempted_groups;
+    sum.attempted_grains += work.attempted_grains;
+    sum.reused_failures += work.reused_failures;
+}
 fn main() {
     let args = Args::parse();
     assert!(
@@ -56,6 +94,19 @@ fn main() {
     );
     let config = ScorchedConfig {
         demo: true,
+        undercut: args.undercut,
+        hillside: args.hillside,
+        roof: args.roof,
+        breakup: args.breakup,
+        drop_height: args.drop.map(|h| match h {
+            Drop::Low => DropHeight::Low,
+            Drop::High => DropHeight::High,
+        }),
+        cohesion: match args.cohesion {
+            Cohesion::Off => BankStrength::Off,
+            Cohesion::Weak => BankStrength::Weak,
+            Cohesion::Strong => BankStrength::Strong,
+        },
         slumping: args.slumping,
         bombardment_seconds: args.bombardment_seconds,
         max_grains: args.limit as usize,
@@ -63,6 +114,11 @@ fn main() {
             Shape::Round => GrainShape::Round,
             Shape::Angular => GrainShape::Hexagon,
         },
+    };
+    let config = if args.hillside || args.roof {
+        config.with_destruction(config.cohesion)
+    } else {
+        config
     };
     let mut state = ScorchedScenario::init(config, args.seed);
     let dt = Duration::from_secs_f64(1.0 / FIXED_HZ as f64);
@@ -74,16 +130,43 @@ fn main() {
     let mut peak_loose = 0;
     let mut peak_contacts = 0;
     let mut checkpoints = Vec::new();
+    let mut packing_work = SettlingWork::default();
+    let mut tail_work = SettlingWork::default();
+    engine_rapier::profile::set_enabled(args.profile);
     for tick in 0..ticks {
         let started = Instant::now();
         ScorchedScenario::step(&mut state, &[], dt);
         let elapsed = started.elapsed().as_secs_f64() * 1000.0;
         timings.push(elapsed);
-        let firing = args.bombardment_seconds == 0 || tick < args.bombardment_seconds * FIXED_HZ;
+        if args.profile {
+            let physics = state.last_physics;
+            eprintln!(
+                "{}",
+                serde_json::json!({
+                    "tick": tick + 1, "total_ms": elapsed,
+                    "profile": engine_rapier::profile::take(),
+                    "rapier_ms": physics.rapier_step_time.as_secs_f64() * 1000.0,
+                    "broad_phase_ms": physics.broad_phase_time.as_secs_f64() * 1000.0,
+                    "narrow_phase_ms": physics.narrow_phase_time.as_secs_f64() * 1000.0,
+                    "solver_ms": physics.solver_time.as_secs_f64() * 1000.0,
+                    "loose": state.loose_cells(), "impacts": state.impacts,
+                    "rejected": state.rejected_blasts,
+                })
+            );
+        }
+        add_work(&mut packing_work, state.settling_work());
+        let firing = if args.roof {
+            tick < 5 * FIXED_HZ
+        } else if args.hillside {
+            tick < 20 * FIXED_HZ
+        } else {
+            args.bombardment_seconds == 0 || tick < args.bombardment_seconds * FIXED_HZ
+        };
         if firing {
             active.push(elapsed);
         } else {
             tail.push(elapsed);
+            add_work(&mut tail_work, state.settling_work());
         }
         peak_bodies = peak_bodies.max(state.body_count());
         peak_loose = peak_loose.max(state.loose_cells());
@@ -101,12 +184,37 @@ fn main() {
                         "loose": state.loose_cells(), "deposited": state.deposited_cells(),
                         "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
                         "settling": state.settling_diagnostics(),
+                        "available_slots": state.config.max_grains - state.loose_cells(),
+                        "last_capacity_rejection": state.last_capacity_rejection,
+                        "packing_work": packing_work,
                         "slumping": state.slumping_diagnostics(),
+                        "cohesion": state.cohesion_diagnostics(),
+                        "impact_fracture": state.impact_diagnostics(),
                         "observation_hash": format!("{:016x}", state.observation_hash()),
                     })
                 );
             }
         }
+    }
+    engine_rapier::profile::set_enabled(false);
+    if args.require_roof {
+        assert_eq!(state.shots, 1, "one ordinary tank shot");
+        assert!(
+            state.cohesion_diagnostics().roof_failures > 0,
+            "roof must crack"
+        );
+        assert!(
+            state.cohesion_diagnostics().failures > state.cohesion_diagnostics().roof_failures,
+            "remaining ledge must fail"
+        );
+        assert!(state.impact_diagnostics().failures > 0, "clump must chip");
+        assert!(state.deposited_cells() > 0, "some dirt must return");
+    }
+    if args.require_lifecycle {
+        assert_eq!(state.shots, 3, "three ordinary tank shots");
+        assert!(state.cohesion_diagnostics().failures > 0, "bank must fail");
+        assert!(state.impact_diagnostics().failures > 0, "clump must chip");
+        assert!(state.deposited_cells() > 0, "some dirt must return");
     }
     if let Some(directory) = &args.packing_dir {
         std::fs::create_dir_all(directory).unwrap();
@@ -144,8 +252,10 @@ fn main() {
     println!(
         "{}",
         serde_json::json!({
-            "workload": if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else { "scorched-earth-scripted-duel-v2" },
-            "slumping_enabled": args.slumping,
+            "workload": if args.roof { "scorched-earth-roof-v1" } else if args.hillside { "scorched-earth-hillside-v2" } else if args.drop.is_some() { "scorched-earth-drop-v1" } else if args.undercut { "scorched-earth-undercut-v1" } else if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else { "scorched-earth-scripted-duel-v2" },
+            "slumping_enabled": state.config.slumping,
+            "cohesion_strength": state.config.cohesion.label(),
+            "drop": state.config.drop_height.map(DropHeight::label), "breakup": state.config.breakup,
             "seed": args.seed, "ticks": ticks, "bombardment_seconds": args.bombardment_seconds,
             "shape": match args.shape { Shape::Round => "round", Shape::Angular => "angular" },
             "grain_limit": args.limit, "shots": state.shots, "impacts": state.impacts,
@@ -158,7 +268,12 @@ fn main() {
             "winner": state.winner().map(|p| p + 1),
             "phases": { "active": timing(&active), "tail": timing(&tail) },
             "settling": state.settling_diagnostics(),
+            "available_slots": state.config.max_grains - state.loose_cells(),
+            "last_capacity_rejection": state.last_capacity_rejection,
+            "packing_work": packing_work, "tail_packing_work": tail_work,
             "slumping": state.slumping_diagnostics(),
+                        "cohesion": state.cohesion_diagnostics(),
+                        "impact_fracture": state.impact_diagnostics(),
         })
     );
 }

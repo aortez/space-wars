@@ -2,6 +2,7 @@
 use clap::Parser;
 use engine_core::Vec2;
 use engine_rapier::terrain::PackingSnapshot;
+use engine_rapier::world::PhysicsId;
 use std::{fmt::Write, path::PathBuf};
 
 #[derive(Parser)]
@@ -10,6 +11,12 @@ struct Args {
     /// Output stem; writes .json and one .svg per attempted placement.
     #[arg(long)]
     output: PathBuf,
+    /// Remove an obstacle from the frozen query only; repeat for multiple bodies.
+    #[arg(long)]
+    omit_body: Vec<u64>,
+    /// Repeat the same frozen query and emit stage timings, without simulation.
+    #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=1000))]
+    profile_repeats: u32,
 }
 
 fn polygon(svg: &mut String, vertices: impl IntoIterator<Item = Vec2>, color: &str, width: f32) {
@@ -24,7 +31,37 @@ fn polygon(svg: &mut String, vertices: impl IntoIterator<Item = Vec2>, color: &s
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let snapshot = PackingSnapshot::from_bytes(&std::fs::read(&args.snapshot)?)?;
-    let report = snapshot.inspect()?;
+    let report = snapshot.inspect_without(
+        &args
+            .omit_body
+            .iter()
+            .copied()
+            .map(PhysicsId::new)
+            .collect::<Vec<_>>(),
+    )?;
+    let expected = serde_json::to_vec(&report)?;
+    for repeat in 0..args.profile_repeats {
+        engine_rapier::profile::set_enabled(true);
+        let repeated = snapshot.inspect_without(
+            &args
+                .omit_body
+                .iter()
+                .copied()
+                .map(PhysicsId::new)
+                .collect::<Vec<_>>(),
+        )?;
+        let profile = engine_rapier::profile::take();
+        engine_rapier::profile::set_enabled(false);
+        assert_eq!(
+            expected,
+            serde_json::to_vec(&repeated)?,
+            "frozen query changed"
+        );
+        eprintln!(
+            "{}",
+            serde_json::json!({"repeat": repeat, "profile": profile})
+        );
+    }
     std::fs::write(
         args.output.with_extension("json"),
         serde_json::to_vec_pretty(&report)?,
@@ -46,6 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         + Vec2::new(size * 3.0, size * 3.0);
     let width = max.x - min.x;
     let height = max.y - min.y;
+    let comparison = if args.omit_body.is_empty() {
+        String::new()
+    } else {
+        format!(" · Omitted bodies: {:?}", args.omit_body)
+    };
     for (i, attempt) in report.attempts.iter().enumerate() {
         let mut svg = format!(
             r##"<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="{}" viewBox="{} {} {} {}"><rect x="{}" y="{}" width="{}" height="{}" fill="#101820"/>"##,
@@ -59,8 +101,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width,
             height + size * 1.5
         );
-        writeln!(svg, r##"<text x="{}" y="{}" fill="white" font-size="{}">Attempt {}: {} grains · Final result: {} accepted, {}</text><text x="{}" y="{}" fill="white" font-size="{}">Purple: cells · Green: clear · Red: blocked · Gold: unstable · Pink: blocker bounds/ID</text>"##,
-            min.x+size*0.2,-max.y-size*0.9,size*0.3,i+1,attempt.grains.len(),report.accepted.len(),report.remaining_reason,
+        writeln!(svg, r##"<text x="{}" y="{}" fill="white" font-size="{}">Attempt {}{}: {} grains · Final result: {} accepted, {}{}</text><text x="{}" y="{}" fill="white" font-size="{}">Purple: cells · Green: clear · Red: blocked · Gold: unstable · Pink: blocker bounds/ID</text>"##,
+            min.x+size*0.2,-max.y-size*0.9,size*0.3,
+            i+1,if report.selected_attempt == Some(i) { " (selected)" } else { "" },
+            attempt.grains.len(),report.accepted.len(),report.remaining_reason,comparison,
             min.x+size*0.2,-max.y-size*0.35,size*0.26).unwrap();
         writeln!(svg, r#"<defs><clipPath id="plot"><rect x="{}" y="{}" width="{}" height="{}"/></clipPath></defs><g clip-path="url(#plot)">"#, min.x, -max.y, width, height).unwrap();
         for p in &report.terrain {

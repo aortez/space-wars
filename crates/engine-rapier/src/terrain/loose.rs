@@ -7,10 +7,16 @@ use std::collections::BTreeMap;
 mod deposition;
 pub use deposition::{
     DepositCommit, PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch,
-    PackingSnapshot, SettlingDiagnostics,
+    PackingSnapshot, SettlingDiagnostics, SettlingWork,
 };
 mod slumping;
 pub use slumping::{SlumpCommit, SlumpingConfig, SlumpingDiagnostics};
+mod cohesion;
+pub use cohesion::{CohesionConfig, CohesionDiagnostics};
+mod impact;
+pub use impact::{ImpactFractureConfig, ImpactFractureDiagnostics};
+mod preset;
+pub use preset::DirtStrength;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LooseTerrainConfig {
@@ -20,6 +26,10 @@ pub struct LooseTerrainConfig {
     pub restitution: f32,
     /// Optional local surface-yield prototype. Undisturbed terrain is retained.
     pub slumping: Option<SlumpingConfig>,
+    /// Optional failure of short, still-connected overhangs near edits.
+    pub cohesion: Option<CohesionConfig>,
+    /// Optional local chipping of dynamic clumps after a hard collision.
+    pub impact_fracture: Option<ImpactFractureConfig>,
 }
 
 impl Default for LooseTerrainConfig {
@@ -30,6 +40,8 @@ impl Default for LooseTerrainConfig {
             friction: 0.6,
             restitution: 0.0,
             slumping: None,
+            cohesion: None,
+            impact_fracture: None,
         }
     }
 }
@@ -62,6 +74,7 @@ impl PreparedRelease {
         source: &Terrain,
         edits: impl IntoIterator<Item = MaterialEdit>,
     ) -> Result<Self, TerrainError> {
+        let _span = crate::profile::span("release_prepare");
         let mut terrain = source.clone();
         let mut grains = Vec::new();
         let mut changed_cells = 0;
@@ -135,6 +148,20 @@ pub struct ReleaseCommit {
     pub new_grains: usize,
 }
 
+/// Admission snapshot, before a release changes the pool. Scenario diagnostics
+/// may retain a rejected request; querying it never changes material or motion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct ReleaseCapacity {
+    pub requested: usize,
+    pub available: usize,
+}
+
+impl ReleaseCapacity {
+    pub fn fits(self) -> bool {
+        self.requested <= self.available
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReleaseError {
     Capacity,
@@ -165,7 +192,12 @@ pub struct LooseTerrain {
     settling: BTreeMap<PhysicsId, deposition::SettlingState>,
     deposited_cells: u64,
     settling_diagnostics: SettlingDiagnostics,
+    settling_work: SettlingWork,
+    // Pure failure memoization: clearing it changes work, not simulation state.
+    failed_packing: BTreeMap<PhysicsId, deposition::Failure>,
     slumping: slumping::SlumpingState,
+    cohesion: cohesion::CohesionState,
+    impact: impact::ImpactState,
 }
 
 impl LooseTerrain {
@@ -176,6 +208,8 @@ impl LooseTerrain {
             || !config.restitution.is_finite()
             || !(0.0..=1.0).contains(&config.restitution)
             || config.slumping.is_some_and(|c| !c.valid())
+            || config.cohesion.is_some_and(|c| !c.valid())
+            || config.impact_fracture.is_some_and(|c| !c.valid())
         {
             return Err(TerrainError("invalid loose material configuration"));
         }
@@ -185,7 +219,11 @@ impl LooseTerrain {
             settling: BTreeMap::new(),
             deposited_cells: 0,
             settling_diagnostics: SettlingDiagnostics::default(),
+            settling_work: SettlingWork::default(),
+            failed_packing: BTreeMap::new(),
             slumping: slumping::SlumpingState::default(),
+            cohesion: cohesion::CohesionState::default(),
+            impact: impact::ImpactState::default(),
         })
     }
     pub fn config(&self) -> LooseTerrainConfig {
@@ -201,7 +239,13 @@ impl LooseTerrain {
         self.grains.iter()
     }
     pub fn can_admit(&self, additional: usize) -> bool {
-        additional <= self.config.max_grains.saturating_sub(self.len())
+        self.release_capacity(additional).fits()
+    }
+    pub fn release_capacity(&self, requested: usize) -> ReleaseCapacity {
+        ReleaseCapacity {
+            requested,
+            available: self.config.max_grains.saturating_sub(self.len()),
+        }
     }
     pub fn quantities(&self) -> Vec<MaterialQuantity> {
         let mut amounts = BTreeMap::<MaterialId, (u64, f64)>::new();
@@ -235,6 +279,7 @@ impl LooseTerrain {
         plan: PreparedRelease,
         next_id: &mut u64,
     ) -> Result<ReleaseCommit, ReleaseError> {
+        let _span = crate::profile::span("release_commit");
         let invalid = |s| ReleaseError::Invalid(TerrainError(s));
         if *source.terrain != plan.source
             || !source.geometry.is_current(source.terrain)
@@ -259,7 +304,8 @@ impl LooseTerrain {
             return Err(invalid("material identity already exists"));
         }
         let new_grains = plan.grain_count();
-        let disturbed: Vec<_> = if self.config.slumping.is_some() {
+        let disturbed: Vec<_> = if self.config.slumping.is_some() || self.config.cohesion.is_some()
+        {
             plan.grains
                 .iter()
                 .filter_map(|g| source.terrain.local_to_cell(g.parent_offset))

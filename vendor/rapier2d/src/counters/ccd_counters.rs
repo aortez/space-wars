@@ -6,7 +6,9 @@ use core::fmt::{Display, Formatter, Result};
 pub struct CCDCounters {
     /// The number of substeps actually performed by the CCD resolution.
     pub num_substeps: usize,
-    /// The total time spent for TOI computation in the CCD resolution.
+    /// Time spent finding the first impact to choose each CCD substep.
+    pub first_impact_time: Timer,
+    /// Time spent predicting impacts and clamping motions, across all substeps.
     pub toi_computation_time: Timer,
     /// The total time spent for force computation and integration in the CCD resolution.
     pub solver_time: Timer,
@@ -21,6 +23,7 @@ impl CCDCounters {
     pub fn new() -> Self {
         CCDCounters {
             num_substeps: 0,
+            first_impact_time: Timer::new(),
             toi_computation_time: Timer::new(),
             solver_time: Timer::new(),
             broad_phase_time: Timer::new(),
@@ -31,6 +34,7 @@ impl CCDCounters {
     /// Resets this counter to 0.
     pub fn reset(&mut self) {
         self.num_substeps = 0;
+        self.first_impact_time.reset();
         self.toi_computation_time.reset();
         self.solver_time.reset();
         self.broad_phase_time.reset();
@@ -41,6 +45,7 @@ impl CCDCounters {
 impl Display for CCDCounters {
     fn fmt(&self, f: &mut Formatter) -> Result {
         writeln!(f, "Number of substeps: {}", self.num_substeps)?;
+        writeln!(f, "First-impact search time: {}", self.first_impact_time)?;
         writeln!(f, "TOI computation time: {}", self.toi_computation_time)?;
         writeln!(f, "Constraints solver time: {}", self.solver_time)?;
         writeln!(f, "Broad-phase time: {}", self.broad_phase_time)?;

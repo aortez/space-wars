@@ -17,14 +17,14 @@ pub struct PackingSnapshot {
     repose: Option<packing::Repose>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PackingPatch {
     /// World-space convex addition, rather than an envelope of the edited cell.
     pub vertices: Vec<Vec2>,
     pub clear: bool,
     pub blockers: Vec<ColliderId>,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PackingAttempt {
     pub stage: &'static str,
     pub grains: Vec<PhysicsId>,
@@ -42,6 +42,9 @@ pub struct PackingInspection {
     pub terrain: Vec<Vec<Vec2>>,
     pub obstacles: Vec<PackingObstacle>,
     pub attempts: Vec<PackingAttempt>,
+    /// Chosen successful surface plan; later exploratory attempts may fail.
+    pub selected_attempt: Option<usize>,
+    pub omitted_bodies: Vec<PhysicsId>,
     pub accepted: Vec<PhysicsId>,
     pub remaining_reason: String,
 }
@@ -74,8 +77,25 @@ impl PackingSnapshot {
         Ok(value)
     }
     pub fn inspect(&self) -> Result<PackingInspection, TerrainError> {
-        let world = PhysicsWorld::from_snapshot_bytes(&self.physics)
+        self.inspect_without(&[])
+    }
+
+    /// Counterfactual development query: remove specified obstacles from a copy
+    /// of the captured world. Destination and candidate grains must remain.
+    pub fn inspect_without(
+        &self,
+        omitted_bodies: &[PhysicsId],
+    ) -> Result<PackingInspection, TerrainError> {
+        let mut world = PhysicsWorld::from_snapshot_bytes(&self.physics)
             .map_err(|_| TerrainError("invalid packing physics snapshot"))?;
+        for &id in omitted_bodies {
+            if id == self.body.entity || self.grains.iter().any(|g| g.id() == id) {
+                return Err(TerrainError("cannot omit packing destination or candidate"));
+            }
+            if !world.remove_entity(id) {
+                return Err(TerrainError("missing packing obstacle"));
+            }
+        }
         let motion = world
             .motion(self.body)
             .ok_or(TerrainError("missing packing destination"))?;
@@ -94,6 +114,15 @@ impl PackingSnapshot {
         let grains: Vec<_> = self.grains.iter().collect();
         let mut attempts = Vec::new();
         let result = packing::prepare(&world, &field, &grains, Some(&mut attempts));
+        let selected_attempt = result.as_ref().ok().and_then(|plan| {
+            let ids: Vec<_> = plan.accepted.iter().map(|&i| grains[i].id()).collect();
+            attempts.iter().rposition(|a| {
+                a.cells == plan.changed
+                    && a.grains == ids
+                    && a.unstable_centers.is_empty()
+                    && a.patches.iter().all(|p| p.clear)
+            })
+        });
         let (accepted, reason): (Vec<PhysicsId>, Reason) = match result {
             Ok(plan) => (
                 plan.accepted.iter().map(|&i| grains[i].id()).collect(),
@@ -172,6 +201,8 @@ impl PackingSnapshot {
             terrain,
             obstacles,
             attempts,
+            selected_attempt,
+            omitted_bodies: omitted_bodies.to_vec(),
             accepted,
             remaining_reason,
         })
@@ -320,8 +351,141 @@ pub(super) fn attempt(
 }
 
 #[cfg(test)]
+mod oracle;
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removing_a_captured_actor_is_a_query_only_comparison() {
+        for (bytes, actor, grains, accepted) in [
+            (
+                include_bytes!("../../../../tests/fixtures/scorched-angular-actor.packing")
+                    .as_slice(),
+                11,
+                50,
+                50,
+            ),
+            (
+                include_bytes!("../../../../tests/fixtures/spacewars-round-roof-actor.packing")
+                    .as_slice(),
+                10000,
+                9,
+                3,
+            ),
+        ] {
+            let snapshot = PackingSnapshot::from_bytes(bytes).unwrap();
+            let before = snapshot.to_bytes().unwrap();
+            let ordinary = snapshot.inspect().unwrap();
+            assert_eq!(ordinary.grains.len(), grains);
+            assert!(ordinary.accepted.is_empty());
+            let actor = PhysicsId::new(actor);
+            assert!(
+                ordinary
+                    .obstacles
+                    .iter()
+                    .any(|o| o.body.entity == actor && o.kind == "actor/body")
+            );
+            let without = snapshot.inspect_without(&[actor]).unwrap();
+            assert_eq!(without.accepted.len(), accepted);
+            assert_eq!(without.omitted_bodies, [actor]);
+            assert!(!without.obstacles.iter().any(|o| o.body.entity == actor));
+            let chosen = &without.attempts[without.selected_attempt.unwrap()];
+            assert!(
+                chosen
+                    .patches
+                    .iter()
+                    .all(|p| p.clear && p.blockers.is_empty())
+            );
+            assert!(chosen.unstable_centers.is_empty());
+            for invalid in [
+                snapshot.body.entity,
+                snapshot.grains[0].id(),
+                PhysicsId::new(u64::MAX),
+            ] {
+                assert!(snapshot.inspect_without(&[invalid]).is_err());
+            }
+            assert_eq!(snapshot.to_bytes().unwrap(), before);
+            assert_eq!(
+                bincode::serialize(&snapshot.inspect().unwrap()).unwrap(),
+                bincode::serialize(&ordinary).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn captured_piles_pack_supported_cells_without_rebuilding_an_unstable_bank() {
+        for (bytes, minimum) in [
+            (
+                include_bytes!("../../../../tests/fixtures/scorched-round-repose.packing")
+                    .as_slice(),
+                32,
+            ),
+            (
+                include_bytes!("../../../../tests/fixtures/scorched-angular-repose.packing")
+                    .as_slice(),
+                48,
+            ),
+            (
+                include_bytes!("../../../../tests/fixtures/spacewars-round-curved.packing")
+                    .as_slice(),
+                56,
+            ),
+        ] {
+            let snapshot = PackingSnapshot::from_bytes(bytes).unwrap();
+            let report = snapshot.inspect().unwrap();
+            assert!(
+                report.accepted.len() >= minimum,
+                "{}: {} accepted",
+                report.remaining_reason,
+                report.accepted.len()
+            );
+            assert!(
+                report
+                    .attempts
+                    .iter()
+                    .filter(|a| a.stage == "surface additions")
+                    .count()
+                    <= 8
+            );
+            let last = &report.attempts[report.selected_attempt.unwrap()];
+            assert!(last.unstable_centers.is_empty());
+            assert!(
+                last.patches
+                    .iter()
+                    .all(|p| p.clear && p.blockers.is_empty())
+            );
+
+            let world = PhysicsWorld::from_snapshot_bytes(&snapshot.physics).unwrap();
+            let geometry = TerrainGeometry::with_surface(&snapshot.terrain, snapshot.surface);
+            let field = packing::Field {
+                terrain: &snapshot.terrain,
+                geometry: &geometry,
+                body: snapshot.body,
+                groups: snapshot.groups,
+                repose: snapshot.repose.clone(),
+                repacking: true,
+            };
+            let grains: Vec<_> = snapshot.grains.iter().collect();
+            let plan = packing::prepare(&world, &field, &grains, None).unwrap();
+            assert!(snapshot.repose.is_some());
+            assert_eq!(plan.changed.len(), plan.accepted.len());
+            for (&i, &c) in plan.accepted.iter().zip(&plan.changed) {
+                assert_eq!(snapshot.terrain.cell(c), Some(Cell::VOID));
+                assert_eq!(plan.terrain.cell(c), Some(grains[i].cell()));
+                // Space Wars supplies a sampled planetary field rather than
+                // Rapier's uniform world gravity. Check the captured rule.
+                let repose = field.repose.as_ref().unwrap();
+                assert!(!super::super::super::slumping::oversteep(
+                    &plan.terrain,
+                    c,
+                    repose.gravity[&(c.y, c.x)],
+                    repose.degrees,
+                ));
+            }
+        }
+    }
 
     #[test]
     fn captured_angular_pile_repacks_around_tank_and_unselected_grains() {
@@ -331,7 +495,10 @@ mod tests {
         let snapshot = PackingSnapshot::from_bytes(bytes).unwrap();
         let before = snapshot.to_bytes().unwrap();
         let report = snapshot.inspect().unwrap();
-        assert!(!report.accepted.is_empty());
+        assert!(
+            report.accepted.len() >= 22,
+            "retain the existing recovery fallback"
+        );
         assert!(report.accepted.len() < report.grains.len());
         assert!(
             report
@@ -344,10 +511,7 @@ mod tests {
         assert!(report.obstacles.iter().any(|o| o.kind == "actor/body"));
         assert!(report.obstacles.iter().any(|o| o.kind == "loose grain"));
         assert!(
-            report
-                .attempts
-                .last()
-                .unwrap()
+            report.attempts[report.selected_attempt.unwrap()]
                 .patches
                 .iter()
                 .all(|p| p.clear && p.blockers.is_empty())

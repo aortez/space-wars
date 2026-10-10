@@ -1,0 +1,4796 @@
+{
+  "work": "bounded contact breakup of dynamic clumps",
+  "date": "2026-10-06",
+  "head": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+  "parent_review": "dirt-cohesion-20261006",
+  "toolchain": "Rust 1.89.0, --locked --release; static AArch64 benchmarks",
+  "protocol": "Serial runs per host, paused kiosk during Picade timing. Desktop timing completed before Yocto build. Audits, hashes, diagnostics, and replay outside update timers. Single timing samples per configuration; small differences are noise. Picade mid-run thermal/frequency observations are included, not a claim that throttling was absent.",
+  "scope": "Uniform opt-in local chipping of dynamic fragments, gated by pre-solve relative speed and solver impulse/source mass. Default 512 contact scans, 16 chipped cells, one patch attempt per boundary, 0.35-second cooldown. Existing barrage/Spacewars stress scenes produced no impact fractures at yield speed 6; they measure opt-in checking overhead. Actual fracture is exercised by drop/bank fixtures and the rotating-planet integration test.",
+  "validation": {
+    "core_scenario_tests": 812,
+    "client_tests": 3,
+    "baseline_scene_hashes_unchanged": 16,
+    "matching_cross_host_scene_results": 34,
+    "executions": 38,
+    "scene_results": 68,
+    "scorched_replays": 28,
+    "clippy": "engine-rapier and scenario-scorched-earth all-targets, no-deps, -D warnings passed. Broader Spacewars strict Clippy reports 17 existing warnings in unchanged code; source checked against the captured baseline. Full Spacewars tests passed.",
+    "format_and_diff_check": true
+  },
+  "before_source_manifest_sha256": "43b77a1670a5d75080ce6a2e2e9df2bfebea8cb89302211cb3dc93eae2192354",
+  "after_source_manifest_sha256": "c25ce8ffcc89a074836ed783001fc90aca6b66bfd065f60e55bee3bdb7d648b3",
+  "changed_source_sha256": {
+    "scenarios/spacewars/examples/loose_terrain_benchmark.rs": "7c7790d178350fecec7b808c3eadc23d0781e1c63b81cc701432f75e635e51d8",
+    "scenarios/spacewars/src/terrain.rs": "faa39718708b352b34f41ef2062831b749ec40070366af90f3e08372abe91402",
+    "scenarios/spacewars/src/lib.rs": "499948d7e385eeb7081466c10b6ed62bde2c5b393e0d3c77d12925714f35cb17",
+    "scenarios/spacewars/src/terrain/diagnostics.rs": "c20e49a1c83f7e69a6ec7c4e8e6325896ac2e2b5924f3db3ca61f06a2dfff752",
+    "scenarios/spacewars/src/terrain/loose.rs": "98a13245429fd9ca5e2121a665143250a83defa870f1e5d852b4035718666940",
+    "scenarios/spacewars/src/terrain/tests/loose.rs": "053dc696dd25d5278200f4283e40d8d108f254255fcb9222c0ca3c89fbf16666",
+    "scenarios/scorched-earth/examples/scorched_benchmark.rs": "aeea9cd25b786f2ed5aee53221978fa22fe6e84374b8f26bf1a85cbcc6f8111d",
+    "scenarios/scorched-earth/src/action.rs": "05444caadc6dded0721e88da4038ad93f06b9ff1bcae9ad48a6d2f22f36c730f",
+    "scenarios/scorched-earth/src/tests.rs": "f305c7c3456d8e31412937af3495a8016e0efafbfb922242abf097a85ebb1b37",
+    "scenarios/scorched-earth/src/render.rs": "12ebe0d3857cd899baa4c45142426a38e161f3cef4f4aaba4d0a607c2b33ea45",
+    "scenarios/scorched-earth/src/lib.rs": "1521d40801ae3e13500a0d5ccb5c77c77ad7d2d2998e3d96b721d32e7b0dc82c",
+    "scenarios/scorched-earth/src/bank.rs": "64ceb461747715ac6894d242a4d2a2821a96742f623ee298e0228ea6fa618349",
+    "scenarios/scorched-earth/src/material.rs": "48ee6df8c67e2494c18f49a8d29d359bcc0f7e2be350ec2c9e1e67328b59f2c9",
+    "scenarios/scorched-earth/src/drop_test.rs": "5e26f50f8b01289a3273242f4ed283e20cde7f34beeaa64a233670ff5cdbf6c1",
+    "crates/engine-client/src/client_scenarios/scorched_earth.rs": "49001f6d66ec300a28dae8a85007f3f4f43aeeb6ee0d02955cf0021bc66b8fa1",
+    "crates/engine-rapier/src/world.rs": "afc4b6e2a5510606f3dcf07d57fabb315852661b74997dbc23382d9b873f230b",
+    "crates/engine-rapier/src/terrain.rs": "d405bd5217ecefed49268846cdb9f1c1ef0cd906b985e1bf5c0dedeb7f55ea70",
+    "crates/engine-rapier/src/terrain/loose/impact/tests.rs": "710cd41924d7517f98b742dea0437821760ae1b4887c57388faacc587dff3714",
+    "crates/engine-rapier/src/terrain/loose/deposition.rs": "93791d7291607cf4f7db20c1e1cab72cd98f1396442881d64f6b6bbe136357fd",
+    "crates/engine-rapier/src/terrain/loose/impact.rs": "ca81c39cf69cfcac3fde823f22f3b8372ea2f185f2707c9006dc80bff8b003dd",
+    "crates/engine-rapier/src/terrain/loose.rs": "0ea94515a1a7c5630189602217652ec445d817a437d193a062e727a4aff817e4"
+  },
+  "picade_mid_run_metadata": [
+    {
+      "command": "date -Is",
+      "exit": 0,
+      "stdout": "2026-10-06T21:17:03-07:00\n",
+      "stderr": ""
+    },
+    {
+      "command": "uname -a",
+      "exit": 0,
+      "stdout": "Linux sw-picade 6.6.63-v8 #1 SMP PREEMPT Fri Dec  6 10:10:05 UTC 2024 aarch64 GNU/Linux\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /sys/class/thermal/thermal_zone0/temp",
+      "exit": 0,
+      "stdout": "80828\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq",
+      "exit": 0,
+      "stdout": "1500000\n",
+      "stderr": ""
+    },
+    {
+      "command": "vcgencmd get_throttled",
+      "exit": 127,
+      "stdout": "",
+      "stderr": "bash: line 1: vcgencmd: command not found\n"
+    },
+    {
+      "command": "systemctl show spacewars-kiosk.service -p ActiveState -p MainPID -p NRestarts",
+      "exit": 0,
+      "stdout": "MainPID=408\nNRestarts=0\nActiveState=active\n",
+      "stderr": ""
+    },
+    {
+      "command": "spacewars-cli ui state --json",
+      "exit": 0,
+      "stdout": "{\n  \"schema_version\": 1,\n  \"revision\": 2,\n  \"screen\": \"pause.main\",\n  \"active_scenario\": \"scorched-earth\",\n  \"selected_scenario\": \"scorched-earth\",\n  \"selected_control\": \"pause.resume\",\n  \"controls\": [\n    {\n      \"id\": \"pause.resume\",\n      \"label\": \"Resume\",\n      \"enabled\": true\n    },\n    {\n      \"id\": \"pause.restart\",\n      \"label\": \"Restart Round\",\n      \"enabled\": true\n    },\n    {\n      \"id\": \"pause.controls\",\n      \"label\": \"Controls\",\n      \"enabled\": true\n    },\n    {\n      \"id\": \"pause.return-to-launcher\",\n      \"label\": \"Return to Launcher\",\n      \"enabled\": true\n    },\n    {\n      \"id\": \"pause.sound\",\n      \"label\": \"App Settings\",\n      \"enabled\": true\n    }\n  ],\n  \"actions\": [\n    \"up\",\n    \"down\",\n    \"left\",\n    \"right\",\n    \"confirm\",\n    \"back\",\n    \"start\",\n    \"controls\"\n  ],\n  \"scenario_revision\": 2,\n  \"paused\": true,\n  \"benchmark_active\": false,\n  \"error\": null\n}\n",
+      "stderr": ""
+    }
+  ],
+  "final_source_manifest_sha256": "75a5dc882d382e4ceb9062d24ca84b51e2f03b3636de5ffbae478d867d01edbb",
+  "presentation_adjustment": {
+    "note": "After timing, only Scorched render labels changed: clump-break/refusal counts and the Bank test label in drop mode. Physics, controls, and observations are unchanged. Client tests were rerun and the final client was rebuilt and checked live.",
+    "patch": "--- measured/scenarios/scorched-earth/src/render.rs\n+++ final/scenarios/scorched-earth/src/render.rs\n@@ -340,16 +340,27 @@\n         RenderColor::rgb(0.055, 0.085, 0.12),\n     );\n     text(&mut frame, Vec2::new(0.0, -19.6), result, 13.0, INK);\n+    let (events, event_label, rejections) = if state.config.drop_height.is_some() {\n+        let d = state.impact_diagnostics();\n+        (\n+            d.failures,\n+            \"clump breaks\",\n+            d.capacity_denials + d.fragment_denials,\n+        )\n+    } else {\n+        (state.impacts, \"impacts\", state.rejected_blasts)\n+    };\n     text(\n         &mut frame,\n         Vec2::new(0.0, -22.3),\n         format!(\n-            \"{} / {} loose  \u00b7  {} returned  \u00b7  {} impacts  \u00b7  {} capacity rejections\",\n+            \"{} / {} loose  \u00b7  {} returned  \u00b7  {} {}  \u00b7  {} capacity rejections\",\n             state.loose_cells(),\n             state.config.max_grains,\n             state.deposited_cells(),\n-            state.impacts,\n-            state.rejected_blasts\n+            events,\n+            event_label,\n+            rejections\n         ),\n         12.0,\n         INK,\n@@ -380,7 +391,7 @@\n         } else {\n             \"Barrage\"\n         },\n-        if state.config.undercut {\n+        if state.config.undercut || state.config.drop_height.is_some() {\n             \"Bank test\"\n         } else {\n             \"Hills\"\n",
+    "changed_source_sha256": {
+      "scenarios/scorched-earth/src/render.rs": "3dbb54ef3b53863632ecf671d3277454eca8354ce80031b678e2175a1a877126"
+    }
+  },
+  "runs": [
+    {
+      "host": "desktop",
+      "version": "before",
+      "case": "barrage-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "7b40410b759325fd0d5a39487ffaa1a16735884ac2df84b4b70690e5a604d0de",
+      "wall_seconds": 3.0521323680877686,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 620,
+        "grain_limit": 192,
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 5.077596,
+        "mean_ms": 0.41867993347222277,
+        "observation_hash": "c6b99ae5b618b174",
+        "p95_ms": 1.6915470000000001,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 5.077596,
+            "mean_ms": 0.7753522655555558,
+            "p95_ms": 3.681688,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.670266,
+            "mean_ms": 0.06200760138888891,
+            "p95_ms": 0.316098,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": false,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "before",
+      "case": "barrage-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "7b40410b759325fd0d5a39487ffaa1a16735884ac2df84b4b70690e5a604d0de",
+      "wall_seconds": 1.5014286041259766,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 1029,
+        "grain_limit": 192,
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 3.396479,
+        "mean_ms": 0.20378729194444412,
+        "observation_hash": "3be4e1e4bc5a32df",
+        "p95_ms": 0.5717,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 3.396479,
+            "mean_ms": 0.32834771583333316,
+            "p95_ms": 0.828166,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.525684,
+            "mean_ms": 0.07922686805555551,
+            "p95_ms": 0.279117,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": false,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "before",
+      "case": "spacewars-default",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "e8be7eefd495eb241666f175adbbac52d2a4975884752909e4c826e4c7fe3609",
+      "wall_seconds": 4.692644357681274,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.025",
+          "step_p50_ms": "0.024",
+          "step_p95_ms": "0.035",
+          "step_p99_ms": "0.044",
+          "step_max_ms": "0.155",
+          "frame_p95_ms": "0.012",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "0.102",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.353",
+          "step_p99_ms": "0.498",
+          "step_max_ms": "0.940",
+          "frame_p95_ms": "0.019",
+          "state_hash": "538f2bb861f4cb03"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "0.197",
+          "step_p50_ms": "0.026",
+          "step_p95_ms": "0.663",
+          "step_p99_ms": "1.923",
+          "step_max_ms": "2.993",
+          "frame_p95_ms": "0.024",
+          "state_hash": "6ac7cfb14fcef0f9"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.081",
+          "step_p50_ms": "0.070",
+          "step_p95_ms": "0.109",
+          "step_p99_ms": "0.152",
+          "step_max_ms": "1.188",
+          "frame_p95_ms": "0.210",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "0.707",
+          "step_p50_ms": "0.589",
+          "step_p95_ms": "1.646",
+          "step_p99_ms": "3.208",
+          "step_max_ms": "4.731",
+          "frame_p95_ms": "0.253",
+          "state_hash": "d42437a2f1e7cbf6"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "0.757",
+          "step_p50_ms": "0.692",
+          "step_p95_ms": "1.919",
+          "step_p99_ms": "2.866",
+          "step_max_ms": "4.671",
+          "frame_p95_ms": "0.255",
+          "state_hash": "cb7c99ccfd903081"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "barrage-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics",
+        "--replay"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 6.048286199569702,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "breakup": false,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 620,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 4.892144999999999,
+        "mean_ms": 0.41548198000000064,
+        "observation_hash": "c6b99ae5b618b174",
+        "p95_ms": 1.6884910000000002,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 4.892144999999999,
+            "mean_ms": 0.7682095211111123,
+            "p95_ms": 3.6815469999999997,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.70386,
+            "mean_ms": 0.06275443888888893,
+            "p95_ms": 0.32006500000000004,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "barrage-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics",
+        "--replay"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 2.978902578353882,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "breakup": false,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 1029,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 3.452525,
+        "mean_ms": 0.2038960955555557,
+        "observation_hash": "3be4e1e4bc5a32df",
+        "p95_ms": 0.569276,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 3.452525,
+            "mean_ms": 0.32890441305555523,
+            "p95_ms": 0.832674,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.5454000000000003,
+            "mean_ms": 0.0788877780555555,
+            "p95_ms": 0.278656,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "spacewars-default",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "4fd9952f8fe72baac87b353e71400b2854926482d4e3aa9907aacdb339b10002",
+      "wall_seconds": 4.695432901382446,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.025",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.036",
+          "step_p99_ms": "0.043",
+          "step_max_ms": "0.154",
+          "frame_p95_ms": "0.012",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "0.102",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.356",
+          "step_p99_ms": "0.498",
+          "step_max_ms": "0.942",
+          "frame_p95_ms": "0.019",
+          "state_hash": "538f2bb861f4cb03"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "0.197",
+          "step_p50_ms": "0.026",
+          "step_p95_ms": "0.661",
+          "step_p99_ms": "1.913",
+          "step_max_ms": "2.931",
+          "frame_p95_ms": "0.024",
+          "state_hash": "6ac7cfb14fcef0f9"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.083",
+          "step_p50_ms": "0.072",
+          "step_p95_ms": "0.112",
+          "step_p99_ms": "0.154",
+          "step_max_ms": "1.191",
+          "frame_p95_ms": "0.211",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "0.713",
+          "step_p50_ms": "0.596",
+          "step_p95_ms": "1.661",
+          "step_p99_ms": "3.275",
+          "step_max_ms": "4.764",
+          "frame_p95_ms": "0.253",
+          "state_hash": "d42437a2f1e7cbf6"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "0.756",
+          "step_p50_ms": "0.681",
+          "step_p95_ms": "1.918",
+          "step_p99_ms": "2.855",
+          "step_max_ms": "4.640",
+          "frame_p95_ms": "0.252",
+          "state_hash": "cb7c99ccfd903081"
+        }
+      ]
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "barrage-breakup-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 6.043469190597534,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 620,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 4.90493,
+        "mean_ms": 0.41630155458333373,
+        "observation_hash": "2dc90265c42523ff",
+        "p95_ms": 1.679454,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 4.90493,
+            "mean_ms": 0.770424001666668,
+            "p95_ms": 3.6716290000000003,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 4.720270999999999,
+            "mean_ms": 0.06217910750000002,
+            "p95_ms": 0.31605700000000003,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "bank-breakup-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--undercut",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.17147016525268555,
+      "result": {
+        "available_slots": 191,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 5184.0,
+          "last_resistance": 1333.3333740234375,
+          "pending": 0,
+          "released_cells": 48,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 42,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 2816,
+          "peak_severity": 7.654736518859863,
+          "pending": 0,
+          "released_cells": 6,
+          "scanned": 20,
+          "stale_hits": 0
+        },
+        "impacts": 1,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 3049,
+          "loose": 1,
+          "solid": 3048
+        },
+        "max_ms": 1.411378,
+        "mean_ms": 0.09196994888888879,
+        "observation_hash": "637d8b19644019f0",
+        "p95_ms": 0.19952699999999998,
+        "packing_work": {
+          "attempted_grains": 314,
+          "attempted_groups": 55,
+          "reused_failures": 0
+        },
+        "peak_bodies": 47,
+        "peak_contacts": 75,
+        "peak_loose": 43,
+        "phases": {
+          "active": {
+            "max_ms": 1.411378,
+            "mean_ms": 0.09196994888888879,
+            "p95_ms": 0.19952699999999998,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 1,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-undercut-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-low-weak-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.03571653366088867,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.130266,
+        "mean_ms": 0.01740276555555558,
+        "observation_hash": "4a6205c8e07d9625",
+        "p95_ms": 0.061616000000000004,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.130266,
+            "mean_ms": 0.01740276555555558,
+            "p95_ms": 0.061616000000000004,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-low-strong-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.035666704177856445,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.126119,
+        "mean_ms": 0.01725901444444445,
+        "observation_hash": "6888c8d3cfa06dc8",
+        "p95_ms": 0.061346000000000005,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.126119,
+            "mean_ms": 0.01725901444444445,
+            "p95_ms": 0.061346000000000005,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-high-weak-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.08442234992980957,
+      "result": {
+        "available_slots": 182,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 2,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 12709,
+          "peak_severity": 21.000118255615234,
+          "pending": 0,
+          "released_cells": 12,
+          "scanned": 49,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 10,
+          "solid": 2253
+        },
+        "max_ms": 0.34789800000000004,
+        "mean_ms": 0.04421765999999995,
+        "observation_hash": "ece3c686119092aa",
+        "p95_ms": 0.079931,
+        "packing_work": {
+          "attempted_grains": 17,
+          "attempted_groups": 12,
+          "reused_failures": 0
+        },
+        "peak_bodies": 16,
+        "peak_contacts": 27,
+        "peak_loose": 12,
+        "phases": {
+          "active": {
+            "max_ms": 0.34789800000000004,
+            "mean_ms": 0.04421765999999995,
+            "p95_ms": 0.079931,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 9,
+          "no_room": 0,
+          "obstructed": 1,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-high-strong-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.03013014793395996,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 30283,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.113084,
+        "mean_ms": 0.013917927777777771,
+        "observation_hash": "b7a2a7bf89263b5f",
+        "p95_ms": 0.050466000000000004,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.113084,
+            "mean_ms": 0.013917927777777771,
+            "p95_ms": 0.050466000000000004,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "barrage-breakup-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 2.991354465484619,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 1029,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 3.434682,
+        "mean_ms": 0.20428374583333334,
+        "observation_hash": "fb070591083e8d28",
+        "p95_ms": 0.575608,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 3.434682,
+            "mean_ms": 0.32945404388888827,
+            "p95_ms": 0.828987,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 2.639158,
+            "mean_ms": 0.07911344777777773,
+            "p95_ms": 0.28044,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "bank-breakup-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--undercut",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.21316266059875488,
+      "result": {
+        "available_slots": 158,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 5184.0,
+          "last_resistance": 1333.3333740234375,
+          "pending": 0,
+          "released_cells": 48,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 10,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 2550,
+          "peak_severity": 7.525030136108398,
+          "pending": 0,
+          "released_cells": 7,
+          "scanned": 81,
+          "stale_hits": 0
+        },
+        "impacts": 1,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 3049,
+          "loose": 34,
+          "solid": 3015
+        },
+        "max_ms": 1.879021,
+        "mean_ms": 0.11458729666666666,
+        "observation_hash": "004ee74848b7a6bd",
+        "p95_ms": 0.21682,
+        "packing_work": {
+          "attempted_grains": 518,
+          "attempted_groups": 33,
+          "reused_failures": 9
+        },
+        "peak_bodies": 48,
+        "peak_contacts": 65,
+        "peak_loose": 44,
+        "phases": {
+          "active": {
+            "max_ms": 1.879021,
+            "mean_ms": 0.11458729666666666,
+            "p95_ms": 0.21682,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 34,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-undercut-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-low-weak-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.03690958023071289,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.127912,
+        "mean_ms": 0.017324986666666677,
+        "observation_hash": "ef858a4bbd74f021",
+        "p95_ms": 0.061707,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.127912,
+            "mean_ms": 0.017324986666666677,
+            "p95_ms": 0.061707,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-low-strong-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.03636741638183594,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.12715,
+        "mean_ms": 0.01723350111111113,
+        "observation_hash": "421d67930db95628",
+        "p95_ms": 0.061406,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.12715,
+            "mean_ms": 0.01723350111111113,
+            "p95_ms": 0.061406,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-high-weak-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.0687246322631836,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 12,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 12593,
+          "peak_severity": 21.000118255615234,
+          "pending": 0,
+          "released_cells": 12,
+          "scanned": 34,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.985262,
+        "mean_ms": 0.035317058888888885,
+        "observation_hash": "200a7b7652d2f2a2",
+        "p95_ms": 0.07620400000000001,
+        "packing_work": {
+          "attempted_grains": 46,
+          "attempted_groups": 15,
+          "reused_failures": 0
+        },
+        "peak_bodies": 16,
+        "peak_contacts": 22,
+        "peak_loose": 12,
+        "phases": {
+          "active": {
+            "max_ms": 0.985262,
+            "mean_ms": 0.035317058888888885,
+            "p95_ms": 0.07620400000000001,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "drop-high-strong-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "8d5b195a903e6895cdbb40ab884f2c3e7a21b2747b5c2a130e0a90ec3b1dfdaf",
+      "wall_seconds": 0.03004932403564453,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 30283,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.114937,
+        "mean_ms": 0.013911773333333346,
+        "observation_hash": "df0e99798af8e3d3",
+        "p95_ms": 0.050406,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.114937,
+            "mean_ms": 0.013911773333333346,
+            "p95_ms": 0.050406,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "desktop",
+      "version": "after",
+      "case": "spacewars-breakup",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--cohesion",
+        "500",
+        "--impact-yield-speed",
+        "6",
+        "--diagnostics"
+      ],
+      "sha256": "4fd9952f8fe72baac87b353e71400b2854926482d4e3aa9907aacdb339b10002",
+      "wall_seconds": 4.756403923034668,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.025",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.035",
+          "step_p99_ms": "0.043",
+          "step_max_ms": "0.154",
+          "frame_p95_ms": "0.012",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "0.104",
+          "step_p50_ms": "0.025",
+          "step_p95_ms": "0.357",
+          "step_p99_ms": "0.524",
+          "step_max_ms": "0.937",
+          "frame_p95_ms": "0.019",
+          "state_hash": "a72e085ade4030df"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "0.200",
+          "step_p50_ms": "0.027",
+          "step_p95_ms": "0.671",
+          "step_p99_ms": "1.913",
+          "step_max_ms": "2.988",
+          "frame_p95_ms": "0.024",
+          "state_hash": "c764dee339bd1498"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "0.083",
+          "step_p50_ms": "0.072",
+          "step_p95_ms": "0.113",
+          "step_p99_ms": "0.156",
+          "step_max_ms": "1.206",
+          "frame_p95_ms": "0.210",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "0.717",
+          "step_p50_ms": "0.601",
+          "step_p95_ms": "1.653",
+          "step_p99_ms": "3.209",
+          "step_max_ms": "4.805",
+          "frame_p95_ms": "0.253",
+          "state_hash": "64318babac80944b"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "0.777",
+          "step_p50_ms": "0.702",
+          "step_p95_ms": "1.956",
+          "step_p99_ms": "2.898",
+          "step_max_ms": "4.922",
+          "frame_p95_ms": "0.250",
+          "state_hash": "8d8ebfe71d1a97ba"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "version": "before",
+      "case": "barrage-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "fc19f3af42fc24c38784edc289741e214e907290952f555baab47c1d1388a394",
+      "wall_seconds": 34.41867804527283,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 620,
+        "grain_limit": 192,
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 43.228303000000004,
+        "mean_ms": 4.282280833611105,
+        "observation_hash": "c6b99ae5b618b174",
+        "p95_ms": 15.271785,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 43.228303000000004,
+            "mean_ms": 7.8988418616666545,
+            "p95_ms": 29.390877,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 42.818084999999996,
+            "mean_ms": 0.6657198055555553,
+            "p95_ms": 3.475676,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": false,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "before",
+      "case": "barrage-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "fc19f3af42fc24c38784edc289741e214e907290952f555baab47c1d1388a394",
+      "wall_seconds": 16.854278564453125,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 1029,
+        "grain_limit": 192,
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 34.113302,
+        "mean_ms": 2.2548325333333303,
+        "observation_hash": "3be4e1e4bc5a32df",
+        "p95_ms": 6.343801,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 34.113302,
+            "mean_ms": 3.55154298138889,
+            "p95_ms": 8.009399,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 24.536804,
+            "mean_ms": 0.9581220852777778,
+            "p95_ms": 3.102901,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": false,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "before",
+      "case": "spacewars-default",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "a99c00f569466c7d3eede353b19d2e7bf432013ff7d800f4caa2ff9df59d31d5",
+      "wall_seconds": 61.008496046066284,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.257",
+          "step_p50_ms": "0.210",
+          "step_p95_ms": "0.556",
+          "step_p99_ms": "1.229",
+          "step_max_ms": "2.046",
+          "frame_p95_ms": "0.137",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "1.015",
+          "step_p50_ms": "0.230",
+          "step_p95_ms": "3.390",
+          "step_p99_ms": "5.675",
+          "step_max_ms": "11.792",
+          "frame_p95_ms": "0.239",
+          "state_hash": "538f2bb861f4cb03"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "1.832",
+          "step_p50_ms": "0.349",
+          "step_p95_ms": "6.451",
+          "step_p99_ms": "15.093",
+          "step_max_ms": "28.715",
+          "frame_p95_ms": "0.315",
+          "state_hash": "6ac7cfb14fcef0f9"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "1.347",
+          "step_p50_ms": "1.171",
+          "step_p95_ms": "2.343",
+          "step_p99_ms": "3.752",
+          "step_max_ms": "10.263",
+          "frame_p95_ms": "5.705",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "8.274",
+          "step_p50_ms": "7.770",
+          "step_p95_ms": "19.124",
+          "step_p99_ms": "30.264",
+          "step_max_ms": "51.459",
+          "frame_p95_ms": "6.407",
+          "state_hash": "d42437a2f1e7cbf6"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "8.335",
+          "step_p50_ms": "7.441",
+          "step_p95_ms": "19.522",
+          "step_p99_ms": "29.526",
+          "step_max_ms": "46.041",
+          "frame_p95_ms": "6.249",
+          "state_hash": "cb7c99ccfd903081"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "barrage-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics",
+        "--replay"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 62.80005216598511,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "breakup": false,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 620,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 42.758161,
+        "mean_ms": 4.291649962916666,
+        "observation_hash": "c6b99ae5b618b174",
+        "p95_ms": 15.035732,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 42.758161,
+            "mean_ms": 7.926254809444441,
+            "p95_ms": 29.686098,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 42.111312999999996,
+            "mean_ms": 0.6570451163888895,
+            "p95_ms": 3.484713,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "barrage-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--diagnostics",
+        "--replay"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 33.71630811691284,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "breakup": false,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "off",
+        "deposited_cells": 1029,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 30.399334,
+        "mean_ms": 2.277413494305557,
+        "observation_hash": "3be4e1e4bc5a32df",
+        "p95_ms": 6.535726,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 30.399334,
+            "mean_ms": 3.5713265255555564,
+            "p95_ms": 8.364230000000001,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 22.994094999999998,
+            "mean_ms": 0.9835004630555552,
+            "p95_ms": 3.1596599999999997,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "spacewars-default",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--diagnostics"
+      ],
+      "sha256": "8b671054985c94920a987f21819110f78aa5110b9720f6fffba963e0cd6cd499",
+      "wall_seconds": 62.505367040634155,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.254",
+          "step_p50_ms": "0.206",
+          "step_p95_ms": "0.572",
+          "step_p99_ms": "1.165",
+          "step_max_ms": "2.486",
+          "frame_p95_ms": "0.132",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "1.017",
+          "step_p50_ms": "0.254",
+          "step_p95_ms": "3.450",
+          "step_p99_ms": "5.693",
+          "step_max_ms": "12.124",
+          "frame_p95_ms": "0.261",
+          "state_hash": "538f2bb861f4cb03"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "1.828",
+          "step_p50_ms": "0.321",
+          "step_p95_ms": "6.494",
+          "step_p99_ms": "13.614",
+          "step_max_ms": "25.186",
+          "frame_p95_ms": "0.314",
+          "state_hash": "6ac7cfb14fcef0f9"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "1.338",
+          "step_p50_ms": "1.166",
+          "step_p95_ms": "2.383",
+          "step_p99_ms": "3.898",
+          "step_max_ms": "11.370",
+          "frame_p95_ms": "5.240",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "8.325",
+          "step_p50_ms": "7.803",
+          "step_p95_ms": "19.039",
+          "step_p99_ms": "30.711",
+          "step_max_ms": "47.822",
+          "frame_p95_ms": "6.141",
+          "state_hash": "d42437a2f1e7cbf6"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "8.390",
+          "step_p50_ms": "7.588",
+          "step_p95_ms": "20.026",
+          "step_p99_ms": "28.901",
+          "step_max_ms": "39.244",
+          "frame_p95_ms": "6.383",
+          "state_hash": "cb7c99ccfd903081"
+        }
+      ]
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "barrage-breakup-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 63.588709592819214,
+      "result": {
+        "available_slots": 174,
+        "bombardment_seconds": 60,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 620,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": {
+          "available": 37,
+          "requested": 41
+        },
+        "material": {
+          "initial": 10393,
+          "loose": 18,
+          "solid": 10375
+        },
+        "max_ms": 44.213243,
+        "mean_ms": 4.321572117777774,
+        "observation_hash": "2dc90265c42523ff",
+        "p95_ms": 15.255509,
+        "packing_work": {
+          "attempted_grains": 25330,
+          "attempted_groups": 748,
+          "reused_failures": 98
+        },
+        "peak_bodies": 195,
+        "peak_contacts": 349,
+        "peak_loose": 192,
+        "phases": {
+          "active": {
+            "max_ms": 44.213243,
+            "mean_ms": 7.973048873888888,
+            "p95_ms": 29.488193,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 42.864846,
+            "mean_ms": 0.6700953616666667,
+            "p95_ms": 3.516176,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 6,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 18,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 455,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 28,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1309,
+          "attempted_groups": 65,
+          "reused_failures": 94
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "bank-breakup-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--undercut",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 2.1205227375030518,
+      "result": {
+        "available_slots": 191,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 5184.0,
+          "last_resistance": 1333.3333740234375,
+          "pending": 0,
+          "released_cells": 48,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 42,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 2816,
+          "peak_severity": 7.654736518859863,
+          "pending": 0,
+          "released_cells": 6,
+          "scanned": 20,
+          "stale_hits": 0
+        },
+        "impacts": 1,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 3049,
+          "loose": 1,
+          "solid": 3048
+        },
+        "max_ms": 10.939562,
+        "mean_ms": 1.0175515422222223,
+        "observation_hash": "637d8b19644019f0",
+        "p95_ms": 2.716627,
+        "packing_work": {
+          "attempted_grains": 314,
+          "attempted_groups": 55,
+          "reused_failures": 0
+        },
+        "peak_bodies": 47,
+        "peak_contacts": 75,
+        "peak_loose": 43,
+        "phases": {
+          "active": {
+            "max_ms": 10.939562,
+            "mean_ms": 1.0175515422222223,
+            "p95_ms": 2.716627,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 1,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-undercut-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-low-weak-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.520552396774292,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 1.179046,
+        "mean_ms": 0.1420704488888889,
+        "observation_hash": "4a6205c8e07d9625",
+        "p95_ms": 0.435478,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 1.179046,
+            "mean_ms": 0.1420704488888889,
+            "p95_ms": 0.435478,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-low-strong-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.5606369972229004,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 3.831618,
+        "mean_ms": 0.1566637777777779,
+        "observation_hash": "6888c8d3cfa06dc8",
+        "p95_ms": 0.45673699999999995,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 3.831618,
+            "mean_ms": 0.1566637777777779,
+            "p95_ms": 0.45673699999999995,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-high-weak-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 1.1560161113739014,
+      "result": {
+        "available_slots": 182,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 2,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 12709,
+          "peak_severity": 21.000118255615234,
+          "pending": 0,
+          "released_cells": 12,
+          "scanned": 49,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 10,
+          "solid": 2253
+        },
+        "max_ms": 4.8649059999999995,
+        "mean_ms": 0.4976512811111109,
+        "observation_hash": "ece3c686119092aa",
+        "p95_ms": 1.0457509999999999,
+        "packing_work": {
+          "attempted_grains": 17,
+          "attempted_groups": 12,
+          "reused_failures": 0
+        },
+        "peak_bodies": 16,
+        "peak_contacts": 27,
+        "peak_loose": 12,
+        "phases": {
+          "active": {
+            "max_ms": 4.8649059999999995,
+            "mean_ms": 0.4976512811111109,
+            "p95_ms": 1.0457509999999999,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 9,
+          "no_room": 0,
+          "obstructed": 1,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-high-strong-round",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "round",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.5028390884399414,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 30283,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 1.746783,
+        "mean_ms": 0.12077503777777786,
+        "observation_hash": "b7a2a7bf89263b5f",
+        "p95_ms": 0.36633,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 1.746783,
+            "mean_ms": 0.12077503777777786,
+            "p95_ms": 0.36633,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "round",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "barrage-breakup-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "120",
+        "--bombardment-seconds",
+        "60",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 33.7655725479126,
+      "result": {
+        "available_slots": 142,
+        "bombardment_seconds": 60,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 1029,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "stale_hits": 0
+        },
+        "impacts": 30,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 33.253497,
+        "mean_ms": 2.2776900805555567,
+        "observation_hash": "fb070591083e8d28",
+        "p95_ms": 6.581503,
+        "packing_work": {
+          "attempted_grains": 10149,
+          "attempted_groups": 582,
+          "reused_failures": 110
+        },
+        "peak_bodies": 141,
+        "peak_contacts": 231,
+        "peak_loose": 138,
+        "phases": {
+          "active": {
+            "max_ms": 33.253497,
+            "mean_ms": 3.58893527861111,
+            "p95_ms": 8.256861,
+            "ticks": 3600
+          },
+          "tail": {
+            "max_ms": 23.981051,
+            "mean_ms": 0.9664448825000004,
+            "p95_ms": 3.112809,
+            "ticks": 3600
+          }
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 50,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 30,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 584,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 7,
+          "released_cells": 54,
+          "scanned": 7,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": true,
+        "tail_packing_work": {
+          "attempted_grains": 1681,
+          "attempted_groups": 55,
+          "reused_failures": 107
+        },
+        "ticks": 7200,
+        "winner": null,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "bank-breakup-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--undercut",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 2.5651278495788574,
+      "result": {
+        "available_slots": 158,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 5184.0,
+          "last_resistance": 1333.3333740234375,
+          "pending": 0,
+          "released_cells": 48,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 10,
+        "drop": null,
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 2550,
+          "peak_severity": 7.525030136108398,
+          "pending": 0,
+          "released_cells": 7,
+          "scanned": 81,
+          "stale_hits": 0
+        },
+        "impacts": 1,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 3049,
+          "loose": 34,
+          "solid": 3015
+        },
+        "max_ms": 18.521057,
+        "mean_ms": 1.2583392744444448,
+        "observation_hash": "004ee74848b7a6bd",
+        "p95_ms": 3.117401,
+        "packing_work": {
+          "attempted_grains": 518,
+          "attempted_groups": 33,
+          "reused_failures": 9
+        },
+        "peak_bodies": 48,
+        "peak_contacts": 65,
+        "peak_loose": 44,
+        "phases": {
+          "active": {
+            "max_ms": 18.521057,
+            "mean_ms": 1.2583392744444448,
+            "p95_ms": 3.117401,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 34,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-undercut-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-low-weak-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.5341837406158447,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 1.410266,
+        "mean_ms": 0.1450033000000001,
+        "observation_hash": "ef858a4bbd74f021",
+        "p95_ms": 0.402534,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 1.410266,
+            "mean_ms": 0.1450033000000001,
+            "p95_ms": 0.402534,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-low-strong-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "low",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.5295202732086182,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "low",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 35374,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 1.734931,
+        "mean_ms": 0.14437289444444446,
+        "observation_hash": "421d67930db95628",
+        "p95_ms": 0.399775,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 1.734931,
+            "mean_ms": 0.14437289444444446,
+            "p95_ms": 0.399775,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-high-weak-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.8708939552307129,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "weak",
+        "deposited_cells": 12,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 1,
+          "fragment_denials": 0,
+          "held_checks": 12593,
+          "peak_severity": 21.000118255615234,
+          "pending": 0,
+          "released_cells": 12,
+          "scanned": 34,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 7.630199,
+        "mean_ms": 0.3153764222222223,
+        "observation_hash": "200a7b7652d2f2a2",
+        "p95_ms": 0.878605,
+        "packing_work": {
+          "attempted_grains": 46,
+          "attempted_groups": 15,
+          "reused_failures": 0
+        },
+        "peak_bodies": 16,
+        "peak_contacts": 22,
+        "peak_loose": 12,
+        "phases": {
+          "active": {
+            "max_ms": 7.630199,
+            "mean_ms": 0.3153764222222223,
+            "p95_ms": 0.878605,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "drop-high-strong-angular",
+      "exe": "scorched_benchmark",
+      "args": [
+        "--seed",
+        "42",
+        "--shape",
+        "angular",
+        "--replay",
+        "--diagnostics",
+        "--seconds",
+        "15",
+        "--drop",
+        "high",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "sha256": "5f47ffb099b25695d2152176b77a885ef0a28da9c2d7e77f8a872fe993d16493",
+      "wall_seconds": 0.6723484992980957,
+      "result": {
+        "available_slots": 192,
+        "bombardment_seconds": 0,
+        "breakup": true,
+        "cohesion": {
+          "capacity_denials": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 0,
+          "last_load": 0.0,
+          "last_resistance": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "cohesion_strength": "strong",
+        "deposited_cells": 0,
+        "drop": "high",
+        "grain_limit": 192,
+        "impact_fracture": {
+          "budget_skips": 0,
+          "capacity_denials": 0,
+          "contact_overflow": 0,
+          "failures": 0,
+          "fragment_denials": 0,
+          "held_checks": 30283,
+          "peak_severity": 0.0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 62,
+          "stale_hits": 0
+        },
+        "impacts": 0,
+        "last_capacity_rejection": null,
+        "material": {
+          "initial": 2263,
+          "loose": 0,
+          "solid": 2263
+        },
+        "max_ms": 0.9920840000000001,
+        "mean_ms": 0.11690605777777772,
+        "observation_hash": "df0e99798af8e3d3",
+        "p95_ms": 0.321998,
+        "packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "peak_bodies": 4,
+        "peak_contacts": 3,
+        "peak_loose": 0,
+        "phases": {
+          "active": {
+            "max_ms": 0.9920840000000001,
+            "mean_ms": 0.11690605777777772,
+            "p95_ms": 0.321998,
+            "ticks": 900
+          },
+          "tail": null
+        },
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "settling": {
+          "budget": 0,
+          "moving": 0,
+          "no_room": 0,
+          "obstructed": 0,
+          "unstable": 0,
+          "unsupported": 0,
+          "waiting": 0
+        },
+        "shape": "angular",
+        "shots": 0,
+        "slumping": {
+          "capacity_blocked": 0,
+          "capacity_denials": 0,
+          "fragment_blocked": 0,
+          "fragment_denials": 0,
+          "pending": 0,
+          "released_cells": 0,
+          "scanned": 0,
+          "tracking_overflow": 0
+        },
+        "slumping_enabled": false,
+        "tail_packing_work": {
+          "attempted_grains": 0,
+          "attempted_groups": 0,
+          "reused_failures": 0
+        },
+        "ticks": 900,
+        "winner": null,
+        "workload": "scorched-earth-drop-v1"
+      }
+    },
+    {
+      "host": "picade",
+      "version": "after",
+      "case": "spacewars-breakup",
+      "exe": "loose_terrain_benchmark",
+      "args": [
+        "--seconds",
+        "30",
+        "--slumping",
+        "--cohesion",
+        "500",
+        "--impact-yield-speed",
+        "6",
+        "--diagnostics"
+      ],
+      "sha256": "8b671054985c94920a987f21819110f78aa5110b9720f6fffba963e0cd6cd499",
+      "wall_seconds": 61.93787503242493,
+      "result": [
+        {
+          "scene": "combat",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "234",
+          "deposited": "0",
+          "step_mean_ms": "0.250",
+          "step_p50_ms": "0.207",
+          "step_p95_ms": "0.532",
+          "step_p99_ms": "1.159",
+          "step_max_ms": "1.515",
+          "frame_p95_ms": "0.122",
+          "state_hash": "08fcec9c16b72028"
+        },
+        {
+          "scene": "combat",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "35",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "222",
+          "step_mean_ms": "1.020",
+          "step_p50_ms": "0.236",
+          "step_p95_ms": "3.462",
+          "step_p99_ms": "5.601",
+          "step_max_ms": "8.144",
+          "frame_p95_ms": "0.241",
+          "state_hash": "a72e085ade4030df"
+        },
+        {
+          "scene": "combat",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "1",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "0",
+          "deposited": "239",
+          "step_mean_ms": "1.842",
+          "step_p50_ms": "0.309",
+          "step_p95_ms": "6.515",
+          "step_p99_ms": "13.082",
+          "step_max_ms": "24.017",
+          "frame_p95_ms": "0.333",
+          "state_hash": "c764dee339bd1498"
+        },
+        {
+          "scene": "match",
+          "mode": "off",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "0",
+          "fragments": "0",
+          "blocked": "0",
+          "removed": "578",
+          "deposited": "0",
+          "step_mean_ms": "1.354",
+          "step_p50_ms": "1.185",
+          "step_p95_ms": "2.326",
+          "step_p99_ms": "3.969",
+          "step_max_ms": "12.018",
+          "frame_p95_ms": "4.989",
+          "state_hash": "83612e6c699db1f9"
+        },
+        {
+          "scene": "match",
+          "mode": "round",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "104",
+          "fragments": "0",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "385",
+          "step_mean_ms": "8.424",
+          "step_p50_ms": "7.862",
+          "step_p95_ms": "19.284",
+          "step_p99_ms": "30.091",
+          "step_max_ms": "51.781",
+          "frame_p95_ms": "6.578",
+          "state_hash": "64318babac80944b"
+        },
+        {
+          "scene": "match",
+          "mode": "angular",
+          "seed": "42",
+          "limit": "192",
+          "steps": "1800",
+          "grains": "53",
+          "fragments": "1",
+          "blocked": "2",
+          "removed": "0",
+          "deposited": "405",
+          "step_mean_ms": "8.545",
+          "step_p50_ms": "7.745",
+          "step_p95_ms": "19.456",
+          "step_p99_ms": "30.536",
+          "step_max_ms": "40.730",
+          "frame_p95_ms": "6.652",
+          "state_hash": "8d8ebfe71d1a97ba"
+        }
+      ]
+    }
+  ],
+  "deployment": {
+    "host": "sw-picade.local",
+    "client_sha256": "b3bd23221d4cbbc3d6586a1711031910213159866f562f408327efe54e9b6ecb",
+    "cli_sha256": "970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5",
+    "service": {
+      "MainPID": "1375",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "ui": {
+      "schema_version": 1,
+      "revision": 40,
+      "screen": "pause.main",
+      "active_scenario": "scorched-earth",
+      "selected_scenario": "scorched-earth",
+      "selected_control": "pause.resume",
+      "controls": [
+        {
+          "id": "pause.resume",
+          "label": "Resume",
+          "enabled": true
+        },
+        {
+          "id": "pause.restart",
+          "label": "Restart Round",
+          "enabled": true
+        },
+        {
+          "id": "pause.controls",
+          "label": "Controls",
+          "enabled": true
+        },
+        {
+          "id": "pause.return-to-launcher",
+          "label": "Return to Launcher",
+          "enabled": true
+        },
+        {
+          "id": "pause.sound",
+          "label": "App Settings",
+          "enabled": true
+        }
+      ],
+      "actions": [
+        "up",
+        "down",
+        "left",
+        "right",
+        "confirm",
+        "back",
+        "start",
+        "controls"
+      ],
+      "scenario_revision": 3,
+      "paused": true,
+      "benchmark_active": false,
+      "error": null
+    },
+    "final_scene": "Scorched Earth, high drop, weak strength, Angular dirt; paused 1.4 seconds before release",
+    "screenshots": [
+      {
+        "image": "docs/screenshots/dirt-impact/picade-impact-combat.png",
+        "scenario": "spacewars-terrain-duel",
+        "fps": "50.4",
+        "ups": "60.3",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "1.962",
+        "host_step_p95_ms": "3.946"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-drop-low-weak-angular.png",
+        "scenario": "scorched-earth",
+        "fps": "32.0",
+        "ups": "59.2",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "0.728",
+        "host_step_p95_ms": "1.164"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-drop-high-weak-angular.png",
+        "scenario": "scorched-earth",
+        "fps": "30.0",
+        "ups": "61.0",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "1.467",
+        "host_step_p95_ms": "3.162"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-drop-high-strong-angular.png",
+        "scenario": "scorched-earth",
+        "fps": "32.0",
+        "ups": "60.0",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "0.517",
+        "host_step_p95_ms": "1.072"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-drop-high-weak-round.png",
+        "scenario": "scorched-earth",
+        "fps": "32.1",
+        "ups": "60.3",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "0.911",
+        "host_step_p95_ms": "1.627"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-bank-breakup-angular.png",
+        "scenario": "scorched-earth",
+        "fps": "25.5",
+        "ups": "59.8",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": "5.787",
+        "host_step_p95_ms": "13.196"
+      },
+      {
+        "image": "docs/screenshots/dirt-impact/picade-impact-ready.png",
+        "scenario": "scorched-earth",
+        "fps": "12.1",
+        "ups": "0.0",
+        "raster_scale": "2.00",
+        "host_step_avg_ms": null,
+        "host_step_p95_ms": null
+      }
+    ],
+    "live_checks": [
+      "low/weak Angular stays intact",
+      "high/weak Angular chips 12 cells",
+      "high/strong Angular stays intact",
+      "high/weak Round chips 12 cells",
+      "weak Angular bank fractures at root and chips 7 cells on landing",
+      "scene, strength and shape controls replay fixtures",
+      "Spacewars launch/render smoke with existing launcher settings"
+    ],
+    "connection_note": "A brief SSH timeout interrupted the first final-screen pass. A fresh complete pass succeeded after reconnecting."
+  }
+}

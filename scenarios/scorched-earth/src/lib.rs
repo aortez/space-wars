@@ -20,11 +20,17 @@ use engine_terrain::{Material, MaterialId, Terrain, TerrainGeometry, TerrainSurf
 use serde::Serialize;
 
 mod action;
+mod bank;
+mod drop_test;
+mod hillside;
 mod material;
 mod render;
+mod roof;
 #[cfg(test)]
 mod tests;
 pub use action::{Command, Controls, ScorchedAction};
+pub use drop_test::DropHeight;
+pub use engine_rapier::terrain::DirtStrength as BankStrength;
 pub use material::MaterialBalance;
 
 pub const FIXED_HZ: u32 = 60;
@@ -45,6 +51,16 @@ pub struct ScorchedConfig {
     /// duration, then keep solving the altered world without new impacts.
     pub bombardment_seconds: u32,
     pub slumping: bool,
+    pub cohesion: BankStrength,
+    /// Repeatable support cut, isolated from the artillery scripts.
+    pub undercut: bool,
+    /// Playable ledge encounter, undermined only by normal tank shells.
+    pub hillside: bool,
+    /// Two-ended roof thinned by one ordinary tank shot.
+    pub roof: bool,
+    pub drop_height: Option<DropHeight>,
+    /// Enable contact breakup independently of connected-bank failure.
+    pub breakup: bool,
 }
 impl Default for ScorchedConfig {
     fn default() -> Self {
@@ -54,6 +70,12 @@ impl Default for ScorchedConfig {
             demo: false,
             bombardment_seconds: 0,
             slumping: false,
+            cohesion: BankStrength::Off,
+            undercut: false,
+            hillside: false,
+            roof: false,
+            drop_height: None,
+            breakup: false,
         }
     }
 }
@@ -88,6 +110,9 @@ pub struct ScorchedState {
     pub config: ScorchedConfig,
     pub impacts: u64,
     pub rejected_blasts: u64,
+    /// Most recent grain-capacity refusal, sampled before the blast response.
+    /// Inspection only; it does not participate in simulation decisions/hashes.
+    pub last_capacity_rejection: Option<engine_rapier::terrain::ReleaseCapacity>,
     pub shots: u64,
     pub last_physics: PhysicsStepMetrics,
     seed: u64,
@@ -115,26 +140,51 @@ impl ScorchedState {
     pub fn new(mut config: ScorchedConfig, seed: u64) -> Self {
         config.max_grains = config.max_grains.clamp(1, 512);
         config.bombardment_seconds = config.bombardment_seconds.min(600);
-        let field = Terrain::generate(
-            193,
-            129,
-            CELL_SIZE,
-            vec![Material {
-                id: DIRT,
-                hardness: 100,
-            }],
-            |c| {
-                let x = (c.x as f32 + 0.5 - 193.0 * 0.5) * CELL_SIZE;
-                let y = (c.y as f32 + 0.5 - 129.0 * 0.5) * CELL_SIZE;
-                if y <= hill(x, seed) {
-                    DIRT
-                } else {
-                    MaterialId::VOID
-                }
-            },
-        )
-        .expect("bounded hill field");
-        let initial_cells = field
+        if config.roof {
+            config.hillside = false;
+        }
+        if config.hillside || config.roof {
+            config.undercut = false;
+            config.drop_height = None;
+            config.bombardment_seconds = 0;
+        }
+        if config.drop_height.is_some() {
+            config.undercut = false;
+        }
+        if config.undercut || config.drop_height.is_some() {
+            config.demo = false;
+            config.bombardment_seconds = 0;
+        }
+        let field = if config.roof {
+            roof::terrain()
+        } else if config.hillside {
+            hillside::terrain(seed)
+        } else if config.drop_height.is_some() {
+            drop_test::floor()
+        } else if config.undercut {
+            bank::terrain()
+        } else {
+            Terrain::generate(
+                193,
+                129,
+                CELL_SIZE,
+                vec![Material {
+                    id: DIRT,
+                    hardness: 100,
+                }],
+                |c| {
+                    let x = (c.x as f32 + 0.5 - 193.0 * 0.5) * CELL_SIZE;
+                    let y = (c.y as f32 + 0.5 - 129.0 * 0.5) * CELL_SIZE;
+                    if y <= hill(x, seed) {
+                        DIRT
+                    } else {
+                        MaterialId::VOID
+                    }
+                },
+            )
+            .expect("bounded hill field")
+        };
+        let mut initial_cells = field
             .cells()
             .iter()
             .filter(|c| c.material != MaterialId::VOID)
@@ -173,7 +223,13 @@ impl ScorchedState {
         let tanks = std::array::from_fn(|index| {
             let id = PhysicsId::new(10 + index as u64);
             let body = BodyId::new(id, BodyRole::PRIMARY);
-            let x = if index == 0 { -27.0 } else { 27.0 };
+            let x = if config.roof {
+                if index == 0 { 0.0 } else { 4.0 }
+            } else if index == 0 {
+                if config.hillside { -1.0 } else { -27.0 }
+            } else {
+                27.0
+            };
             let mut collider = ColliderSpec::convex_polygon(
                 ColliderId::new(id, ColliderRole::PRIMARY, 0),
                 vec![
@@ -190,7 +246,24 @@ impl ScorchedState {
             assert!(physics.insert_body(
                 body,
                 BodySpec {
-                    position: Vec2::new(x, hill(x, seed) + 2.0),
+                    position: Vec2::new(
+                        x,
+                        if config.roof {
+                            if index == 0 { 15.0 } else { -8.7 }
+                        } else if config.drop_height.is_some() {
+                            -8.0
+                        } else if config.undercut || config.hillside {
+                            if index == 0 {
+                                9.0
+                            } else if config.hillside {
+                                -8.7
+                            } else {
+                                -8.0
+                            }
+                        } else {
+                            hill(x, seed) + 2.0
+                        }
+                    ),
                     angular_damping: 2.0,
                     ccd_enabled: true,
                     ..Default::default()
@@ -203,25 +276,46 @@ impl ScorchedState {
                 speed: 32.0,
                 facing: if index == 0 { 1.0 } else { -1.0 },
                 health: 100.0,
-                next_shot: index as u64 * 300,
+                next_shot: if config.hillside || config.roof {
+                    0
+                } else {
+                    index as u64 * 300
+                },
                 shots: 0,
             }
         });
+        let mut terrain = vec![ground];
+        if let Some(height) = config.drop_height {
+            let clump = drop_test::clump(&mut physics, height);
+            initial_cells += clump
+                .terrain
+                .cells()
+                .iter()
+                .filter(|c| c.material != MaterialId::VOID)
+                .count() as u64;
+            terrain.push(clump);
+        }
         physics.step(DT);
-        Self {
+        let mut state = Self {
             tick: 0,
             config,
             impacts: 0,
             rejected_blasts: 0,
+            last_capacity_rejection: None,
             shots: 0,
             last_physics: PhysicsStepMetrics::default(),
             seed,
             physics,
-            terrain: vec![ground],
+            terrain,
             loose: LooseTerrain::new(LooseTerrainConfig {
                 max_grains: config.max_grains,
                 shape: config.shape,
                 slumping: config.slumping.then(Default::default),
+                cohesion: config.cohesion.config(),
+                impact_fracture: config
+                    .breakup
+                    .then(|| config.cohesion.impact_config())
+                    .flatten(),
                 ..Default::default()
             })
             .expect("bounded loose material"),
@@ -229,11 +323,17 @@ impl ScorchedState {
             initial_cells,
             tanks,
             shells: Vec::new(),
-            selected: 0,
+            selected: if config.hillside || config.roof { 1 } else { 0 },
             previous: Controls::default(),
             flashes: Vec::new(),
             status: "Aim and fire. The other tank returns fire; Demo controls both.",
+        };
+        if state.config.roof {
+            state.aim_at_roof();
+        } else if state.config.hillside {
+            state.aim_at_hillside();
         }
+        state
     }
 
     pub fn camera(&self) -> Camera2 {
@@ -247,6 +347,9 @@ impl ScorchedState {
     }
     pub fn settling_diagnostics(&self) -> engine_rapier::terrain::SettlingDiagnostics {
         self.loose.settling_diagnostics()
+    }
+    pub fn settling_work(&self) -> engine_rapier::terrain::SettlingWork {
+        self.loose.settling_work()
     }
     pub fn body_count(&self) -> usize {
         self.physics.body_count()
@@ -271,7 +374,9 @@ impl ScorchedState {
         (pivot, pivot + tank.direction() * 2.8)
     }
     fn fire(&mut self, player: usize) {
-        if self.config.bombardment_seconds > 0
+        if self.config.undercut
+            || self.config.drop_height.is_some()
+            || self.config.bombardment_seconds > 0
             || !self.fighting()
             || self.tick < self.tanks[player].next_shot
             || self.shells.len() >= MAX_SHELLS
@@ -333,7 +438,20 @@ impl ScorchedState {
         self.tanks[player].speed = (speed * (0.93 + phase as f32 * 0.025)).clamp(12.0, 48.0);
     }
     fn advance(&mut self) {
-        if self.config.bombardment_seconds > 0 {
+        if self.config.roof {
+            self.advance_roof();
+        } else if self.config.hillside {
+            self.advance_hillside();
+        } else if self.config.drop_height.is_some() {
+            if self.tick == 120 {
+                self.physics
+                    .set_body_kind(drop_test::BODY, BodyKind::Dynamic, true);
+            }
+        } else if self.config.undercut {
+            if self.tick == 120 {
+                self.cut_bank_support();
+            }
+        } else if self.config.bombardment_seconds > 0 {
             // Health-independent rain exercises the real swept-shell impact
             // path. Later shots encounter the already deformed terrain.
             if self.tick < u64::from(self.config.bombardment_seconds) * u64::from(FIXED_HZ)
@@ -360,7 +478,13 @@ impl ScorchedState {
                 }
             }
         }
+        self.loose.capture_impact_motion(
+            &self.physics,
+            self.terrain.iter().map(|f| (f.assembly.body(), &f.terrain)),
+            DT,
+        );
         self.last_physics = self.physics.step(DT);
+        self.loose.sample_impact_contacts(&self.physics);
         let mut impacts = Vec::new();
         self.shells.retain_mut(|shell| {
             let movement = shell.velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
@@ -386,6 +510,8 @@ impl ScorchedState {
             self.explode(point);
         }
         self.slump();
+        self.fracture_banks();
+        self.fracture_impacts();
         self.settle();
         for tank in &mut self.tanks {
             let position = self.physics.motion(tank.body).unwrap().position;
@@ -406,22 +532,60 @@ impl ScorchedState {
             Command::Select => self.selected = 1 - self.selected,
             Command::Demo => {
                 self.config.demo = !self.config.demo;
-                if self.config.bombardment_seconds > 0 {
+                if self.config.hillside || self.config.roof {
+                    *self = Self::new(self.config, self.seed);
+                } else if self.config.bombardment_seconds > 0
+                    || self.config.undercut
+                    || self.config.drop_height.is_some()
+                {
                     self.config.bombardment_seconds = 0;
+                    self.config.undercut = false;
+                    self.config.drop_height = None;
                     *self = Self::new(self.config, self.seed);
                 }
             }
             Command::Collapse => {
-                self.config.slumping = !self.config.slumping;
+                if self.config.hillside || self.config.roof {
+                    self.config = self.config.with_destruction(self.config.cohesion.next());
+                } else if self.config.undercut || self.config.drop_height.is_some() {
+                    self.config.cohesion = self.config.cohesion.next();
+                } else {
+                    self.config.slumping = !self.config.slumping;
+                }
                 *self = Self::new(self.config, self.seed);
             }
             Command::Barrage => {
-                self.config.bombardment_seconds = if self.config.bombardment_seconds == 0 {
-                    60
+                if self.config.roof {
+                    self.config.roof = false;
+                } else if self.config.hillside {
+                    self.config.hillside = false;
+                    self.config.roof = true;
+                    self.config = self.config.with_destruction(BankStrength::Weak);
+                } else if self.config.drop_height == Some(DropHeight::High) {
+                    self.config.drop_height = None;
+                    self.config.hillside = true;
+                    self.config = self.config.with_destruction(BankStrength::Weak);
+                } else if self.config.drop_height.is_some() {
+                    self.config.drop_height = match self.config.drop_height {
+                        Some(DropHeight::Low) => Some(DropHeight::High),
+                        _ => None,
+                    };
+                } else if self.config.undercut {
+                    self.config.undercut = false;
+                    self.config.drop_height = Some(DropHeight::Low);
+                    self.config.breakup = true;
+                } else if self.config.bombardment_seconds > 0 {
+                    self.config.undercut = true;
+                    self.config.breakup = true;
+                    self.config.bombardment_seconds = 0;
+                    self.config.slumping = false;
+                    if self.config.cohesion == BankStrength::Off {
+                        self.config.cohesion = BankStrength::Weak;
+                    }
                 } else {
-                    0
-                };
-                self.config.demo = false;
+                    self.config.bombardment_seconds = 60;
+                }
+                self.config.demo = self.config.hillside || self.config.roof;
                 *self = Self::new(self.config, self.seed);
             }
             Command::Shape => {
@@ -432,6 +596,69 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::Reset => *self = Self::new(self.config, self.seed),
+            Command::Roof => {
+                self.config.roof = !self.config.roof;
+                self.config.demo = self.config.roof;
+                self.config.hillside = false;
+                self.config.undercut = false;
+                self.config.drop_height = None;
+                self.config.bombardment_seconds = 0;
+                if self.config.roof {
+                    self.config = self.config.with_destruction(BankStrength::Weak);
+                }
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Hillside => {
+                self.config.roof = false;
+                self.config.hillside = !self.config.hillside;
+                self.config.demo = self.config.hillside;
+                self.config.undercut = false;
+                self.config.drop_height = None;
+                self.config.bombardment_seconds = 0;
+                if self.config.hillside || self.config.roof {
+                    self.config = self.config.with_destruction(BankStrength::Weak);
+                }
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Bank => {
+                self.config.roof = false;
+                self.config.hillside = false;
+                self.config.undercut = !self.config.undercut;
+                self.config.drop_height = None;
+                if self.config.undercut {
+                    self.config.breakup = true;
+                    self.config.slumping = false;
+                    if self.config.cohesion == BankStrength::Off {
+                        self.config.cohesion = BankStrength::Weak;
+                    }
+                }
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Drop => {
+                self.config.roof = false;
+                self.config.hillside = false;
+                self.config.drop_height = match self.config.drop_height {
+                    None => Some(DropHeight::Low),
+                    Some(DropHeight::Low) => Some(DropHeight::High),
+                    Some(DropHeight::High) => None,
+                };
+                self.config.undercut = false;
+                self.config.breakup = true;
+                self.config.slumping = false;
+                self.config.bombardment_seconds = 0;
+                if self.config.cohesion == BankStrength::Off {
+                    self.config.cohesion = BankStrength::Weak;
+                }
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Strength => {
+                if self.config.undercut || self.config.drop_height.is_some() {
+                    self.config.cohesion = self.config.cohesion.next();
+                } else {
+                    self.config = self.config.with_destruction(self.config.cohesion.next());
+                }
+                *self = Self::new(self.config, self.seed);
+            }
         }
         self.clamp_aim();
     }
@@ -481,15 +708,33 @@ impl Scenario for ScorchedScenario {
             }
         }
         for (held, before, command) in [
-            (controls.select, state.previous.select, Command::Select),
-            (controls.demo, state.previous.demo, Command::Demo),
-            (controls.shape, state.previous.shape, Command::Shape),
             (
-                controls.collapse,
+                controls.select && !controls.shape && !controls.collapse,
+                state.previous.select,
+                Command::Select,
+            ),
+            (controls.demo, state.previous.demo, Command::Demo),
+            (
+                controls.shape && !controls.select,
+                state.previous.shape,
+                Command::Shape,
+            ),
+            (
+                controls.collapse && !controls.select,
                 state.previous.collapse,
                 Command::Collapse,
             ),
             (controls.barrage, state.previous.barrage, Command::Barrage),
+            (
+                controls.select && controls.shape,
+                state.previous.select && state.previous.shape,
+                Command::Bank,
+            ),
+            (
+                controls.select && controls.collapse,
+                state.previous.select && state.previous.collapse,
+                Command::Strength,
+            ),
         ] {
             if held && !before {
                 state.command(command)
@@ -533,7 +778,7 @@ impl Scenario for ScorchedScenario {
             .map(|g| (g.body(), g.cell(), motion(g.body())))
             .collect();
         let tanks: Vec<_> = state.tanks.iter().map(|t| (t, motion(t.body))).collect();
-        Observation { payload: serde_json::to_vec(&serde_json::json!({
+        let mut payload = serde_json::json!({
             "seed": state.seed, "tick": state.tick, "shape": format!("{:?}", state.config.shape),
             "limit": state.config.max_grains, "demo": state.config.demo, "selected": state.selected,
             "bombardment_seconds": state.config.bombardment_seconds,
@@ -541,7 +786,26 @@ impl Scenario for ScorchedScenario {
             "shots": state.shots, "impacts": state.impacts, "rejected": state.rejected_blasts,
             "deposited": state.deposited_cells(), "fields": fields, "grains": grains,
             "tanks": tanks, "shells": state.shells,
-        })).expect("finite scenario observation") }
+        });
+        // Preserve existing observations when the experiment is disabled.
+        if state.config.roof {
+            payload["roof"] = serde_json::json!(true);
+        }
+        if state.config.hillside {
+            payload["hillside"] = serde_json::json!(true);
+        }
+        if state.config.undercut {
+            payload["undercut"] = serde_json::json!(true);
+        }
+        if let Some(height) = state.config.drop_height {
+            payload["drop_height"] = serde_json::json!(height.label());
+        }
+        if state.config.breakup {
+            payload["breakup"] = serde_json::json!(true);
+        }
+        Observation {
+            payload: serde_json::to_vec(&payload).expect("finite scenario observation"),
+        }
     }
     fn render_frame(state: &Self::State) -> RenderFrame {
         render::frame(state)
