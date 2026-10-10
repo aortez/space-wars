@@ -20,6 +20,17 @@ pub struct RecoveryTaskObservationV1 {
     pub claim_footing: Option<claim_footing::ClaimFootingSurvey>,
 }
 impl SurfaceSortieState {
+    /// Read-only replay instrumentation: retain the recorded survey cadence
+    /// while reconstructing a controller from its original task start.
+    #[cfg(feature = "sensor-profile")]
+    pub fn recovery_observation_for_replay(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> RecoveryTaskObservationV1 {
+        self.recovery_task_observation_with_query(player, query)
+    }
+
     pub fn recovery_task_observation(
         &self,
         player: usize,
@@ -32,6 +43,27 @@ impl SurfaceSortieState {
         &self,
         player: usize,
         query: LandingSiteQuery,
+    ) -> RecoveryTaskObservationV1 {
+        self.recovery_task_observation_with_search(player, query, None)
+    }
+
+    /// Experimental caller-owned search progress. Repeated reads with the
+    /// same request cannot consume candidates or mutate the native world.
+    #[cfg(feature = "sensor-profile")]
+    pub fn recovery_observation_with_rebuild_search(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        search: &rebuild_placement::RebuildSearchProgress,
+    ) -> RecoveryTaskObservationV1 {
+        self.recovery_task_observation_with_search(player, query, Some(search))
+    }
+
+    fn recovery_task_observation_with_search(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        search: Option<&rebuild_placement::RebuildSearchProgress>,
     ) -> RecoveryTaskObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("recovery_task_observation");
@@ -64,7 +96,11 @@ impl SurfaceSortieState {
         let ground = self.ground_navigation_map(player);
         let claim_footing = self.claim_footing_survey(p, ground.as_ref());
         let posture = self.ground_posture_observation(player, p);
-        let rebuild = self.rebuild_relocation_survey(player);
+        let rebuild = if let Some(search) = search {
+            self.rebuild_relocation_survey_with_search(player, Some(search))
+        } else {
+            self.rebuild_relocation_survey(player)
+        };
         let jetpack = self.jetpack_navigation_with_ground(player, ground.as_ref());
         let pod_righting = self.pilots.get(player).and_then(|pilot| {
             pilot.pod_righting_observation(

@@ -21,6 +21,7 @@ pub use flag_approach::FlagApproach;
 mod jetpack;
 mod posture;
 mod rejoin;
+mod staging;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -81,6 +82,12 @@ pub struct GroundTelemetry {
     pub policy: &'static str,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub continuous_walk: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub live_claim_stopping_disabled: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub precise_rebuild: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging_seed_tick: Option<u64>,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -111,6 +118,11 @@ pub struct GroundTelemetry {
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
+    terrain_launch_forecast: Option<
+        scenario_spacewars::surface_sortie::jetpack::forecast::terrain::TerrainCrossingForecast,
+    >,
+    terrain_launch_tick: Option<u64>,
+    terrain_flight_required: bool,
     active_flight_checks: bool,
     active_flight:
         Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleFlightRequest>,
@@ -146,6 +158,9 @@ impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             active_flight_checks: false,
+            terrain_launch_forecast: None,
+            terrain_launch_tick: None,
+            terrain_flight_required: false,
             active_flight: None,
             launch_forecast: None,
             last_flight_check: None,
@@ -156,6 +171,9 @@ impl GroundNavigationTask {
             telemetry: GroundTelemetry {
                 policy: "ground_navigation_v10",
                 continuous_walk: false,
+                live_claim_stopping_disabled: false,
+                precise_rebuild: false,
+                staging_seed_tick: None,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -213,15 +231,46 @@ impl GroundNavigationTask {
     pub fn telemetry(&self) -> &GroundTelemetry {
         &self.telemetry
     }
+    /// Arrival can precede waypoint advancement after a displacement. Keep
+    /// subsequent footing corrections aimed at the measured final node.
+    pub(crate) fn retain_arrived_rebuild(&mut self) -> Option<u16> {
+        if self.telemetry.goal != GroundGoal::Arrived || !self.telemetry.precise_rebuild {
+            return None;
+        }
+        let target = self.telemetry.target?;
+        let id = *self.telemetry.path.last()?;
+        let node = self.map.as_ref()?.nodes.iter().find(|n| n.id == id)?;
+        if node.position.distance_to(target) > 0.01 {
+            return None;
+        }
+        self.telemetry.waypoint = self.telemetry.path.len() - 1;
+        Some(id)
+    }
     /// Maintain walking speed through ordinary route interiors. Endpoints,
     /// sharp turns, jumps and unsupported motion retain proportional steering.
     /// Like other control changes, this takes effect on the next uncached tick.
     pub fn set_continuous_walk(&mut self, enabled: bool) {
         self.telemetry.continuous_walk = enabled;
     }
+    /// Diagnostic ablation of stopping during a supported native flag raise.
+    /// Route planning, continuous walking and flight checks remain independent.
+    pub fn set_live_claim_stopping(&mut self, enabled: bool) {
+        self.telemetry.live_claim_stopping_disabled = !enabled;
+    }
+    /// Refined placement needs the measured footing itself, rather than a
+    /// nearby endpoint already inside the ordinary rebuild arrival envelope.
+    pub fn set_precise_rebuild(&mut self, enabled: bool) {
+        self.telemetry.precise_rebuild = enabled
+            && matches!(
+                self.telemetry.destination,
+                GroundDestination::Rebuild { .. }
+            );
+    }
     pub fn reset(&mut self, context: BrainReset) {
         let active_flight_checks = self.active_flight_checks;
         let continuous_walk = self.telemetry.continuous_walk;
+        let live_claim_stopping_disabled = self.telemetry.live_claim_stopping_disabled;
+        let precise_rebuild = self.telemetry.precise_rebuild;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
         } else if self.powered_flag {
@@ -230,6 +279,8 @@ impl GroundNavigationTask {
             Self::new(context, self.telemetry.destination)
         };
         self.telemetry.continuous_walk = continuous_walk;
+        self.telemetry.live_claim_stopping_disabled = live_claim_stopping_disabled;
+        self.set_precise_rebuild(precise_rebuild);
         self.active_flight_checks = active_flight_checks;
     }
     pub fn is_crossing(&self) -> bool {
@@ -238,6 +289,8 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.telemetry.staging_seed_tick = None;
+        self.telemetry.precise_rebuild = false;
         self.telemetry.flag_approach = None;
         self.joint_flag = false;
         self.flag_survey_tick = None;
@@ -263,6 +316,17 @@ impl GroundNavigationTask {
     }
     pub fn step(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
+        if let Some(forecast) = o
+            .jetpack
+            .as_ref()
+            .and_then(|j| j.terrain_flight.as_ref())
+            .and_then(|s| s.forecast)
+            && o.ground
+                .as_ref()
+                .is_some_and(|map| forecast.valid_for(map, p.tick))
+        {
+            self.terrain_launch_forecast = Some(forecast);
+        }
         if self.active_flight_checks
             && let Some(forecast) = o.jetpack.as_ref().and_then(|j| j.vehicle_forecast)
             && forecast.valid_at(p.tick)
@@ -542,7 +606,12 @@ impl GroundNavigationTask {
                 return action;
             }
         }
-        if actor.position.distance_to(target) < range {
+        let arrived = if self.telemetry.precise_rebuild {
+            foot.distance_to(local(target)) < 0.12
+        } else {
+            actor.position.distance_to(target) < range
+        };
+        if arrived {
             self.telemetry.goal = if self.telemetry.claim_target.is_some() {
                 GroundGoal::Settle
             } else if self.telemetry.destination == GroundDestination::Hatch
@@ -592,6 +661,15 @@ impl GroundNavigationTask {
                 self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
             self.telemetry.target = Some(selected_target);
             self.crossing_plan = crossing;
+            self.terrain_flight_required = crossing.is_some_and(|plan| {
+                o.jetpack
+                    .as_ref()
+                    .and_then(|j| j.terrain_flight.as_ref())
+                    .and_then(|s| s.forecast)
+                    .is_some_and(|f| {
+                        plan.same_corridor(&f.plan) || plan.same_corridor(&f.plan.reversed())
+                    })
+            });
             self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {
                 self.rejoin = None;
@@ -634,6 +712,7 @@ impl GroundNavigationTask {
             && p.balanced
         {
             self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, *plan));
+            self.terrain_launch_tick = None;
             self.active_flight = None;
             self.last_flight_check = None;
             return self.follow_crossing(o);

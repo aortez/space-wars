@@ -163,6 +163,8 @@ pub struct MissionTelemetry {
     pub policy: &'static str,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub powered_capture: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub live_claim_stopping_disabled: bool,
     pub goal: MissionGoal,
     pub goal_since: u64,
     pub target: Option<usize>,
@@ -277,6 +279,7 @@ impl MaterialMissionPilot {
             telemetry: MissionTelemetry {
                 policy: policy.id(),
                 powered_capture: false,
+                live_claim_stopping_disabled: false,
                 goal: MissionGoal::Select,
                 goal_since: 0,
                 target: None,
@@ -349,6 +352,7 @@ impl MaterialMissionPilot {
         let transfer_approach = self.telemetry.transfer_approach.is_some();
         let transfer_speed = self.telemetry.transfer_speed.is_some();
         let powered_capture = self.telemetry.powered_capture;
+        let live_claim_stopping = !self.telemetry.live_claim_stopping_disabled;
         let destination_retry = self.telemetry.destination_retry.is_some();
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
@@ -371,6 +375,7 @@ impl MaterialMissionPilot {
         self.configure_transfer_approach(transfer_approach);
         self.configure_transfer_speed(transfer_speed);
         self.configure_powered_capture(powered_capture);
+        self.configure_live_claim_stopping(live_claim_stopping);
         self.configure_active_flight_checks(active_flight_checks);
         self.enable_destination_retry(destination_retry);
         self.enable_pursuit_disengagement(disengagement);
@@ -388,6 +393,7 @@ impl MaterialMissionPilot {
     }
     pub(crate) fn configure_powered_capture(&mut self, enabled: bool) {
         assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(enabled || !self.telemetry.live_claim_stopping_disabled);
         assert!(
             self.previous_tick.is_none() && self.capture.is_none(),
             "configure powered capture before the first intent"
@@ -398,6 +404,11 @@ impl MaterialMissionPilot {
         assert!(!enabled || self.telemetry.powered_capture);
         assert!(self.previous_tick.is_none() && self.capture.is_none());
         self.active_flight_checks = enabled;
+    }
+    pub(crate) fn configure_live_claim_stopping(&mut self, enabled: bool) {
+        assert!(enabled || self.telemetry.powered_capture);
+        assert!(self.previous_tick.is_none() && self.capture.is_none());
+        self.telemetry.live_claim_stopping_disabled = !enabled;
     }
     /// The instance owns both its sensor semantics and its local controller.
     pub fn objective_planning(&self) -> ObjectivePlanning {
@@ -492,6 +503,7 @@ impl MaterialMissionPilot {
         )
         .with_bounded_acquisition(self.bounded_acquisition)
         .with_active_flight_checks(self.active_flight_checks)
+        .with_live_claim_stopping(!self.telemetry.live_claim_stopping_disabled)
         .with_cover_retry_cooldown(self.cover_retry_cooldown)
         .with_cover_response(self.cover_response)
         .with_initial_cover(self.initial_cover)

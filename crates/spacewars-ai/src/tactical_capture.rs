@@ -36,6 +36,7 @@ impl std::ops::Deref for CaptureTelemetry {
 #[derive(Debug, Clone)]
 pub struct TacticalCapturePilot {
     active_flight_checks: bool,
+    live_claim_stopping: bool,
     planning: ObjectivePlanning,
     context: BrainReset,
     base: TacticalSortiePilot,
@@ -63,6 +64,7 @@ impl TacticalCapturePilot {
         sortie.policy = Self::policy(planning);
         Self {
             active_flight_checks: false,
+            live_claim_stopping: true,
             planning,
             context,
             base,
@@ -92,6 +94,13 @@ impl TacticalCapturePilot {
     pub fn with_active_flight_checks(mut self, enabled: bool) -> Self {
         assert!(!enabled || self.planning == ObjectivePlanning::JetpackRoundTrip);
         self.active_flight_checks = enabled;
+        self
+    }
+    /// Configure the powered controller's live-claim ablation before use.
+    pub fn with_live_claim_stopping(mut self, enabled: bool) -> Self {
+        assert!(enabled || self.planning == ObjectivePlanning::JetpackRoundTrip);
+        assert!(self.previous_tick.is_none() && self.ground.is_none());
+        self.live_claim_stopping = enabled;
         self
     }
     pub fn vehicle_flight_request(
@@ -314,6 +323,7 @@ impl TacticalCapturePilot {
             }
             let ground = self.ground.as_mut().unwrap();
             ground.set_active_flight_checks(self.active_flight_checks);
+            ground.set_live_claim_stopping(self.live_claim_stopping);
             ground.set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip);
             let controls = ground.step(&o.combat.recovery);
             if ground.is_crossing()

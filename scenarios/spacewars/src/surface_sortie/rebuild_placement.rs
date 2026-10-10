@@ -2,9 +2,42 @@
 //! checked again by recovery at the actual build tick; it reserves no space.
 use super::*;
 use ground_navigation::{GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
+mod refinement;
+pub use refinement::RebuildRefinementWork;
+mod staging;
+mod support;
+pub use staging::{RebuildSearchProgress, RebuildStagingProposal};
+
+#[cfg(feature = "sensor-profile")]
+mod coverage;
+#[cfg(feature = "sensor-profile")]
+mod footprint;
+#[cfg(feature = "sensor-profile")]
+mod local_forecast;
+#[cfg(feature = "sensor-profile")]
+mod native_forecast;
+#[cfg(feature = "sensor-profile")]
+pub(super) mod selection;
+#[cfg(feature = "sensor-profile")]
+pub use local_forecast::RebuildLocalForecast;
+#[cfg(feature = "sensor-profile")]
+mod preview_normal;
+#[cfg(feature = "sensor-profile")]
+mod probe;
+#[cfg(feature = "sensor-profile")]
+pub use preview_normal::RebuildPreviewNormal;
+#[cfg(feature = "sensor-profile")]
+mod radial;
+#[cfg(feature = "sensor-profile")]
+mod round_foot;
+#[cfg(feature = "sensor-profile")]
+mod standing_forecast;
+#[cfg(feature = "sensor-profile")]
+pub use probe::RebuildPlacementProbeRequest;
 
 const LOCAL_HALF_SPAN: i32 = 56;
 pub const MAX_REBUILD_WALK: f32 = 24.0;
+const REBUILD_OFFSETS: [f32; 4] = [-8.0, -14.0, 8.0, 14.0];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -12,9 +45,14 @@ pub enum RebuildRejection {
     QueriesPending,
     NoGround,
     HullObstructed,
+    LandingMisaligned,
+    LandingUnsupported,
     NoHatchFooting,
     NoHatchRoute,
     HatchRouteTooLong,
+    ForecastRejected,
+    ForecastUnavailable,
+    ForecastStale,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -25,6 +63,13 @@ pub struct RebuildAttempt {
     pub center: Option<Vec2>,
     pub hatch: Option<Vec2>,
     pub route: Option<GroundRouteDiagnostics>,
+    /// Alignment at the predicted resting ship origin, using the native
+    /// radial landing frame rather than the standing pilot's support normal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub settling_angle_degrees: Option<f32>,
+    /// Measured foot normals against radial up at the predicted resting origin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub support_alignments: Option<[f32; 2]>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RebuildPlacementReport {
@@ -32,6 +77,21 @@ pub struct RebuildPlacementReport {
     pub planet: usize,
     pub revision: Option<u64>,
     pub standing: Vec2,
+    /// A retained query anchor; hatch routes still begin at `standing`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<Vec2>,
+    /// Query direction at a retained anchor, for read-only pose diagnostics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_up: Option<Vec2>,
+    /// Experimental query direction in the planet's local frame. The ship's
+    /// actual pose still comes from measured ground beneath both landing feet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radial_up: Option<Vec2>,
+    /// Measured direction retained from a selected, reached preview. This does
+    /// not replace `standing` or authorize construction without fresh checks.
+    #[cfg(feature = "sensor-profile")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_normal: Option<RebuildPreviewNormal>,
     pub selected_offset: Option<f32>,
     pub attempts: Vec<RebuildAttempt>,
 }
@@ -55,6 +115,8 @@ impl RebuildPlacementReport {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct RebuildStandingSite {
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub precise: bool,
     pub planet: usize,
     pub revision: u64,
     pub position: Vec2,
@@ -75,10 +137,42 @@ pub struct RebuildRelocationSurvey {
     pub checked: usize,
     pub attempts: Vec<RebuildRelocationAttempt>,
     pub site: Option<RebuildStandingSite>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refinement: Option<RebuildRefinementWork>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<RebuildSearchProgress>,
+    /// A measured walking step toward a preview, not a buildable standing site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging: Option<RebuildStagingProposal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staging_map: Option<GroundMap>,
 }
 pub(super) struct RebuildPose {
     pub center: Vec2,
     pub normal: Vec2,
+}
+
+struct PlacementOrigin {
+    point: Vec2,
+    up: Vec2,
+    standing: Vec2,
+    anchored: bool,
+}
+
+fn position_replacement(ship: &mut ShipState, frame: motion::SurfaceFrame, pose: &RebuildPose) {
+    ship.position = pose.center - SHIP_PIVOT;
+    ship.rotation_radians = rotation_for_direction(pose.normal);
+    ship.direction = pose.normal;
+    ship.velocity = motion::point_velocity(frame, pose.center);
+    ship.omega = physics::control_angular_velocity(ship, frame.angular_velocity);
+}
+
+fn settling_angle(normal: Vec2, center: Vec2, planet_center: Vec2) -> f32 {
+    normal
+        .dot((center - planet_center).normalized())
+        .clamp(-1.0, 1.0)
+        .acos()
+        .to_degrees()
 }
 
 impl SurfaceSortieState {
@@ -94,6 +188,18 @@ impl SurfaceSortieState {
         if self.pilots[player].combat.is_some() {
             ship.enable_weapon_supply();
         }
+        ship
+    }
+
+    pub(super) fn replacement_ship_at(
+        &self,
+        player: usize,
+        planet: usize,
+        pose: &RebuildPose,
+    ) -> ShipState {
+        let mut ship = self.replacement_ship(player);
+        let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+        position_replacement(&mut ship, frame, pose);
         ship
     }
 
@@ -135,17 +241,89 @@ impl SurfaceSortieState {
         up: Vec2,
         map: Option<&GroundMap>,
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        let (pose, mut report) =
+            self.find_rebuild_placement_offsets(player, planet, point, up, map, &REBUILD_OFFSETS);
+        if pose.is_some()
+            || !self.pilots[player].rebuild_refinement
+            || self.world.physics.material_queries_dirty
+        {
+            return (pose, report);
+        }
+        let (pose, extra) = self.find_rebuild_placement_offsets(
+            player,
+            planet,
+            point,
+            up,
+            map,
+            &refinement::EXTRA_OFFSETS,
+        );
+        report.selected_offset = extra.selected_offset;
+        report.attempts.extend(extra.attempts);
+        (pose, report)
+    }
+
+    fn find_rebuild_placement_offsets(
+        &self,
+        player: usize,
+        planet: usize,
+        point: Vec2,
+        up: Vec2,
+        map: Option<&GroundMap>,
+        offsets: &[f32],
+    ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        self.find_rebuild_placement_from(
+            player,
+            planet,
+            PlacementOrigin {
+                point,
+                up,
+                standing: point,
+                anchored: false,
+            },
+            map,
+            offsets,
+        )
+    }
+
+    fn find_rebuild_placement_from(
+        &self,
+        player: usize,
+        planet: usize,
+        origin: PlacementOrigin,
+        map: Option<&GroundMap>,
+        offsets: &[f32],
+    ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        let PlacementOrigin {
+            point,
+            up,
+            standing: actual_standing,
+            anchored,
+        } = origin;
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("find_rebuild_placement");
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let local = |point: Vec2| (point - frame.position).rotate_radians(-frame.angle);
         let world_point = |point: Vec2| frame.position + point.rotate_radians(frame.angle);
+        // Preview ray normals and actual contact normals may describe different
+        // facets at almost the same point. Use one query frame for both, while
+        // retaining the measured landing pose and all placement guards below.
+        let radial = self.pilots[player].rebuild_radial_placement;
+        let up = if radial {
+            (point - frame.position).normalized()
+        } else {
+            up
+        };
         let material = self.world.terrain.planets.get(&planet);
         let mut report = RebuildPlacementReport {
             tick: self.world.tick,
             planet,
             revision: material.map(|t| t.field.revision()),
-            standing: local(point),
+            standing: local(actual_standing),
+            anchor: anchored.then(|| local(point)),
+            anchor_up: anchored.then(|| up.rotate_radians(-frame.angle)),
+            radial_up: radial.then(|| up.rotate_radians(-frame.angle)),
+            #[cfg(feature = "sensor-profile")]
+            preview_normal: None,
             selected_offset: None,
             attempts: Vec::new(),
         };
@@ -156,6 +334,8 @@ impl SurfaceSortieState {
                 center: None,
                 hatch: None,
                 route: None,
+                settling_angle_degrees: None,
+                support_alignments: None,
             });
             return (None, report);
         }
@@ -192,16 +372,18 @@ impl SurfaceSortieState {
         };
         let mut best = None;
         let mut best_cost = f32::INFINITY;
-        for offset in [-8.0, -14.0, 8.0, 14.0] {
+        for &offset in offsets {
             let mut attempt = RebuildAttempt {
                 offset,
                 rejection: None,
                 center: None,
                 hatch: None,
                 route: None,
+                settling_angle_degrees: None,
+                support_alignments: None,
             };
             type Candidate = (RebuildPose, Option<Vec2>, Option<GroundRouteDiagnostics>);
-            let evaluate = || -> Result<Candidate, RebuildRejection> {
+            let mut evaluate = || -> Result<Candidate, RebuildRejection> {
                 let hit = ground(point + right * offset + up * 12.0, -up, 24.0)
                     .ok_or(RebuildRejection::NoGround)?;
                 if hit.normal.dot(up) < 0.8 {
@@ -209,6 +391,7 @@ impl SurfaceSortieState {
                 }
                 let mut normal = hit.normal;
                 let mut floor = hit.point;
+                let mut foot_normals = None;
                 // Predict the resting pose from both actual feet, just as a
                 // landing survey does, instead of a single staircase normal.
                 if material.is_some() {
@@ -225,8 +408,24 @@ impl SurfaceSortieState {
                         return Err(RebuildRejection::NoGround);
                     }
                     floor = left.point.midpoint(right_hit.point);
+                    foot_normals = Some([left.normal, right_hit.normal]);
                 }
                 let center = floor + normal * (radius + 0.6);
+                let settled = floor + normal * 5.45;
+                let angle_degrees = settling_angle(normal, settled, frame.position);
+                attempt.settling_angle_degrees = Some(angle_degrees);
+                if !angle_degrees.is_finite() || angle_degrees >= landing::LANDED_ANGLE {
+                    return Err(RebuildRejection::LandingMisaligned);
+                }
+                if self.pilots[player].rebuild_support_alignment
+                    && let Some(normals) = foot_normals
+                {
+                    let alignments = support::alignments(normals, settled, frame.position);
+                    attempt.support_alignments = Some(alignments);
+                    if !support::supports_landing(alignments) {
+                        return Err(RebuildRejection::LandingUnsupported);
+                    }
+                }
                 if !self.world.physics.surface_vehicle_space_is_clear(
                     &replacement,
                     center,
@@ -238,7 +437,8 @@ impl SurfaceSortieState {
                 }
                 // Same-tick transfers/rebuilds are not in the completed index.
                 // Only this seat's replaced pod disappears in the proposed world.
-                let standing = point + (point - frame.position).normalized() * spec.half_height();
+                let standing = actual_standing
+                    + (actual_standing - frame.position).normalized() * spec.half_height();
                 let other_seat_occupied = self.pilots.iter().enumerate().any(|(seat, pilot)| {
                     if seat == player {
                         return false;
@@ -267,7 +467,6 @@ impl SurfaceSortieState {
                 let Some(map) = map else {
                     return Ok((RebuildPose { center, normal }, None, None));
                 };
-                let settled = floor + normal * 5.45;
                 let angle = rotation_for_direction(normal);
                 let hatch = self
                     .material_access_at(
@@ -287,7 +486,7 @@ impl SurfaceSortieState {
                     preview_clear(world, axis, settled, angle)
                         && preview_clear(world, axis, center, angle)
                 });
-                let route = avoiding.route_to_hatch(local(point), local(hatch));
+                let route = avoiding.route_to_hatch(local(actual_standing), local(hatch));
                 Ok((
                     RebuildPose { center, normal },
                     Some(local(hatch)),
@@ -330,6 +529,14 @@ impl SurfaceSortieState {
         &self,
         player: usize,
     ) -> Option<RebuildRelocationSurvey> {
+        self.rebuild_relocation_survey_with_search(player, None)
+    }
+
+    pub(super) fn rebuild_relocation_survey_with_search(
+        &self,
+        player: usize,
+        search: Option<&RebuildSearchProgress>,
+    ) -> Option<RebuildRelocationSurvey> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("rebuild_relocation_survey");
         // Alternate with the full ground survey. A relocation only needs this
@@ -341,10 +548,14 @@ impl SurfaceSortieState {
             return None;
         }
         let recovery = self.pilots[player].recovery.as_ref()?.observation();
-        if !matches!(
-            recovery.status,
-            SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
-        ) {
+        let staged_recheck =
+            self.pilots[player].rebuild_refinement && search.is_some_and(|s| s.preferred.is_some());
+        if !staged_recheck
+            && !matches!(
+                recovery.status,
+                SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
+            )
+        {
             return None;
         }
         let actor = self.spaceling_snapshot(player)?;
@@ -370,6 +581,12 @@ impl SurfaceSortieState {
             checked: 0,
             attempts: Vec::new(),
             site: None,
+            refinement: self.pilots[player]
+                .rebuild_refinement
+                .then(Default::default),
+            search: None,
+            staging: None,
+            staging_map: None,
         };
         // Fixed bearing offsets can all miss viable standing material after a
         // crater. Spread the bounded previews over actual nearby footing.
@@ -401,7 +618,11 @@ impl SurfaceSortieState {
         }
         let batches = candidates.len().div_ceil(8).max(1);
         let batch = (self.world.tick / ground_navigation::GROUND_REFRESH_TICKS) as usize % batches;
+        let mut promising = Vec::new();
         for node in candidates.into_iter().skip(batch * 8).take(8) {
+            if let Some(work) = &mut survey.refinement {
+                work.coarse_candidates += 1;
+            }
             let id = node.id;
             survey.attempts.push(RebuildRelocationAttempt {
                 bearing: id,
@@ -414,13 +635,20 @@ impl SurfaceSortieState {
                 continue;
             }
             survey.checked += 1;
-            let (pose, report) = self.find_rebuild_placement(
+            let (pose, report) = self.find_rebuild_placement_offsets(
                 player,
                 map.planet,
                 frame.position + node.position.rotate_radians(frame.angle),
                 node.normal.rotate_radians(frame.angle),
                 Some(&base),
+                &REBUILD_OFFSETS,
             );
+            if let Some(work) = &mut survey.refinement {
+                work.offset_checks += report.attempts.len();
+                if refinement::promising(&report) {
+                    promising.push(node);
+                }
+            }
             survey.attempts.last_mut().unwrap().placement = Some(report.clone());
             if pose.is_some() {
                 let attempt = report
@@ -441,6 +669,7 @@ impl SurfaceSortieState {
                     .map(|e| e.length)
                     .sum::<f32>();
                 survey.site = Some(RebuildStandingSite {
+                    precise: false,
                     planet: map.planet,
                     revision: map.revision,
                     position: node.position,
@@ -452,6 +681,141 @@ impl SurfaceSortieState {
                 break;
             }
         }
+        if survey.site.is_none() && survey.refinement.is_some() {
+            if let Some(search) = search {
+                self.progressive_rebuild_survey(
+                    player,
+                    &map,
+                    &base,
+                    &promising,
+                    search,
+                    &mut survey,
+                );
+            } else {
+                self.refine_rebuild_survey(player, &map, &base, &promising, &mut survey);
+            }
+        }
+        if survey.staging.is_some() && search.is_some_and(|s| s.include_staging_map) {
+            // Keep the actual survey tick and geometry. The staging leg has
+            // already passed its walk-only check; powered edges belong to the
+            // onward preview, not to the ordinary ground controller's map.
+            map.edges
+                .retain(|e| e.kind != ground_navigation::GroundEdgeKind::Jetpack);
+            survey.staging_map = Some(map);
+        }
         Some(survey)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn vector(v: &Value) -> Vec2 {
+        Vec2::new(
+            v["x"].as_f64().unwrap() as f32,
+            v["y"].as_f64().unwrap() as f32,
+        )
+    }
+
+    #[test]
+    fn retained_failed_builds_pass_the_old_support_gate_but_cannot_settle() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("tests/fixtures/rebuild-misalignment.json")).unwrap();
+        let state = SurfaceSortieScenario::init_material(42, 1);
+        let radius =
+            physics::SpacewarsPhysics::surface_vehicle_clearance_radius(&state.replacement_ship(0));
+        for sample in fixture["samples"].as_array().unwrap() {
+            let normal = Vec2::Y.rotate_radians(sample["ship"]["angle"].as_f64().unwrap() as f32);
+            let support = vector(&sample["standing_support"]["normal"]);
+            assert!(
+                normal.dot(support) >= 0.98,
+                "the standing-frame gate accepted this pose"
+            );
+            let center = vector(&sample["ship"]["position"]);
+            let origin = vector(&sample["frame"]["position"]);
+            let settled = center + normal * (5.45 - radius - 0.6);
+            assert!(settling_angle(normal, settled, origin) > landing::LANDED_ANGLE);
+            // Changing world translation/rotation cannot change admissibility.
+            for angle in [0.0, 0.7, -2.3] {
+                let offset = Vec2::new(-417.0, 631.0);
+                let transformed = settling_angle(
+                    normal.rotate_radians(angle),
+                    settled.rotate_radians(angle) + offset,
+                    origin.rotate_radians(angle) + offset,
+                );
+                assert!(transformed > landing::LANDED_ANGLE);
+            }
+        }
+    }
+
+    #[test]
+    fn accepted_native_placements_match_the_landing_frame_and_are_read_only() {
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        for _ in 0..120 {
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[SurfaceSortieAction {
+                interact_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1)],
+            Duration::from_nanos(16_666_667),
+        );
+        for _ in 0..30 {
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        let snapshot = state.spaceling_snapshot(0).unwrap();
+        let support = snapshot.support.unwrap();
+        let planet = physics::planet_surface_support_index(support.collider).unwrap();
+        let map = state.rebuild_ground_map(0, planet, support.position);
+        let before = state.world.physics.snapshot_bytes();
+        let (pose, report) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert!(pose.is_some(), "{report:?}");
+        let selected = report
+            .attempts
+            .iter()
+            .find(|a| Some(a.offset) == report.selected_offset)
+            .unwrap();
+        assert!(selected.settling_angle_degrees.unwrap() < landing::LANDED_ANGLE);
+        let (_, repeat) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert_eq!(report, repeat);
+        assert_eq!(state.world.physics.snapshot_bytes(), before);
+        #[cfg(feature = "sensor-profile")]
+        {
+            assert!(state.set_rebuild_refinement(0, true));
+            let (refined_pose, refined) = state.find_rebuild_placement(
+                0,
+                planet,
+                support.position,
+                support.normal,
+                map.as_ref(),
+            );
+            assert!(refined_pose.is_some());
+            assert_eq!(refined, report, "an accepted old offset retains precedence");
+            let (_, cloned) = state.clone().find_rebuild_placement(
+                0,
+                planet,
+                support.position,
+                support.normal,
+                map.as_ref(),
+            );
+            assert_eq!(cloned, report);
+            assert!(!state.set_rebuild_refinement(99, true));
+            assert_eq!(state.world.physics.snapshot_bytes(), before);
+        }
+        state.world.physics.material_queries_dirty = true;
+        let (pose, report) =
+            state.find_rebuild_placement(0, planet, support.position, support.normal, map.as_ref());
+        assert!(pose.is_none());
+        assert_eq!(
+            report.attempts[0].rejection,
+            Some(RebuildRejection::QueriesPending)
+        );
     }
 }

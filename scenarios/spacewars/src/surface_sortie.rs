@@ -184,6 +184,12 @@ pub struct SurfaceSortieState {
     damage: impact::SurfaceDamageState,
     asteroids: asteroids::AsteroidPressure,
     round: Option<match_rules::MatchRound>,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_local_forecasts: Option<Vec<rebuild_placement::RebuildLocalForecast>>,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_selection: Option<rebuild_placement::selection::SelectionState>,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_preview_events: Vec<serde_json::Value>,
 }
 
 #[derive(Clone)]
@@ -206,6 +212,12 @@ pub(super) struct SurfacePilot {
     landing_gear: landing_gear::LandingGear,
     pod_righting: pod_righting::PodRightingState,
     recovery: Option<recovery::SurfaceRecovery>,
+    rebuild_refinement: bool,
+    rebuild_contact_frame: bool,
+    rebuild_radial_placement: bool,
+    #[cfg(feature = "sensor-profile")]
+    rebuild_preview_normal: Option<rebuild_placement::RebuildPreviewNormal>,
+    rebuild_support_alignment: bool,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -253,6 +265,12 @@ impl SurfacePilot {
             landing_gear: landing_gear::LandingGear::default(),
             pod_righting: pod_righting::PodRightingState::default(),
             recovery: None,
+            rebuild_refinement: false,
+            rebuild_contact_frame: false,
+            rebuild_radial_placement: false,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_preview_normal: None,
+            rebuild_support_alignment: false,
         }
     }
 
@@ -955,6 +973,12 @@ impl SurfaceSortieScenario {
             damage: impact::SurfaceDamageState::default(),
             asteroids: asteroids::AsteroidPressure::default(),
             round: None,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_local_forecasts: None,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_selection: None,
+            #[cfg(feature = "sensor-profile")]
+            rebuild_preview_events: Vec::new(),
         }
     }
 

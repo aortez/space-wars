@@ -89,6 +89,35 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
 }
 
 #[test]
+fn precise_rebuild_arrival_requires_footing_and_does_not_change_other_destinations() {
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    let destination = GroundDestination::Rebuild {
+        planet: o.flight.pilot.planet.index,
+        position: Vec2::new(6.0, 60.0),
+    };
+    let mut task = GroundNavigationTask::new(context, destination);
+    task.set_precise_rebuild(true);
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 5.6;
+    task.step(&o);
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert_eq!(task.telemetry().path.last(), Some(&3));
+    advance(&mut o, 1);
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 5.95;
+    o.flight.pilot.supported_planet = None;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    advance(&mut o, 2);
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    task.retarget(GroundDestination::Hatch);
+    task.set_precise_rebuild(true);
+    assert!(!task.telemetry().precise_rebuild);
+}
+
+#[test]
 fn continuous_walk_keeps_speed_in_both_directions_then_slows_for_the_hatch() {
     for direction in [-1.0, 1.0] {
         let (context, mut o) = fixture();
@@ -432,6 +461,39 @@ fn powered_planner_finishes_its_own_raise_without_walking_to_a_new_endpoint() {
     historical.step(&old);
     advance(&mut old, 2);
     assert!(historical.step(&old).horizontal < 0.0);
+}
+
+#[test]
+fn live_claim_ablation_walks_to_the_endpoint_and_survives_clone_and_reset() {
+    let (mut task, mut o) = raising_flag_fixture(true);
+    task.set_continuous_walk(true);
+    task.set_live_claim_stopping(false);
+    let mut copy = task.clone();
+    assert_eq!(task.step(&o), copy.step(&o));
+    advance(&mut o, 2);
+    let action = task.step(&o);
+    assert!(action.horizontal < 0.0);
+    assert_eq!(action, copy.step(&o));
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().flag_approach.is_some());
+    assert!(task.telemetry().continuous_walk);
+    assert_eq!(task.telemetry().policy, "ground_navigation_v12");
+
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert!(task.telemetry().live_claim_stopping_disabled);
+    assert!(task.telemetry().continuous_walk);
+    task.step(&o);
+    advance(&mut o, 3);
+    assert!(task.step(&o).horizontal < 0.0);
+
+    // Restoring only this rule stops at the same supported native raise.
+    task.set_live_claim_stopping(true);
+    advance(&mut o, 4);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
 }
 
 #[test]
@@ -793,6 +855,7 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
         CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
     };
     o.jetpack = Some(JetpackNavigationObservation {
+        terrain_flight: None,
         vehicle_continuation: None,
         vehicle_forecast: None,
         reference_velocity: Vec2::ZERO,
@@ -817,6 +880,92 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
             },
         }),
     });
+}
+
+#[test]
+fn high_terrain_route_requires_a_current_forecast_and_retains_reserve_and_deadlines() {
+    use scenario_spacewars::surface_sortie::jetpack::{
+        CrossingAnchor,
+        forecast::{
+            FlightEstimate,
+            terrain::{TerrainCrossingForecast, TerrainFlightSurvey},
+        },
+    };
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 1.0);
+    let mut plan = o.jetpack.as_mut().unwrap().crossing.take().unwrap();
+    plan.destination = Vec2::new(6.0, 70.0);
+    plan.cruise_radius = 73.5;
+    plan.anchor = CrossingAnchor::GroundGap { from: 0, to: 3 };
+    let map = o.ground.as_mut().unwrap();
+    map.edges.clear();
+    map.nodes.retain(|n| n.id == 0 || n.id == 3);
+    map.nodes[1].position = plan.destination;
+    let f = TerrainCrossingForecast {
+        version: 1,
+        measured_tick: 0,
+        launch_until_tick: 30,
+        plan,
+        nodes: [0, 3],
+        flights: [FlightEstimate {
+            seconds: 5.0,
+            burn_seconds: 1.8,
+            arrival_speed: 2.0,
+        }; 2],
+    };
+    o.jetpack.as_mut().unwrap().terrain_flight = Some(TerrainFlightSurvey {
+        forecast: Some(f),
+        ..Default::default()
+    });
+    let destination = GroundDestination::Rebuild {
+        planet: plan.planet,
+        position: plan.destination,
+    };
+    for stale in [false, true] {
+        let mut trial = o.clone();
+        if stale {
+            trial
+                .jetpack
+                .as_mut()
+                .unwrap()
+                .terrain_flight
+                .as_mut()
+                .unwrap()
+                .forecast
+                .as_mut()
+                .unwrap()
+                .launch_until_tick = 0;
+        }
+        let mut task = GroundNavigationTask::new(context, destination);
+        task.step(&trial);
+        assert_eq!(
+            task.telemetry().route.as_ref().unwrap().flights,
+            usize::from(!stale)
+        );
+        if stale {
+            continue;
+        }
+        let mut ready = task.clone();
+        advance(&mut trial, 1);
+        ready.step(&trial);
+        assert_eq!(ready.telemetry().goal, GroundGoal::JetpackLift);
+        trial.jetpack.as_mut().unwrap().surveyed = false;
+        advance(&mut trial, 2);
+        assert!(ready.step(&trial).primary_held);
+        let mut deadline = ready.clone();
+        let mut reserve = trial.clone();
+        reserve.jetpack.as_mut().unwrap().charge = 0.04;
+        advance(&mut reserve, 3);
+        assert!(!ready.step(&reserve).primary_held);
+        assert_eq!(ready.telemetry().flight_interruptions, 1);
+        advance(&mut trial, 722);
+        assert!(!deadline.step(&trial).primary_held);
+        assert_eq!(deadline.telemetry().flight_interruptions, 1);
+        assert_eq!(deadline.telemetry().started_tick, Some(0));
+        advance(&mut trial, 5401);
+        deadline.step(&trial);
+        assert_eq!(deadline.telemetry().goal, GroundGoal::Blocked);
+    }
 }
 
 #[test]

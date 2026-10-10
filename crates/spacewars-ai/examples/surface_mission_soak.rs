@@ -21,6 +21,9 @@ mod flag_survey;
 mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
+#[cfg(feature = "sensor-profile")]
+#[path = "support/high_ledge_probe.rs"]
+mod high_ledge_probe;
 #[path = "support/impact_probe.rs"]
 mod impact_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -43,6 +46,9 @@ mod planning_probe;
 mod projectile_diagnostics;
 #[path = "support/projectile_response.rs"]
 mod projectile_response;
+#[cfg(feature = "sensor-profile")]
+#[path = "support/rebuild_replay.rs"]
+mod rebuild_replay;
 #[path = "support/successor_continuation.rs"]
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
@@ -209,6 +215,9 @@ fn main() {
     let mut projectile_trace = projectile_diagnostics::ProjectileTrace::from_args(&out);
     let mut projectile_response = projectile_response::ResponseProbe::from_args(&out, seat);
     let mut impact_probe = impact_probe::ImpactProbe::from_args(&out, seat);
+    assert!(cfg!(feature = "sensor-profile") || arg("--probe-high-ledge", "none") == "none");
+    #[cfg(feature = "sensor-profile")]
+    let mut high_ledge_probe = high_ledge_probe::HighLedgeProbe::from_args();
     assert!(
         !native_capture_probe::timing_enabled()
             || native_capture_probe.is_some()
@@ -281,6 +290,13 @@ fn main() {
         interval_seconds: interval,
         severity: MaterialAsteroidSeverity::Mixed,
     });
+    assert!(cfg!(feature = "sensor-profile") || arg("--rebuild-replay-tape", "none") == "none");
+    #[cfg(feature = "sensor-profile")]
+    if arg("--rebuild-replay-tape", "none") != "none" {
+        assert!(mode == "duel" && match_rules && world_kind == "generated" && !strike);
+        rebuild_replay::run(state, &out, seed);
+        return;
+    }
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
     let powered_capture_seats = match arg("--powered-capture-seats", "none").as_str() {
@@ -295,6 +311,17 @@ fn main() {
         "true" => true,
         _ => panic!("--active-flight-checks must be true or false"),
     };
+    let terrain_flight_forecast = match arg("--terrain-flight-forecast", "false").as_str() {
+        "true" => true,
+        "false" => false,
+        _ => panic!("--terrain-flight-forecast must be true or false"),
+    };
+    let live_claim_stopping = match arg("--live-claim-stopping", "true").as_str() {
+        "false" => false,
+        "true" => true,
+        _ => panic!("--live-claim-stopping must be true or false"),
+    };
+    assert!(live_claim_stopping || powered_capture_seats.contains(&true));
     let pursuit_health_seats = match arg("--pursuit-health-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -468,6 +495,7 @@ fn main() {
         )
         .with_powered_capture(powered_capture_seats[i])
         .with_active_flight_checks(active_flight_checks && powered_capture_seats[i])
+        .with_live_claim_stopping(live_claim_stopping || !powered_capture_seats[i])
         .with_pursuit_health(pursuit_health_seats[i])
         .with_pursuit_climb_laser(pursuit_climb_laser_seats[i])
         .with_acquisition_defense(acquisition_defense_seats[i])
@@ -568,9 +596,10 @@ fn main() {
                 });
                 let clock = Instant::now();
                 let mut observe = || {
-                    if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i) && !request.objective_planning.is_legacy()
-                    }) {
+                    let mut observation = if let Some(live) =
+                        live_planning.as_mut().filter(|live| {
+                            live.enabled_for(i) && !request.objective_planning.is_legacy()
+                        }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
                         live.observe(&state, i, &mut o.local, request.objective_planning);
@@ -589,7 +618,12 @@ fn main() {
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
+                    };
+                    if terrain_flight_forecast {
+                        state
+                            .add_terrain_flight_forecast(i, &mut observation.local.combat.recovery);
                     }
+                    observation
                 };
                 #[cfg(not(feature = "sensor-profile"))]
                 let mut o = observe();
@@ -758,6 +792,10 @@ fn main() {
                     .as_ref()
                     .and_then(|c| c.ground.as_ref())
                     .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
+                #[cfg(feature = "sensor-profile")]
+                if let Some(probe) = &mut high_ledge_probe {
+                    probe.observe(&state, i, &o.local.combat.recovery, ground);
+                }
                 if !probed_ground_start && i == seat
                     && (probe_ground_tick == Some(tick)
                         || probe_ground_start && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting)))
@@ -982,6 +1020,10 @@ fn main() {
         if let Some(trace) = &mut projectile_trace {
             trace.observe(&state);
         }
+        #[cfg(feature = "sensor-profile")]
+        if let Some(probe) = &mut high_ledge_probe {
+            probe.record_step(&state, &actions);
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -1101,6 +1143,10 @@ fn main() {
     if let Some(probe) = projectile_response {
         probe.finish(&state);
     }
+    #[cfg(feature = "sensor-profile")]
+    if let Some(probe) = high_ledge_probe {
+        probe.finish(&out, seed);
+    }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
         || final_audit.occupied_cells + final_audit.removed_cells != initial
@@ -1139,10 +1185,18 @@ fn main() {
         evidence.finish();
     }
     report["policy_configuration"] = json!(pilots.each_ref().map(|p| p.descriptor()));
+    if terrain_flight_forecast {
+        report["terrain_flight_forecast"] = json!({
+            "profile":"bounded_high_terrain_flight_v1", "enabled_seats":[true,true],
+            "graph_work_limit":8192, "query_work_limit":8192,
+            "scope":"One nearest high gap per completed pod-recovery survey. Synchronous work outside the live objective planner quota; actual vehicle colliders retained. Both directions and three launch samples, fresh launch permission, 5% reserve and unchanged recovery deadline."
+        });
+    }
     if powered_capture_seats.contains(&true) {
         report["powered_capture"] = json!({
             "profile": spacewars_ai::mission_policy::POWERED_CAPTURE_PROFILE,
             "enabled_seats": powered_capture_seats,
+            "live_claim_stopping_enabled_seats": powered_capture_seats.map(|enabled| enabled && live_claim_stopping),
             "scope": "Opt-in v13 native powered landing routes and on-foot controller. The configured live planner allowance and all forecast validity gates remain in force; other sensors retain their synchronous work.",
         });
     }

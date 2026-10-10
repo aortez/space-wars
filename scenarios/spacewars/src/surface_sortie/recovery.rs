@@ -4,6 +4,9 @@
 use super::rebuild_placement::RebuildPlacementReport;
 use super::*;
 
+#[cfg(feature = "sensor-profile")]
+mod contact_frame;
+
 const SCUTTLE_TIME: Duration = Duration::from_secs(3);
 const REBUILD_TIME: Duration = Duration::from_secs(8);
 const PLACEMENT_RETRY: Duration = Duration::from_millis(500);
@@ -203,7 +206,7 @@ impl SurfaceSortieState {
         true
     }
 
-    fn rebuild_candidate(
+    pub(super) fn rebuild_candidate(
         &self,
         player: usize,
     ) -> Result<(usize, Vec2, Vec2), SurfaceRecoveryStatus> {
@@ -232,11 +235,24 @@ impl SurfaceSortieState {
         if self.world.planets[planet].owner_id != Some(self.pilots[player].owner.index()) {
             return Err(SurfaceRecoveryStatus::NeedOwnedPlanet);
         }
-        Ok((planet, support.position, support.normal))
+        if self.pilots[player].rebuild_contact_frame {
+            // Solver world contacts precede body integration. Attach placement
+            // rays to the completed planet pose, as the claim anchor already does.
+            let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+            Ok((
+                planet,
+                frame.position + support.local_surface.position.rotate_radians(frame.angle),
+                support.local_surface.normal.rotate_radians(frame.angle),
+            ))
+        } else {
+            Ok((planet, support.position, support.normal))
+        }
     }
 
     pub(super) fn update_recovery(&mut self, dt: Duration) {
         for player in 0..self.player_count() {
+            #[cfg(feature = "sensor-profile")]
+            self.refresh_rebuild_preview_normal(player);
             if self.pilots[player].recovery.is_none() {
                 continue;
             }
@@ -251,6 +267,8 @@ impl SurfaceSortieState {
                 Err(status) => {
                     recovery.reset_rebuild();
                     recovery.status = status;
+                    #[cfg(feature = "sensor-profile")]
+                    self.cancel_rebuild_selection(player, "recovery_precondition_lost");
                     continue;
                 }
             };
@@ -258,6 +276,8 @@ impl SurfaceSortieState {
             if recovery.planet != Some(planet) {
                 recovery.reset_rebuild();
                 recovery.planet = Some(planet);
+                #[cfg(feature = "sensor-profile")]
+                self.cancel_rebuild_selection(player, "recovery_planet_changed");
                 // Ownership/support must exist for a fresh full build interval.
                 continue;
             }
@@ -274,6 +294,10 @@ impl SurfaceSortieState {
                 continue;
             }
             if !self.try_rebuild_vehicle(player, planet, point, normal) {
+                #[cfg(feature = "sensor-profile")]
+                if self.rebuild_selection_pending(player) {
+                    continue;
+                }
                 let recovery = self.pilots[player].recovery.as_mut().unwrap();
                 recovery.status = recovery.placement.as_ref().map_or(
                     SurfaceRecoveryStatus::ClearanceBlocked,
@@ -287,20 +311,47 @@ impl SurfaceSortieState {
 
     fn try_rebuild_vehicle(&mut self, player: usize, planet: usize, point: Vec2, up: Vec2) -> bool {
         let index = self.pilots[player].vehicle.0;
-        let map = self.rebuild_ground_map(player, planet, point);
-        let (pose, report) = self.find_rebuild_placement(player, planet, point, up, map.as_ref());
+        #[cfg(feature = "sensor-profile")]
+        let selected = if self.rebuild_selection_enabled(player) {
+            let Some(selected) = self.select_forecast_rebuild(player, planet, point, up) else {
+                return false;
+            };
+            Some(selected)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "sensor-profile"))]
+        let selected: Option<(
+            Option<rebuild_placement::RebuildPose>,
+            RebuildPlacementReport,
+        )> = None;
+        let (pose, report) = selected.unwrap_or_else(|| {
+            let map = self.rebuild_ground_map(player, planet, point);
+            #[cfg(feature = "sensor-profile")]
+            {
+                self.find_native_rebuild_placement(player, planet, point, up, map.as_ref())
+            }
+            #[cfg(not(feature = "sensor-profile"))]
+            {
+                self.find_rebuild_placement(player, planet, point, up, map.as_ref())
+            }
+        });
         self.pilots[player].recovery.as_mut().unwrap().placement = Some(report);
         let Some(pose) = pose else {
             return false;
         };
+        #[cfg(feature = "sensor-profile")]
+        if self.rebuild_local_forecasts.is_some() {
+            let forecast =
+                rebuild_placement::RebuildLocalForecast::new(self, player, planet, &pose);
+            self.rebuild_local_forecasts
+                .as_mut()
+                .unwrap()
+                .push(forecast);
+        }
         let center = pose.center;
-        let mut replacement = self.replacement_ship(player);
+        let replacement = self.replacement_ship_at(player, planet, &pose);
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
-        replacement.position = center - SHIP_PIVOT;
-        replacement.rotation_radians = rotation_for_direction(pose.normal);
-        replacement.direction = pose.normal;
-        replacement.velocity = motion::point_velocity(frame, center);
-        replacement.omega = physics::control_angular_velocity(&replacement, frame.angular_velocity);
         self.world.ships[index] = replacement;
         self.reconcile_recovery_vehicles();
         // Rapier stores COM velocity, while the surface frame is evaluated

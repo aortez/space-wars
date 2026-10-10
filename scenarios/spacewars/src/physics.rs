@@ -38,6 +38,7 @@ const LANDING_FOOT_ROLE: ColliderRole = ColliderRole::new(8);
 const OUTPOST_TERMINAL_ROLE: ColliderRole = ColliderRole::new(9);
 
 pub(super) const LANDING_FOOT_RADIUS: f32 = 0.45;
+pub(super) const LANDING_MIN_SUPPORT_ALIGNMENT: f32 = 0.7;
 pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0, -5.0)];
 const RECOVERY_BREAKUP_GRACE_TICKS: u64 = 30;
 pub(super) fn surface_landing_geometry(form: ShipForm) -> ([Vec2; 2], f32) {
@@ -252,7 +253,27 @@ impl SpacewarsPhysics {
         sun: Option<SunState>,
         planets: &[PlanetState],
     ) -> Self {
-        let mut physics = Self {
+        let mut physics = Self::empty(planets.len());
+        physics.world.reserve(
+            ships.len() + planets.len() + 2,
+            ships.len() + planets.len() * 3 + 2,
+            0,
+        );
+        let _ = physics.insert_world_boundary(universe_radius);
+        if let Some(sun) = sun {
+            let _ = physics.insert_sun(sun);
+        }
+        for (index, planet) in planets.iter().enumerate() {
+            let _ = physics.insert_planet(index, planet);
+        }
+        for (index, ship) in ships.iter().enumerate() {
+            let _ = physics.insert_ship(index, ship, false, false, false);
+        }
+        physics
+    }
+
+    fn empty(planet_count: usize) -> Self {
+        Self {
             world: PhysicsWorld::new(PhysicsWorldConfig {
                 gravity: Vec2::ZERO,
                 length_unit: 10.0,
@@ -273,27 +294,36 @@ impl SpacewarsPhysics {
             tick: 0,
             contact_last_seen: BTreeMap::new(),
             pre_step_motions: BTreeMap::new(),
-            planet_keys: vec![None; planets.len()],
+            planet_keys: vec![None; planet_count],
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
-        };
-        physics.world.reserve(
-            ships.len() + planets.len() + 2,
-            ships.len() + planets.len() * 3 + 2,
-            0,
-        );
-        let _ = physics.insert_world_boundary(universe_radius);
-        if let Some(sun) = sun {
-            let _ = physics.insert_sun(sun);
         }
-        for (index, planet) in planets.iter().enumerate() {
-            let _ = physics.insert_planet(index, planet);
+    }
+
+    #[cfg(feature = "sensor-profile")]
+    pub(super) fn rebuild_forecast_world(
+        &self,
+        planet: usize,
+        index: usize,
+        ship: &ShipState,
+        spawn: bool,
+    ) -> Option<Self> {
+        if self.material_queries_dirty || !self.material_planets.contains(&planet) {
+            return None;
         }
-        for (index, ship) in ships.iter().enumerate() {
-            let _ = physics.insert_ship(index, ship, false, false, false);
+        let world = self
+            .world
+            .copy_kinematic_body(self.planet_body(planet), 128, 16_384)?;
+        let mut physics = Self::empty(planet + 1);
+        physics.world = world;
+        physics.material_planets.insert(planet);
+        physics.surface_ships = Some(vec![index]);
+        physics.surface_recovery = self.surface_recovery;
+        if spawn && !physics.insert_ship(index, ship, false, false, false) {
+            return None;
         }
-        physics
+        Some(physics)
     }
 
     pub fn reconcile(&mut self, input: PhysicsReconcileInput<'_>) -> PhysicsLifecycle {
@@ -757,7 +787,7 @@ impl SpacewarsPhysics {
         planet: usize,
         up: Vec2,
     ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
-        self.landing_contacts_with_alignment(index, planet, up, 0.7)
+        self.landing_contacts_with_alignment(index, planet, up, LANDING_MIN_SUPPORT_ALIGNMENT)
     }
 
     /// Keep an earned landing across small normal changes at round-foot/voxel

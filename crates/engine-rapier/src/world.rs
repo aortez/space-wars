@@ -21,7 +21,10 @@ use rapier2d::prelude::{
 };
 use serde::{Deserialize, Serialize};
 
+mod ball_cast;
+pub use ball_cast::{BallCastHit, BallCastOptions, BallCastStatus};
 mod clearance;
+mod forecast_body;
 mod query_snapshot;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
