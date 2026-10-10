@@ -114,8 +114,8 @@ The **Hillside** button opens a filled, uneven hillside with the current dirt sh
 The right tank aims into the slope below the left tank. Demo fires ordinary
 shells at 2, 10 and 18 seconds, followed by a quiet tail. There is no initial
 tunnel or supporting pier: successive circular craters excavate the undercut.
-With seed 42 and Weak physics, the early hits hold before an irregular section
-fails, falls and chips. Nothing cuts terrain or spawns fragments on a timer.
+With Weak physics, a sufficiently undermined section can fail, fall and chip
+on a hard landing. Nothing cuts terrain or spawns fragments on a timer.
 
 **V / right shoulder / Demo** switches to manual play and resets the encounter.
 The right tank remains selected and pre-aimed: use Fire, or change angle/power.
@@ -123,9 +123,16 @@ Demo recalculates its ballistic aim from the tank's current pose before each
 shot; manual play retains the player's chosen angle and power.
 **K / right face** cycles Weak → Strong → Off and restarts the same encounter.
 **T / top face** changes Round/Angular grains; Reset repeats the current setup.
-Weak demonstrates bank failure, falling-clump chipping and deposition. Strong
-and Off provide comparisons; Off still retains ordinary conserved blast debris.
+Weak enables bank failure, falling-clump chipping and deposition. Strong and
+Off provide comparisons; Off still retains ordinary conserved blast debris.
 The status line counts shots, bank breaks and clump breaks separately.
+
+The hillside's crater and contact outcomes depend on the system math library as
+well as the seed and shape. Seed 42 can leave a Weak bank holding or a falling
+fragment below the chipping threshold. Its automated test requires shell impacts,
+dirt release and deposition, material conservation and clone replay for both
+shapes and all three strengths. The controlled Bank, Drop and Roof tests require
+bank collapse, hard-impact fracture and loss of tank support respectively.
 
 The upper **Physics** button (Tank + Collapse / Tab + K) applies the combined
 preset to ordinary hills and barrage too. Their separate Collapse toggle still
@@ -139,6 +146,8 @@ an ordinary cannon hit on a rotating material planet, with another ship on the
 uneven ledge. Both use the production terrain lifecycle. `--require-lifecycle` makes a
 run fail unless a weapon hit, bank failure, impact chipping and some deposition
 all happen. It is intended for the Weak comparison, not the holding controls.
+This gate evaluates the actual run; changing the system math library can change
+whether the same seeded encounter completes the whole sequence.
 
 ```sh
 cargo +1.89.0 run --locked --release -p scenario-scorched-earth --example scorched_benchmark -- \
