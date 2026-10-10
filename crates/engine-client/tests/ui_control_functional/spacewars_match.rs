@@ -54,12 +54,18 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.break-duration.next", "6"),
                 ("launcher.settings.match.asteroid-interval.next", "8"),
                 ("launcher.settings.match.asteroid-strength.next", "Heavy"),
-                ("launcher.settings.match.loose-dirt.next", "On · 192 grains"),
+                (
+                    "launcher.settings.match.loose-dirt.next",
+                    "Strong · Angular",
+                ),
             ] {
-                for _ in 0..4 {
-                    if control_value(&state, control) == Some(expected) {
-                        break;
-                    }
+                let mut visited = std::collections::BTreeSet::new();
+                while control_value(&state, control) != Some(expected) {
+                    let value = control_value(&state, control).unwrap().to_owned();
+                    assert!(
+                        visited.insert(value),
+                        "{expected:?} is absent from {control}"
+                    );
                     state = harness.activate_guarded(control, &state);
                 }
                 assert_eq!(control_value(&state, control), Some(expected));
@@ -131,7 +137,10 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.break-duration.next", "6"),
                 ("launcher.settings.match.asteroid-interval.next", "8"),
                 ("launcher.settings.match.asteroid-strength.next", "Heavy"),
-                ("launcher.settings.match.loose-dirt.next", "On · 192 grains"),
+                (
+                    "launcher.settings.match.loose-dirt.next",
+                    "Strong · Angular",
+                ),
             ] {
                 assert_eq!(control_value(&state, control), Some(expected));
             }

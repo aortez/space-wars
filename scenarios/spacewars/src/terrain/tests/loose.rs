@@ -848,7 +848,8 @@ fn rotating_roof_cannon_cut_uses_shared_strength_and_retains_all_material() {
                 let spin = world.motion(ground).unwrap().angular_velocity;
                 for grain in state.loose_terrain().unwrap().iter() {
                     let motion = world.motion(grain.body()).unwrap();
-                    let support_velocity = world.velocity_at_point(ground, motion.position).unwrap();
+                    let support_velocity =
+                        world.velocity_at_point(ground, motion.position).unwrap();
                     let threshold = grain.cell_size() * 0.2;
                     grain_samples += 1;
                     quiet_samples += usize::from(

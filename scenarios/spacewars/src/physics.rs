@@ -913,7 +913,8 @@ impl SpacewarsPhysics {
         if !self.distributed_gravity {
             self.world.apply_velocity_delta(body, delta_velocity, true)
         } else {
-            self.world.apply_acceleration(body, delta_velocity / dt, true)
+            self.world
+                .apply_acceleration(body, delta_velocity / dt, true)
         }
     }
 
