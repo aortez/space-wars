@@ -27,6 +27,8 @@ mod radial;
 #[cfg(feature = "sensor-profile")]
 mod round_foot;
 #[cfg(feature = "sensor-profile")]
+mod standing_forecast;
+#[cfg(feature = "sensor-profile")]
 pub use probe::RebuildPlacementProbeRequest;
 
 const LOCAL_HALF_SPAN: i32 = 56;

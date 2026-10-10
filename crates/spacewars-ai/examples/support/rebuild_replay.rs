@@ -275,6 +275,12 @@ fn fork(
     let mut first_action = None;
     let mut audit_failures = Vec::new();
     let coverage_tick: u64 = crate::arg("--rebuild-coverage-tick", "0").parse().unwrap();
+    let standing_ticks: Vec<u64> = crate::arg("--rebuild-standing-forecast-ticks", "")
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().unwrap())
+        .collect();
+    assert!(standing_ticks.len() <= 5);
     let probe_path = crate::arg("--rebuild-placement-probe", "none");
     let probe_request: Option<RebuildPlacementProbeRequest> = (probe_path != "none")
         .then(|| serde_json::from_slice(&fs::read(&probe_path).unwrap()).unwrap());
@@ -415,6 +421,12 @@ fn fork(
             write(
                 &out.join("rebuild-coverage.json"),
                 &state.rebuild_coverage_diagnostics(seat),
+            );
+        }
+        if live && standing_ticks.contains(&row.tick) {
+            write(
+                &out.join(format!("rebuild-standing-forecast-{}.json", row.tick)),
+                &state.rebuild_standing_forecast_diagnostics(seat),
             );
         }
         if first_task.is_none() && row.recovery.as_ref() != Some(&telemetry) {

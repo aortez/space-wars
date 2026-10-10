@@ -103,6 +103,17 @@ impl RebuildLocalForecast {
         )
     }
 
+    /// Conditional landing at this snapshot's epoch, without travel/build time.
+    /// Used only by the offline standing-site diagnostic, never the selector.
+    pub(super) fn standing_preview(
+        state: &SurfaceSortieState,
+        seat: usize,
+        pose: &RebuildPose,
+        report: RebuildPlacementReport,
+    ) -> Self {
+        Self::from_candidate(state, seat, report.planet, pose, report, 0, Instant::now())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn from_candidate(
         state: &SurfaceSortieState,

@@ -70,7 +70,7 @@ pub struct RebuildStagingProposal {
     pub hatch_walk_length: f32,
 }
 
-fn staging_step(
+pub(super) fn staging_step(
     map: &GroundMap,
     foot: Vec2,
     target: &GroundNode,
