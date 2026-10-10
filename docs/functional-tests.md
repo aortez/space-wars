@@ -1,9 +1,9 @@
 # Functional UI tests
 
-Normal PR CI runs 46 of these full-application workflows using nextest's `ui-pr`
+Normal PR CI runs 49 of these full-application workflows using nextest's `ui-pr`
 profile. Only four long-running workflows (the two-match Spacewars case, automatic
 Clock demo, rain, and duck traversal) are deferred. The separate **UI functional tests**
-workflow runs all 50 nightly/on demand using the `ui` profile. Normal CI also
+workflow runs all 53 nightly/on demand using the `ui` profile. Normal CI also
 compiles every test and runs the display-free unit, simulation, rendering and
 control-protocol tests. See the [selection rationale and guard](ci-performance.md#deferred-ui-scenarios)
 and [manual dispatch instructions](ci-performance.md#running-the-full-ui-suite-on-github).
@@ -12,16 +12,16 @@ The inventory including the first attached-device workflows is:
 
 | Area | Workflows | Main coverage |
 |---|---:|---|
-| Launcher and basic lifecycle | 3 | Navigation, controls, Clock and classic Spacewars lifecycle |
+| Launcher and basic lifecycle | 4 | Navigation, controls, Clock, Pizza and classic Spacewars lifecycle |
 | Shared settings and diagnostics | 5 | Sound, controllers, network, Device Info and FPS display |
 | Clock | 13 | Events, previews, cleanup, fonts/messages and persistence |
 | Autostart | 2 | Idle scheduling, interruption, repeated matches and saved preferences |
 | Spacewars matches and HUD | 5 | Player/bot choices, results, scoreboard, rematches and rendering |
-| Labs, terrain and expeditions | 20 | Lifecycle/rendering across presets, including two-player setups |
+| Labs, terrain and expeditions | 22 | Lifecycle/rendering across presets, including two-player setups |
 | Attached-device workflows | 2 | Shared live-session checks, automatic/paused sessions and failed-check cleanup |
 
 Several workflows apply the same lifecycle to different scenario presets. These
-50 display-dependent tests share their test binary with three display-free HUD
+53 display-dependent tests share their test binary with three display-free HUD
 region tests, which run in the ordinary workspace suite. The CI selection guard
 reports the discovered counts and ensures new workflows join the PR set unless
 explicitly deferred; the documentation's inventory is a checkpoint, not a filter.
@@ -80,6 +80,14 @@ The initial workflows verify:
 - selecting Clock, changing its 12/24-hour setting through stable control IDs,
   launching and pausing the scenario, returning to the launcher, and relaunching
   a fresh Clock scenario revision.
+
+The Pizza lifecycle workflow selects `pizza` and starts gameplay, pauses through
+the guarded host API, restarts through `pause.restart`, pauses again, and returns
+to the launcher through `pause.return-to-launcher`. It verifies that pausing
+preserves the scenario revision, restarting creates a fresh unpaused instance,
+and returning clears the active scenario and revision while retaining Pizza's
+selection without an error. It uses the shared isolated real-client harness and
+deadline-based state waits.
 
 Clock event workflows additionally verify Off/Calm/Demo controls, individual
 Falling/Color Cycle/Meltdown/Duck switches, the public event catalog, named manual previews
