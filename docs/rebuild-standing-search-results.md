@@ -131,6 +131,13 @@ reaching this scene; this one holds the scene fixed. It can separate candidates
 hidden by the query frame from the current patch's remaining geometric and
 settling limitations, before changing search extent or recovery policy.
 
+That follow-up is now recorded in the
+[same-scene query-direction results](rebuild-query-directions-results.md).
+Contact-normal queries expose six conditional positive placements in every
+coarse snapshot while radial queries retain none, with identical maps and
+routes. The original radial-only result above remains valid within its query
+frame; executed recovery still needs validation.
+
 The [manifest](data/rebuild-standing-search-v1.json) and
 [portable review bundle](data/rebuild-standing-search-v1.json.gz) contain full
 maps, all placement rejections, every forecast, both reference forecasts, actual
