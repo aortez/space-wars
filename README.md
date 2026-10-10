@@ -1,17 +1,31 @@
-# Space-Wars
+# Space Wars
 
-A reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
-as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
+This is my vision for a 2d physics-based game and AI playground. It will soon
+be a playground for evolving and training neural nets to play various scenarios
+within it, including a "Space Wars" scenario, in which 2 players attempt to best
+their opponent in combat, enlisting whatever resources they can acquire.
+
+It also contains a very fancy clock mode. Beyond just showing the correct time, the
+clock contains an event system and various organisms. Currently we have nice things
+like rain, a drain, exploding letters, melting letters, a parkour rubber ducky, a
+cautious crow... etc. It's a dynamic system.
+
+## Why is it Called Space Wars?
+Being able to support my vision of the old 1985 Spacewar DOS game is a primary goal
+of this project. I can only hope to emulate the glory of this game's combat.
+
+## Other Fancy Features
 
 # On target hardware
-Below is a zoomed out view of a CTF game mode.
+Below is a zoomed out view of a CTF game mode. This picture definitely needs updating.
 ![Gameplay example](./space-wars.webp "Gameplay example")
 
 ## Status
 
 The local launcher includes the following scenarios and presets:
 
-- **Spacewars** — a complete round on three generated destructible planets:
+- **Spacewars** —
+- a complete round on three generated destructible planets:
   natural landing, on-foot flags, mining, combat, escape pods and rebuilding.
   Each player can be human or a mission bot, including bot versus bot. A living
   pilot can recover after losing every ship and flag; pilot death ends the round.
@@ -25,6 +39,8 @@ The local launcher includes the following scenarios and presets:
 - **Spacewars Classic** — the previous berth-based game and historical visual
   benchmark, under `spacewars-classic`. Its world presets, legacy bot and
   no-ship/no-planets defeat rules remain available for comparison.
+  This is supposed to be a reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
+  as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation.
   Rapier owns rigid-body motion and contacts while the scenario supplies mutual
   gravity and gameplay damage. Click empty space to make a ball, or grab and
