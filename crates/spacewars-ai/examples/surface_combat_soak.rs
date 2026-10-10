@@ -1,7 +1,7 @@
 //! Physical combat, optionally followed by P1 attempting to land under fire.
 //! Fixed initial health is optional; no runtime hits or recovery are scripted.
 use engine_common::{
-    CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
+    CombatBreakSettings, DirtMode, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
 use scenario_spacewars::{
     PlayerId,
@@ -42,7 +42,20 @@ fn arg(name: &str, default: &str) -> String {
 fn main() {
     let seed = arg("--seed", "42").parse().unwrap();
     let seconds: u32 = arg("--seconds", "180").parse().unwrap();
-    assert!((1..=180).contains(&seconds));
+    assert!((1..=600).contains(&seconds));
+    let dirt_name = arg("--dirt", "off");
+    let dirt_mode = match dirt_name.as_str() {
+        "off" => None,
+        "round" => Some(DirtMode::Round),
+        "angular" => Some(DirtMode::Angular),
+        "weak-round" => Some(DirtMode::WeakRound),
+        "weak-angular" => Some(DirtMode::WeakAngular),
+        "strong-round" => Some(DirtMode::StrongRound),
+        "strong-angular" => Some(DirtMode::StrongAngular),
+        _ => panic!(
+            "--dirt must be off, round, angular, weak-round, weak-angular, strong-round, or strong-angular"
+        ),
+    };
     let mirror = arg("--mirror", "false") == "true";
     let separation: f32 = arg("--separation", "0.5").parse().unwrap();
     assert!((0.3..=1.5).contains(&separation));
@@ -120,6 +133,9 @@ fn main() {
     );
     if match_rules {
         state.enable_match_rules();
+    }
+    if let Some(mode) = dirt_mode {
+        state.enable_dirt_mode(mode);
     }
     let mut brains = [0, 1].map(|seat| {
         // Keep the landing subject's policy fixed across pressure comparisons;
@@ -374,7 +390,7 @@ fn main() {
         if tick % 60 == 59 {
             let audit = state.terrain_diagnostics();
             if !audit.issues.is_empty()
-                || audit.occupied_cells + audit.removed_cells != initial
+                || audit.occupied_cells + audit.loose_cells as u64 + audit.removed_cells != initial
                 || audit.max_speed >= 500.0
             {
                 let message = format!("audit failed at {}s: {audit:?}", (tick + 1) / 60);
@@ -396,7 +412,11 @@ fn main() {
                     ));
                 }
             }
-            samples.push(json!({"second":(tick+1)/60,"capture_combat":tactical.combat_telemetry(),"brains":brains.each_ref().map(|b| b.telemetry()),"pilots":std::array::from_fn::<_,2,_>(|seat| state.combat_observation(seat, if seat == subject_seat && land_after.is_some_and(|s| tick>=s*60) {
+            let step_window = &steps[steps.len() - 60..];
+            samples.push(json!({"second":(tick+1)/60,
+                "step_mean_ms":step_window.iter().sum::<f64>() / step_window.len() as f64,
+                "step_max_ms":step_window.iter().copied().fold(0.0, f64::max),
+                "capture_combat":tactical.combat_telemetry(),"brains":brains.each_ref().map(|b| b.telemetry()),"pilots":std::array::from_fn::<_,2,_>(|seat| state.combat_observation(seat, if seat == subject_seat && land_after.is_some_and(|s| tick>=s*60) {
                 if use_tactical {tactical.site_request()} else {landing.site_request()}
             } else {brains[seat].site_request()})),"audit":audit,"asteroids":state.asteroid_pressure(),"landing":land_after.filter(|s| tick >= s * 60).map(|_| if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())})}));
             if failure.is_some()
@@ -434,7 +454,8 @@ fn main() {
     policies.sort_by(f64::total_cmp);
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
-        || final_audit.occupied_cells + final_audit.removed_cells != initial
+        || final_audit.occupied_cells + final_audit.loose_cells as u64 + final_audit.removed_cells
+            != initial
         || final_audit.max_speed >= 500.0
     {
         failure.get_or_insert_with(|| "final physical audit failed".to_owned());
@@ -448,13 +469,14 @@ fn main() {
             .unwrap();
         }
     }
-    let report = json!({"version":5,"capture_combat":tactical.combat_telemetry(),"asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
+    let mut report = json!({"version":6,"capture_combat":tactical.combat_telemetry(),"asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
         "match_rules":match_rules,"round":state.match_observation(),"elapsed_ticks":steps.len(),"final_audit":final_audit,
         "final_players":[state.observation(0),state.observation(1)],
         "termination":if failure.is_some(){"physics_alarm"}else if state.match_outcome().is_some(){"round_finished"}else{"budget_exhausted"},
         "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())},"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
         "ai_max_ms":ai.last(),"sensor_p95_ms":sensors[sensors.len()*95/100],"sensor_max_ms":sensors.last(),"policy_p95_ms":policies[policies.len()*95/100],"policy_max_ms":policies.last(),"samples":samples,"events":events,"ground_failures":ground_failures});
+    report["dirt"] = json!(dirt_name);
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

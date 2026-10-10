@@ -28,9 +28,14 @@ pub enum Command {
     Reset,
     Collapse,
     Barrage,
+    Bank,
+    Strength,
+    Drop,
+    Hillside,
+    Roof,
 }
 impl Command {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 16] = [
         Self::AimDown,
         Self::AimUp,
         Self::PowerDown,
@@ -42,6 +47,11 @@ impl Command {
         Self::Reset,
         Self::Collapse,
         Self::Barrage,
+        Self::Bank,
+        Self::Strength,
+        Self::Drop,
+        Self::Hillside,
+        Self::Roof,
     ];
 }
 

@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Scorched Earth: Left/Right or A/D adjusts elevation; Up/Down or W/S adjusts power. Hold Space to fire. Tab selects the other tank. V toggles the scripted duel; T switches Round/Angular dirt and resets. R restarts with the same seed. The other tank returns fire automatically. On-screen buttons provide the same controls. Gamepad: d-pad or right stick aims and changes power, bottom face fires, left face selects a tank, top face switches dirt, right shoulder toggles Demo. Start/Esc opens the pause menu. Destroy the opponent or its footing. Material capacity rejections preserve the dirt; combat damage still applies.",
+    controls_help: "Scorched Earth: Left/Right or A/D adjusts elevation; Up/Down or W/S adjusts power. Hold Space to fire. Tab selects the other tank. V toggles the scripted duel; T switches Round/Angular dirt and resets. K toggles collapse; J cycles duel, barrage, bank, low drop, high drop, hillside and roof. Hillside uses ordinary tank shells to undermine a ledge; Demo fires three shots, or turn it off to aim and fire yourself. Roof fires one shot under a bridge: compare weak and strong physics. In hillside/roof, K cycles the combined physics preset. In bank/drop tests, K cycles off/weak/strong strength and replays the test. Drop tests release the same clump after two seconds; hard landings can chip weak dirt. Hold Tab+T for the bank test or Tab+K for combined physics (isolated strength in bank/drop tests). R restarts with the same seed. The other tank returns fire automatically. On-screen buttons provide the same controls. Gamepad: d-pad or right stick aims and changes power, bottom face fires, left face selects a tank, top face switches dirt, right shoulder toggles Demo; left shoulder cycles duel/barrage/bank/low drop/high drop/hillside/roof. In bank/drop tests, right face changes strength; in hillside/roof it changes the combined physics preset. Hold left+top face for the bank test or left+right face for strength. Start/Esc opens the pause menu. Destroy the opponent or its footing. Material capacity rejections preserve the dirt; combat damage still applies.",
     create,
 };
 
@@ -175,7 +175,15 @@ mod tests {
             assert_eq!(frames, scene.render_frames(RenderBackend::Raster, viewport));
             let overlay =
                 crate::render::raster_text_overlay(&frames, viewport, scene.frame_layout());
-            for label in ["YOU · 100", "CPU · 100", "Angle −", "Reset"] {
+            for label in [
+                "YOU · 100",
+                "CPU · 100",
+                "Angle −",
+                "Reset",
+                "Hills",
+                "Physics: off",
+                "Drop test",
+            ] {
                 let item = overlay.iter().find(|p| p.text == label).expect(label);
                 assert!(item.x >= 0.0 && item.x < viewport.width, "{label}");
                 assert!(item.y >= 0.0 && item.y < viewport.height, "{label}");

@@ -21,7 +21,9 @@ use rapier2d::prelude::{
 };
 use serde::{Deserialize, Serialize};
 
+mod ccd;
 mod clearance;
+pub(crate) use clearance::{SolidDependency, SolidObstacles};
 mod query_snapshot;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
@@ -238,7 +240,7 @@ pub struct CompoundChild {
     pub angle: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CollisionGroups {
     pub memberships: u32,
     pub filter: u32,
@@ -567,6 +569,9 @@ pub struct PhysicsStepMetrics {
     pub solver_time: Duration,
     /// None when the physics backend does not provide complete CCD timing.
     pub ccd_time: Option<Duration>,
+    pub ccd_first_impact_time: Duration,
+    pub ccd_clamping_time: Duration,
+    pub ccd_substeps: usize,
     pub active_bodies: usize,
     pub sleeping_bodies: usize,
     pub candidate_pairs: usize,
@@ -714,6 +719,7 @@ impl PhysicsWorld {
         let config = normalized_world_config(config);
         let mut raw = RapierWorld {
             gravity: to_rapier(config.gravity),
+            narrow_phase: NarrowPhase::with_query_dispatcher(ccd::CompoundCcdDispatcher),
             ..RapierWorld::default()
         };
         raw.integration_parameters.dt = 1.0 / 60.0;
@@ -910,6 +916,27 @@ impl PhysicsWorld {
         self.raw.bodies.get(handle).map(body_motion)
     }
 
+    /// Motion entering a solve, including a position-driven body's prescribed
+    /// velocity for this timestep. Its previous solved velocity can be stale.
+    pub fn incoming_motion(&self, id: BodyId, dt: f32) -> Option<BodyMotion> {
+        if !dt.is_finite() || dt <= 0.0 {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        let mut motion = body_motion(body);
+        if body.is_fixed() {
+            motion.linear_velocity = Vec2::ZERO;
+            motion.angular_velocity = 0.0;
+        } else if body.body_type() == RigidBodyType::KinematicPositionBased {
+            let center = body.local_center_of_mass();
+            motion.linear_velocity =
+                from_rapier((body.next_position() * center - body.position() * center) / dt);
+            motion.angular_velocity =
+                (body.next_position().rotation * body.rotation().inverse()).angle() / dt;
+        }
+        Some(motion)
+    }
+
     /// Current world-space min/max of one body's enabled solid colliders.
     /// Allocation-free and local to that body's parts; sensors do not enlarge
     /// physical support. Uses the current body pose even before the next step.
@@ -954,6 +981,16 @@ impl PhysicsWorld {
     pub fn body_mass(&self, id: BodyId) -> Option<f32> {
         let handle = self.body_handle(id)?;
         self.raw.bodies.get(handle).map(RigidBody::mass)
+    }
+
+    pub fn body_kind(&self, id: BodyId) -> Option<BodyKind> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(match body.body_type() {
+            RigidBodyType::Dynamic => BodyKind::Dynamic,
+            RigidBodyType::Fixed => BodyKind::Fixed,
+            RigidBodyType::KinematicPositionBased => BodyKind::KinematicPosition,
+            RigidBodyType::KinematicVelocityBased => BodyKind::KinematicVelocity,
+        })
     }
 
     pub fn center_of_mass(&self, id: BodyId) -> Option<Vec2> {
@@ -1124,9 +1161,9 @@ impl PhysicsWorld {
     /// Apply a mass-independent linear velocity change as a center-of-mass
     /// impulse.
     ///
-    /// This is the natural binding for gravity and other acceleration models:
-    /// the model computes `delta_velocity`, while Rapier retains authority over
-    /// inertial mass, locked axes, body kind, sleeping, and joint response.
+    /// Rapier retains authority over inertial mass, locked axes, body kind,
+    /// sleeping, and joint response. For continuous fields, `apply_acceleration`
+    /// distributes the force over solver substeps instead of one initial kick.
     pub fn apply_velocity_delta(
         &mut self,
         id: BodyId,
@@ -1157,6 +1194,7 @@ impl PhysicsWorld {
     }
 
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
+        let _span = crate::profile::span("world_step");
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
             self.contact_events.clear();
             self.contact_event_collector.clear();
@@ -1256,9 +1294,12 @@ impl PhysicsWorld {
             island_time: counters.stages.island_construction_time.time(),
             island_constraints_time: counters.stages.island_constraints_collection_time.time(),
             solver_time: counters.stages.solver_time.time(),
-            // Rapier 0.34 does not time all CCD paths; its aggregate counter
-            // remains zero. A partial TOI timer is not a total CCD measurement.
-            ccd_time: None,
+            // The vendored backend times both substep selection and clamping,
+            // accumulating across every substep (see SPACEWARS_PATCH.md).
+            ccd_time: Some(counters.stages.ccd_time.time()),
+            ccd_first_impact_time: counters.ccd.first_impact_time.time(),
+            ccd_clamping_time: counters.ccd.toi_computation_time.time(),
+            ccd_substeps: counters.ccd.num_substeps,
             active_bodies: self.raw.islands.active_bodies().count(),
             sleeping_bodies: self
                 .bodies
@@ -1604,6 +1645,45 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
     ) -> Vec<bool> {
+        self.polygons_clearance(position, angle, polygons, groups, excluded, None)
+    }
+
+    /// Development query: the same conservative clearance test, retaining all
+    /// blocking collider identities per patch. Empty identities with `false`
+    /// mean invalid geometry, rather than a confirmed obstacle. No world state
+    /// or completed-step query index is changed.
+    pub fn current_polygon_obstacles(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+    ) -> Vec<(bool, Vec<ColliderId>)> {
+        let mut obstacles = vec![SolidObstacles::default(); polygons.len()];
+        let clear = self.polygons_clearance(
+            position,
+            angle,
+            polygons,
+            groups,
+            excluded,
+            Some(&mut obstacles),
+        );
+        clear
+            .into_iter()
+            .zip(obstacles.into_iter().map(SolidObstacles::into_ids))
+            .collect()
+    }
+
+    fn polygons_clearance(
+        &self,
+        position: Vec2,
+        angle: f32,
+        polygons: &[Vec<Vec2>],
+        groups: CollisionGroups,
+        excluded: &[PhysicsId],
+        obstacles: Option<&mut Vec<SolidObstacles>>,
+    ) -> Vec<bool> {
         if !finite_vec2(position) || !angle.is_finite() {
             return vec![false; polygons.len()];
         }
@@ -1629,7 +1709,7 @@ impl PhysicsWorld {
                 shape,
             ));
         }
-        self.current_shapes_clearance(&shapes, groups, excluded, false)
+        self.current_shapes_clearance(&shapes, groups, excluded, false, obstacles)
     }
 
     fn current_shapes_are_clear(
@@ -1638,7 +1718,7 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
     ) -> bool {
-        self.current_shapes_clearance(shapes, groups, excluded, true)
+        self.current_shapes_clearance(shapes, groups, excluded, true, None)
             .into_iter()
             .all(|clear| clear)
     }
@@ -1649,6 +1729,7 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         excluded: &[PhysicsId],
         stop_on_first: bool,
+        mut obstacles: Option<&mut Vec<SolidObstacles>>,
     ) -> Vec<bool> {
         let bounds: Vec<_> = shapes.iter().map(|(p, s)| s.compute_aabb(p)).collect();
         let Some(mut envelope) = bounds.first().copied() else {
@@ -1686,8 +1767,10 @@ impl PhysicsWorld {
             {
                 continue;
             }
-            for (((pose, shape), bounds), clear) in shapes.iter().zip(&bounds).zip(&mut results) {
-                if !*clear
+            for (i, (((pose, shape), bounds), clear)) in
+                shapes.iter().zip(&bounds).zip(&mut results).enumerate()
+            {
+                if (!*clear && obstacles.is_none())
                     || bounds.maxs.x <= other_bounds.mins.x
                     || bounds.mins.x >= other_bounds.maxs.x
                     || bounds.maxs.y <= other_bounds.mins.y
@@ -1695,13 +1778,19 @@ impl PhysicsWorld {
                 {
                     continue;
                 }
-                *clear = !rapier2d::parry::query::intersection_test(
+                let blocked = rapier2d::parry::query::intersection_test(
                     pose,
                     shape.as_ref(),
                     &other_pose,
                     collider.shape(),
                 )
                 .unwrap_or(true);
+                if blocked {
+                    *clear = false;
+                    if let Some(ref mut obstacles) = obstacles {
+                        obstacles[i].record(decode_collider(collider.user_data));
+                    }
+                }
                 if stop_on_first && !*clear {
                     return results;
                 }
@@ -1832,7 +1921,7 @@ impl PhysicsWorld {
     }
 
     pub fn from_snapshot_bytes(bytes: &[u8]) -> Result<Self, PhysicsWorldError> {
-        let snapshot: PhysicsSnapshot =
+        let mut snapshot: PhysicsSnapshot =
             bincode::deserialize(bytes).map_err(|error| PhysicsWorldError(error.to_string()))?;
         if snapshot.version != SNAPSHOT_VERSION {
             return Err(PhysicsWorldError(format!(
@@ -1840,6 +1929,12 @@ impl PhysicsWorld {
                 snapshot.version
             )));
         }
+
+        // Rapier omits dispatchers from serialization. Restore our stateless
+        // compound sweep filter while retaining the saved contact workspaces.
+        snapshot
+            .narrow_phase
+            .set_query_dispatcher(ccd::CompoundCcdDispatcher);
 
         let body_indices = snapshot
             .body_entries

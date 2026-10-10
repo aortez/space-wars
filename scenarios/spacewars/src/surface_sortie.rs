@@ -53,7 +53,7 @@ pub use claim::{
 };
 pub use flight::SurfaceWingAction;
 pub use landing::{LandingPhase, LandingTelemetry};
-pub use material::{SurfaceMiningAction, SurfaceMiningObservation};
+pub use material::{SurfaceMiningAction, SurfaceMiningObservation, dirt_config};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 pub use profiles::GeneratedSurfaceProfile;
@@ -278,9 +278,7 @@ impl SurfacePilot {
                 dt,
                 !physics.material_queries_dirty,
             );
-            physics
-                .world
-                .apply_velocity_delta(body.body(), velocity_delta, true);
+            physics.apply_gravity_delta(body.body(), velocity_delta, dt);
         }
     }
 }

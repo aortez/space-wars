@@ -5,6 +5,7 @@
 //! fields, then reads authoritative motion and normalized events.
 
 pub mod buoyancy;
+pub mod profile;
 pub mod rover;
 pub mod spaceling;
 pub mod terrain;

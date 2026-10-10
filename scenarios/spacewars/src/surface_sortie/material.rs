@@ -146,6 +146,13 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    /// Apply the launcher choice before play, sharing failure thresholds with
+    /// Scorched Earth. Plain grains preserve the earlier non-yielding trial.
+    pub fn enable_dirt_mode(&mut self, mode: engine_common::DirtMode) {
+        self.enable_loose_terrain_with_config(dirt_config(mode))
+            .expect("initial dirt mode");
+    }
+
     /// Read-only material inspection for geometry comparisons and diagnostics.
     pub fn planet_terrain(&self, planet: usize) -> Option<&engine_terrain::Terrain> {
         self.world.planet_terrain(planet)
@@ -157,6 +164,18 @@ impl SurfaceSortieState {
 
     pub fn terrain_diagnostics(&self) -> TerrainDiagnostics {
         self.world.terrain_diagnostics()
+    }
+
+    pub fn loose_settling_work(&self) -> engine_rapier::terrain::SettlingWork {
+        self.world
+            .loose_terrain()
+            .map_or(Default::default(), |pool| pool.settling_work())
+    }
+
+    pub fn capture_loose_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, engine_terrain::TerrainError> {
+        self.world.capture_loose_packing()
     }
 
     pub fn mining_observation(&self, player: usize) -> Option<SurfaceMiningObservation> {
@@ -526,14 +545,32 @@ impl SurfaceSortieState {
             .expect("initial loose terrain configuration");
     }
 
-    /// Configure a release experiment before play. The ordinary launcher keeps
-    /// its default preset; benchmark callers can compare contact shapes/limits.
+    /// Configure a release experiment before play.
     pub fn enable_loose_terrain_with_config(
         &mut self,
         config: engine_rapier::terrain::LooseTerrainConfig,
     ) -> Result<(), engine_terrain::TerrainError> {
         self.world.enable_loose_terrain(config)
     }
+}
+
+pub fn dirt_config(mode: engine_common::DirtMode) -> engine_rapier::terrain::LooseTerrainConfig {
+    use engine_common::DirtMode;
+    use engine_rapier::terrain::{DirtStrength, GrainShape, LooseTerrainConfig};
+    let strength = match mode {
+        DirtMode::Round | DirtMode::Angular => DirtStrength::Off,
+        DirtMode::WeakRound | DirtMode::WeakAngular => DirtStrength::Weak,
+        DirtMode::StrongRound | DirtMode::StrongAngular => DirtStrength::Strong,
+    };
+    strength.apply(LooseTerrainConfig {
+        shape: match mode {
+            DirtMode::Angular | DirtMode::WeakAngular | DirtMode::StrongAngular => {
+                GrainShape::Hexagon
+            }
+            _ => GrainShape::Round,
+        },
+        ..Default::default()
+    })
 }
 
 #[cfg(test)]

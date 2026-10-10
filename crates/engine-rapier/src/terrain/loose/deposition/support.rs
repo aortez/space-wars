@@ -17,6 +17,7 @@ impl ContactGraph {
         grains: &[TerrainGrain],
         fields: &BTreeMap<BodyId, TerrainBodyMut<'_>>,
     ) -> Self {
+        let _span = crate::profile::span("support_graph");
         let ids: BTreeMap<_, _> = grains
             .iter()
             .enumerate()

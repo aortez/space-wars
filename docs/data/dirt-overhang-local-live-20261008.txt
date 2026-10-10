@@ -1,0 +1,594 @@
+spacewars-cli ui activate pause.resume --expect-screen pause.main --json
+{
+  "schema_version": 1,
+  "revision": 2,
+  "screen": "pause.main",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-start.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-start.png
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-first-crater.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-first-crater.png
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-undercut.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-undercut.png
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-collapsed.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-angular-collapsed.png
+
+
+spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 4,
+  "screen": "pause.main",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=1
+paused=true
+game_over=false
+benchmark_active=false
+renderer=vector
+raster_scale=1.00
+performance_target=60 Hz
+fps=--
+ups=--
+frames_total=6077
+updates_total=1772
+fps_source=submitted-frames
+No active Spacewars diagnostics.
+
+No rule-bot flight history captured.
+performance_overlay_enabled=false
+performance_overlay_text=Paused
+autostart_enabled=false
+autostart_activity=clock
+autostart_phase=disabled
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+master_volume_percent=25
+master_muted=false
+settings_save_pending=false
+
+
+spacewars-cli ui activate pause.resume --expect-screen pause.main --json
+{
+  "schema_version": 1,
+  "revision": 4,
+  "screen": "pause.main",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+spacewars-cli input press north --hold-ms 120 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "north",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 1,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-round-collapsed.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-round-collapsed.png
+
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=1
+paused=false
+game_over=false
+benchmark_active=false
+renderer=vector
+raster_scale=1.00
+performance_target=60 Hz
+fps=62.5
+ups=59.5
+frames_total=11468
+updates_total=3466
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1020
+host_viewport_height=1383
+host_internal_width=1020
+host_internal_height=1383
+host_scene_primitives=1339
+host_updates_per_callback=0.958
+host_interval_avg_ms=16.015
+host_interval_p95_ms=16.711
+host_interval_max_ms=16.797
+host_step_avg_ms=0.979
+host_step_p95_ms=1.552
+host_step_max_ms=2.261
+host_scene_avg_ms=0.066
+host_scene_p95_ms=0.115
+host_scene_max_ms=0.129
+host_prepare_avg_ms=1.195
+host_prepare_p95_ms=1.349
+host_prepare_max_ms=1.957
+host_callback_avg_ms=2.241
+host_callback_p95_ms=2.868
+host_callback_max_ms=3.462
+host_raster_buffers_avg_ms=0.000
+host_raster_buffers_p95_ms=0.000
+host_raster_buffers_max_ms=0.000
+host_raster_clear_avg_ms=0.000
+host_raster_clear_p95_ms=0.000
+host_raster_clear_max_ms=0.000
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=0.000
+host_raster_other_frames_p95_ms=0.000
+host_raster_other_frames_max_ms=0.000
+host_raster_image_avg_ms=0.000
+host_raster_image_p95_ms=0.000
+host_raster_image_max_ms=0.000
+No active Spacewars diagnostics.
+performance_overlay_enabled=false
+performance_overlay_text=FPS 62 | UPS 60
+autostart_enabled=false
+autostart_activity=clock
+autostart_phase=disabled
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+master_volume_percent=25
+master_muted=false
+settings_save_pending=false
+
+
+spacewars-cli input press east --hold-ms 120 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 1,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-round-strong.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-round-strong.png
+
+
+spacewars-cli status
+scenario=scorched-earth
+scenario_revision=1
+paused=false
+game_over=false
+benchmark_active=false
+renderer=vector
+raster_scale=1.00
+performance_target=60 Hz
+fps=62.4
+ups=59.4
+frames_total=13232
+updates_total=5162
+fps_source=submitted-frames
+host_cpu_samples=120
+host_viewport_width=1020
+host_viewport_height=1383
+host_internal_width=1020
+host_internal_height=1383
+host_scene_primitives=1307
+host_updates_per_callback=0.958
+host_interval_avg_ms=16.024
+host_interval_p95_ms=16.706
+host_interval_max_ms=16.737
+host_step_avg_ms=0.350
+host_step_p95_ms=0.459
+host_step_max_ms=1.103
+host_scene_avg_ms=0.108
+host_scene_p95_ms=0.136
+host_scene_max_ms=0.168
+host_prepare_avg_ms=1.435
+host_prepare_p95_ms=1.679
+host_prepare_max_ms=1.806
+host_callback_avg_ms=1.895
+host_callback_p95_ms=2.186
+host_callback_max_ms=2.502
+host_raster_buffers_avg_ms=0.000
+host_raster_buffers_p95_ms=0.000
+host_raster_buffers_max_ms=0.000
+host_raster_clear_avg_ms=0.000
+host_raster_clear_p95_ms=0.000
+host_raster_clear_max_ms=0.000
+host_raster_player_avg_ms=0.000
+host_raster_player_p95_ms=0.000
+host_raster_player_max_ms=0.000
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=0.000
+host_raster_player_sun_planets_p95_ms=0.000
+host_raster_player_sun_planets_max_ms=0.000
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.000
+host_raster_player_effects_p95_ms=0.000
+host_raster_player_effects_max_ms=0.000
+host_raster_player_ships_avg_ms=0.000
+host_raster_player_ships_p95_ms=0.000
+host_raster_player_ships_max_ms=0.000
+host_raster_player_debris_avg_ms=0.000
+host_raster_player_debris_p95_ms=0.000
+host_raster_player_debris_max_ms=0.000
+host_raster_player_particles_avg_ms=0.000
+host_raster_player_particles_p95_ms=0.000
+host_raster_player_particles_max_ms=0.000
+host_raster_player_other_avg_ms=0.000
+host_raster_player_other_p95_ms=0.000
+host_raster_player_other_max_ms=0.000
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.000
+host_raster_player_sun_corona_p95_ms=0.000
+host_raster_player_sun_corona_max_ms=0.000
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.000
+host_raster_overview_live_p95_ms=0.000
+host_raster_overview_live_max_ms=0.000
+host_raster_overview_blit_avg_ms=0.000
+host_raster_overview_blit_p95_ms=0.000
+host_raster_overview_blit_max_ms=0.000
+host_raster_other_frames_avg_ms=0.000
+host_raster_other_frames_p95_ms=0.000
+host_raster_other_frames_max_ms=0.000
+host_raster_image_avg_ms=0.000
+host_raster_image_p95_ms=0.000
+host_raster_image_max_ms=0.000
+No active Spacewars diagnostics.
+performance_overlay_enabled=false
+performance_overlay_text=FPS 62 | UPS 59
+autostart_enabled=false
+autostart_activity=clock
+autostart_phase=disabled
+autostart_session=manual
+autostart_repeats=0
+autostart_delay_seconds=30
+master_volume_percent=25
+master_muted=false
+settings_save_pending=false
+
+
+spacewars-cli input press east --hold-ms 120 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 1,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+
+spacewars-cli input press east --hold-ms 120 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "east",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 1,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+
+spacewars-cli input press north --hold-ms 120 --profile picade --expect-screen gameplay --json
+{
+  "schema_version": 1,
+  "player": 1,
+  "button": "north",
+  "release_reason": "elapsed",
+  "state": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "gameplay",
+    "active_scenario": "scorched-earth",
+    "selected_scenario": "scorched-earth",
+    "selected_control": null,
+    "controls": [],
+    "actions": [],
+    "scenario_revision": 1,
+    "paused": false,
+    "benchmark_active": false,
+    "error": null
+  }
+}
+
+
+spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 6,
+  "screen": "pause.main",
+  "active_scenario": "scorched-earth",
+  "selected_scenario": "scorched-earth",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Restart Round",
+      "enabled": true
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+spacewars-cli screenshot /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-ready.png
+screenshot saved to /home/data/workspace/space-wars2/docs/screenshots/dirt-overhang/local-ready.png
+

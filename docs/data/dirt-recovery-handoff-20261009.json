@@ -1,0 +1,3249 @@
+{
+  "version": 1,
+  "production_policy_changed": false,
+  "source_head": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+  "baseline_manifest_sha256": "b46b1b94d3dacf492f648f6fc91e11f2aab727700fba985df40a0c97c8f03320",
+  "case_count": 4,
+  "reference_seconds_matched": 1200,
+  "unchanged_clone_ticks_matched": 72000,
+  "independent_baseline_comparisons": [
+    {
+      "shape": "angular",
+      "matched_ticks": 26065
+    },
+    {
+      "shape": "round",
+      "matched_ticks": 21072
+    }
+  ],
+  "cases": [
+    {
+      "case": "angular-pod-immediate",
+      "subject_seat": 1,
+      "blocking_reason": "recovery exceeded two-minute task budget",
+      "first_block_tick": 8064,
+      "fork_tick": 8065,
+      "end_tick": 26065,
+      "reference_seconds_matched": 300,
+      "unchanged_clone_ticks_matched": 18000,
+      "reset_first_completion": null,
+      "reset_first_new_loss": null,
+      "reset_first_block": [
+        10782,
+        "no accessible rebuild after four measured relocations"
+      ],
+      "changed_action_ticks": [
+        17543,
+        17998
+      ],
+      "first_changed_action_tick": [
+        8272,
+        8065
+      ],
+      "before_reset": {
+        "tick": 8065,
+        "goal": "recovery exceeded two-minute task budget",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 8064,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 4,
+          "landed_tick": null,
+          "landing_rejections": [
+            {
+              "local_position": {
+                "x": 1.9073486328125e-06,
+                "y": 59.4999885559082
+              },
+              "retry_after_tick": 5947,
+              "revision": 145,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5047
+            },
+            {
+              "local_position": {
+                "x": -7.152557373046875e-06,
+                "y": 59.50001525878906
+              },
+              "retry_after_tick": 7491,
+              "revision": 187,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 6591
+            },
+            {
+              "local_position": {
+                "x": -60.50000762939453,
+                "y": 4.9591064453125e-05
+              },
+              "retry_after_tick": 8767,
+              "revision": 225,
+              "site": {
+                "bearing": 16,
+                "planet": 0
+              },
+              "tick": 7867
+            }
+          ],
+          "landing_retries": 3,
+          "last_progress_tick": 8064,
+          "reason": "recovery exceeded two-minute task budget",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 33,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 7,
+            "braking_seconds": 0.0,
+            "heading_error": 0.11455489695072174,
+            "last_progress_tick": 7988,
+            "relative_speed": 2.506657600402832,
+            "relative_spin": 0.2961403727531433,
+            "settled_tick": 8003,
+            "spin_seconds": 0.0,
+            "started_tick": 7868
+          },
+          "started_tick": 863,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": 0.6922324299812317,
+          "position": {
+            "x": 437.9825134277344,
+            "y": 471.2450256347656
+          },
+          "spin": -1.3599916696548462,
+          "velocity": {
+            "x": 3.5415706634521484,
+            "y": 0.6995375156402588
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 240,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      },
+      "after_reset": {
+        "tick": 26065,
+        "goal": "no accessible rebuild after four measured relocations",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 9670,
+          "goal": "blocked",
+          "goal_since": 10782,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": {
+              "rebuild": {
+                "planet": 0,
+                "position": {
+                  "x": 28.06179428100586,
+                  "y": 52.50004196166992
+                }
+              }
+            },
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "survey",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 10771,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": null,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 10771,
+            "target": {
+              "x": 28.061790466308594,
+              "y": 52.50004959106445
+            },
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 6,
+          "landed_tick": 9668,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 10782,
+          "reason": "no accessible rebuild after four measured relocations",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 15,
+          "relocations": 4,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 56,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.0009274186450056732,
+            "last_progress_tick": 8764,
+            "relative_speed": 0.8530253767967224,
+            "relative_spin": 0.0017017005011439323,
+            "settled_tick": 8805,
+            "spin_seconds": 0.0,
+            "started_tick": 8644
+          },
+          "started_tick": 8065,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": 1.0172441005706787,
+          "position": {
+            "x": 449.6319885253906,
+            "y": 531.08203125
+          },
+          "spin": 0.006539702415466309,
+          "velocity": {
+            "x": -0.466185063123703,
+            "y": -0.7519030570983887
+          }
+        },
+        "ship": {
+          "angle": -2.233555793762207,
+          "position": {
+            "x": 559.3465576171875,
+            "y": 486.5115661621094
+          },
+          "spin": 0.01631753519177437,
+          "velocity": {
+            "x": 0.2024642825126648,
+            "y": 0.8931745886802673
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 461,
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 970,
+            "selected_offset": null,
+            "standing": {
+              "x": 41.50480270385742,
+              "y": 41.62845230102539
+            },
+            "tick": 26055
+          },
+          "planet": 0,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 5,
+          "rebuild_progress": 1.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "clearance_blocked"
+        },
+        "planet_revision": 972,
+        "claim": {
+          "captures": 2,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": -0.9730930328369141,
+              "y": -0.23041260242462158
+            },
+            "player": "player_2",
+            "position": {
+              "x": 450.0205078125,
+              "y": 530.96484375
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 1,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        }
+      },
+      "control_final": {
+        "tick": 26065,
+        "goal": "recovery exceeded two-minute task budget",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 8064,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 4,
+          "landed_tick": null,
+          "landing_rejections": [
+            {
+              "local_position": {
+                "x": 1.9073486328125e-06,
+                "y": 59.4999885559082
+              },
+              "retry_after_tick": 5947,
+              "revision": 145,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5047
+            },
+            {
+              "local_position": {
+                "x": -7.152557373046875e-06,
+                "y": 59.50001525878906
+              },
+              "retry_after_tick": 7491,
+              "revision": 187,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 6591
+            },
+            {
+              "local_position": {
+                "x": -60.50000762939453,
+                "y": 4.9591064453125e-05
+              },
+              "retry_after_tick": 8767,
+              "revision": 225,
+              "site": {
+                "bearing": 16,
+                "planet": 0
+              },
+              "tick": 7867
+            }
+          ],
+          "landing_retries": 3,
+          "last_progress_tick": 8064,
+          "reason": "recovery exceeded two-minute task budget",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 33,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 7,
+            "braking_seconds": 0.0,
+            "heading_error": 0.11455489695072174,
+            "last_progress_tick": 7988,
+            "relative_speed": 2.506657600402832,
+            "relative_spin": 0.2961403727531433,
+            "settled_tick": 8003,
+            "spin_seconds": 0.0,
+            "started_tick": 7868
+          },
+          "started_tick": 863,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": 2.3043322563171387,
+          "position": {
+            "x": 488.6103820800781,
+            "y": 559.074462890625
+          },
+          "spin": 0.01482649426907301,
+          "velocity": {
+            "x": -0.8853678107261658,
+            "y": -0.171631321310997
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 705,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      },
+      "reset_milestones": [
+        {
+          "tick": 8065,
+          "goal": "stabilizing escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "stabilize_pod",
+            "goal_since": 8065,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 8065,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 1,
+              "braking_seconds": 0.0,
+              "heading_error": 1.3127185106277466,
+              "last_progress_tick": 8065,
+              "relative_speed": 3.5111751556396484,
+              "relative_spin": -1.3749977350234985,
+              "settled_tick": null,
+              "spin_seconds": 0.14583295583724976,
+              "started_tick": 8065
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 8247,
+          "goal": "landing escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "land_pod",
+            "goal_since": 8247,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 8247,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 1,
+              "braking_seconds": 0.0,
+              "heading_error": 0.001708746887743473,
+              "last_progress_tick": 8245,
+              "relative_speed": 0.8585140109062195,
+              "relative_spin": 0.0044500576332211494,
+              "settled_tick": 8246,
+              "spin_seconds": 0.0,
+              "started_tick": 8065
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 8644,
+          "goal": "stabilizing escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "stabilize_pod",
+            "goal_since": 8644,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 8644,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.9388391375541687,
+              "heading_error": 0.7353806495666504,
+              "last_progress_tick": 8644,
+              "relative_speed": 27.88190269470215,
+              "relative_spin": -0.25889909267425537,
+              "settled_tick": null,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 8806,
+          "goal": "landing escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "land_pod",
+            "goal_since": 8806,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 8806,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 9668,
+          "goal": "leaving escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "exit_pod",
+            "goal_since": 9668,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 2,
+            "landed_tick": 9668,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 9668,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 9670,
+          "goal": "waiting for stable footing",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 9670,
+            "goal": "claim",
+            "goal_since": 9670,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "settle",
+              "invalidations": 0,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 0,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": null,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 9670,
+              "target": null,
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 2,
+            "landed_tick": 9668,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 9670,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 9861,
+          "goal": "rebuilding ship",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 9670,
+            "goal": "rebuild",
+            "goal_since": 9861,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "arrived",
+              "invalidations": 7,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 9860,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": 325,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 9670,
+              "target": {
+                "x": 44.499996185302734,
+                "y": 40.046348571777344
+              },
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 2,
+            "landed_tick": 9668,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 9861,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 10341,
+          "goal": "finding rebuild space",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 9670,
+            "goal": "find_build_space",
+            "goal_since": 10341,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "arrived",
+              "invalidations": 7,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 9860,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": 325,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 9670,
+              "target": {
+                "x": 44.499996185302734,
+                "y": 40.046348571777344
+              },
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 2,
+            "landed_tick": 9668,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 10341,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 10782,
+          "goal": "no accessible rebuild after four measured relocations",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 9670,
+            "goal": "blocked",
+            "goal_since": 10782,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": {
+                "rebuild": {
+                  "planet": 0,
+                  "position": {
+                    "x": 28.06179428100586,
+                    "y": 52.50004196166992
+                  }
+                }
+              },
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "survey",
+              "invalidations": 0,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 10771,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": null,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 10771,
+              "target": {
+                "x": 28.061790466308594,
+                "y": 52.50004959106445
+              },
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 6,
+            "landed_tick": 9668,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 10782,
+            "reason": "no accessible rebuild after four measured relocations",
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 15,
+            "relocations": 4,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 56,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 2,
+              "braking_seconds": 0.0,
+              "heading_error": 0.0009274186450056732,
+              "last_progress_tick": 8764,
+              "relative_speed": 0.8530253767967224,
+              "relative_spin": 0.0017017005011439323,
+              "settled_tick": 8805,
+              "spin_seconds": 0.0,
+              "started_tick": 8644
+            },
+            "started_tick": 8065,
+            "status": "blocked",
+            "task": "recover_ship_v10"
+          }
+        }
+      ],
+      "summary_sha256": "8aa12fe5440c4fc1b7caf4d9f8d371f15d0305bceaf3bcd09bb6972bfdd41f35",
+      "reset-first-block": {
+        "tick": 10782,
+        "goal": "no accessible rebuild after four measured relocations",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 9670,
+          "goal": "blocked",
+          "goal_since": 10782,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": {
+              "rebuild": {
+                "planet": 0,
+                "position": {
+                  "x": 28.06179428100586,
+                  "y": 52.50004196166992
+                }
+              }
+            },
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "survey",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 10771,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": null,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 10771,
+            "target": {
+              "x": 28.061790466308594,
+              "y": 52.50004959106445
+            },
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 6,
+          "landed_tick": 9668,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 10782,
+          "reason": "no accessible rebuild after four measured relocations",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 15,
+          "relocations": 4,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 56,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.0009274186450056732,
+            "last_progress_tick": 8764,
+            "relative_speed": 0.8530253767967224,
+            "relative_spin": 0.0017017005011439323,
+            "settled_tick": 8805,
+            "spin_seconds": 0.0,
+            "started_tick": 8644
+          },
+          "started_tick": 8065,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": -2.862236738204956,
+          "position": {
+            "x": 516.6196899414062,
+            "y": 442.34930419921875
+          },
+          "spin": 0.013822662644088268,
+          "velocity": {
+            "x": 0.8632408976554871,
+            "y": 0.24784019589424133
+          }
+        },
+        "ship": {
+          "angle": -2.4605603218078613,
+          "position": {
+            "x": 520.07275390625,
+            "y": 443.20928955078125
+          },
+          "spin": 0.017448734492063522,
+          "velocity": {
+            "x": 0.8545050024986267,
+            "y": 0.30208665132522583
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 15,
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 377,
+            "selected_offset": null,
+            "standing": {
+              "x": 44.5045166015625,
+              "y": 39.62810134887695
+            },
+            "tick": 10761
+          },
+          "planet": 0,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 1.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "clearance_blocked"
+        },
+        "planet_revision": 378,
+        "claim": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": -0.43087494373321533,
+              "y": -0.9024115800857544
+            },
+            "player": "player_2",
+            "position": {
+              "x": 516.96435546875,
+              "y": 442.58770751953125
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        }
+      }
+    },
+    {
+      "case": "angular-pod-later",
+      "subject_seat": 1,
+      "blocking_reason": "recovery exceeded two-minute task budget",
+      "first_block_tick": 8064,
+      "fork_tick": 14400,
+      "end_tick": 32400,
+      "reference_seconds_matched": 300,
+      "unchanged_clone_ticks_matched": 18000,
+      "reset_first_completion": null,
+      "reset_first_new_loss": null,
+      "reset_first_block": [
+        15301,
+        "pod stabilization stopped making progress"
+      ],
+      "changed_action_ticks": [
+        16794,
+        902
+      ],
+      "first_changed_action_tick": [
+        15353,
+        14400
+      ],
+      "before_reset": {
+        "tick": 14400,
+        "goal": "recovery exceeded two-minute task budget",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 8064,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 4,
+          "landed_tick": null,
+          "landing_rejections": [
+            {
+              "local_position": {
+                "x": 1.9073486328125e-06,
+                "y": 59.4999885559082
+              },
+              "retry_after_tick": 5947,
+              "revision": 145,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5047
+            },
+            {
+              "local_position": {
+                "x": -7.152557373046875e-06,
+                "y": 59.50001525878906
+              },
+              "retry_after_tick": 7491,
+              "revision": 187,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 6591
+            },
+            {
+              "local_position": {
+                "x": -60.50000762939453,
+                "y": 4.9591064453125e-05
+              },
+              "retry_after_tick": 8767,
+              "revision": 225,
+              "site": {
+                "bearing": 16,
+                "planet": 0
+              },
+              "tick": 7867
+            }
+          ],
+          "landing_retries": 3,
+          "last_progress_tick": 8064,
+          "reason": "recovery exceeded two-minute task budget",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 33,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 7,
+            "braking_seconds": 0.0,
+            "heading_error": 0.11455489695072174,
+            "last_progress_tick": 7988,
+            "relative_speed": 2.506657600402832,
+            "relative_spin": 0.2961403727531433,
+            "settled_tick": 8003,
+            "spin_seconds": 0.0,
+            "started_tick": 7868
+          },
+          "started_tick": 863,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": -0.3304837942123413,
+          "position": {
+            "x": 524.59033203125,
+            "y": 444.5455627441406
+          },
+          "spin": 0.014769981615245342,
+          "velocity": {
+            "x": 0.8314966559410095,
+            "y": 0.36809515953063965
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 449,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      },
+      "after_reset": {
+        "tick": 32400,
+        "goal": "pod stabilization stopped making progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 15301,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 15301,
+          "reason": "pod stabilization stopped making progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 1,
+            "braking_seconds": 0.0,
+            "heading_error": 2.317185401916504,
+            "last_progress_tick": 14400,
+            "relative_speed": 0.00018531175737734884,
+            "relative_spin": -0.0005338406190276146,
+            "settled_tick": null,
+            "spin_seconds": 0.0,
+            "started_tick": 14400
+          },
+          "started_tick": 14400,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": -2.4673264026641846,
+          "position": {
+            "x": 441.0456237792969,
+            "y": 487.9229431152344
+          },
+          "spin": 0.015013703145086765,
+          "velocity": {
+            "x": 0.18177781999111176,
+            "y": -0.8849964141845703
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 1015,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      },
+      "control_final": {
+        "tick": 32400,
+        "goal": "recovery exceeded two-minute task budget",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 8064,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 4,
+          "landed_tick": null,
+          "landing_rejections": [
+            {
+              "local_position": {
+                "x": 1.9073486328125e-06,
+                "y": 59.4999885559082
+              },
+              "retry_after_tick": 5947,
+              "revision": 145,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 5047
+            },
+            {
+              "local_position": {
+                "x": -7.152557373046875e-06,
+                "y": 59.50001525878906
+              },
+              "retry_after_tick": 7491,
+              "revision": 187,
+              "site": {
+                "bearing": 0,
+                "planet": 0
+              },
+              "tick": 6591
+            },
+            {
+              "local_position": {
+                "x": -60.50000762939453,
+                "y": 4.9591064453125e-05
+              },
+              "retry_after_tick": 8767,
+              "revision": 225,
+              "site": {
+                "bearing": 16,
+                "planet": 0
+              },
+              "tick": 7867
+            }
+          ],
+          "landing_retries": 3,
+          "last_progress_tick": 8064,
+          "reason": "recovery exceeded two-minute task budget",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 33,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 7,
+            "braking_seconds": 0.0,
+            "heading_error": 0.11455489695072174,
+            "last_progress_tick": 7988,
+            "relative_speed": 2.506657600402832,
+            "relative_spin": 0.2961403727531433,
+            "settled_tick": 8003,
+            "spin_seconds": 0.0,
+            "started_tick": 7868
+          },
+          "started_tick": 863,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": -2.3025054931640625,
+          "position": {
+            "x": 440.8048400878906,
+            "y": 487.7886962890625
+          },
+          "spin": 0.014975357800722122,
+          "velocity": {
+            "x": 0.1829209327697754,
+            "y": -0.8885667324066162
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 881,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      },
+      "reset_milestones": [
+        {
+          "tick": 14400,
+          "goal": "stabilizing escape pod",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "stabilize_pod",
+            "goal_since": 14400,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 14400,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 1,
+              "braking_seconds": 0.0,
+              "heading_error": 2.3937294483184814,
+              "last_progress_tick": 14400,
+              "relative_speed": 0.001045656157657504,
+              "relative_spin": -0.00022177770733833313,
+              "settled_tick": null,
+              "spin_seconds": 0.0,
+              "started_tick": 14400
+            },
+            "started_tick": 14400,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 15301,
+          "goal": "pod stabilization stopped making progress",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": null,
+            "goal": "blocked",
+            "goal_since": 15301,
+            "ground": null,
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 15301,
+            "reason": "pod stabilization stopped making progress",
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 1,
+              "braking_seconds": 0.0,
+              "heading_error": 2.317185401916504,
+              "last_progress_tick": 14400,
+              "relative_speed": 0.00018531175737734884,
+              "relative_spin": -0.0005338406190276146,
+              "settled_tick": null,
+              "spin_seconds": 0.0,
+              "started_tick": 14400
+            },
+            "started_tick": 14400,
+            "status": "blocked",
+            "task": "recover_ship_v10"
+          }
+        }
+      ],
+      "summary_sha256": "098cd9f0339716bc6d76503f05cc15a0c8a1b5993086f51515e95907152b262f",
+      "reset-first-block": {
+        "tick": 15301,
+        "goal": "pod stabilization stopped making progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": null,
+          "goal": "blocked",
+          "goal_since": 15301,
+          "ground": null,
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 15301,
+          "reason": "pod stabilization stopped making progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 1,
+            "braking_seconds": 0.0,
+            "heading_error": 2.317185401916504,
+            "last_progress_tick": 14400,
+            "relative_speed": 0.00018531175737734884,
+            "relative_spin": -0.0005338406190276146,
+            "settled_tick": null,
+            "spin_seconds": 0.0,
+            "started_tick": 14400
+          },
+          "started_tick": 14400,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": {
+          "aboard": 1
+        },
+        "supported_planet": null,
+        "balanced": false,
+        "actor": null,
+        "ship": {
+          "angle": -0.18293866515159607,
+          "position": {
+            "x": 536.2271118164062,
+            "y": 451.4920959472656
+          },
+          "spin": 0.014459706842899323,
+          "velocity": {
+            "x": 0.7271409630775452,
+            "y": 0.5415784120559692
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "land_pod"
+        },
+        "planet_revision": 466,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "aboard"
+        }
+      }
+    },
+    {
+      "case": "round-claim-immediate",
+      "subject_seat": 0,
+      "blocking_reason": "no supported claim progress",
+      "first_block_tick": 3071,
+      "fork_tick": 3072,
+      "end_tick": 21072,
+      "reference_seconds_matched": 300,
+      "unchanged_clone_ticks_matched": 18000,
+      "reset_first_completion": null,
+      "reset_first_new_loss": null,
+      "reset_first_block": [
+        3973,
+        "no supported claim progress"
+      ],
+      "changed_action_ticks": [
+        0,
+        0
+      ],
+      "first_changed_action_tick": [
+        null,
+        null
+      ],
+      "before_reset": {
+        "tick": 3072,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 2170,
+          "goal": "blocked",
+          "goal_since": 3071,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 25,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 125,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 2170,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": 2168,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3071,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 48,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.018033022060990334,
+            "last_progress_tick": 1616,
+            "relative_speed": 0.7939825654029846,
+            "relative_spin": 0.04676927626132965,
+            "settled_tick": 1665,
+            "spin_seconds": 0.0,
+            "started_tick": 1556
+          },
+          "started_tick": 705,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": null,
+        "balanced": false,
+        "actor": {
+          "angle": 1.1075239181518555,
+          "position": {
+            "x": 765.376708984375,
+            "y": 795.7855834960938
+          },
+          "spin": 250.23068237304688,
+          "velocity": {
+            "x": 56.03907775878906,
+            "y": -40.7110595703125
+          }
+        },
+        "ship": {
+          "angle": -2.7206571102142334,
+          "position": {
+            "x": 160.75379943847656,
+            "y": 299.0074768066406
+          },
+          "spin": 2.035076141357422,
+          "velocity": {
+            "x": 18.442487716674805,
+            "y": 1.8539189100265503
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_support"
+        },
+        "planet_revision": 125,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "need_support"
+        }
+      },
+      "after_reset": {
+        "tick": 21072,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 3072,
+          "goal": "blocked",
+          "goal_since": 3973,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 23,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 182,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 3072,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3973,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": null,
+          "started_tick": 3072,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": 0.1648036241531372,
+          "position": {
+            "x": 488.7318115234375,
+            "y": 555.2796630859375
+          },
+          "spin": -0.15763238072395325,
+          "velocity": {
+            "x": -0.8553449511528015,
+            "y": -0.2088647484779358
+          }
+        },
+        "ship": {
+          "angle": 2.6878700256347656,
+          "position": {
+            "x": 516.2271728515625,
+            "y": 996.766845703125
+          },
+          "spin": 28.23676300048828,
+          "velocity": {
+            "x": 26.21653175354004,
+            "y": -6.676299095153809
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_owned_planet"
+        },
+        "planet_revision": 1050,
+        "claim": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.8498291969299316,
+              "y": 0.5270581245422363
+            },
+            "player": "player_2",
+            "position": {
+              "x": 550.9985961914062,
+              "y": 528.7632446289062
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "approach_flag"
+        }
+      },
+      "control_final": {
+        "tick": 21072,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 2170,
+          "goal": "blocked",
+          "goal_since": 3071,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 25,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 125,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 2170,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": 2168,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3071,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 48,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.018033022060990334,
+            "last_progress_tick": 1616,
+            "relative_speed": 0.7939825654029846,
+            "relative_spin": 0.04676927626132965,
+            "settled_tick": 1665,
+            "spin_seconds": 0.0,
+            "started_tick": 1556
+          },
+          "started_tick": 705,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": 0.1648036241531372,
+          "position": {
+            "x": 488.7318115234375,
+            "y": 555.2796630859375
+          },
+          "spin": -0.15763238072395325,
+          "velocity": {
+            "x": -0.8553449511528015,
+            "y": -0.2088647484779358
+          }
+        },
+        "ship": {
+          "angle": 2.6878700256347656,
+          "position": {
+            "x": 516.2271728515625,
+            "y": 996.766845703125
+          },
+          "spin": 28.23676300048828,
+          "velocity": {
+            "x": 26.21653175354004,
+            "y": -6.676299095153809
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_owned_planet"
+        },
+        "planet_revision": 1050,
+        "claim": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.8498291969299316,
+              "y": 0.5270581245422363
+            },
+            "player": "player_2",
+            "position": {
+              "x": 550.9985961914062,
+              "y": 528.7632446289062
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "approach_flag"
+        }
+      },
+      "reset_milestones": [
+        {
+          "tick": 3072,
+          "goal": "waiting for stable footing",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 3072,
+            "goal": "claim",
+            "goal_since": 3072,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "settle",
+              "invalidations": 0,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 0,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": null,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 3072,
+              "target": null,
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 3072,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": null,
+            "started_tick": 3072,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 3973,
+          "goal": "no supported claim progress",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 3072,
+            "goal": "blocked",
+            "goal_since": 3973,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "settle",
+              "invalidations": 23,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 0,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 0,
+              "return_failure": null,
+              "revision": 182,
+              "route": null,
+              "start_repositions": 0,
+              "started_tick": 3072,
+              "target": null,
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 0,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 3973,
+            "reason": "no supported claim progress",
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": null,
+            "started_tick": 3072,
+            "status": "blocked",
+            "task": "recover_ship_v10"
+          }
+        }
+      ],
+      "summary_sha256": "c155a418df9db8959738931ff7abc351ab4861c838a01567f5a385be0072e349",
+      "reset-first-block": {
+        "tick": 3973,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 3072,
+          "goal": "blocked",
+          "goal_since": 3973,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 23,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 182,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 3072,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3973,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": null,
+          "started_tick": 3072,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": null,
+        "balanced": false,
+        "actor": {
+          "angle": 2.513920783996582,
+          "position": {
+            "x": 575.8906860351562,
+            "y": 10.540899276733398
+          },
+          "spin": -99.49687194824219,
+          "velocity": {
+            "x": -56.55215835571289,
+            "y": -1.0747077465057373
+          }
+        },
+        "ship": {
+          "angle": 0.06299972534179688,
+          "position": {
+            "x": 722.48681640625,
+            "y": 216.6875762939453
+          },
+          "spin": 4.157567977905273,
+          "velocity": {
+            "x": 84.19522857666016,
+            "y": -33.8542366027832
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_support"
+        },
+        "planet_revision": 183,
+        "claim": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "need_support"
+        }
+      }
+    },
+    {
+      "case": "round-claim-later",
+      "subject_seat": 0,
+      "blocking_reason": "no supported claim progress",
+      "first_block_tick": 3071,
+      "fork_tick": 14400,
+      "end_tick": 32400,
+      "reference_seconds_matched": 300,
+      "unchanged_clone_ticks_matched": 18000,
+      "reset_first_completion": null,
+      "reset_first_new_loss": null,
+      "reset_first_block": [
+        14730,
+        "no measured walk/jump/jetpack route to destination"
+      ],
+      "changed_action_ticks": [
+        0,
+        0
+      ],
+      "first_changed_action_tick": [
+        null,
+        null
+      ],
+      "before_reset": {
+        "tick": 14400,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 2170,
+          "goal": "blocked",
+          "goal_since": 3071,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 25,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 125,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 2170,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": 2168,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3071,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 48,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.018033022060990334,
+            "last_progress_tick": 1616,
+            "relative_speed": 0.7939825654029846,
+            "relative_spin": 0.04676927626132965,
+            "settled_tick": 1665,
+            "spin_seconds": 0.0,
+            "started_tick": 1556
+          },
+          "started_tick": 705,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": null,
+        "balanced": false,
+        "actor": {
+          "angle": -0.8078906536102295,
+          "position": {
+            "x": 557.7982177734375,
+            "y": 508.0138854980469
+          },
+          "spin": 2.0411860942840576,
+          "velocity": {
+            "x": -0.7539445757865906,
+            "y": 1.3715177774429321
+          }
+        },
+        "ship": {
+          "angle": 3.076798677444458,
+          "position": {
+            "x": 93.65921783447266,
+            "y": 265.7230224609375
+          },
+          "spin": 6.037059783935547,
+          "velocity": {
+            "x": -13.314202308654785,
+            "y": 29.800172805786133
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_support"
+        },
+        "planet_revision": 739,
+        "claim": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.44263723492622375,
+              "y": -0.8967006802558899
+            },
+            "player": "player_2",
+            "position": {
+              "x": 523.71044921875,
+              "y": 446.46502685546875
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "need_support"
+        }
+      },
+      "after_reset": {
+        "tick": 32400,
+        "goal": "no measured walk/jump/jetpack route to destination",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 14400,
+          "goal": "blocked",
+          "goal_since": 14730,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "blocked",
+            "invalidations": 8,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 14400,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": "no measured walk/jump/jetpack route to destination",
+            "replans": 12,
+            "return_failure": null,
+            "revision": 753,
+            "route": {
+              "closest_reachable_distance": null,
+              "destination_nodes": 8,
+              "failure": "no_start_footing",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.5216462016105652,
+              "partial": false,
+              "reachable_nodes": 0,
+              "start_distance": 5.1337409019470215,
+              "start_node": 479
+            },
+            "start_repositions": 0,
+            "started_tick": 14400,
+            "target": {
+              "x": 58.49998092651367,
+              "y": -2.435567855834961
+            },
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 5400,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 14730,
+          "reason": "no measured walk/jump/jetpack route to destination",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": null,
+          "started_tick": 14400,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": 3.0130913257598877,
+          "position": {
+            "x": 493.972900390625,
+            "y": 444.9563903808594
+          },
+          "spin": -0.14585724472999573,
+          "velocity": {
+            "x": 0.8657497763633728,
+            "y": -0.0616106316447258
+          }
+        },
+        "ship": {
+          "angle": 0.4695080518722534,
+          "position": {
+            "x": 416.9112854003906,
+            "y": 982.478759765625
+          },
+          "spin": 0.0,
+          "velocity": {
+            "x": 17.2877140045166,
+            "y": -2.814385175704956
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 307,
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "hull_obstructed",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "hull_obstructed",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 1596,
+            "selected_offset": null,
+            "standing": {
+              "x": 19.153697967529297,
+              "y": 51.4899787902832
+            },
+            "tick": 32400
+          },
+          "planet": 0,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 2,
+          "rebuild_progress": 1.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "clearance_blocked"
+        },
+        "planet_revision": 1596,
+        "claim": {
+          "captures": 3,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.24352838099002838,
+              "y": -0.969893753528595
+            },
+            "player": "player_1",
+            "position": {
+              "x": 495.02313232421875,
+              "y": 445.6517639160156
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 2,
+          "owner": "player_1",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        }
+      },
+      "control_final": {
+        "tick": 32400,
+        "goal": "no supported claim progress",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 2170,
+          "goal": "blocked",
+          "goal_since": 3071,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "settle",
+            "invalidations": 25,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 0,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 0,
+            "return_failure": null,
+            "revision": 125,
+            "route": null,
+            "start_repositions": 0,
+            "started_tick": 2170,
+            "target": null,
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 0,
+          "invalidations": 0,
+          "landed_tick": 2168,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 3071,
+          "reason": "no supported claim progress",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": {
+            "bearing": 48,
+            "planet": 0
+          },
+          "site_search_since": null,
+          "stabilization": {
+            "attempts": 2,
+            "braking_seconds": 0.0,
+            "heading_error": 0.018033022060990334,
+            "last_progress_tick": 1616,
+            "relative_speed": 0.7939825654029846,
+            "relative_spin": 0.04676927626132965,
+            "settled_tick": 1665,
+            "spin_seconds": 0.0,
+            "started_tick": 1556
+          },
+          "started_tick": 705,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": 0,
+        "balanced": true,
+        "actor": {
+          "angle": 3.0130913257598877,
+          "position": {
+            "x": 493.972900390625,
+            "y": 444.9563903808594
+          },
+          "spin": -0.14585724472999573,
+          "velocity": {
+            "x": 0.8657497763633728,
+            "y": -0.0616106316447258
+          }
+        },
+        "ship": {
+          "angle": 0.4695080518722534,
+          "position": {
+            "x": 416.9112854003906,
+            "y": 982.478759765625
+          },
+          "spin": 0.0,
+          "velocity": {
+            "x": 17.2877140045166,
+            "y": -2.814385175704956
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 307,
+          "placement": {
+            "attempts": [
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -8.0,
+                "rejection": "hull_obstructed",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": -14.0,
+                "rejection": "hull_obstructed",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 8.0,
+                "rejection": "no_ground",
+                "route": null
+              },
+              {
+                "center": null,
+                "hatch": null,
+                "offset": 14.0,
+                "rejection": "no_ground",
+                "route": null
+              }
+            ],
+            "planet": 0,
+            "revision": 1596,
+            "selected_offset": null,
+            "standing": {
+              "x": 19.153697967529297,
+              "y": 51.4899787902832
+            },
+            "tick": 32400
+          },
+          "planet": 0,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 2,
+          "rebuild_progress": 1.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "clearance_blocked"
+        },
+        "planet_revision": 1596,
+        "claim": {
+          "captures": 3,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.24352838099002838,
+              "y": -0.969893753528595
+            },
+            "player": "player_1",
+            "position": {
+              "x": 495.02313232421875,
+              "y": 445.6517639160156
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 2,
+          "owner": "player_1",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        }
+      },
+      "reset_milestones": [
+        {
+          "tick": 14400,
+          "goal": "checking a ground route",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 14400,
+            "goal": "claim",
+            "goal_since": 14400,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "survey",
+              "invalidations": 0,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 14400,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 1,
+              "return_failure": null,
+              "revision": 739,
+              "route": {
+                "closest_reachable_distance": null,
+                "destination_nodes": 8,
+                "failure": "no_start_footing",
+                "flights": 0,
+                "jumps": 0,
+                "length": 0.0,
+                "nearest_destination_distance": 0.5216605067253113,
+                "partial": false,
+                "reachable_nodes": 0,
+                "start_distance": 5.126101016998291,
+                "start_node": 479
+              },
+              "start_repositions": 0,
+              "started_tick": 14400,
+              "target": {
+                "x": 58.499969482421875,
+                "y": -2.435586929321289
+              },
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 5400,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 14400,
+            "reason": null,
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": null,
+            "started_tick": 14400,
+            "status": "running",
+            "task": "recover_ship_v10"
+          }
+        },
+        {
+          "tick": 14730,
+          "goal": "no measured walk/jump/jetpack route to destination",
+          "recovery": {
+            "completed_tick": null,
+            "exited_tick": 14400,
+            "goal": "blocked",
+            "goal_since": 14730,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": null,
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "blocked",
+              "invalidations": 8,
+              "jetpack_crossings": 0,
+              "jumps": 0,
+              "last_progress_tick": 14400,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": "no measured walk/jump/jetpack route to destination",
+              "replans": 12,
+              "return_failure": null,
+              "revision": 753,
+              "route": {
+                "closest_reachable_distance": null,
+                "destination_nodes": 8,
+                "failure": "no_start_footing",
+                "flights": 0,
+                "jumps": 0,
+                "length": 0.0,
+                "nearest_destination_distance": 0.5216462016105652,
+                "partial": false,
+                "reachable_nodes": 0,
+                "start_distance": 5.1337409019470215,
+                "start_node": 479
+              },
+              "start_repositions": 0,
+              "started_tick": 14400,
+              "target": {
+                "x": 58.49998092651367,
+                "y": -2.435567855834961
+              },
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 5400,
+            "invalidations": 0,
+            "landed_tick": null,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 14730,
+            "reason": "no measured walk/jump/jetpack route to destination",
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 0,
+            "relocations": 0,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": null,
+            "site_search_since": null,
+            "stabilization": null,
+            "started_tick": 14400,
+            "status": "blocked",
+            "task": "recover_ship_v10"
+          }
+        }
+      ],
+      "summary_sha256": "b1ef3d1ec1db434da3884fcdc5dc911a92d385ebd025e6391c85c4530b48c791",
+      "reset-first-block": {
+        "tick": 14730,
+        "goal": "no measured walk/jump/jetpack route to destination",
+        "recovery": {
+          "completed_tick": null,
+          "exited_tick": 14400,
+          "goal": "blocked",
+          "goal_since": 14730,
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": "flag",
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "blocked",
+            "invalidations": 8,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 14400,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": "no measured walk/jump/jetpack route to destination",
+            "replans": 12,
+            "return_failure": null,
+            "revision": 753,
+            "route": {
+              "closest_reachable_distance": null,
+              "destination_nodes": 8,
+              "failure": "no_start_footing",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.5216462016105652,
+              "partial": false,
+              "reachable_nodes": 0,
+              "start_distance": 5.1337409019470215,
+              "start_node": 479
+            },
+            "start_repositions": 0,
+            "started_tick": 14400,
+            "target": {
+              "x": 58.49998092651367,
+              "y": -2.435567855834961
+            },
+            "waypoint": 0
+          },
+          "ground_budget_ticks": 5400,
+          "invalidations": 0,
+          "landed_tick": null,
+          "landing_rejections": [],
+          "landing_retries": 0,
+          "last_progress_tick": 14730,
+          "reason": "no measured walk/jump/jetpack route to destination",
+          "rebuilt_tick": null,
+          "relocation_site": null,
+          "relocation_surveys": 0,
+          "relocations": 0,
+          "return_failure": null,
+          "scuttle_attempts": 0,
+          "scuttle_started_tick": null,
+          "scuttled_tick": null,
+          "site": null,
+          "site_search_since": null,
+          "stabilization": null,
+          "started_tick": 14400,
+          "status": "blocked",
+          "task": "recover_ship_v10"
+        },
+        "completed_recoveries": 0,
+        "location": "on_foot",
+        "supported_planet": null,
+        "balanced": false,
+        "actor": {
+          "angle": -0.6822956800460815,
+          "position": {
+            "x": 556.9327392578125,
+            "y": 512.7510986328125
+          },
+          "spin": 2.139836311340332,
+          "velocity": {
+            "x": -0.6069743037223816,
+            "y": 1.2621203660964966
+          }
+        },
+        "ship": {
+          "angle": 1.9450215101242065,
+          "position": {
+            "x": 56.73323440551758,
+            "y": 421.1408996582031
+          },
+          "spin": 45.78959655761719,
+          "velocity": {
+            "x": 5.516694068908691,
+            "y": 38.13984680175781
+          }
+        },
+        "ship_form": "escape_pod",
+        "native_recovery": {
+          "blocked_attempts": 0,
+          "placement": null,
+          "planet": null,
+          "pod_ejections": 1,
+          "rebuild_interruptions": 0,
+          "rebuild_progress": 0.0,
+          "rebuild_required_seconds": 8.0,
+          "rebuilds": 0,
+          "scuttle_progress": 0.0,
+          "scuttle_required_seconds": 3.0,
+          "ships_lost": 1,
+          "status": "need_support"
+        },
+        "planet_revision": 753,
+        "claim": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": 0.5149867534637451,
+              "y": -0.8571979999542236
+            },
+            "player": "player_2",
+            "position": {
+              "x": 528.0391235351562,
+              "y": 448.5997314453125
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_2",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "need_support"
+        }
+      }
+    }
+  ]
+}

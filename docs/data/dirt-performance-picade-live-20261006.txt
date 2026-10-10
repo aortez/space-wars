@@ -1,0 +1,22 @@
+Host: sw-picade.local
+engine-client SHA256: b3359405774bfd3ae49b9844a39463d199ec4bac62326db4289322cb3c5f1808
+spacewars-cli SHA256: 970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5
+Service: {"MainPID": "1680", "NRestarts": "0", "ActiveState": "active"}
+Final UI: {"revision": 9, "screen": "pause.main", "active_scenario": "scorched-earth", "scenario_revision": 2, "paused": true}
+Both shapes visually inspected. Full Round barrage plus quiet tail; Angular impacts. Fresh Round/collapse-on barrage left paused. Live captures are not the headless seed-42 workload. PR unchanged.
+
+Visual HUD samples (docs/screenshots/dirt-performance):
+{"image": "picade-performance-round.png", "shape": "Round", "collapse": true, "phase": "Barrage 48s remaining", "loose": 76, "returned": 159, "impacts": 6, "capacity_rejections": 0, "bank_cells_released": 21, "fps": 26, "ups": 60}
+{"image": "picade-performance-rest.png", "shape": "Round", "collapse": true, "phase": "Rest 26s", "loose": 47, "returned": 922, "impacts": 30, "capacity_rejections": 0, "bank_cells_released": 23, "pending_checks": 5, "fps": 32, "ups": 60}
+{"image": "picade-performance-angular.png", "shape": "Angular", "collapse": true, "phase": "Barrage 48s remaining", "loose": 147, "returned": 84, "impacts": 6, "capacity_rejections": 0, "bank_cells_released": 17, "fps": 18, "ups": 58}
+
+Selected CLI status samples (outside benchmarks):
+{"scenario": "scorched-earth", "fps": "25.7", "ups": "60.4", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "18.5", "ups": "59.3", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "22.4", "ups": "60.5", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "26.2", "ups": "59.3", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "24.5", "ups": "60.8", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "31.4", "ups": "60.9", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "29.9", "ups": "59.8", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "32.7", "ups": "60.4", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "15.5", "ups": "58.0", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}

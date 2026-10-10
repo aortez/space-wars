@@ -11,9 +11,12 @@ mod storage;
 
 mod connectivity;
 pub use connectivity::DetachedTerrain;
+mod cohesion;
+pub use cohesion::{Cantilever, RoofSpan};
 mod transfer;
 pub use transfer::{CellDeposit, DetachedCell, ReleasedCells};
 mod additions;
+pub use additions::SurfaceAdditionPreview;
 
 pub const CHUNK_SIZE: u32 = 32;
 const FORMAT_VERSION: u32 = 1;

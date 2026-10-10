@@ -1469,7 +1469,9 @@ impl SpacewarsScenario {
             );
         }
 
+        terrain::loose::capture_impacts(state, dt);
         let rapier = state.physics.step(dt);
+        terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
         state
             .physics
@@ -2540,6 +2542,10 @@ fn apply_world_gravity_with_pilots(
         terrain,
         ..
     } = state;
+    // Forces persist in Rapier. Each tick owns a fresh gravity/control force
+    // budget, including ticks where a source disappears or its field is zero.
+    physics.world.clear_forces();
+    physics.distributed_gravity = terrain.loose.is_some();
     gravity_participants.clear();
     for pilot in pilots.iter_mut() {
         pilot.ship_gravity_delta = Vec2::ZERO;
@@ -2715,15 +2721,17 @@ fn apply_world_gravity_with_pilots(
                 {
                     pilot.ship_gravity_delta = output.velocity_delta;
                 }
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::Ship(index),
+                assert!(physics.apply_gravity_delta(
+                    physics.ship_body(index),
                     output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_DEBRIS_TAG => {
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::Debris(payload),
+                assert!(physics.apply_gravity_delta(
+                    physics::primary_body(engine_rapier::world::PhysicsId::new(payload)),
                     output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_PARTICLE_TAG => {
@@ -2736,16 +2744,18 @@ fn apply_world_gravity_with_pilots(
                     .get(&rover_id)
                     .copied()
                     .unwrap_or(Vec2::ZERO);
-                assert!(physics.apply_rover_velocity_delta(
+                assert!(physics.apply_rover_gravity_delta(
                     rover_id,
                     body_index,
                     output.velocity_delta - frame_delta,
+                    dt,
                 ));
             }
             GRAVITY_TERRAIN_FRAGMENT_TAG => {
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::TerrainFragment(payload),
-                    output.velocity_delta
+                assert!(physics.apply_gravity_delta(
+                    physics::primary_body(engine_rapier::world::PhysicsId::new(payload)),
+                    output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_BODY_TAG | GRAVITY_ROVER_FRAME_TAG => {}

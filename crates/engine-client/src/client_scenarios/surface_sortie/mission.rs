@@ -113,7 +113,7 @@ fn create_with_seats(
     }
     state.set_asteroid_pressure(settings.material_combat.asteroids);
     if settings.material_combat.loose_dirt {
-        state.enable_loose_terrain();
+        state.enable_dirt_mode(settings.material_combat.dirt_mode);
     }
     Box::new(MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario::new(state),

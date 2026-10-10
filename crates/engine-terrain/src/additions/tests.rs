@@ -210,3 +210,141 @@ fn preview_includes_growth_past_the_field_edge_from_interpolated_samples() {
         );
     }
 }
+
+#[test]
+fn alternative_previews_preserve_every_patch_across_overlapping_edits() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let source = Terrain::generate(
+            35,
+            6,
+            0.5,
+            vec![Material {
+                id: MaterialId(1),
+                hardness: 100,
+            }],
+            |c| {
+                if c.y < 2 {
+                    MaterialId(1)
+                } else {
+                    MaterialId::VOID
+                }
+            },
+        )
+        .unwrap();
+        let source = source
+            .with_surface_distances(|p| if p.y < -0.5 { 0.19 } else { -0.07 })
+            .unwrap();
+        let mut preview = surface.addition_preview(&source);
+        let mut expected = Vec::new();
+        let mut alternatives = Vec::new();
+        // Revisit overlapping tiles, field edges and a chunk seam in different
+        // orders. Only identical reconstruction inputs may reuse a tile.
+        for coordinates in [
+            vec![(0, 2), (1, 2)],
+            vec![(1, 2), (2, 2)],
+            vec![(31, 2), (32, 2)],
+            vec![(34, 2)],
+        ] {
+            let mut after = source.clone();
+            let edits: Vec<_> = coordinates
+                .into_iter()
+                .map(|(x, y)| CellDeposit {
+                    coordinate: CellCoord::new(x, y),
+                    cell: Cell {
+                        material: MaterialId(1),
+                        durability: 37,
+                    },
+                    cell_size: 0.5,
+                })
+                .collect();
+            after.deposit_cells(&edits).unwrap();
+            let changed: Vec<_> = edits.iter().map(|e| e.coordinate).collect();
+            expected.push(surface.added_surface(&source, &after, &changed));
+            alternatives.push((after, changed));
+        }
+        for i in [0, 1, 0, 3, 2, 1, 3, 0] {
+            let (after, changed) = &alternatives[i];
+            assert_eq!(preview.added_surface(after, changed), expected[i]);
+            assert!(preview.added_surface(&source, changed).is_empty());
+        }
+    }
+}
+
+#[test]
+fn alternative_previews_track_distance_only_changes_with_the_same_revision() {
+    let source = Terrain::generate(
+        35,
+        7,
+        0.5,
+        vec![Material {
+            id: MaterialId(1),
+            hardness: 100,
+        }],
+        |c| {
+            if c.y < 3 {
+                MaterialId(1)
+            } else {
+                MaterialId::VOID
+            }
+        },
+    )
+    .unwrap();
+    let source = source
+        .with_surface_distances(|p| if p.y < -0.25 { 0.19 } else { -0.07 })
+        .unwrap();
+    let surface = TerrainSurface::Interpolated;
+    for deposit in [
+        CellCoord::new(0, 3),
+        CellCoord::new(32, 3),
+        CellCoord::new(34, 3),
+    ] {
+        let mut base = source.clone();
+        base.deposit_cells(&[CellDeposit {
+            coordinate: deposit,
+            cell: Cell {
+                material: MaterialId(1),
+                durability: 37,
+            },
+            cell_size: 0.5,
+        }])
+        .unwrap();
+        let mut preview = surface.addition_preview(&source);
+        let expected = surface.added_surface(&source, &base, &[deposit]);
+        assert_eq!(preview.added_surface(&base, &[deposit]), expected);
+        let mut differences = 0;
+        for y in -2..=2 {
+            for x in -2..=2 {
+                let sample = CellCoord::new(deposit.x + x, deposit.y + y);
+                if base.cell(sample).is_none() {
+                    continue;
+                }
+                let after = base
+                    .clone()
+                    .with_surface_distances(|p| {
+                        let c = base.local_to_cell(p).unwrap();
+                        if c == sample {
+                            base.distance(c) * 0.37
+                        } else {
+                            base.distance(c)
+                        }
+                    })
+                    .unwrap();
+                assert_eq!(after.revision(), base.revision());
+                let changed = [deposit, sample];
+                let fresh = surface.added_surface(&source, &after, &changed);
+                differences +=
+                    usize::from(fresh != surface.added_surface(&source, &base, &changed));
+                assert_eq!(preview.added_surface(&after, &changed), fresh);
+                assert_eq!(preview.added_surface(&base, &[deposit]), expected);
+            }
+        }
+        assert!(
+            differences > 0,
+            "fixture must alter the reconstructed surface"
+        );
+    }
+}

@@ -1,12 +1,11 @@
-# Local Rapier 0.34.0 correction
+# Local Rapier 0.34.0 corrections
 
 This is the published `rapier2d` 0.34.0 crate. Its crates.io archive SHA-256 is
 `691626cdcb70312199acd86322b57ddabea6da4f4399b4b1ddad0f2ff140dd71`.
 The workspace pins this version and uses a Cargo path patch. Dependencies and
 features otherwise retain the workspace lockfile's versions.
 
-Only `src/dynamics/solver/velocity_solver.rs` differs from the published Rust
-source: retain the interpolated velocity of kinematic bodies even when their
+`src/dynamics/solver/velocity_solver.rs` retains the interpolated velocity of kinematic bodies even when their
 own CCD is disabled. `TOIEntry::try_from_colliders` needs that velocity to reject
 pairs moving too slowly relative to each other to require a CCD sweep. Zeroing
 it mistakes shared transport for closing speed. A small passenger can then be
@@ -30,6 +29,23 @@ RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked -p engine-rapier \
 See `docs/moving-ground-ccd.md` for the gameplay reproduction, rejected sweep
 experiment, acceptance results and remaining limitations. Remove this vendor
 copy and Cargo patch only after an upstream version passes these checks.
+
+Two small backend extensions support the shared compound-sweep optimization
+described in `docs/compound-ccd-pruning.md`:
+
+- `src/geometry/narrow_phase.rs` adds `set_query_dispatcher`. Snapshot loading
+  restores the engine's stateless dispatcher without dropping Rapier's contact
+  graph or manifold workspaces. That dispatcher delegates all persistent contact
+  queries to the original implementation, so the workspaces remain compatible.
+- `src/pipeline/physics_pipeline.rs` and `src/counters/ccd_counters.rs` time both
+  first-impact searches and motion clamping, accumulating across all CCD
+  substeps. The original aggregate CCD timer was unused; its clamping timer
+  restarted on every substep. These counters are diagnostics, never simulation
+  inputs. No CCD activation, stepping, solver or motion-clamping logic changes.
+
+The pruning algorithm is in the engine adapter, not this vendor copy. The four
+Rust files named above are the complete set of source differences from the
+published crate.
 
 Upstream metadata identifies commit
 `a1ef31035613154dfb97a9e1d480c6a5eb9d0010`, with a dirty publishing tree; the

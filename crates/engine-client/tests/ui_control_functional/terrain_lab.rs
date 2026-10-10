@@ -33,9 +33,32 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 let loose = "launcher.settings.combat.loose-dirt.next";
                 if renderer == "vector" {
                     assert_eq!(control_value(&state, loose), Some("Off"));
-                    state = harness.activate_guarded(loose, &state);
+                    let choices = [
+                        "Off",
+                        "Round grains",
+                        "Angular grains",
+                        "Weak · Round",
+                        "Weak · Angular",
+                        "Strong · Round",
+                        "Strong · Angular",
+                    ];
+                    for expected in choices.iter().skip(1).chain(choices.first()) {
+                        state = harness.activate_guarded(loose, &state);
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
+                    for expected in choices.iter().rev() {
+                        state = harness.activate_guarded(
+                            "launcher.settings.combat.loose-dirt.previous",
+                            &state,
+                        );
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
+                    for expected in choices.iter().skip(1).take(4) {
+                        state = harness.activate_guarded(loose, &state);
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
                 }
-                assert_eq!(control_value(&state, loose), Some("On · 192 grains"));
+                assert_eq!(control_value(&state, loose), Some("Weak · Angular"));
                 let interval = "launcher.settings.combat.break-interval.next";
                 let duration = "launcher.settings.combat.break-duration.next";
                 let mission = "launcher.settings.combat.mission.next";

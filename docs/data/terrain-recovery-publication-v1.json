@@ -1,0 +1,622 @@
+{
+  "schema": "terrain-recovery-publication-v1",
+  "scope": "Preserve and prepare #174; integrate exact terrain commits into draft #178; fix UI coverage without changing qualified runtime",
+  "sources": {
+    "head": "2e5d270cf8b8eb9ef9d156f4f8d470bd22fff99e",
+    "terrain_head": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+    "qualified_ci_source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+    "differences_from_qualified_ci": [
+      "crates/engine-client/tests/ui_control_functional/spacewars_match.rs",
+      "crates/engine-client/tests/ui_control_functional/terrain_lab.rs",
+      "docs/data/dirt-recovery-handoff-20261009.json",
+      "docs/late-match-dirt-review.md",
+      "docs/terrain-recovery-handoff.md"
+    ],
+    "resolved_with_identical_qualified_files": [
+      "crates/engine-rapier/src/world.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic.rs"
+    ],
+    "runtime_identical": true
+  },
+  "original_terrain": {
+    "source_head": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+    "original_preserved": true,
+    "files": 2140,
+    "bytes": 257035090,
+    "frozen_head": "f5c368bff32d1604a2bc0c3c5c30d438b5562741",
+    "differences_from_frozen": [
+      "docs/data/dirt-recovery-handoff-20261009.json",
+      "docs/late-match-dirt-review.md",
+      "docs/terrain-recovery-handoff.md"
+    ],
+    "snapshot_sha256": "7001e9d6ac6c8afe660cb049de5493845c9302fdce51f2a7f2ceaff017a0f4cc"
+  },
+  "original_checkouts_preserved": true,
+  "original_manifest_sha256": "5a4fdc1f937e057a2acbc85fb60f3852e1c4942d7b3e3deeb9068d0aa8ebce4f",
+  "environment": {
+    "rust": "1.89.0",
+    "dependencies": "--locked",
+    "cargo_profile": "ci",
+    "RUST_MIN_STACK": "16777216",
+    "nextest": "0.9.144",
+    "nextest_download": {
+      "url": "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.144/cargo-nextest-0.9.144-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "8a4f726272b0a1c499bd87ca3978bfbb1a8c20bb08ccf075b9996e2081bd1e1e"
+    },
+    "display": "isolated Xvfb, 1280x1024x24"
+  },
+  "counts": {
+    "terrain_workspace": {
+      "tests": 2717,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "terrain_ui": {
+      "tests": 48,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "combined_workspace": {
+      "tests": 2751,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "combined_ui_initial": {
+      "tests": 48,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0
+    },
+    "combined_ui_fixed": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "current_local_checks": {
+    "combined-fmt": {
+      "phase": "combined-fmt",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "source": "2e5d270cf8b8eb9ef9d156f4f8d470bd22fff99e",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 1.8272705078125,
+      "log": "combined-fmt.log",
+      "receipt_sha256": "c09574133739ffb084893d47cf257a41cad52f238c16440a5e4269ae60cf2384",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "combined-ui": {
+      "phase": "combined-ui",
+      "command": [
+        "xvfb-run",
+        "-a",
+        "-s",
+        "-screen 0 1280x1024x24",
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "run",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ui-pr",
+        "-E",
+        "package(=engine-client) & binary(=ui_control_functional) & (test(=spacewars_match::normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers) | test(=spacewars_terrain::material_combat_ai_launch_pause_restart_and_both_renderers) | test(=spacewars_terrain::material_duel_launch_pause_restart_and_both_renderers))",
+        "--run-ignored",
+        "only",
+        "--no-tests",
+        "fail"
+      ],
+      "source": "2e5d270cf8b8eb9ef9d156f4f8d470bd22fff99e",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 86.3296594619751,
+      "log": "combined-ui.log",
+      "receipt_sha256": "da121c943d723316efe862fc2e60673f8e70c35e33c7c53c7bb8e692aa627971",
+      "log_sha256": "9110f6b372483a84d36fdb0fae472c69480b9d870ce84ba216e8b637f21aae54"
+    },
+    "terrain-fmt": {
+      "phase": "terrain-fmt",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 1.7266523838043213,
+      "log": "terrain-fmt.log",
+      "receipt_sha256": "3423807c6e3ed49a09470f2449ae2b131186a3eeceb8617652f17587e2718943",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "terrain-tests": {
+      "phase": "terrain-tests",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "run",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ci",
+        "--no-tests",
+        "fail"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 106.94456839561462,
+      "log": "terrain-tests.log",
+      "receipt_sha256": "968ede42c7b6b2bd0b1d6b152ec32bbd1ddb5d792b48c7bc6e9b9615297d44fc",
+      "log_sha256": "5bafa9f2649d7ed45c02fac446ff01fc025a70f57b95f226923a970c8b574e10"
+    },
+    "terrain-ui-list": {
+      "phase": "terrain-ui-list",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "list",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ui",
+        "-E",
+        "package(=engine-client) & binary(=ui_control_functional)",
+        "--run-ignored",
+        "only",
+        "--message-format",
+        "json"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 0.4633677005767822,
+      "log": "terrain-ui-list.log",
+      "receipt_sha256": "e22106530ae28e1cac3c93dff659781e6b664a60f85cc22ccd92c34fe5742b0e",
+      "log_sha256": "013ed213cca33bd4f70b65f087640896e10bf23d5abb8405ea0133440d6002ff"
+    },
+    "terrain-ui-pr-list": {
+      "phase": "terrain-ui-pr-list",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "list",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ui-pr",
+        "-E",
+        "package(=engine-client) & binary(=ui_control_functional)",
+        "--run-ignored",
+        "only",
+        "--message-format",
+        "json"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 0.45571422576904297,
+      "log": "terrain-ui-pr-list.log",
+      "receipt_sha256": "13581e31ebda832c36d46dcb48c00dce4f57f0909ae6f5430f1b5023854d7af9",
+      "log_sha256": "013ed213cca33bd4f70b65f087640896e10bf23d5abb8405ea0133440d6002ff"
+    },
+    "terrain-ui-selection": {
+      "phase": "terrain-ui-selection",
+      "command": [
+        "python3",
+        ".github/ci/assert_ui_selection.py",
+        "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain-ui-list-output.json",
+        "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain-ui-pr-list-output.json"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021765708923339844,
+      "log": "terrain-ui-selection.log",
+      "receipt_sha256": "63baab2d63867c35bfed14880fa61ef783ff17ba96241ebe459d51d8d42824be",
+      "log_sha256": "af62d3884a152228066b8ef6cf8f833d16f0b5b853980bfd91ab91c4f6e6efb2"
+    },
+    "terrain-ui": {
+      "phase": "terrain-ui",
+      "command": [
+        "xvfb-run",
+        "-a",
+        "-s",
+        "-screen 0 1280x1024x24",
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "run",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ui-pr",
+        "-E",
+        "package(=engine-client) & binary(=ui_control_functional)",
+        "--run-ignored",
+        "only",
+        "--no-tests",
+        "fail"
+      ],
+      "source": "e877b081704c4f1e1bb8eaa6a21219d83065c422",
+      "cwd": "/home/data/workspace/spacewars-handoffs/terrain-publication-prep-20261010/terrain",
+      "exit_code": 0,
+      "elapsed_seconds": 344.2988865375519,
+      "log": "terrain-ui.log",
+      "receipt_sha256": "55f4c4bc794646b757411adfd60b56db645217b32e0a02e35e62c4f422a9e343",
+      "log_sha256": "b77b088009c6e481c7c3397033eb42b31701116b316cfcaf33907e873d9fb0f4"
+    }
+  },
+  "preceding_combined_checks": {
+    "build": {
+      "phase": "build",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--profile",
+        "ci",
+        "--no-run",
+        "--timings"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 88.53554439544678,
+      "log": "build.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "426ce48ea8da23f235a01962f1d623282cd1db45979cd4d47cb29abb254a67f5",
+      "log_sha256": "ce12f36f6398e34fa3d398259e1dffa100b53795cd3b56ba473f1772bc8f9234"
+    },
+    "build-reuse-consecutive": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--profile",
+        "ci",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.2611219882965088,
+      "verification": "Build reuse verified: all 755 compiler artifacts were fresh.",
+      "log": "build-reuse-consecutive.log",
+      "receipt_sha256": "b724e45983790ddea9e02526e30d9c1922175fcccdc4ac0fb845cdc075d2a0a3",
+      "log_sha256": "1a5b61f0bf59eb0b49ed8758a55c387ae2464ceb5f5c2631cfe163fc597bed8c"
+    },
+    "workspace": {
+      "phase": "workspace",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "nextest",
+        "run",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--cargo-profile",
+        "ci",
+        "--profile",
+        "ci",
+        "--no-tests",
+        "fail"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 52.374971866607666,
+      "log": "workspace.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "74fc603f3a8ac93be3c344986cfd2a69bb0ccc8b184b2f77a18fc52279ede77f",
+      "log_sha256": "3b24e2f59bfa61acd148d24dabe7f686b6d6d06f3680a266804f5a505b2cd747"
+    },
+    "python-ci": {
+      "phase": "python-ci",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/ci",
+        "-p",
+        "test_*.py"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 17.744789838790894,
+      "log": "python-ci.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "eb4916ae8506927df6ec86bb382b9ada0d332498b5daf1f143e5fb57401edc4d",
+      "log_sha256": "85f0ff52c79b41194d042e2b679d1aba8757bff69799599e80765cf1898d7441"
+    },
+    "python-input": {
+      "phase": "python-input",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_picade_input.py"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 0.04253101348876953,
+      "log": "python-input.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "386d45a8ee3c9d184be0e8ddbe3516cfe51bca5e6fcb4e4faf7099279cf978e7",
+      "log_sha256": "698d16d7b93c4bd9707d3cfacda6fb1e0fea99ed0cda6e69bedc42772940540a"
+    },
+    "python-analysis": {
+      "phase": "python-analysis",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests",
+        "-p",
+        "test_*.py"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 10.858386516571045,
+      "log": "python-analysis.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "fb8134a9e1617a2158cef9104ec24aa92ed39b59ff04b42edd7880bcabf6d366",
+      "log_sha256": "72ab085fbdde164c42da44462597345bdbc20a55931f673af34604b52bb752dd"
+    },
+    "yocto-isolated": {
+      "phase": "yocto-isolated",
+      "command": [
+        "npm",
+        "--prefix",
+        "yocto",
+        "test"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 1.3754832744598389,
+      "log": "yocto-isolated.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "9f4231eea2a4dad4d3824d88ecb35de16dd8362f7402dd433be7e60ef106cdf1",
+      "log_sha256": "fe8a7d9ba5f7a2a9b0c4e5c822324618c3278f592bd30524cd55c1f6f67e60a8"
+    },
+    "shellcheck": {
+      "phase": "shellcheck",
+      "command": [
+        "shellcheck",
+        "benchmark-clock.sh",
+        "update.sh",
+        "yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh",
+        "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh",
+        "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh",
+        "yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 0.145613431930542,
+      "log": "shellcheck.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "3c12a5f3931064f606bdd6b45d6aee3bdb9314998fb478add21a7779e4c1d6cb",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "kms": {
+      "phase": "kms",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "vendor/i-slint-backend-linuxkms/Cargo.toml",
+        "--features",
+        "renderer-software",
+        "--lib"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 30.017581701278687,
+      "log": "kms.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "0fd95c2de89b46956a1fb2084663030550f69bcf1a6c024b3af36d620ff831b9",
+      "log_sha256": "cca4bbd0c8ad97ac477239f0a0ce27b688e3e397eab65a01f572a2e9fb16084f"
+    },
+    "navigation": {
+      "phase": "navigation",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "run",
+        "--locked",
+        "--release",
+        "-p",
+        "engine-agent",
+        "--",
+        "--suite",
+        "navigation-v1",
+        "--verify"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 43.048577547073364,
+      "log": "navigation.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "95f59feb463a8f6f16f329b4711d5148dc92576b1b412b6fc65b62a5f7047f81",
+      "log_sha256": "c14d15588fe65dca3ae9c2864eef83060d0066409e59c26f0ffc84fce378d0ee"
+    },
+    "strategy": {
+      "phase": "strategy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "run",
+        "--locked",
+        "--release",
+        "-p",
+        "engine-agent",
+        "--",
+        "--suite",
+        "strategy-v1",
+        "--verify"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 6.145514965057373,
+      "log": "strategy.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "27db87674abf11f678bfc9211a3aceff2c9e249ca6a819ae0f74bad524a3973d",
+      "log_sha256": "b58842a20ab950f9b9b6de76f8d9e07d643eb872a41b37e6cfcea30e20c90c0c"
+    },
+    "nes-clippy": {
+      "phase": "nes-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "engine-nes",
+        "-p",
+        "scenario-falling",
+        "-p",
+        "scenario-nes",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 3.485543966293335,
+      "log": "nes-clippy.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "e124d2836e5dc96c098072f132aeacd18feb997a2ae231566c12a50eeff74ebe",
+      "log_sha256": "b75ad4c554650c860fa58de45568d10fe5fd44c4682a4dda75e16d52cfe1403b"
+    },
+    "nes-benchmark": {
+      "phase": "nes-benchmark",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "run",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-falling",
+        "--bin",
+        "falling-benchmark",
+        "--",
+        "120",
+        "10"
+      ],
+      "cwd": "/home/data/workspace/spacewars-handoffs/integration-ci-20261010/combined",
+      "exit_code": 0,
+      "elapsed_seconds": 5.347497224807739,
+      "log": "nes-benchmark.log",
+      "source": "07019b85f9e85ac0a41afd910e9b24a44c3673fb",
+      "receipt_sha256": "ccad7c773fc4e7cb2b77128d40c3fb4d9e84d83aefb9c26f692184c34eee7a28",
+      "log_sha256": "1674d2ca60f43b3fcbde3150f182a4c085985c7532936d9e5dd1c8e20bcf782c"
+    }
+  },
+  "initial_ui_failures": [
+    "spacewars_match::normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers",
+    "spacewars_terrain::material_combat_ai_launch_pause_restart_and_both_renderers",
+    "spacewars_terrain::material_duel_launch_pause_restart_and_both_renderers"
+  ],
+  "initial_ui_log_sha256": "a905164e8d4216f98a33c58b5dab5cc2f2b3629d896336e39060e28979b41076",
+  "initial_ui_junit_sha256": "b9ab61269b359b9450f268a4947385b3894686fc70e2d1b18835e23d380c059e",
+  "previous_published_178_failure": {
+    "run": "https://github.com/aortez/space-wars/actions/runs/38019941181",
+    "test": "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+    "reason": "blasted grains are absent from vector: 0 pixels",
+    "local_combined_preflight": "passed; new hosted status still required",
+    "retained_log_sha256": "c1538b80e8339d1cc34e4b079e49ca593283ae2a2c07c191c006e2610a655150"
+  },
+  "retained_setup_failures": [
+    {
+      "phase": "yocto",
+      "log": "yocto.log",
+      "observation": "The real Cargo cache-maintenance fixture leaves its binary present with the locally injected shared CARGO_TARGET_DIR.",
+      "controlled_check": "yocto-cache-isolated.json",
+      "correction": "Run this independent CI job without the shared Rust target environment variable.",
+      "result": "The isolated fixture and complete 34 Node + 36 Python test suite pass.",
+      "source_comparison": "yocto/scripts/build-cache.mjs and its test are identical to main 6611a0b; introduced by c1240ba (#129).",
+      "scope": "Existing auxiliary behavior under a non-CI environment; no cache-maintenance fix is claimed."
+    },
+    {
+      "phase": "build-reuse",
+      "log": "build-reuse.log",
+      "observation": "An intervening git status refreshed the worktree index after the first build, correctly invalidating the client build identity.",
+      "correction": "Run the unchanged build consecutively without an index-refreshing Git command.",
+      "result": "build-reuse-consecutive.json confirms all 755 compiler artifacts are fresh.",
+      "source_comparison": "No source or fixture changes were made."
+    }
+  ],
+  "reused_recovery_validation": {
+    "receipt": "docs/data/terrain-recovery-assembly-v1.json on #178",
+    "passed": 553,
+    "ai_library": 454,
+    "ground_navigation": 45,
+    "native_surface_recovery": 51,
+    "ground_posture": 3,
+    "ignored_diagnostics": 17,
+    "strict_ai_clippy": "passed",
+    "scope": "Prior local execution on identical runtime and recovery test source; not rerun during publication preparation"
+  },
+  "limits": [
+    "Fresh GitHub platform CI required",
+    "Four long UI workflows intentionally deferred",
+    "Device timing/playtests pending for final combined source",
+    "No deployment, merge, or default/frontier promotion"
+  ],
+  "counts_scope": "JUnit counts cover executed tests only; nextest exclusions are recorded separately.",
+  "nextest_excluded": {
+    "terrain_workspace": 60,
+    "terrain_ui": 7,
+    "combined_workspace": 60,
+    "combined_ui_fixed": 52,
+    "ui_pr_deferred_long_workflows": 4
+  }
+}

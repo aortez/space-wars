@@ -15,8 +15,9 @@ use engine_terrain::{
 
 use super::*;
 
-mod loose;
+pub(crate) mod loose;
 pub(super) use loose::render_loose;
+mod destruction;
 mod diagnostics;
 pub use diagnostics::TerrainDiagnostics;
 mod motion_trace;
@@ -61,6 +62,8 @@ pub(super) struct TerrainState {
     pending_blasts: Vec<(PhysicsId, RadialImpulse)>,
     pub loose: Option<LooseTerrain>,
     pub rejected_releases: u64,
+    /// Diagnostic snapshot only; it cannot affect future simulation decisions.
+    pub last_capacity_rejection: Option<engine_rapier::terrain::ReleaseCapacity>,
     next_fragment: u64,
     pub fixture: bool,
     pub legacy_services: bool,
@@ -83,6 +86,7 @@ impl Default for TerrainState {
             pending_blasts: Vec::new(),
             loose: None,
             rejected_releases: 0,
+            last_capacity_rejection: None,
             next_fragment: FRAGMENT_ID_BASE,
             fixture: false,
             legacy_services: true,
@@ -305,8 +309,22 @@ pub(super) fn commit(state: &mut SpacewarsState) {
     let pending = std::mem::take(&mut state.terrain.pending);
     let pending = loose::commit_releases(state, pending);
     for pending in pending {
+        let watch = state
+            .terrain
+            .loose
+            .as_ref()
+            .is_some_and(|p| p.config().cohesion.is_some());
         let Some(field) = state.terrain.field_mut(pending.body) else {
             continue;
+        };
+        let disturbed: Vec<_> = if watch {
+            field
+                .brush_cells(pending.edit.brush)
+                .expect("validated mining brush")
+                .map(|(c, _)| c)
+                .collect()
+        } else {
+            Vec::new()
         };
         let result = field
             .apply(pending.edit)
@@ -314,6 +332,7 @@ pub(super) fn commit(state: &mut SpacewarsState) {
         if result.changed_cells == 0 {
             continue;
         }
+        loose::disturb_mined(&mut state.terrain, pending.body, &disturbed);
         let removed = result
             .removed
             .iter()
@@ -396,6 +415,8 @@ pub(super) fn commit(state: &mut SpacewarsState) {
         }
     }
     loose::commit_slumping(state);
+    loose::commit_cohesion(state);
+    loose::commit_impacts(state);
     loose::commit_deposits(state);
     reconcile_support(state);
 }

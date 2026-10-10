@@ -1003,6 +1003,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             combat_mission: window.get_launcher_combat_mission().to_string(),
             combat_asteroid_interval: window.get_launcher_combat_asteroid_interval().to_string(),
             loose_dirt: window.get_launcher_loose_dirt(),
+            dirt_mode: window.get_launcher_dirt_mode().to_string(),
             combat_asteroid_strength: window.get_launcher_combat_asteroid_strength().to_string(),
             spacewars_preset: window.get_launcher_spacewars_preset().to_string(),
             spacewars_planets: window.get_launcher_use_planets().to_string(),
