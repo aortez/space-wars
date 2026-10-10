@@ -19,6 +19,8 @@ use scenario_spacewars::{
 use serde::Serialize;
 
 pub const RULE_PILOT_V4_POLICY_ID: &str = "rule_pilot_v4";
+#[cfg(feature = "sensor-profile")]
+mod terrain_recovery;
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct CombatIntent {
     pub flight: FlightIntent,
@@ -69,6 +71,8 @@ pub struct RulePilotV4 {
     break_random: u64,
     break_side: f32,
     awaiting_break_return: bool,
+    #[cfg(feature = "sensor-profile")]
+    terrain_recovery: bool,
 }
 impl RulePilotV4 {
     /// The original policy remains available for regression and Off comparisons.
@@ -95,6 +99,8 @@ impl RulePilotV4 {
                 ^ (context.actor.index() as u64 + 1).wrapping_mul(0xd1b5_4a32_d192_ed03),
             break_side: 1.0,
             awaiting_break_return: false,
+            #[cfg(feature = "sensor-profile")]
+            terrain_recovery: false,
             telemetry: CombatPilotTelemetry {
                 policy: RULE_PILOT_V4_POLICY_ID,
                 goal: "takeoff",
@@ -122,7 +128,11 @@ impl RulePilotV4 {
         pilot
     }
     pub fn reset(&mut self, context: BrainReset) {
+        #[cfg(feature = "sensor-profile")]
+        let terrain_recovery = self.terrain_recovery;
         *self = Self::with_combat_breaks(context, self.telemetry.breaks.config);
+        #[cfg(feature = "sensor-profile")]
+        self.set_terrain_recovery(terrain_recovery);
     }
     pub fn telemetry(&self) -> &CombatPilotTelemetry {
         &self.telemetry
@@ -164,6 +174,8 @@ impl RulePilotV4 {
             self.finish_break(p.tick, true);
             self.awaiting_break_return = false;
             self.task = Some(RecoverShipTask::new(self.context));
+            #[cfg(feature = "sensor-profile")]
+            self.configure_terrain_recovery();
             self.awaiting_rejoin = false;
         }
         self.seen_losses = losses;

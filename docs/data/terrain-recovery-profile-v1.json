@@ -1,0 +1,487 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "6b943b44244eb29548ae86afa72eb93486248d2e",
+    "source_inputs_sha256": "f8b46bddc65b4cb16ebd011f3d9038060f9e888d8463a1268a100d53bc50431b",
+    "source_input_count": 2437,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791663317.0715268,
+    "exit_code": 0,
+    "seconds": 63.40920281410217,
+    "binary_sha256": "9d61538aadbc6f3fea4e11c8dfb766a207cc4ff9732ab6de4ddd2f33ece31b25"
+  },
+  "audit": {
+    "schema": 1,
+    "passed": true,
+    "source_inputs_checked": 2437,
+    "reference_files_checked": 10,
+    "artifacts_checked": 66,
+    "decisions_verified": 52611,
+    "material_samples": 877,
+    "initial_controllers_equal": true,
+    "all_action_rows_equal": true,
+    "final_snapshots_equal": true,
+    "retained_pre_decision_failures": 2,
+    "production_unchanged_by_harness_correction": true,
+    "cases": [
+      {
+        "name": "20202-round-collapse-0-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "profile": "terrain_recovery_supported_hatch_v1",
+        "end_tick": 36000,
+        "verified_decisions": 36000,
+        "completed": [
+          [
+            12301
+          ],
+          [
+            7519,
+            24911
+          ]
+        ],
+        "blocked_ticks": [
+          4653,
+          5047
+        ],
+        "match": {
+          "elapsed_seconds": 600.0,
+          "finished_tick": 36000,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            2,
+            0
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 14.718953132629395,
+              "last_damage": {
+                "amount": 0.05327330529689789,
+                "cause": "laser",
+                "contact": null,
+                "tick": 10631
+              },
+              "protected_until_tick": 26593
+            },
+            {
+              "death_tick": null,
+              "health": 97.48228454589844,
+              "last_damage": {
+                "amount": 0.052302200347185135,
+                "cause": "laser",
+                "contact": null,
+                "tick": 24235
+              },
+              "protected_until_tick": 13322
+            }
+          ],
+          "reason": "time_limit",
+          "remaining_seconds": 0.0,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        }
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "profile": "terrain_recovery_supported_hatch_v1",
+        "end_tick": 16611,
+        "verified_decisions": 16611,
+        "completed": [
+          [
+            11337
+          ],
+          []
+        ],
+        "blocked_ticks": [
+          0,
+          0
+        ],
+        "match": {
+          "elapsed_seconds": 276.850005537,
+          "finished_tick": 16611,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            3,
+            0
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 9765
+            },
+            {
+              "death_tick": 16611,
+              "health": 0.0,
+              "last_damage": {
+                "amount": 7.338127136230469,
+                "cause": "impact",
+                "contact": {
+                  "actor_motion": {
+                    "angle": -2.3854658603668213,
+                    "position": {
+                      "x": 185.37960815429688,
+                      "y": 528.4017944335938
+                    },
+                    "spin": 193.0229949951172,
+                    "velocity": {
+                      "x": -148.88453674316406,
+                      "y": -27.505229949951172
+                    }
+                  },
+                  "closing_speed": 345.9649658203125,
+                  "impulse": 28.490388870239258,
+                  "normal": {
+                    "x": -0.8404535055160522,
+                    "y": -0.5418835878372192
+                  },
+                  "on_foot": true,
+                  "other_id": null,
+                  "other_kind": "world",
+                  "other_motion": null,
+                  "point": {
+                    "x": 183.1954345703125,
+                    "y": 528.262939453125
+                  }
+                },
+                "tick": 16611
+              },
+              "protected_until_tick": 12606
+            }
+          ],
+          "reason": "pilot_death",
+          "remaining_seconds": 323.149994463,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        }
+      }
+    ]
+  },
+  "validation": {
+    "source_commit": "6b943b44244eb29548ae86afa72eb93486248d2e",
+    "passed_tests": 454,
+    "note": "Consolidated from executed commands, observed exit codes and retained logs; timings are not inferred.",
+    "reused_gameplay_tests": {
+      "passed": 120,
+      "source_commit": "9c8285da49ccf09ffcb22899800dc12fbd9a375f",
+      "reason": "Named selection does not change controller rules, native physics or gameplay."
+    },
+    "checks": [
+      {
+        "name": "library",
+        "command": [
+          "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010-v2/recovery-profile"
+        ],
+        "env": {
+          "RUST_MIN_STACK": "16777216"
+        },
+        "log": "validation-frozen-library.log",
+        "exit_code": 0,
+        "passed_tests": 454,
+        "log_sha256": "466e99d393b72cebbd3ae0334d3708481b7fd02d8069edfb0d961c76ac6709ae"
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "clippy",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib",
+          "--tests",
+          "--features",
+          "sensor-profile",
+          "--no-deps",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "env": {
+          "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+        },
+        "log": "validation-clippy.log",
+        "exit_code": 0,
+        "log_sha256": "a0add910831fbf33974c6e23aa5af458fcd79439b9e8469bd485f3b222174bc8"
+      },
+      {
+        "name": "default-check",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "check",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib"
+        ],
+        "env": {
+          "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+        },
+        "log": "validation-default.log",
+        "exit_code": 0,
+        "log_sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+      },
+      {
+        "name": "format",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "env": {},
+        "log": "validation-format-correction.log",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "harness_correction": {
+    "failed_runtime": {
+      "source_commit": "3c8fb050e2cea0b41166f5f8a058044af35acd5a",
+      "source_inputs_sha256": "34d04281bf6a6918a8c0d96aac894d95b2762d81672d27c848b25741e035463b",
+      "source_input_count": 2437,
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "env": {
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+        "RUST_MIN_STACK": "16777216"
+      },
+      "started_unix": 1791663101.0960987,
+      "exit_code": 0,
+      "seconds": 63.62386393547058,
+      "binary_sha256": "174f7726581af0162fc0ab2ac343fbe185fe9165fbc46b7159fdc72dfae84527"
+    },
+    "failed_cases": [
+      {
+        "name": "10101-angular-collapse-0-candidate-p1",
+        "source_commit": "3c8fb050e2cea0b41166f5f8a058044af35acd5a",
+        "binary_sha256": "174f7726581af0162fc0ab2ac343fbe185fe9165fbc46b7159fdc72dfae84527",
+        "command": [
+          "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/recovery-profile",
+          "mission_pilot::terrain_recovery::qualification::profile::retained_named_recovery_profile",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "env": {
+          "RUST_MIN_STACK": "16777216",
+          "SPACEWARS_MISSION_CASE": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/cases/10101-angular-collapse-0-candidate-p1/case.json",
+          "SPACEWARS_RECOVERY_PROFILE": "terrain_recovery_supported_hatch_v1",
+          "SPACEWARS_MISSION_REFERENCE": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/references/10101-angular-collapse-0-candidate-p1",
+          "SPACEWARS_RECOVERY_OUT": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/cases/10101-angular-collapse-0-candidate-p1/output"
+        },
+        "started_unix": 1791663184.3448977,
+        "exit_code": 101,
+        "seconds": 0.05383038520812988
+      },
+      {
+        "name": "20202-round-collapse-0-candidate-p2",
+        "source_commit": "3c8fb050e2cea0b41166f5f8a058044af35acd5a",
+        "binary_sha256": "174f7726581af0162fc0ab2ac343fbe185fe9165fbc46b7159fdc72dfae84527",
+        "command": [
+          "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/recovery-profile",
+          "mission_pilot::terrain_recovery::qualification::profile::retained_named_recovery_profile",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "env": {
+          "RUST_MIN_STACK": "16777216",
+          "SPACEWARS_MISSION_CASE": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/cases/20202-round-collapse-0-candidate-p2/case.json",
+          "SPACEWARS_RECOVERY_PROFILE": "terrain_recovery_supported_hatch_v1",
+          "SPACEWARS_MISSION_REFERENCE": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/references/20202-round-collapse-0-candidate-p2",
+          "SPACEWARS_RECOVERY_OUT": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010/cases/20202-round-collapse-0-candidate-p2/output"
+        },
+        "started_unix": 1791663184.3500133,
+        "exit_code": 101,
+        "seconds": 0.06959319114685059
+      }
+    ],
+    "failure_analysis": [
+      {
+        "case": "20202-round-collapse-0-candidate-p2",
+        "failure": "initial snapshot comparison before any game decision",
+        "complete_initial_controller_comparison_passed": true,
+        "differences": [
+          {
+            "path": "/pilots/0/target/motion/spin",
+            "in_memory": -0.015102071687579155,
+            "parsed_reference": -0.015102071687579157
+          },
+          {
+            "path": "/pilots/1/recovery/flight/pilot/planet/motion/position/x",
+            "in_memory": 459.56231689453125,
+            "parsed_reference": 459.5623168945313
+          },
+          {
+            "path": "/pilots/1/recovery/flight/pilot/ship/spin",
+            "in_memory": -0.015102071687579155,
+            "parsed_reference": -0.015102071687579157
+          },
+          {
+            "path": "/audit/max_spin",
+            "in_memory": 0.015102071687579155,
+            "parsed_reference": 0.015102071687579157
+          }
+        ]
+      },
+      {
+        "case": "10101-angular-collapse-0-candidate-p1",
+        "failure": "initial snapshot comparison before any game decision",
+        "complete_initial_controller_comparison_passed": true,
+        "differences": [
+          {
+            "path": "/pilots/0/recovery/flight/pilot/planet/motion/position/y",
+            "in_memory": 934.8406982421875,
+            "parsed_reference": 934.8406982421876
+          },
+          {
+            "path": "/pilots/0/target/motion/position/x",
+            "in_memory": 202.25723266601562,
+            "parsed_reference": 202.2572326660156
+          },
+          {
+            "path": "/pilots/0/target/motion/velocity/y",
+            "in_memory": 13.873673439025879,
+            "parsed_reference": 13.87367343902588
+          },
+          {
+            "path": "/pilots/1/recovery/flight/flight/forward_speed",
+            "in_memory": 2.2649765014648438e-06,
+            "parsed_reference": 2.264976501464844e-06
+          },
+          {
+            "path": "/pilots/1/recovery/flight/pilot/ship/position/x",
+            "in_memory": 202.25723266601562,
+            "parsed_reference": 202.2572326660156
+          },
+          {
+            "path": "/pilots/1/recovery/flight/pilot/ship/velocity/y",
+            "in_memory": 13.677520751953125,
+            "parsed_reference": 13.677520751953123
+          }
+        ]
+      }
+    ],
+    "raw_reference_values_equal_in_memory_values": true,
+    "native_f32_bits_equal": true,
+    "decisions_before_failure": 0,
+    "correction": "Only the diagnostic snapshot comparison changes: compare exact saved bytes for initial and final snapshots. Production profile, controller rules, physics, cases and reference inputs unchanged.",
+    "prior_directory": "/home/data/workspace/spacewars-handoffs/recovery-profile-20261010",
+    "prior_validation": "The 454 library tests, strict AI Clippy, default-feature compilation and formatting passed on the unchanged production profile; the corrected diagnostic is validated separately."
+  },
+  "terrain_source_status": {
+    "checked_unix": 1791662833.8001626,
+    "pull_requests": {
+      "174": {
+        "baseRefName": "main",
+        "headRefName": "feat/shared-dirt-packing",
+        "headRefOid": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+        "isDraft": false,
+        "mergedAt": null,
+        "number": 174,
+        "state": "OPEN",
+        "title": "Recover blocked dirt deposits and add frozen packing inspection",
+        "url": "https://github.com/aortez/space-wars/pull/174"
+      },
+      "178": {
+        "baseRefName": "main",
+        "headRefName": "bot-rebuild-preview-normal",
+        "headRefOid": "cada1eb12a2d8a394f285e0dbc47666c4f8bffca",
+        "isDraft": true,
+        "mergedAt": null,
+        "number": 178,
+        "state": "OPEN",
+        "title": "Checkpoint bot traversal and ship-rebuild recovery",
+        "url": "https://github.com/aortez/space-wars/pull/178"
+      }
+    },
+    "main": "6611a0b0eef4a13d5f5c061541a95d79cb82165e",
+    "main_changed_paths": [
+      "README.md"
+    ],
+    "frozen_terrain_commit": "f5c368bff32d1604a2bc0c3c5c30d438b5562741",
+    "current_terrain_checkout": "/home/data/workspace/space-wars2",
+    "added": {
+      "docs/data/dirt-recovery-handoff-20261009.json": "db9b02282ac9c93b8a40db820dc2467fee24ea6ef8547d21c89911489f73ac96",
+      "docs/terrain-recovery-handoff.md": "de53b21e31622dd0601180379c0f24dbcf680538b03d7964db24145be90a5c52"
+    },
+    "changed": [
+      "docs/late-match-dirt-review.md"
+    ],
+    "compared_paths": 2138,
+    "receipt_sha256": "e24138018925ff0bbca3e6836b6c194fe5797cf2bc6c03de83b49522a4b7a1fa"
+  },
+  "references": {
+    "source_commit": "9c8285da49ccf09ffcb22899800dc12fbd9a375f",
+    "source_directory": "/home/data/workspace/spacewars-handoffs/hatch-arrival-20261010",
+    "source_package": "terrain-recovery-hatch-arrival-20261010.tar.gz",
+    "files": {
+      "20202-round-collapse-0-candidate-p2/actions.jsonl": "e7c6235be0422a10b458bbb7c61d8d83ecc3e5161697c0456f7087b65490f4d4",
+      "20202-round-collapse-0-candidate-p2/initial.json": "289a55f293352e3521cb2bda9debf42d2adfbb5b499241b4d4d1bdab747cf8c9",
+      "20202-round-collapse-0-candidate-p2/initial-controllers.txt": "d702605e4bcf0fefbdaf29b9847f324514eec45e0a77cec68d87e12398dacdd6",
+      "20202-round-collapse-0-candidate-p2/final.json": "f95bd4137ba5fa37e10cd6588a98a3aba78a469c14af6b7d03ee20fe37607547",
+      "20202-round-collapse-0-candidate-p2/summary.json": "25e2abcd24a422963cb882c068948cab13f6704519a718922c2b14f3e7fffa88",
+      "10101-angular-collapse-0-candidate-p1/actions.jsonl": "4de925a673c3829aee95a4aed2645e464607c8ab85623529fde2c25a41c1c9ce",
+      "10101-angular-collapse-0-candidate-p1/initial.json": "652c2149705f7b7c84cbb6905a6095da3dddd5ae7c67aa413ef85d44eee2243d",
+      "10101-angular-collapse-0-candidate-p1/initial-controllers.txt": "38ebdb511920380a9c26288c7df19681efea6d64821706fbdb721b2001e179ae",
+      "10101-angular-collapse-0-candidate-p1/final.json": "c37e9751cf13c7860d8bc10c127159254d3dbfe0a403a0c9177dce9afdbecc1a",
+      "10101-angular-collapse-0-candidate-p1/summary.json": "8e5e39768ed89e696d045fc372fa17da64215c79dc613b9cd5fe0b5c68a8fee3"
+    }
+  },
+  "profile": "terrain_recovery_supported_hatch_v1",
+  "defaults_changed": false,
+  "physics_changed": false,
+  "github_changed": false,
+  "deployed": false,
+  "scope": "Named selection reproduces two prior live matches exactly; the prior sixteen-pair matrix remains behavioral qualification. The later opponent rebuild stall and both blocked Angular cases remain unresolved. Final published terrain integration and device qualification are pending."
+}

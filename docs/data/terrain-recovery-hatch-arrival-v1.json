@@ -1,0 +1,5234 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "9c8285da49ccf09ffcb22899800dc12fbd9a375f",
+    "source_inputs_sha256": "ac76031ccbf06243ad3bbdc379168663484499545798d540af8bee2b084cf877",
+    "source_input_count": 2430,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791661305.103511,
+    "exit_code": 0,
+    "seconds": 0.21267032623291016,
+    "binary_sha256": "d2893134c5bc0bc3aec6d509716ca89b13811f92126a46a844eb52a64352c18d"
+  },
+  "audit": {
+    "schema": 1,
+    "passed": true,
+    "complete": true,
+    "pending_cases": [],
+    "source_inputs_checked": 2430,
+    "artifacts_checked": 1226,
+    "material_samples": 12484,
+    "control_decisions_verified": 398922,
+    "target_recovered": true,
+    "target_first_completion": 24911,
+    "matrix_cases": 16,
+    "cases": [
+      {
+        "name": "20202-round-collapse-0-candidate-p2-fork24743",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "fork": 24743,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 11257,
+          "airborne_near_hatch": 486,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "be0eaa4369e9acc0",
+          "initial_controller_fnv64": "74c8f09da13bddc3",
+          "initial_completed": 1,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 9364
+              },
+              {
+                "death_tick": null,
+                "health": 44.30573272705078,
+                "last_damage": {
+                  "amount": 41.514732360839844,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -0.4542199373245239,
+                      "position": {
+                        "x": 1216.7471923828125,
+                        "y": 727.729736328125
+                      },
+                      "spin": -23.21086311340332,
+                      "velocity": {
+                        "x": -3.5995519161224365,
+                        "y": -4.514544486999512
+                      }
+                    },
+                    "closing_speed": 22.37868309020996,
+                    "impulse": 2.346527576446533,
+                    "normal": {
+                      "x": 0.9982873797416687,
+                      "y": -0.05850258469581604
+                    },
+                    "on_foot": true,
+                    "other_id": 1125899906844018,
+                    "other_kind": "terrain_fragment",
+                    "other_motion": {
+                      "angle": 2.717080593109131,
+                      "position": {
+                        "x": 1217.3734130859375,
+                        "y": 727.9703369140625
+                      },
+                      "spin": -7.763683795928955,
+                      "velocity": {
+                        "x": -19.56450843811035,
+                        "y": -4.242563247680664
+                      }
+                    },
+                    "point": {
+                      "x": 1216.951416015625,
+                      "y": 727.9950561523438
+                    }
+                  },
+                  "tick": 30011
+                },
+                "protected_until_tick": 13322
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [],
+          "completed": [],
+          "final_recoveries": [
+            1,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 408,
+                "capture": 8202,
+                "hunt": 859,
+                "launch": 144,
+                "select": 3,
+                "transfer": 1641
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "spaceling stopped making progress on ground route": 9772
+              },
+              "completed": [],
+              "first_block": 26228,
+              "first_mission_block": 26228,
+              "longest_recovery_block": 9772,
+              "mission_blocked_ticks": 9772,
+              "mission_goals": {
+                "blocked": 9772,
+                "recover": 1485
+              },
+              "native_refinement_decisions": 11257,
+              "recovery_blocked_ticks": 9772,
+              "recovery_decisions": 11257
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 11256,
+          "recovery_airborne_near_hatch": 486,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": 24828,
+          "first_scenario_difference": 24830,
+          "hatch_decisions": 2852,
+          "airborne_near_hatch": 93,
+          "airborne_near_hatch_steering": 86,
+          "initial_physics": "be0eaa4369e9acc0",
+          "initial_controller_fnv64": "74c8f09da13bddc3",
+          "initial_completed": 1,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 26593
+              },
+              {
+                "death_tick": null,
+                "health": 97.48228454589844,
+                "last_damage": {
+                  "amount": 0.052302200347185135,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 24235
+                },
+                "protected_until_tick": 13322
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 24911,
+              "revision": 182,
+              "hatch_distance": 1.8482559553494424,
+              "relative_speed": 1.6378331164102762
+            }
+          ],
+          "completed": [
+            24911
+          ],
+          "final_recoveries": [
+            1,
+            2
+          ],
+          "metrics": [
+            {
+              "block_reasons": {
+                "spaceling stopped making progress on ground route": 4653
+              },
+              "completed": [],
+              "first_block": 31347,
+              "first_mission_block": 31347,
+              "longest_recovery_block": 4653,
+              "mission_blocked_ticks": 4653,
+              "mission_goals": {
+                "blocked": 4653,
+                "capture": 1570,
+                "hunt": 99,
+                "recover": 4934,
+                "select": 1
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 4653,
+              "recovery_decisions": 9587
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                24911
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 28,
+                "capture": 6206,
+                "hunt": 2355,
+                "launch": 546,
+                "recover": 168,
+                "select": 3,
+                "transfer": 1951
+              },
+              "native_refinement_decisions": 168,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 169
+            }
+          ],
+          "selected_ground_ticks": 167,
+          "recovery_hatch_ticks": 167,
+          "recovery_airborne_near_hatch": 62,
+          "recovery_airborne_steering": 62
+        }
+      },
+      {
+        "name": "10101-round-collapse-0-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 29840,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1519,
+          "airborne_near_hatch": 55,
+          "airborne_near_hatch_steering": 23,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 497.33334328,
+            "finished_tick": 29840,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              0,
+              3
+            ],
+            "pilots": [
+              {
+                "death_tick": 29840,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.005844011902809143,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 29840
+                },
+                "protected_until_tick": 28297
+              },
+              {
+                "death_tick": null,
+                "health": 97.91886138916016,
+                "last_damage": {
+                  "amount": 0.048533134162425995,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 16042
+                },
+                "protected_until_tick": 15050
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 102.66665672,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2262,
+              "revision": 3,
+              "hatch_distance": 0.43768037756071226,
+              "relative_speed": 0.0365228472043847
+            },
+            {
+              "tick": 6903,
+              "revision": 43,
+              "hatch_distance": 0.47739106987941915,
+              "relative_speed": 0.018129583196409105
+            },
+            {
+              "tick": 11536,
+              "revision": 50,
+              "hatch_distance": 1.8105670224152075,
+              "relative_speed": 1.8601556647369302
+            },
+            {
+              "tick": 19208,
+              "revision": 42,
+              "hatch_distance": 1.214046685963936,
+              "relative_speed": 0.002869373993377162
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 16932,
+                "hunt": 3600,
+                "launch": 686,
+                "recover": 1723,
+                "select": 7,
+                "transfer": 6892
+              },
+              "native_refinement_decisions": 1723,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1723
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                16552
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 12764,
+                "hunt": 9204,
+                "launch": 1394,
+                "recover": 1682,
+                "select": 10,
+                "transfer": 4786
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1683
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 29840,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1519,
+          "airborne_near_hatch": 55,
+          "airborne_near_hatch_steering": 23,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 497.33334328,
+            "finished_tick": 29840,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              0,
+              3
+            ],
+            "pilots": [
+              {
+                "death_tick": 29840,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.005844011902809143,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 29840
+                },
+                "protected_until_tick": 28297
+              },
+              {
+                "death_tick": null,
+                "health": 97.91886138916016,
+                "last_damage": {
+                  "amount": 0.048533134162425995,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 16042
+                },
+                "protected_until_tick": 15050
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 102.66665672,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2262,
+              "revision": 3,
+              "hatch_distance": 0.43768037756071226,
+              "relative_speed": 0.0365228472043847
+            },
+            {
+              "tick": 6903,
+              "revision": 43,
+              "hatch_distance": 0.47739106987941915,
+              "relative_speed": 0.018129583196409105
+            },
+            {
+              "tick": 11536,
+              "revision": 50,
+              "hatch_distance": 1.8105670224152075,
+              "relative_speed": 1.8601556647369302
+            },
+            {
+              "tick": 19208,
+              "revision": 42,
+              "hatch_distance": 1.214046685963936,
+              "relative_speed": 0.002869373993377162
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 16932,
+                "hunt": 3600,
+                "launch": 686,
+                "recover": 1723,
+                "select": 7,
+                "transfer": 6892
+              },
+              "native_refinement_decisions": 1723,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1723
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                16552
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 12764,
+                "hunt": 9204,
+                "launch": 1394,
+                "recover": 1682,
+                "select": 10,
+                "transfer": 4786
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1683
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-round-collapse-0-candidate-p2",
+        "case": {
+          "seed": 10101,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 29840,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2116,
+          "airborne_near_hatch": 70,
+          "airborne_near_hatch_steering": 35,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 497.33334328,
+            "finished_tick": 29840,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              0,
+              3
+            ],
+            "pilots": [
+              {
+                "death_tick": 29840,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.005844011902809143,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 29840
+                },
+                "protected_until_tick": 28297
+              },
+              {
+                "death_tick": null,
+                "health": 97.91886138916016,
+                "last_damage": {
+                  "amount": 0.048533134162425995,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 16042
+                },
+                "protected_until_tick": 15050
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 102.66665672,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6963,
+              "revision": 40,
+              "hatch_distance": 0.4403575829735869,
+              "relative_speed": 0.0019834665097051957
+            },
+            {
+              "tick": 9502,
+              "revision": 26,
+              "hatch_distance": 2.9969715488701154,
+              "relative_speed": 0.5791405334655652
+            },
+            {
+              "tick": 13581,
+              "revision": 69,
+              "hatch_distance": 0.5802224233435741,
+              "relative_speed": 0.005628236984499162
+            },
+            {
+              "tick": 16551,
+              "revision": 95,
+              "hatch_distance": 0.44864119844483363,
+              "relative_speed": 0.01663245593713282
+            },
+            {
+              "tick": 20752,
+              "revision": 87,
+              "hatch_distance": 2.9735461860168915,
+              "relative_speed": 0.005946294307175562
+            },
+            {
+              "tick": 24175,
+              "revision": 73,
+              "hatch_distance": 1.4307539670772111,
+              "relative_speed": 0.0020042970203677313
+            }
+          ],
+          "completed": [
+            16552
+          ],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 16932,
+                "hunt": 3600,
+                "launch": 686,
+                "recover": 1723,
+                "select": 7,
+                "transfer": 6892
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1723
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                16552
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 12764,
+                "hunt": 9204,
+                "launch": 1394,
+                "recover": 1682,
+                "select": 10,
+                "transfer": 4786
+              },
+              "native_refinement_decisions": 1682,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1683
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 72,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 29840,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2116,
+          "airborne_near_hatch": 70,
+          "airborne_near_hatch_steering": 35,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 497.33334328,
+            "finished_tick": 29840,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              0,
+              3
+            ],
+            "pilots": [
+              {
+                "death_tick": 29840,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.005844011902809143,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 29840
+                },
+                "protected_until_tick": 28297
+              },
+              {
+                "death_tick": null,
+                "health": 97.91886138916016,
+                "last_damage": {
+                  "amount": 0.048533134162425995,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 16042
+                },
+                "protected_until_tick": 15050
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 102.66665672,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6963,
+              "revision": 40,
+              "hatch_distance": 0.4403575829735869,
+              "relative_speed": 0.0019834665097051957
+            },
+            {
+              "tick": 9502,
+              "revision": 26,
+              "hatch_distance": 2.9969715488701154,
+              "relative_speed": 0.5791405334655652
+            },
+            {
+              "tick": 13581,
+              "revision": 69,
+              "hatch_distance": 0.5802224233435741,
+              "relative_speed": 0.005628236984499162
+            },
+            {
+              "tick": 16551,
+              "revision": 95,
+              "hatch_distance": 0.44864119844483363,
+              "relative_speed": 0.01663245593713282
+            },
+            {
+              "tick": 20752,
+              "revision": 87,
+              "hatch_distance": 2.9735461860168915,
+              "relative_speed": 0.005946294307175562
+            },
+            {
+              "tick": 24175,
+              "revision": 73,
+              "hatch_distance": 1.4307539670772111,
+              "relative_speed": 0.0020042970203677313
+            }
+          ],
+          "completed": [
+            16552
+          ],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 16932,
+                "hunt": 3600,
+                "launch": 686,
+                "recover": 1723,
+                "select": 7,
+                "transfer": 6892
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1723
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                16552
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 12764,
+                "hunt": 9204,
+                "launch": 1394,
+                "recover": 1682,
+                "select": 10,
+                "transfer": 4786
+              },
+              "native_refinement_decisions": 1682,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1683
+            }
+          ],
+          "selected_ground_ticks": 72,
+          "recovery_hatch_ticks": 72,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-round-collapse-1-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "round",
+          "slumping": true,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 5116,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 189,
+          "airborne_near_hatch": 8,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 85.266668372,
+            "finished_tick": 5116,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              1,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 5116,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 99.82780456542969,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 2.848552703857422,
+                      "position": {
+                        "x": 481.6618957519531,
+                        "y": 1225.6693115234375
+                      },
+                      "spin": 0.298592209815979,
+                      "velocity": {
+                        "x": 1.6760445833206177,
+                        "y": 16.593000411987305
+                      }
+                    },
+                    "closing_speed": 65.19778442382812,
+                    "impulse": 28.496295928955078,
+                    "normal": {
+                      "x": -0.9961772561073303,
+                      "y": -0.08735492825508118
+                    },
+                    "on_foot": false,
+                    "other_id": 100076,
+                    "other_kind": "asteroid",
+                    "other_motion": {
+                      "angle": 2.6534359455108643,
+                      "position": {
+                        "x": 479.3831481933594,
+                        "y": 1223.97265625
+                      },
+                      "spin": 4.17230749130249,
+                      "velocity": {
+                        "x": 70.5636215209961,
+                        "y": -17.52776336669922
+                      }
+                    },
+                    "point": {
+                      "x": 481.3525390625,
+                      "y": 1224.1455078125
+                    }
+                  },
+                  "tick": 5116
+                },
+                "protected_until_tick": 4571
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 514.733331628,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2281,
+              "revision": 6,
+              "hatch_distance": 0.4246945731729784,
+              "relative_speed": 0.03938632123166285
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 1567,
+                "hunt": 1800,
+                "launch": 342,
+                "select": 2,
+                "transfer": 1405
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 2123,
+                "launch": 1153,
+                "recover": 725,
+                "select": 3,
+                "transfer": 1112
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 725
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 5116,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 189,
+          "airborne_near_hatch": 8,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 85.266668372,
+            "finished_tick": 5116,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              1,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 5116,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 99.82780456542969,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 2.848552703857422,
+                      "position": {
+                        "x": 481.6618957519531,
+                        "y": 1225.6693115234375
+                      },
+                      "spin": 0.298592209815979,
+                      "velocity": {
+                        "x": 1.6760445833206177,
+                        "y": 16.593000411987305
+                      }
+                    },
+                    "closing_speed": 65.19778442382812,
+                    "impulse": 28.496295928955078,
+                    "normal": {
+                      "x": -0.9961772561073303,
+                      "y": -0.08735492825508118
+                    },
+                    "on_foot": false,
+                    "other_id": 100076,
+                    "other_kind": "asteroid",
+                    "other_motion": {
+                      "angle": 2.6534359455108643,
+                      "position": {
+                        "x": 479.3831481933594,
+                        "y": 1223.97265625
+                      },
+                      "spin": 4.17230749130249,
+                      "velocity": {
+                        "x": 70.5636215209961,
+                        "y": -17.52776336669922
+                      }
+                    },
+                    "point": {
+                      "x": 481.3525390625,
+                      "y": 1224.1455078125
+                    }
+                  },
+                  "tick": 5116
+                },
+                "protected_until_tick": 4571
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 514.733331628,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2281,
+              "revision": 6,
+              "hatch_distance": 0.4246945731729784,
+              "relative_speed": 0.03938632123166285
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 1567,
+                "hunt": 1800,
+                "launch": 342,
+                "select": 2,
+                "transfer": 1405
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 2123,
+                "launch": 1153,
+                "recover": 725,
+                "select": 3,
+                "transfer": 1112
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 725
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-round-collapse-1-candidate-p2",
+        "case": {
+          "seed": 10101,
+          "shape": "round",
+          "slumping": true,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 5116,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 0,
+          "airborne_near_hatch": 0,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 85.266668372,
+            "finished_tick": 5116,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              1,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 5116,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 99.82780456542969,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 2.848552703857422,
+                      "position": {
+                        "x": 481.6618957519531,
+                        "y": 1225.6693115234375
+                      },
+                      "spin": 0.298592209815979,
+                      "velocity": {
+                        "x": 1.6760445833206177,
+                        "y": 16.593000411987305
+                      }
+                    },
+                    "closing_speed": 65.19778442382812,
+                    "impulse": 28.496295928955078,
+                    "normal": {
+                      "x": -0.9961772561073303,
+                      "y": -0.08735492825508118
+                    },
+                    "on_foot": false,
+                    "other_id": 100076,
+                    "other_kind": "asteroid",
+                    "other_motion": {
+                      "angle": 2.6534359455108643,
+                      "position": {
+                        "x": 479.3831481933594,
+                        "y": 1223.97265625
+                      },
+                      "spin": 4.17230749130249,
+                      "velocity": {
+                        "x": 70.5636215209961,
+                        "y": -17.52776336669922
+                      }
+                    },
+                    "point": {
+                      "x": 481.3525390625,
+                      "y": 1224.1455078125
+                    }
+                  },
+                  "tick": 5116
+                },
+                "protected_until_tick": 4571
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 514.733331628,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 1567,
+                "hunt": 1800,
+                "launch": 342,
+                "select": 2,
+                "transfer": 1405
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 2123,
+                "launch": 1153,
+                "recover": 725,
+                "select": 3,
+                "transfer": 1112
+              },
+              "native_refinement_decisions": 725,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 725
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 5116,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 0,
+          "airborne_near_hatch": 0,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 85.266668372,
+            "finished_tick": 5116,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              1,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 5116,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 99.82780456542969,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 2.848552703857422,
+                      "position": {
+                        "x": 481.6618957519531,
+                        "y": 1225.6693115234375
+                      },
+                      "spin": 0.298592209815979,
+                      "velocity": {
+                        "x": 1.6760445833206177,
+                        "y": 16.593000411987305
+                      }
+                    },
+                    "closing_speed": 65.19778442382812,
+                    "impulse": 28.496295928955078,
+                    "normal": {
+                      "x": -0.9961772561073303,
+                      "y": -0.08735492825508118
+                    },
+                    "on_foot": false,
+                    "other_id": 100076,
+                    "other_kind": "asteroid",
+                    "other_motion": {
+                      "angle": 2.6534359455108643,
+                      "position": {
+                        "x": 479.3831481933594,
+                        "y": 1223.97265625
+                      },
+                      "spin": 4.17230749130249,
+                      "velocity": {
+                        "x": 70.5636215209961,
+                        "y": -17.52776336669922
+                      }
+                    },
+                    "point": {
+                      "x": 481.3525390625,
+                      "y": 1224.1455078125
+                    }
+                  },
+                  "tick": 5116
+                },
+                "protected_until_tick": 4571
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 514.733331628,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 1567,
+                "hunt": 1800,
+                "launch": 342,
+                "select": 2,
+                "transfer": 1405
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 2123,
+                "launch": 1153,
+                "recover": 725,
+                "select": 3,
+                "transfer": 1112
+              },
+              "native_refinement_decisions": 725,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 725
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 16611,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1109,
+          "airborne_near_hatch": 34,
+          "airborne_near_hatch_steering": 6,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 276.850005537,
+            "finished_tick": 16611,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 9765
+              },
+              {
+                "death_tick": 16611,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 7.338127136230469,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -2.3854658603668213,
+                      "position": {
+                        "x": 185.37960815429688,
+                        "y": 528.4017944335938
+                      },
+                      "spin": 193.0229949951172,
+                      "velocity": {
+                        "x": -148.88453674316406,
+                        "y": -27.505229949951172
+                      }
+                    },
+                    "closing_speed": 345.9649658203125,
+                    "impulse": 28.490388870239258,
+                    "normal": {
+                      "x": -0.8404535055160522,
+                      "y": -0.5418835878372192
+                    },
+                    "on_foot": true,
+                    "other_id": null,
+                    "other_kind": "world",
+                    "other_motion": null,
+                    "point": {
+                      "x": 183.1954345703125,
+                      "y": 528.262939453125
+                    }
+                  },
+                  "tick": 16611
+                },
+                "protected_until_tick": 12606
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 323.149994463,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2291,
+              "revision": 3,
+              "hatch_distance": 0.42651927051243277,
+              "relative_speed": 0.015647149473364284
+            },
+            {
+              "tick": 6344,
+              "revision": 39,
+              "hatch_distance": 0.45022473683880954,
+              "relative_speed": 0.00601310759094221
+            },
+            {
+              "tick": 8550,
+              "revision": 62,
+              "hatch_distance": 0.42817451093308007,
+              "relative_speed": 0.019664637946362033
+            },
+            {
+              "tick": 11336,
+              "revision": 64,
+              "hatch_distance": 1.8092879164036748,
+              "relative_speed": 0.06300974869597577
+            },
+            {
+              "tick": 15204,
+              "revision": 31,
+              "hatch_distance": 1.8957528374074826,
+              "relative_speed": 0.010292057022324034
+            }
+          ],
+          "completed": [
+            11337
+          ],
+          "final_recoveries": [
+            1,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                11337
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 6770,
+                "hunt": 5595,
+                "launch": 521,
+                "recover": 1752,
+                "select": 7,
+                "transfer": 1966
+              },
+              "native_refinement_decisions": 1752,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1753
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 290,
+                "capture": 3886,
+                "hunt": 5052,
+                "launch": 1118,
+                "recover": 3895,
+                "select": 5,
+                "transfer": 2365
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4185
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 101,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 16611,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1109,
+          "airborne_near_hatch": 34,
+          "airborne_near_hatch_steering": 6,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 276.850005537,
+            "finished_tick": 16611,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 9765
+              },
+              {
+                "death_tick": 16611,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 7.338127136230469,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -2.3854658603668213,
+                      "position": {
+                        "x": 185.37960815429688,
+                        "y": 528.4017944335938
+                      },
+                      "spin": 193.0229949951172,
+                      "velocity": {
+                        "x": -148.88453674316406,
+                        "y": -27.505229949951172
+                      }
+                    },
+                    "closing_speed": 345.9649658203125,
+                    "impulse": 28.490388870239258,
+                    "normal": {
+                      "x": -0.8404535055160522,
+                      "y": -0.5418835878372192
+                    },
+                    "on_foot": true,
+                    "other_id": null,
+                    "other_kind": "world",
+                    "other_motion": null,
+                    "point": {
+                      "x": 183.1954345703125,
+                      "y": 528.262939453125
+                    }
+                  },
+                  "tick": 16611
+                },
+                "protected_until_tick": 12606
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 323.149994463,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2291,
+              "revision": 3,
+              "hatch_distance": 0.42651927051243277,
+              "relative_speed": 0.015647149473364284
+            },
+            {
+              "tick": 6344,
+              "revision": 39,
+              "hatch_distance": 0.45022473683880954,
+              "relative_speed": 0.00601310759094221
+            },
+            {
+              "tick": 8550,
+              "revision": 62,
+              "hatch_distance": 0.42817451093308007,
+              "relative_speed": 0.019664637946362033
+            },
+            {
+              "tick": 11336,
+              "revision": 64,
+              "hatch_distance": 1.8092879164036748,
+              "relative_speed": 0.06300974869597577
+            },
+            {
+              "tick": 15204,
+              "revision": 31,
+              "hatch_distance": 1.8957528374074826,
+              "relative_speed": 0.010292057022324034
+            }
+          ],
+          "completed": [
+            11337
+          ],
+          "final_recoveries": [
+            1,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                11337
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 6770,
+                "hunt": 5595,
+                "launch": 521,
+                "recover": 1752,
+                "select": 7,
+                "transfer": 1966
+              },
+              "native_refinement_decisions": 1752,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1753
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 290,
+                "capture": 3886,
+                "hunt": 5052,
+                "launch": 1118,
+                "recover": 3895,
+                "select": 5,
+                "transfer": 2365
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4185
+            }
+          ],
+          "selected_ground_ticks": 101,
+          "recovery_hatch_ticks": 101,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p2",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 16611,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 367,
+          "airborne_near_hatch": 7,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 276.850005537,
+            "finished_tick": 16611,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 9765
+              },
+              {
+                "death_tick": 16611,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 7.338127136230469,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -2.3854658603668213,
+                      "position": {
+                        "x": 185.37960815429688,
+                        "y": 528.4017944335938
+                      },
+                      "spin": 193.0229949951172,
+                      "velocity": {
+                        "x": -148.88453674316406,
+                        "y": -27.505229949951172
+                      }
+                    },
+                    "closing_speed": 345.9649658203125,
+                    "impulse": 28.490388870239258,
+                    "normal": {
+                      "x": -0.8404535055160522,
+                      "y": -0.5418835878372192
+                    },
+                    "on_foot": true,
+                    "other_id": null,
+                    "other_kind": "world",
+                    "other_motion": null,
+                    "point": {
+                      "x": 183.1954345703125,
+                      "y": 528.262939453125
+                    }
+                  },
+                  "tick": 16611
+                },
+                "protected_until_tick": 12606
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 323.149994463,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 7823,
+              "revision": 21,
+              "hatch_distance": 0.4396405180764779,
+              "relative_speed": 0.018926581978359634
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            1,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                11337
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 6770,
+                "hunt": 5595,
+                "launch": 521,
+                "recover": 1752,
+                "select": 7,
+                "transfer": 1966
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1753
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 290,
+                "capture": 3886,
+                "hunt": 5052,
+                "launch": 1118,
+                "recover": 3895,
+                "select": 5,
+                "transfer": 2365
+              },
+              "native_refinement_decisions": 4185,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4185
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 16611,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 367,
+          "airborne_near_hatch": 7,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 276.850005537,
+            "finished_tick": 16611,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 9765
+              },
+              {
+                "death_tick": 16611,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 7.338127136230469,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -2.3854658603668213,
+                      "position": {
+                        "x": 185.37960815429688,
+                        "y": 528.4017944335938
+                      },
+                      "spin": 193.0229949951172,
+                      "velocity": {
+                        "x": -148.88453674316406,
+                        "y": -27.505229949951172
+                      }
+                    },
+                    "closing_speed": 345.9649658203125,
+                    "impulse": 28.490388870239258,
+                    "normal": {
+                      "x": -0.8404535055160522,
+                      "y": -0.5418835878372192
+                    },
+                    "on_foot": true,
+                    "other_id": null,
+                    "other_kind": "world",
+                    "other_motion": null,
+                    "point": {
+                      "x": 183.1954345703125,
+                      "y": 528.262939453125
+                    }
+                  },
+                  "tick": 16611
+                },
+                "protected_until_tick": 12606
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 323.149994463,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 7823,
+              "revision": 21,
+              "hatch_distance": 0.4396405180764779,
+              "relative_speed": 0.018926581978359634
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            1,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                11337
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "capture": 6770,
+                "hunt": 5595,
+                "launch": 521,
+                "recover": 1752,
+                "select": 7,
+                "transfer": 1966
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1753
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 290,
+                "capture": 3886,
+                "hunt": 5052,
+                "launch": 1118,
+                "recover": 3895,
+                "select": 5,
+                "transfer": 2365
+              },
+              "native_refinement_decisions": 4185,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4185
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-angular-collapse-1-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": true,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 21376,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1821,
+          "airborne_near_hatch": 41,
+          "airborne_near_hatch_steering": 4,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 356.266673792,
+            "finished_tick": 21376,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 21376,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.03712446242570877,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 21376
+                },
+                "protected_until_tick": 19380
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 243.733326208,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2266,
+              "revision": 6,
+              "hatch_distance": 0.4261036098781656,
+              "relative_speed": 0.03637989962297446
+            },
+            {
+              "tick": 6033,
+              "revision": 41,
+              "hatch_distance": 0.45299189355472685,
+              "relative_speed": 0.008759935133441206
+            },
+            {
+              "tick": 8738,
+              "revision": 52,
+              "hatch_distance": 0.49887784935589863,
+              "relative_speed": 0.010036813876230533
+            },
+            {
+              "tick": 13643,
+              "revision": 58,
+              "hatch_distance": 2.9928893543527395,
+              "relative_speed": 1.2963903431941544
+            },
+            {
+              "tick": 15517,
+              "revision": 65,
+              "hatch_distance": 1.657855013060458,
+              "relative_speed": 0.01047950577119167
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 47,
+                "capture": 9057,
+                "hunt": 9191,
+                "launch": 369,
+                "select": 6,
+                "transfer": 2706
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                11618
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 68,
+                "capture": 11171,
+                "hunt": 814,
+                "launch": 1824,
+                "recover": 4218,
+                "select": 7,
+                "transfer": 3274
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4219
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 21376,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 1821,
+          "airborne_near_hatch": 41,
+          "airborne_near_hatch_steering": 4,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "d9fbebc888c1772f",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 356.266673792,
+            "finished_tick": 21376,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 21376,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.03712446242570877,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 21376
+                },
+                "protected_until_tick": 19380
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 243.733326208,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2266,
+              "revision": 6,
+              "hatch_distance": 0.4261036098781656,
+              "relative_speed": 0.03637989962297446
+            },
+            {
+              "tick": 6033,
+              "revision": 41,
+              "hatch_distance": 0.45299189355472685,
+              "relative_speed": 0.008759935133441206
+            },
+            {
+              "tick": 8738,
+              "revision": 52,
+              "hatch_distance": 0.49887784935589863,
+              "relative_speed": 0.010036813876230533
+            },
+            {
+              "tick": 13643,
+              "revision": 58,
+              "hatch_distance": 2.9928893543527395,
+              "relative_speed": 1.2963903431941544
+            },
+            {
+              "tick": 15517,
+              "revision": 65,
+              "hatch_distance": 1.657855013060458,
+              "relative_speed": 0.01047950577119167
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 47,
+                "capture": 9057,
+                "hunt": 9191,
+                "launch": 369,
+                "select": 6,
+                "transfer": 2706
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                11618
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 68,
+                "capture": 11171,
+                "hunt": 814,
+                "launch": 1824,
+                "recover": 4218,
+                "select": 7,
+                "transfer": 3274
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4219
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "10101-angular-collapse-1-candidate-p2",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": true,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 21376,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 630,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 356.266673792,
+            "finished_tick": 21376,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 21376,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.03712446242570877,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 21376
+                },
+                "protected_until_tick": 19380
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 243.733326208,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6173,
+              "revision": 42,
+              "hatch_distance": 0.43990015393251414,
+              "relative_speed": 0.0075781893388449295
+            },
+            {
+              "tick": 8358,
+              "revision": 38,
+              "hatch_distance": 0.4356772736501269,
+              "relative_speed": 0.01958728531570415
+            },
+            {
+              "tick": 11617,
+              "revision": 58,
+              "hatch_distance": 0.6821937939768098,
+              "relative_speed": 0.02423701600584327
+            }
+          ],
+          "completed": [
+            11618
+          ],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 47,
+                "capture": 9057,
+                "hunt": 9191,
+                "launch": 369,
+                "select": 6,
+                "transfer": 2706
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                11618
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 68,
+                "capture": 11171,
+                "hunt": 814,
+                "launch": 1824,
+                "recover": 4218,
+                "select": 7,
+                "transfer": 3274
+              },
+              "native_refinement_decisions": 4218,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4219
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 75,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 21376,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 630,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "2040683c15799fe0",
+          "initial_controller_fnv64": "ad42d485061fb561",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 356.266673792,
+            "finished_tick": 21376,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": 21376,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 0.03712446242570877,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 21376
+                },
+                "protected_until_tick": 19380
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 243.733326208,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6173,
+              "revision": 42,
+              "hatch_distance": 0.43990015393251414,
+              "relative_speed": 0.0075781893388449295
+            },
+            {
+              "tick": 8358,
+              "revision": 38,
+              "hatch_distance": 0.4356772736501269,
+              "relative_speed": 0.01958728531570415
+            },
+            {
+              "tick": 11617,
+              "revision": 58,
+              "hatch_distance": 0.6821937939768098,
+              "relative_speed": 0.02423701600584327
+            }
+          ],
+          "completed": [
+            11618
+          ],
+          "final_recoveries": [
+            0,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 47,
+                "capture": 9057,
+                "hunt": 9191,
+                "launch": 369,
+                "select": 6,
+                "transfer": 2706
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {},
+              "completed": [
+                11618
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 68,
+                "capture": 11171,
+                "hunt": 814,
+                "launch": 1824,
+                "recover": 4218,
+                "select": 7,
+                "transfer": 3274
+              },
+              "native_refinement_decisions": 4218,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 4219
+            }
+          ],
+          "selected_ground_ticks": 76,
+          "recovery_hatch_ticks": 75,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-round-collapse-0-candidate-p1",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 18574,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 822,
+          "airborne_near_hatch": 21,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 309.566672858,
+            "finished_tick": 18574,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 9364
+              },
+              {
+                "death_tick": 18574,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 16.719614028930664,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 1.8111480474472046,
+                      "position": {
+                        "x": 1609.6566162109375,
+                        "y": 1044.3726806640625
+                      },
+                      "spin": 0.0,
+                      "velocity": {
+                        "x": 14.297107696533203,
+                        "y": -15.094470977783203
+                      }
+                    },
+                    "closing_speed": 129.9355926513672,
+                    "impulse": 57.78923797607422,
+                    "normal": {
+                      "x": 0.5993911623954773,
+                      "y": 0.8004562854766846
+                    },
+                    "on_foot": false,
+                    "other_id": 100244,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": -0.1375734657049179,
+                      "position": {
+                        "x": 1610.01123046875,
+                        "y": 1048.3345947265625
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 174.5679168701172,
+                        "y": -302.809326171875
+                      }
+                    },
+                    "point": {
+                      "x": 1610.372802734375,
+                      "y": 1045.228271484375
+                    }
+                  },
+                  "tick": 18574
+                },
+                "protected_until_tick": 13329
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 290.433327142,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 3434,
+              "revision": 16,
+              "hatch_distance": 0.44179200727106716,
+              "relative_speed": 0.01240756069588846
+            },
+            {
+              "tick": 8311,
+              "revision": 13,
+              "hatch_distance": 0.45315143902695454,
+              "relative_speed": 0.027968388259021135
+            },
+            {
+              "tick": 12298,
+              "revision": 16,
+              "hatch_distance": 1.8994925514616379,
+              "relative_speed": 0.030645323620247217
+            },
+            {
+              "tick": 16868,
+              "revision": 61,
+              "hatch_distance": 0.43983370090205215,
+              "relative_speed": 0.0037549564191864233
+            }
+          ],
+          "completed": [
+            12299
+          ],
+          "final_recoveries": [
+            1,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                12299
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 147,
+                "capture": 6479,
+                "hunt": 5283,
+                "launch": 674,
+                "recover": 3115,
+                "select": 6,
+                "transfer": 2870
+              },
+              "native_refinement_decisions": 3115,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 3116
+            },
+            {
+              "block_reasons": {
+                "pod stabilization stopped making progress": 2843
+              },
+              "completed": [
+                7519
+              ],
+              "first_block": 15731,
+              "first_mission_block": 15731,
+              "longest_recovery_block": 2843,
+              "mission_blocked_ticks": 2028,
+              "mission_goals": {
+                "avoid_sun": 2263,
+                "blocked": 2028,
+                "capture": 856,
+                "hunt": 2878,
+                "launch": 4660,
+                "recover": 3222,
+                "select": 6,
+                "transfer": 2661
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 2843,
+              "recovery_decisions": 7159
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 80,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 18574,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 822,
+          "airborne_near_hatch": 21,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 309.566672858,
+            "finished_tick": 18574,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              3,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 9364
+              },
+              {
+                "death_tick": 18574,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 16.719614028930664,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 1.8111480474472046,
+                      "position": {
+                        "x": 1609.6566162109375,
+                        "y": 1044.3726806640625
+                      },
+                      "spin": 0.0,
+                      "velocity": {
+                        "x": 14.297107696533203,
+                        "y": -15.094470977783203
+                      }
+                    },
+                    "closing_speed": 129.9355926513672,
+                    "impulse": 57.78923797607422,
+                    "normal": {
+                      "x": 0.5993911623954773,
+                      "y": 0.8004562854766846
+                    },
+                    "on_foot": false,
+                    "other_id": 100244,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": -0.1375734657049179,
+                      "position": {
+                        "x": 1610.01123046875,
+                        "y": 1048.3345947265625
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 174.5679168701172,
+                        "y": -302.809326171875
+                      }
+                    },
+                    "point": {
+                      "x": 1610.372802734375,
+                      "y": 1045.228271484375
+                    }
+                  },
+                  "tick": 18574
+                },
+                "protected_until_tick": 13329
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 290.433327142,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 3434,
+              "revision": 16,
+              "hatch_distance": 0.44179200727106716,
+              "relative_speed": 0.01240756069588846
+            },
+            {
+              "tick": 8311,
+              "revision": 13,
+              "hatch_distance": 0.45315143902695454,
+              "relative_speed": 0.027968388259021135
+            },
+            {
+              "tick": 12298,
+              "revision": 16,
+              "hatch_distance": 1.8994925514616379,
+              "relative_speed": 0.030645323620247217
+            },
+            {
+              "tick": 16868,
+              "revision": 61,
+              "hatch_distance": 0.43983370090205215,
+              "relative_speed": 0.0037549564191864233
+            }
+          ],
+          "completed": [
+            12299
+          ],
+          "final_recoveries": [
+            1,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                12299
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 147,
+                "capture": 6479,
+                "hunt": 5283,
+                "launch": 674,
+                "recover": 3115,
+                "select": 6,
+                "transfer": 2870
+              },
+              "native_refinement_decisions": 3115,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 3116
+            },
+            {
+              "block_reasons": {
+                "pod stabilization stopped making progress": 2843
+              },
+              "completed": [
+                7519
+              ],
+              "first_block": 15731,
+              "first_mission_block": 15731,
+              "longest_recovery_block": 2843,
+              "mission_blocked_ticks": 2028,
+              "mission_goals": {
+                "avoid_sun": 2263,
+                "blocked": 2028,
+                "capture": 856,
+                "hunt": 2878,
+                "launch": 4660,
+                "recover": 3222,
+                "select": 6,
+                "transfer": 2661
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 2843,
+              "recovery_decisions": 7159
+            }
+          ],
+          "selected_ground_ticks": 81,
+          "recovery_hatch_ticks": 80,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-round-collapse-0-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 11351,
+          "airborne_near_hatch": 486,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 9364
+              },
+              {
+                "death_tick": null,
+                "health": 44.30573272705078,
+                "last_damage": {
+                  "amount": 41.514732360839844,
+                  "cause": "impact",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": -0.4542199373245239,
+                      "position": {
+                        "x": 1216.7471923828125,
+                        "y": 727.729736328125
+                      },
+                      "spin": -23.21086311340332,
+                      "velocity": {
+                        "x": -3.5995519161224365,
+                        "y": -4.514544486999512
+                      }
+                    },
+                    "closing_speed": 22.37868309020996,
+                    "impulse": 2.346527576446533,
+                    "normal": {
+                      "x": 0.9982873797416687,
+                      "y": -0.05850258469581604
+                    },
+                    "on_foot": true,
+                    "other_id": 1125899906844018,
+                    "other_kind": "terrain_fragment",
+                    "other_motion": {
+                      "angle": 2.717080593109131,
+                      "position": {
+                        "x": 1217.3734130859375,
+                        "y": 727.9703369140625
+                      },
+                      "spin": -7.763683795928955,
+                      "velocity": {
+                        "x": -19.56450843811035,
+                        "y": -4.242563247680664
+                      }
+                    },
+                    "point": {
+                      "x": 1216.951416015625,
+                      "y": 727.9950561523438
+                    }
+                  },
+                  "tick": 30011
+                },
+                "protected_until_tick": 13322
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 7518,
+              "revision": 25,
+              "hatch_distance": 2.994274997993055,
+              "relative_speed": 0.9425289449078699
+            }
+          ],
+          "completed": [
+            7519
+          ],
+          "final_recoveries": [
+            1,
+            1
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [
+                12301
+              ],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 628,
+                "capture": 14596,
+                "hunt": 11119,
+                "launch": 1295,
+                "recover": 3117,
+                "select": 9,
+                "transfer": 5236
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 3118
+            },
+            {
+              "block_reasons": {
+                "spaceling stopped making progress on ground route": 14819
+              },
+              "completed": [
+                7519
+              ],
+              "first_block": 19696,
+              "first_mission_block": 19696,
+              "longest_recovery_block": 9772,
+              "mission_blocked_ticks": 14819,
+              "mission_goals": {
+                "avoid_sun": 399,
+                "blocked": 14819,
+                "capture": 899,
+                "hunt": 2992,
+                "launch": 4660,
+                "recover": 9564,
+                "select": 6,
+                "transfer": 2661
+              },
+              "native_refinement_decisions": 24591,
+              "recovery_blocked_ticks": 14819,
+              "recovery_decisions": 24592
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 11349,
+          "recovery_airborne_near_hatch": 486,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": 24828,
+          "first_scenario_difference": 24830,
+          "hatch_decisions": 2946,
+          "airborne_near_hatch": 93,
+          "airborne_near_hatch_steering": 86,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              0
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 14.718953132629395,
+                "last_damage": {
+                  "amount": 0.05327330529689789,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 10631
+                },
+                "protected_until_tick": 26593
+              },
+              {
+                "death_tick": null,
+                "health": 97.48228454589844,
+                "last_damage": {
+                  "amount": 0.052302200347185135,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 24235
+                },
+                "protected_until_tick": 13322
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 7518,
+              "revision": 25,
+              "hatch_distance": 2.994274997993055,
+              "relative_speed": 0.9425289449078699
+            },
+            {
+              "tick": 24911,
+              "revision": 182,
+              "hatch_distance": 1.8482559553494424,
+              "relative_speed": 1.6378331164102762
+            }
+          ],
+          "completed": [
+            7519,
+            24911
+          ],
+          "final_recoveries": [
+            1,
+            2
+          ],
+          "metrics": [
+            {
+              "block_reasons": {
+                "spaceling stopped making progress on ground route": 4653
+              },
+              "completed": [
+                12301
+              ],
+              "first_block": 31347,
+              "first_mission_block": 31347,
+              "longest_recovery_block": 4653,
+              "mission_blocked_ticks": 4653,
+              "mission_goals": {
+                "avoid_sun": 220,
+                "blocked": 4653,
+                "capture": 7964,
+                "hunt": 10359,
+                "launch": 1151,
+                "recover": 8051,
+                "select": 7,
+                "transfer": 3595
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 4653,
+              "recovery_decisions": 12705
+            },
+            {
+              "block_reasons": {
+                "spaceling stopped making progress on ground route": 5047
+              },
+              "completed": [
+                7519,
+                24911
+              ],
+              "first_block": 19696,
+              "first_mission_block": 19696,
+              "longest_recovery_block": 5047,
+              "mission_blocked_ticks": 5047,
+              "mission_goals": {
+                "avoid_sun": 427,
+                "blocked": 5047,
+                "capture": 7105,
+                "hunt": 5347,
+                "launch": 5206,
+                "recover": 8247,
+                "select": 9,
+                "transfer": 4612
+              },
+              "native_refinement_decisions": 13502,
+              "recovery_blocked_ticks": 5047,
+              "recovery_decisions": 13504
+            }
+          ],
+          "selected_ground_ticks": 261,
+          "recovery_hatch_ticks": 260,
+          "recovery_airborne_near_hatch": 62,
+          "recovery_airborne_steering": 62
+        }
+      },
+      {
+        "name": "20202-round-collapse-1-candidate-p1",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": true,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 9231,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 517,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 153.850003077,
+            "finished_tick": 9231,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": 9231,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 39.862911224365234,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 0.5836742520332336,
+                      "position": {
+                        "x": 1589.4134521484375,
+                        "y": 297.1538391113281
+                      },
+                      "spin": 42.11583709716797,
+                      "velocity": {
+                        "x": -19.03946876525879,
+                        "y": -17.291967391967773
+                      }
+                    },
+                    "closing_speed": 130.393310546875,
+                    "impulse": 39.7618293762207,
+                    "normal": {
+                      "x": 0.45967501401901245,
+                      "y": 0.8880870938301086
+                    },
+                    "on_foot": false,
+                    "other_id": 100111,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": 0.02058614231646061,
+                      "position": {
+                        "x": 1589.14892578125,
+                        "y": 301.6201477050781
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 194.55563354492188,
+                        "y": -268.1393737792969
+                      }
+                    },
+                    "point": {
+                      "x": 1590.08349609375,
+                      "y": 297.885498046875
+                    }
+                  },
+                  "tick": 9231
+                },
+                "protected_until_tick": 8031
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 446.149996923,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2048,
+              "revision": 26,
+              "hatch_distance": 0.5015336150173568,
+              "relative_speed": 0.0036727609345948782
+            },
+            {
+              "tick": 6979,
+              "revision": 38,
+              "hatch_distance": 0.4389049077514245,
+              "relative_speed": 0.008021327911269763
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 766,
+                "capture": 2874,
+                "hunt": 1598,
+                "launch": 656,
+                "patrol": 82,
+                "recover": 1380,
+                "select": 6,
+                "transfer": 1869
+              },
+              "native_refinement_decisions": 1380,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1380
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 677,
+                "capture": 2515,
+                "hunt": 2953,
+                "launch": 528,
+                "select": 3,
+                "transfer": 2555
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 9231,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 517,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 153.850003077,
+            "finished_tick": 9231,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": 9231,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 39.862911224365234,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 0.5836742520332336,
+                      "position": {
+                        "x": 1589.4134521484375,
+                        "y": 297.1538391113281
+                      },
+                      "spin": 42.11583709716797,
+                      "velocity": {
+                        "x": -19.03946876525879,
+                        "y": -17.291967391967773
+                      }
+                    },
+                    "closing_speed": 130.393310546875,
+                    "impulse": 39.7618293762207,
+                    "normal": {
+                      "x": 0.45967501401901245,
+                      "y": 0.8880870938301086
+                    },
+                    "on_foot": false,
+                    "other_id": 100111,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": 0.02058614231646061,
+                      "position": {
+                        "x": 1589.14892578125,
+                        "y": 301.6201477050781
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 194.55563354492188,
+                        "y": -268.1393737792969
+                      }
+                    },
+                    "point": {
+                      "x": 1590.08349609375,
+                      "y": 297.885498046875
+                    }
+                  },
+                  "tick": 9231
+                },
+                "protected_until_tick": 8031
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 446.149996923,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2048,
+              "revision": 26,
+              "hatch_distance": 0.5015336150173568,
+              "relative_speed": 0.0036727609345948782
+            },
+            {
+              "tick": 6979,
+              "revision": 38,
+              "hatch_distance": 0.4389049077514245,
+              "relative_speed": 0.008021327911269763
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 766,
+                "capture": 2874,
+                "hunt": 1598,
+                "launch": 656,
+                "patrol": 82,
+                "recover": 1380,
+                "select": 6,
+                "transfer": 1869
+              },
+              "native_refinement_decisions": 1380,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1380
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 677,
+                "capture": 2515,
+                "hunt": 2953,
+                "launch": 528,
+                "select": 3,
+                "transfer": 2555
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-round-collapse-1-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": true,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 9231,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 187,
+          "airborne_near_hatch": 7,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 153.850003077,
+            "finished_tick": 9231,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": 9231,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 39.862911224365234,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 0.5836742520332336,
+                      "position": {
+                        "x": 1589.4134521484375,
+                        "y": 297.1538391113281
+                      },
+                      "spin": 42.11583709716797,
+                      "velocity": {
+                        "x": -19.03946876525879,
+                        "y": -17.291967391967773
+                      }
+                    },
+                    "closing_speed": 130.393310546875,
+                    "impulse": 39.7618293762207,
+                    "normal": {
+                      "x": 0.45967501401901245,
+                      "y": 0.8880870938301086
+                    },
+                    "on_foot": false,
+                    "other_id": 100111,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": 0.02058614231646061,
+                      "position": {
+                        "x": 1589.14892578125,
+                        "y": 301.6201477050781
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 194.55563354492188,
+                        "y": -268.1393737792969
+                      }
+                    },
+                    "point": {
+                      "x": 1590.08349609375,
+                      "y": 297.885498046875
+                    }
+                  },
+                  "tick": 9231
+                },
+                "protected_until_tick": 8031
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 446.149996923,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6417,
+              "revision": 26,
+              "hatch_distance": 0.44019431445571994,
+              "relative_speed": 0.0036706931559316877
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 766,
+                "capture": 2874,
+                "hunt": 1598,
+                "launch": 656,
+                "patrol": 82,
+                "recover": 1380,
+                "select": 6,
+                "transfer": 1869
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1380
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 677,
+                "capture": 2515,
+                "hunt": 2953,
+                "launch": 528,
+                "select": 3,
+                "transfer": 2555
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 9231,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 187,
+          "airborne_near_hatch": 7,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 153.850003077,
+            "finished_tick": 9231,
+            "outcome": {
+              "winner": "player_2"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": 9231,
+                "health": 0.0,
+                "last_damage": {
+                  "amount": 39.862911224365234,
+                  "cause": "missile",
+                  "contact": {
+                    "actor_motion": {
+                      "angle": 0.5836742520332336,
+                      "position": {
+                        "x": 1589.4134521484375,
+                        "y": 297.1538391113281
+                      },
+                      "spin": 42.11583709716797,
+                      "velocity": {
+                        "x": -19.03946876525879,
+                        "y": -17.291967391967773
+                      }
+                    },
+                    "closing_speed": 130.393310546875,
+                    "impulse": 39.7618293762207,
+                    "normal": {
+                      "x": 0.45967501401901245,
+                      "y": 0.8880870938301086
+                    },
+                    "on_foot": false,
+                    "other_id": 100111,
+                    "other_kind": "missile",
+                    "other_motion": {
+                      "angle": 0.02058614231646061,
+                      "position": {
+                        "x": 1589.14892578125,
+                        "y": 301.6201477050781
+                      },
+                      "spin": 2.0,
+                      "velocity": {
+                        "x": 194.55563354492188,
+                        "y": -268.1393737792969
+                      }
+                    },
+                    "point": {
+                      "x": 1590.08349609375,
+                      "y": 297.885498046875
+                    }
+                  },
+                  "tick": 9231
+                },
+                "protected_until_tick": 8031
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "pilot_death",
+            "remaining_seconds": 446.149996923,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6417,
+              "revision": 26,
+              "hatch_distance": 0.44019431445571994,
+              "relative_speed": 0.0036706931559316877
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 766,
+                "capture": 2874,
+                "hunt": 1598,
+                "launch": 656,
+                "patrol": 82,
+                "recover": 1380,
+                "select": 6,
+                "transfer": 1869
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 1380
+            },
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 677,
+                "capture": 2515,
+                "hunt": 2953,
+                "launch": 528,
+                "select": 3,
+                "transfer": 2555
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-angular-collapse-0-candidate-p1",
+        "case": {
+          "seed": 20202,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 580,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2073,
+              "revision": 10,
+              "hatch_distance": 0.5853698523957145,
+              "relative_speed": 0.0035820489554259176
+            },
+            {
+              "tick": 8972,
+              "revision": 21,
+              "hatch_distance": 0.44107078362732705,
+              "relative_speed": 0.0016114585192302145
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 5103,
+                "capture": 17717,
+                "hunt": 2075,
+                "launch": 830,
+                "select": 12,
+                "transfer": 10263
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "no reachable standing site with hatch access": 27674
+              },
+              "completed": [],
+              "first_block": 8326,
+              "first_mission_block": 8326,
+              "longest_recovery_block": 27674,
+              "mission_blocked_ticks": 27674,
+              "mission_goals": {
+                "avoid_sun": 565,
+                "blocked": 27674,
+                "capture": 2885,
+                "hunt": 1301,
+                "launch": 487,
+                "recover": 1498,
+                "select": 3,
+                "transfer": 1587
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 27674,
+              "recovery_decisions": 29172
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 580,
+          "airborne_near_hatch": 14,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 2073,
+              "revision": 10,
+              "hatch_distance": 0.5853698523957145,
+              "relative_speed": 0.0035820489554259176
+            },
+            {
+              "tick": 8972,
+              "revision": 21,
+              "hatch_distance": 0.44107078362732705,
+              "relative_speed": 0.0016114585192302145
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 5103,
+                "capture": 17717,
+                "hunt": 2075,
+                "launch": 830,
+                "select": 12,
+                "transfer": 10263
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "no reachable standing site with hatch access": 27674
+              },
+              "completed": [],
+              "first_block": 8326,
+              "first_mission_block": 8326,
+              "longest_recovery_block": 27674,
+              "mission_blocked_ticks": 27674,
+              "mission_goals": {
+                "avoid_sun": 565,
+                "blocked": 27674,
+                "capture": 2885,
+                "hunt": 1301,
+                "launch": 487,
+                "recover": 1498,
+                "select": 3,
+                "transfer": 1587
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 27674,
+              "recovery_decisions": 29172
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-angular-collapse-0-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2086,
+          "airborne_near_hatch": 176,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 5103,
+                "capture": 17717,
+                "hunt": 2075,
+                "launch": 830,
+                "select": 12,
+                "transfer": 10263
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "no reachable standing site with hatch access": 27674
+              },
+              "completed": [],
+              "first_block": 8326,
+              "first_mission_block": 8326,
+              "longest_recovery_block": 27674,
+              "mission_blocked_ticks": 27674,
+              "mission_goals": {
+                "avoid_sun": 565,
+                "blocked": 27674,
+                "capture": 2885,
+                "hunt": 1301,
+                "launch": 487,
+                "recover": 1498,
+                "select": 3,
+                "transfer": 1587
+              },
+              "native_refinement_decisions": 29172,
+              "recovery_blocked_ticks": 27674,
+              "recovery_decisions": 29172
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 717,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2086,
+          "airborne_near_hatch": 176,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 5103,
+                "capture": 17717,
+                "hunt": 2075,
+                "launch": 830,
+                "select": 12,
+                "transfer": 10263
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "no reachable standing site with hatch access": 27674
+              },
+              "completed": [],
+              "first_block": 8326,
+              "first_mission_block": 8326,
+              "longest_recovery_block": 27674,
+              "mission_blocked_ticks": 27674,
+              "mission_goals": {
+                "avoid_sun": 565,
+                "blocked": 27674,
+                "capture": 2885,
+                "hunt": 1301,
+                "launch": 487,
+                "recover": 1498,
+                "select": 3,
+                "transfer": 1587
+              },
+              "native_refinement_decisions": 29172,
+              "recovery_blocked_ticks": 27674,
+              "recovery_decisions": 29172
+            }
+          ],
+          "selected_ground_ticks": 717,
+          "recovery_hatch_ticks": 717,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-angular-collapse-1-candidate-p1",
+        "case": {
+          "seed": 20202,
+          "shape": "angular",
+          "slumping": true,
+          "candidate_seat": 0
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2209,
+          "airborne_near_hatch": 49,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 97.6766357421875,
+                "last_damage": {
+                  "amount": 0.055840447545051575,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 30207
+                },
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 1831,
+              "revision": 29,
+              "hatch_distance": 0.4388543012057277,
+              "relative_speed": 0.00763867296673502
+            },
+            {
+              "tick": 8682,
+              "revision": 26,
+              "hatch_distance": 0.441511905313352,
+              "relative_speed": 0.0014309792111136062
+            },
+            {
+              "tick": 11378,
+              "revision": 31,
+              "hatch_distance": 0.4407845397685819,
+              "relative_speed": 0.002475331159412932
+            },
+            {
+              "tick": 16688,
+              "revision": 102,
+              "hatch_distance": 0.4397172939180729,
+              "relative_speed": 0.002736524881242162
+            },
+            {
+              "tick": 20588,
+              "revision": 49,
+              "hatch_distance": 0.4524578905797522,
+              "relative_speed": 0.00760985594361978
+            },
+            {
+              "tick": 24758,
+              "revision": 58,
+              "hatch_distance": 0.4398906140744619,
+              "relative_speed": 0.007851002641562172
+            },
+            {
+              "tick": 28538,
+              "revision": 128,
+              "hatch_distance": 0.4399379175452164,
+              "relative_speed": 0.01106500407648956
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 1022,
+                "capture": 19902,
+                "hunt": 5132,
+                "launch": 1360,
+                "select": 8,
+                "transfer": 8576
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "unreachable ship replacement could not start or finish": 8081
+              },
+              "completed": [],
+              "first_block": 27919,
+              "first_mission_block": 27919,
+              "longest_recovery_block": 8081,
+              "mission_blocked_ticks": 8081,
+              "mission_goals": {
+                "avoid_sun": 760,
+                "blocked": 8081,
+                "capture": 15700,
+                "hunt": 1184,
+                "launch": 785,
+                "recover": 2082,
+                "select": 10,
+                "transfer": 7398
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 8081,
+              "recovery_decisions": 10163
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 2209,
+          "airborne_near_hatch": 49,
+          "airborne_near_hatch_steering": 0,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "34ecff09d71efd6e",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 97.6766357421875,
+                "last_damage": {
+                  "amount": 0.055840447545051575,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 30207
+                },
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 1831,
+              "revision": 29,
+              "hatch_distance": 0.4388543012057277,
+              "relative_speed": 0.00763867296673502
+            },
+            {
+              "tick": 8682,
+              "revision": 26,
+              "hatch_distance": 0.441511905313352,
+              "relative_speed": 0.0014309792111136062
+            },
+            {
+              "tick": 11378,
+              "revision": 31,
+              "hatch_distance": 0.4407845397685819,
+              "relative_speed": 0.002475331159412932
+            },
+            {
+              "tick": 16688,
+              "revision": 102,
+              "hatch_distance": 0.4397172939180729,
+              "relative_speed": 0.002736524881242162
+            },
+            {
+              "tick": 20588,
+              "revision": 49,
+              "hatch_distance": 0.4524578905797522,
+              "relative_speed": 0.00760985594361978
+            },
+            {
+              "tick": 24758,
+              "revision": 58,
+              "hatch_distance": 0.4398906140744619,
+              "relative_speed": 0.007851002641562172
+            },
+            {
+              "tick": 28538,
+              "revision": 128,
+              "hatch_distance": 0.4399379175452164,
+              "relative_speed": 0.01106500407648956
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 1022,
+                "capture": 19902,
+                "hunt": 5132,
+                "launch": 1360,
+                "select": 8,
+                "transfer": 8576
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "unreachable ship replacement could not start or finish": 8081
+              },
+              "completed": [],
+              "first_block": 27919,
+              "first_mission_block": 27919,
+              "longest_recovery_block": 8081,
+              "mission_blocked_ticks": 8081,
+              "mission_goals": {
+                "avoid_sun": 760,
+                "blocked": 8081,
+                "capture": 15700,
+                "hunt": 1184,
+                "launch": 785,
+                "recover": 2082,
+                "select": 10,
+                "transfer": 7398
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 8081,
+              "recovery_decisions": 10163
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 0,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      },
+      {
+        "name": "20202-angular-collapse-1-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "angular",
+          "slumping": true,
+          "candidate_seat": 1
+        },
+        "fork": 0,
+        "control": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 12253,
+          "airborne_near_hatch": 46,
+          "airborne_near_hatch_steering": 4,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 97.6766357421875,
+                "last_damage": {
+                  "amount": 0.055840447545051575,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 30207
+                },
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6372,
+              "revision": 18,
+              "hatch_distance": 0.4352299045777556,
+              "relative_speed": 0.009434305793766562
+            },
+            {
+              "tick": 9240,
+              "revision": 56,
+              "hatch_distance": 0.5717804515307867,
+              "relative_speed": 0.004499721282718701
+            },
+            {
+              "tick": 15203,
+              "revision": 46,
+              "hatch_distance": 0.4425155954050817,
+              "relative_speed": 0.0026528679429657868
+            },
+            {
+              "tick": 18893,
+              "revision": 47,
+              "hatch_distance": 0.44119068384649673,
+              "relative_speed": 0.0035190757455300704
+            },
+            {
+              "tick": 22869,
+              "revision": 121,
+              "hatch_distance": 2.15710961874078,
+              "relative_speed": 0.008027302454964422
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 1022,
+                "capture": 19902,
+                "hunt": 5132,
+                "launch": 1360,
+                "select": 8,
+                "transfer": 8576
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "unreachable ship replacement could not start or finish": 8081
+              },
+              "completed": [],
+              "first_block": 27919,
+              "first_mission_block": 27919,
+              "longest_recovery_block": 8081,
+              "mission_blocked_ticks": 8081,
+              "mission_goals": {
+                "avoid_sun": 760,
+                "blocked": 8081,
+                "capture": 15700,
+                "hunt": 1184,
+                "launch": 785,
+                "recover": 2082,
+                "select": 10,
+                "transfer": 7398
+              },
+              "native_refinement_decisions": 10163,
+              "recovery_blocked_ticks": 8081,
+              "recovery_decisions": 10163
+            }
+          ],
+          "selected_ground_ticks": 0,
+          "recovery_hatch_ticks": 10163,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        },
+        "candidate": {
+          "end_tick": 36000,
+          "first_input_difference": null,
+          "first_scenario_difference": null,
+          "hatch_decisions": 12253,
+          "airborne_near_hatch": 46,
+          "airborne_near_hatch_steering": 4,
+          "initial_physics": "259a2aa46766b06c",
+          "initial_controller_fnv64": "f5a826ce72d7a788",
+          "initial_completed": 0,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 97.6766357421875,
+                "last_damage": {
+                  "amount": 0.055840447545051575,
+                  "cause": "laser",
+                  "contact": null,
+                  "tick": 30207
+                },
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "boardings": [
+            {
+              "tick": 6372,
+              "revision": 18,
+              "hatch_distance": 0.4352299045777556,
+              "relative_speed": 0.009434305793766562
+            },
+            {
+              "tick": 9240,
+              "revision": 56,
+              "hatch_distance": 0.5717804515307867,
+              "relative_speed": 0.004499721282718701
+            },
+            {
+              "tick": 15203,
+              "revision": 46,
+              "hatch_distance": 0.4425155954050817,
+              "relative_speed": 0.0026528679429657868
+            },
+            {
+              "tick": 18893,
+              "revision": 47,
+              "hatch_distance": 0.44119068384649673,
+              "relative_speed": 0.0035190757455300704
+            },
+            {
+              "tick": 22869,
+              "revision": 121,
+              "hatch_distance": 2.15710961874078,
+              "relative_speed": 0.008027302454964422
+            }
+          ],
+          "completed": [],
+          "final_recoveries": [
+            0,
+            0
+          ],
+          "metrics": [
+            {
+              "block_reasons": {},
+              "completed": [],
+              "first_block": null,
+              "first_mission_block": null,
+              "longest_recovery_block": 0,
+              "mission_blocked_ticks": 0,
+              "mission_goals": {
+                "avoid_sun": 1022,
+                "capture": 19902,
+                "hunt": 5132,
+                "launch": 1360,
+                "select": 8,
+                "transfer": 8576
+              },
+              "native_refinement_decisions": 0,
+              "recovery_blocked_ticks": 0,
+              "recovery_decisions": 0
+            },
+            {
+              "block_reasons": {
+                "unreachable ship replacement could not start or finish": 8081
+              },
+              "completed": [],
+              "first_block": 27919,
+              "first_mission_block": 27919,
+              "longest_recovery_block": 8081,
+              "mission_blocked_ticks": 8081,
+              "mission_goals": {
+                "avoid_sun": 760,
+                "blocked": 8081,
+                "capture": 15700,
+                "hunt": 1184,
+                "launch": 785,
+                "recover": 2082,
+                "select": 10,
+                "transfer": 7398
+              },
+              "native_refinement_decisions": 10163,
+              "recovery_blocked_ticks": 8081,
+              "recovery_decisions": 10163
+            }
+          ],
+          "selected_ground_ticks": 10163,
+          "recovery_hatch_ticks": 10163,
+          "recovery_airborne_near_hatch": 0,
+          "recovery_airborne_steering": 0
+        }
+      }
+    ]
+  },
+  "references": {
+    "source_commit": "e36ee55149f5402fb7551e70d0515ac239ffc86b",
+    "source_directory": "/home/data/workspace/spacewars-handoffs/mission-recovery-20261010",
+    "files": {
+      "10101-round-collapse-0-candidate-p1/actions.jsonl": "2164273bfc4084094fa3f7fbce283f87acdfe93f8e0aa83ac36018957f2f0c29",
+      "10101-round-collapse-0-candidate-p1/final.json": "74a4e1f8d1974dcde1585e48b606a3cd3fd7e39c68ec850b857fbe15ff110133",
+      "10101-round-collapse-0-candidate-p1/summary.json": "6743ff5373b83f0ac2518843299ca91937cd523206a81083092faa05a9c5db32",
+      "10101-round-collapse-0-candidate-p2/actions.jsonl": "ded3cc5e184f40ae2e44aeea5140adf39adbea0d6f04f0d7b1e0a6fd098ee1de",
+      "10101-round-collapse-0-candidate-p2/final.json": "74a4e1f8d1974dcde1585e48b606a3cd3fd7e39c68ec850b857fbe15ff110133",
+      "10101-round-collapse-0-candidate-p2/summary.json": "bc2521d31e56aa71d6afa1ea83fc190a6f1f7c1771bf6923b420535b63d4c58e",
+      "10101-round-collapse-1-candidate-p1/actions.jsonl": "bf2e9c866b150a76b9ce1c150428bebbaf13b15d88a36f03d39c116f410d5dd8",
+      "10101-round-collapse-1-candidate-p1/final.json": "9c20bc45c7ece778ceb38aec4e04a1ddb17589ae922b443ea5e2ae282260a78a",
+      "10101-round-collapse-1-candidate-p1/summary.json": "8b8dc73651b8bf91ca3058fa470e0fc4811b200cfc9d122ec2ef029b44877fed",
+      "10101-round-collapse-1-candidate-p2/actions.jsonl": "292137bf714ecb97d691d4e2435210fe46b66acdb2293bd3fa96b2ade8053ca0",
+      "10101-round-collapse-1-candidate-p2/final.json": "9c20bc45c7ece778ceb38aec4e04a1ddb17589ae922b443ea5e2ae282260a78a",
+      "10101-round-collapse-1-candidate-p2/summary.json": "619df175f61cc1d98573c35d2ef6fd59a1f0ac7d35bff346edae6fc5965ef080",
+      "10101-angular-collapse-0-candidate-p1/actions.jsonl": "1de375417b521c11a19b81fcb0c7fd49b759d1b94afad2a371bca85c15bfa260",
+      "10101-angular-collapse-0-candidate-p1/final.json": "c37e9751cf13c7860d8bc10c127159254d3dbfe0a403a0c9177dce9afdbecc1a",
+      "10101-angular-collapse-0-candidate-p1/summary.json": "63d5ab44688b90363af9f2e7fa06150c520b60484aa220096e9834cfd4c05d56",
+      "10101-angular-collapse-0-candidate-p2/actions.jsonl": "03fc7e6373b0f76fb0db9b196c2ee94ae3145c32934e9c4625f6da35fbd4166f",
+      "10101-angular-collapse-0-candidate-p2/final.json": "c37e9751cf13c7860d8bc10c127159254d3dbfe0a403a0c9177dce9afdbecc1a",
+      "10101-angular-collapse-0-candidate-p2/summary.json": "1e732282e5618f0b88803d666d7c41265932ffcf68b964fee6cc15bda9a18b63",
+      "10101-angular-collapse-1-candidate-p1/actions.jsonl": "29fb58d5715566da406ce0515efd862fba36758736a1417ce8a85e16b1b124db",
+      "10101-angular-collapse-1-candidate-p1/final.json": "1601b368a49531c02ccd28000d87db14332d1f707fdb520f228119860b539478",
+      "10101-angular-collapse-1-candidate-p1/summary.json": "f542025bdaffc547a12d88c53ef1275eb5351b2526850cbf8589b5b97e5e06b9",
+      "10101-angular-collapse-1-candidate-p2/actions.jsonl": "6046b88dbea754b0b0314f7a495dcab0a8081ed498bd8efdb983f32e728ae684",
+      "10101-angular-collapse-1-candidate-p2/final.json": "1601b368a49531c02ccd28000d87db14332d1f707fdb520f228119860b539478",
+      "10101-angular-collapse-1-candidate-p2/summary.json": "e411d9e18072ed6d9894ef1ffd7c6ba9d4e1026853996c6cb640304e2a530929",
+      "20202-round-collapse-0-candidate-p1/actions.jsonl": "9963c83e39d63952d6fdc675598567b265a15a35ddd4589270467f70fbb1853f",
+      "20202-round-collapse-0-candidate-p1/final.json": "91f40d4c5435ef96f731f3cf41f990785c89d410631108b88ff9aa20d19fc3ad",
+      "20202-round-collapse-0-candidate-p1/summary.json": "bc9739c23abfd83c0f1d97f3f22fa7ba18a5082fafaebb7fe8117524dba83c1f",
+      "20202-round-collapse-0-candidate-p2/actions.jsonl": "0ca618e8c28f0cffa96d6d6cac5a5cc5a94a3ca1367c48e52f08941648102d15",
+      "20202-round-collapse-0-candidate-p2/final.json": "540ff4fc425d8b78507391108d36718a86ca9bb9ebbc3be5b6e6583201aa3183",
+      "20202-round-collapse-0-candidate-p2/summary.json": "622761016a101748f9079db5a2815fc12b490d178feab388991085609f5064af",
+      "20202-round-collapse-1-candidate-p1/actions.jsonl": "98c7c852c86c19a42200454877b1549517c2e4c83813aa5d50b05a89eacc43fd",
+      "20202-round-collapse-1-candidate-p1/final.json": "e610890c636b424e9a3f4af85b3cb6da4acd8700cceeb241b849f4f8890806a0",
+      "20202-round-collapse-1-candidate-p1/summary.json": "ec87b49429c5d03a569f1ccd50f10700a72350efbfc598713111c7e7491821be",
+      "20202-round-collapse-1-candidate-p2/actions.jsonl": "dfd713c5983719ec8a275ba3353d44e2830ddea07902440ff5294cadf33e9454",
+      "20202-round-collapse-1-candidate-p2/final.json": "e610890c636b424e9a3f4af85b3cb6da4acd8700cceeb241b849f4f8890806a0",
+      "20202-round-collapse-1-candidate-p2/summary.json": "545a3c6ff66599a886935ef965bd48ec5419aed9d18a19b0463edbddaa9ece5c",
+      "20202-angular-collapse-0-candidate-p1/actions.jsonl": "69ce0cb4f5821faad2323679573cfc86f344b25cab67582d6b40e905b3e01b78",
+      "20202-angular-collapse-0-candidate-p1/final.json": "7793b164864288edd4c3e34680a0b070d9fc919c932edcb4b6563f3233821194",
+      "20202-angular-collapse-0-candidate-p1/summary.json": "6fbfedfa92ce7c15b35c7e7f1b663bcc7122ce0447b31e4ba0176ee86c56ba0c",
+      "20202-angular-collapse-0-candidate-p2/actions.jsonl": "7f9ad5d9eb2f000f30bb7101485c6c3b2400508ce4c74f76d121ed3b233350d4",
+      "20202-angular-collapse-0-candidate-p2/final.json": "56479747881748bc1676597f6f63df657f706394304499f776492cd8e829718b",
+      "20202-angular-collapse-0-candidate-p2/summary.json": "54325b8eed766e963add8cf174156f4f7934bb31f9ea8c904401d35d98e97ee7",
+      "20202-angular-collapse-1-candidate-p1/actions.jsonl": "358a911ad5d815db7f58260a1f58229a5cf316a3cc8a601774a5eba2d1ec0462",
+      "20202-angular-collapse-1-candidate-p1/final.json": "e670b83605bb5f5d94e1e8d9b1167ca601624922d68cfdf7d99d9b5e27462c40",
+      "20202-angular-collapse-1-candidate-p1/summary.json": "a782e33cd7a3bd2607047cbea4ba079995fe11a0d59448bac60e66d534c4b1b2",
+      "20202-angular-collapse-1-candidate-p2/actions.jsonl": "e913984c87f7f203ab5b2900334688de06ff02a5ce21d1a69f9e72d2f03241b7",
+      "20202-angular-collapse-1-candidate-p2/final.json": "e670b83605bb5f5d94e1e8d9b1167ca601624922d68cfdf7d99d9b5e27462c40",
+      "20202-angular-collapse-1-candidate-p2/summary.json": "c92da9e1574f893a5a6f49159815b69e5a05b1d9f7caf76066a77ff263ea08c8"
+    }
+  },
+  "validation": {
+    "source_commit": "9c8285da49ccf09ffcb22899800dc12fbd9a375f",
+    "note": "Consolidated from the executed commands, observed tool exit codes and retained logs; no timing values were inferred.",
+    "total_passed_tests": 572,
+    "checks": [
+      {
+        "name": "library",
+        "command": [
+          "/home/data/workspace/spacewars-handoffs/hatch-arrival-20261010/hatch-arrival-comparison"
+        ],
+        "env": {
+          "RUST_MIN_STACK": "16777216"
+        },
+        "exit_code": 0,
+        "passed_tests": 452,
+        "log": "validation-frozen-library.log",
+        "log_sha256": "67943145b46524429d9d1dc56e41f72c04fd40218f5e9e4d717311de757fff84"
+      },
+      {
+        "name": "gameplay",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--release",
+          "-p",
+          "spacewars-ai",
+          "--features",
+          "sensor-profile",
+          "--test",
+          "ground_navigation",
+          "--test",
+          "surface_recovery",
+          "--test",
+          "ground_walk",
+          "--test",
+          "ground_jetpack",
+          "--test",
+          "surface_mission"
+        ],
+        "env": {
+          "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+          "RUST_MIN_STACK": "16777216"
+        },
+        "exit_code": 0,
+        "passed_tests": 120,
+        "log": "validation-gameplay-final.log",
+        "log_sha256": "2c34708530e5f7fa99daae5b8b24207e23d3a3960c05792efa8669962ed41492"
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "clippy",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib",
+          "--tests",
+          "--features",
+          "sensor-profile",
+          "--no-deps",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "env": {
+          "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+        },
+        "exit_code": 0,
+        "passed_tests": null,
+        "log": "validation-clippy-final.log",
+        "log_sha256": "8d0f00d7b6c97be2733860f1bfc76bfa55e45d45cc239f5dd0f449be62ed70ee"
+      },
+      {
+        "name": "default-check",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "check",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib"
+        ],
+        "env": {
+          "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+        },
+        "exit_code": 0,
+        "passed_tests": null,
+        "log": "validation-default.log",
+        "log_sha256": "374d54bf033e8e08601182cad6aea7f81b77be0c88bb98f4b6180b63ee0e1950"
+      },
+      {
+        "name": "format",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "env": {},
+        "exit_code": 0,
+        "passed_tests": null,
+        "log": "validation-format.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "preflight_notes": "preflight-notes.json"
+  },
+  "execution": {
+    "fork_tick": 24743,
+    "first_changed_input": 24828,
+    "first_public_scenario_difference": 24830,
+    "waypoint_advanced": 24856,
+    "boarded_tick": 24911,
+    "completed_tick": 24911,
+    "native_jumps": 2,
+    "native_getups": 0,
+    "terrain_revisions_through_boarding": [
+      182
+    ],
+    "initial_controls_armed": false,
+    "first_armed_tick": 24744,
+    "from_zero_suffix_and_final_equal_fork_candidate": true,
+    "changed_match_opponent_failure": {
+      "first_block_tick": 31347,
+      "recovery_started_tick": 26413,
+      "rebuilt_tick": null,
+      "ground": {
+        "claim_relocations": 0,
+        "claim_target": null,
+        "crawl_direction": null,
+        "crawl_target": null,
+        "crossing": null,
+        "destination": {
+          "rebuild": {
+            "planet": 1,
+            "position": {
+              "x": 10.056537628173828,
+              "y": -136.33328247070312
+            }
+          }
+        },
+        "displacements": 0,
+        "flight_interruptions": 0,
+        "get_up_repositions": 0,
+        "goal": "blocked",
+        "invalidations": 0,
+        "jetpack_crossings": 0,
+        "jumps": 12,
+        "last_progress_tick": 30866,
+        "partial_routes": 0,
+        "path": [
+          252,
+          253,
+          255,
+          257,
+          259,
+          261,
+          262
+        ],
+        "policy": "ground_navigation_v10",
+        "reason": "spaceling stopped making progress on ground route",
+        "replans": 1,
+        "return_failure": null,
+        "revision": 195,
+        "route": {
+          "closest_reachable_distance": 6.103515625e-05,
+          "destination_nodes": 1,
+          "failure": null,
+          "flights": 0,
+          "jumps": 5,
+          "length": 17.31122589111328,
+          "nearest_destination_distance": 6.103515625e-05,
+          "partial": false,
+          "reachable_nodes": 21,
+          "start_distance": 2.603628635406494,
+          "start_node": 252
+        },
+        "start_repositions": 0,
+        "started_tick": 30706,
+        "target": {
+          "x": 10.056522369384766,
+          "y": -136.33331298828125
+        },
+        "waypoint": 1
+      },
+      "source": "cases/20202-round-collapse-0-candidate-p2-fork24743/output/candidate/first-recovery-block-p1.json",
+      "source_sha256": "cfd134f8837b583707d436c4a270fec02bad0661f45595cf1aaf710995f76852"
+    }
+  },
+  "interpretation": {
+    "target_recovered": true,
+    "unchanged_input_cases": [
+      "10101-round-collapse-0-candidate-p1",
+      "10101-round-collapse-0-candidate-p2",
+      "10101-round-collapse-1-candidate-p1",
+      "10101-round-collapse-1-candidate-p2",
+      "10101-angular-collapse-0-candidate-p1",
+      "10101-angular-collapse-0-candidate-p2",
+      "10101-angular-collapse-1-candidate-p1",
+      "10101-angular-collapse-1-candidate-p2",
+      "20202-round-collapse-0-candidate-p1",
+      "20202-round-collapse-1-candidate-p1",
+      "20202-round-collapse-1-candidate-p2",
+      "20202-angular-collapse-0-candidate-p1",
+      "20202-angular-collapse-0-candidate-p2",
+      "20202-angular-collapse-1-candidate-p1",
+      "20202-angular-collapse-1-candidate-p2"
+    ],
+    "selected_recovery_hatch_cases": [
+      "10101-round-collapse-0-candidate-p2",
+      "10101-angular-collapse-0-candidate-p1",
+      "10101-angular-collapse-1-candidate-p2",
+      "20202-round-collapse-0-candidate-p1",
+      "20202-round-collapse-0-candidate-p2",
+      "20202-angular-collapse-0-candidate-p2",
+      "20202-angular-collapse-1-candidate-p2"
+    ],
+    "paired_outcomes": [
+      {
+        "name": "10101-round-collapse-0-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-round-collapse-0-candidate-p2",
+        "seat": 1,
+        "control_completed": 1,
+        "candidate_completed": 1,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 72,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-round-collapse-1-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-round-collapse-1-candidate-p2",
+        "seat": 1,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p1",
+        "seat": 0,
+        "control_completed": 1,
+        "candidate_completed": 1,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 101,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p2",
+        "seat": 1,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-angular-collapse-1-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "10101-angular-collapse-1-candidate-p2",
+        "seat": 1,
+        "control_completed": 1,
+        "candidate_completed": 1,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 75,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-round-collapse-0-candidate-p1",
+        "seat": 0,
+        "control_completed": 1,
+        "candidate_completed": 1,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 80,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-round-collapse-0-candidate-p2",
+        "seat": 1,
+        "control_completed": 1,
+        "candidate_completed": 2,
+        "control_blocked_ticks": 14819,
+        "candidate_blocked_ticks": 5047,
+        "candidate_recovery_hatch_ticks": 260,
+        "first_input_difference": 24828
+      },
+      {
+        "name": "20202-round-collapse-1-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-round-collapse-1-candidate-p2",
+        "seat": 1,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-angular-collapse-0-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-angular-collapse-0-candidate-p2",
+        "seat": 1,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 27674,
+        "candidate_blocked_ticks": 27674,
+        "candidate_recovery_hatch_ticks": 717,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-angular-collapse-1-candidate-p1",
+        "seat": 0,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 0,
+        "candidate_blocked_ticks": 0,
+        "candidate_recovery_hatch_ticks": 0,
+        "first_input_difference": null
+      },
+      {
+        "name": "20202-angular-collapse-1-candidate-p2",
+        "seat": 1,
+        "control_completed": 0,
+        "candidate_completed": 0,
+        "control_blocked_ticks": 8081,
+        "candidate_blocked_ticks": 8081,
+        "candidate_recovery_hatch_ticks": 10163,
+        "first_input_difference": null
+      }
+    ],
+    "defaults_changed": false,
+    "physics_changed": false,
+    "scope": "One retained Round failure recovered by the live controller. The tick-zero replay reproduces its suffix and final state. Matrix includes cases without recovery hatch exposure; reactive opponent outcomes are reported for both seats. No win-rate claim or default promotion. Published #174 integration and device qualification remain pending."
+  },
+  "plot": {
+    "source_files": {
+      "cases/20202-round-collapse-0-candidate-p2-fork24743/output/candidate/summary.json": "003ef8a8695b6173327c3756cc2a6a1973f6620e890d64ba2cec66accca82c3f",
+      "cases/20202-round-collapse-0-candidate-p2-fork24743/output/control/hatch-decisions.jsonl": "b711b0727290a74281e28f129487fddb34c6229d5dac3776ede2cf05a08d2b02",
+      "cases/20202-round-collapse-0-candidate-p2-fork24743/output/candidate/hatch-decisions.jsonl": "903eaccd8175d42d0665c6e176cb885c98941d81d7dd6adac4b4288a37ff7a19"
+    },
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.3",
+    "output": {
+      "hatch-arrival.png": "7e27a67cba1e51a141591675367d791ac7e35046fc17a2c60c9a8f61e90ad0a9",
+      "hatch-arrival.pdf": "b0dcb51692a58c44526fd6da857db3fb7d8aa8d8ff7c3866530a1206b7776d34"
+    },
+    "scope": "Recorded live controller traces from an identical rebuild state. Foot positions estimate center minus actor up times half height; not collider bottoms or terrain geometry. Both controllers run unchanged ordinary jump and boarding gates."
+  },
+  "post_freeze_changes": [
+    "Auditor adds optional incremental checking and distinguishes recovery hatch exposure from other on-foot/boarding activity.",
+    "Result analysis, figures, documentation and packaging added. Policy, harness and frozen binary unchanged."
+  ]
+}

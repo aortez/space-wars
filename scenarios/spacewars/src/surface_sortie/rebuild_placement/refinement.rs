@@ -79,6 +79,13 @@ pub(super) fn neighbors<'a>(
 }
 
 impl SurfaceSortieState {
+    #[cfg(feature = "sensor-profile")]
+    pub fn rebuild_refinement_enabled(&self, player: usize) -> Option<bool> {
+        self.pilots
+            .get(player)
+            .map(|pilot| pilot.rebuild_refinement)
+    }
+
     /// Experimental search density only. Native placement/landing guards and
     /// recovery timers remain authoritative, including for actual builds.
     #[cfg(feature = "sensor-profile")]

@@ -380,6 +380,58 @@ fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) 
     (task, o)
 }
 
+#[cfg(feature = "sensor-profile")]
+#[test]
+fn supported_hatch_option_reaches_current_and_reset_tasks_but_native_ready_still_boards() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    let p = &mut o.flight.pilot;
+    p.ship_available = true;
+    p.ship_form = ShipForm::Ship;
+    p.hatch = Some(Vec2::new(6.0, 60.0));
+    p.boarding_hatches = [p.hatch, None];
+    p.landing.phase = LandingPhase::Landed;
+    p.landing.planet = Some(p.planet.index);
+    p.landing.supported_feet = 2;
+    p.transfer = TransferResult::TooFar;
+    task.step(&o);
+    let start = task.telemetry().started_tick;
+    let mut control = task.clone();
+    task.set_hatch_supported_arrival(true);
+    let p = &mut o.flight.pilot;
+    p.tick = 1;
+    p.actor.as_mut().unwrap().position.x = 3.7;
+    p.supported_planet = None;
+    p.transfer = TransferResult::MustBeSupported;
+    o.ground.as_mut().unwrap().tick = 1;
+    assert_eq!(control.step(&o).controls, SurfaceSortieAction::default());
+    assert_ne!(task.step(&o).controls.horizontal, 0.0);
+    assert_eq!(task.telemetry().started_tick, start);
+    assert!(
+        task.telemetry()
+            .ground
+            .as_ref()
+            .unwrap()
+            .hatch_supported_arrival
+    );
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert_ne!(task.step(&o).controls.horizontal, 0.0);
+    o.flight.pilot.tick = 2;
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    o.flight.pilot.transfer = TransferResult::Ready;
+    let action = task.step(&o);
+    assert!(action.controls.interact_held);
+    assert_eq!(action.controls.horizontal, 0.0);
+    assert_eq!(task.step(&o), action);
+    o.flight.pilot.tick = 3;
+    o.flight.pilot.location = PilotLocation::Aboard(o.flight.pilot.vehicle);
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Succeeded);
+}
+
 #[test]
 fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain() {
     let (mut task, mut o) = rebuild_relocation_fixture();

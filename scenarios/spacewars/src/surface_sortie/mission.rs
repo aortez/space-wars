@@ -407,6 +407,42 @@ impl SurfaceSortieState {
         cadence: LandingSurveyCadence,
         objective_surveys: bool,
     ) -> MissionObservationV1 {
+        self.mission_observation_with_local(player, request, cadence, |query| {
+            self.tactical_sortie_observation_profile(
+                player,
+                query,
+                request.objective_planning,
+                objective_surveys,
+            )
+        })
+    }
+
+    /// Experimental recovery preserves mission cadence, context and objectives.
+    #[cfg(feature = "sensor-profile")]
+    pub fn mission_observation_with_rebuild_search(
+        &self,
+        player: usize,
+        request: MissionSensorRequest,
+        cadence: LandingSurveyCadence,
+        search: &rebuild_placement::RebuildSearchProgress,
+    ) -> MissionObservationV1 {
+        self.mission_observation_with_local(player, request, cadence, |query| {
+            self.tactical_sortie_with_rebuild_search(
+                player,
+                query,
+                request.objective_planning,
+                search,
+            )
+        })
+    }
+
+    fn mission_observation_with_local(
+        &self,
+        player: usize,
+        request: MissionSensorRequest,
+        cadence: LandingSurveyCadence,
+        local: impl FnOnce(LandingSiteQuery) -> TacticalSortieObservationV1,
+    ) -> MissionObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("mission_observation");
         let current = self.motion_planet_index(player);
@@ -476,12 +512,7 @@ impl SurfaceSortieState {
             request.last_survey,
             flag_approach,
         );
-        let mut local = self.tactical_sortie_observation_profile(
-            player,
-            query,
-            request.objective_planning,
-            objective_surveys,
-        );
+        let mut local = local(query);
         if request.objective_planning == landing_objective::ObjectivePlanning::JetpackRoundTrip
             && let Some(flight) = request.vehicle_flight
             && local

@@ -6,6 +6,8 @@ use super::*;
 
 #[cfg(feature = "sensor-profile")]
 mod contact_frame;
+#[cfg(feature = "sensor-profile")]
+mod diagnostics;
 
 const SCUTTLE_TIME: Duration = Duration::from_secs(3);
 const REBUILD_TIME: Duration = Duration::from_secs(8);
@@ -250,6 +252,8 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn update_recovery(&mut self, dt: Duration) {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("native_recovery_update");
         for player in 0..self.player_count() {
             #[cfg(feature = "sensor-profile")]
             self.refresh_rebuild_preview_normal(player);
@@ -310,6 +314,8 @@ impl SurfaceSortieState {
     }
 
     fn try_rebuild_vehicle(&mut self, player: usize, planet: usize, point: Vec2, up: Vec2) -> bool {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("native_rebuild_attempt");
         let index = self.pilots[player].vehicle.0;
         #[cfg(feature = "sensor-profile")]
         let selected = if self.rebuild_selection_enabled(player) {

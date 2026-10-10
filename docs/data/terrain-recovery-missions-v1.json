@@ -1,0 +1,5519 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "e36ee55149f5402fb7551e70d0515ac239ffc86b",
+    "source_inputs_sha256": "56647fc0d7dfd56960d093d6e78bdff6dbfd2fc6dc114a2e7a27aabd7b48b26b",
+    "source_input_count": 2388,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791618710.7263129,
+    "exit_code": 0,
+    "seconds": 59.43401861190796,
+    "binary_sha256": "8d2a0fa7d48bbf9b7455621b8dca4997f37703e0dea40f9e03116d551d999d5e"
+  },
+  "raw_root": "/home/data/workspace/spacewars-handoffs/mission-recovery-20261010",
+  "audit_sha256": "84691f012672093cac10a1affba59e37794669a902d7c3ace850fb037beb6523",
+  "inspection_sha256": "5bb8a7034f854c429184d4a7200f0222730c79cc390ada11df443c605d82d78b",
+  "aggregate": {
+    "cases": 24,
+    "comparisons": 16,
+    "total_ticks": 553096,
+    "overlapping_ticks": 362922,
+    "audit_samples": 9226,
+    "transition_observations": 3628,
+    "case_artifacts": 603,
+    "identical_comparisons": 14,
+    "identical_outcomes": 15,
+    "completed_recoveries_all_arms": 15,
+    "resumed_missions_all_arms": 15,
+    "control_recoveries": 5,
+    "control_sorties": 42,
+    "control_frame_changes": 170,
+    "control_losses": 12,
+    "control_rebuilds": 6,
+    "candidate_recovery_decisions": 82711,
+    "candidate_native_refinement_decisions": 82706,
+    "candidate_recoveries": 5,
+    "recovery_blocked_ticks": 139746,
+    "mission_blocked_ticks": 138931,
+    "run_seconds": 407.6247465610504,
+    "features": {
+      "p1:survey": 3,
+      "p2:survey": 2637
+    },
+    "max_host_work": {
+      "graph": 4,
+      "physics_queries": 142
+    },
+    "decisions_mean_ms": 0.09401750233503768,
+    "decisions_max_ms": 8.379572999999999,
+    "planning_mean_ms": 0.002861951775098717,
+    "planning_max_ms": 0.278746,
+    "step_mean_ms": 0.4179091399973965,
+    "step_max_ms": 8.911493
+  },
+  "validation": [
+    {
+      "name": "library",
+      "command": [
+        "/home/data/workspace/spacewars-handoffs/mission-recovery-20261010/mission-recovery-comparison"
+      ],
+      "started_unix": 1791619207.8368847,
+      "exit_code": 0,
+      "seconds": 1.7719852924346924
+    },
+    {
+      "name": "native-mission",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::mission"
+      ],
+      "started_unix": 1791619209.6091104,
+      "exit_code": 0,
+      "seconds": 61.512824296951294
+    },
+    {
+      "name": "native-combat-observations",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::combat"
+      ],
+      "started_unix": 1791619271.1222522,
+      "exit_code": 0,
+      "seconds": 0.23360371589660645
+    },
+    {
+      "name": "recovery-gameplay",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--test",
+        "ground_jetpack",
+        "--test",
+        "ground_walk",
+        "--test",
+        "recovery_route_stall",
+        "--test",
+        "surface_combat",
+        "--test",
+        "surface_mission"
+      ],
+      "started_unix": 1791619271.3561416,
+      "exit_code": 0,
+      "seconds": 57.45576214790344
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_unix": 1791619328.8121223,
+      "exit_code": 0,
+      "seconds": 3.478037118911743
+    },
+    {
+      "name": "native-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-deps"
+      ],
+      "started_unix": 1791619332.2904086,
+      "exit_code": 0,
+      "seconds": 3.4938368797302246
+    },
+    {
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "started_unix": 1791619335.7844093,
+      "exit_code": 0,
+      "seconds": 1.3385603427886963
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_unix": 1791619337.1231172,
+      "exit_code": 0,
+      "seconds": 1.8376164436340332
+    }
+  ],
+  "cases": [
+    {
+      "name": "10101-round-collapse-0-control",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 16552,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": -0.0006276667,
+            "foot_clearances": [
+              0.058421016,
+              -0.0006276667
+            ],
+            "angle_degrees": 3.2895598,
+            "descent_speed": -0.004695978,
+            "lateral_speed": -0.0024544671,
+            "relative_spin": 0.00045849755,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 16553,
+            "goal": "hunt",
+            "planet": 0
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 498,
+      "timing": {
+        "decisions": [
+          {
+            "count": 29840,
+            "mean_ms": 0.11293050449061662,
+            "p50_ms": 0.004208,
+            "p95_ms": 0.041999999999999996,
+            "p99_ms": 4.204354,
+            "max_ms": 7.157215
+          },
+          {
+            "count": 29840,
+            "mean_ms": 0.07324087064343164,
+            "p50_ms": 0.0045780000000000005,
+            "p95_ms": 0.039615,
+            "p99_ms": 3.90033,
+            "max_ms": 7.217277999999999
+          }
+        ],
+        "planning": {
+          "count": 29840,
+          "mean_ms": 0.0026351880026809654,
+          "p50_ms": 0.002022,
+          "p95_ms": 0.005189,
+          "p99_ms": 0.0101,
+          "max_ms": 0.09629099999999999
+        },
+        "step": {
+          "count": 29840,
+          "mean_ms": 0.22775295908176946,
+          "p50_ms": 0.164661,
+          "p95_ms": 0.550048,
+          "p99_ms": 1.115324,
+          "max_ms": 3.3808990000000003
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 176,
+      "case": {
+        "candidate_seat": null,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 29840,
+      "match": {
+        "elapsed_seconds": 497.33334328,
+        "finished_tick": 29840,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          0,
+          3
+        ],
+        "pilots": [
+          {
+            "death_tick": 29840,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.005844011902809143,
+              "cause": "laser",
+              "contact": null,
+              "tick": 29840
+            },
+            "protected_until_tick": 28297
+          },
+          {
+            "death_tick": null,
+            "health": 97.91886138916016,
+            "last_damage": {
+              "amount": 0.048533134162425995,
+              "cause": "laser",
+              "contact": null,
+              "tick": 16042
+            },
+            "protected_until_tick": 15050
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 102.66665672,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 16932,
+            "hunt": 3600,
+            "launch": 686,
+            "recover": 1723,
+            "select": 7,
+            "transfer": 6892
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1723
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            16552
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 12764,
+            "hunt": 9204,
+            "launch": 1394,
+            "recover": 1682,
+            "select": 10,
+            "transfer": 4786
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1683
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 0,
+          "frame_changes": 9
+        },
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 1,
+          "frame_changes": 16
+        }
+      ]
+    },
+    {
+      "name": "10101-round-collapse-0-candidate-p1",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 16552,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": -0.0006276667,
+            "foot_clearances": [
+              0.058421016,
+              -0.0006276667
+            ],
+            "angle_degrees": 3.2895598,
+            "descent_speed": -0.004695978,
+            "lateral_speed": -0.0024544671,
+            "relative_spin": 0.00045849755,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 16553,
+            "goal": "hunt",
+            "planet": 0
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 498,
+      "timing": {
+        "decisions": [
+          {
+            "count": 29840,
+            "mean_ms": 0.11285429212466487,
+            "p50_ms": 0.004168,
+            "p95_ms": 0.041056999999999996,
+            "p99_ms": 4.171501999999999,
+            "max_ms": 7.691825000000001
+          },
+          {
+            "count": 29840,
+            "mean_ms": 0.07318706628686328,
+            "p50_ms": 0.004558,
+            "p95_ms": 0.039134,
+            "p99_ms": 3.9085860000000006,
+            "max_ms": 8.154978999999999
+          }
+        ],
+        "planning": {
+          "count": 29840,
+          "mean_ms": 0.0025430946045576406,
+          "p50_ms": 0.001973,
+          "p95_ms": 0.004509,
+          "p99_ms": 0.009939,
+          "max_ms": 0.091282
+        },
+        "step": {
+          "count": 29840,
+          "mean_ms": 0.22618492476541555,
+          "p50_ms": 0.162827,
+          "p95_ms": 0.5454789999999999,
+          "p99_ms": 1.103693,
+          "max_ms": 3.3943950000000003
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 176,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 29840,
+      "match": {
+        "elapsed_seconds": 497.33334328,
+        "finished_tick": 29840,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          0,
+          3
+        ],
+        "pilots": [
+          {
+            "death_tick": 29840,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.005844011902809143,
+              "cause": "laser",
+              "contact": null,
+              "tick": 29840
+            },
+            "protected_until_tick": 28297
+          },
+          {
+            "death_tick": null,
+            "health": 97.91886138916016,
+            "last_damage": {
+              "amount": 0.048533134162425995,
+              "cause": "laser",
+              "contact": null,
+              "tick": 16042
+            },
+            "protected_until_tick": 15050
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 102.66665672,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 16932,
+            "hunt": 3600,
+            "launch": 686,
+            "recover": 1723,
+            "select": 7,
+            "transfer": 6892
+          },
+          "native_refinement_decisions": 1723,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1723
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            16552
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 12764,
+            "hunt": 9204,
+            "launch": 1394,
+            "recover": 1682,
+            "select": 10,
+            "transfer": 4786
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1683
+        }
+      ],
+      "native_refinement": [
+        true,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 0,
+          "frame_changes": 9
+        },
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 1,
+          "frame_changes": 16
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 29840,
+        "lengths": [
+          29840,
+          29840
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-round-collapse-0-candidate-p2",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 16552,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": -0.0006276667,
+            "foot_clearances": [
+              0.058421016,
+              -0.0006276667
+            ],
+            "angle_degrees": 3.2895598,
+            "descent_speed": -0.004695978,
+            "lateral_speed": -0.0024544671,
+            "relative_spin": 0.00045849755,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 16553,
+            "goal": "hunt",
+            "planet": 0
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 498,
+      "timing": {
+        "decisions": [
+          {
+            "count": 29840,
+            "mean_ms": 0.11241084121983913,
+            "p50_ms": 0.004168,
+            "p95_ms": 0.041158,
+            "p99_ms": 4.160481,
+            "max_ms": 7.51923
+          },
+          {
+            "count": 29840,
+            "mean_ms": 0.07317425837801608,
+            "p50_ms": 0.004528,
+            "p95_ms": 0.039424,
+            "p99_ms": 3.887516,
+            "max_ms": 8.379572999999999
+          }
+        ],
+        "planning": {
+          "count": 29840,
+          "mean_ms": 0.002602046983914209,
+          "p50_ms": 0.002023,
+          "p95_ms": 0.004658000000000001,
+          "p99_ms": 0.010098,
+          "max_ms": 0.107554
+        },
+        "step": {
+          "count": 29840,
+          "mean_ms": 0.22563029336461127,
+          "p50_ms": 0.160944,
+          "p95_ms": 0.5448379999999999,
+          "p99_ms": 1.100557,
+          "max_ms": 3.368767
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 176,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 29840,
+      "match": {
+        "elapsed_seconds": 497.33334328,
+        "finished_tick": 29840,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          0,
+          3
+        ],
+        "pilots": [
+          {
+            "death_tick": 29840,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.005844011902809143,
+              "cause": "laser",
+              "contact": null,
+              "tick": 29840
+            },
+            "protected_until_tick": 28297
+          },
+          {
+            "death_tick": null,
+            "health": 97.91886138916016,
+            "last_damage": {
+              "amount": 0.048533134162425995,
+              "cause": "laser",
+              "contact": null,
+              "tick": 16042
+            },
+            "protected_until_tick": 15050
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 102.66665672,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 16932,
+            "hunt": 3600,
+            "launch": 686,
+            "recover": 1723,
+            "select": 7,
+            "transfer": 6892
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1723
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            16552
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 12764,
+            "hunt": 9204,
+            "launch": 1394,
+            "recover": 1682,
+            "select": 10,
+            "transfer": 4786
+          },
+          "native_refinement_decisions": 1682,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1683
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 0,
+          "frame_changes": 9
+        },
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 1,
+          "frame_changes": 16
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 29840,
+        "lengths": [
+          29840,
+          29840
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-round-collapse-1-control",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 86,
+      "timing": {
+        "decisions": [
+          {
+            "count": 5116,
+            "mean_ms": 0.01931650293197811,
+            "p50_ms": 0.0036969999999999998,
+            "p95_ms": 0.038793,
+            "p99_ms": 0.043121,
+            "max_ms": 4.418438
+          },
+          {
+            "count": 5116,
+            "mean_ms": 0.062091302580140735,
+            "p50_ms": 0.0047090000000000005,
+            "p95_ms": 0.034946,
+            "p99_ms": 1.636999,
+            "max_ms": 7.52432
+          }
+        ],
+        "planning": {
+          "count": 5116,
+          "mean_ms": 0.0036893348318999216,
+          "p50_ms": 0.002054,
+          "p95_ms": 0.005671,
+          "p99_ms": 0.044474,
+          "max_ms": 0.067027
+        },
+        "step": {
+          "count": 5116,
+          "mean_ms": 0.24972224257232215,
+          "p50_ms": 0.203214,
+          "p95_ms": 0.614319,
+          "p99_ms": 1.242615,
+          "max_ms": 2.224358
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 48,
+      "case": {
+        "candidate_seat": null,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 5116,
+      "match": {
+        "elapsed_seconds": 85.266668372,
+        "finished_tick": 5116,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          1,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 5116,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 99.82780456542969,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": 2.848552703857422,
+                  "position": {
+                    "x": 481.6618957519531,
+                    "y": 1225.6693115234375
+                  },
+                  "spin": 0.298592209815979,
+                  "velocity": {
+                    "x": 1.6760445833206177,
+                    "y": 16.593000411987305
+                  }
+                },
+                "closing_speed": 65.19778442382812,
+                "impulse": 28.496295928955078,
+                "normal": {
+                  "x": -0.9961772561073303,
+                  "y": -0.08735492825508118
+                },
+                "on_foot": false,
+                "other_id": 100076,
+                "other_kind": "asteroid",
+                "other_motion": {
+                  "angle": 2.6534359455108643,
+                  "position": {
+                    "x": 479.3831481933594,
+                    "y": 1223.97265625
+                  },
+                  "spin": 4.17230749130249,
+                  "velocity": {
+                    "x": 70.5636215209961,
+                    "y": -17.52776336669922
+                  }
+                },
+                "point": {
+                  "x": 481.3525390625,
+                  "y": 1224.1455078125
+                }
+              },
+              "tick": 5116
+            },
+            "protected_until_tick": 4571
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 514.733331628,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 1567,
+            "hunt": 1800,
+            "launch": 342,
+            "select": 2,
+            "transfer": 1405
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 2123,
+            "launch": 1153,
+            "recover": 725,
+            "select": 3,
+            "transfer": 1112
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 725
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 2
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 7
+        }
+      ]
+    },
+    {
+      "name": "10101-round-collapse-1-candidate-p1",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 86,
+      "timing": {
+        "decisions": [
+          {
+            "count": 5116,
+            "mean_ms": 0.018751948201720093,
+            "p50_ms": 0.003737,
+            "p95_ms": 0.038463000000000004,
+            "p99_ms": 0.042982000000000006,
+            "max_ms": 4.047408
+          },
+          {
+            "count": 5116,
+            "mean_ms": 0.058710612978889756,
+            "p50_ms": 0.0046890000000000005,
+            "p95_ms": 0.034315,
+            "p99_ms": 1.5736400000000001,
+            "max_ms": 7.157147
+          }
+        ],
+        "planning": {
+          "count": 5116,
+          "mean_ms": 0.0036708416731821734,
+          "p50_ms": 0.0020340000000000002,
+          "p95_ms": 0.006131999999999999,
+          "p99_ms": 0.043612,
+          "max_ms": 0.070804
+        },
+        "step": {
+          "count": 5116,
+          "mean_ms": 0.24950938232994527,
+          "p50_ms": 0.200067,
+          "p95_ms": 0.613458,
+          "p99_ms": 1.257263,
+          "max_ms": 2.2866359999999997
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 48,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 5116,
+      "match": {
+        "elapsed_seconds": 85.266668372,
+        "finished_tick": 5116,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          1,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 5116,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 99.82780456542969,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": 2.848552703857422,
+                  "position": {
+                    "x": 481.6618957519531,
+                    "y": 1225.6693115234375
+                  },
+                  "spin": 0.298592209815979,
+                  "velocity": {
+                    "x": 1.6760445833206177,
+                    "y": 16.593000411987305
+                  }
+                },
+                "closing_speed": 65.19778442382812,
+                "impulse": 28.496295928955078,
+                "normal": {
+                  "x": -0.9961772561073303,
+                  "y": -0.08735492825508118
+                },
+                "on_foot": false,
+                "other_id": 100076,
+                "other_kind": "asteroid",
+                "other_motion": {
+                  "angle": 2.6534359455108643,
+                  "position": {
+                    "x": 479.3831481933594,
+                    "y": 1223.97265625
+                  },
+                  "spin": 4.17230749130249,
+                  "velocity": {
+                    "x": 70.5636215209961,
+                    "y": -17.52776336669922
+                  }
+                },
+                "point": {
+                  "x": 481.3525390625,
+                  "y": 1224.1455078125
+                }
+              },
+              "tick": 5116
+            },
+            "protected_until_tick": 4571
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 514.733331628,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 1567,
+            "hunt": 1800,
+            "launch": 342,
+            "select": 2,
+            "transfer": 1405
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 2123,
+            "launch": 1153,
+            "recover": 725,
+            "select": 3,
+            "transfer": 1112
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 725
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 2
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 7
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 5116,
+        "lengths": [
+          5116,
+          5116
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-round-collapse-1-candidate-p2",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 86,
+      "timing": {
+        "decisions": [
+          {
+            "count": 5116,
+            "mean_ms": 0.018634362392494136,
+            "p50_ms": 0.0037170000000000003,
+            "p95_ms": 0.038042,
+            "p99_ms": 0.042370000000000005,
+            "max_ms": 4.075200000000001
+          },
+          {
+            "count": 5116,
+            "mean_ms": 0.05884097810789679,
+            "p50_ms": 0.004799,
+            "p95_ms": 0.034375,
+            "p99_ms": 1.541369,
+            "max_ms": 7.176854
+          }
+        ],
+        "planning": {
+          "count": 5116,
+          "mean_ms": 0.0036665213057075845,
+          "p50_ms": 0.002073,
+          "p95_ms": 0.0054,
+          "p99_ms": 0.04261,
+          "max_ms": 0.06287899999999999
+        },
+        "step": {
+          "count": 5116,
+          "mean_ms": 0.2484157365129007,
+          "p50_ms": 0.20117,
+          "p95_ms": 0.6113139999999999,
+          "p99_ms": 1.257774,
+          "max_ms": 2.239876
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 48,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 10101,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 5116,
+      "match": {
+        "elapsed_seconds": 85.266668372,
+        "finished_tick": 5116,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          1,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 5116,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 99.82780456542969,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": 2.848552703857422,
+                  "position": {
+                    "x": 481.6618957519531,
+                    "y": 1225.6693115234375
+                  },
+                  "spin": 0.298592209815979,
+                  "velocity": {
+                    "x": 1.6760445833206177,
+                    "y": 16.593000411987305
+                  }
+                },
+                "closing_speed": 65.19778442382812,
+                "impulse": 28.496295928955078,
+                "normal": {
+                  "x": -0.9961772561073303,
+                  "y": -0.08735492825508118
+                },
+                "on_foot": false,
+                "other_id": 100076,
+                "other_kind": "asteroid",
+                "other_motion": {
+                  "angle": 2.6534359455108643,
+                  "position": {
+                    "x": 479.3831481933594,
+                    "y": 1223.97265625
+                  },
+                  "spin": 4.17230749130249,
+                  "velocity": {
+                    "x": 70.5636215209961,
+                    "y": -17.52776336669922
+                  }
+                },
+                "point": {
+                  "x": 481.3525390625,
+                  "y": 1224.1455078125
+                }
+              },
+              "tick": 5116
+            },
+            "protected_until_tick": 4571
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 514.733331628,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 1567,
+            "hunt": 1800,
+            "launch": 342,
+            "select": 2,
+            "transfer": 1405
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 2123,
+            "launch": 1153,
+            "recover": 725,
+            "select": 3,
+            "transfer": 1112
+          },
+          "native_refinement_decisions": 725,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 725
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 2
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 7
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 5116,
+        "lengths": [
+          5116,
+          5116
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-angular-collapse-0-control",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 11337,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": 7.1555376e-05,
+            "foot_clearances": [
+              0.017743796,
+              7.1555376e-05
+            ],
+            "angle_degrees": 0.15825878,
+            "descent_speed": 0.0050296304,
+            "lateral_speed": -0.0018678878,
+            "relative_spin": 0.00029684603,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11338,
+            "goal": "hunt",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 277,
+      "timing": {
+        "decisions": [
+          {
+            "count": 16611,
+            "mean_ms": 0.047332091686232015,
+            "p50_ms": 0.013165,
+            "p95_ms": 0.042769999999999996,
+            "p99_ms": 0.049454,
+            "max_ms": 6.633048
+          },
+          {
+            "count": 16611,
+            "mean_ms": 0.05703355216422852,
+            "p50_ms": 0.004077,
+            "p95_ms": 0.037871999999999996,
+            "p99_ms": 3.071195,
+            "max_ms": 7.028243
+          }
+        ],
+        "planning": {
+          "count": 16611,
+          "mean_ms": 0.0031301106495695624,
+          "p50_ms": 0.002474,
+          "p95_ms": 0.004679,
+          "p99_ms": 0.026678999999999998,
+          "max_ms": 0.113544
+        },
+        "step": {
+          "count": 16611,
+          "mean_ms": 1.003447449160195,
+          "p50_ms": 1.008072,
+          "p95_ms": 2.084083,
+          "p99_ms": 2.9403889999999997,
+          "max_ms": 4.907802
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 133,
+      "case": {
+        "candidate_seat": null,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 16611,
+      "match": {
+        "elapsed_seconds": 276.850005537,
+        "finished_tick": 16611,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 9765
+          },
+          {
+            "death_tick": 16611,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 7.338127136230469,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -2.3854658603668213,
+                  "position": {
+                    "x": 185.37960815429688,
+                    "y": 528.4017944335938
+                  },
+                  "spin": 193.0229949951172,
+                  "velocity": {
+                    "x": -148.88453674316406,
+                    "y": -27.505229949951172
+                  }
+                },
+                "closing_speed": 345.9649658203125,
+                "impulse": 28.490388870239258,
+                "normal": {
+                  "x": -0.8404535055160522,
+                  "y": -0.5418835878372192
+                },
+                "on_foot": true,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 183.1954345703125,
+                  "y": 528.262939453125
+                }
+              },
+              "tick": 16611
+            },
+            "protected_until_tick": 12606
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 323.149994463,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            11337
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 6770,
+            "hunt": 5595,
+            "launch": 521,
+            "recover": 1752,
+            "select": 7,
+            "transfer": 1966
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1753
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 290,
+            "capture": 3886,
+            "hunt": 5052,
+            "launch": 1118,
+            "recover": 3895,
+            "select": 5,
+            "transfer": 2365
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4185
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "need_support"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 1,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 11
+        }
+      ]
+    },
+    {
+      "name": "10101-angular-collapse-0-candidate-p1",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 11337,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": 7.1555376e-05,
+            "foot_clearances": [
+              0.017743796,
+              7.1555376e-05
+            ],
+            "angle_degrees": 0.15825878,
+            "descent_speed": 0.0050296304,
+            "lateral_speed": -0.0018678878,
+            "relative_spin": 0.00029684603,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11338,
+            "goal": "hunt",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 277,
+      "timing": {
+        "decisions": [
+          {
+            "count": 16611,
+            "mean_ms": 0.04725489350430438,
+            "p50_ms": 0.012724000000000001,
+            "p95_ms": 0.04229,
+            "p99_ms": 0.047951,
+            "max_ms": 6.6233200000000005
+          },
+          {
+            "count": 16611,
+            "mean_ms": 0.05723664493407983,
+            "p50_ms": 0.004098,
+            "p95_ms": 0.037972,
+            "p99_ms": 3.090783,
+            "max_ms": 7.10553
+          }
+        ],
+        "planning": {
+          "count": 16611,
+          "mean_ms": 0.003100895731744025,
+          "p50_ms": 0.0024660000000000003,
+          "p95_ms": 0.004568,
+          "p99_ms": 0.026991,
+          "max_ms": 0.106932
+        },
+        "step": {
+          "count": 16611,
+          "mean_ms": 1.0030490817530553,
+          "p50_ms": 1.0081319999999998,
+          "p95_ms": 2.083532,
+          "p99_ms": 2.9453489999999998,
+          "max_ms": 4.898776
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 133,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 16611,
+      "match": {
+        "elapsed_seconds": 276.850005537,
+        "finished_tick": 16611,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 9765
+          },
+          {
+            "death_tick": 16611,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 7.338127136230469,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -2.3854658603668213,
+                  "position": {
+                    "x": 185.37960815429688,
+                    "y": 528.4017944335938
+                  },
+                  "spin": 193.0229949951172,
+                  "velocity": {
+                    "x": -148.88453674316406,
+                    "y": -27.505229949951172
+                  }
+                },
+                "closing_speed": 345.9649658203125,
+                "impulse": 28.490388870239258,
+                "normal": {
+                  "x": -0.8404535055160522,
+                  "y": -0.5418835878372192
+                },
+                "on_foot": true,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 183.1954345703125,
+                  "y": 528.262939453125
+                }
+              },
+              "tick": 16611
+            },
+            "protected_until_tick": 12606
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 323.149994463,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            11337
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 6770,
+            "hunt": 5595,
+            "launch": 521,
+            "recover": 1752,
+            "select": 7,
+            "transfer": 1966
+          },
+          "native_refinement_decisions": 1752,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1753
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 290,
+            "capture": 3886,
+            "hunt": 5052,
+            "launch": 1118,
+            "recover": 3895,
+            "select": 5,
+            "transfer": 2365
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4185
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "need_support"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 1,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 11
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 16611,
+        "lengths": [
+          16611,
+          16611
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-angular-collapse-0-candidate-p2",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 11337,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": 7.1555376e-05,
+            "foot_clearances": [
+              0.017743796,
+              7.1555376e-05
+            ],
+            "angle_degrees": 0.15825878,
+            "descent_speed": 0.0050296304,
+            "lateral_speed": -0.0018678878,
+            "relative_spin": 0.00029684603,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11338,
+            "goal": "hunt",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 277,
+      "timing": {
+        "decisions": [
+          {
+            "count": 16611,
+            "mean_ms": 0.0476916740111974,
+            "p50_ms": 0.013005,
+            "p95_ms": 0.0425,
+            "p99_ms": 0.048642,
+            "max_ms": 6.758135
+          },
+          {
+            "count": 16611,
+            "mean_ms": 0.05743175016555294,
+            "p50_ms": 0.004067,
+            "p95_ms": 0.038321999999999995,
+            "p99_ms": 3.0789709999999997,
+            "max_ms": 7.107144
+          }
+        ],
+        "planning": {
+          "count": 16611,
+          "mean_ms": 0.003135210101739811,
+          "p50_ms": 0.002485,
+          "p95_ms": 0.004678,
+          "p99_ms": 0.027241,
+          "max_ms": 0.11083
+        },
+        "step": {
+          "count": 16611,
+          "mean_ms": 1.0037501801216062,
+          "p50_ms": 1.008333,
+          "p95_ms": 2.0877,
+          "p99_ms": 2.949026,
+          "max_ms": 4.928631
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 133,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 16611,
+      "match": {
+        "elapsed_seconds": 276.850005537,
+        "finished_tick": 16611,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 9765
+          },
+          {
+            "death_tick": 16611,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 7.338127136230469,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -2.3854658603668213,
+                  "position": {
+                    "x": 185.37960815429688,
+                    "y": 528.4017944335938
+                  },
+                  "spin": 193.0229949951172,
+                  "velocity": {
+                    "x": -148.88453674316406,
+                    "y": -27.505229949951172
+                  }
+                },
+                "closing_speed": 345.9649658203125,
+                "impulse": 28.490388870239258,
+                "normal": {
+                  "x": -0.8404535055160522,
+                  "y": -0.5418835878372192
+                },
+                "on_foot": true,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 183.1954345703125,
+                  "y": 528.262939453125
+                }
+              },
+              "tick": 16611
+            },
+            "protected_until_tick": 12606
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 323.149994463,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            11337
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "capture": 6770,
+            "hunt": 5595,
+            "launch": 521,
+            "recover": 1752,
+            "select": 7,
+            "transfer": 1966
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1753
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 290,
+            "capture": 3886,
+            "hunt": 5052,
+            "launch": 1118,
+            "recover": 3895,
+            "select": 5,
+            "transfer": 2365
+          },
+          "native_refinement_decisions": 4185,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4185
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "need_support"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 4,
+          "completed_recoveries": 1,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 11
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 16611,
+        "lengths": [
+          16611,
+          16611
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-angular-collapse-1-control",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 11618,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 1,
+            "phase": "landed",
+            "altitude": -0.0019793212,
+            "foot_clearances": [
+              -0.0019793212,
+              -0.0010026395
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": -0.00084064767,
+            "lateral_speed": 0.004520278,
+            "relative_spin": -0.0008401908,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11619,
+            "goal": "hunt",
+            "planet": 1
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 357,
+      "timing": {
+        "decisions": [
+          {
+            "count": 21376,
+            "mean_ms": 0.057565987930389216,
+            "p50_ms": 0.004779,
+            "p95_ms": 0.041798999999999996,
+            "p99_ms": 3.434392,
+            "max_ms": 7.191973
+          },
+          {
+            "count": 21376,
+            "mean_ms": 0.10400218254116766,
+            "p50_ms": 0.007143999999999999,
+            "p95_ms": 0.03738,
+            "p99_ms": 4.0131749999999995,
+            "max_ms": 7.5081
+          }
+        ],
+        "planning": {
+          "count": 21376,
+          "mean_ms": 0.0029188737369011974,
+          "p50_ms": 0.002264,
+          "p95_ms": 0.004639000000000001,
+          "p99_ms": 0.025268000000000002,
+          "max_ms": 0.102734
+        },
+        "step": {
+          "count": 21376,
+          "mean_ms": 0.4197299563529192,
+          "p50_ms": 0.375919,
+          "p95_ms": 1.050463,
+          "p99_ms": 1.7826840000000002,
+          "max_ms": 4.92231
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 156,
+      "case": {
+        "candidate_seat": null,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 21376,
+      "match": {
+        "elapsed_seconds": 356.266673792,
+        "finished_tick": 21376,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 21376,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.03712446242570877,
+              "cause": "laser",
+              "contact": null,
+              "tick": 21376
+            },
+            "protected_until_tick": 19380
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 243.733326208,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 47,
+            "capture": 9057,
+            "hunt": 9191,
+            "launch": 369,
+            "select": 6,
+            "transfer": 2706
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            11618
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 68,
+            "capture": 11171,
+            "hunt": 814,
+            "launch": 1824,
+            "recover": 4218,
+            "select": 7,
+            "transfer": 3274
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4219
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 1,
+          "frame_changes": 14
+        }
+      ]
+    },
+    {
+      "name": "10101-angular-collapse-1-candidate-p1",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 11618,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 1,
+            "phase": "landed",
+            "altitude": -0.0019793212,
+            "foot_clearances": [
+              -0.0019793212,
+              -0.0010026395
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": -0.00084064767,
+            "lateral_speed": 0.004520278,
+            "relative_spin": -0.0008401908,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11619,
+            "goal": "hunt",
+            "planet": 1
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 357,
+      "timing": {
+        "decisions": [
+          {
+            "count": 21376,
+            "mean_ms": 0.05764171556886227,
+            "p50_ms": 0.004758999999999999,
+            "p95_ms": 0.041849,
+            "p99_ms": 3.453999,
+            "max_ms": 7.159363
+          },
+          {
+            "count": 21376,
+            "mean_ms": 0.10450998395396706,
+            "p50_ms": 0.0071330000000000005,
+            "p95_ms": 0.037511,
+            "p99_ms": 4.0299760000000004,
+            "max_ms": 7.436666
+          }
+        ],
+        "planning": {
+          "count": 21376,
+          "mean_ms": 0.0029000076721556888,
+          "p50_ms": 0.002253,
+          "p95_ms": 0.004668,
+          "p99_ms": 0.024815999999999998,
+          "max_ms": 0.278746
+        },
+        "step": {
+          "count": 21376,
+          "mean_ms": 0.4196747531811377,
+          "p50_ms": 0.375398,
+          "p95_ms": 1.050834,
+          "p99_ms": 1.779519,
+          "max_ms": 4.929314
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 156,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 21376,
+      "match": {
+        "elapsed_seconds": 356.266673792,
+        "finished_tick": 21376,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 21376,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.03712446242570877,
+              "cause": "laser",
+              "contact": null,
+              "tick": 21376
+            },
+            "protected_until_tick": 19380
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 243.733326208,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 47,
+            "capture": 9057,
+            "hunt": 9191,
+            "launch": 369,
+            "select": 6,
+            "transfer": 2706
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            11618
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 68,
+            "capture": 11171,
+            "hunt": 814,
+            "launch": 1824,
+            "recover": 4218,
+            "select": 7,
+            "transfer": 3274
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4219
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 1,
+          "frame_changes": 14
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 21376,
+        "lengths": [
+          21376,
+          21376
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "10101-angular-collapse-1-candidate-p2",
+      "completions": [
+        {
+          "seat": 1,
+          "tick": 11618,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 1,
+            "phase": "landed",
+            "altitude": -0.0019793212,
+            "foot_clearances": [
+              -0.0019793212,
+              -0.0010026395
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": -0.00084064767,
+            "lateral_speed": 0.004520278,
+            "relative_spin": -0.0008401908,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 11619,
+            "goal": "hunt",
+            "planet": 1
+          }
+        }
+      ],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 357,
+      "timing": {
+        "decisions": [
+          {
+            "count": 21376,
+            "mean_ms": 0.057715321622380245,
+            "p50_ms": 0.004779,
+            "p95_ms": 0.041699,
+            "p99_ms": 3.4576059999999997,
+            "max_ms": 7.29068
+          },
+          {
+            "count": 21376,
+            "mean_ms": 0.10424767748877245,
+            "p50_ms": 0.0070929999999999995,
+            "p95_ms": 0.037419999999999995,
+            "p99_ms": 4.023083000000001,
+            "max_ms": 7.524261
+          }
+        ],
+        "planning": {
+          "count": 21376,
+          "mean_ms": 0.002902366064745509,
+          "p50_ms": 0.002255,
+          "p95_ms": 0.004588999999999999,
+          "p99_ms": 0.025327,
+          "max_ms": 0.10439600000000002
+        },
+        "step": {
+          "count": 21376,
+          "mean_ms": 0.4198639261321108,
+          "p50_ms": 0.375138,
+          "p95_ms": 1.053528,
+          "p99_ms": 1.783947,
+          "max_ms": 4.898905999999999
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 156,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 21376,
+      "match": {
+        "elapsed_seconds": 356.266673792,
+        "finished_tick": 21376,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 21376,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 0.03712446242570877,
+              "cause": "laser",
+              "contact": null,
+              "tick": 21376
+            },
+            "protected_until_tick": 19380
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 243.733326208,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 47,
+            "capture": 9057,
+            "hunt": 9191,
+            "launch": 369,
+            "select": 6,
+            "transfer": 2706
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {},
+          "completed": [
+            11618
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 68,
+            "capture": 11171,
+            "hunt": 814,
+            "launch": 1824,
+            "recover": 4218,
+            "select": 7,
+            "transfer": 3274
+          },
+          "native_refinement_decisions": 4218,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 4219
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 6
+        },
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 1,
+          "frame_changes": 14
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 21376,
+        "lengths": [
+          21376,
+          21376
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-round-collapse-0-control",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 12301,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": 0.0014530122,
+            "foot_clearances": [
+              0.00290367,
+              0.0014530122
+            ],
+            "angle_degrees": 0.05595291,
+            "descent_speed": -0.001600309,
+            "lateral_speed": -0.0036338274,
+            "relative_spin": 0.00068141334,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 12302,
+            "goal": "launch",
+            "planet": 0
+          }
+        },
+        {
+          "seat": 1,
+          "tick": 7519,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": -0.0053810775,
+            "foot_clearances": [
+              -0.0053810775,
+              -0.004551798
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": 6.095558e-05,
+            "lateral_speed": -0.00025292323,
+            "relative_spin": 4.758686e-05,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 7520,
+            "goal": "launch",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {
+        "p1:survey": 1
+      },
+      "max_survey_work": {
+        "coarse_candidates": 0,
+        "refined_candidates": 0,
+        "offset_checks": 0,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.08413709033333334,
+            "p50_ms": 0.004969,
+            "p95_ms": 0.037712,
+            "p99_ms": 3.757052,
+            "max_ms": 7.225758
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.11439141172222222,
+            "p50_ms": 0.008566,
+            "p95_ms": 0.027351999999999998,
+            "p99_ms": 4.041749,
+            "max_ms": 7.169181
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.0029687226666666668,
+          "p50_ms": 0.002254,
+          "p95_ms": 0.004939,
+          "p99_ms": 0.029244,
+          "max_ms": 0.1114
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.4946591973611111,
+          "p50_ms": 0.405947,
+          "p95_ms": 1.079608,
+          "p99_ms": 2.330158,
+          "max_ms": 4.013105
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 168,
+      "case": {
+        "candidate_seat": null,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 14.718953132629395,
+            "last_damage": {
+              "amount": 0.05327330529689789,
+              "cause": "laser",
+              "contact": null,
+              "tick": 10631
+            },
+            "protected_until_tick": 9364
+          },
+          {
+            "death_tick": null,
+            "health": 44.30573272705078,
+            "last_damage": {
+              "amount": 41.514732360839844,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -0.4542199373245239,
+                  "position": {
+                    "x": 1216.7471923828125,
+                    "y": 727.729736328125
+                  },
+                  "spin": -23.21086311340332,
+                  "velocity": {
+                    "x": -3.5995519161224365,
+                    "y": -4.514544486999512
+                  }
+                },
+                "closing_speed": 22.37868309020996,
+                "impulse": 2.346527576446533,
+                "normal": {
+                  "x": 0.9982873797416687,
+                  "y": -0.05850258469581604
+                },
+                "on_foot": true,
+                "other_id": 1125899906844018,
+                "other_kind": "terrain_fragment",
+                "other_motion": {
+                  "angle": 2.717080593109131,
+                  "position": {
+                    "x": 1217.3734130859375,
+                    "y": 727.9703369140625
+                  },
+                  "spin": -7.763683795928955,
+                  "velocity": {
+                    "x": -19.56450843811035,
+                    "y": -4.242563247680664
+                  }
+                },
+                "point": {
+                  "x": 1216.951416015625,
+                  "y": 727.9950561523438
+                }
+              },
+              "tick": 30011
+            },
+            "protected_until_tick": 13322
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            12301
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 628,
+            "capture": 14596,
+            "hunt": 11119,
+            "launch": 1295,
+            "recover": 3117,
+            "select": 9,
+            "transfer": 5236
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 3118
+        },
+        {
+          "block_reasons": {
+            "spaceling stopped making progress on ground route": 14819
+          },
+          "completed": [
+            7519
+          ],
+          "first_block": 19696,
+          "first_mission_block": 19696,
+          "longest_recovery_block": 9772,
+          "mission_blocked_ticks": 14819,
+          "mission_goals": {
+            "avoid_sun": 399,
+            "blocked": 14819,
+            "capture": 899,
+            "hunt": 2992,
+            "launch": 4660,
+            "recover": 9564,
+            "select": 6,
+            "transfer": 2661
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 14819,
+          "recovery_decisions": 24592
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 2,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 2,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 1,
+          "completed_sorties": 3,
+          "completed_recoveries": 1,
+          "frame_changes": 17
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 1,
+          "frame_changes": 11
+        }
+      ]
+    },
+    {
+      "name": "20202-round-collapse-0-candidate-p1",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 12299,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": 0.001355201,
+            "foot_clearances": [
+              0.0029141605,
+              0.001355201
+            ],
+            "angle_degrees": 0.052339155,
+            "descent_speed": -0.0026023334,
+            "lateral_speed": -0.005777558,
+            "relative_spin": 0.0010804888,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 12300,
+            "goal": "launch",
+            "planet": 0
+          }
+        },
+        {
+          "seat": 1,
+          "tick": 7519,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": -0.0053810775,
+            "foot_clearances": [
+              -0.0053810775,
+              -0.004551798
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": 6.095558e-05,
+            "lateral_speed": -0.00025292323,
+            "relative_spin": 4.758686e-05,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 7520,
+            "goal": "launch",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {
+        "p1:survey": 1
+      },
+      "max_survey_work": {
+        "coarse_candidates": 3,
+        "refined_candidates": 0,
+        "offset_checks": 12,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 310,
+      "timing": {
+        "decisions": [
+          {
+            "count": 18574,
+            "mean_ms": 0.04381093345536772,
+            "p50_ms": 0.00526,
+            "p95_ms": 0.039735,
+            "p99_ms": 0.369006,
+            "max_ms": 6.931223
+          },
+          {
+            "count": 18574,
+            "mean_ms": 0.05455651566706148,
+            "p50_ms": 0.003456,
+            "p95_ms": 0.035306,
+            "p99_ms": 3.300329,
+            "max_ms": 7.208526
+          }
+        ],
+        "planning": {
+          "count": 18574,
+          "mean_ms": 0.0036927234306019167,
+          "p50_ms": 0.0024349999999999997,
+          "p95_ms": 0.008535,
+          "p99_ms": 0.037802,
+          "max_ms": 0.10818499999999999
+        },
+        "step": {
+          "count": 18574,
+          "mean_ms": 0.46711714407235927,
+          "p50_ms": 0.382542,
+          "p95_ms": 1.137807,
+          "p99_ms": 2.117267,
+          "max_ms": 3.9378929999999994
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 211,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 18574,
+      "match": {
+        "elapsed_seconds": 309.566672858,
+        "finished_tick": 18574,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 14.718953132629395,
+            "last_damage": {
+              "amount": 0.05327330529689789,
+              "cause": "laser",
+              "contact": null,
+              "tick": 10631
+            },
+            "protected_until_tick": 9364
+          },
+          {
+            "death_tick": 18574,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 16.719614028930664,
+              "cause": "missile",
+              "contact": {
+                "actor_motion": {
+                  "angle": 1.8111480474472046,
+                  "position": {
+                    "x": 1609.6566162109375,
+                    "y": 1044.3726806640625
+                  },
+                  "spin": 0.0,
+                  "velocity": {
+                    "x": 14.297107696533203,
+                    "y": -15.094470977783203
+                  }
+                },
+                "closing_speed": 129.9355926513672,
+                "impulse": 57.78923797607422,
+                "normal": {
+                  "x": 0.5993911623954773,
+                  "y": 0.8004562854766846
+                },
+                "on_foot": false,
+                "other_id": 100244,
+                "other_kind": "missile",
+                "other_motion": {
+                  "angle": -0.1375734657049179,
+                  "position": {
+                    "x": 1610.01123046875,
+                    "y": 1048.3345947265625
+                  },
+                  "spin": 2.0,
+                  "velocity": {
+                    "x": 174.5679168701172,
+                    "y": -302.809326171875
+                  }
+                },
+                "point": {
+                  "x": 1610.372802734375,
+                  "y": 1045.228271484375
+                }
+              },
+              "tick": 18574
+            },
+            "protected_until_tick": 13329
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 290.433327142,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            12299
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 147,
+            "capture": 6479,
+            "hunt": 5283,
+            "launch": 674,
+            "recover": 3115,
+            "select": 6,
+            "transfer": 2870
+          },
+          "native_refinement_decisions": 3115,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 3116
+        },
+        {
+          "block_reasons": {
+            "pod stabilization stopped making progress": 2843
+          },
+          "completed": [
+            7519
+          ],
+          "first_block": 15731,
+          "first_mission_block": 15731,
+          "longest_recovery_block": 2843,
+          "mission_blocked_ticks": 2028,
+          "mission_goals": {
+            "avoid_sun": 2263,
+            "blocked": 2028,
+            "capture": 856,
+            "hunt": 2878,
+            "launch": 4660,
+            "recover": 3222,
+            "select": 6,
+            "transfer": 2661
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 2843,
+          "recovery_decisions": 7159
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 2,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 1,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "hunt",
+          "target": null,
+          "completed_sorties": 3,
+          "completed_recoveries": 1,
+          "frame_changes": 11
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 1,
+          "frame_changes": 14
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 18574,
+        "lengths": [
+          36000,
+          18574
+        ],
+        "first_difference": {
+          "actions": 11723,
+          "sites": 12300,
+          "decision_fnv64": 11519,
+          "scenario_before_step_fnv64": 11519
+        },
+        "different_ticks": {
+          "actions": 6659,
+          "sites": 5160,
+          "decision_fnv64": 7055,
+          "scenario_before_step_fnv64": 6887
+        },
+        "different_seat_inputs": [
+          6137,
+          6413
+        ]
+      },
+      "same_match_result": false
+    },
+    {
+      "name": "20202-round-collapse-0-candidate-p2",
+      "completions": [
+        {
+          "seat": 0,
+          "tick": 12301,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 0,
+            "phase": "landed",
+            "altitude": 0.0014530122,
+            "foot_clearances": [
+              0.00290367,
+              0.0014530122
+            ],
+            "angle_degrees": 0.05595291,
+            "descent_speed": -0.001600309,
+            "lateral_speed": -0.0036338274,
+            "relative_spin": 0.00068141334,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 12302,
+            "goal": "launch",
+            "planet": 0
+          }
+        },
+        {
+          "seat": 1,
+          "tick": 7519,
+          "native_rebuilds": 1,
+          "landing": {
+            "planet": 2,
+            "phase": "landed",
+            "altitude": -0.0053810775,
+            "foot_clearances": [
+              -0.0053810775,
+              -0.004551798
+            ],
+            "angle_degrees": 0.0,
+            "descent_speed": 6.095558e-05,
+            "lateral_speed": -0.00025292323,
+            "relative_spin": 4.758686e-05,
+            "supported_feet": 2,
+            "corner_support": false,
+            "assist_strength": 1.0,
+            "settled_seconds": 0.25
+          },
+          "health": 100.0,
+          "losses": 1,
+          "mission_resumed": {
+            "tick": 7520,
+            "goal": "launch",
+            "planet": 2
+          }
+        }
+      ],
+      "features": {
+        "p1:survey": 1
+      },
+      "max_survey_work": {
+        "coarse_candidates": 0,
+        "refined_candidates": 0,
+        "offset_checks": 0,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.0846516136111111,
+            "p50_ms": 0.004979,
+            "p95_ms": 0.038172,
+            "p99_ms": 3.812587,
+            "max_ms": 7.531577
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.11578534972222221,
+            "p50_ms": 0.008846,
+            "p95_ms": 0.027611999999999998,
+            "p99_ms": 4.085182,
+            "max_ms": 7.677341
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.002983998277777778,
+          "p50_ms": 0.002264,
+          "p95_ms": 0.0048790000000000005,
+          "p99_ms": 0.028272,
+          "max_ms": 0.168159
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.4954218443888889,
+          "p50_ms": 0.406207,
+          "p95_ms": 1.084196,
+          "p99_ms": 2.3356380000000003,
+          "max_ms": 3.9876470000000004
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 168,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": false
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 14.718953132629395,
+            "last_damage": {
+              "amount": 0.05327330529689789,
+              "cause": "laser",
+              "contact": null,
+              "tick": 10631
+            },
+            "protected_until_tick": 9364
+          },
+          {
+            "death_tick": null,
+            "health": 44.30573272705078,
+            "last_damage": {
+              "amount": 41.514732360839844,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -0.4542199373245239,
+                  "position": {
+                    "x": 1216.7471923828125,
+                    "y": 727.729736328125
+                  },
+                  "spin": -23.21086311340332,
+                  "velocity": {
+                    "x": -3.5995519161224365,
+                    "y": -4.514544486999512
+                  }
+                },
+                "closing_speed": 22.37868309020996,
+                "impulse": 2.346527576446533,
+                "normal": {
+                  "x": 0.9982873797416687,
+                  "y": -0.05850258469581604
+                },
+                "on_foot": true,
+                "other_id": 1125899906844018,
+                "other_kind": "terrain_fragment",
+                "other_motion": {
+                  "angle": 2.717080593109131,
+                  "position": {
+                    "x": 1217.3734130859375,
+                    "y": 727.9703369140625
+                  },
+                  "spin": -7.763683795928955,
+                  "velocity": {
+                    "x": -19.56450843811035,
+                    "y": -4.242563247680664
+                  }
+                },
+                "point": {
+                  "x": 1216.951416015625,
+                  "y": 727.9950561523438
+                }
+              },
+              "tick": 30011
+            },
+            "protected_until_tick": 13322
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [
+            12301
+          ],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 628,
+            "capture": 14596,
+            "hunt": 11119,
+            "launch": 1295,
+            "recover": 3117,
+            "select": 9,
+            "transfer": 5236
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 3118
+        },
+        {
+          "block_reasons": {
+            "spaceling stopped making progress on ground route": 14819
+          },
+          "completed": [
+            7519
+          ],
+          "first_block": 19696,
+          "first_mission_block": 19696,
+          "longest_recovery_block": 9772,
+          "mission_blocked_ticks": 14819,
+          "mission_goals": {
+            "avoid_sun": 399,
+            "blocked": 14819,
+            "capture": 899,
+            "hunt": 2992,
+            "launch": 4660,
+            "recover": 9564,
+            "select": 6,
+            "transfer": 2661
+          },
+          "native_refinement_decisions": 24591,
+          "recovery_blocked_ticks": 14819,
+          "recovery_decisions": 24592
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 1,
+          "blocked_attempts": 2,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 2,
+          "rebuilds": 2,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 1,
+          "completed_sorties": 3,
+          "completed_recoveries": 1,
+          "frame_changes": 17
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 1,
+          "frame_changes": 11
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-round-collapse-1-control",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 154,
+      "timing": {
+        "decisions": [
+          {
+            "count": 9231,
+            "mean_ms": 0.02436370393240169,
+            "p50_ms": 0.0039369999999999995,
+            "p95_ms": 0.037150999999999997,
+            "p99_ms": 0.045906999999999996,
+            "max_ms": 4.278486
+          },
+          {
+            "count": 9231,
+            "mean_ms": 0.057566512512187196,
+            "p50_ms": 0.002876,
+            "p95_ms": 0.029656,
+            "p99_ms": 3.748035,
+            "max_ms": 4.443708
+          }
+        ],
+        "planning": {
+          "count": 9231,
+          "mean_ms": 0.0038133076589751923,
+          "p50_ms": 0.002365,
+          "p95_ms": 0.007624,
+          "p99_ms": 0.039947,
+          "max_ms": 0.09278499999999999
+        },
+        "step": {
+          "count": 9231,
+          "mean_ms": 0.3346166664500054,
+          "p50_ms": 0.293905,
+          "p95_ms": 0.708668,
+          "p99_ms": 1.546479,
+          "max_ms": 3.091015
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 93,
+      "case": {
+        "candidate_seat": null,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 9231,
+      "match": {
+        "elapsed_seconds": 153.850003077,
+        "finished_tick": 9231,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": 9231,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 39.862911224365234,
+              "cause": "missile",
+              "contact": {
+                "actor_motion": {
+                  "angle": 0.5836742520332336,
+                  "position": {
+                    "x": 1589.4134521484375,
+                    "y": 297.1538391113281
+                  },
+                  "spin": 42.11583709716797,
+                  "velocity": {
+                    "x": -19.03946876525879,
+                    "y": -17.291967391967773
+                  }
+                },
+                "closing_speed": 130.393310546875,
+                "impulse": 39.7618293762207,
+                "normal": {
+                  "x": 0.45967501401901245,
+                  "y": 0.8880870938301086
+                },
+                "on_foot": false,
+                "other_id": 100111,
+                "other_kind": "missile",
+                "other_motion": {
+                  "angle": 0.02058614231646061,
+                  "position": {
+                    "x": 1589.14892578125,
+                    "y": 301.6201477050781
+                  },
+                  "spin": 2.0,
+                  "velocity": {
+                    "x": 194.55563354492188,
+                    "y": -268.1393737792969
+                  }
+                },
+                "point": {
+                  "x": 1590.08349609375,
+                  "y": 297.885498046875
+                }
+              },
+              "tick": 9231
+            },
+            "protected_until_tick": 8031
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 446.149996923,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 766,
+            "capture": 2874,
+            "hunt": 1598,
+            "launch": 656,
+            "patrol": 82,
+            "recover": 1380,
+            "select": 6,
+            "transfer": 1869
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1380
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 677,
+            "capture": 2515,
+            "hunt": 2953,
+            "launch": 528,
+            "select": 3,
+            "transfer": 2555
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        },
+        {
+          "goal": "transfer",
+          "target": 2,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 5
+        }
+      ]
+    },
+    {
+      "name": "20202-round-collapse-1-candidate-p1",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 154,
+      "timing": {
+        "decisions": [
+          {
+            "count": 9231,
+            "mean_ms": 0.023403154912793846,
+            "p50_ms": 0.003917,
+            "p95_ms": 0.036599,
+            "p99_ms": 0.047389,
+            "max_ms": 3.869084
+          },
+          {
+            "count": 9231,
+            "mean_ms": 0.053072790596901745,
+            "p50_ms": 0.002886,
+            "p95_ms": 0.029045,
+            "p99_ms": 3.42766,
+            "max_ms": 3.921061
+          }
+        ],
+        "planning": {
+          "count": 9231,
+          "mean_ms": 0.0037407608059798507,
+          "p50_ms": 0.002294,
+          "p95_ms": 0.007485,
+          "p99_ms": 0.039995,
+          "max_ms": 0.095731
+        },
+        "step": {
+          "count": 9231,
+          "mean_ms": 0.3356598901527462,
+          "p50_ms": 0.294346,
+          "p95_ms": 0.70448,
+          "p99_ms": 1.559884,
+          "max_ms": 3.149906
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 93,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 9231,
+      "match": {
+        "elapsed_seconds": 153.850003077,
+        "finished_tick": 9231,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": 9231,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 39.862911224365234,
+              "cause": "missile",
+              "contact": {
+                "actor_motion": {
+                  "angle": 0.5836742520332336,
+                  "position": {
+                    "x": 1589.4134521484375,
+                    "y": 297.1538391113281
+                  },
+                  "spin": 42.11583709716797,
+                  "velocity": {
+                    "x": -19.03946876525879,
+                    "y": -17.291967391967773
+                  }
+                },
+                "closing_speed": 130.393310546875,
+                "impulse": 39.7618293762207,
+                "normal": {
+                  "x": 0.45967501401901245,
+                  "y": 0.8880870938301086
+                },
+                "on_foot": false,
+                "other_id": 100111,
+                "other_kind": "missile",
+                "other_motion": {
+                  "angle": 0.02058614231646061,
+                  "position": {
+                    "x": 1589.14892578125,
+                    "y": 301.6201477050781
+                  },
+                  "spin": 2.0,
+                  "velocity": {
+                    "x": 194.55563354492188,
+                    "y": -268.1393737792969
+                  }
+                },
+                "point": {
+                  "x": 1590.08349609375,
+                  "y": 297.885498046875
+                }
+              },
+              "tick": 9231
+            },
+            "protected_until_tick": 8031
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 446.149996923,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 766,
+            "capture": 2874,
+            "hunt": 1598,
+            "launch": 656,
+            "patrol": 82,
+            "recover": 1380,
+            "select": 6,
+            "transfer": 1869
+          },
+          "native_refinement_decisions": 1380,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1380
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 677,
+            "capture": 2515,
+            "hunt": 2953,
+            "launch": 528,
+            "select": 3,
+            "transfer": 2555
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        }
+      ],
+      "native_refinement": [
+        true,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        },
+        {
+          "goal": "transfer",
+          "target": 2,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 5
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 9231,
+        "lengths": [
+          9231,
+          9231
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-round-collapse-1-candidate-p2",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 154,
+      "timing": {
+        "decisions": [
+          {
+            "count": 9231,
+            "mean_ms": 0.02331183176253927,
+            "p50_ms": 0.0038970000000000003,
+            "p95_ms": 0.036359,
+            "p99_ms": 0.044674,
+            "max_ms": 3.934527
+          },
+          {
+            "count": 9231,
+            "mean_ms": 0.05305897627559311,
+            "p50_ms": 0.002936,
+            "p95_ms": 0.029075,
+            "p99_ms": 3.4199360000000003,
+            "max_ms": 4.067267999999999
+          }
+        ],
+        "planning": {
+          "count": 9231,
+          "mean_ms": 0.003708271801538295,
+          "p50_ms": 0.0022640000000000004,
+          "p95_ms": 0.007493,
+          "p99_ms": 0.040536,
+          "max_ms": 0.09542099999999999
+        },
+        "step": {
+          "count": 9231,
+          "mean_ms": 0.3314387727223486,
+          "p50_ms": 0.289777,
+          "p95_ms": 0.695523,
+          "p99_ms": 1.547571,
+          "max_ms": 3.103399
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 142
+      },
+      "transition_observations": 93,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": true
+      },
+      "end_tick": 9231,
+      "match": {
+        "elapsed_seconds": 153.850003077,
+        "finished_tick": 9231,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": 9231,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 39.862911224365234,
+              "cause": "missile",
+              "contact": {
+                "actor_motion": {
+                  "angle": 0.5836742520332336,
+                  "position": {
+                    "x": 1589.4134521484375,
+                    "y": 297.1538391113281
+                  },
+                  "spin": 42.11583709716797,
+                  "velocity": {
+                    "x": -19.03946876525879,
+                    "y": -17.291967391967773
+                  }
+                },
+                "closing_speed": 130.393310546875,
+                "impulse": 39.7618293762207,
+                "normal": {
+                  "x": 0.45967501401901245,
+                  "y": 0.8880870938301086
+                },
+                "on_foot": false,
+                "other_id": 100111,
+                "other_kind": "missile",
+                "other_motion": {
+                  "angle": 0.02058614231646061,
+                  "position": {
+                    "x": 1589.14892578125,
+                    "y": 301.6201477050781
+                  },
+                  "spin": 2.0,
+                  "velocity": {
+                    "x": 194.55563354492188,
+                    "y": -268.1393737792969
+                  }
+                },
+                "point": {
+                  "x": 1590.08349609375,
+                  "y": 297.885498046875
+                }
+              },
+              "tick": 9231
+            },
+            "protected_until_tick": 8031
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 446.149996923,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 766,
+            "capture": 2874,
+            "hunt": 1598,
+            "launch": 656,
+            "patrol": 82,
+            "recover": 1380,
+            "select": 6,
+            "transfer": 1869
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 1380
+        },
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 677,
+            "capture": 2515,
+            "hunt": 2953,
+            "launch": 528,
+            "select": 3,
+            "transfer": 2555
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "land_pod"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "recover",
+          "target": null,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        },
+        {
+          "goal": "transfer",
+          "target": 2,
+          "completed_sorties": 1,
+          "completed_recoveries": 0,
+          "frame_changes": 5
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 9231,
+        "lengths": [
+          9231,
+          9231
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-angular-collapse-0-control",
+      "completions": [],
+      "features": {
+        "p2:survey": 879
+      },
+      "max_survey_work": {
+        "coarse_candidates": 0,
+        "refined_candidates": 0,
+        "offset_checks": 0,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.12638506472222222,
+            "p50_ms": 0.0034470000000000004,
+            "p95_ms": 0.028825,
+            "p99_ms": 6.104303,
+            "max_ms": 6.526349
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.148431694,
+            "p50_ms": 0.006583,
+            "p95_ms": 1.456309,
+            "p99_ms": 3.473978,
+            "max_ms": 4.183006000000001
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.002020044722222222,
+          "p50_ms": 0.001503,
+          "p95_ms": 0.003516,
+          "p99_ms": 0.008004,
+          "max_ms": 0.093076
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.21117494827777777,
+          "p50_ms": 0.120778,
+          "p95_ms": 0.659454,
+          "p99_ms": 1.8375489999999999,
+          "max_ms": 3.688964
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 177,
+      "case": {
+        "candidate_seat": null,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 5103,
+            "capture": 17717,
+            "hunt": 2075,
+            "launch": 830,
+            "select": 12,
+            "transfer": 10263
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "no reachable standing site with hatch access": 27674
+          },
+          "completed": [],
+          "first_block": 8326,
+          "first_mission_block": 8326,
+          "longest_recovery_block": 27674,
+          "mission_blocked_ticks": 27674,
+          "mission_goals": {
+            "avoid_sun": 565,
+            "blocked": 27674,
+            "capture": 2885,
+            "hunt": 1301,
+            "launch": 487,
+            "recover": 1498,
+            "select": 3,
+            "transfer": 1587
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 27674,
+          "recovery_decisions": 29172
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 882,
+          "status": "hatch_blocked"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 27
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 3
+        }
+      ]
+    },
+    {
+      "name": "20202-angular-collapse-0-candidate-p1",
+      "completions": [],
+      "features": {
+        "p2:survey": 879
+      },
+      "max_survey_work": {
+        "coarse_candidates": 0,
+        "refined_candidates": 0,
+        "offset_checks": 0,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.1263322676111111,
+            "p50_ms": 0.003497,
+            "p95_ms": 0.028815,
+            "p99_ms": 6.093803,
+            "max_ms": 6.817049000000001
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.14831746650000002,
+            "p50_ms": 0.006612000000000001,
+            "p95_ms": 1.453654,
+            "p99_ms": 3.467486,
+            "max_ms": 4.056908
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.0020356648888888887,
+          "p50_ms": 0.001522,
+          "p95_ms": 0.003658,
+          "p99_ms": 0.008095000000000001,
+          "max_ms": 0.08466000000000001
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.21108816655555557,
+          "p50_ms": 0.120978,
+          "p95_ms": 0.654556,
+          "p99_ms": 1.838992,
+          "max_ms": 3.6396200000000003
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 177,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 5103,
+            "capture": 17717,
+            "hunt": 2075,
+            "launch": 830,
+            "select": 12,
+            "transfer": 10263
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "no reachable standing site with hatch access": 27674
+          },
+          "completed": [],
+          "first_block": 8326,
+          "first_mission_block": 8326,
+          "longest_recovery_block": 27674,
+          "mission_blocked_ticks": 27674,
+          "mission_goals": {
+            "avoid_sun": 565,
+            "blocked": 27674,
+            "capture": 2885,
+            "hunt": 1301,
+            "launch": 487,
+            "recover": 1498,
+            "select": 3,
+            "transfer": 1587
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 27674,
+          "recovery_decisions": 29172
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 882,
+          "status": "hatch_blocked"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 27
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 3
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-angular-collapse-0-candidate-p2",
+      "completions": [],
+      "features": {
+        "p2:survey": 879
+      },
+      "max_survey_work": {
+        "coarse_candidates": 8,
+        "refined_candidates": 0,
+        "offset_checks": 0,
+        "staging_route_checks": 0
+      },
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.1264434965,
+            "p50_ms": 0.003497,
+            "p95_ms": 0.029215,
+            "p99_ms": 6.093192,
+            "max_ms": 6.888514
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.14858873919444443,
+            "p50_ms": 0.006873,
+            "p95_ms": 1.454546,
+            "p99_ms": 3.470341,
+            "max_ms": 3.9129259999999997
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.0020669124444444445,
+          "p50_ms": 0.001552,
+          "p95_ms": 0.0037079999999999995,
+          "p99_ms": 0.008046000000000001,
+          "max_ms": 0.154682
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.33027089788888886,
+          "p50_ms": 0.12208,
+          "p95_ms": 0.659044,
+          "p99_ms": 7.009413,
+          "max_ms": 8.911493
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 126
+      },
+      "transition_observations": 177,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": false
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 5103,
+            "capture": 17717,
+            "hunt": 2075,
+            "launch": 830,
+            "select": 12,
+            "transfer": 10263
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "no reachable standing site with hatch access": 27674
+          },
+          "completed": [],
+          "first_block": 8326,
+          "first_mission_block": 8326,
+          "longest_recovery_block": 27674,
+          "mission_blocked_ticks": 27674,
+          "mission_goals": {
+            "avoid_sun": 565,
+            "blocked": 27674,
+            "capture": 2885,
+            "hunt": 1301,
+            "launch": 487,
+            "recover": 1498,
+            "select": 3,
+            "transfer": 1587
+          },
+          "native_refinement_decisions": 29172,
+          "recovery_blocked_ticks": 27674,
+          "recovery_decisions": 29172
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 1,
+          "rebuilds": 0,
+          "blocked_attempts": 882,
+          "status": "hatch_blocked"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 2,
+          "completed_recoveries": 0,
+          "frame_changes": 27
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 0,
+          "completed_recoveries": 0,
+          "frame_changes": 3
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 8025,
+          "scenario_before_step_fnv64": 8025
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 27975,
+          "scenario_before_step_fnv64": 26397
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-angular-collapse-1-control",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.088771531,
+            "p50_ms": 0.030386999999999997,
+            "p95_ms": 0.04192,
+            "p99_ms": 3.758095,
+            "max_ms": 7.2906439999999995
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.11366690447222222,
+            "p50_ms": 0.008646,
+            "p95_ms": 0.041879,
+            "p99_ms": 3.6337800000000002,
+            "max_ms": 7.390141
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.0031508342222222223,
+          "p50_ms": 0.002483,
+          "p95_ms": 0.00483,
+          "p99_ms": 0.031751,
+          "max_ms": 0.093396
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.4552147162222222,
+          "p50_ms": 0.389746,
+          "p95_ms": 1.1068600000000002,
+          "p99_ms": 1.993003,
+          "max_ms": 3.212946
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 131
+      },
+      "transition_observations": 244,
+      "case": {
+        "candidate_seat": null,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 97.6766357421875,
+            "last_damage": {
+              "amount": 0.055840447545051575,
+              "cause": "laser",
+              "contact": null,
+              "tick": 30207
+            },
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 1022,
+            "capture": 19902,
+            "hunt": 5132,
+            "launch": 1360,
+            "select": 8,
+            "transfer": 8576
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "unreachable ship replacement could not start or finish": 8081
+          },
+          "completed": [],
+          "first_block": 27919,
+          "first_mission_block": 27919,
+          "longest_recovery_block": 8081,
+          "mission_blocked_ticks": 8081,
+          "mission_goals": {
+            "avoid_sun": 760,
+            "blocked": 8081,
+            "capture": 15700,
+            "hunt": 1184,
+            "launch": 785,
+            "recover": 2082,
+            "select": 10,
+            "transfer": 7398
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 8081,
+          "recovery_decisions": 10163
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 7,
+          "completed_recoveries": 0,
+          "frame_changes": 16
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        }
+      ]
+    },
+    {
+      "name": "20202-angular-collapse-1-candidate-p1",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.08903627516666666,
+            "p50_ms": 0.030528000000000003,
+            "p95_ms": 0.042039,
+            "p99_ms": 3.7595680000000002,
+            "max_ms": 7.2886
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.11402514558333335,
+            "p50_ms": 0.008746,
+            "p95_ms": 0.04235,
+            "p99_ms": 3.6380980000000003,
+            "max_ms": 7.425249
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.0031481974722222224,
+          "p50_ms": 0.002453,
+          "p95_ms": 0.004869,
+          "p99_ms": 0.032652,
+          "max_ms": 0.15009299999999998
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.45723137108333334,
+          "p50_ms": 0.392111,
+          "p95_ms": 1.111137,
+          "p99_ms": 1.987683,
+          "max_ms": 3.233264
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 131
+      },
+      "transition_observations": 244,
+      "case": {
+        "candidate_seat": 0,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 97.6766357421875,
+            "last_damage": {
+              "amount": 0.055840447545051575,
+              "cause": "laser",
+              "contact": null,
+              "tick": 30207
+            },
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 1022,
+            "capture": 19902,
+            "hunt": 5132,
+            "launch": 1360,
+            "select": 8,
+            "transfer": 8576
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "unreachable ship replacement could not start or finish": 8081
+          },
+          "completed": [],
+          "first_block": 27919,
+          "first_mission_block": 27919,
+          "longest_recovery_block": 8081,
+          "mission_blocked_ticks": 8081,
+          "mission_goals": {
+            "avoid_sun": 760,
+            "blocked": 8081,
+            "capture": 15700,
+            "hunt": 1184,
+            "launch": 785,
+            "recover": 2082,
+            "select": 10,
+            "transfer": 7398
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 8081,
+          "recovery_decisions": 10163
+        }
+      ],
+      "native_refinement": [
+        false,
+        false
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 7,
+          "completed_recoveries": 0,
+          "frame_changes": 16
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    },
+    {
+      "name": "20202-angular-collapse-1-candidate-p2",
+      "completions": [],
+      "features": {},
+      "max_survey_work": {},
+      "audit_samples": 600,
+      "timing": {
+        "decisions": [
+          {
+            "count": 36000,
+            "mean_ms": 0.09600046297222221,
+            "p50_ms": 0.030858,
+            "p95_ms": 0.043241999999999996,
+            "p99_ms": 4.120429,
+            "max_ms": 7.698464
+          },
+          {
+            "count": 36000,
+            "mean_ms": 0.1238072893888889,
+            "p50_ms": 0.009117,
+            "p95_ms": 0.043011,
+            "p99_ms": 4.007987,
+            "max_ms": 8.024179
+          }
+        ],
+        "planning": {
+          "count": 36000,
+          "mean_ms": 0.003286668138888889,
+          "p50_ms": 0.002584,
+          "p95_ms": 0.005289,
+          "p99_ms": 0.032482000000000004,
+          "max_ms": 0.12763100000000002
+        },
+        "step": {
+          "count": 36000,
+          "mean_ms": 0.4614997714166667,
+          "p50_ms": 0.395166,
+          "p95_ms": 1.116588,
+          "p99_ms": 2.004965,
+          "max_ms": 3.1514300000000004
+        }
+      },
+      "max_host_work": {
+        "graph": 4,
+        "physics_queries": 131
+      },
+      "transition_observations": 244,
+      "case": {
+        "candidate_seat": 1,
+        "seed": 20202,
+        "shape": "angular",
+        "slumping": true
+      },
+      "end_tick": 36000,
+      "match": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 97.6766357421875,
+            "last_damage": {
+              "amount": 0.055840447545051575,
+              "cause": "laser",
+              "contact": null,
+              "tick": 30207
+            },
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "metrics": [
+        {
+          "block_reasons": {},
+          "completed": [],
+          "first_block": null,
+          "first_mission_block": null,
+          "longest_recovery_block": 0,
+          "mission_blocked_ticks": 0,
+          "mission_goals": {
+            "avoid_sun": 1022,
+            "capture": 19902,
+            "hunt": 5132,
+            "launch": 1360,
+            "select": 8,
+            "transfer": 8576
+          },
+          "native_refinement_decisions": 0,
+          "recovery_blocked_ticks": 0,
+          "recovery_decisions": 0
+        },
+        {
+          "block_reasons": {
+            "unreachable ship replacement could not start or finish": 8081
+          },
+          "completed": [],
+          "first_block": 27919,
+          "first_mission_block": 27919,
+          "longest_recovery_block": 8081,
+          "mission_blocked_ticks": 8081,
+          "mission_goals": {
+            "avoid_sun": 760,
+            "blocked": 8081,
+            "capture": 15700,
+            "hunt": 1184,
+            "launch": 785,
+            "recover": 2082,
+            "select": 10,
+            "transfer": 7398
+          },
+          "native_refinement_decisions": 10163,
+          "recovery_blocked_ticks": 8081,
+          "recovery_decisions": 10163
+        }
+      ],
+      "native_refinement": [
+        false,
+        true
+      ],
+      "native_recovery": [
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        },
+        {
+          "ships_lost": 0,
+          "rebuilds": 0,
+          "blocked_attempts": 0,
+          "status": "ship_available"
+        }
+      ],
+      "mission": [
+        {
+          "goal": "capture",
+          "target": 0,
+          "completed_sorties": 7,
+          "completed_recoveries": 0,
+          "frame_changes": 16
+        },
+        {
+          "goal": "blocked",
+          "target": null,
+          "completed_sorties": 5,
+          "completed_recoveries": 0,
+          "frame_changes": 10
+        }
+      ],
+      "comparison": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_match_result": true
+    }
+  ]
+}

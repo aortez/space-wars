@@ -225,7 +225,31 @@ impl SurfaceSortieState {
     ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
-        let mut combat = self.combat_observation_with_query(player, query);
+        let combat = self.combat_observation_with_query(player, query);
+        self.tactical_sortie_from_combat(player, combat, planning, objective_surveys)
+    }
+
+    /// Reuse the same local sensor composition with one enhanced recovery read.
+    #[cfg(feature = "sensor-profile")]
+    pub(super) fn tactical_sortie_with_rebuild_search(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        planning: landing_objective::ObjectivePlanning,
+        search: &rebuild_placement::RebuildSearchProgress,
+    ) -> TacticalSortieObservationV1 {
+        let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
+        let combat = self.combat_observation_with_rebuild_search(player, query, search);
+        self.tactical_sortie_from_combat(player, combat, planning, true)
+    }
+
+    fn tactical_sortie_from_combat(
+        &self,
+        player: usize,
+        mut combat: CombatObservationV2,
+        planning: landing_objective::ObjectivePlanning,
+        objective_surveys: bool,
+    ) -> TacticalSortieObservationV1 {
         if planning == landing_objective::ObjectivePlanning::JetpackRoundTrip {
             self.add_vehicle_forecast(player, &mut combat.recovery);
         }
@@ -303,6 +327,26 @@ impl SurfaceSortieState {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("combat_observation");
         let recovery = self.recovery_task_observation_with_query(player, query);
+        self.combat_observation_from_recovery(player, recovery)
+    }
+
+    /// Explicit experimental recovery sensing without a second ordinary survey.
+    #[cfg(feature = "sensor-profile")]
+    pub fn combat_observation_with_rebuild_search(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        search: &rebuild_placement::RebuildSearchProgress,
+    ) -> CombatObservationV2 {
+        let recovery = self.recovery_observation_with_rebuild_search(player, query, search);
+        self.combat_observation_from_recovery(player, recovery)
+    }
+
+    fn combat_observation_from_recovery(
+        &self,
+        player: usize,
+        recovery: RecoveryTaskObservationV1,
+    ) -> CombatObservationV2 {
         let p = &recovery.flight.pilot;
         let ship = &self.world.ships[p.vehicle.0];
         let target = self.pilots.iter().enumerate().find_map(|(seat, other)| {

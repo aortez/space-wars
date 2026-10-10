@@ -1,8 +1,11 @@
-//! Read-only short crawl probes for a supported character that cannot stand.
+//! Read-only short corridor probes for a supported character.
 use super::*;
 pub use engine_rapier::spaceling::{SpacelingBalance, SpacelingGetUpResult};
 
 pub const CRAWL_DISTANCE: f32 = 0.6;
+
+#[cfg(feature = "sensor-profile")]
+mod diagnostics;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct CrawlStep {
@@ -32,10 +35,54 @@ pub struct GroundPostureObservation {
 }
 
 impl SurfaceSortieState {
+    /// Opt-in host request during a bounded ground-rejoin attempt. The same
+    /// capsule sweeps and surviving-floor checks remain movement prerequisites.
+    #[cfg(feature = "sensor-profile")]
+    pub fn add_ground_rejoin_corridors(
+        &self,
+        player: usize,
+        o: &mut recovery_sensors::RecoveryTaskObservationV1,
+    ) {
+        let p = &o.flight.pilot;
+        if player != p.owner.index()
+            || p.tick != self.tick()
+            || self.world.physics.material_queries_dirty
+            || self
+                .world
+                .terrain
+                .planets
+                .get(&p.planet.index)
+                .is_none_or(|terrain| terrain.field.revision() != p.planet.revision)
+            || !o.posture.as_ref().is_some_and(|posture| {
+                posture.version == 1
+                    && posture.owner == p.owner
+                    && posture.planet == p.planet.index
+                    && posture.revision == p.planet.revision
+                    && posture.tick == p.tick
+                    && posture.stable
+                    && posture.balance == SpacelingBalance::Balanced
+                    && posture.standing_clear
+            })
+        {
+            return;
+        }
+        let _profile = super::sensor_profile::Scope::new("ground_rejoin_corridors");
+        o.posture = self.ground_posture_with_corridors(player, p, true);
+    }
+
     pub(super) fn ground_posture_observation(
         &self,
         player: usize,
         p: &pilot::PilotObservationV1,
+    ) -> Option<GroundPostureObservation> {
+        self.ground_posture_with_corridors(player, p, false)
+    }
+
+    fn ground_posture_with_corridors(
+        &self,
+        player: usize,
+        p: &pilot::PilotObservationV1,
+        include_standing: bool,
     ) -> Option<GroundPostureObservation> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("ground_posture_observation");
@@ -83,7 +130,8 @@ impl SurfaceSortieState {
         if !stable
             || !(snapshot.balance == SpacelingBalance::Recovering
                 && snapshot.get_up_result == SpacelingGetUpResult::Blocked
-                || snapshot.balance == SpacelingBalance::Balanced && !standing_clear)
+                || snapshot.balance == SpacelingBalance::Balanced
+                    && (!standing_clear || include_standing))
             || p.supported_planet != Some(p.planet.index)
         {
             return Some(observation);
@@ -153,6 +201,85 @@ mod tests {
     use engine_rapier::world::{
         BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
     };
+
+    #[test]
+    #[cfg(feature = "sensor-profile")]
+    fn standing_corridors_are_fresh_supported_and_read_only() {
+        let dt = Duration::from_nanos(16_666_667);
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        state.world.planets[0].wrapper_omega = 0.0;
+        state.world.ships[0].position += Vec2::new(200.0, 200.0);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let up = -Vec2::Y;
+        let hit = state
+            .world
+            .physics
+            .material_ground_ray(0, state.world.planets[0].position + up * 80.0, -up, 100.0)
+            .unwrap();
+        let spec = SurfaceSortieState::spec();
+        state.pilots[0].body = Some(
+            SpacelingAssembly::insert(
+                &mut state.world.physics.world,
+                pilot_physics_id(PlayerId::PLAYER_1),
+                hit.point + up * (spec.half_height() + 0.02),
+                rotation_for_direction(up),
+                spec,
+            )
+            .unwrap(),
+        );
+        state.pilots[0].controls_armed = true;
+        for _ in 0..180 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
+        }
+        let ordinary = state.recovery_task_observation(0, None);
+        let posture = ordinary.posture.as_ref().unwrap();
+        assert!(posture.stable && posture.standing_clear, "{posture:?}");
+        assert_eq!(posture.balance, SpacelingBalance::Balanced);
+        assert_eq!(posture.crawl, [None, None]);
+        let before = state.world.physics.world.snapshot_bytes().unwrap();
+        let mut requested = ordinary.clone();
+        state.add_ground_rejoin_corridors(0, &mut requested);
+        assert!(
+            requested
+                .posture
+                .as_ref()
+                .unwrap()
+                .crawl
+                .iter()
+                .any(Option::is_some)
+        );
+        // All other public fields, including the upright clearance result, keep
+        // their ordinary meaning; only measured corridor fields are added.
+        let mut restored = requested.clone();
+        let p = restored.posture.as_mut().unwrap();
+        p.crawl = [None, None];
+        p.crawl_clearance = [None, None];
+        p.crawl_floor = [None, None];
+        assert_eq!(restored, ordinary);
+        state.add_ground_rejoin_corridors(0, &mut restored);
+        assert_eq!(restored, requested);
+        assert_eq!(state.world.physics.world.snapshot_bytes().unwrap(), before);
+        assert_eq!(state.recovery_task_observation(0, None), ordinary);
+        for fault in 0..7 {
+            let mut invalid = ordinary.clone();
+            match fault {
+                0 => invalid.flight.pilot.supported_planet = None,
+                1 => invalid.flight.pilot.queries_ready = false,
+                2 => invalid.flight.pilot.tick -= 1,
+                3 => invalid.flight.pilot.planet.revision += 1,
+                4 => invalid.posture.as_mut().unwrap().stable = false,
+                5 => invalid.posture.as_mut().unwrap().tick -= 1,
+                _ => state.world.physics.material_queries_dirty = true,
+            }
+            state.add_ground_rejoin_corridors(0, &mut invalid);
+            assert!(
+                invalid.posture.is_none_or(|p| p.crawl == [None, None]),
+                "fault {fault}"
+            );
+        }
+        assert!(state.world.physics.material_queries_dirty);
+        assert_eq!(state.world.physics.world.snapshot_bytes().unwrap(), before);
+    }
 
     #[test]
     fn small_pilot_gets_up_on_material_ground() {

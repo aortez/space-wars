@@ -86,6 +86,8 @@ pub struct GroundTelemetry {
     pub live_claim_stopping_disabled: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub precise_rebuild: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub hatch_supported_arrival: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staging_seed_tick: Option<u64>,
     pub destination: GroundDestination,
@@ -153,6 +155,7 @@ pub struct GroundNavigationTask {
     hatch_missing_since: Option<u64>,
     hatch_unsettled_since: Option<u64>,
     rejoin: Option<rejoin::GroundRejoin>,
+    rejoin_target_directed: bool,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
@@ -173,6 +176,7 @@ impl GroundNavigationTask {
                 continuous_walk: false,
                 live_claim_stopping_disabled: false,
                 precise_rebuild: false,
+                hatch_supported_arrival: false,
                 staging_seed_tick: None,
                 destination,
                 goal: GroundGoal::Survey,
@@ -220,6 +224,7 @@ impl GroundNavigationTask {
             hatch_missing_since: None,
             hatch_unsettled_since: None,
             rejoin: None,
+            rejoin_target_directed: false,
         }
     }
     pub fn with_vehicle_forecasts(context: BrainReset, destination: GroundDestination) -> Self {
@@ -266,11 +271,19 @@ impl GroundNavigationTask {
                 GroundDestination::Rebuild { .. }
             );
     }
+    /// Proximity to a hatch while airborne does not identify landing ground.
+    /// Keep following the measured route until actual support allows settling.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_hatch_supported_arrival(&mut self, enabled: bool) {
+        self.telemetry.hatch_supported_arrival = enabled;
+    }
     pub fn reset(&mut self, context: BrainReset) {
+        let rejoin_target_directed = self.rejoin_target_directed;
         let active_flight_checks = self.active_flight_checks;
         let continuous_walk = self.telemetry.continuous_walk;
         let live_claim_stopping_disabled = self.telemetry.live_claim_stopping_disabled;
         let precise_rebuild = self.telemetry.precise_rebuild;
+        let hatch_supported_arrival = self.telemetry.hatch_supported_arrival;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
         } else if self.powered_flag {
@@ -281,7 +294,9 @@ impl GroundNavigationTask {
         self.telemetry.continuous_walk = continuous_walk;
         self.telemetry.live_claim_stopping_disabled = live_claim_stopping_disabled;
         self.set_precise_rebuild(precise_rebuild);
+        self.telemetry.hatch_supported_arrival = hatch_supported_arrival;
         self.active_flight_checks = active_flight_checks;
+        self.rejoin_target_directed = rejoin_target_directed;
     }
     pub fn is_crossing(&self) -> bool {
         self.crossing_task.is_some() || self.settling_after_interrupt
@@ -301,6 +316,7 @@ impl GroundNavigationTask {
         self.telemetry.claim_target = None;
         self.telemetry.target = None;
         self.rejoin = None;
+        self.rejoin_target_directed = false;
         self.clear_route();
     }
     fn block(&mut self, reason: &'static str) {
@@ -611,6 +627,11 @@ impl GroundNavigationTask {
         } else {
             actor.position.distance_to(target) < range
         };
+        let arrived = arrived
+            && (!self.telemetry.hatch_supported_arrival
+                || self.telemetry.destination != GroundDestination::Hatch
+                || p.supported_planet == Some(p.planet.index)
+                || p.transfer == TransferResult::Ready);
         if arrived {
             self.telemetry.goal = if self.telemetry.claim_target.is_some() {
                 GroundGoal::Settle

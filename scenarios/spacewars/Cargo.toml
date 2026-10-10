@@ -8,7 +8,7 @@ rust-version.workspace = true
 
 [features]
 # Opt-in read-only mission sensor profiling for diagnostic runners.
-sensor-profile = []
+sensor-profile = ["engine-rapier/query-diagnostics"]
 
 [dependencies]
 engine-common = { workspace = true }

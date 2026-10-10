@@ -6,6 +6,11 @@ use serde::Serialize;
 
 pub const POWERED_CAPTURE_PROFILE: &str = "mission_powered_capture_v1";
 
+#[cfg(feature = "sensor-profile")]
+mod recovery_profile;
+#[cfg(feature = "sensor-profile")]
+pub use recovery_profile::MissionRecoveryProfile;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub enum MissionPolicy {
     #[default]
@@ -134,6 +139,23 @@ pub struct MissionBot(MaterialMissionPilot);
 impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
+    }
+    /// Historical terrain switch; does not select supported hatch arrival.
+    /// Use the paired mission decision driver for its native sensor options.
+    #[cfg(feature = "sensor-profile")]
+    pub fn with_terrain_recovery(mut self, enabled: bool) -> Self {
+        self.0.configure_terrain_recovery(enabled);
+        self
+    }
+    /// Select a complete experimental recovery profile before the first intent.
+    /// Use `decide_with_terrain_recovery` to pair its sensors and native options.
+    #[cfg(feature = "sensor-profile")]
+    pub fn with_recovery_profile(mut self, profile: MissionRecoveryProfile) -> Self {
+        self.0
+            .configure_terrain_recovery(profile != MissionRecoveryProfile::Standard);
+        self.0
+            .set_hatch_supported_arrival(profile == MissionRecoveryProfile::SupportedHatchV1);
+        self
     }
     /// Opt-in v13 route/controller comparison, configured before the first intent.
     pub fn with_powered_capture(mut self, enabled: bool) -> Self {

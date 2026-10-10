@@ -24,6 +24,16 @@ impl GroundRejoin {
 }
 
 impl GroundNavigationTask {
+    /// Selected only by an active bounded rebuild rejoin. Changing the option
+    /// preserves the current attempt, retained step and cached-tick contract.
+    pub(crate) fn set_rejoin_target_directed(&mut self, enabled: bool) {
+        self.rejoin_target_directed = enabled
+            && matches!(
+                self.telemetry.destination,
+                GroundDestination::Rebuild { .. }
+            );
+    }
+
     pub(super) fn rejoin_ground(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
         let actor = p.actor.unwrap();
@@ -78,21 +88,34 @@ impl GroundNavigationTask {
                     && (position - (*origin + delta.normalized() * along)).length() < 0.15
             })
             .map(|(_, _, _, step)| step);
-        if let Some(step) = posture
+        let previous = posture
             .crawl
             .iter()
             .flatten()
-            .find(|step| Some(step.direction) == attempt.direction)
-            .or_else(|| {
-                posture.crawl.iter().flatten().min_by(|a, b| {
-                    a.position
-                        .distance_to(attempt.target)
-                        .total_cmp(&b.position.distance_to(attempt.target))
-                })
+            .find(|step| Some(step.direction) == attempt.direction);
+        let closest = || {
+            posture.crawl.iter().flatten().min_by(|a, b| {
+                a.position
+                    .distance_to(attempt.target)
+                    .total_cmp(&b.position.distance_to(attempt.target))
             })
-            .copied()
-            .or(retained)
-        {
+        };
+        let fresh = if self.rejoin_target_directed {
+            let nearest = closest();
+            // Preserve direction only on an exact distance tie. An endpoint
+            // score ranks already measured corridors; it grants no new route.
+            previous
+                .filter(|step| {
+                    nearest.is_none_or(|nearest| {
+                        step.position.distance_to(attempt.target)
+                            <= nearest.position.distance_to(attempt.target)
+                    })
+                })
+                .or(nearest)
+        } else {
+            previous.or_else(closest)
+        };
+        if let Some(step) = fresh.copied().or(retained) {
             if retained != Some(step) {
                 attempt.step = Some((p.tick, p.planet.revision, position, step));
             }

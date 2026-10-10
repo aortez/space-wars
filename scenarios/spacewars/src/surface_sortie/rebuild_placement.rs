@@ -301,6 +301,8 @@ impl SurfaceSortieState {
         } = origin;
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("find_rebuild_placement");
+        #[cfg(feature = "sensor-profile")]
+        let offset_checks = super::sensor_profile::Counter::new("rebuild_placement_offset_checks");
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let local = |point: Vec2| (point - frame.position).rotate_radians(-frame.angle);
         let world_point = |point: Vec2| frame.position + point.rotate_radians(frame.angle);
@@ -373,6 +375,8 @@ impl SurfaceSortieState {
         let mut best = None;
         let mut best_cost = f32::INFINITY;
         for &offset in offsets {
+            #[cfg(feature = "sensor-profile")]
+            offset_checks.add(1);
             let mut attempt = RebuildAttempt {
                 offset,
                 rejection: None,

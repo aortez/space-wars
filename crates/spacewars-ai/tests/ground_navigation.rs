@@ -88,6 +88,143 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
     }
 }
 
+#[cfg(feature = "sensor-profile")]
+mod hatch_supported_arrival {
+    use super::*;
+
+    fn approach() -> (BrainReset, GroundNavigationTask, RecoveryTaskObservationV1) {
+        let (context, mut o) = fixture();
+        o.jetpack = None;
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        task.step(&o);
+        advance(&mut o, 1);
+        o.flight.pilot.actor.as_mut().unwrap().position.x = 2.0;
+        task.step(&o);
+        assert_eq!(task.telemetry().waypoint, 2);
+        advance(&mut o, 2);
+        o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(3.7, 60.95);
+        o.flight.pilot.supported_planet = None;
+        (context, task, o)
+    }
+
+    #[test]
+    fn airborne_hatch_proximity_keeps_route_steering_until_support_returns() {
+        let (_, mut task, mut o) = approach();
+        let mut control = task.clone();
+        task.set_hatch_supported_arrival(true);
+        assert_eq!(control.step(&o), SurfaceSortieAction::default());
+        assert_eq!(control.telemetry().goal, GroundGoal::Settle);
+        let action = task.step(&o);
+        assert!(action.horizontal > 0.0);
+        assert!(!action.primary_held && !action.interact_held);
+        assert_eq!(task.telemetry().path, control.telemetry().path);
+        assert_eq!(task.telemetry().waypoint, 2);
+        let telemetry = task.telemetry().clone();
+        assert_eq!(task.step(&o), action);
+        assert_eq!(task.telemetry(), &telemetry);
+        advance(&mut o, 3);
+        o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+        // Brief contact loss resumes this route, without a new jump or budget.
+        advance(&mut o, 4);
+        o.flight.pilot.supported_planet = None;
+        assert!(task.step(&o).horizontal > 0.0);
+        assert!(!task.step(&o).primary_held);
+        assert_eq!(task.telemetry().started_tick, Some(0));
+        advance(&mut o, 90 * 60 + 1);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    }
+
+    #[test]
+    fn selection_preserves_cached_ticks_clone_reset_and_input_gates() {
+        let (context, mut task, mut o) = approach();
+        let before = task.step(&o);
+        task.set_hatch_supported_arrival(true);
+        assert_eq!(
+            task.step(&o),
+            before,
+            "selection waits for an uncached tick"
+        );
+        let mut copy = task.clone();
+        advance(&mut o, 3);
+        assert_eq!(task.step(&o), copy.step(&o));
+        assert!(task.step(&o).horizontal > 0.0);
+        task.reset(context);
+        assert!(task.telemetry().hatch_supported_arrival);
+        o.flight.pilot.controls_armed = false;
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        advance(&mut o, 4);
+        o.flight.pilot.controls_armed = true;
+        o.flight.pilot.queries_ready = false;
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        advance(&mut o, 5);
+        o.flight.pilot.queries_ready = true;
+        assert!(task.step(&o).horizontal > 0.0);
+    }
+
+    #[test]
+    fn nearby_hatch_without_a_measured_route_cannot_drive_or_extend_the_timeout() {
+        let (context, _, mut o) = approach();
+        o.ground.as_mut().unwrap().nodes.clear();
+        o.ground.as_mut().unwrap().edges.clear();
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        task.set_hatch_supported_arrival(true);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Survey);
+        advance(&mut o, 303);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+        advance(&mut o, 304);
+        o.ground = fixture().1.ground;
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    }
+
+    #[test]
+    fn flag_claim_and_rebuild_arrivals_keep_their_quiet_landing_behavior() {
+        let (context, mut o) = fixture();
+        o.jetpack = None;
+        let p = &mut o.flight.pilot;
+        let claim = p.planet.claim.as_mut().unwrap();
+        claim.owner = Some(PlayerId::PLAYER_2);
+        claim.flag = Some(PlanetFlagObservation {
+            player: PlayerId::PLAYER_2,
+            position: Vec2::new(6.0, 60.0),
+            normal: Vec2::Y,
+            raised_fraction: 1.0,
+        });
+        p.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.0 + HALF_HEIGHT);
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+        let mut control = task.clone();
+        task.set_hatch_supported_arrival(true);
+        assert_eq!(task.step(&o), control.step(&o));
+        assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+        o.flight.pilot.supported_planet = None;
+        advance(&mut o, 2);
+        assert_eq!(task.step(&o), control.step(&o));
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+        assert_eq!(task.telemetry().goal, control.telemetry().goal);
+
+        let (context, _, mut o) = approach();
+        let destination = GroundDestination::Rebuild {
+            planet: o.flight.pilot.planet.index,
+            position: Vec2::new(3.7, 60.0),
+        };
+        let mut task = GroundNavigationTask::new(context, destination);
+        let mut control = task.clone();
+        task.set_hatch_supported_arrival(true);
+        assert_eq!(task.step(&o), control.step(&o));
+        assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+        advance(&mut o, 3);
+        o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+        assert_eq!(task.step(&o), control.step(&o));
+        assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    }
+}
+
 #[test]
 fn precise_rebuild_arrival_requires_footing_and_does_not_change_other_destinations() {
     let (context, mut o) = fixture();

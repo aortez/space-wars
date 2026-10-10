@@ -1,0 +1,720 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "8f4f554ddb040bbf5170d98adc2c5e1b9b8f466f",
+    "source_inputs_sha256": "c8f6332e5c2428b1f291cb7d726d3df893a4e07df0745d5179c83ce568377fc5",
+    "source_input_count": 2400,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791622088.7863028,
+    "exit_code": 0,
+    "seconds": 61.52937841415405,
+    "binary_sha256": "a2303c5c4cbd817a51388ba2a6977729ecdd5de16ef3e5b09e003fe0a25382f8"
+  },
+  "raw_directory": "standing-rejoin-20261010",
+  "audit_sha256": "c4bef2084f3614dc5bfebadff795ee6a2a5fcc641fef35e5ab5bc3e108bac001",
+  "source_files_verified": 2400,
+  "case_artifacts_verified": 114,
+  "cases": [
+    {
+      "fork_tick": 8025,
+      "comparison": {
+        "overlap_ticks": 27975,
+        "first_difference": {
+          "actions": 8025,
+          "sites": null,
+          "decision_fnv64": 8025,
+          "scenario_before_step_fnv64": 8026
+        },
+        "different_ticks": {
+          "actions": 312,
+          "decision_fnv64": 27975,
+          "scenario_before_step_fnv64": 27974
+        }
+      },
+      "arms": {
+        "control": {
+          "start_tick": 8025,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 27975,
+          "reason": "no reachable standing site with hatch access",
+          "rejoin": null,
+          "rejoin_trace_ticks": 0,
+          "movement_ticks": 0,
+          "max_rejoin_displacement": 0,
+          "native_recovery": {
+            "blocked_attempts": 882,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 5,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 467,
+          "features": {
+            "survey": 879
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "ground": null
+        },
+        "candidate": {
+          "start_tick": 8025,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 0,
+          "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+          "rejoin": {
+            "deadline_tick": 8505,
+            "finished_tick": 8506,
+            "origin": {
+              "x": 20.18758201599121,
+              "y": 4.724009037017822
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8025,
+            "target": {
+              "x": 23.333330154418945,
+              "y": 6.149932861328125
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 312,
+          "max_rejoin_displacement": 0.5686405045585857,
+          "native_recovery": {
+            "blocked_attempts": 863,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 27,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 467,
+          "features": {
+            "survey": 859
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": {
+              "rebuild": {
+                "planet": 0,
+                "position": {
+                  "x": 23.333330154418945,
+                  "y": 6.149932861328125
+                }
+              }
+            },
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "rejoin",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 8025,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 17,
+            "return_failure": null,
+            "revision": 16,
+            "route": {
+              "closest_reachable_distance": null,
+              "destination_nodes": 5,
+              "failure": "no_start_footing",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.00012212990259286016,
+              "partial": false,
+              "reachable_nodes": 0,
+              "start_distance": 4.088482856750488,
+              "start_node": 405
+            },
+            "start_repositions": 1,
+            "started_tick": 8025,
+            "target": {
+              "x": 23.33334732055664,
+              "y": 6.149979114532471
+            },
+            "waypoint": 0
+          }
+        }
+      },
+      "direction_reversals": 24,
+      "last_movement": [
+        8505,
+        1.0
+      ],
+      "supported_stable_standing_clear_ticks": 0,
+      "first_supported_stable_standing_clear_tick": null,
+      "route_start_distance_range": [
+        3.8534061908721924,
+        4.11052131652832
+      ],
+      "final_attempt_posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          {
+            "direction": 1.0,
+            "position": {
+              "x": 20.30330467224121,
+              "y": 4.616903781890869
+            }
+          }
+        ],
+        "crawl_clearance": [
+          0.06781859695911407,
+          0.64000004529953
+        ],
+        "crawl_floor": [
+          null,
+          true
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_2",
+        "planet": 0,
+        "revision": 16,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 8506,
+        "version": 1
+      }
+    },
+    {
+      "fork_tick": 8325,
+      "comparison": {
+        "overlap_ticks": 27675,
+        "first_difference": {
+          "actions": 8325,
+          "sites": null,
+          "decision_fnv64": 8325,
+          "scenario_before_step_fnv64": 8326
+        },
+        "different_ticks": {
+          "actions": 131,
+          "decision_fnv64": 27675,
+          "scenario_before_step_fnv64": 27674
+        }
+      },
+      "arms": {
+        "control": {
+          "start_tick": 8325,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 27675,
+          "reason": "no reachable standing site with hatch access",
+          "rejoin": null,
+          "rejoin_trace_ticks": 0,
+          "movement_ticks": 0,
+          "max_rejoin_displacement": 0,
+          "native_recovery": {
+            "blocked_attempts": 882,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 5,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 462,
+          "features": {
+            "survey": 869
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "ground": null
+        },
+        "candidate": {
+          "start_tick": 8325,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 0,
+          "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+          "rejoin": {
+            "deadline_tick": 8805,
+            "finished_tick": 8806,
+            "origin": {
+              "x": 20.301828384399414,
+              "y": 4.60287618637085
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8325,
+            "target": {
+              "x": 23.333393096923828,
+              "y": 6.150030136108398
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 131,
+          "max_rejoin_displacement": 0.8173789243375544,
+          "native_recovery": {
+            "blocked_attempts": 858,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 16,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 462,
+          "features": {
+            "survey": 845
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": null,
+            "destination": {
+              "rebuild": {
+                "planet": 0,
+                "position": {
+                  "x": 23.333393096923828,
+                  "y": 6.150030136108398
+                }
+              }
+            },
+            "displacements": 0,
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "rejoin",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 8325,
+            "partial_routes": 0,
+            "path": [],
+            "policy": "ground_navigation_v10",
+            "reason": null,
+            "replans": 17,
+            "return_failure": null,
+            "revision": 16,
+            "route": {
+              "closest_reachable_distance": null,
+              "destination_nodes": 5,
+              "failure": "no_start_footing",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 6.218841735972092e-05,
+              "partial": false,
+              "reachable_nodes": 0,
+              "start_distance": 3.8338863849639893,
+              "start_node": 405
+            },
+            "start_repositions": 1,
+            "started_tick": 8325,
+            "target": {
+              "x": 23.333406448364258,
+              "y": 6.150026321411133
+            },
+            "waypoint": 0
+          }
+        }
+      },
+      "direction_reversals": 9,
+      "last_movement": [
+        8560,
+        1.0
+      ],
+      "supported_stable_standing_clear_ticks": 255,
+      "first_supported_stable_standing_clear_tick": 8530,
+      "route_start_distance_range": [
+        3.8316707611083984,
+        4.112857818603516
+      ],
+      "final_attempt_posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_2",
+        "planet": 0,
+        "revision": 16,
+        "stable": true,
+        "standing_clear": true,
+        "tick": 8806,
+        "version": 1
+      }
+    }
+  ],
+  "validation": [
+    {
+      "name": "library",
+      "command": [
+        "/home/data/workspace/spacewars-handoffs/standing-rejoin-20261010/standing-rejoin-comparison"
+      ],
+      "started_unix": 1791622272.5810714,
+      "exit_code": 0,
+      "seconds": 1.7064204216003418,
+      "tests_passed": 445,
+      "log_sha256": "65924c24b6e43cffb840cf351deb302afc3ecf78d5289e6ffab4d047315a3682"
+    },
+    {
+      "name": "native-mission",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::mission"
+      ],
+      "started_unix": 1791622274.287703,
+      "exit_code": 0,
+      "seconds": 0.3091862201690674,
+      "tests_passed": 8,
+      "log_sha256": "928bceef1f08de8037eb51f260d55973e893c671040eadd409e03117c5086d92"
+    },
+    {
+      "name": "native-combat-observations",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::combat"
+      ],
+      "started_unix": 1791622274.597161,
+      "exit_code": 0,
+      "seconds": 0.23130583763122559,
+      "tests_passed": 7,
+      "log_sha256": "052b36afee3bbbea98f8036c4cdc0661cbcc35c4d6ba77374670002db2421520"
+    },
+    {
+      "name": "recovery-gameplay",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--test",
+        "ground_jetpack",
+        "--test",
+        "ground_walk",
+        "--test",
+        "recovery_route_stall",
+        "--test",
+        "surface_combat",
+        "--test",
+        "surface_mission"
+      ],
+      "started_unix": 1791622274.828639,
+      "exit_code": 0,
+      "seconds": 56.69293022155762,
+      "tests_passed": 117,
+      "log_sha256": "92eb167ec7dc23ed2c30e390e29d469aa24a6954c3d71ee76607091a7be5c4fa"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_unix": 1791622331.52177,
+      "exit_code": 0,
+      "seconds": 3.241879463195801,
+      "tests_passed": 0,
+      "log_sha256": "02b10ee054832aed7e6672e35913367a6a646863b9b06bf39f5fb6f78bb07259"
+    },
+    {
+      "name": "native-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-deps"
+      ],
+      "started_unix": 1791622334.7639594,
+      "exit_code": 0,
+      "seconds": 3.3116488456726074,
+      "tests_passed": 0,
+      "log_sha256": "a149e104aee5dc50db3a4b3be4f81a5502a7ed9f8e66f44633ac27bccb08b8df"
+    },
+    {
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "started_unix": 1791622338.0757937,
+      "exit_code": 0,
+      "seconds": 1.023951768875122,
+      "tests_passed": 0,
+      "log_sha256": "26bc01c3d3154db98a055a8627ffd596d44d90cc605a456dd56482ba94bead31"
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_unix": 1791622339.0999293,
+      "exit_code": 0,
+      "seconds": 1.7989726066589355,
+      "tests_passed": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "tests_passed": 577,
+  "reference_sha256": "7f9ad5d9eb2f000f30bb7101485c6c3b2400508ce4c74f76d121ed3b233350d4",
+  "validation_sha256": "a07bc8ed5810331a801468e2ad141a33e32638cfab8586bb1fe2983922418fdf",
+  "reference_ticks_verified": 72000,
+  "continuation_action_ticks": 111300,
+  "material_audit_samples": 1858,
+  "interpretation": "Both bounded attempts move but fail to rejoin or complete recovery. The later attempt exposes upright-clearance suppression of crawl probes while start footing remains unavailable.",
+  "limitations": [
+    "No proof of physical impossibility or successful escape.",
+    "One setting at two retained times, not independent seeds.",
+    "Option remains independently selected only in the existing task; no default, host profile, deployment or GitHub change.",
+    "Continuing safe probes after upright clearance still requires a controlled native experiment."
+  ],
+  "inspection_sha256": "2df585d94800c23e9526361bae6af9e65a109a7d3427a0b5944d5261025ddfa9"
+}

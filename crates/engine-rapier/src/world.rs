@@ -24,6 +24,10 @@ use serde::{Deserialize, Serialize};
 mod ball_cast;
 pub use ball_cast::{BallCastHit, BallCastOptions, BallCastStatus};
 mod clearance;
+#[cfg(feature = "query-diagnostics")]
+mod connectivity;
+#[cfg(feature = "query-diagnostics")]
+pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
 mod query_snapshot;
 pub use query_snapshot::{
