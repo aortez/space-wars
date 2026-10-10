@@ -958,6 +958,8 @@ fn a_fresh_preview_already_at_the_foot_can_be_held_before_a_ground_route_is_need
             revision: Some(site.revision),
             standing: site.position,
             radial_up: None,
+            #[cfg(feature = "sensor-profile")]
+            preview_normal: None,
             selected_offset: Some(-10.0),
             attempts: Vec::new(),
         }),
@@ -1097,6 +1099,8 @@ fn held_footing_releases_large_displacements_and_native_placement_failures() {
                     revision: Some(site.revision),
                     standing: site.position,
                     radial_up: None,
+                    #[cfg(feature = "sensor-profile")]
+                    preview_normal: None,
                     selected_offset: None,
                     attempts: Vec::new(),
                 },
@@ -1148,6 +1152,8 @@ fn held_footing_ignores_latched_failures_until_a_current_attempt_rejects_it() {
                 revision: Some(site.revision),
                 standing: site.position,
                 radial_up: None,
+                #[cfg(feature = "sensor-profile")]
+                preview_normal: None,
                 selected_offset: None,
                 attempts: Vec::new(),
             };
@@ -1185,6 +1191,8 @@ fn held_footing_ignores_latched_failures_until_a_current_attempt_rejects_it() {
                 revision: Some(site.revision),
                 standing: site.position,
                 radial_up: None,
+                #[cfg(feature = "sensor-profile")]
+                preview_normal: None,
                 selected_offset: None,
                 attempts: Vec::new(),
             });

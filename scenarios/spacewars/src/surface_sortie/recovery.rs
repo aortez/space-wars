@@ -251,6 +251,8 @@ impl SurfaceSortieState {
 
     pub(super) fn update_recovery(&mut self, dt: Duration) {
         for player in 0..self.player_count() {
+            #[cfg(feature = "sensor-profile")]
+            self.refresh_rebuild_preview_normal(player);
             if self.pilots[player].recovery.is_none() {
                 continue;
             }
@@ -325,7 +327,14 @@ impl SurfaceSortieState {
         )> = None;
         let (pose, report) = selected.unwrap_or_else(|| {
             let map = self.rebuild_ground_map(player, planet, point);
-            self.find_rebuild_placement(player, planet, point, up, map.as_ref())
+            #[cfg(feature = "sensor-profile")]
+            {
+                self.find_native_rebuild_placement(player, planet, point, up, map.as_ref())
+            }
+            #[cfg(not(feature = "sensor-profile"))]
+            {
+                self.find_rebuild_placement(player, planet, point, up, map.as_ref())
+            }
         });
         self.pilots[player].recovery.as_mut().unwrap().placement = Some(report);
         let Some(pose) = pose else {

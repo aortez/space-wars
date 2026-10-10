@@ -21,7 +21,11 @@ pub(super) mod selection;
 #[cfg(feature = "sensor-profile")]
 pub use local_forecast::RebuildLocalForecast;
 #[cfg(feature = "sensor-profile")]
+mod preview_normal;
+#[cfg(feature = "sensor-profile")]
 mod probe;
+#[cfg(feature = "sensor-profile")]
+pub use preview_normal::RebuildPreviewNormal;
 #[cfg(feature = "sensor-profile")]
 mod radial;
 #[cfg(feature = "sensor-profile")]
@@ -83,6 +87,11 @@ pub struct RebuildPlacementReport {
     /// actual pose still comes from measured ground beneath both landing feet.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub radial_up: Option<Vec2>,
+    /// Measured direction retained from a selected, reached preview. This does
+    /// not replace `standing` or authorize construction without fresh checks.
+    #[cfg(feature = "sensor-profile")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_normal: Option<RebuildPreviewNormal>,
     pub selected_offset: Option<f32>,
     pub attempts: Vec<RebuildAttempt>,
 }
@@ -313,6 +322,8 @@ impl SurfaceSortieState {
             anchor: anchored.then(|| local(point)),
             anchor_up: anchored.then(|| up.rotate_radians(-frame.angle)),
             radial_up: radial.then(|| up.rotate_radians(-frame.angle)),
+            #[cfg(feature = "sensor-profile")]
+            preview_normal: None,
             selected_offset: None,
             attempts: Vec::new(),
         };

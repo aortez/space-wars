@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use spacewars_ai::{
     BrainReset,
     combat_pilot::CombatIntent,
+    ground_task::GroundGoal,
     recovery_task::{RecoverShipTask, TaskStatus},
 };
 use std::{
@@ -326,6 +327,14 @@ fn fork(
         ..Default::default()
     };
     let mut contact_transition = None;
+    let preview_requested = crate::arg("--rebuild-preview-normal", "false") == "true";
+    if preview_requested {
+        assert!(selection);
+        assert_eq!(crate::arg("--rebuild-contact-frame", "false"), "true");
+        assert_eq!(crate::arg("--rebuild-precise-arrival", "false"), "true");
+    }
+    let mut preview_pending = false;
+    let mut preview_events = Vec::new();
     let mut selection_trace = selection.then(|| {
         BufWriter::new(
             fs::File::create(out.join(format!("rebuild-selection-{name}.jsonl"))).unwrap(),
@@ -415,10 +424,48 @@ fn fork(
             state.recovery_observation_for_replay(seat, query(&row.pilots[seat]["site_query"]))
         };
         state.add_terrain_flight_forecast(seat, &mut o);
+        let old_relocations = task.telemetry().relocations;
+        let old_site = task.telemetry().relocation_site;
         let intent = CombatIntent {
             flight: task.step(&o),
             ..Default::default()
         };
+        if preview_requested && live {
+            let telemetry = task.telemetry();
+            if telemetry.relocations > old_relocations {
+                assert_eq!(telemetry.relocations, old_relocations + 1);
+                state.clear_rebuild_preview_normal(seat, "new_destination");
+                let radial = crate::arg("--rebuild-radial-placement", "false") == "true"
+                    && !contact_switch.applied;
+                preview_pending = !radial;
+                if preview_pending {
+                    let survey = o.rebuild.as_ref().unwrap();
+                    assert_eq!(telemetry.relocation_site, survey.site);
+                    assert!(
+                        state.capture_rebuild_preview_normal(seat, survey),
+                        "selected preview did not reproduce at {}",
+                        row.tick
+                    );
+                }
+            } else if old_site.is_some() && telemetry.relocation_site.is_none() {
+                if preview_pending
+                    && telemetry
+                        .ground
+                        .as_ref()
+                        .is_some_and(|g| g.goal == GroundGoal::Arrived)
+                {
+                    assert!(
+                        state.arrive_rebuild_preview_normal(seat),
+                        "precise arrival did not reproduce at {}",
+                        row.tick
+                    );
+                } else {
+                    state.clear_rebuild_preview_normal(seat, "destination_cleared_without_arrival");
+                }
+                preview_pending = false;
+            }
+        }
+        preview_events.extend(state.take_rebuild_preview_normal_events());
         let generated = intent.encode(owner);
         let mut paired = row.actions.clone();
         if live {
@@ -555,6 +602,11 @@ fn fork(
             writeln!(contacts, "{}", state.rebuild_contact_diagnostics(seat)).unwrap();
         }
         if let Some(stop) = stop {
+            write(
+                &out.join(format!("rebuild-preview-normal-{name}.json")),
+                &json!({"schema":1,"seat":seat,"requested":preview_requested,
+                    "eligible":preview_requested && live,"events":preview_events}),
+            );
             write(
                 &out.join(format!("rebuild-contact-switch-{name}.json")),
                 &json!({"schema":1,"seat":seat,"requested":contact_requested,

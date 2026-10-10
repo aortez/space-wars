@@ -42,6 +42,8 @@ impl SurfaceSortieState {
             .unwrap_or(point);
         let up = if let Some(up) = report.anchor_up {
             up.rotate_radians(frame.angle)
+        } else if let Some(preview) = &report.preview_normal {
+            preview.normal.rotate_radians(frame.angle)
         } else if pilot.rebuild_radial_placement {
             (point - frame.position).normalized()
         } else {

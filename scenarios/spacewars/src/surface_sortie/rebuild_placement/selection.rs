@@ -19,6 +19,7 @@ struct Search {
     revision: Option<u64>,
     anchor: Vec2,
     up: Vec2,
+    preview_normal: Option<RebuildPreviewNormal>,
     offsets: Vec<f32>,
     next: usize,
     last_report: RebuildPlacementReport,
@@ -56,6 +57,14 @@ impl SurfaceSortieState {
         self.rebuild_selection
             .as_ref()
             .is_some_and(|s| s.searches[player].is_some())
+    }
+
+    pub(super) fn rebuild_selection_uses_preview_normal(&self, player: usize) -> bool {
+        self.rebuild_selection.as_ref().is_some_and(|s| {
+            s.searches[player]
+                .as_ref()
+                .is_some_and(|q| q.preview_normal.is_some())
+        })
     }
 
     pub(in crate::surface_sortie) fn cancel_rebuild_selection(
@@ -111,7 +120,7 @@ impl SurfaceSortieState {
         let Some(mut search) = old else {
             let map = self.rebuild_ground_map(player, planet, point);
             let (pose, report) =
-                self.find_rebuild_placement(player, planet, point, up, map.as_ref());
+                self.find_native_rebuild_placement(player, planet, point, up, map.as_ref());
             let Some(pose) = pose else {
                 return Some((None, report));
             };
@@ -137,7 +146,11 @@ impl SurfaceSortieState {
                 planet,
                 revision,
                 anchor: local(point),
-                up: up.rotate_radians(-frame.angle),
+                up: report
+                    .preview_normal
+                    .as_ref()
+                    .map_or_else(|| up.rotate_radians(-frame.angle), |p| p.normal),
+                preview_normal: report.preview_normal.clone(),
                 offsets,
                 next: 1,
                 last_report: report,
@@ -149,6 +162,8 @@ impl SurfaceSortieState {
             || revision != search.revision
             || self.world.physics.material_queries_dirty
             || local(point).distance_to(search.anchor) > MAX_ANCHOR_DISTANCE
+            || self.active_rebuild_preview_normal(player, planet, point)
+                != search.preview_normal.as_ref()
         {
             self.selection_event(
                 player,
@@ -236,7 +251,7 @@ impl SurfaceSortieState {
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
         let frame = motion::SurfaceFrame::read(&self.world.physics, search.planet);
         let map = self.rebuild_ground_map(player, search.planet, standing);
-        self.find_rebuild_placement_from(
+        let (pose, mut report) = self.find_rebuild_placement_from(
             player,
             search.planet,
             PlacementOrigin {
@@ -247,7 +262,9 @@ impl SurfaceSortieState {
             },
             map.as_ref(),
             &[offset],
-        )
+        );
+        report.preview_normal = search.preview_normal.clone();
+        (pose, report)
     }
 }
 
