@@ -6,6 +6,63 @@ use serde_json::{Value, json};
 const MAX_FORECASTS: usize = 64;
 
 impl SurfaceSortieState {
+    /// Compare query frames on the same snapshot. Only a diagnostic clone's
+    /// direction flag changes; native play and the measured search stay fixed.
+    pub fn rebuild_direction_forecast_diagnostics(&self, player: usize) -> Value {
+        let native = self.rebuild_standing_forecast_diagnostics(player);
+        if native.get("unavailable").is_some() {
+            return native;
+        }
+        let before = self.world.physics.world.snapshot_bytes().unwrap();
+        let radial = self.pilots[player].rebuild_radial_placement;
+        let mut alternate = self.clone();
+        alternate.pilots[player].rebuild_radial_placement = !radial;
+        let other = alternate.rebuild_standing_forecast_diagnostics(player);
+        for key in [
+            "tick",
+            "seat",
+            "planet",
+            "revision",
+            "foot",
+            "offsets",
+            "map",
+            "replacement_map",
+        ] {
+            assert_eq!(native[key], other[key], "{key}");
+        }
+        let fixed_cases = |report: &Value| {
+            report["attempts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|case| {
+                    let mut fixed = case.as_object().unwrap().clone();
+                    fixed.remove("placement");
+                    fixed.remove("forecasts");
+                    fixed
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(fixed_cases(&native), fixed_cases(&other));
+        assert_eq!(
+            before,
+            alternate.world.physics.world.snapshot_bytes().unwrap()
+        );
+        assert_eq!(before, self.world.physics.world.snapshot_bytes().unwrap());
+        assert_eq!(self.pilots[player].rebuild_radial_placement, radial);
+        let (contact, radial_report) = if radial {
+            (other, native)
+        } else {
+            (native, other)
+        };
+        json!({"schema":1,"tick":self.tick(),"seat":player,
+            "native_direction":if radial {"radial"} else {"contact_normal"},
+            "directions":{"contact_normal":contact,"radial":radial_report},
+            "physics_unchanged":true,"native_flag_unchanged":true,"same_search_inputs":true,
+            "preview_only":true,"controller_input":false,
+            "scope":"Only placement query direction varies. Contact normal means native support up at the current point and measured node normal elsewhere. No travel or construction delay is predicted."})
+    }
+
     pub fn rebuild_standing_forecast_diagnostics(&self, player: usize) -> Value {
         if player >= self.player_count()
             || self.world.physics.material_queries_dirty
@@ -163,6 +220,42 @@ impl SurfaceSortieState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rebuild_direction_forecast_keeps_both_searches_and_native_flag_fixed() {
+        let mut state = native_forecast::tests::preparing_build(false);
+        assert!(state.rebuild_direction_forecast_diagnostics(99)["unavailable"].is_string());
+        for _ in 0..2 {
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        state.pilots[0].rebuild_radial_placement = true;
+        let before = state.world.physics.snapshot_bytes();
+        let actor = state.spaceling_snapshot(0);
+        let recovery = state.observation(0).recovery;
+        let tick = state.tick();
+        let pair = state.rebuild_direction_forecast_diagnostics(0);
+        assert_eq!(pair["native_direction"], "radial");
+        assert_eq!(pair["same_search_inputs"], true);
+        assert_eq!(state.world.physics.snapshot_bytes(), before);
+        assert_eq!(state.spaceling_snapshot(0), actor);
+        assert_eq!(state.observation(0).recovery, recovery);
+        assert_eq!(state.tick(), tick);
+        assert!(state.pilots[0].rebuild_radial_placement);
+        for direction in ["contact_normal", "radial"] {
+            let report = &pair["directions"][direction];
+            assert!(report["forecasts"].as_u64().unwrap() <= MAX_FORECASTS as u64);
+            for case in report["attempts"].as_array().unwrap() {
+                if case["eligible"] == true {
+                    assert_eq!(
+                        case["placement"].get("radial_up").is_some(),
+                        direction == "radial"
+                    );
+                }
+            }
+        }
+        state.world.physics.material_queries_dirty = true;
+        assert!(state.rebuild_direction_forecast_diagnostics(0)["unavailable"].is_string());
+    }
 
     #[test]
     fn rebuild_standing_forecast_preserves_world_and_checks_every_accepted_pose() {

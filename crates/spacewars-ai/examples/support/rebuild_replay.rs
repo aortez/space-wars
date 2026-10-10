@@ -281,6 +281,12 @@ fn fork(
         .map(|s| s.parse().unwrap())
         .collect();
     assert!(standing_ticks.len() <= 5);
+    let direction_ticks: Vec<u64> = crate::arg("--rebuild-direction-forecast-ticks", "")
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().unwrap())
+        .collect();
+    assert!(direction_ticks.len() <= 5);
     let probe_path = crate::arg("--rebuild-placement-probe", "none");
     let probe_request: Option<RebuildPlacementProbeRequest> = (probe_path != "none")
         .then(|| serde_json::from_slice(&fs::read(&probe_path).unwrap()).unwrap());
@@ -427,6 +433,12 @@ fn fork(
             write(
                 &out.join(format!("rebuild-standing-forecast-{}.json", row.tick)),
                 &state.rebuild_standing_forecast_diagnostics(seat),
+            );
+        }
+        if live && direction_ticks.contains(&row.tick) {
+            write(
+                &out.join(format!("rebuild-direction-forecast-{}.json", row.tick)),
+                &state.rebuild_direction_forecast_diagnostics(seat),
             );
         }
         if first_task.is_none() && row.recovery.as_ref() != Some(&telemetry) {
