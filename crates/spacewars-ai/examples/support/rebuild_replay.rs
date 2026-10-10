@@ -81,6 +81,71 @@ fn write(path: &Path, value: &Value) {
     fs::write(path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
 }
 
+/// A one-shot replay intervention, using only already emitted native events.
+/// Keep the failed forecast and every remaining offset before changing frames.
+#[derive(Default)]
+struct ContactAfterVeto {
+    eligible: bool,
+    vetoed: Option<(u64, u64)>,
+    trigger: Option<Value>,
+    applied: bool,
+}
+
+impl ContactAfterVeto {
+    fn observe(&mut self, seat: usize, event: &Value) {
+        if !self.eligible || self.trigger.is_some() || event["seat"] != seat {
+            return;
+        }
+        if event["kind"] == "evaluated"
+            && event["prediction"] == false
+            && event["accepted"] == false
+        {
+            self.vetoed = Some((
+                event["search_tick"].as_u64().unwrap(),
+                event["tick"].as_u64().unwrap(),
+            ));
+        }
+        if event["kind"] == "exhausted"
+            && let Some((search, negative)) = self.vetoed
+            && event["search_tick"] == search
+        {
+            let exhausted = event["tick"].as_u64().unwrap();
+            assert!(search < negative && negative <= exhausted);
+            self.trigger = Some(json!({"search_tick":search,"negative_tick":negative,
+                "exhaustion_tick":exhausted,"activation_tick":exhausted+1}));
+        }
+    }
+
+    fn take_due(&mut self, tick: u64) -> Option<Value> {
+        let trigger = self.trigger.as_ref()?;
+        if self.applied {
+            return None;
+        }
+        let due = trigger["activation_tick"].as_u64().unwrap();
+        assert!(tick <= due, "missed contact-query intervention");
+        if tick != due {
+            return None;
+        }
+        self.applied = true;
+        Some(trigger.clone())
+    }
+}
+
+fn switch_to_contact(state: &mut SurfaceSortieState, task: &RecoverShipTask, seat: usize) -> Value {
+    let pilot = canonical(state.observation(seat));
+    let contact = state.rebuild_contact_diagnostics(seat);
+    let telemetry = canonical(task.telemetry());
+    let search = canonical(task.rebuild_search_request());
+    assert!(state.set_rebuild_radial_placement(seat, false));
+    assert_eq!(canonical(state.observation(seat)), pilot);
+    assert_eq!(state.rebuild_contact_diagnostics(seat), contact);
+    assert_eq!(canonical(task.telemetry()), telemetry);
+    assert_eq!(canonical(task.rebuild_search_request()), search);
+    json!({"tick":state.tick(),"seat":seat,"from":"radial","to":"contact_normal",
+        "pilot":pilot,"contact":contact,"task":telemetry,"search":search,
+        "pilot_unchanged":true,"contact_unchanged":true,"task_unchanged":true,"search_unchanged":true})
+}
+
 pub fn run(mut state: SurfaceSortieState, out: &Path, seed: u64) {
     let path = crate::arg("--rebuild-replay-tape", "none");
     let seat: usize = crate::arg("--rebuild-replay-seat", "1").parse().unwrap();
@@ -252,6 +317,15 @@ fn fork(
     if selection {
         assert!(state.set_rebuild_forecast_selection(seat, true));
     }
+    let contact_requested = crate::arg("--rebuild-contact-after-veto", "false") == "true";
+    assert!(!contact_requested || selection);
+    let mut contact_switch = ContactAfterVeto {
+        eligible: contact_requested
+            && live
+            && crate::arg("--rebuild-radial-placement", "false") == "true",
+        ..Default::default()
+    };
+    let mut contact_transition = None;
     let mut selection_trace = selection.then(|| {
         BufWriter::new(
             fs::File::create(out.join(format!("rebuild-selection-{name}.jsonl"))).unwrap(),
@@ -296,8 +370,12 @@ fn fork(
     loop {
         let row = read(&mut tape);
         assert_eq!(row.tick, state.tick());
+        if contact_switch.take_due(row.tick).is_some() {
+            contact_transition = Some(switch_to_contact(&mut state, &task, seat));
+        }
         if let Some(trace) = &mut selection_trace {
             for event in state.take_rebuild_selection_events() {
+                contact_switch.observe(seat, &event);
                 writeln!(trace, "{event}").unwrap();
             }
         }
@@ -477,6 +555,12 @@ fn fork(
             writeln!(contacts, "{}", state.rebuild_contact_diagnostics(seat)).unwrap();
         }
         if let Some(stop) = stop {
+            write(
+                &out.join(format!("rebuild-contact-switch-{name}.json")),
+                &json!({"schema":1,"seat":seat,"requested":contact_requested,
+                    "eligible":contact_switch.eligible,"applied":contact_switch.applied,
+                    "trigger":contact_switch.trigger,"transition":contact_transition}),
+            );
             if let Some(trace) = &mut selection_trace {
                 trace.flush().unwrap();
             }
@@ -507,6 +591,72 @@ fn fork(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn contact_switch_waits_for_matching_negative_search_exhaustion_and_runs_once() {
+        let mut gate = ContactAfterVeto {
+            eligible: true,
+            ..Default::default()
+        };
+        let negative = json!({"seat":1,"kind":"evaluated","search_tick":100,
+            "tick":140,"prediction":false,"accepted":false});
+        let exhausted = json!({"seat":1,"kind":"exhausted","search_tick":100,"tick":165});
+        gate.observe(1, &exhausted);
+        assert!(gate.take_due(165).is_none());
+        gate.observe(0, &negative);
+        gate.observe(1, &exhausted);
+        assert!(gate.trigger.is_none());
+        gate.observe(1, &negative);
+        let mut other = exhausted.clone();
+        other["search_tick"] = json!(101);
+        gate.observe(1, &other);
+        assert!(gate.trigger.is_none());
+        gate.observe(1, &exhausted);
+        assert!(gate.take_due(165).is_none());
+        assert_eq!(gate.take_due(166).unwrap()["negative_tick"], 140);
+        assert!(gate.take_due(167).is_none());
+        gate.observe(1, &negative);
+        gate.observe(1, &exhausted);
+        assert!(gate.take_due(200).is_none());
+    }
+
+    #[test]
+    fn contact_switch_ignores_disabled_positive_and_inconclusive_cases() {
+        for (eligible, prediction) in [
+            (false, json!(false)),
+            (true, json!(true)),
+            (true, Value::Null),
+        ] {
+            let mut gate = ContactAfterVeto {
+                eligible,
+                ..Default::default()
+            };
+            gate.observe(
+                1,
+                &json!({"seat":1,"kind":"evaluated","search_tick":100,
+                "tick":140,"prediction":prediction,"accepted":false}),
+            );
+            gate.observe(
+                1,
+                &json!({"seat":1,"kind":"exhausted","search_tick":100,"tick":165}),
+            );
+            assert!(gate.take_due(166).is_none());
+        }
+    }
+
+    #[test]
+    fn contact_switch_preserves_native_observation_and_existing_task() {
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        let task = RecoverShipTask::new(BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        });
+        assert!(state.set_rebuild_radial_placement(0, true));
+        let record = switch_to_contact(&mut state, &task, 0);
+        assert_eq!(record["task_unchanged"], true);
+        assert_eq!(record["pilot_unchanged"], true);
+        assert_eq!(record["search_unchanged"], true);
+    }
 
     #[test]
     fn typed_native_floats_match_the_retained_value_serialization() {
