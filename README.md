@@ -2,13 +2,14 @@
 
 This is my vision for a 2d physics-based game and AI playground. It will soon
 be a playground for evolving and training neural nets to play various scenarios
-within it, including a "Space Wars" scenario, in which 2 players attempt to best
-their opponent in combat, enlisting whatever resources they can acquire.
+within it, including a "Space Wars" scenario, in which 2 players compete, at the
+most direct level, this involves controlling a small ship to destroy your opponent
+so you will rule the galaxy.
 
 It also contains a very fancy clock mode. Beyond just showing the correct time, the
 clock contains an event system and various organisms. Currently we have nice things
 like rain, a drain, exploding letters, melting letters, a parkour rubber ducky, a
-cautious crow... etc. It's a dynamic system.
+cautious crow... etc. Some events can overlap.
 
 ## Why is it Called Space Wars?
 Being able to support my vision of the old 1985 Spacewar DOS game is a primary goal
