@@ -182,6 +182,27 @@ jobs:
           path: target/functional-test-artifacts
           if-no-files-found: ignore
 
+  spacewars-recovery:
+    name: Spacewars experimental recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      # The normal workspace build does not enable the experimental host/profile.
+      # Retained full-match diagnostics remain ignored and require their packages.
+      - name: Test recovery profiles and native ground/boarding behavior
+        run: cargo test --locked --profile ci -p spacewars-ai --features sensor-profile --lib --test ground_navigation --test surface_recovery
+      - name: Test experimental supported-corridor observations
+        run: cargo test --locked --profile ci -p scenario-spacewars --features sensor-profile --lib surface_sortie::ground_posture::tests
+      - name: Lint recovery code and diagnostics
+        run: cargo clippy --locked -p spacewars-ai --features sensor-profile --lib --tests --no-deps -- -D warnings
+
   spacewars-ai-regression:
     name: Spacewars AI deterministic baselines
     runs-on: ubuntu-latest
