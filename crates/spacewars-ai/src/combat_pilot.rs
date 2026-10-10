@@ -421,6 +421,9 @@ fn turn(o: &CombatObservationV2, direction: Vec2) -> f32 {
 }
 
 #[cfg(test)]
+mod recovery_diagnostic;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use engine_common::Scenario;
