@@ -347,6 +347,94 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn launcher_can_run_the_pizza_menu_lifecycle() {
+    run_functional_test("launcher-pizza-menu-lifecycle", |harness| {
+        let mut state = harness.wait_until_ready();
+        assert_launcher_main(&state);
+        state = harness.activate_until_scenario("pizza", state);
+
+        let launcher_revision = state.revision;
+        harness.activate_guarded("launcher.start", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("pizza".into()),
+                revision_after: Some(launcher_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert_eq!(state.selected_scenario, "pizza");
+        let original_scenario_revision = state
+            .scenario_revision
+            .expect("Pizza gameplay must report a scenario revision");
+        assert!(!state.paused);
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("pizza".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert!(state.paused);
+        assert_eq!(state.scenario_revision, Some(original_scenario_revision));
+        harness.capture_screenshot("pause.png");
+
+        let restart_requested = harness.activate_guarded("pause.restart", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("pizza".into()),
+                revision_after: Some(restart_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert_eq!(state.selected_scenario, "pizza");
+        let restarted_scenario_revision = state
+            .scenario_revision
+            .expect("restarted Pizza gameplay must report a scenario revision");
+        assert_ne!(restarted_scenario_revision, original_scenario_revision);
+        assert!(!state.paused);
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("pizza".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert_eq!(state.scenario_revision, Some(restarted_scenario_revision));
+
+        let return_from_revision = state.revision;
+        harness.activate_guarded("pause.return-to-launcher", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::LauncherMain),
+                scenario: None,
+                revision_after: Some(return_from_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert!(!state.paused);
+        assert_eq!(state.active_scenario, None);
+        assert_eq!(state.scenario_revision, None);
+        assert_eq!(state.selected_scenario, "pizza");
+        assert_eq!(state.error, None);
+        harness.capture_screenshot("returned-launcher.png");
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_can_run_the_classic_spacewars_menu_lifecycle() {
     run_functional_test("launcher-classic-spacewars-menu-lifecycle", |harness| {
         let mut state = harness.wait_until_ready();
