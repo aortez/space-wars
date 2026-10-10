@@ -127,6 +127,12 @@ construction, settling and boarding within the original task limits. Preserve
 the successful handoff control and forecast veto. These results do not require
 wider routes, relaxed placement guards or a global radial default.
 
+The [post-veto execution test](rebuild-contact-recovery-results.md) now completes
+that comparison. The existing search discovers and precisely reaches accepted
+preview sites, but later native placement rejects them; the candidate exhausts
+four relocations without building. Discovery therefore works in this retained
+continuation, while preview-to-native placement consistency remains unresolved.
+
 The [manifest](data/rebuild-query-directions-v1.json) and
 [portable review bundle](data/rebuild-query-directions-v1.json.gz) include all
 paired reports and samples, prior references, actual search rows, timing logs,

@@ -1,0 +1,2268 @@
+{
+  "schema": 1,
+  "profile": "retained_rebuild_contact_recovery_v1",
+  "complete": true,
+  "screen": {
+    "controls_retained": true,
+    "pre_veto_path_preserved": true,
+    "recorded_forks_preserved": true,
+    "isolated_recovery_complete": false,
+    "decision": "not_qualified",
+    "scored_match": false,
+    "default_promotion": false
+  },
+  "runtime_source_commit": "f9a950b86e736c1b8080c0d4322c1edaa53099aa",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-contact-recovery/v1/surface_mission_soak",
+    "sha256": "ddb2cde5d1b4971e001a6e7ef4942355609aa57ab4098bf190b1b6cef0255b28"
+  },
+  "frozen_inputs": 1029,
+  "changed_inputs": [
+    "crates/spacewars-ai/examples/support/rebuild_replay.rs",
+    "docs/rebuild-contact-recovery-plan.md",
+    "tools/tests/test_rebuild_contact_recovery.py",
+    "tools/validate-rebuild-contact-recovery.py"
+  ],
+  "prefixes": 3,
+  "continuations": 6,
+  "simulation_retries": 0,
+  "audit_resumes": 0,
+  "diagnosis": {
+    "outcomes": {
+      "control_handoff": {
+        "live": {
+          "last_tick": 27261,
+          "reason": "recovery_complete",
+          "task_reason": null,
+          "health": 60.66692352294922,
+          "losses": 1,
+          "relocations": 3,
+          "build_ticks": [
+            27154
+          ],
+          "boarding_ticks": [
+            27260
+          ]
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "losses": 1,
+          "relocations": 1,
+          "build_ticks": [
+            27499
+          ],
+          "boarding_ticks": []
+        }
+      },
+      "control_coarse": {
+        "live": {
+          "last_tick": 25739,
+          "reason": "recovery_blocked",
+          "task_reason": "no reachable standing site with hatch access",
+          "health": 100.0,
+          "losses": 1,
+          "relocations": 1,
+          "build_ticks": [],
+          "boarding_ticks": []
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "losses": 1,
+          "relocations": 1,
+          "build_ticks": [],
+          "boarding_ticks": []
+        }
+      },
+      "contact_coarse": {
+        "live": {
+          "last_tick": 28809,
+          "reason": "recovery_blocked",
+          "task_reason": "no accessible rebuild after four measured relocations",
+          "health": 100.0,
+          "losses": 1,
+          "relocations": 4,
+          "build_ticks": [],
+          "boarding_ticks": []
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "losses": 1,
+          "relocations": 1,
+          "build_ticks": [],
+          "boarding_ticks": []
+        }
+      }
+    },
+    "trigger": {
+      "activation_tick": 25439,
+      "exhaustion_tick": 25438,
+      "negative_tick": 25413,
+      "search_tick": 25373
+    },
+    "equal_pre_activation_rows": 1672,
+    "first_differences": {
+      "row": 25440,
+      "physical_pilots": 25468,
+      "task": 25470,
+      "actions": 25666,
+      "length": 25740
+    },
+    "candidate_search": {
+      "surveys": 12,
+      "relocation_ticks": [
+        24300,
+        25650,
+        26340,
+        27870
+      ],
+      "staging_ticks": [],
+      "arrival_ticks": [],
+      "max_offset_checks": 240,
+      "max_staging_route_checks": 2,
+      "sha256": "a7e55feca882d5a890f3ecdcd894808f2bfba0832bf9c2ff19fdeb544edc891e"
+    },
+    "candidate_arrival": {
+      "enabled": true,
+      "arrivals": [
+        {
+          "tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "foot_distance": 0.11892101405493477
+        },
+        {
+          "tick": 25922,
+          "selection_tick": 25650,
+          "site": {
+            "flight_length": -0.0,
+            "hatch_walk_length": 3.490327835083008,
+            "jetpack_flights": 0,
+            "planet": 0,
+            "position": {
+              "x": 29.005231857299805,
+              "y": -15.964298248291016
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 7.222764015197754
+          },
+          "foot_distance": 0.11973845725097132
+        },
+        {
+          "tick": 27415,
+          "selection_tick": 26340,
+          "site": {
+            "flight_length": 5.629759311676025,
+            "hatch_walk_length": 3.8715813159942623,
+            "jetpack_flights": 2,
+            "planet": 0,
+            "position": {
+              "x": 32.300296783447266,
+              "y": 1.5868234634399414
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 18.32537269592285
+          },
+          "foot_distance": 0.11920528324446127
+        }
+      ],
+      "native_attempts": [
+        {
+          "tick": 25438,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": true,
+          "point_distance": 0.9359682370823512
+        },
+        {
+          "tick": 25468,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": true,
+          "point_distance": 0.9579560214174954
+        },
+        {
+          "tick": 25498,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": true,
+          "point_distance": 0.9816892884858694
+        },
+        {
+          "tick": 25528,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": true,
+          "point_distance": 1.0062124386744102
+        },
+        {
+          "tick": 25558,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": false,
+          "point_distance": 1.0267271634509976
+        },
+        {
+          "tick": 25588,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": false,
+          "point_distance": 1.0506877301564261
+        },
+        {
+          "tick": 25618,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": false,
+          "point_distance": 1.0731731926415602
+        },
+        {
+          "tick": 25648,
+          "arrival_tick": 25026,
+          "selection_tick": 24300,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "same_terrain": false,
+          "point_distance": 1.0927644812079178
+        },
+        {
+          "tick": 26333,
+          "arrival_tick": 25922,
+          "selection_tick": 25650,
+          "site": {
+            "flight_length": -0.0,
+            "hatch_walk_length": 3.490327835083008,
+            "jetpack_flights": 0,
+            "planet": 0,
+            "position": {
+              "x": 29.005231857299805,
+              "y": -15.964298248291016
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 7.222764015197754
+          },
+          "same_terrain": true,
+          "point_distance": 0.6683669657234754
+        },
+        {
+          "tick": 27856,
+          "arrival_tick": 27415,
+          "selection_tick": 26340,
+          "site": {
+            "flight_length": 5.629759311676025,
+            "hatch_walk_length": 3.8715813159942623,
+            "jetpack_flights": 2,
+            "planet": 0,
+            "position": {
+              "x": 32.300296783447266,
+              "y": 1.5868234634399414
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 18.32537269592285
+          },
+          "same_terrain": true,
+          "point_distance": 0.2991250846056508
+        }
+      ],
+      "sha256": "f125b308fc278d559e8e19ec38d287bca34bd7d6aa2dc47e3d2019a795ff6a06"
+    },
+    "candidate_selection": {
+      "searches": 1,
+      "candidate_queries": 25,
+      "maximum_update_ms": 4.4848930000000005,
+      "cancellations": 0,
+      "invalidations": 0,
+      "exhausted": 1,
+      "pending": 0,
+      "measurements": [
+        {
+          "capture_tick": 25373,
+          "launch_tick": 25413,
+          "decision_tick": 25413,
+          "offset": -8.0,
+          "accepted": false,
+          "prediction": false,
+          "warmup_steps": 40,
+          "steps": 120,
+          "stop": "horizon",
+          "forecast_events": {
+            "first_contact": 25461,
+            "first_two_supported": null,
+            "first_settled": null
+          },
+          "timing": {
+            "diagnostics_ms": 0.6348830000000001,
+            "physics_steps_ms": 2.4343160000000004,
+            "setup_ms": 0.048681999999999996
+          },
+          "maximum_chunk_ms": 0.145846
+        }
+      ],
+      "physics_work": 160,
+      "sha256": "ecc7b9a3a98ad4508e92d178481fa40babf1b10b3e9a26610464525219510268"
+    },
+    "isolated_recovery_complete": false,
+    "scope": "One retained live continuation after a verified radial forecast veto. Fixed opponent controls; no fresh-game, reactive-opponent or frontier qualification.",
+    "execution": {
+      "selections": [
+        {
+          "tick": 24300,
+          "relocation": 1,
+          "bearing": 324,
+          "site": {
+            "flight_length": 5.742920875549316,
+            "hatch_walk_length": 0.0,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 23.02244758605957,
+              "y": -20.866273880004883
+            },
+            "revision": 21,
+            "walk_length": 10.662684440612791
+          },
+          "offset": -8.0,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 32,
+            "refined_candidates": 0
+          }
+        },
+        {
+          "tick": 25650,
+          "relocation": 2,
+          "bearing": 343,
+          "site": {
+            "flight_length": -0.0,
+            "hatch_walk_length": 3.490327835083008,
+            "jetpack_flights": 0,
+            "planet": 0,
+            "position": {
+              "x": 29.005231857299805,
+              "y": -15.964298248291016
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 7.222764015197754
+          },
+          "offset": -11.0,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 84,
+            "refined_candidates": 2
+          }
+        },
+        {
+          "tick": 26340,
+          "relocation": 3,
+          "bearing": 388,
+          "site": {
+            "flight_length": 5.629759311676025,
+            "hatch_walk_length": 3.8715813159942623,
+            "jetpack_flights": 2,
+            "planet": 0,
+            "position": {
+              "x": 32.300296783447266,
+              "y": 1.5868234634399414
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 18.32537269592285
+          },
+          "offset": -11.0,
+          "work": {
+            "coarse_candidates": 5,
+            "offset_checks": 86,
+            "refined_candidates": 3,
+            "staging_route_checks": 2
+          }
+        },
+        {
+          "tick": 27870,
+          "relocation": 4,
+          "bearing": 343,
+          "site": {
+            "flight_length": 2.9799842834472656,
+            "hatch_walk_length": 3.4902772903442383,
+            "jetpack_flights": 1,
+            "planet": 0,
+            "position": {
+              "x": 29.005115509033203,
+              "y": -15.964295387268066
+            },
+            "precise": true,
+            "revision": 22,
+            "walk_length": 20.54856300354004
+          },
+          "offset": -11.0,
+          "work": {
+            "coarse_candidates": 5,
+            "offset_checks": 138,
+            "refined_candidates": 5
+          }
+        }
+      ],
+      "arrived_failures": [
+        {
+          "tick": 26333,
+          "bearing": 343,
+          "selection_tick": 25650,
+          "arrival_tick": 25922,
+          "native_point_distance": 0.6683669657234754,
+          "same_terrain_revision": true,
+          "rejections": {
+            "no_ground": 18,
+            "no_hatch_route": 8
+          },
+          "reference_tick": 25710,
+          "reference_normal": {
+            "x": 0.9848145246505737,
+            "y": -0.1736101508140564
+          },
+          "actual_contact_normal": {
+            "x": 0.6152805089950562,
+            "y": -0.788308322429657
+          },
+          "normal_difference_degrees": 42.029910243907565,
+          "scope": "Reference normal is from the earlier retained revision-22 diagnostic, not a new same-scene direction ablation. Point and epoch also differ."
+        },
+        {
+          "tick": 27856,
+          "bearing": 388,
+          "selection_tick": 26340,
+          "arrival_tick": 27415,
+          "native_point_distance": 0.2991250846056508,
+          "same_terrain_revision": true,
+          "rejections": {
+            "no_hatch_footing": 6,
+            "no_ground": 16,
+            "no_hatch_route": 4
+          },
+          "reference_tick": 27114,
+          "reference_normal": {
+            "x": 0.9230677485466003,
+            "y": 0.3846374452114105
+          },
+          "actual_contact_normal": {
+            "x": 0.9230677485466003,
+            "y": 0.38463735580444336
+          },
+          "normal_difference_degrees": 4.676310850554341e-06,
+          "scope": "Reference normal is from the earlier retained revision-22 diagnostic, not a new same-scene direction ablation. Point and epoch also differ."
+        }
+      ],
+      "fourth_site_invalidated": {
+        "tick": 28330,
+        "selected_revision": 22,
+        "current_revision": 25,
+        "arrived": false,
+        "witness": {
+          "actions": [
+            {
+              "Scenario": {
+                "kind": 1398079490,
+                "payload": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079491,
+                "payload": [
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079493,
+                "payload": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079490,
+                "payload": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079491,
+                "payload": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079493,
+                "payload": [
+                  1,
+                  0,
+                  0
+                ]
+              }
+            }
+          ],
+          "applied": true,
+          "audit": null,
+          "generated_actions": [
+            {
+              "Scenario": {
+                "kind": 1398079490,
+                "payload": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079491,
+                "payload": [
+                  1,
+                  0
+                ]
+              }
+            },
+            {
+              "Scenario": {
+                "kind": 1398079493,
+                "payload": [
+                  1,
+                  0,
+                  0
+                ]
+              }
+            }
+          ],
+          "landing_diagnostics": {
+            "exit": {
+              "capsule_clear": true,
+              "capsule_position": {
+                "x": 1407.02783203125,
+                "y": 1363.21044921875
+              },
+              "clear_without_planet": true,
+              "clear_without_ship": true,
+              "floor": {
+                "x": 1407.4752197265625,
+                "y": 1362.8572998046875
+              },
+              "normal": {
+                "x": -0.7849230170249939,
+                "y": 0.6195932626724243
+              },
+              "occupied": false
+            },
+            "feet": [
+              {
+                "contacts": [
+                  {
+                    "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1006), part: 0 }",
+                    "local_position": {
+                      "x": -24.2428035736084,
+                      "y": 26.88720703125
+                    },
+                    "normal": {
+                      "x": -0.8506032228469849,
+                      "y": 0.5258080959320068
+                    },
+                    "normal_speed": 0.05835996940732002,
+                    "position": {
+                      "x": 1405.283447265625,
+                      "y": 1360.290771484375
+                    },
+                    "retained_planet": true,
+                    "separation": 0.0002694427967071533,
+                    "up_alignment": 0.9995108246803284
+                  }
+                ],
+                "count": 1
+              },
+              {
+                "contacts": [
+                  {
+                    "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1006), part: 0 }",
+                    "local_position": {
+                      "x": -23.19063949584961,
+                      "y": 27.79881477355957
+                    },
+                    "normal": {
+                      "x": -0.8294306993484497,
+                      "y": 0.5586096048355103
+                    },
+                    "normal_speed": -0.0018329001031816006,
+                    "position": {
+                      "x": 1406.052734375,
+                      "y": 1361.451171875
+                    },
+                    "retained_planet": true,
+                    "separation": 0.0006837546825408936,
+                    "up_alignment": 0.9999698400497437
+                  }
+                ],
+                "count": 1
+              }
+            ],
+            "foot_clearances": [
+              0.000679507851600647,
+              -0.00031967461109161377
+            ],
+            "hull": {
+              "contacts": [],
+              "count": 0
+            },
+            "landing": {
+              "altitude": -0.00031967461109161377,
+              "angle_degrees": 0.0656106024980545,
+              "assist_strength": 1.0,
+              "corner_support": false,
+              "descent_speed": -0.03478018939495087,
+              "foot_clearances": [
+                0.000679507851600647,
+                -0.00031967461109161377
+              ],
+              "lateral_speed": 0.03714889660477638,
+              "phase": "landed",
+              "planet": 0,
+              "relative_spin": -0.04363499954342842,
+              "settled_seconds": 0.25,
+              "supported_feet": 2
+            },
+            "planet": 0,
+            "queries_ready": true,
+            "site_hull_clearance": null,
+            "tick": 28330,
+            "transfer": "too_far",
+            "version": 1
+          },
+          "live": true,
+          "observation": {
+            "claim_footing": null,
+            "flight": {
+              "flight": {
+                "enabled": false,
+                "forward_speed": 0.034823812544345856,
+                "limits": {
+                  "brake_acceleration": 40.0,
+                  "brake_gain": 4.0,
+                  "cruise_speed": 70.0,
+                  "thrust_acceleration": 45.0,
+                  "turn_acceleration": 6.0,
+                  "turn_speed": 1.7999999523162842
+                },
+                "relative_speed": 0.050889112055301666,
+                "stopping_distance": 3.237127384636551e-05,
+                "sweep": 0.0,
+                "version": 1,
+                "wings_closed": false
+              },
+              "pilot": {
+                "actor": {
+                  "angle": -0.934860348701477,
+                  "position": {
+                    "x": 1471.445556640625,
+                    "y": 1349.2525634765625
+                  },
+                  "spin": -0.8544318675994873,
+                  "velocity": {
+                    "x": 10.763068199157715,
+                    "y": -17.464763641357422
+                  }
+                },
+                "actor_up": {
+                  "x": 0.8532553315162659,
+                  "y": 0.5214933753013611
+                },
+                "balanced": true,
+                "boarding_hatches": [
+                  {
+                    "x": 1407.4752197265625,
+                    "y": 1362.8572998046875
+                  },
+                  {
+                    "x": 1404.384521484375,
+                    "y": 1358.1873779296875
+                  }
+                ],
+                "controls_armed": true,
+                "gravity": {
+                  "x": 17.633594512939453,
+                  "y": -12.355669975280762
+                },
+                "hatch": {
+                  "x": 1407.4752197265625,
+                  "y": 1362.8572998046875
+                },
+                "landing": {
+                  "altitude": -0.00031967461109161377,
+                  "angle_degrees": 0.0656106024980545,
+                  "assist_strength": 1.0,
+                  "corner_support": false,
+                  "descent_speed": -0.03478018939495087,
+                  "foot_clearances": [
+                    0.000679507851600647,
+                    -0.00031967461109161377
+                  ],
+                  "lateral_speed": 0.03714889660477638,
+                  "phase": "landed",
+                  "planet": 0,
+                  "relative_spin": -0.04363499954342842,
+                  "settled_seconds": 0.25,
+                  "supported_feet": 2
+                },
+                "last_transfer": "exited",
+                "location": "on_foot",
+                "owner": "player_2",
+                "planet": {
+                  "claim": {
+                    "captures": 3,
+                    "claimant": null,
+                    "flag": {
+                      "normal": {
+                        "x": 0.700786292552948,
+                        "y": -0.7133712768554688
+                      },
+                      "player": "player_2",
+                      "position": {
+                        "x": 1461.0989990234375,
+                        "y": 1314.4814453125
+                      },
+                      "raised_fraction": 1.0
+                    },
+                    "flag_interaction_range": 3.0,
+                    "neutralizations": 2,
+                    "owner": "player_2",
+                    "phase": "idle",
+                    "planet": 0,
+                    "progress": 0.0,
+                    "stage_required_seconds": 3.0,
+                    "status": "secured"
+                  },
+                  "index": 0,
+                  "motion": {
+                    "angle": 0.2713164985179901,
+                    "position": {
+                      "x": 1436.0228271484375,
+                      "y": 1340.5938720703125
+                    },
+                    "spin": 0.00057220458984375,
+                    "velocity": {
+                      "x": 10.664735794067383,
+                      "y": -17.394784927368164
+                    }
+                  },
+                  "radius": 36.57160949707031,
+                  "revision": 25
+                },
+                "queries_ready": true,
+                "recovery": {
+                  "blocked_attempts": 14,
+                  "placement": null,
+                  "planet": 0,
+                  "pod_ejections": 1,
+                  "rebuild_interruptions": 18,
+                  "rebuild_progress": 0.0020833334419876337,
+                  "rebuild_required_seconds": 8.0,
+                  "rebuilds": 0,
+                  "scuttle_progress": 0.0,
+                  "scuttle_required_seconds": 3.0,
+                  "ships_lost": 1,
+                  "status": "rebuilding"
+                },
+                "relative_speed": -0.2832043766975403,
+                "ship": {
+                  "angle": 0.9846757054328918,
+                  "position": {
+                    "x": 1405.13623046875,
+                    "y": 1361.048828125
+                  },
+                  "spin": -0.04306279495358467,
+                  "velocity": {
+                    "x": 10.644545555114746,
+                    "y": -17.362281799316406
+                  }
+                },
+                "ship_available": true,
+                "ship_form": "escape_pod",
+                "ship_health": 0.0,
+                "site_query": {
+                  "selected": {
+                    "bearing": 7,
+                    "planet": 0
+                  }
+                },
+                "sites": [],
+                "spaceling": 2,
+                "supported_planet": 0,
+                "tick": 28330,
+                "transfer": "too_far",
+                "transfers": 7,
+                "vehicle": 1,
+                "version": 1
+              },
+              "version": 2
+            },
+            "ground": null,
+            "jetpack": {
+              "burn_seconds": 13.666629791259766,
+              "burning": false,
+              "charge": 0.4319429397583008,
+              "crossing": null,
+              "gravity": {
+                "x": -12.406500816345215,
+                "y": -7.582616806030273
+              },
+              "reference_velocity": {
+                "x": 10.674379348754883,
+                "y": -17.36012077331543
+              },
+              "surveyed": false,
+              "terrain_crossings": []
+            },
+            "pod_righting": {
+              "eligible": false,
+              "lifts": 0,
+              "needs_release": false,
+              "remaining_seconds": 0.0
+            },
+            "posture": {
+              "balance": "balanced",
+              "crawl": [
+                null,
+                null
+              ],
+              "crawl_clearance": [
+                null,
+                null
+              ],
+              "crawl_floor": [
+                null,
+                null
+              ],
+              "get_up_attempts": 0,
+              "get_up_result": "not_requested",
+              "owner": "player_2",
+              "planet": 0,
+              "revision": 25,
+              "stable": true,
+              "standing_clear": true,
+              "tick": 28330,
+              "version": 1
+            },
+            "rebuild": null,
+            "sites": [
+              {
+                "boarding_hatches": [
+                  {
+                    "x": 1408.0947265625,
+                    "y": 1363.628662109375
+                  },
+                  {
+                    "x": 1404.8741455078125,
+                    "y": 1359.04736328125
+                  }
+                ],
+                "hatch_has_settling_margin": false,
+                "hatch_position": {
+                  "x": 1408.0947265625,
+                  "y": 1363.6287841796875
+                },
+                "id": {
+                  "bearing": 7,
+                  "planet": 0
+                },
+                "local_position": {
+                  "x": -22.960710525512695,
+                  "y": 27.977581024169922
+                },
+                "normal": {
+                  "x": -0.818588376045227,
+                  "y": 0.5743806958198547
+                },
+                "position": {
+                  "x": 1406.404052734375,
+                  "y": 1361.39453125
+                },
+                "revision": 25,
+                "vehicle_position": {
+                  "x": 1405.708251953125,
+                  "y": 1361.8828125
+                },
+                "velocity": {
+                  "x": 10.652554512023926,
+                  "y": -17.41213035583496
+                }
+              }
+            ],
+            "version": 1
+          },
+          "pilots": [
+            {
+              "actor": {
+                "angle": 3.003608465194702,
+                "position": {
+                  "x": 1442.3240966796875,
+                  "y": 1316.9300537109375
+                },
+                "spin": -0.0458819642663002,
+                "velocity": {
+                  "x": 10.708943367004395,
+                  "y": -17.380887985229492
+                }
+              },
+              "actor_up": {
+                "x": -0.12095700204372406,
+                "y": -0.9926578402519226
+              },
+              "balanced": true,
+              "boarding_hatches": [
+                null,
+                null
+              ],
+              "controls_armed": true,
+              "gravity": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "hatch": null,
+              "landing": {
+                "altitude": 0.0,
+                "angle_degrees": 0.0,
+                "assist_strength": 0.0,
+                "corner_support": false,
+                "descent_speed": 0.0,
+                "foot_clearances": [
+                  0.0,
+                  0.0
+                ],
+                "lateral_speed": 0.0,
+                "phase": "flying",
+                "planet": null,
+                "relative_spin": 0.0,
+                "settled_seconds": 0.0,
+                "supported_feet": 0
+              },
+              "last_transfer": "exited",
+              "location": "on_foot",
+              "owner": "player_1",
+              "planet": {
+                "claim": {
+                  "captures": 3,
+                  "claimant": null,
+                  "flag": {
+                    "normal": {
+                      "x": 0.700786292552948,
+                      "y": -0.7133712768554688
+                    },
+                    "player": "player_2",
+                    "position": {
+                      "x": 1461.0989990234375,
+                      "y": 1314.4814453125
+                    },
+                    "raised_fraction": 1.0
+                  },
+                  "flag_interaction_range": 3.0,
+                  "neutralizations": 2,
+                  "owner": "player_2",
+                  "phase": "idle",
+                  "planet": 0,
+                  "progress": 0.0,
+                  "stage_required_seconds": 3.0,
+                  "status": "approach_flag"
+                },
+                "index": 0,
+                "motion": {
+                  "angle": 0.2713164985179901,
+                  "position": {
+                    "x": 1436.0228271484375,
+                    "y": 1340.5938720703125
+                  },
+                  "spin": 0.00057220458984375,
+                  "velocity": {
+                    "x": 10.664735794067383,
+                    "y": -17.394784927368164
+                  }
+                },
+                "radius": 36.57160949707031,
+                "revision": 25
+              },
+              "queries_ready": true,
+              "recovery": {
+                "blocked_attempts": 246,
+                "placement": null,
+                "planet": null,
+                "pod_ejections": 1,
+                "rebuild_interruptions": 6,
+                "rebuild_progress": 0.0,
+                "rebuild_required_seconds": 8.0,
+                "rebuilds": 1,
+                "scuttle_progress": 0.0,
+                "scuttle_required_seconds": 3.0,
+                "ships_lost": 2,
+                "status": "need_owned_planet"
+              },
+              "relative_speed": -0.06675341725349426,
+              "ship": {
+                "angle": -1.9868874549865723,
+                "position": {
+                  "x": 1361.0931396484375,
+                  "y": 1421.807861328125
+                },
+                "spin": 0.0,
+                "velocity": {
+                  "x": 17.988021850585938,
+                  "y": -9.64806079864502
+                }
+              },
+              "ship_available": false,
+              "ship_form": "ship",
+              "ship_health": 0.0,
+              "site_query": "not_requested",
+              "sites": [],
+              "spaceling": 1,
+              "supported_planet": 0,
+              "tick": 28330,
+              "transfer": "vehicle_unavailable",
+              "transfers": 5,
+              "vehicle": 0,
+              "version": 1
+            },
+            {
+              "actor": {
+                "angle": -0.934860348701477,
+                "position": {
+                  "x": 1471.445556640625,
+                  "y": 1349.2525634765625
+                },
+                "spin": -0.8544318675994873,
+                "velocity": {
+                  "x": 10.763068199157715,
+                  "y": -17.464763641357422
+                }
+              },
+              "actor_up": {
+                "x": 0.8532553315162659,
+                "y": 0.5214933753013611
+              },
+              "balanced": true,
+              "boarding_hatches": [
+                {
+                  "x": 1407.4752197265625,
+                  "y": 1362.8572998046875
+                },
+                {
+                  "x": 1404.384521484375,
+                  "y": 1358.1873779296875
+                }
+              ],
+              "controls_armed": true,
+              "gravity": {
+                "x": 17.633594512939453,
+                "y": -12.355669975280762
+              },
+              "hatch": {
+                "x": 1407.4752197265625,
+                "y": 1362.8572998046875
+              },
+              "landing": {
+                "altitude": -0.00031967461109161377,
+                "angle_degrees": 0.0656106024980545,
+                "assist_strength": 1.0,
+                "corner_support": false,
+                "descent_speed": -0.03478018939495087,
+                "foot_clearances": [
+                  0.000679507851600647,
+                  -0.00031967461109161377
+                ],
+                "lateral_speed": 0.03714889660477638,
+                "phase": "landed",
+                "planet": 0,
+                "relative_spin": -0.04363499954342842,
+                "settled_seconds": 0.25,
+                "supported_feet": 2
+              },
+              "last_transfer": "exited",
+              "location": "on_foot",
+              "owner": "player_2",
+              "planet": {
+                "claim": {
+                  "captures": 3,
+                  "claimant": null,
+                  "flag": {
+                    "normal": {
+                      "x": 0.700786292552948,
+                      "y": -0.7133712768554688
+                    },
+                    "player": "player_2",
+                    "position": {
+                      "x": 1461.0989990234375,
+                      "y": 1314.4814453125
+                    },
+                    "raised_fraction": 1.0
+                  },
+                  "flag_interaction_range": 3.0,
+                  "neutralizations": 2,
+                  "owner": "player_2",
+                  "phase": "idle",
+                  "planet": 0,
+                  "progress": 0.0,
+                  "stage_required_seconds": 3.0,
+                  "status": "secured"
+                },
+                "index": 0,
+                "motion": {
+                  "angle": 0.2713164985179901,
+                  "position": {
+                    "x": 1436.0228271484375,
+                    "y": 1340.5938720703125
+                  },
+                  "spin": 0.00057220458984375,
+                  "velocity": {
+                    "x": 10.664735794067383,
+                    "y": -17.394784927368164
+                  }
+                },
+                "radius": 36.57160949707031,
+                "revision": 25
+              },
+              "queries_ready": true,
+              "recovery": {
+                "blocked_attempts": 14,
+                "placement": null,
+                "planet": 0,
+                "pod_ejections": 1,
+                "rebuild_interruptions": 18,
+                "rebuild_progress": 0.0020833334419876337,
+                "rebuild_required_seconds": 8.0,
+                "rebuilds": 0,
+                "scuttle_progress": 0.0,
+                "scuttle_required_seconds": 3.0,
+                "ships_lost": 1,
+                "status": "rebuilding"
+              },
+              "relative_speed": -0.2832043766975403,
+              "ship": {
+                "angle": 0.9846757054328918,
+                "position": {
+                  "x": 1405.13623046875,
+                  "y": 1361.048828125
+                },
+                "spin": -0.04306279495358467,
+                "velocity": {
+                  "x": 10.644545555114746,
+                  "y": -17.362281799316406
+                }
+              },
+              "ship_available": true,
+              "ship_form": "escape_pod",
+              "ship_health": 0.0,
+              "site_query": {
+                "selected": {
+                  "bearing": 7,
+                  "planet": 0
+                }
+              },
+              "sites": [],
+              "spaceling": 2,
+              "supported_planet": 0,
+              "tick": 28330,
+              "transfer": "too_far",
+              "transfers": 7,
+              "vehicle": 1,
+              "version": 1
+            }
+          ],
+          "recorded_actions": [
+            [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    0,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ],
+            [
+              {
+                "Scenario": {
+                  "kind": 1398079490,
+                  "payload": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079491,
+                  "payload": [
+                    1,
+                    0
+                  ]
+                }
+              },
+              {
+                "Scenario": {
+                  "kind": 1398079493,
+                  "payload": [
+                    1,
+                    0,
+                    0
+                  ]
+                }
+              }
+            ]
+          ],
+          "stop": null,
+          "task": {
+            "completed_tick": null,
+            "exited_tick": 18278,
+            "goal": "rebuild",
+            "goal_since": 28330,
+            "ground": {
+              "claim_relocations": 0,
+              "claim_target": null,
+              "crawl_direction": null,
+              "crawl_target": null,
+              "crossing": {
+                "claimed": false,
+                "completed_tick": 28329,
+                "crossings": 1,
+                "goal": "Complete",
+                "lowest_charge": 0.4277762770652771,
+                "plan": {
+                  "anchor": {
+                    "GroundGap": {
+                      "from": 381,
+                      "to": 384
+                    }
+                  },
+                  "cruise_radius": 39.07320022583008,
+                  "destination": {
+                    "x": 36.04875946044922,
+                    "y": -1.3277111053466797
+                  },
+                  "direction": "Right",
+                  "planet": 0,
+                  "revision": 25,
+                  "start": {
+                    "x": 33.38094711303711,
+                    "y": -4.863739013671875e-05
+                  }
+                },
+                "policy": "jetpack_crossing_v3",
+                "reason": null,
+                "started_tick": 27921
+              },
+              "destination": "flag",
+              "displacements": 0,
+              "flight_interruptions": 0,
+              "get_up_repositions": 0,
+              "goal": "survey",
+              "invalidations": 0,
+              "jetpack_crossings": 1,
+              "jumps": 0,
+              "last_progress_tick": 28329,
+              "partial_routes": 0,
+              "path": [],
+              "policy": "ground_navigation_v10",
+              "reason": null,
+              "replans": 1,
+              "return_failure": null,
+              "revision": 22,
+              "route": {
+                "closest_reachable_distance": 0.00012262041855137795,
+                "destination_nodes": 1,
+                "failure": null,
+                "flights": 1,
+                "jumps": 2,
+                "length": 23.52860450744629,
+                "nearest_destination_distance": 0.00012262041855137795,
+                "partial": false,
+                "reachable_nodes": 80,
+                "start_distance": 0.08589710295200348,
+                "start_node": 389
+              },
+              "start_repositions": 0,
+              "started_tick": 27871,
+              "target": null,
+              "waypoint": 0
+            },
+            "ground_budget_ticks": 5400,
+            "invalidations": 1,
+            "landed_tick": 18276,
+            "landing_rejections": [],
+            "landing_retries": 0,
+            "last_progress_tick": 28330,
+            "reason": null,
+            "rebuild_search": {
+              "include_staging_map": true,
+              "origin": {
+                "x": 32.1655387878418,
+                "y": 1.8819236755371096
+              },
+              "planet": 0,
+              "preferred": null,
+              "revision": 22,
+              "started_tick": 27870,
+              "visited": [
+                341,
+                340,
+                342,
+                339,
+                343
+              ]
+            },
+            "rebuilt_tick": null,
+            "relocation_site": null,
+            "relocation_surveys": 12,
+            "relocations": 4,
+            "return_failure": null,
+            "scuttle_attempts": 0,
+            "scuttle_started_tick": null,
+            "scuttled_tick": null,
+            "site": {
+              "bearing": 7,
+              "planet": 0
+            },
+            "site_search_since": null,
+            "stabilization": {
+              "attempts": 1,
+              "braking_seconds": 0.0,
+              "heading_error": 0.11282172799110413,
+              "last_progress_tick": 17001,
+              "relative_speed": 0.306291788816452,
+              "relative_spin": -0.291655570268631,
+              "settled_tick": 17003,
+              "spin_seconds": 0.0,
+              "started_tick": 16821
+            },
+            "started_tick": 16820,
+            "status": "running",
+            "task": "recover_ship_v10"
+          },
+          "tick": 28330
+        }
+      },
+      "new_forecasts_after_switch": 0
+    }
+  },
+  "provenance": {
+    "prior_bundle": {
+      "path": "docs/data/rebuild-query-directions-v1.json.gz",
+      "bytes": 4586337,
+      "sha256": "5bf2124cc056f0cef161085d690c4070620f14146abc43bf1327b74788957815"
+    },
+    "prior_plan": {
+      "path": "target/rebuild-query-directions/v1/plan.json",
+      "bytes": 136770,
+      "sha256": "7dbb3e4ea91e1727c9b2911ddb57a55120124a3b7d4fcd5e9dbdbb7a0ddf8e01"
+    },
+    "prior_summary": {
+      "path": "target/rebuild-query-directions/v1/summary.json",
+      "bytes": 3213426,
+      "sha256": "fc588b888ecb066362adf18badd1dcd6a23b08452ecb36c3241d7268450a639f"
+    },
+    "bounds_source": {
+      "path": "target/rebuild-forecast-selection/v2/plan.json",
+      "bytes": 145987,
+      "sha256": "9a67e58f83e93b92b778b8435ac61e9301b29569ba2a051182cf94d0fb254657"
+    }
+  },
+  "archives": {
+    "control_handoff": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-contact-recovery/v1/archives/control_handoff.tar.gz",
+      "sha256": "68a12e322820868ad2446ed7b3f27d1e00a2a33286a45e7f4e161e64758c983a",
+      "bytes": 50353155,
+      "raw_bytes": 327956299,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "c6beb50d5a76e427cf74d798955189f9e7ddea781486aec2d6099162ae890cd6",
+          "bytes": 615190
+        },
+        "live-contact-audit.json": {
+          "sha256": "ef95b7fe512b62230bb65ad1ed5b55ef10a9c95db2875f2f5edf2f3276734c86",
+          "bytes": 46044
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "168a1ab7286bf517d18e4b3f559b4cbc4b55410fd7b8f5847738e2ca932b6c17",
+          "bytes": 137070
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-selection-audit.json": {
+          "sha256": "7e2621a2423ad5b5426b8437feb33ea58061d36cdb4517f939fd2c05f74f708d",
+          "bytes": 1202198
+        },
+        "live-selection-orientation-audit.json": {
+          "sha256": "7daaa2a8979ecb336d8bde83e4d7751139e78d0a7b1d7790e77355b8253920ae",
+          "bytes": 31774
+        },
+        "live-staging-audit.json": {
+          "sha256": "eede7837ba0c874fbb998a98e684425ba5a9086ab2f85057c29a3074299dce9e",
+          "bytes": 949376
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "47cf0c38f181a85eedc719cf5f9831ef6641dab4643839e6372fa34084329e10",
+          "bytes": 179323
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "query-directions-audit.json": {
+          "sha256": "90bd1a304a42e737de5c81e9158264feeb1eb06587eeff6721aa7d5b24a1a100",
+          "bytes": 591843
+        },
+        "rebuild-contact-switch-live.json": {
+          "sha256": "8ea253b54fb3d0143ec92167fe538366c66ed18dc17876df66b80845228b4b87",
+          "bytes": 134
+        },
+        "rebuild-contact-switch-recorded.json": {
+          "sha256": "8ea253b54fb3d0143ec92167fe538366c66ed18dc17876df66b80845228b4b87",
+          "bytes": 134
+        },
+        "rebuild-direction-forecast-27114.json": {
+          "sha256": "b22c19c498f0c5d6bb11fad27db345deb9c30045fb8a7d5d62d84e70278d2fdf",
+          "bytes": 10553204
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "81836ed48b16fdb6c4ad11579aaa8a0bbe119af30eaad4430498fb472060e06c",
+          "bytes": 1897730
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "eed1993c1fa6c79e6e92f6b2d1eadd88566a7cf381c309c59513bfe15bcfec97",
+          "bytes": 62531536
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "f96995b06b3c379c29d4153ad2c58f1a2d9a0205fb1d4145d4f59f250f879386",
+          "bytes": 3458242
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "e4c2a03231fe7f257ea60c1170ff070e2da65ef98a0f2976028dc0262afd2fdc",
+          "bytes": 107652296
+        },
+        "rebuild-replay.json": {
+          "sha256": "b36c7e1d3b7616438d73742e04dd104d3ff50c814e4aa19d5c9048c6d4334f03",
+          "bytes": 80029
+        },
+        "rebuild-round-foot-live-27154.json": {
+          "sha256": "e4064a60fc808681ac75a881bb1103c19fb2015f25b9604818c9e4380a816cc4",
+          "bytes": 15532
+        },
+        "rebuild-round-foot-recorded-27499.json": {
+          "sha256": "76ce9e1ea432841ff05a2b827e9b788c8178579032ef3fbf2a0b8f72e01ef67e",
+          "bytes": 15552
+        },
+        "rebuild-selection-live.jsonl": {
+          "sha256": "5dd73b7851a4cc463dcff94005d1149b80f2fe9e029cdbb530a41f252f21f98c",
+          "bytes": 196678
+        },
+        "rebuild-selection-recorded.jsonl": {
+          "sha256": "10d358059561468729d3ffa2ff895d48b8be1d1249064d098e9beec53aafe5bb",
+          "bytes": 192445
+        },
+        "rebuild-standing-forecast-27114.json": {
+          "sha256": "f7311624f148ff1e9b2f4c9f523eed89187b3e3613004d22476285a50239a25c",
+          "bytes": 6693456
+        },
+        "recorded-audit.json": {
+          "sha256": "b52702466ea3eded1098e94be3b0996a2388773c46b0259d20f811db176f6780",
+          "bytes": 482807
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "8b26f00e4e5cb4fbd5666f4f5737661a482d734dcd5b2915b2b6a5bd62a1e084",
+          "bytes": 376536
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-selection-audit.json": {
+          "sha256": "6f0f68e01bfedac2b00a5bccd3b8074dab102f4748782b39d2ffe2621ad60480",
+          "bytes": 1228390
+        },
+        "recorded-selection-orientation-audit.json": {
+          "sha256": "5e8e26c87f6d23d7940f4fc7f8deca249cd203f1ddd1a4f0024d69c7e8ee28d4",
+          "bytes": 300531
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "cf300f3c86cae16017a2b8e1f1fdeabb18a2a5a24579bf96a3102395a217b1f6",
+          "bytes": 1332224
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "standing-search-audit.json": {
+          "sha256": "ea76a599a7989f3c7c5875903d3b939642dcc7274cf84f841d8dbe180effe43c",
+          "bytes": 86778
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "control_coarse": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-contact-recovery/v1/archives/control_coarse.tar.gz",
+      "sha256": "85b1a28a8675c59cb0654485ade241f575ca56303dfece274b43c62098c72480",
+      "bytes": 49314413,
+      "raw_bytes": 330681998,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "9c49be29cb84dd0fd80bb39b3cdb4ab57490354275fff3986e3f3b11c2449160",
+          "bytes": 218663
+        },
+        "live-contact-audit.json": {
+          "sha256": "260553024e717b805fec0e6a406a3572e3cb8d98abfad465d865773c5ef3e131",
+          "bytes": 86166
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "7242bdc6806ab7330c2bcec961e544fd010ac59a856dcf5418d8920cf36285a0",
+          "bytes": 539911
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-selection-audit.json": {
+          "sha256": "6af5c364ad9b1eb28cdd4cc126c55888547a8336269205501e40b0affa5c2ae8",
+          "bytes": 421710
+        },
+        "live-selection-orientation-audit.json": {
+          "sha256": "b9936867e67ee56c6b05b235affff994ef822e8593a819e27504ccebd36f6d5e",
+          "bytes": 60903
+        },
+        "live-staging-audit.json": {
+          "sha256": "93fb3fe495de7182f1d0729d691eef344c514dcf9ebb89a7657babc6ffb6b75a",
+          "bytes": 382902
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "query-directions-audit.json": {
+          "sha256": "ee25c2b05c3a43f18c422616fdfee31ee234257f26c8bd81f038fc85d57d2b67",
+          "bytes": 2210177
+        },
+        "rebuild-contact-switch-live.json": {
+          "sha256": "8ea253b54fb3d0143ec92167fe538366c66ed18dc17876df66b80845228b4b87",
+          "bytes": 134
+        },
+        "rebuild-contact-switch-recorded.json": {
+          "sha256": "8ea253b54fb3d0143ec92167fe538366c66ed18dc17876df66b80845228b4b87",
+          "bytes": 134
+        },
+        "rebuild-direction-forecast-25373.json": {
+          "sha256": "9a2488ce6ea72ad579d9563a66356aaf35b3db83c5ff56ccca29ed7d220726e8",
+          "bytes": 7145581
+        },
+        "rebuild-direction-forecast-25440.json": {
+          "sha256": "3eb28480470e65e4d7afc20171dd0a1c1ea4c749cab47e446d66f765bacf39d9",
+          "bytes": 7230732
+        },
+        "rebuild-direction-forecast-25560.json": {
+          "sha256": "f3a7b9e17ec8c78a2cfc58db909cd0a7562d3ab95b7c6ddf2671f569496b3669",
+          "bytes": 4559930
+        },
+        "rebuild-direction-forecast-25710.json": {
+          "sha256": "007e4fb5674b7eab7622e9b867807bbf657461adf78006d729add776cc0b6661",
+          "bytes": 6956533
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "e72294756315a0ad15a3106f2efcd8e91b67ef446d56c35c3f05ad4f87d69a09",
+          "bytes": 1203676
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "e0882d6025bf5f7edab45ad768bcfec3edf4432f9e5c6f4d03e6c5bc4dcb07d2",
+          "bytes": 36066061
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "3d3aec72024689c46f64360f4a501f7fa6bfd5fe7047269ba2d2a000504e12e1",
+          "bytes": 3458244
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "a33bbd6f0cc4c74affed641323317cb6a193234e2e3d7ba540ae500dcc9df41b",
+          "bytes": 119383484
+        },
+        "rebuild-replay.json": {
+          "sha256": "55641975e7a7f33dc9ef2cfa7acd6646f434787a477cab5e229fb5b313c204f8",
+          "bytes": 92687
+        },
+        "rebuild-selection-live.jsonl": {
+          "sha256": "39d47b309787f64bab0911db952f2252d79ae97e837d1449a82316978e60f7a2",
+          "bytes": 206099
+        },
+        "rebuild-selection-recorded.jsonl": {
+          "sha256": "d35e3502eb934d9bd79253631fb6ae922723c196da4cff322354fe32c330f4f2",
+          "bytes": 8323
+        },
+        "rebuild-standing-forecast-25373.json": {
+          "sha256": "eb638dbf879344341b55c2b7b31a8a0a97f07e193c25f2667e09104fb7cd6a21",
+          "bytes": 3154812
+        },
+        "rebuild-standing-forecast-25440.json": {
+          "sha256": "ddd14d57090f850056fcd393991bd6016b85905601a48104d92b7ba42909748d",
+          "bytes": 3230698
+        },
+        "rebuild-standing-forecast-25560.json": {
+          "sha256": "a9d631afea59b3b1958238da7751c31fbd9438a6709a56ef412dde75f0134c2f",
+          "bytes": 758793
+        },
+        "rebuild-standing-forecast-25710.json": {
+          "sha256": "bcccc1fef35c0f2bc1531356ef90660f0839dca851ca618d9d8b28dc2ff763d2",
+          "bytes": 2971856
+        },
+        "recorded-audit.json": {
+          "sha256": "7d5207682e7ad07404ffdfc064199d8903b4783d86acc42f3c21d2006185f0af",
+          "bytes": 346144
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "4d3f133e7b1abdf73fc8b3fc116bcdea834b34c40755a62da4e108516832404f",
+          "bytes": 665445
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-selection-audit.json": {
+          "sha256": "9d40b53f52b0a50d63cbe94cfddaa4439ce0fd2c1576eaab91ccd519e7efb906",
+          "bytes": 13449
+        },
+        "recorded-selection-orientation-audit.json": {
+          "sha256": "19a0a2d1d972fb37185b4e110f5cc1784645e9181d5556a83d60d00c40ce45ca",
+          "bytes": 477776
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "095707c9bcecf52bfd439d4c5dd81bda8da61cc2bae4023f38d8cfad74fde3fc",
+          "bytes": 1494603
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "standing-search-audit.json": {
+          "sha256": "b4600357cdcd134f63c7afecce1e11ae91f4f15ad54f8977ce65f23bc446d49d",
+          "bytes": 226998
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "contact_coarse": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-contact-recovery/v1/archives/contact_coarse.tar.gz",
+      "sha256": "9eff5286c322b1a93b15485d61be283a937ae6ff0cdb167932c471232bcd8601",
+      "bytes": 54773243,
+      "raw_bytes": 349526377,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "contact-continuation-comparison.json": {
+          "sha256": "f02fb1286d87908a8053bbd806b6e64996f783eac0b21c500f707597eb954ad2",
+          "bytes": 224933
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "31f683db103ee31f36e6bc511635a9004cacf55fc64910adcc3e1b22cfa0d4ee",
+          "bytes": 673468
+        },
+        "live-contact-audit.json": {
+          "sha256": "74100845e023a31e09ec262bc5bd2a907b98cdd651460a84f8b55fafae9add4d",
+          "bytes": 101622
+        },
+        "live-contact-orientation-audit.json": {
+          "sha256": "e14826cdba56331b0fd5877f097eb306245afc3e9c59f59017a60efbe6b6c947",
+          "bytes": 348130
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "f125b308fc278d559e8e19ec38d287bca34bd7d6aa2dc47e3d2019a795ff6a06",
+          "bytes": 571050
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-selection-audit.json": {
+          "sha256": "ecc7b9a3a98ad4508e92d178481fa40babf1b10b3e9a26610464525219510268",
+          "bytes": 421872
+        },
+        "live-staging-audit.json": {
+          "sha256": "a7e55feca882d5a890f3ecdcd894808f2bfba0832bf9c2ff19fdeb544edc891e",
+          "bytes": 801802
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-contact-switch-live.json": {
+          "sha256": "983e88d50217f0115f92f1e7673d69f9b127ae2dffe9f94cb2628571db298c59",
+          "bytes": 13261
+        },
+        "rebuild-contact-switch-recorded.json": {
+          "sha256": "45dc3dac02682ac51c75618fdb149fce5a5a72c619d1351685e9a83ebc0815b1",
+          "bytes": 133
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "8b9a2b3a8e8761be18441a1b7cd90f1773706e75701192aab83938084639b028",
+          "bytes": 2746371
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "c8731387fa804ad1f34914bf33a165611ccc20bc892ec48f39fb748707a6c55d",
+          "bytes": 89836378
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "3d3aec72024689c46f64360f4a501f7fa6bfd5fe7047269ba2d2a000504e12e1",
+          "bytes": 3458244
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "a33bbd6f0cc4c74affed641323317cb6a193234e2e3d7ba540ae500dcc9df41b",
+          "bytes": 119383484
+        },
+        "rebuild-replay.json": {
+          "sha256": "50c94bdc8cbacbf1dd2ad2084e332529860ea7dd384b237b1d334c06e20fb663",
+          "bytes": 92235
+        },
+        "rebuild-selection-live.jsonl": {
+          "sha256": "c3aa94492f72f0cd2a5652bf2752580911b302bedec5bcbaaccf8fca5dcfceca",
+          "bytes": 206168
+        },
+        "rebuild-selection-recorded.jsonl": {
+          "sha256": "2b8c61a27d5c2b05623d25a7d4b64897bad18c9bb82affb58e8a648652fa0f97",
+          "bytes": 8246
+        },
+        "recorded-audit.json": {
+          "sha256": "7d5207682e7ad07404ffdfc064199d8903b4783d86acc42f3c21d2006185f0af",
+          "bytes": 346144
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "4d3f133e7b1abdf73fc8b3fc116bcdea834b34c40755a62da4e108516832404f",
+          "bytes": 665445
+        },
+        "recorded-contact-orientation-audit.json": {
+          "sha256": "a3575435ec5b6a4f7dd4ed554f60e69f00a6465816ae6e777388fc5a850494d1",
+          "bytes": 1009951
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-selection-audit.json": {
+          "sha256": "a2b915065c83a5c0c2ffcfafea0e37911e52a508321e616b6b7281009182206a",
+          "bytes": 13463
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "095707c9bcecf52bfd439d4c5dd81bda8da61cc2bae4023f38d8cfad74fde3fc",
+          "bytes": 1494603
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    }
+  },
+  "retained_control_files": {
+    "control_handoff": 44,
+    "control_coarse": 48
+  },
+  "validation": {
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/harness.log",
+      "log_sha256": "d3f37771f107cadbf40af6a832c399e9f81b24e9f4171e0f8a7875f6535ddd3c"
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/python.log",
+      "log_sha256": "3c716997ffff2eb7f421350a37539ff907d250cf8e92575e7c2777f34b3fcc3a"
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "4fe7c9d194360286066699af11bd25321d88c82086168d3f230566162f21974b"
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/release.log",
+      "log_sha256": "93a241ce5b7631c6baa8a1cf8f1140f64dcae9a6e7d08dbcbfd8fb518a0c3804"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/default_check.log",
+      "log_sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-contact-recovery/v1/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "plan_sha256": "6378403947e28e280c905892c2dbaa4e056ceca6304f9b7c6e258d8cfc9aa445",
+  "summary_sha256": "85734b00836a9805541f10a0a068721df0e3a716cec3df684dd67728d32c256a",
+  "review_bundle": {
+    "path": "docs/data/rebuild-contact-recovery-v1.json.gz",
+    "bytes": 4843828,
+    "sha256": "610d9b716ed006e22a6f69287764b1d633dbe2d08cbf70433ab36400ef050985"
+  }
+}
