@@ -1,5 +1,26 @@
 # Carry a reached preview's measured normal into native placement
 
+## Corrective batch v2
+
+Batch v1, source `78b9444`, stopped at live handoff tick 24420 before any normal
+activation. The replay hook mistook a staging relocation for a construction-site
+selection: both `survey.site` and `task.relocation_site` were null. Both controls
+finished unchanged; the candidate recorded fork finished unchanged, and all 653
+completed candidate live rows/contact samples through 24419 match its control.
+The coarse candidate never started. Preserve the failed summary, log, comparison,
+reference staging row, controls and verified partial archive under `v1`.
+
+Correct only the hook's selection gate: a relocation counter increment without
+an actual selected site cannot capture a direction. Add a staging regression
+test. Keep native source, query guards, normal lifecycle, commands, cases and
+bounds unchanged. Freeze a corrected executable and repeat the four-run batch
+once under `v2`, reporting this one harness restart. This narrow correction
+supersedes the no-retry rule for the documented abort only; no outcome tuning or
+further simulation retries are allowed. Retain source/hash links to the aborted
+batch and unchanged native validation; rerun checks affected by the hook.
+
+## Fixed experiment
+
 The preceding [contact-normal continuation](rebuild-contact-recovery-results.md)
 reaches accepted sites at 343 and 388, but native placement rejects both after
 waiting for construction. Test the selected preview's measured direction alone;

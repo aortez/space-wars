@@ -14,7 +14,8 @@ V=importlib.util.module_from_spec(spec);spec.loader.exec_module(V)
 ROOT,P,I,B,D,L,A,S=V.ROOT,V.P,V.I,V.B,V.D,V.L,V.A,V.S
 PRIOR=ROOT/'target/rebuild-contact-recovery/v1'
 REFERENCE=ROOT/'docs/data/rebuild-contact-recovery-v1.json.gz'
-PROFILE='retained_rebuild_preview_normal_v1'
+PROFILE='retained_rebuild_preview_normal_v2'
+ABORTED=ROOT/'target/rebuild-preview-normal/v1/failure.json'
 MODES={'control_handoff':('control_handoff',False),'control_coarse':('contact_coarse',False),
        'normal_handoff':('control_handoff',True),'normal_coarse':('contact_coarse',True)}
 OWN=('tools/validate-rebuild-preview-normal.py','tools/tests/test_rebuild_preview_normal.py','docs/rebuild-preview-normal-plan.md')
@@ -48,12 +49,25 @@ def verify(plan,out,reaudit=False):
     check_inputs(plan['inputs'],inputs(),reaudit)
     for n in ('plan','summary'):assert P.digest(PRIOR/(n+'.json'))==plan['prior_'+n+'_sha256']
     assert P.digest(REFERENCE)==plan['reference_sha256']
+    assert plan['aborted_batch']==repair_provenance()
     for n in ('tape','binary'):assert P.digest(plan[n]['path'])==plan[n]['sha256']
     prior=json.loads((PRIOR/'plan.json').read_text())
     assert plan['bounds']==prior['bounds'] and plan['limits']==LIMITS and plan['expected_trigger']==V.TRIGGER
     assert plan['seat']==1 and plan['task_start']==16820 and plan['end']==29421
     assert not plan['default_promotion'] and plan['fresh_games']==0 and plan['commands'].keys()==MODES.keys()
     for n,cmd in plan['commands'].items():assert cmd==command(prior,Path(plan['binary']['path']),out/'raw'/n,n)
+
+
+def repair_provenance():
+    failure=json.loads(ABORTED.read_text())
+    for record in [failure['plan'],failure['summary'],*failure['witnesses'].values()]:
+        assert P.digest(record['path'])==record['sha256']
+    original=json.loads(Path(failure['plan']['path']).read_text())
+    current=inputs();assert current.keys()==original['inputs'].keys()
+    changed={p for p in current if current[p]!=original['inputs'][p]}
+    assert changed<=set(OWN)|{'crates/spacewars-ai/examples/support/rebuild_replay.rs'},changed
+    assert failure['tick']==24420 and failure['live_prefix']['rows']==653
+    return dict(path=str(ABORTED),sha256=P.digest(ABORTED),source_commit=failure['source_commit'],changed_inputs=sorted(changed))
 
 
 def freeze(out,binary):
@@ -68,7 +82,7 @@ def freeze(out,binary):
     plan=dict(schema=1,profile=PROFILE,source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         inputs=current,changed_inputs=sorted(changed),binary=dict(path=str(frozen),sha256=P.digest(frozen)),tape=prior['tape'],
         prior_plan_sha256=P.digest(PRIOR/'plan.json'),prior_summary_sha256=P.digest(PRIOR/'summary.json'),reference_sha256=P.digest(REFERENCE),
-        bounds=prior['bounds'],limits=LIMITS,commands={n:command(prior,frozen,out/'raw'/n,n) for n in MODES},
+        aborted_batch=repair_provenance(),bounds=prior['bounds'],limits=LIMITS,commands={n:command(prior,frozen,out/'raw'/n,n) for n in MODES},
         expected_trigger=V.TRIGGER,seat=1,task_start=16820,end=29421,fresh_games=0,default_promotion=False,build_command=prior['build_command'])
     verify(plan,out);I.write(out/'plan.json',plan)
     print('Frozen two retained controls and two live preview-normal candidates: four prefixes, eight continuations.',flush=True)
@@ -129,7 +143,7 @@ def audit_normal(root,fork,requested):
                 survey=row['observation']['rebuild'];site=task['relocation_site']
                 assert task['relocations']==relocations+1 and survey['tick']==tick and survey['site']==site
                 assert c['position']==site['position'] and c['planet']==site['planet'] and c['revision']==site['revision']
-                selected=next(a['placement'] for a in survey['attempts'] if a['bearing']==c['bearing'])
+                selected=next(a['placement'] for a in survey['attempts'] if a['bearing']==c['bearing'] and a['placement'] is not None and a['placement']['selected_offset']==c['offset'])
                 attempt=next(a for a in selected['attempts'] if a['offset']==c['offset'])
                 assert selected['selected_offset']==c['offset'] and e['validation']['attempts']==[attempt]
                 assert selected.get('preview_normal') is None and selected.get('radial_up') is None

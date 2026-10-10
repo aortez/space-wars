@@ -7,7 +7,10 @@ use scenario_spacewars::{
     surface_sortie::{
         SurfaceSortieScenario, SurfaceSortieState,
         pilot::{LandingSiteId, LandingSiteQuery},
-        rebuild_placement::{RebuildLocalForecast, RebuildPlacementProbeRequest},
+        rebuild_placement::{
+            RebuildLocalForecast, RebuildPlacementProbeRequest, RebuildRelocationSurvey,
+            RebuildStandingSite,
+        },
     },
 };
 use serde::{Deserialize, Serialize};
@@ -145,6 +148,21 @@ fn switch_to_contact(state: &mut SurfaceSortieState, task: &RecoverShipTask, sea
     json!({"tick":state.tick(),"seat":seat,"from":"radial","to":"contact_normal",
         "pilot":pilot,"contact":contact,"task":telemetry,"search":search,
         "pilot_unchanged":true,"contact_unchanged":true,"task_unchanged":true,"search_unchanged":true})
+}
+
+fn selected_normal_preview(
+    radial: bool,
+    site: Option<RebuildStandingSite>,
+    survey: Option<&RebuildRelocationSurvey>,
+) -> Option<&RebuildRelocationSurvey> {
+    // A staging walk also increments the relocation count, but selects no
+    // construction site. Its target preview is not a normal handoff yet.
+    if radial || site.is_none() {
+        return None;
+    }
+    let survey = survey.expect("selected site requires a current survey");
+    assert_eq!(site, survey.site);
+    Some(survey)
 }
 
 pub fn run(mut state: SurfaceSortieState, out: &Path, seed: u64) {
@@ -437,10 +455,10 @@ fn fork(
                 state.clear_rebuild_preview_normal(seat, "new_destination");
                 let radial = crate::arg("--rebuild-radial-placement", "false") == "true"
                     && !contact_switch.applied;
-                preview_pending = !radial;
-                if preview_pending {
-                    let survey = o.rebuild.as_ref().unwrap();
-                    assert_eq!(telemetry.relocation_site, survey.site);
+                let preview =
+                    selected_normal_preview(radial, telemetry.relocation_site, o.rebuild.as_ref());
+                preview_pending = preview.is_some();
+                if let Some(survey) = preview {
                     assert!(
                         state.capture_rebuild_preview_normal(seat, survey),
                         "selected preview did not reproduce at {}",
@@ -643,6 +661,50 @@ fn fork(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normal_handoff_distinguishes_staging_moves_from_selected_construction_sites() {
+        use engine_core::Vec2;
+        use scenario_spacewars::surface_sortie::rebuild_placement::RebuildStagingProposal;
+        let mut survey = RebuildRelocationSurvey {
+            tick: 24420,
+            checked: 1,
+            attempts: Vec::new(),
+            site: None,
+            refinement: None,
+            search: None,
+            staging_map: None,
+            staging: Some(RebuildStagingProposal {
+                planet: 0,
+                revision: 21,
+                position: Vec2::ZERO,
+                walk_length: 2.2,
+                target_bearing: 343,
+                target_position: Vec2::X * 20.0,
+                remaining_length: 21.8,
+                hatch_walk_length: 3.49,
+            }),
+        };
+        assert!(selected_normal_preview(false, None, Some(&survey)).is_none());
+        let site = RebuildStandingSite {
+            precise: true,
+            planet: 0,
+            revision: 21,
+            position: Vec2::X * 20.0,
+            walk_length: 20.0,
+            flight_length: 0.0,
+            jetpack_flights: 0,
+            hatch_walk_length: 3.49,
+        };
+        survey.site = Some(site);
+        survey.staging = None;
+        assert_eq!(
+            selected_normal_preview(false, Some(site), Some(&survey)),
+            Some(&survey)
+        );
+        assert!(selected_normal_preview(true, Some(site), Some(&survey)).is_none());
+        assert!(selected_normal_preview(false, None, Some(&survey)).is_none());
+    }
 
     #[test]
     fn contact_switch_waits_for_matching_negative_search_exhaustion_and_runs_once() {
