@@ -140,3 +140,7 @@ exporter and archive receipts. Full archives remain under
 `target/rebuild-contact-recovery/v1/archives/`. The experiment remains local on
 `bot-rebuild-contact-recovery`; it establishes no fresh-game, reactive-opponent
 or frontier qualification.
+
+The follow-up [measured-normal handoff](rebuild-preview-normal-results.md) now
+completes this coarse recovery while preserving the successful handoff path.
+It uses the actual supported standing point and the existing forecast gate.

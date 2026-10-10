@@ -1,5 +1,7 @@
 import copy
 import importlib.util
+import json
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -71,6 +73,21 @@ class PreviewNormalTest(unittest.TestCase):
         self.assertTrue(P.check_report(p,captured,arrived))
         for fields in (dict(anchor_up=dict(x=0.,y=1.)),dict(anchor=dict(x=32.,y=0.))):
             with self.assertRaises(AssertionError):P.check_report(dict(p,**fields),captured,arrived)
+
+    def test_selected_site_uses_exact_native_f32_identity_across_json_round_trips(self):
+        r=record();r['events']=r['events'][:1];c=r['events'][0]['context']
+        c['position']['x']=29.005271911621094
+        site=dict(position=copy.deepcopy(c['position']),planet=1,revision=22)
+        copied=copy.deepcopy(site);copied['position']['x']=29.005271911621097
+        row=dict(tick=24000,task=dict(relocations=1,relocation_site=copied),pilots=[{},dict(recovery=dict(placement=None))],
+            observation=dict(rebuild=dict(tick=24000,site=site,attempts=[dict(bearing=343,placement=r['events'][0]['validation'])])))
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'rebuild-preview-normal-live.json').write_text(json.dumps(r))
+            (root/'rebuild-selection-live.jsonl').write_text('')
+            path=root/'rebuild-live.jsonl';path.write_text(json.dumps(row)+'\n')
+            self.assertEqual(len(P.audit_normal(root,'live',True)['captures']),1)
+            copied['position']['x']+=.0001;path.write_text(json.dumps(row)+'\n')
+            with self.assertRaises(AssertionError):P.audit_normal(root,'live',True)
 
     def test_reaudit_can_only_repair_auditor_and_its_tests(self):
         old={p:'old' for p in P.CHANGED}

@@ -49,7 +49,7 @@ def verify(plan,out,reaudit=False):
     check_inputs(plan['inputs'],inputs(),reaudit)
     for n in ('plan','summary'):assert P.digest(PRIOR/(n+'.json'))==plan['prior_'+n+'_sha256']
     assert P.digest(REFERENCE)==plan['reference_sha256']
-    assert plan['aborted_batch']==repair_provenance()
+    assert plan['aborted_batch']==repair_provenance(plan['inputs'])
     for n in ('tape','binary'):assert P.digest(plan[n]['path'])==plan[n]['sha256']
     prior=json.loads((PRIOR/'plan.json').read_text())
     assert plan['bounds']==prior['bounds'] and plan['limits']==LIMITS and plan['expected_trigger']==V.TRIGGER
@@ -58,12 +58,12 @@ def verify(plan,out,reaudit=False):
     for n,cmd in plan['commands'].items():assert cmd==command(prior,Path(plan['binary']['path']),out/'raw'/n,n)
 
 
-def repair_provenance():
+def repair_provenance(frozen_inputs=None):
     failure=json.loads(ABORTED.read_text())
     for record in [failure['plan'],failure['summary'],*failure['witnesses'].values()]:
         assert P.digest(record['path'])==record['sha256']
     original=json.loads(Path(failure['plan']['path']).read_text())
-    current=inputs();assert current.keys()==original['inputs'].keys()
+    current=inputs() if frozen_inputs is None else frozen_inputs;assert current.keys()==original['inputs'].keys()
     changed={p for p in current if current[p]!=original['inputs'][p]}
     assert changed<=set(OWN)|{'crates/spacewars-ai/examples/support/rebuild_replay.rs'},changed
     assert failure['tick']==24420 and failure['live_prefix']['rows']==653
@@ -141,8 +141,8 @@ def audit_normal(root,fork,requested):
             c=e['context']
             if e['kind']=='captured':
                 survey=row['observation']['rebuild'];site=task['relocation_site']
-                assert task['relocations']==relocations+1 and survey['tick']==tick and survey['site']==site
-                assert c['position']==site['position'] and c['planet']==site['planet'] and c['revision']==site['revision']
+                assert task['relocations']==relocations+1 and survey['tick']==tick and S.same_native(survey['site'],site)
+                assert S.same_native(c['position'],site['position']) and c['planet']==site['planet'] and c['revision']==site['revision']
                 selected=next(a['placement'] for a in survey['attempts'] if a['bearing']==c['bearing'] and a['placement'] is not None and a['placement']['selected_offset']==c['offset'])
                 attempt=next(a for a in selected['attempts'] if a['offset']==c['offset'])
                 assert selected['selected_offset']==c['offset'] and e['validation']['attempts']==[attempt]
