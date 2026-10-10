@@ -1,0 +1,683 @@
+/usr/bin/spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 2,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "6140352705967597710"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match · New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+/usr/bin/spacewars-cli ui activate pause.resume --expect-screen pause.main --json
+{
+  "schema_version": 1,
+  "revision": 2,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "6140352705967597710"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match · New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+/usr/bin/spacewars-cli status
+scenario=spacewars
+scenario_revision=1
+paused=false
+game_over=false
+benchmark_active=false
+renderer=raster
+raster_scale=2.00
+performance_target=60 Hz
+fps=9.6
+ups=47.9
+frames_total=1055
+updates_total=3703
+fps_source=submitted-frames
+host_cpu_samples=57
+host_viewport_width=1024
+host_viewport_height=768
+host_internal_width=2048
+host_internal_height=1536
+host_scene_primitives=6573
+host_updates_per_callback=4.614
+host_interval_avg_ms=92.700
+host_interval_p95_ms=117.906
+host_interval_max_ms=121.673
+host_step_avg_ms=59.741
+host_step_p95_ms=84.422
+host_step_max_ms=89.764
+host_scene_avg_ms=3.892
+host_scene_p95_ms=5.189
+host_scene_max_ms=5.421
+host_prepare_avg_ms=16.630
+host_prepare_p95_ms=19.875
+host_prepare_max_ms=20.012
+host_callback_avg_ms=80.276
+host_callback_p95_ms=103.934
+host_callback_max_ms=107.523
+host_raster_buffers_avg_ms=0.002
+host_raster_buffers_p95_ms=0.002
+host_raster_buffers_max_ms=0.002
+host_raster_clear_avg_ms=2.956
+host_raster_clear_p95_ms=3.004
+host_raster_clear_max_ms=3.014
+host_raster_player_avg_ms=9.322
+host_raster_player_p95_ms=11.753
+host_raster_player_max_ms=11.819
+host_raster_player_starfield_avg_ms=0.000
+host_raster_player_starfield_p95_ms=0.000
+host_raster_player_starfield_max_ms=0.000
+host_raster_player_world_avg_ms=0.000
+host_raster_player_world_p95_ms=0.000
+host_raster_player_world_max_ms=0.000
+host_raster_player_sun_planets_avg_ms=8.712
+host_raster_player_sun_planets_p95_ms=10.955
+host_raster_player_sun_planets_max_ms=11.157
+host_raster_player_spaceports_avg_ms=0.000
+host_raster_player_spaceports_p95_ms=0.000
+host_raster_player_spaceports_max_ms=0.000
+host_raster_player_effects_avg_ms=0.080
+host_raster_player_effects_p95_ms=0.135
+host_raster_player_effects_max_ms=0.206
+host_raster_player_ships_avg_ms=0.132
+host_raster_player_ships_p95_ms=0.146
+host_raster_player_ships_max_ms=0.149
+host_raster_player_debris_avg_ms=0.121
+host_raster_player_debris_p95_ms=0.153
+host_raster_player_debris_max_ms=0.160
+host_raster_player_particles_avg_ms=0.045
+host_raster_player_particles_p95_ms=0.165
+host_raster_player_particles_max_ms=0.185
+host_raster_player_other_avg_ms=0.220
+host_raster_player_other_p95_ms=0.479
+host_raster_player_other_max_ms=0.502
+host_raster_player_hud_avg_ms=0.000
+host_raster_player_hud_p95_ms=0.000
+host_raster_player_hud_max_ms=0.000
+host_raster_player_sun_corona_avg_ms=0.186
+host_raster_player_sun_corona_p95_ms=0.463
+host_raster_player_sun_corona_max_ms=0.471
+host_raster_overview_refresh_avg_ms=0.000
+host_raster_overview_refresh_p95_ms=0.000
+host_raster_overview_refresh_max_ms=0.000
+host_raster_overview_live_avg_ms=0.288
+host_raster_overview_live_p95_ms=0.312
+host_raster_overview_live_max_ms=0.321
+host_raster_overview_blit_avg_ms=1.102
+host_raster_overview_blit_p95_ms=1.260
+host_raster_overview_blit_max_ms=1.290
+host_raster_other_frames_avg_ms=0.412
+host_raster_other_frames_p95_ms=0.463
+host_raster_other_frames_max_ms=0.526
+host_raster_image_avg_ms=0.001
+host_raster_image_p95_ms=0.001
+host_raster_image_max_ms=0.001
+No active Spacewars diagnostics.
+match_seed=6140352705967597710
+match_tick=3703
+match_player_1=material_mission_v9
+match_player_2=material_mission_v10
+match_remaining_seconds=838.283
+match_owned_planets=0,0
+match_finish_reason=None
+match_result=in_progress
+mission_profile_version=2
+mission_profile_samples=120
+mission_profile_first_tick=3584
+mission_profile_last_tick=3703
+mission_sensor_p1_avg_ms=0.060
+mission_sensor_p1_p95_ms=0.077
+mission_sensor_p1_max_ms=0.107
+mission_sensor_p2_avg_ms=0.239
+mission_sensor_p2_p95_ms=0.258
+mission_sensor_p2_max_ms=0.298
+mission_policy_p1_avg_ms=0.022
+mission_policy_p1_p95_ms=0.023
+mission_policy_p1_max_ms=0.057
+mission_policy_p2_avg_ms=0.024
+mission_policy_p2_p95_ms=0.026
+mission_policy_p2_max_ms=0.027
+mission_scenario_avg_ms=14.496
+mission_scenario_p95_ms=21.493
+mission_scenario_max_ms=37.305
+mission_planning_avg_ms=0.075
+mission_planning_p95_ms=0.264
+mission_planning_max_ms=0.341
+mission_total_avg_ms=14.921
+mission_total_p95_ms=21.944
+mission_total_max_ms=37.688
+mission_world_physics_avg_ms=10.220
+mission_world_physics_p95_ms=10.420
+mission_world_physics_max_ms=24.651
+mission_world_lifecycle_avg_ms=2.704
+mission_world_lifecycle_p95_ms=9.076
+mission_world_lifecycle_max_ms=25.431
+mission_world_workload_avg_ms=0.690
+mission_world_workload_p95_ms=0.752
+mission_world_workload_max_ms=0.850
+mission_world_gravity_avg_ms=0.153
+mission_world_gravity_p95_ms=0.249
+mission_world_gravity_max_ms=0.460
+mission_world_collision_avg_ms=0.619
+mission_world_collision_p95_ms=0.669
+mission_world_collision_max_ms=0.726
+mission_sortie_outside_world_avg_ms=0.110
+mission_sortie_outside_world_p95_ms=0.128
+mission_sortie_outside_world_max_ms=0.145
+mission_p1_bot_observations=120
+mission_p1_full_survey_requests=0
+mission_p1_deferred_surveys=0
+mission_p1_selected_site_requests=0
+mission_p1_site_query=NotRequested
+mission_p1_location=Aboard(VehicleId(0))
+mission_p1_form=Ship
+mission_p1_planet=0
+mission_p1_site_request=Some(LandingSiteId { planet: 1, bearing: 64 })
+mission_p1_landing_sites=0
+mission_p1_recovery_sites=0
+mission_p1_ground_nodes=0
+mission_p1_objective_survey=false
+mission_p1_task=Planet 1: climbing for transfer
+mission_p2_bot_observations=120
+mission_p2_full_survey_requests=0
+mission_p2_deferred_surveys=0
+mission_p2_selected_site_requests=120
+mission_p2_site_query=Selected(LandingSiteId { planet: 0, bearing: 31 })
+mission_p2_location=Aboard(VehicleId(1))
+mission_p2_form=Ship
+mission_p2_planet=0
+mission_p2_site_request=Some(LandingSiteId { planet: 0, bearing: 31 })
+mission_p2_landing_sites=1
+mission_p2_recovery_sites=1
+mission_p2_ground_nodes=0
+mission_p2_objective_survey=false
+mission_p2_task=Planet 0: descending behind cover
+mission_evaluation_models=["capture_mission_reference_v1","capture_mission_reference_v1"]
+mission_evaluation_work=2366
+mission_evaluation_p1=null
+mission_evaluation_p2={"model":"capture_mission_reference_v1","policy":"material_mission_v10","actor":"player_2","source_tick":3700,"completed_tick":3701,"current_target":0,"selected_tick":2343,"match_context":{"remaining_seconds":838.3333321,"owned_planets":[0,0],"pilots_alive":[true,true],"pilot_health":[100.0,100.0],"finished":false},"ship_health":99.16589,"ship_form":"ship","location":{"aboard":1},"opponent_distance":329.63983,"combat_risk":"unmodelled; timing is conditional on successful execution","inactive_reason":null,"candidates_truncated":false,"candidates":[{"planet":0,"current":true,"revision":126,"observed_owner":null,"ownership_known":true,"adds_ownership":true,"first_rebuild_foothold":true,"distance":172.73872,"travel_seconds":0.0,"site":{"planet":0,"bearing":31},"evidence_tick":3700,"evidence_age_ticks":0,"route_source_tick":null,"route_validated_tick":null,"evidence_kind":"current local measurement","local":{"landing":17.866667,"exit":0.016666668,"outbound":0.06666667,"claim":3.0166667,"return_board":0.033333335,"departure":3.766667},"unknown_reason":null,"total_seconds":24.766666,"reference_exceeds_match_time":false},{"planet":2,"current":false,"revision":46,"observed_owner":null,"ownership_known":true,"adds_ownership":true,"first_rebuild_foothold":true,"distance":523.3205,"travel_seconds":8.959081,"site":null,"evidence_tick":null,"evidence_age_ticks":null,"route_source_tick":null,"route_validated_tick":null,"evidence_kind":"historical timing reference; live feasibility unknown","local":null,"unknown_reason":"remote or local surface unmeasured","total_seconds":null,"reference_exceeds_match_time":null},{"planet":1,"current":false,"revision":14,"observed_owner":null,"ownership_known":true,"adds_ownership":true,"first_rebuild_foothold":true,"distance":595.6344,"travel_seconds":12.779342,"site":null,"evidence_tick":null,"evidence_age_ticks":null,"route_source_tick":null,"route_validated_tick":null,"evidence_kind":"historical timing reference; live feasibility unknown","local":null,"unknown_reason":"remote or local surface unmeasured","total_seconds":null,"reference_exceeds_match_time":null}],"fastest_supported":0,"preferred_by_time":null,"comparison_reason":"insufficient evidence for complete shortlist comparison","charged_work":4}
+mission_alternative_survey={"submitted":124,"cancelled":123,"checks":501,"measured":307,"no_landing":194,"incomplete":0,"physics_queries":20498,"deferred":{},"max_retained":2}
+mission_flag_survey=null
+mission_flag_value_shadow={"charged":0,"completed":0,"deferred_source_observations":0,"model":"capture_flag_value_shadow_v1","observational":true,"p1":null,"p2":null}
+spaceling_p1_present=false
+spaceling_p2_present=false
+
+performance_overlay_enabled=true
+performance_overlay_text=FPS 10 | UPS 48
+kms_profile_version=6
+kms_profile_enabled=true
+kms_loop_samples=120
+kms_loops_total=3717
+kms_output_width=1024
+kms_output_height=768
+kms_pixel_format=XRGB8888
+kms_buffer_bytes=3145728
+kms_buffer_age=3
+kms_buffer_mode=direct
+kms_shadow_bytes=0
+kms_texture_mode=rgb
+kms_draw_detail=true
+kms_window_wall_ms=10314.684
+kms_dirty_pixels_window=94371840
+kms_draws_total=1088
+kms_draws_window=120
+kms_flip_submissions_total=1087
+kms_flip_submissions_window=120
+kms_flip_completions_total=1086
+kms_flip_completions_window=120
+kms_modesets_total=1
+kms_modesets_window=0
+kms_flip_read_errors_total=0
+kms_flip_read_errors_window=0
+kms_copy_bytes_total=0
+kms_copy_bytes_window=0
+kms_rgb_blits_total=1055
+kms_rgb_blits_window=120
+kms_rgb_pixels_total=829685760
+kms_rgb_pixels_window=94371840
+kms_loop_calls=120
+kms_loop_cpu_samples=120
+kms_loop_wall_total_ms=10314.684
+kms_loop_wall_avg_ms=85.956
+kms_loop_wall_p95_ms=110.588
+kms_loop_wall_max_ms=121.705
+kms_loop_cpu_total_ms=10285.234
+kms_loop_cpu_avg_ms=85.710
+kms_loop_cpu_p95_ms=110.351
+kms_loop_cpu_max_ms=121.187
+kms_timers_calls=120
+kms_timers_cpu_samples=120
+kms_timers_wall_total_ms=8439.013
+kms_timers_wall_avg_ms=70.325
+kms_timers_wall_p95_ms=98.240
+kms_timers_wall_max_ms=107.613
+kms_timers_cpu_total_ms=8417.346
+kms_timers_cpu_avg_ms=70.145
+kms_timers_cpu_p95_ms=98.101
+kms_timers_cpu_max_ms=107.189
+kms_callbacks_calls=120
+kms_callbacks_cpu_samples=120
+kms_callbacks_wall_total_ms=0.226
+kms_callbacks_wall_avg_ms=0.002
+kms_callbacks_wall_p95_ms=0.002
+kms_callbacks_wall_max_ms=0.002
+kms_callbacks_cpu_total_ms=0.222
+kms_callbacks_cpu_avg_ms=0.002
+kms_callbacks_cpu_p95_ms=0.002
+kms_callbacks_cpu_max_ms=0.002
+kms_render_calls=120
+kms_render_cpu_samples=120
+kms_render_wall_total_ms=1870.272
+kms_render_wall_avg_ms=15.586
+kms_render_wall_p95_ms=67.087
+kms_render_wall_max_ms=70.742
+kms_render_cpu_total_ms=1863.043
+kms_render_cpu_avg_ms=15.525
+kms_render_cpu_p95_ms=66.982
+kms_render_cpu_max_ms=70.644
+kms_dispatch_calls=120
+kms_dispatch_cpu_samples=120
+kms_dispatch_wall_total_ms=3.148
+kms_dispatch_wall_avg_ms=0.026
+kms_dispatch_wall_p95_ms=0.027
+kms_dispatch_wall_max_ms=0.054
+kms_dispatch_cpu_total_ms=3.160
+kms_dispatch_cpu_avg_ms=0.026
+kms_dispatch_cpu_p95_ms=0.027
+kms_dispatch_cpu_max_ms=0.055
+kms_map_calls=120
+kms_map_cpu_samples=120
+kms_map_wall_total_ms=7.009
+kms_map_wall_avg_ms=0.058
+kms_map_wall_p95_ms=0.075
+kms_map_wall_max_ms=0.079
+kms_map_cpu_total_ms=7.067
+kms_map_cpu_avg_ms=0.059
+kms_map_cpu_p95_ms=0.076
+kms_map_cpu_max_ms=0.080
+kms_draw_calls=120
+kms_draw_cpu_samples=120
+kms_draw_wall_total_ms=1834.863
+kms_draw_wall_avg_ms=15.291
+kms_draw_wall_p95_ms=66.792
+kms_draw_wall_max_ms=70.395
+kms_draw_cpu_total_ms=1832.040
+kms_draw_cpu_avg_ms=15.267
+kms_draw_cpu_p95_ms=66.735
+kms_draw_cpu_max_ms=70.369
+kms_unmap_calls=120
+kms_unmap_cpu_samples=120
+kms_unmap_wall_total_ms=8.691
+kms_unmap_wall_avg_ms=0.072
+kms_unmap_wall_p95_ms=0.076
+kms_unmap_wall_max_ms=0.079
+kms_unmap_cpu_total_ms=8.764
+kms_unmap_cpu_avg_ms=0.073
+kms_unmap_cpu_p95_ms=0.076
+kms_unmap_cpu_max_ms=0.080
+kms_flip_wait_calls=120
+kms_flip_wait_cpu_samples=120
+kms_flip_wait_wall_total_ms=1.257
+kms_flip_wait_wall_avg_ms=0.010
+kms_flip_wait_wall_p95_ms=0.011
+kms_flip_wait_wall_max_ms=0.012
+kms_flip_wait_cpu_total_ms=1.261
+kms_flip_wait_cpu_avg_ms=0.011
+kms_flip_wait_cpu_p95_ms=0.011
+kms_flip_wait_cpu_max_ms=0.012
+kms_submit_calls=120
+kms_submit_cpu_samples=120
+kms_submit_wall_total_ms=16.218
+kms_submit_wall_avg_ms=0.135
+kms_submit_wall_p95_ms=0.181
+kms_submit_wall_max_ms=0.193
+kms_submit_cpu_total_ms=11.915
+kms_submit_cpu_avg_ms=0.099
+kms_submit_cpu_p95_ms=0.114
+kms_submit_cpu_max_ms=0.137
+kms_background_calls=0
+kms_background_cpu_samples=0
+kms_copy_calls=0
+kms_copy_cpu_samples=0
+kms_rgb_blit_calls=120
+kms_rgb_blit_cpu_samples=120
+kms_rgb_blit_wall_total_ms=501.417
+kms_rgb_blit_wall_avg_ms=4.178
+kms_rgb_blit_wall_p95_ms=4.331
+kms_rgb_blit_wall_max_ms=4.817
+kms_rgb_blit_cpu_total_ms=500.356
+kms_rgb_blit_cpu_avg_ms=4.170
+kms_rgb_blit_cpu_p95_ms=4.293
+kms_rgb_blit_cpu_max_ms=4.787
+kms_draw_generic_calls=0
+kms_draw_generic_cpu_samples=0
+kms_draw_rgb_calls=120
+kms_draw_rgb_cpu_samples=120
+kms_draw_rgb_wall_total_ms=1833.522
+kms_draw_rgb_wall_avg_ms=15.279
+kms_draw_rgb_wall_p95_ms=66.782
+kms_draw_rgb_wall_max_ms=70.384
+kms_draw_rgb_cpu_total_ms=1831.389
+kms_draw_rgb_cpu_avg_ms=15.262
+kms_draw_rgb_cpu_p95_ms=66.730
+kms_draw_rgb_cpu_max_ms=70.363
+kms_core_render_calls=120
+kms_core_render_cpu_samples=0
+kms_core_render_wall_total_ms=1833.286
+kms_core_render_wall_avg_ms=15.277
+kms_core_render_wall_p95_ms=66.780
+kms_core_render_wall_max_ms=70.381
+kms_core_prepare_calls=120
+kms_core_prepare_cpu_samples=0
+kms_core_prepare_wall_total_ms=0.772
+kms_core_prepare_wall_avg_ms=0.006
+kms_core_prepare_wall_p95_ms=0.007
+kms_core_prepare_wall_max_ms=0.008
+kms_core_dirty_calls=120
+kms_core_dirty_cpu_samples=0
+kms_core_dirty_wall_total_ms=83.369
+kms_core_dirty_wall_avg_ms=0.695
+kms_core_dirty_wall_p95_ms=2.445
+kms_core_dirty_wall_max_ms=3.038
+kms_core_items_calls=120
+kms_core_items_cpu_samples=0
+kms_core_items_wall_total_ms=1734.485
+kms_core_items_wall_avg_ms=14.454
+kms_core_items_wall_p95_ms=65.742
+kms_core_items_wall_max_ms=69.200
+kms_core_image_calls=120
+kms_core_image_cpu_samples=0
+kms_core_image_wall_total_ms=504.760
+kms_core_image_wall_avg_ms=4.206
+kms_core_image_wall_p95_ms=4.360
+kms_core_image_wall_max_ms=4.847
+kms_core_texture_calls=34909
+kms_core_texture_cpu_samples=0
+kms_core_texture_wall_total_ms=754.641
+kms_core_texture_wall_avg_ms=6.289
+kms_core_texture_wall_p95_ms=7.486
+kms_core_texture_wall_max_ms=7.793
+kms_core_fallback_calls=34789
+kms_core_fallback_cpu_samples=0
+kms_core_fallback_wall_total_ms=241.973
+kms_core_fallback_wall_avg_ms=2.016
+kms_core_fallback_wall_p95_ms=3.224
+kms_core_fallback_wall_max_ms=3.430
+kms_core_rectangle_calls=2926
+kms_core_rectangle_cpu_samples=0
+kms_core_rectangle_wall_total_ms=404.729
+kms_core_rectangle_wall_avg_ms=3.373
+kms_core_rectangle_wall_p95_ms=52.541
+kms_core_rectangle_wall_max_ms=55.829
+kms_core_text_calls=2933
+kms_core_text_cpu_samples=0
+kms_core_text_wall_total_ms=527.353
+kms_core_text_wall_avg_ms=4.395
+kms_core_text_wall_p95_ms=5.978
+kms_core_text_wall_max_ms=6.637
+kms_core_path_calls=0
+kms_core_path_cpu_samples=0
+kms_core_background_calls=120
+kms_core_background_cpu_samples=0
+kms_core_background_wall_total_ms=0.077
+kms_core_background_wall_avg_ms=0.001
+kms_core_background_wall_p95_ms=0.001
+kms_core_background_wall_max_ms=0.001
+kms_core_text_font_calls=2933
+kms_core_text_font_cpu_samples=0
+kms_core_text_font_wall_total_ms=16.446
+kms_core_text_font_wall_avg_ms=0.137
+kms_core_text_font_wall_p95_ms=0.176
+kms_core_text_font_wall_max_ms=0.200
+kms_core_text_glyph_run_calls=2933
+kms_core_text_glyph_run_cpu_samples=0
+kms_core_text_glyph_run_wall_total_ms=274.195
+kms_core_text_glyph_run_wall_avg_ms=2.285
+kms_core_text_glyph_run_wall_p95_ms=3.590
+kms_core_text_glyph_run_wall_max_ms=4.120
+kms_core_text_texture_calls=34789
+kms_core_text_texture_cpu_samples=0
+kms_core_text_texture_wall_total_ms=251.589
+kms_core_text_texture_wall_avg_ms=2.097
+kms_core_text_texture_wall_p95_ms=3.331
+kms_core_text_texture_wall_max_ms=3.544
+kms_core_text_fallback_calls=34789
+kms_core_text_fallback_cpu_samples=0
+kms_core_text_fallback_wall_total_ms=241.973
+kms_core_text_fallback_wall_avg_ms=2.016
+kms_core_text_fallback_wall_p95_ms=3.224
+kms_core_text_fallback_wall_max_ms=3.430
+autostart_enabled=true
+autostart_activity=spacewars-bots
+autostart_phase=running
+autostart_session=automatic
+autostart_repeats=0
+autostart_delay_seconds=30
+launch_state=complete
+launch_scenario=spacewars
+launch_stage=starting_scenario
+launch_elapsed_ms=246
+launch_save_ms=0
+launch_asset_ms=0
+launch_start_ms=132
+master_volume_percent=5
+master_muted=false
+settings_save_pending=false
+
+
+/usr/bin/spacewars-cli host pause --json
+{
+  "schema_version": 1,
+  "revision": 4,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "6140352705967597710"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match · New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+/usr/bin/spacewars-cli ui state --json
+{
+  "schema_version": 1,
+  "revision": 4,
+  "screen": "pause.main",
+  "active_scenario": "spacewars",
+  "selected_scenario": "spacewars",
+  "selected_control": "pause.resume",
+  "controls": [
+    {
+      "id": "pause.resume",
+      "label": "Resume",
+      "enabled": true
+    },
+    {
+      "id": "pause.restart",
+      "label": "Rematch",
+      "enabled": true,
+      "value": "6140352705967597710"
+    },
+    {
+      "id": "pause.controls",
+      "label": "Controls",
+      "enabled": true
+    },
+    {
+      "id": "pause.return-to-launcher",
+      "label": "Return to Launcher",
+      "enabled": true
+    },
+    {
+      "id": "pause.new-match",
+      "label": "New Match · New World",
+      "enabled": true
+    },
+    {
+      "id": "pause.sound",
+      "label": "App Settings",
+      "enabled": true
+    }
+  ],
+  "actions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "confirm",
+    "back",
+    "start",
+    "controls"
+  ],
+  "scenario_revision": 1,
+  "paused": true,
+  "benchmark_active": false,
+  "error": null
+}
+
+
+systemctl show spacewars-kiosk.service --property=ActiveState --property=MainPID --property=NRestarts
+MainPID=1905
+NRestarts=0
+ActiveState=active
+

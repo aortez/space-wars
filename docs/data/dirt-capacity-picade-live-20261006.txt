@@ -1,0 +1,226 @@
+{
+  "host": "sw-picade.local",
+  "sha256": {
+    "engine-client": "32300a08566e7b5ffc428f2a7c90f6107174306bc8f346ac52f6ae663a92f801",
+    "spacewars-cli": "970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5"
+  },
+  "service": {
+    "MainPID": "4372",
+    "NRestarts": "0",
+    "ActiveState": "active"
+  },
+  "final_ui": {
+    "revision": 45,
+    "screen": "pause.main",
+    "active_scenario": "scorched-earth",
+    "scenario_revision": 3,
+    "paused": true
+  },
+  "combat_settings_restored": {
+    "launcher.settings.combat.loose-dirt": "On \u00b7 192 grains",
+    "launcher.settings.combat.asteroid-interval": "1",
+    "launcher.settings.combat.asteroid-strength": "Heavy"
+  },
+  "status_samples": [
+    {
+      "scenario": "spacewars-terrain-duel",
+      "fps": "57.6",
+      "ups": "59.6",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "540",
+      "host_step_avg_ms": "1.301",
+      "host_step_p95_ms": "3.493",
+      "host_step_max_ms": "5.171"
+    },
+    {
+      "scenario": "spacewars-terrain-duel",
+      "fps": "57.3",
+      "ups": "60.3",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "1145",
+      "host_step_avg_ms": "1.598",
+      "host_step_p95_ms": "2.048",
+      "host_step_max_ms": "3.935"
+    },
+    {
+      "scenario": "spacewars-terrain-duel",
+      "fps": "58.5",
+      "ups": "60.5",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "1630",
+      "host_step_avg_ms": "1.748",
+      "host_step_p95_ms": "2.380",
+      "host_step_max_ms": "3.821"
+    },
+    {
+      "scenario": "spacewars-terrain-duel",
+      "fps": "59.8",
+      "ups": "59.8",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "1690",
+      "host_step_avg_ms": "1.490",
+      "host_step_p95_ms": "2.003",
+      "host_step_max_ms": "3.505"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "22.7",
+      "ups": "59.6",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "733",
+      "host_step_avg_ms": "8.005",
+      "host_step_p95_ms": "17.443",
+      "host_step_max_ms": "44.613"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "21.4",
+      "ups": "60.2",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "1348",
+      "host_step_avg_ms": "16.289",
+      "host_step_p95_ms": "31.488",
+      "host_step_max_ms": "38.088"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "22.6",
+      "ups": "60.0",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "1962",
+      "host_step_avg_ms": "11.183",
+      "host_step_p95_ms": "24.587",
+      "host_step_max_ms": "34.378"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "20.8",
+      "ups": "60.4",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "2567",
+      "host_step_avg_ms": "14.355",
+      "host_step_p95_ms": "36.416",
+      "host_step_max_ms": "44.466"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "22.2",
+      "ups": "59.7",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "3178",
+      "host_step_avg_ms": "11.467",
+      "host_step_p95_ms": "25.761",
+      "host_step_max_ms": "33.799"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "24.6",
+      "ups": "59.2",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "3787",
+      "host_step_avg_ms": "11.670",
+      "host_step_p95_ms": "28.098",
+      "host_step_max_ms": "33.463"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "25.3",
+      "ups": "60.4",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "3849",
+      "host_step_avg_ms": "10.413",
+      "host_step_p95_ms": "28.098",
+      "host_step_max_ms": "33.463"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "16.3",
+      "ups": "58.4",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "false",
+      "updates_total": "4705",
+      "host_step_avg_ms": "16.751",
+      "host_step_p95_ms": "44.501",
+      "host_step_max_ms": "61.196"
+    },
+    {
+      "scenario": "scorched-earth",
+      "fps": "12.0",
+      "ups": "0.0",
+      "renderer": "raster",
+      "raster_scale": "2.00",
+      "paused": "true",
+      "updates_total": "4790"
+    }
+  ],
+  "screenshots": [
+    "docs/screenshots/dirt-capacity/picade-capacity-angular.png",
+    "docs/screenshots/dirt-capacity/picade-capacity-combat.png",
+    "docs/screenshots/dirt-capacity/picade-capacity-ready.png",
+    "docs/screenshots/dirt-capacity/picade-capacity-round.png"
+  ],
+  "visual_samples": [
+    {
+      "image": "picade-capacity-combat.png",
+      "scenario": "spacewars-terrain-duel",
+      "loose": 51,
+      "returned": 283,
+      "grain_limit": 192,
+      "fps": 60,
+      "ups": 60
+    },
+    {
+      "image": "picade-capacity-round.png",
+      "scenario": "scorched-earth",
+      "shape": "Round",
+      "collapse": true,
+      "phase": "Rest 2s",
+      "loose": 48,
+      "returned": 921,
+      "impacts": 30,
+      "capacity_rejections": 0,
+      "bank_cells_released": 23,
+      "grain_limit": 192,
+      "fps": 25,
+      "ups": 60
+    },
+    {
+      "image": "picade-capacity-angular.png",
+      "scenario": "scorched-earth",
+      "shape": "Angular",
+      "collapse": true,
+      "phase": "Barrage 48s remaining",
+      "loose": 147,
+      "returned": 84,
+      "impacts": 6,
+      "capacity_rejections": 0,
+      "bank_cells_released": 17,
+      "grain_limit": 192,
+      "fps": 19,
+      "ups": 59
+    }
+  ]
+}

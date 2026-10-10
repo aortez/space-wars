@@ -1,0 +1,502 @@
+{
+  "date": "2026-10-09",
+  "branch": "feat/shared-dirt-packing",
+  "head": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+  "dirty": true,
+  "runtime_changed": false,
+  "before_source_manifest_sha256": "ff133f5778007a569abf516c6e3d2bca6cb94873ff065994a87102ed1a9abedc",
+  "changed_files_before_evidence": {
+    "crates/engine-rapier/src/terrain/loose/deposition/inspection.rs": {
+      "before": "111ef2cdc0bcb2b04b28d2cdf555549144a05b3121a526d9b371d0802f8ac816",
+      "after": "5f2044d9f6228e52baed76fb04b5217bce463c6d7d3bb38aa3830a6372601130"
+    },
+    "crates/engine-rapier/src/terrain/loose/deposition/inspection/oracle.rs": {
+      "before": null,
+      "after": "2f7c181e4e5cec55136c5d0142b40df804efa53c7c9e0cd0c6f3145b400c1a6e"
+    },
+    "crates/engine-rapier/tests/fixtures/README.md": {
+      "before": "aeb3e8d4905d8445c3e33bce3432e376d1223e99ffbb19ca78b24b0fa3fad174",
+      "after": "cd54529e4792b3f541f111ef1768cdf86bdb37cda10fb32d09b80767f7466eea"
+    },
+    "crates/engine-rapier/tests/fixtures/spacewars-angular-roof-small.packing": {
+      "before": null,
+      "after": "2c9db0db88a9fae56b8a94880d54d214043aaf0b7e8884e7d9171fb4c8861ed6"
+    },
+    "crates/engine-rapier/tests/fixtures/spacewars-round-roof-small.packing": {
+      "before": null,
+      "after": "d05f36a6539682a4462fe0cd6dfb28a0a35ef8ebb561b24652570d783ff10bd9"
+    },
+    "docs/cave-packing-oracle.md": {
+      "before": null,
+      "after": "fdf33e45c212daba9ae5c6b238dece9b6a2bded3c9825abe9b09dc0e313d0094"
+    },
+    "docs/packing-preview-reuse.md": {
+      "before": "e25ca5400be4e82dfb215fe1a3708afb6e89d350c5947826c19d12285983f008",
+      "after": "214c48154bc4490b72cc4fbd4beffa2594c189eaeb0a541dc698b58f69cc7280"
+    },
+    "docs/roof-collapse.md": {
+      "before": "d071a4fec15b7a9204cc68cdc8f379a6ba99a1052633ec738a8bffbd10f0107d",
+      "after": "26634cc2eff4c5455b54f951edf497083bcdce70b050898731135159e63fe432"
+    },
+    "docs/shared-loose-terrain.md": {
+      "before": "adb974819e89feaa91041b62b82eda6ad509192179d170c17179444bde563c0c",
+      "after": "25d3062de9184a8c886b6f8fc34cc3f2cfb6fac601a8c90316bca675111653f1"
+    }
+  },
+  "previous_runtime_evidence": "dirt-packing-reuse-20261008.json",
+  "tests": {
+    "passed": 840,
+    "by_crate": {
+      "engine-rapier": 151,
+      "engine-terrain": 46,
+      "scenario-scorched-earth": 19,
+      "scenario-spacewars": 563,
+      "scenario-terrain-lab": 61
+    },
+    "ignored_developer_entry": 1,
+    "picade_new_regressions_passed": 2,
+    "engine_rapier_strict_clippy": "passed",
+    "rustfmt": "passed"
+  },
+  "test_executables": {
+    "desktop": {
+      "path": "/home/data/workspace/space-wars2/target/ci/deps/engine_rapier-888e91fe9468b63a",
+      "sha256": "38886db2bd262dd53140574afcafdc14388cbe66b74043baf86af1b7b8ad6e19"
+    },
+    "picade": {
+      "path": "/home/data/workspace/space-wars2/target/aarch64-unknown-linux-gnu/ci/deps/engine_rapier-96ad2ba4011eb81e",
+      "sha256": "b848e36dbde42480f944fa76d624c728a301e5075dff4582f51ddb97a1461e4c"
+    }
+  },
+  "scope": {
+    "capture": "Space Wars seed 42, Weak roof, 30 seconds; five groups per shape",
+    "full_membership_queries": 6,
+    "up_to_three_grain_queries": 4,
+    "actor_removal_control_queries": 5,
+    "actual_world_assignments": 4913253,
+    "actual_world_stable_assignments": 24847,
+    "actual_world_clear_assignments": 0,
+    "pre_enumeration_assignment_bound_limit": 20000000,
+    "limits": [
+      "Four larger groups were searched only through three-grain deposits.",
+      "Fixed captured poses, original destination field, existing reach/wall/repose rules.",
+      "No combined transactions across destination fields or field expansion.",
+      "Surface reconstruction and collision queries share runtime primitives.",
+      "Round group 0 without ship 10001 permits three grains; bounded runtime accepts one. With the ship present the complete search permits zero."
+    ]
+  },
+  "queries": [
+    {
+      "shape": "round",
+      "group": 0,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "8ff4a0e81982c4cfb9bffa23bb31ec3db2a169775fdab265d4f45b08389fd996",
+      "grains": 7,
+      "max_selected": 7,
+      "runtime_accepted": 0,
+      "evaluated": 626,
+      "connected": 248,
+      "stable": 200,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "round",
+      "group": 1,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "d05f36a6539682a4462fe0cd6dfb28a0a35ef8ebb561b24652570d783ff10bd9",
+      "grains": 3,
+      "max_selected": 3,
+      "runtime_accepted": 0,
+      "evaluated": 101,
+      "connected": 28,
+      "stable": 26,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "round",
+      "group": 2,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "6823f8561f7efa355c7be2ebea0acd2c3d169d2dbb9dc9428d72452d876134e8",
+      "grains": 9,
+      "max_selected": 9,
+      "runtime_accepted": 0,
+      "evaluated": 33,
+      "connected": 21,
+      "stable": 13,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 0,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "1d745473feda575ae3d3ff9bbce79ce6e58e77e96111f8202a95cac77b751aba",
+      "grains": 14,
+      "max_selected": 14,
+      "runtime_accepted": 0,
+      "evaluated": 124905,
+      "connected": 56411,
+      "stable": 6225,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 2,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "2c9db0db88a9fae56b8a94880d54d214043aaf0b7e8884e7d9171fb4c8861ed6",
+      "grains": 8,
+      "max_selected": 8,
+      "runtime_accepted": 0,
+      "evaluated": 548,
+      "connected": 236,
+      "stable": 133,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 3,
+      "membership_limit": null,
+      "omitted_actor": null,
+      "snapshot_sha256": "05fc60d6ccac08600041f8ca21870030d56e641c953519e89d8e665c8d8cf4ed",
+      "grains": 2,
+      "max_selected": 2,
+      "runtime_accepted": 0,
+      "evaluated": 0,
+      "connected": 0,
+      "stable": 0,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "round",
+      "group": 3,
+      "membership_limit": 3,
+      "omitted_actor": null,
+      "snapshot_sha256": "2ebd32e2dc46037eaf64b389bbb6413e9db21cfce5ec6ae919f3fffd3ce871fc",
+      "grains": 37,
+      "max_selected": 3,
+      "runtime_accepted": 0,
+      "evaluated": 4189658,
+      "connected": 206099,
+      "stable": 14015,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "round",
+      "group": 4,
+      "membership_limit": 3,
+      "omitted_actor": null,
+      "snapshot_sha256": "6694896bfd5d49a98d7948e64f54dfaa82ec7f016942305a56f6f283ca3ccfa6",
+      "grains": 8,
+      "max_selected": 3,
+      "runtime_accepted": 0,
+      "evaluated": 21190,
+      "connected": 4205,
+      "stable": 0,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 1,
+      "membership_limit": 3,
+      "omitted_actor": null,
+      "snapshot_sha256": "61eb5792fba4794bcd45df25a51944601c6917fe6a0e1f32bd1a83e0f739b7f2",
+      "grains": 22,
+      "max_selected": 3,
+      "runtime_accepted": 0,
+      "evaluated": 533420,
+      "connected": 81137,
+      "stable": 4235,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 4,
+      "membership_limit": 3,
+      "omitted_actor": null,
+      "snapshot_sha256": "3dfc4e1bd551012b2adc2edfe5cc5b566a36a9eb65612dc29a18b81852155314",
+      "grains": 10,
+      "max_selected": 3,
+      "runtime_accepted": 0,
+      "evaluated": 42772,
+      "connected": 6648,
+      "stable": 0,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "round",
+      "group": 0,
+      "membership_limit": null,
+      "omitted_actor": 10001,
+      "snapshot_sha256": "8ff4a0e81982c4cfb9bffa23bb31ec3db2a169775fdab265d4f45b08389fd996",
+      "grains": 7,
+      "max_selected": 7,
+      "runtime_accepted": 1,
+      "evaluated": 626,
+      "connected": 248,
+      "stable": 200,
+      "clear": 3,
+      "best": [
+        {
+          "index": 4,
+          "x": 3,
+          "y": 2
+        },
+        {
+          "index": 5,
+          "x": 2,
+          "y": 1
+        },
+        {
+          "index": 6,
+          "x": 3,
+          "y": 3
+        }
+      ],
+      "max_accepted": 3
+    },
+    {
+      "shape": "round",
+      "group": 1,
+      "membership_limit": null,
+      "omitted_actor": 10000,
+      "snapshot_sha256": "d05f36a6539682a4462fe0cd6dfb28a0a35ef8ebb561b24652570d783ff10bd9",
+      "grains": 3,
+      "max_selected": 3,
+      "runtime_accepted": 2,
+      "evaluated": 101,
+      "connected": 28,
+      "stable": 26,
+      "clear": 4,
+      "best": [
+        {
+          "index": 0,
+          "x": 3,
+          "y": 2
+        },
+        {
+          "index": 1,
+          "x": 4,
+          "y": 2
+        }
+      ],
+      "max_accepted": 2
+    },
+    {
+      "shape": "round",
+      "group": 2,
+      "membership_limit": null,
+      "omitted_actor": 10000,
+      "snapshot_sha256": "6823f8561f7efa355c7be2ebea0acd2c3d169d2dbb9dc9428d72452d876134e8",
+      "grains": 9,
+      "max_selected": 9,
+      "runtime_accepted": 3,
+      "evaluated": 33,
+      "connected": 21,
+      "stable": 13,
+      "clear": 8,
+      "best": [
+        {
+          "index": 0,
+          "x": 0,
+          "y": 3
+        },
+        {
+          "index": 2,
+          "x": 1,
+          "y": 4
+        },
+        {
+          "index": 5,
+          "x": 0,
+          "y": 4
+        }
+      ],
+      "max_accepted": 3
+    },
+    {
+      "shape": "angular",
+      "group": 0,
+      "membership_limit": null,
+      "omitted_actor": 10000,
+      "snapshot_sha256": "1d745473feda575ae3d3ff9bbce79ce6e58e77e96111f8202a95cac77b751aba",
+      "grains": 14,
+      "max_selected": 14,
+      "runtime_accepted": 0,
+      "evaluated": 124905,
+      "connected": 56411,
+      "stable": 6225,
+      "clear": 0,
+      "best": [],
+      "max_accepted": 0
+    },
+    {
+      "shape": "angular",
+      "group": 2,
+      "membership_limit": null,
+      "omitted_actor": 10000,
+      "snapshot_sha256": "2c9db0db88a9fae56b8a94880d54d214043aaf0b7e8884e7d9171fb4c8861ed6",
+      "grains": 8,
+      "max_selected": 8,
+      "runtime_accepted": 4,
+      "evaluated": 548,
+      "connected": 236,
+      "stable": 133,
+      "clear": 40,
+      "best": [
+        {
+          "index": 0,
+          "x": 1,
+          "y": 3
+        },
+        {
+          "index": 1,
+          "x": 2,
+          "y": 3
+        },
+        {
+          "index": 2,
+          "x": 2,
+          "y": 4
+        },
+        {
+          "index": 4,
+          "x": 0,
+          "y": 4
+        }
+      ],
+      "max_accepted": 4
+    }
+  ],
+  "desktop_picade_queries_identical": true,
+  "desktop_query_results_sha256": "3eeb4f116610cada3c53288f98118a235f8c149fa9eb1f1cb5d9c6fdda70729a",
+  "picade_query_results_sha256": "3eeb4f116610cada3c53288f98118a235f8c149fa9eb1f1cb5d9c6fdda70729a",
+  "logs": {
+    "test-suite.log": "a73f8baf660b4c2c895b568816cad2ba16d1d4cafd8ab5769f167a4905fc4840",
+    "clippy.log": "59d5c384939e4abcbe953b4d3832c431c98e1e14b71661f42d58a29dc7226e71",
+    "oracle-summary.log": "8781f5520858143a6e2abd07b07fcc93e119ae436309f7317960daafa14b0f99",
+    "picade-oracle-summary.log": "8781f5520858143a6e2abd07b07fcc93e119ae436309f7317960daafa14b0f99"
+  },
+  "local_smoke_reviews": {
+    "round": {
+      "mode": "weak-round",
+      "scenario": "spacewars-terrain-duel",
+      "ui": {
+        "schema_version": 1,
+        "revision": 1,
+        "screen": "gameplay",
+        "active_scenario": "spacewars-terrain-duel",
+        "selected_scenario": "spacewars-terrain-duel",
+        "selected_control": null,
+        "controls": [],
+        "actions": [],
+        "scenario_revision": 1,
+        "paused": false,
+        "benchmark_active": false,
+        "error": null
+      },
+      "sha256": "205db8c1c00d05b727bbde618939d7e0a42620b900a14c3125c1a73d13f8b9b0",
+      "status": "scenario=spacewars-terrain-duel\nscenario_revision=1\npaused=false\ngame_over=false\nbenchmark_active=false\nrenderer=vector\nraster_scale=1.00\nperformance_target=60 Hz\nfps=62.4\nups=60.4\nframes_total=3076\nupdates_total=2965\nfps_source=submitted-frames\nhost_cpu_samples=120\nhost_viewport_width=1092\nhost_viewport_height=1383\nhost_internal_width=1092\nhost_internal_height=1383\nhost_scene_primitives=542\nhost_updates_per_callback=0.967\nhost_interval_avg_ms=16.037\nhost_interval_p95_ms=16.700\nhost_interval_max_ms=17.372\nhost_step_avg_ms=1.782\nhost_step_p95_ms=2.753\nhost_step_max_ms=7.784\nhost_scene_avg_ms=0.114\nhost_scene_p95_ms=0.155\nhost_scene_max_ms=0.230\nhost_prepare_avg_ms=0.882\nhost_prepare_p95_ms=1.084\nhost_prepare_max_ms=4.753\nhost_callback_avg_ms=2.783\nhost_callback_p95_ms=3.939\nhost_callback_max_ms=8.975\nhost_raster_buffers_avg_ms=0.000\nhost_raster_buffers_p95_ms=0.000\nhost_raster_buffers_max_ms=0.000\nhost_raster_clear_avg_ms=0.000\nhost_raster_clear_p95_ms=0.000\nhost_raster_clear_max_ms=0.000\nhost_raster_player_avg_ms=0.000\nhost_raster_player_p95_ms=0.000\nhost_raster_player_max_ms=0.000\nhost_raster_player_starfield_avg_ms=0.000\nhost_raster_player_starfield_p95_ms=0.000\nhost_raster_player_starfield_max_ms=0.000\nhost_raster_player_world_avg_ms=0.000\nhost_raster_player_world_p95_ms=0.000\nhost_raster_player_world_max_ms=0.000\nhost_raster_player_sun_planets_avg_ms=0.000\nhost_raster_player_sun_planets_p95_ms=0.000\nhost_raster_player_sun_planets_max_ms=0.000\nhost_raster_player_spaceports_avg_ms=0.000\nhost_raster_player_spaceports_p95_ms=0.000\nhost_raster_player_spaceports_max_ms=0.000\nhost_raster_player_effects_avg_ms=0.000\nhost_raster_player_effects_p95_ms=0.000\nhost_raster_player_effects_max_ms=0.000\nhost_raster_player_ships_avg_ms=0.000\nhost_raster_player_ships_p95_ms=0.000\nhost_raster_player_ships_max_ms=0.000\nhost_raster_player_debris_avg_ms=0.000\nhost_raster_player_debris_p95_ms=0.000\nhost_raster_player_debris_max_ms=0.000\nhost_raster_player_particles_avg_ms=0.000\nhost_raster_player_particles_p95_ms=0.000\nhost_raster_player_particles_max_ms=0.000\nhost_raster_player_other_avg_ms=0.000\nhost_raster_player_other_p95_ms=0.000\nhost_raster_player_other_max_ms=0.000\nhost_raster_player_hud_avg_ms=0.000\nhost_raster_player_hud_p95_ms=0.000\nhost_raster_player_hud_max_ms=0.000\nhost_raster_player_sun_corona_avg_ms=0.000\nhost_raster_player_sun_corona_p95_ms=0.000\nhost_raster_player_sun_corona_max_ms=0.000\nhost_raster_overview_refresh_avg_ms=0.000\nhost_raster_overview_refresh_p95_ms=0.000\nhost_raster_overview_refresh_max_ms=0.000\nhost_raster_overview_live_avg_ms=0.000\nhost_raster_overview_live_p95_ms=0.000\nhost_raster_overview_live_max_ms=0.000\nhost_raster_overview_blit_avg_ms=0.000\nhost_raster_overview_blit_p95_ms=0.000\nhost_raster_overview_blit_max_ms=0.000\nhost_raster_other_frames_avg_ms=0.000\nhost_raster_other_frames_p95_ms=0.000\nhost_raster_other_frames_max_ms=0.000\nhost_raster_image_avg_ms=0.000\nhost_raster_image_p95_ms=0.000\nhost_raster_image_max_ms=0.000\nNo active Spacewars diagnostics.\nperformance_overlay_enabled=false\nperformance_overlay_text=FPS 62 | UPS 60\nautostart_enabled=false\nautostart_activity=clock\nautostart_phase=disabled\nautostart_session=manual\nautostart_repeats=0\nautostart_delay_seconds=30\nmaster_volume_percent=25\nmaster_muted=false\nsettings_save_pending=false\n"
+    },
+    "angular": {
+      "mode": "weak-angular",
+      "scenario": "spacewars-terrain-duel",
+      "ui": {
+        "schema_version": 1,
+        "revision": 1,
+        "screen": "gameplay",
+        "active_scenario": "spacewars-terrain-duel",
+        "selected_scenario": "spacewars-terrain-duel",
+        "selected_control": null,
+        "controls": [],
+        "actions": [],
+        "scenario_revision": 1,
+        "paused": false,
+        "benchmark_active": false,
+        "error": null
+      },
+      "sha256": "205db8c1c00d05b727bbde618939d7e0a42620b900a14c3125c1a73d13f8b9b0",
+      "status": "scenario=spacewars-terrain-duel\nscenario_revision=1\npaused=false\ngame_over=false\nbenchmark_active=false\nrenderer=vector\nraster_scale=1.00\nperformance_target=60 Hz\nfps=62.4\nups=59.4\nframes_total=3778\nupdates_total=3632\nfps_source=submitted-frames\nhost_cpu_samples=120\nhost_viewport_width=5116\nhost_viewport_height=1383\nhost_internal_width=5116\nhost_internal_height=1383\nhost_scene_primitives=1148\nhost_updates_per_callback=0.958\nhost_interval_avg_ms=16.022\nhost_interval_p95_ms=16.629\nhost_interval_max_ms=16.763\nhost_step_avg_ms=1.764\nhost_step_p95_ms=2.313\nhost_step_max_ms=2.563\nhost_scene_avg_ms=0.117\nhost_scene_p95_ms=0.128\nhost_scene_max_ms=0.237\nhost_prepare_avg_ms=1.483\nhost_prepare_p95_ms=1.592\nhost_prepare_max_ms=2.103\nhost_callback_avg_ms=3.366\nhost_callback_p95_ms=3.951\nhost_callback_max_ms=4.363\nhost_raster_buffers_avg_ms=0.000\nhost_raster_buffers_p95_ms=0.000\nhost_raster_buffers_max_ms=0.000\nhost_raster_clear_avg_ms=0.000\nhost_raster_clear_p95_ms=0.000\nhost_raster_clear_max_ms=0.000\nhost_raster_player_avg_ms=0.000\nhost_raster_player_p95_ms=0.000\nhost_raster_player_max_ms=0.000\nhost_raster_player_starfield_avg_ms=0.000\nhost_raster_player_starfield_p95_ms=0.000\nhost_raster_player_starfield_max_ms=0.000\nhost_raster_player_world_avg_ms=0.000\nhost_raster_player_world_p95_ms=0.000\nhost_raster_player_world_max_ms=0.000\nhost_raster_player_sun_planets_avg_ms=0.000\nhost_raster_player_sun_planets_p95_ms=0.000\nhost_raster_player_sun_planets_max_ms=0.000\nhost_raster_player_spaceports_avg_ms=0.000\nhost_raster_player_spaceports_p95_ms=0.000\nhost_raster_player_spaceports_max_ms=0.000\nhost_raster_player_effects_avg_ms=0.000\nhost_raster_player_effects_p95_ms=0.000\nhost_raster_player_effects_max_ms=0.000\nhost_raster_player_ships_avg_ms=0.000\nhost_raster_player_ships_p95_ms=0.000\nhost_raster_player_ships_max_ms=0.000\nhost_raster_player_debris_avg_ms=0.000\nhost_raster_player_debris_p95_ms=0.000\nhost_raster_player_debris_max_ms=0.000\nhost_raster_player_particles_avg_ms=0.000\nhost_raster_player_particles_p95_ms=0.000\nhost_raster_player_particles_max_ms=0.000\nhost_raster_player_other_avg_ms=0.000\nhost_raster_player_other_p95_ms=0.000\nhost_raster_player_other_max_ms=0.000\nhost_raster_player_hud_avg_ms=0.000\nhost_raster_player_hud_p95_ms=0.000\nhost_raster_player_hud_max_ms=0.000\nhost_raster_player_sun_corona_avg_ms=0.000\nhost_raster_player_sun_corona_p95_ms=0.000\nhost_raster_player_sun_corona_max_ms=0.000\nhost_raster_overview_refresh_avg_ms=0.000\nhost_raster_overview_refresh_p95_ms=0.000\nhost_raster_overview_refresh_max_ms=0.000\nhost_raster_overview_live_avg_ms=0.000\nhost_raster_overview_live_p95_ms=0.000\nhost_raster_overview_live_max_ms=0.000\nhost_raster_overview_blit_avg_ms=0.000\nhost_raster_overview_blit_p95_ms=0.000\nhost_raster_overview_blit_max_ms=0.000\nhost_raster_other_frames_avg_ms=0.000\nhost_raster_other_frames_p95_ms=0.000\nhost_raster_other_frames_max_ms=0.000\nhost_raster_image_avg_ms=0.000\nhost_raster_image_p95_ms=0.000\nhost_raster_image_max_ms=0.000\nNo active Spacewars diagnostics.\nperformance_overlay_enabled=false\nperformance_overlay_text=FPS 62 | UPS 59\nautostart_enabled=false\nautostart_activity=clock\nautostart_phase=disabled\nautostart_session=manual\nautostart_repeats=0\nautostart_delay_seconds=30\nmaster_volume_percent=25\nmaster_muted=false\nsettings_save_pending=false\n"
+    }
+  },
+  "local_review_left_at": {
+    "schema_version": 1,
+    "revision": 5,
+    "screen": "pause.main",
+    "active_scenario": "spacewars-terrain-duel",
+    "selected_scenario": "spacewars-terrain-duel",
+    "selected_control": "pause.resume",
+    "controls": [
+      {
+        "id": "pause.resume",
+        "label": "Resume",
+        "enabled": true
+      },
+      {
+        "id": "pause.restart",
+        "label": "Restart Round",
+        "enabled": true
+      },
+      {
+        "id": "pause.controls",
+        "label": "Controls",
+        "enabled": true
+      },
+      {
+        "id": "pause.return-to-launcher",
+        "label": "Return to Launcher",
+        "enabled": true
+      },
+      {
+        "id": "pause.sound",
+        "label": "App Settings",
+        "enabled": true
+      }
+    ],
+    "actions": [
+      "up",
+      "down",
+      "left",
+      "right",
+      "confirm",
+      "back",
+      "start",
+      "controls"
+    ],
+    "scenario_revision": 2,
+    "paused": true,
+    "benchmark_active": false,
+    "error": null
+  },
+  "local_review_socket": "/tmp/spacewars-partial-review.sock",
+  "picade_runtime": {
+    "redeployed": false,
+    "client_sha256": "c5fc68b8241a2250b50695447bb8a1d2bb8081cd171273b81da5e3e54000ee0a",
+    "cli_sha256": "85c4227b37371f6fc7d7640135a7c2b83684d091cc1afeae991bf3a871cd97b1",
+    "installed_hashes_rechecked": true
+  },
+  "artifacts": "target/dirt-partial-packing-review/"
+}

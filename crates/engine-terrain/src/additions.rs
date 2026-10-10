@@ -1,12 +1,38 @@
 //! Convex patches added by a local material edit. Used to validate growth
 //! without treating unchanged supporting terrain as a new obstruction.
 use super::*;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 type Point = [f64; 2];
 type Polygon = Vec<Point>;
 
+/// Local preview workspace for alternative edits against one immutable field.
+/// Reuses old geometry and alternative tiles with identical reconstruction inputs.
+/// Drop this workspace after the edit decision to release its tile caches.
+pub struct SurfaceAdditionPreview<'a> {
+    previous: &'a Terrain,
+    surface: TerrainSurface,
+    owners: BTreeMap<(i32, i32), Vec<Polygon>>,
+    tiles: BTreeMap<(i32, i32), Vec<Polygon>>,
+    alternatives: BTreeMap<(i32, i32), Vec<TileAddition>>,
+}
+
+struct TileAddition {
+    samples: [u32; 25],
+    patches: Vec<Vec<Vec2>>,
+}
+
 impl TerrainSurface {
+    pub fn addition_preview(self, previous: &Terrain) -> SurfaceAdditionPreview<'_> {
+        SurfaceAdditionPreview {
+            previous,
+            surface: self,
+            owners: BTreeMap::new(),
+            tiles: BTreeMap::new(),
+            alternatives: BTreeMap::new(),
+        }
+    }
+
     /// Preview the new solid area minus the previous surface as convex patches
     /// in field-local coordinates. Reads only local reconstruction samples; a
     /// rejected placement does not need a complete chunk-cache rebuild.
@@ -18,11 +44,22 @@ impl TerrainSurface {
         terrain: &Terrain,
         changed: &[CellCoord],
     ) -> Vec<Vec<Vec2>> {
+        self.addition_preview(previous)
+            .added_surface(terrain, changed)
+    }
+}
+
+impl SurfaceAdditionPreview<'_> {
+    /// Same result and patch order as `TerrainSurface::added_surface`. Cache
+    /// entries include the full local material/sample stencil, not revisions:
+    /// independent alternative fields can have the same revision.
+    pub fn added_surface(&mut self, terrain: &Terrain, changed: &[CellCoord]) -> Vec<Vec<Vec2>> {
+        let previous = self.previous;
         assert_eq!(
             (previous.width(), previous.height(), previous.cell_size()),
             (terrain.width(), terrain.height(), terrain.cell_size())
         );
-        let halo = i32::from(self != TerrainSurface::Blocks);
+        let halo = i32::from(self.surface != TerrainSurface::Blocks);
         let mut tiles = BTreeSet::new();
         for c in changed {
             for y in c.y - halo..=c.y + halo {
@@ -34,17 +71,43 @@ impl TerrainSurface {
             }
         }
         let mut result = Vec::new();
+        // Neighboring tiles inspect the same owners. Reconstruct each owner's
+        // polygons once per immutable field, retaining the original tile,
+        // owner, polygon and clipping order (including very thin patches).
+        let mut new_owners = BTreeMap::new();
         let epsilon_area = f64::from(terrain.cell_size()).powi(2) * 1.0e-10;
         for (y, x) in tiles {
+            let cell = CellCoord::new(x, y);
+            let samples = tile_samples(terrain, self.surface, cell);
+            let alternatives = self.alternatives.entry((y, x)).or_default();
+            if let Some(cached) = alternatives.iter().find(|a| a.samples == samples) {
+                result.extend(cached.patches.iter().cloned());
+                continue;
+            }
             let center = terrain.cell_center(CellCoord::new(x, y));
             let half = terrain.cell_size() * 0.5;
             let min = center - Vec2::new(half, half);
             let max = center + Vec2::new(half, half);
             let clip = rectangle(min, max);
-            let old = patches_in_tile(previous, self, CellCoord::new(x, y), &clip);
-            for polygon in patches_in_tile(terrain, self, CellCoord::new(x, y), &clip) {
+            let old = self.tiles.entry((y, x)).or_insert_with(|| {
+                patches_in_tile(
+                    previous,
+                    self.surface,
+                    CellCoord::new(x, y),
+                    &clip,
+                    &mut self.owners,
+                )
+            });
+            let mut added = Vec::new();
+            for polygon in patches_in_tile(
+                terrain,
+                self.surface,
+                CellCoord::new(x, y),
+                &clip,
+                &mut new_owners,
+            ) {
                 let mut pieces = vec![polygon];
-                for obstacle in &old {
+                for obstacle in old.iter() {
                     pieces = pieces
                         .into_iter()
                         .flat_map(|p| subtract(p, obstacle))
@@ -54,7 +117,7 @@ impl TerrainSurface {
                         break;
                     }
                 }
-                result.extend(
+                added.extend(
                     pieces
                         .into_iter()
                         .filter(|p| area(p) > epsilon_area)
@@ -65,9 +128,36 @@ impl TerrainSurface {
                         }),
                 );
             }
+            result.extend(added.iter().cloned());
+            alternatives.push(TileAddition {
+                samples,
+                patches: added,
+            });
         }
         result
     }
+}
+
+fn tile_samples(t: &Terrain, surface: TerrainSurface, tile: CellCoord) -> [u32; 25] {
+    let mut samples = [0; 25];
+    // A tile clips owners at most one cell away. Each owner reads its 3x3
+    // neighborhood, so the complete dependency is 5x5, including ghost cells.
+    let halo = if surface == TerrainSurface::Blocks {
+        0
+    } else {
+        2
+    };
+    for y in -halo..=halo {
+        for x in -halo..=halo {
+            let c = CellCoord::new(tile.x + x, tile.y + y);
+            samples[((y + 2) * 5 + x + 2) as usize] = if surface == TerrainSurface::Interpolated {
+                t.distance(c).to_bits()
+            } else {
+                u32::from(t.cell(c).is_some_and(|c| c.material != MaterialId::VOID))
+            };
+        }
+    }
+    samples
 }
 
 fn patches_in_tile(
@@ -75,35 +165,40 @@ fn patches_in_tile(
     surface: TerrainSurface,
     cell: CellCoord,
     clip: &Polygon,
+    owners: &mut BTreeMap<(i32, i32), Vec<Polygon>>,
 ) -> Vec<Polygon> {
     let mut result = Vec::new();
     let halo = i32::from(surface != TerrainSurface::Blocks);
     for y in cell.y - halo..=cell.y + halo {
         for x in cell.x - halo..=cell.x + halo {
             let owner = CellCoord::new(x, y);
-            if !t
-                .cell(owner)
-                .is_some_and(|c| c.material != MaterialId::VOID)
-            {
+            if t.cell(owner).is_none_or(|c| c.material == MaterialId::VOID) {
                 continue;
             }
-            let polygons = match surface {
-                TerrainSurface::Blocks => {
-                    result.push(clip.clone());
-                    continue;
-                }
-                TerrainSurface::Contour => {
-                    let mut polygons = vec![surface::cell_polygon(t, owner)];
-                    polygons.extend(surface::fills(t, owner).into_iter().map(|p| p.vertices));
-                    polygons
-                }
-                TerrainSurface::Interpolated => surface::interpolated::owned_polygons(t, owner)
+            if surface == TerrainSurface::Blocks {
+                result.push(clip.clone());
+                continue;
+            }
+            let polygons = owners.entry((y, x)).or_insert_with(|| {
+                let polygons = match surface {
+                    TerrainSurface::Contour => {
+                        let mut polygons = vec![surface::cell_polygon(t, owner)];
+                        polygons.extend(surface::fills(t, owner).into_iter().map(|p| p.vertices));
+                        polygons
+                    }
+                    TerrainSurface::Interpolated => surface::interpolated::owned_polygons(t, owner)
+                        .into_iter()
+                        .map(|p| p.vertices)
+                        .collect(),
+                    TerrainSurface::Blocks => unreachable!(),
+                };
+                polygons
                     .into_iter()
-                    .map(|p| p.vertices)
-                    .collect(),
-            };
-            for vertices in polygons {
-                let mut p: Polygon = vertices.iter().map(|v| [v.x.into(), v.y.into()]).collect();
+                    .map(|vertices| vertices.iter().map(|v| [v.x.into(), v.y.into()]).collect())
+                    .collect()
+            });
+            for polygon in polygons {
+                let mut p = polygon.clone();
                 for (a, b) in edges(clip) {
                     p = half_plane(&p, a, b, true);
                 }

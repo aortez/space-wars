@@ -1,0 +1,66 @@
+Picade bank-cohesion review, 2026-10-06
+974f6ebec1a353f86f7a6d3235f6440f925983e7f5c340f94e7f6afdb934c390  /usr/bin/engine-client
+970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5  /usr/bin/spacewars-cli
+MainPID=5114
+NRestarts=0
+ActiveState=active
+
+Scorched Earth, bank test, Angular, weak strength, paused with 1.4 s until support cut
+
+Angular weak: ledge fell and tilted onto loose dirt; root broke, 48 cells released
+Angular strong: the same cut leaves the ledge attached
+Round weak: ledge fell; Round grains visible
+All bank samples: 60 UPS, about 27–29 FPS at raster scale 2
+Combat scene launch/render smoke check; no launcher settings changed and no live Spacewars cohesion option enabled
+
+docs/screenshots/dirt-cohesion/picade-cohesion-combat.png
+scenario=spacewars-terrain-duel
+paused=false
+renderer=raster
+raster_scale=2.00
+fps=59.2
+ups=60.2
+host_step_avg_ms=1.241
+host_step_p95_ms=2.650
+host_step_max_ms=4.012
+
+docs/screenshots/dirt-cohesion/picade-bank-weak-angular.png
+scenario=scorched-earth
+paused=false
+renderer=raster
+raster_scale=2.00
+fps=27.1
+ups=60.0
+host_step_avg_ms=4.478
+host_step_p95_ms=9.979
+host_step_max_ms=15.529
+
+docs/screenshots/dirt-cohesion/picade-bank-strong-angular.png
+scenario=scorched-earth
+paused=false
+renderer=raster
+raster_scale=2.00
+fps=29.1
+ups=60.1
+host_step_avg_ms=3.536
+host_step_p95_ms=5.240
+host_step_max_ms=12.153
+
+docs/screenshots/dirt-cohesion/picade-bank-weak-round.png
+scenario=scorched-earth
+paused=false
+renderer=raster
+raster_scale=2.00
+fps=29.1
+ups=60.2
+host_step_avg_ms=3.961
+host_step_p95_ms=6.205
+host_step_max_ms=9.345
+
+docs/screenshots/dirt-cohesion/picade-bank-ready.png
+scenario=scorched-earth
+paused=true
+renderer=raster
+raster_scale=2.00
+fps=12.0
+ups=0.0

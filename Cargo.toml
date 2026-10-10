@@ -91,8 +91,8 @@ scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
-# Retain kinematic velocity for CCD's relative-speed checks; zeroing it can
-# mistake shared transport for impact speed and trap small actors in the ground.
+# Retain kinematic velocity for CCD's relative-speed checks, time CCD stages,
+# and restore the shared compound-sweep dispatcher after snapshot loading.
 # See vendor/rapier2d/SPACEWARS_PATCH.md for provenance and regression coverage.
 rapier2d = { path = "vendor/rapier2d" }
 # Slint 1.13's software snapshot path leaves alpha unset and reuses the display

@@ -59,6 +59,31 @@ impl SpacewarsState {
     pub fn loose_terrain(&self) -> Option<&LooseTerrain> {
         self.terrain.loose.as_ref()
     }
+
+    /// Development capture using the same planetary force law as deposition.
+    pub fn capture_loose_packing(
+        &mut self,
+    ) -> Result<Vec<engine_rapier::terrain::PackingSnapshot>, TerrainError> {
+        let mut gravity = material_gravity(self);
+        let terrain = &mut self.terrain;
+        let Some(pool) = terrain.loose.as_ref() else {
+            return Ok(Vec::new());
+        };
+        let fields = terrain
+            .planets
+            .values_mut()
+            .map(|p| TerrainBodyMut {
+                terrain: &mut p.field,
+                geometry: &mut p.geometry,
+                assembly: &mut p.assembly,
+            })
+            .chain(terrain.fragments.values_mut().map(|f| TerrainBodyMut {
+                terrain: &mut f.terrain,
+                geometry: &mut f.geometry,
+                assembly: &mut f.assembly,
+            }));
+        pool.capture_packing_with_gravity(&self.physics.world, fields, &mut gravity)
+    }
 }
 
 pub(super) enum ContactHit {
@@ -140,6 +165,28 @@ pub(super) fn commit_releases(
         let Some(field) = state.terrain.field(id) else {
             continue;
         };
+        let mined: Vec<_> = if state
+            .terrain
+            .loose
+            .as_ref()
+            .unwrap()
+            .config()
+            .cohesion
+            .is_some()
+        {
+            edits
+                .iter()
+                .filter(|e| e.blast.is_none())
+                .flat_map(|e| {
+                    field
+                        .brush_cells(e.edit.brush)
+                        .expect("validated mining brush")
+                        .map(|(c, _)| c)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
         // Preserve contact coordinates and damage/mining order, then split once.
         let plan = PreparedRelease::from_edits(
             field,
@@ -160,6 +207,7 @@ pub(super) fn commit_releases(
         let terrain = &mut state.terrain;
         let pool = terrain.loose.as_mut().unwrap();
         let previous = pool.len();
+        let capacity = pool.release_capacity(plan.grain_count());
         let source = if let Some(fragment) = terrain.fragments.get_mut(&id.value()) {
             TerrainBodyMut {
                 terrain: &mut fragment.terrain,
@@ -186,8 +234,12 @@ pub(super) fn commit_releases(
         let committed = match result {
             Ok(result) => result,
             Err(ReleaseError::Capacity) => {
+                terrain.last_capacity_rejection = Some(capacity);
                 terrain.rejected_releases +=
                     edits.iter().filter(|e| e.blast.is_some()).count() as u64;
+                // Retain the crater's cells, not the impact's effect on bodies
+                // already in the world. Keep each sampled impulse exactly once.
+                blasts.extend(pending_blasts);
                 // Mining retains its usual behavior even when impacts cannot fit.
                 ordinary.extend(edits.into_iter().filter(|e| e.blast.is_none()));
                 continue;
@@ -196,6 +248,7 @@ pub(super) fn commit_releases(
         };
         terrain.removed_cells += discarded;
         register_release(state, id, previous, committed);
+        disturb_mined(&mut state.terrain, id, &mined);
         blasts.extend(pending_blasts);
     }
     // Snapshot every source motion before applying any blast. All material and
@@ -212,7 +265,31 @@ pub(super) fn commit_releases(
     ordinary
 }
 
-// The same registry, query-cache and support boundary handles both causes.
+/// Discard/mining edits also expose banks. Release and deposition already
+/// notify the pool themselves; this adds only the opt-in mining boundary.
+pub(super) fn disturb_mined(terrain: &mut TerrainState, id: PhysicsId, cells: &[CellCoord]) {
+    let Some(pool) = terrain
+        .loose
+        .as_mut()
+        .filter(|p| p.config().cohesion.is_some())
+    else {
+        return;
+    };
+    let field = terrain
+        .fragments
+        .get(&id.value())
+        .map(|f| &f.terrain)
+        .or_else(|| {
+            physics::planet_index(id)
+                .and_then(|i| terrain.planets.get(&i))
+                .map(|p| &p.field)
+        });
+    if let Some(field) = field {
+        pool.disturb(physics::primary_body(id), field, cells.iter().copied());
+    }
+}
+
+// Release causes share the same registry, query-cache and support boundary.
 fn register_release(
     state: &mut SpacewarsState,
     id: PhysicsId,
@@ -255,15 +332,9 @@ fn register_release(
     }
 }
 
-pub(super) fn commit_slumping(state: &mut SpacewarsState) {
-    if !state
-        .terrain
-        .loose
-        .as_ref()
-        .is_some_and(|pool| pool.config().slumping.is_some())
-    {
-        return;
-    }
+fn material_gravity(
+    state: &SpacewarsState,
+) -> impl FnMut(engine_rapier::world::BodyId, Vec2) -> Vec2 + use<> {
     // Sample the same point/spherical law as loose-grain gravity, at completed
     // body poses. The solver retains its own scratch; no force is applied here.
     let mut sources = Vec::new();
@@ -292,7 +363,45 @@ pub(super) fn commit_slumping(state: &mut SpacewarsState) {
         Vec2::ZERO,
         1.0,
     ));
-    let mut gravity = GravitySolver::new();
+    let mut solver = GravitySolver::new();
+    move |_, position| {
+        sources.last_mut().unwrap().position = position;
+        solver
+            .solve(
+                &sources,
+                GravityConfig {
+                    backend: GravityBackend::BarnesHut { theta: 0.7 },
+                    softening: GRAVITY_SOFTENING,
+                    interaction_scale: GRAVITY,
+                },
+            )
+            .expect("valid material gravity")
+            .iter()
+            .find(|o| o.id == GravityId::new(u64::MAX))
+            .unwrap()
+            .velocity_delta
+    }
+}
+
+pub(super) fn commit_slumping(state: &mut SpacewarsState) {
+    commit_yield(state, false);
+}
+
+pub(super) fn commit_cohesion(state: &mut SpacewarsState) {
+    commit_yield(state, true);
+}
+
+fn commit_yield(state: &mut SpacewarsState, cohesion: bool) {
+    if !state.terrain.loose.as_ref().is_some_and(|pool| {
+        if cohesion {
+            pool.config().cohesion.is_some()
+        } else {
+            pool.config().slumping.is_some()
+        }
+    }) {
+        return;
+    }
+    let mut gravity = material_gravity(state);
     let capacity = 64usize.saturating_sub(state.terrain.fragments.len());
     let terrain = &mut state.terrain;
     let pool = terrain.loose.as_mut().unwrap();
@@ -310,38 +419,38 @@ pub(super) fn commit_slumping(state: &mut SpacewarsState) {
             geometry: &mut f.geometry,
             assembly: &mut f.assembly,
         }));
-    let committed = pool
-        .slump(
+    let committed = if cohesion {
+        pool.fracture_banks(
             &mut state.physics.world,
             fields,
-            |_, position| {
-                sources.last_mut().unwrap().position = position;
-                gravity
-                    .solve(
-                        &sources,
-                        GravityConfig {
-                            backend: GravityBackend::BarnesHut { theta: 0.7 },
-                            softening: GRAVITY_SOFTENING,
-                            interaction_scale: GRAVITY,
-                        },
-                    )
-                    .expect("valid slumping gravity")
-                    .iter()
-                    .find(|o| o.id == GravityId::new(u64::MAX))
-                    .unwrap()
-                    .velocity_delta
-            },
+            &mut gravity,
             &mut terrain.next_fragment,
             capacity,
             1.0 / 60.0,
         )
-        .expect("valid Spacewars slumping");
+    } else {
+        pool.slump(
+            &mut state.physics.world,
+            fields,
+            &mut gravity,
+            &mut terrain.next_fragment,
+            capacity,
+            1.0 / 60.0,
+        )
+    }
+    .expect("valid Spacewars material yield");
     if let Some(committed) = committed {
         register_release(state, committed.body.entity, previous, committed.release);
     }
 }
 
 pub(super) fn commit_deposits(state: &mut SpacewarsState) {
+    let mut gravity = state
+        .terrain
+        .loose
+        .as_ref()
+        .filter(|p| p.config().slumping.is_some())
+        .map(|_| material_gravity(state));
     let terrain = &mut state.terrain;
     let Some(pool) = terrain.loose.as_mut() else {
         return;
@@ -367,7 +476,12 @@ pub(super) fn commit_deposits(state: &mut SpacewarsState) {
     // Spacewars' material boundary runs once per 60 Hz simulation tick. Pending
     // damage/blasts have already resolved, so a new impulse resets quiet time.
     let commits = pool
-        .settle(&mut state.physics.world, fields, 1.0 / 60.0)
+        .settle_with_gravity(
+            &mut state.physics.world,
+            fields,
+            |body, position| gravity.as_mut().map_or(Vec2::ZERO, |g| g(body, position)),
+            1.0 / 60.0,
+        )
         .expect("valid Spacewars deposition");
     for commit in commits {
         state.physics.material_queries_dirty = true;
@@ -437,5 +551,54 @@ pub(super) fn observe(state: &SpacewarsState, payload: &mut Vec<u8>) {
         for v in [blast.center.x, blast.center.y, blast.radius, blast.speed] {
             payload.extend(v.to_le_bytes());
         }
+    }
+}
+
+/// These bracket the single canonical solve; publication stays at the next
+/// ordinary material boundary with mining, blasts and deposition.
+pub(crate) fn capture_impacts(state: &mut SpacewarsState, dt: f32) {
+    let terrain = &mut state.terrain;
+    let Some(pool) = terrain.loose.as_mut() else {
+        return;
+    };
+    pool.capture_impact_motion(
+        &state.physics.world,
+        terrain
+            .fragments
+            .values()
+            .map(|f| (f.assembly.body(), &f.terrain)),
+        dt,
+    );
+}
+pub(crate) fn sample_impacts(state: &mut SpacewarsState) {
+    if let Some(pool) = state.terrain.loose.as_mut() {
+        pool.sample_impact_contacts(&state.physics.world);
+    }
+}
+pub(super) fn commit_impacts(state: &mut SpacewarsState) {
+    let terrain = &mut state.terrain;
+    let Some(pool) = terrain
+        .loose
+        .as_mut()
+        .filter(|p| p.config().impact_fracture.is_some())
+    else {
+        return;
+    };
+    let previous = pool.len();
+    let capacity = 64usize.saturating_sub(terrain.fragments.len());
+    let commit = pool
+        .fracture_impacts(
+            &mut state.physics.world,
+            terrain.fragments.values_mut().map(|f| TerrainBodyMut {
+                terrain: &mut f.terrain,
+                geometry: &mut f.geometry,
+                assembly: &mut f.assembly,
+            }),
+            &mut terrain.next_fragment,
+            capacity,
+        )
+        .expect("valid Spacewars impact fracture");
+    if let Some(commit) = commit {
+        register_release(state, commit.body.entity, previous, commit.release);
     }
 }

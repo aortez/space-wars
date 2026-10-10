@@ -122,9 +122,13 @@ mod tests {
             severity: MaterialAsteroidSeverity::Heavy,
         });
         let initial = state.terrain_diagnostics().occupied_cells;
+        let mut peak_loose = 0;
         for tick in 0..1800 {
             SurfaceSortieScenario::step(&mut state, &[], DT);
             assert_eq!(state.world.tick, tick + 1);
+            let loose = state.world.loose_terrain().unwrap().len();
+            peak_loose = peak_loose.max(loose);
+            assert!(loose <= 192);
             if tick % 60 == 0 {
                 let audit = state.terrain_diagnostics();
                 assert!(audit.issues.is_empty(), "{:?}", audit.issues);
@@ -136,7 +140,9 @@ mod tests {
             }
         }
         let audit = state.terrain_diagnostics();
-        assert!(audit.loose_cells > 0 && audit.loose_cells <= 192);
+        // The last arrival may have fully repacked by this tick. Require an
+        // actual release during the run, not leftover rubble at its endpoint.
+        assert!(peak_loose > 0);
         assert!(audit.deposited_cells > 0);
         let mut replay = state.clone();
         for _ in 0..120 {

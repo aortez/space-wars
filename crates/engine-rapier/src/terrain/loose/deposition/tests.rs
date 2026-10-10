@@ -223,11 +223,216 @@ fn occupied_space_blocks_addition_even_before_the_next_broadphase_update() {
     }
     assert_eq!(pool.len(), 1);
     assert_eq!(field.terrain, before);
+    let world_before = world.snapshot_bytes().unwrap();
+    let hash_before = pool.settling_hash();
+    let captures = pool.capture_packing(&world, [view(&mut field)]).unwrap();
+    assert_eq!(captures.len(), 1);
+    let inspection = PackingSnapshot::from_bytes(&captures[0].to_bytes().unwrap())
+        .unwrap()
+        .inspect()
+        .unwrap();
+    assert!(inspection.accepted.is_empty());
+    assert!(
+        inspection
+            .attempts
+            .iter()
+            .flat_map(|a| &a.patches)
+            .flat_map(|p| &p.blockers)
+            .any(|id| id.entity == blocker)
+    );
+    assert_eq!(world.snapshot_bytes().unwrap(), world_before);
+    assert_eq!(pool.settling_hash(), hash_before);
+    assert_eq!(field.terrain, before);
     world.remove_entity(blocker);
     for _ in 0..60 {
         step(&mut world, &mut field, &mut pool);
     }
     assert!(pool.is_empty());
+}
+
+#[test]
+fn unchanged_failures_reuse_work_and_moving_or_removed_blockers_retry() {
+    let (mut world, mut field, mut pool) = fixture(TerrainSurface::Blocks, GrainShape::Round);
+    release(&mut world, &mut field, &mut pool, &mut 2);
+    for _ in 0..28 {
+        step(&mut world, &mut field, &mut pool);
+    }
+    let blocker = BodyId::new(PhysicsId::new(99), BodyRole::PRIMARY);
+    world.insert_body(
+        blocker,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: field.terrain.cell_center(CELL) + Vec2::new(0.43, 0.43),
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(
+            ColliderId::new(blocker.entity, ColliderRole::PRIMARY, 0),
+            0.03,
+        )],
+    );
+    let mut uncached = (world.clone(), field.clone(), pool.clone());
+    let mut attempts = 0;
+    let mut reused = 0;
+    let mut reference_attempts = 0;
+    for _ in 0..600 {
+        step(&mut world, &mut field, &mut pool);
+        uncached.2.failed_packing.clear();
+        step(&mut uncached.0, &mut uncached.1, &mut uncached.2);
+        assert_eq!(pool.settling_hash(), uncached.2.settling_hash());
+        assert_eq!(field.terrain, uncached.1.terrain);
+        attempts += pool.settling_work().attempted_groups;
+        reused += pool.settling_work().reused_failures;
+        reference_attempts += uncached.2.settling_work().attempted_groups;
+    }
+    assert!(reused >= 10, "{attempts} attempts, {reused} reused");
+    assert!(attempts < reference_attempts / 2);
+    assert_eq!(
+        world.snapshot_bytes().unwrap(),
+        uncached.0.snapshot_bytes().unwrap()
+    );
+    assert_eq!(pool.len(), 1);
+    assert!(!pool.failed_packing.is_empty());
+    for remove in [false, true] {
+        let (mut world, mut field, mut pool) = (world.clone(), field.clone(), pool.clone());
+        let mut replay = (world.clone(), field.clone(), pool.clone());
+        for world in [&mut world, &mut replay.0] {
+            if remove {
+                world.remove_entity(blocker.entity);
+            } else {
+                world.set_pose(blocker, Vec2::new(20.0, 20.0), 0.0, true);
+            }
+        }
+        for _ in 0..60 {
+            step(&mut world, &mut field, &mut pool);
+            step(&mut replay.0, &mut replay.1, &mut replay.2);
+            assert_eq!(pool.settling_hash(), replay.2.settling_hash());
+        }
+        assert!(pool.is_empty(), "remove={remove}");
+        assert_eq!(field.terrain, replay.1.terrain);
+        assert!(pool.failed_packing.is_empty());
+    }
+}
+
+#[test]
+fn moving_an_actor_reopens_a_blocked_cell_under_flat_and_planetary_gravity() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        for shape in [GrainShape::Round, GrainShape::Hexagon] {
+            for planetary in [false, true] {
+                let (mut world, mut field, mut pool) = fixture(surface, shape);
+                pool.config.slumping = Some(SlumpingConfig::default());
+                let angle = if planetary { 0.7 } else { 0.0 };
+                world.set_pose(field.assembly.body(), Vec2::ZERO, angle, true);
+                world.set_gravity(Vec2::ZERO);
+                release(&mut world, &mut field, &mut pool, &mut 2);
+                let center = field.terrain.cell_center(CELL);
+                let blocker = BodyId::new(PhysicsId::new(99), BodyRole::PRIMARY);
+                world.insert_body(
+                    blocker,
+                    BodySpec {
+                        kind: BodyKind::Fixed,
+                        position: (center + Vec2::new(0.43, 0.43)).rotate_radians(angle),
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::ball(
+                        ColliderId::new(blocker.entity, ColliderRole::PRIMARY, 0),
+                        0.03,
+                    )],
+                );
+                let gravity = |_: BodyId, p: Vec2| {
+                    if planetary {
+                        (Vec2::new(0.0, -30.0).rotate_radians(angle) - p).normalized() * 10.0
+                    } else {
+                        Vec2::new(0.0, -10.0)
+                    }
+                };
+                let advance = |world: &mut PhysicsWorld,
+                               field: &mut TerrainFragment,
+                               pool: &mut LooseTerrain| {
+                    world.clear_forces();
+                    for g in pool.iter() {
+                        let p = world.motion(g.body()).unwrap().position;
+                        world.apply_acceleration(g.body(), gravity(g.body(), p), false);
+                    }
+                    world.step(DT);
+                    pool.settle_with_gravity(world, [view(field)], gravity, DT)
+                        .unwrap();
+                };
+                let before = field.terrain.clone();
+                for _ in 0..240 {
+                    advance(&mut world, &mut field, &mut pool);
+                }
+                assert_eq!(pool.len(), 1, "{surface:?}/{shape:?} planetary={planetary}");
+                assert_eq!(field.terrain, before);
+                let mut replay = (world.clone(), field.clone(), pool.clone());
+                world.set_pose(blocker, Vec2::new(20.0, 20.0), 0.0, true);
+                replay.0.set_pose(blocker, Vec2::new(20.0, 20.0), 0.0, true);
+                for _ in 0..120 {
+                    advance(&mut world, &mut field, &mut pool);
+                    advance(&mut replay.0, &mut replay.1, &mut replay.2);
+                    assert_eq!(pool.settling_hash(), replay.2.settling_hash());
+                    assert_eq!(field.terrain, replay.1.terrain);
+                }
+                assert!(
+                    pool.is_empty(),
+                    "{surface:?}/{shape:?} planetary={planetary}: {:?}",
+                    pool.settling_diagnostics()
+                );
+                assert_eq!(pool.deposited_cells(), 1);
+                assert_eq!(field.terrain.cell(CELL).unwrap().durability, 73);
+                assert!(world.contains_body(blocker));
+                pool.audit(&world).unwrap();
+            }
+        }
+    }
+}
+
+#[test]
+fn failed_plan_dependencies_include_gravity_terrain_and_recovery_eligibility() {
+    let (mut world, mut field, mut pool) = fixture(TerrainSurface::Blocks, GrainShape::Round);
+    release(&mut world, &mut field, &mut pool, &mut 2);
+    let grains: Vec<_> = pool.iter().collect();
+    let capture = |world: &PhysicsWorld, field: &mut TerrainFragment, gravity: Vec2, repacking| {
+        let borrowed = view(field);
+        let mut field = packing::Field::from(&borrowed).with_repose(
+            world,
+            &grains,
+            Some(SlumpingConfig::default()),
+            &mut |_, _| gravity,
+        );
+        field.repacking = repacking;
+        retry::Inputs::capture(world, &field, &grains).unwrap()
+    };
+    let gravity = Vec2::new(0.0, -10.0);
+    let before = capture(&world, &mut field, gravity, false);
+    assert_eq!(
+        before,
+        capture(&world.clone(), &mut field.clone(), gravity, false)
+    );
+    assert_ne!(before, capture(&world, &mut field, gravity, true));
+    assert_ne!(
+        before,
+        capture(&world, &mut field, Vec2::new(1.0, -10.0), false)
+    );
+    field
+        .terrain
+        .apply(TerrainEdit {
+            brush: Brush::Circle {
+                center: CellCoord::new(4, 4),
+                radius: 0,
+            },
+            mode: EditMode::Damage(1),
+        })
+        .unwrap();
+    field.geometry.refresh(&field.terrain);
+    field
+        .assembly
+        .synchronize(&mut world, &field.terrain, &field.geometry)
+        .unwrap();
+    assert_ne!(before, capture(&world, &mut field, gravity, false));
 }
 
 #[test]

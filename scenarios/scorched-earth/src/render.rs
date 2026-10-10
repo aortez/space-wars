@@ -80,12 +80,19 @@ fn circle(frame: &mut RenderFrame, at: Vec2, radius: f32, color: RenderColor) {
     );
 }
 fn button_center(index: usize) -> Vec2 {
-    Vec2::new((index as f32 - 5.0) * 8.5, -26.0)
+    if index >= 11 {
+        Vec2::new((index as f32 - 13.0) * 17.5, 19.0)
+    } else {
+        Vec2::new((index as f32 - 5.0) * 8.5, -26.0)
+    }
+}
+fn button_width(index: usize) -> f32 {
+    if index >= 11 { 8.0 } else { 4.0 }
 }
 pub(super) fn button_at(at: Vec2) -> Option<Command> {
     Command::ALL.into_iter().enumerate().find_map(|(i, c)| {
         let d = at - button_center(i);
-        (d.x.abs() <= 4.0 && d.y.abs() <= 1.8).then_some(c)
+        (d.x.abs() <= button_width(i) && d.y.abs() <= 1.8).then_some(c)
     })
 }
 
@@ -195,7 +202,12 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         line(&mut frame, pivot, muzzle, color, 5.0);
         text(
             &mut frame,
-            m.position + Vec2::Y * 4.5,
+            m.position
+                + if state.config.roof && m.position.y > 10.0 {
+                    Vec2::new(-5.0, 1.0)
+                } else {
+                    Vec2::Y * 4.5
+                },
             format!(
                 "{} · {:.0}",
                 if i == state.selected && !state.config.demo {
@@ -261,7 +273,63 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         15.0,
         TEAMS[state.selected],
     );
-    let result = if state.config.bombardment_seconds > 0 {
+    let result = if state.config.roof {
+        let d = state.cohesion_diagnostics();
+        format!(
+            "Roof · {} shots · {} roof cracks · {} ledge breaks · {} clump breaks",
+            state.shots,
+            d.roof_failures,
+            d.failures - d.roof_failures,
+            state.impact_diagnostics().failures
+        )
+    } else if state.config.hillside {
+        format!(
+            "Hillside · {} shots · {} bank breaks · {} clump breaks",
+            state.shots,
+            state.cohesion_diagnostics().failures,
+            state.impact_diagnostics().failures
+        )
+    } else if let Some(height) = state.config.drop_height {
+        let d = state.impact_diagnostics();
+        if state.tick <= 120 {
+            format!(
+                "{} drop in {:.1}s · same clump, no added kick",
+                height.label(),
+                (120 - state.tick) as f32 / 60.0
+            )
+        } else if d.failures > 0 {
+            format!(
+                "Impact chipped {} cells · Reset to replay",
+                d.released_cells
+            )
+        } else if d.capacity_denials > 0 {
+            "Impact retained: not enough loose-dirt capacity".into()
+        } else {
+            "Clump intact · compare low / high drop and weak / strong dirt".into()
+        }
+    } else if state.config.undercut {
+        let d = state.cohesion_diagnostics();
+        if state.tick <= 120 {
+            format!(
+                "Bank test: support cut in {:.1}s · identical cut at every strength",
+                (120 - state.tick) as f32 / 60.0
+            )
+        } else if state.rejected_blasts > 0 {
+            "Support cut refused: not enough loose-dirt capacity".into()
+        } else if d.failures > 0 {
+            format!(
+                "Root broke · {} cells released · {} chipped on impact",
+                d.released_cells,
+                state.impact_diagnostics().released_cells
+            )
+        } else if d.held_checks > 0 {
+            "Bank holds after the cut · switch strength to compare".into()
+        } else if state.config.cohesion == BankStrength::Off {
+            "Support removed · bank strength is off".into()
+        } else {
+            "Support removed · watching the ledge".into()
+        }
+    } else if state.config.bombardment_seconds > 0 {
         let elapsed = state.tick / u64::from(FIXED_HZ);
         let duration = u64::from(state.config.bombardment_seconds);
         if elapsed < duration {
@@ -293,16 +361,27 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         RenderColor::rgb(0.055, 0.085, 0.12),
     );
     text(&mut frame, Vec2::new(0.0, -19.6), result, 13.0, INK);
+    let (events, event_label, rejections) = if state.config.drop_height.is_some() {
+        let d = state.impact_diagnostics();
+        (
+            d.failures,
+            "clump breaks",
+            d.capacity_denials + d.fragment_denials,
+        )
+    } else {
+        (state.impacts, "impacts", state.rejected_blasts)
+    };
     text(
         &mut frame,
         Vec2::new(0.0, -22.3),
         format!(
-            "{} / {} loose  ·  {} returned  ·  {} impacts  ·  {} capacity rejections",
+            "{} / {} loose  ·  {} returned  ·  {} {}  ·  {} capacity rejections",
             state.loose_cells(),
             state.config.max_grains,
             state.deposited_cells(),
-            state.impacts,
-            state.rejected_blasts
+            events,
+            event_label,
+            rejections
         ),
         12.0,
         INK,
@@ -317,12 +396,63 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         if state.config.demo { "Demo ON" } else { "Demo" },
         "Dirt",
         "Reset",
-        "Collapse",
-        if state.config.bombardment_seconds > 0 {
+        if state.config.hillside || state.config.roof {
+            "Physics"
+        } else if state.config.undercut || state.config.drop_height.is_some() {
+            "Strength"
+        } else {
+            "Collapse"
+        },
+        if state.config.roof {
             "Duel"
+        } else if state.config.hillside {
+            "Roof"
+        } else if state.config.drop_height == Some(DropHeight::High) {
+            "Hillside"
+        } else if state.config.drop_height == Some(DropHeight::Low) {
+            "High drop"
+        } else if state.config.undercut {
+            "Low drop"
+        } else if state.config.bombardment_seconds > 0 {
+            "Bank test"
         } else {
             "Barrage"
         },
+        if state.config.undercut
+            || state.config.drop_height.is_some()
+            || state.config.hillside
+            || state.config.roof
+        {
+            "Bank test"
+        } else {
+            "Hills"
+        },
+        if !state.config.undercut
+            && state.config.drop_height.is_none()
+            && (state.config.slumping != (state.config.cohesion != BankStrength::Off)
+                || (state.config.cohesion != BankStrength::Off && !state.config.breakup))
+        {
+            "Physics: custom"
+        } else {
+            match (
+                state.config.undercut || state.config.drop_height.is_some(),
+                state.config.cohesion,
+            ) {
+                (true, BankStrength::Off) => "Strength: off",
+                (true, BankStrength::Weak) => "Strength: weak",
+                (true, BankStrength::Strong) => "Strength: strong",
+                (false, BankStrength::Off) => "Physics: off",
+                (false, BankStrength::Weak) => "Physics: weak",
+                (false, BankStrength::Strong) => "Physics: strong",
+            }
+        },
+        match state.config.drop_height {
+            None => "Drop test",
+            Some(DropHeight::Low) => "Drop: low",
+            Some(DropHeight::High) => "Drop: high",
+        },
+        "Hillside",
+        "Roof",
     ]
     .into_iter()
     .enumerate()
@@ -331,11 +461,16 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         rect(
             &mut frame,
             18,
-            center - Vec2::new(4.0, 1.8),
-            center + Vec2::new(4.0, 1.8),
+            center - Vec2::new(button_width(i), 1.8),
+            center + Vec2::new(button_width(i), 1.8),
             if i == 4
                 || (i == 9 && state.config.slumping)
                 || (i == 10 && state.config.bombardment_seconds > 0)
+                || (i == 11 && state.config.undercut)
+                || (i == 12 && state.config.cohesion != BankStrength::Off)
+                || (i == 13 && state.config.drop_height.is_some())
+                || (i == 14 && state.config.hillside)
+                || (i == 15 && state.config.roof)
             {
                 RenderColor::rgb(0.28, 0.36, 0.27)
             } else {
@@ -346,8 +481,34 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
     }
     text(
         &mut frame,
+        Vec2::new(0.0, if state.config.roof { 21.8 } else { 14.5 }),
+        if state.config.roof {
+            "Demo: one shot under the roof · East: physics · North: dirt · Reset: replay"
+        } else if state.config.hillside {
+            "Fire at the bank · Demo: three shots · East: physics · North: dirt"
+        } else if state.config.undercut || state.config.drop_height.is_some() {
+            "Picade: East strength · North dirt · Left shoulder next test"
+        } else {
+            "Hold Tank + Dirt: bank test · Hold Tank + Collapse: strength"
+        },
+        11.0,
+        INK,
+    );
+    if state.config.undercut && state.tick <= 120 {
+        let color = RenderColor::rgb(0.96, 0.65, 0.28);
+        for (a, b) in [
+            (Vec2::new(3.5, -7.5), Vec2::new(6.5, -7.5)),
+            (Vec2::new(6.5, -7.5), Vec2::new(6.5, 3.5)),
+            (Vec2::new(6.5, 3.5), Vec2::new(3.5, 3.5)),
+            (Vec2::new(3.5, 3.5), Vec2::new(3.5, -7.5)),
+        ] {
+            line(&mut frame, a, b, color, 1.5);
+        }
+    }
+    text(
+        &mut frame,
         Vec2::new(0.0, -30.0),
-        "Arrows aim/power · Space fire · Tab tank · V demo · T dirt · K collapse · J barrage · R restart",
+        "Arrows aim/power · Space fire · Tab tank · V demo · T dirt · K collapse · J next scene · R restart",
         11.0,
         INK,
     );

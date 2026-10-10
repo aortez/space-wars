@@ -14,9 +14,11 @@ mod activity_settings;
 mod clock_font;
 mod clock_message;
 mod controller;
+mod dirt_settings;
 pub use activity_settings::{AutostartSettings, MatchSettings};
 pub use clock_font::{ClockFont, ClockFontPool, ClockFontSettings};
 pub use controller::{ControllerBinding, ControllerControl, ControllerProfile, ControllerSource};
+pub use dirt_settings::DirtMode;
 pub mod render;
 
 pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
@@ -147,8 +149,9 @@ pub struct Settings {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MaterialCombatSettings {
-    /// Experimental conserved dirt from impacts; default off until deposition.
+    /// Experimental conserved dirt from impacts; opt-in for existing saves.
     pub loose_dirt: bool,
+    pub dirt_mode: DirtMode,
     pub mission: MaterialCombatMission,
     pub asteroids: MaterialAsteroidSettings,
 }

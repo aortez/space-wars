@@ -1,0 +1,2497 @@
+{
+  "date": "2026-10-09",
+  "branch": "feat/shared-dirt-packing",
+  "head": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+  "dirty": true,
+  "runtime_changed": false,
+  "before_source_manifest_sha256": "64a95cc0f46befaa5ce02519cd466c7e0caafa93ae83a25e6ef734284753be01",
+  "runner_source_sha256": "1b6196b1b7d28e25157cb489f697b11009bae06a241f2e0e371ae9bc80798fb6",
+  "executables": {
+    "native_combat": "bedd7d079863d154339206df55019930997e2c4ba867065d1a4d9ea4f4cb47fa",
+    "picade_combat": "de584e84678f436f06de16ce2b5efb3e23418f89bb0193770c81525bc4a5ce66",
+    "scorched": "76732dbf4e0fe338ea273936a8dfea59f18e346b99773167cf2e0f6d567f6898"
+  },
+  "desktop_cases": 34,
+  "picade_cases": 8,
+  "all_material_audits_passed": true,
+  "all_available_picade_non_timing_reports_match": true,
+  "validation": {
+    "native_release_build": "passed",
+    "aarch64_static_release_build": "passed",
+    "clippy": "passed with one pre-existing library warning in mission_opponent_forecast.rs:179; no example warnings",
+    "rustfmt": "passed",
+    "diff_check": "passed",
+    "default_off_matches_explicit_off": true
+  },
+  "scope": [
+    "Scorched duels stop firing when a tank dies; the rest of the 300-second run is aftermath.",
+    "Scorched barrage fires for 240 seconds then rests for 60 seconds.",
+    "Combat uses ordinary bots, default launch positions and 15-second combat breaks; no match-finish rules.",
+    "Capture requests P1 landing after 60 seconds; successful or failed capture controllers remain finished for the rest of the diagnostic.",
+    "Seed 777 had already lost its subject ship at the 60-second handoff. Separate 120-second controls request capture from tick zero.",
+    "Admission deltas count releases from all causes, not distinct cells or only weapon hits.",
+    "A rejected release is an atomic batch refusal, not a count of destroyed cells.",
+    "Native timing overlapped builds/other cases; Pi ran at nice 10 alongside the kiosk. Neither measures rendered frame time.",
+    "The local controller-input smoke check is not a full human playtest."
+  ],
+  "cases": [
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-42-angular",
+      "game": "scorched",
+      "seed": 42,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 13,
+      "loose": 116,
+      "deposited": 2964,
+      "peak_loose": 190,
+      "late_active_admissions": 598,
+      "late_active_rejections": 5,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "67f50c74b0f5cb74",
+      "report_sha256": "cb47e38569ce7dee82d59a2b418a7be778f1133e45f7d4c8cf34b407fbd5c626"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-42-round",
+      "game": "scorched",
+      "seed": 42,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 6,
+      "loose": 60,
+      "deposited": 3436,
+      "peak_loose": 192,
+      "late_active_admissions": 979,
+      "late_active_rejections": 0,
+      "tail_deposits": 77,
+      "replay_checked": true,
+      "observation_hash": "afbea8e78326860e",
+      "report_sha256": "7c65e7fb45e9b7c8ba3c7f89d49e8c5e43b475955bc3e0d93f12acaf0cb635e3"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-4242-angular",
+      "game": "scorched",
+      "seed": 4242,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 22,
+      "loose": 144,
+      "deposited": 2408,
+      "peak_loose": 192,
+      "late_active_admissions": 476,
+      "late_active_rejections": 10,
+      "tail_deposits": 38,
+      "replay_checked": true,
+      "observation_hash": "b645f7a517f42086",
+      "report_sha256": "60ac45bd890b14578c2466f08bc5e4b2b903bb41ff5f6812f4faf164f0f1f2e9"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-4242-round",
+      "game": "scorched",
+      "seed": 4242,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 0,
+      "loose": 53,
+      "deposited": 3662,
+      "peak_loose": 175,
+      "late_active_admissions": 994,
+      "late_active_rejections": 0,
+      "tail_deposits": 38,
+      "replay_checked": true,
+      "observation_hash": "d532979af2d44308",
+      "report_sha256": "ed31f9a543472017028bd81c6e35195bc703e82b516cff3a9a9fb95873104789"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-777-angular",
+      "game": "scorched",
+      "seed": 777,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 0,
+      "loose": 47,
+      "deposited": 3708,
+      "peak_loose": 165,
+      "late_active_admissions": 899,
+      "late_active_rejections": 0,
+      "tail_deposits": 28,
+      "replay_checked": true,
+      "observation_hash": "5f328269a25f997d",
+      "report_sha256": "b6f7c0552a85f29a091e092cecd7aa2b38feef1d185d430ba0d5cd1908857562"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-barrage-777-round",
+      "game": "scorched",
+      "seed": 777,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 120,
+      "impacts": 120,
+      "rejected": 4,
+      "loose": 57,
+      "deposited": 3564,
+      "peak_loose": 192,
+      "late_active_admissions": 915,
+      "late_active_rejections": 0,
+      "tail_deposits": 66,
+      "replay_checked": true,
+      "observation_hash": "f68ec4b5c6602cfb",
+      "report_sha256": "e78f027f4ed49e27d92df54ceb7a5de19f2c8148d1c32d22da0fbe9f9214d714"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-42-angular",
+      "game": "scorched",
+      "seed": 42,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 11,
+      "impacts": 11,
+      "rejected": 0,
+      "loose": 95,
+      "deposited": 158,
+      "peak_loose": 150,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "8662c89fb19b12b4",
+      "report_sha256": "ab73d55b6ff79dfb25900a6b4429013bcefeae503ff26b0dfac047e0db3175d8"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-42-round",
+      "game": "scorched",
+      "seed": 42,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 11,
+      "impacts": 11,
+      "rejected": 0,
+      "loose": 44,
+      "deposited": 233,
+      "peak_loose": 170,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "f39e1c27b266a7b0",
+      "report_sha256": "bf706f2e1cf1d2484c2b9efe0db310a82de3c5ef2b9b740a18c8bf8f899471ab"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-4242-angular",
+      "game": "scorched",
+      "seed": 4242,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 11,
+      "impacts": 11,
+      "rejected": 0,
+      "loose": 114,
+      "deposited": 168,
+      "peak_loose": 155,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "70b61fd62e58a94d",
+      "report_sha256": "56ca35eeb0b127898e6317c1763f992fc55401d9403579cfdfe065a6b62cb4ac"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-4242-round",
+      "game": "scorched",
+      "seed": 4242,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 11,
+      "impacts": 11,
+      "rejected": 0,
+      "loose": 114,
+      "deposited": 138,
+      "peak_loose": 179,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "593f51993ff6bce9",
+      "report_sha256": "45e1042e4f828b28bb598aa4d8b92c125600a2dfc5d4096c6e953fb80d2bc38a"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-777-angular",
+      "game": "scorched",
+      "seed": 777,
+      "shape": "angular",
+      "seconds": 300,
+      "shots": 11,
+      "impacts": 11,
+      "rejected": 1,
+      "loose": 172,
+      "deposited": 6,
+      "peak_loose": 172,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "c9f1a606a918f202",
+      "report_sha256": "b373f898f38d5b519a07024ca7bc4a25685b7958386d43f2242d4a7372cd3264"
+    },
+    {
+      "host": "desktop",
+      "case": "scorched-duel-777-round",
+      "game": "scorched",
+      "seed": 777,
+      "shape": "round",
+      "seconds": 300,
+      "shots": 9,
+      "impacts": 9,
+      "rejected": 0,
+      "loose": 89,
+      "deposited": 170,
+      "peak_loose": 133,
+      "late_active_admissions": 0,
+      "late_active_rejections": 0,
+      "tail_deposits": 0,
+      "replay_checked": true,
+      "observation_hash": "93ed48f624eb570f",
+      "report_sha256": "9cae651d17fd8b5ceed4aef25352922094dc0aa21eaab8cae417da247e4fe7ea"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 52,
+      "deposited": 310,
+      "rejected": 0,
+      "peak_sampled_loose": 85,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 17,
+      "late_admissions": 101,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5409,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.304986,
+      "step_max_ms": 3.298832,
+      "ai_p95_ms": 0.051456999999999996,
+      "report_sha256": "e5f0a7f15de6c6df0863857a5130259b261b0932c55dea880e19b999c2351e8b",
+      "non_timing_report_sha256": "d34cb6fbee238d008e143d3800468913c414056e72b1310bab2c5957464099de"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 49,
+      "deposited": 423,
+      "rejected": 0,
+      "peak_sampled_loose": 93,
+      "terrain_cannon_hits": 3,
+      "asteroid_terrain_contacts": 16,
+      "late_admissions": 152,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5409,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.315245,
+      "step_max_ms": 4.375325,
+      "ai_p95_ms": 0.059021000000000004,
+      "report_sha256": "766cf1d025a4aef99d6d79c49b9911d73b83f15443e009828afa7d069f2954d4",
+      "non_timing_report_sha256": "313f70f58c4542769b22bb34cd88f52656311b593eee8b9a2b539d27cc8a75f1"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-4242-weak-angular",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 60,
+      "deposited": 314,
+      "rejected": 0,
+      "peak_sampled_loose": 106,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 16,
+      "late_admissions": 51,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5060,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.40470399999999995,
+      "step_max_ms": 3.9482880000000002,
+      "ai_p95_ms": 0.066756,
+      "report_sha256": "6a8535d0372667b1ba800457f59adc13d2a7e0bd2d33a027a6ac692b575a4417",
+      "non_timing_report_sha256": "bb10e821531a2dfaeb9734fcbae5556790b3881c1c30edf7ed10bc1b928c2982"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-4242-weak-round",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 14,
+      "deposited": 338,
+      "rejected": 0,
+      "peak_sampled_loose": 75,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 17,
+      "late_admissions": 58,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        1
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "walking along the ground route"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5152,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.136238,
+      "step_max_ms": 2.5152210000000004,
+      "ai_p95_ms": 0.054483,
+      "report_sha256": "969b8934f2a27b78affa4a5de65db2a0f31868b9d2251fb553df47bdd0f7f834",
+      "non_timing_report_sha256": "91a3225d3ec7033e48731af295f36426ff35915fdca5f8a051067e16519e4b63"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-777-weak-angular",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 302,
+      "rejected": 0,
+      "peak_sampled_loose": 53,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 12,
+      "late_admissions": 21,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        0,
+        2
+      ],
+      "final_goals": [
+        "landing escape pod",
+        "engage ship"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": null,
+        "failed_tick": 3600,
+        "failure": "ship lost during capture sortie"
+      },
+      "step_p95_ms": 0.113765,
+      "step_max_ms": 4.268534,
+      "ai_p95_ms": 0.0527,
+      "report_sha256": "e5c6970ba675ecb909aac7ae9aa95ba474cb678582a0214ec5870ec23bf62ba5",
+      "non_timing_report_sha256": "3fedb720ce5a2aa6559206dd1a79aef2c7008004be29ceec9e20e23d07bff918"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-777-weak-round",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 410,
+      "rejected": 0,
+      "peak_sampled_loose": 114,
+      "terrain_cannon_hits": 3,
+      "asteroid_terrain_contacts": 13,
+      "late_admissions": 20,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        0,
+        2
+      ],
+      "final_goals": [
+        "stabilizing escape pod",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": null,
+        "failed_tick": 3600,
+        "failure": "ship lost during capture sortie"
+      },
+      "step_p95_ms": 0.305307,
+      "step_max_ms": 4.078133,
+      "ai_p95_ms": 0.058781,
+      "report_sha256": "ae10b54b1777a4e6624b76de68b1f9de65f01447583f56ac1202e38845c2b86f",
+      "non_timing_report_sha256": "785cfdcb996d407cd0149126608107f9cc9dec65eee84e48c37827dd1d22e967"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-early-777-weak-angular",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-angular",
+      "seconds": 120,
+      "loose": 0,
+      "deposited": 154,
+      "rejected": 0,
+      "peak_sampled_loose": 48,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 5,
+      "late_admissions": 92,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "final_goals": [
+        "takeoff",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 2157,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.120769,
+      "step_max_ms": 3.2214460000000003,
+      "ai_p95_ms": 0.030858999999999998,
+      "report_sha256": "9263a27ed1c2cbf5b27d634d494db9e484a8a17fddba51cfa908eeb0cb7415e5",
+      "non_timing_report_sha256": "ac3d83617da5f9e28acef1ad83304d58cdff13b6777f2efa02af68190e73ec2b"
+    },
+    {
+      "host": "desktop",
+      "case": "capture-early-777-weak-round",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-round",
+      "seconds": 120,
+      "loose": 0,
+      "deposited": 154,
+      "rejected": 0,
+      "peak_sampled_loose": 48,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 5,
+      "late_admissions": 92,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        0,
+        1
+      ],
+      "final_goals": [
+        "takeoff",
+        "stabilizing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 2162,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 0.11741199999999999,
+      "step_max_ms": 3.9260770000000003,
+      "ai_p95_ms": 0.048692,
+      "report_sha256": "91b3d0fcec57eb247466afc50a43c28b7d144ee8f531d06e9b2581bf6ab50e7b",
+      "non_timing_report_sha256": "33a4d4485f8de27e173d8f0468b824e486abfdb1954b9495de49d187f901362c"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 119,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 2,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 58,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "stabilizing escape pod",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.050586,
+      "step_max_ms": 3.9489700000000005,
+      "ai_p95_ms": 0.053341000000000006,
+      "report_sha256": "8043892e1950e29193edb6b7e826c9cf375e0d8d4e8b7b772d545b225072c447",
+      "non_timing_report_sha256": "3492c4ba709ed97703085626bdebdad4238387f438c46a7a2bc1ee78634e6988"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 1,
+      "deposited": 60,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 0,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "landing escape pod",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.052268,
+      "step_max_ms": 3.894086,
+      "ai_p95_ms": 0.05268900000000001,
+      "report_sha256": "3626c33317833c2a4ce6009e0647ab0f72fb40bc4766cec0019bd3ae9c69aadd",
+      "non_timing_report_sha256": "cdde286ccc776e901db7f1ca54a65c73afafba673bd207da22e84d3216e35bb9"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-4242-weak-angular",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 61,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 0,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "waiting for the assigned ship to land"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.057568999999999995,
+      "step_max_ms": 3.9280390000000005,
+      "ai_p95_ms": 0.051607,
+      "report_sha256": "fe16f84f2041463364b1895ae1c51d58049cc56932b557423f44636ffdd44597",
+      "non_timing_report_sha256": "e76877c10f9af0e22c3e5f37da3d75bfa5b89bd44ec1466e29798077f128860c"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-4242-weak-round",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 61,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 0,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "jumping a ground obstacle",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.054122,
+      "step_max_ms": 3.9077720000000005,
+      "ai_p95_ms": 0.048271,
+      "report_sha256": "4f9b4d3e67504666fda745b759be77dd269f1820e0402ef2449692ddb6595e87",
+      "non_timing_report_sha256": "cda51874c9231fd17a1296e1a3e70a4ca6c3c24bb1ddbc164e749f30f4362f89"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-777-weak-angular",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 108,
+      "rejected": 0,
+      "peak_sampled_loose": 60,
+      "terrain_cannon_hits": 2,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 48,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "engage ship",
+        "engage ship"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.053731,
+      "step_max_ms": 3.9241120000000005,
+      "ai_p95_ms": 0.041548999999999996,
+      "report_sha256": "f8f354d2eccbf0224d36ad9022373eff7e32a95803d0092c9aabd8971f13d764",
+      "non_timing_report_sha256": "91a4f9084bf90f2ead197420b36017b553e55de0d3ab426d5cbc218e59e27bbe"
+    },
+    {
+      "host": "desktop",
+      "case": "combat-777-weak-round",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 60,
+      "rejected": 0,
+      "peak_sampled_loose": 60,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 0,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.051297,
+      "step_max_ms": 3.976923,
+      "ai_p95_ms": 0.026009,
+      "report_sha256": "32bfff37975367aecdf8e57a1f6b77fda5d19d3635b6274b097668f391e1df7e",
+      "non_timing_report_sha256": "7d47c9f3083b65f38890337da077682855407a15ccbed140cb225e1e464b3bc9"
+    },
+    {
+      "host": "desktop",
+      "case": "heavy-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 187,
+      "deposited": 2358,
+      "rejected": 46,
+      "peak_sampled_loose": 191,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 176,
+      "late_admissions": 202,
+      "late_rejections": 21,
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "recovery exceeded two-minute task budget"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 1.034114,
+      "step_max_ms": 2.624518,
+      "ai_p95_ms": 0.061646,
+      "report_sha256": "642a8853204926cb57bc82beb0176d37f0724122ce088b8016b0d48b510d9c8f",
+      "non_timing_report_sha256": "fc6aa732dbe2ecf533c935b0ab6087ccc3a08aec0bec78010340b93253954946"
+    },
+    {
+      "host": "desktop",
+      "case": "heavy-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 129,
+      "deposited": 3488,
+      "rejected": 16,
+      "peak_sampled_loose": 189,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 224,
+      "late_admissions": 448,
+      "late_rejections": 6,
+      "completed_recoveries": [
+        0,
+        1
+      ],
+      "final_goals": [
+        "no supported claim progress",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.8927660000000001,
+      "step_max_ms": 3.464474,
+      "ai_p95_ms": 0.07886900000000001,
+      "report_sha256": "342f9497705acb22c0041e6653bb5284cacee766b37a2126288632f9a293f31d",
+      "non_timing_report_sha256": "60c649eb4302bcdcf00774f082c12117856e1be55ee3771ab91086dae767a74a"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 30,
+      "deposited": 263,
+      "rejected": 0,
+      "peak_sampled_loose": 89,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 20,
+      "late_admissions": 170,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.32811,
+      "step_max_ms": 3.808695,
+      "ai_p95_ms": 0.059532,
+      "report_sha256": "a78f0b7dda99dbb9e283d7029833bf591c16cd168449f05b54585d86c10af5cb",
+      "non_timing_report_sha256": "bbfef9feec024c224a3366c1fc088b64102bb9e430207fed8f1ed13eaaa65d6d"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 24,
+      "deposited": 525,
+      "rejected": 0,
+      "peak_sampled_loose": 83,
+      "terrain_cannon_hits": 5,
+      "asteroid_terrain_contacts": 16,
+      "late_admissions": 114,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        3,
+        2
+      ],
+      "final_goals": [
+        "flyby / weapons off",
+        "engage ship"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.199457,
+      "step_max_ms": 4.1501589999999995,
+      "ai_p95_ms": 0.028453,
+      "report_sha256": "700cb491c8ef66efc6498d477bb14f6f76d91d36e7b83123be97d218eff74087",
+      "non_timing_report_sha256": "0eaa1741d7e9b55c243944b0d5de325961d0f16489823b2f528e43f33d95f9e9"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-4242-weak-angular",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 19,
+      "deposited": 372,
+      "rejected": 0,
+      "peak_sampled_loose": 95,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 22,
+      "late_admissions": 49,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        1
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "walking along the ground route"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.275751,
+      "step_max_ms": 3.300004,
+      "ai_p95_ms": 0.026891,
+      "report_sha256": "53321b737c27d86e6ba39b0d3c40b3699db9c7f909fdcad8eed796237e8d729a",
+      "non_timing_report_sha256": "6fc7684cdc2801db6164919d9b22a4b592d06560339dca8710fc5ba789fee5ec"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-4242-weak-round",
+      "game": "spacewars",
+      "seed": 4242,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 15,
+      "deposited": 416,
+      "rejected": 0,
+      "peak_sampled_loose": 94,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 18,
+      "late_admissions": 129,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        3
+      ],
+      "final_goals": [
+        "engage ship",
+        "engage ship"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.13167800000000002,
+      "step_max_ms": 2.402969,
+      "ai_p95_ms": 0.049623999999999995,
+      "report_sha256": "62df74438dae534269f22c82a9b278e2af6b4c2f733147d4eed5d6c9c4f82786",
+      "non_timing_report_sha256": "141054ae1399ca18d0b72edf37ee6302933da49eab827ea1191443635a11a858"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-777-weak-angular",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 16,
+      "deposited": 364,
+      "rejected": 0,
+      "peak_sampled_loose": 72,
+      "terrain_cannon_hits": 3,
+      "asteroid_terrain_contacts": 15,
+      "late_admissions": 110,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        3,
+        2
+      ],
+      "final_goals": [
+        "climb clear of ground",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.19602,
+      "step_max_ms": 4.096459,
+      "ai_p95_ms": 0.05832,
+      "report_sha256": "69dc659a57dc236b1b46273fed0f6b1a7dcb4263e24bb64c8f57d92fe332e167",
+      "non_timing_report_sha256": "37c2a062c0150e8da841db9bebfab41c4cf8ffc194fca372ce9822bef47935dd"
+    },
+    {
+      "host": "desktop",
+      "case": "mixed-777-weak-round",
+      "game": "spacewars",
+      "seed": 777,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 24,
+      "deposited": 262,
+      "rejected": 0,
+      "peak_sampled_loose": 48,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 13,
+      "late_admissions": 44,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.115688,
+      "step_max_ms": 3.9273880000000005,
+      "ai_p95_ms": 0.03752,
+      "report_sha256": "8ef7da8557326c34566277dd3aa83a888c18be8d5b5d0d2cc17d1d90bca741d9",
+      "non_timing_report_sha256": "07f01c1c1a498033e8c8da7a728e2a420b41c660ed436f267fc4277a57ed8c5a"
+    },
+    {
+      "host": "picade",
+      "case": "capture-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 52,
+      "deposited": 310,
+      "rejected": 0,
+      "peak_sampled_loose": 85,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 17,
+      "late_admissions": 101,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5409,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 2.983606,
+      "step_max_ms": 25.473357,
+      "ai_p95_ms": 0.430348,
+      "report_sha256": "6c836966aff9f5d21b5e6f3f36314e6d82c940248c2d6b983c9a764907c4b3fd",
+      "non_timing_report_sha256": "d34cb6fbee238d008e143d3800468913c414056e72b1310bab2c5957464099de"
+    },
+    {
+      "host": "picade",
+      "case": "capture-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 49,
+      "deposited": 423,
+      "rejected": 0,
+      "peak_sampled_loose": 93,
+      "terrain_cannon_hits": 3,
+      "asteroid_terrain_contacts": 16,
+      "late_admissions": 152,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": {
+        "completed_tick": 5409,
+        "failed_tick": null,
+        "failure": null
+      },
+      "step_p95_ms": 2.9589019999999997,
+      "step_max_ms": 33.880383,
+      "ai_p95_ms": 0.503366,
+      "report_sha256": "e9db2f35c7de0ab2bb02740465ae40b2076b0a5e64cbc2fd5383059d30322ef0",
+      "non_timing_report_sha256": "313f70f58c4542769b22bb34cd88f52656311b593eee8b9a2b539d27cc8a75f1"
+    },
+    {
+      "host": "picade",
+      "case": "combat-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 0,
+      "deposited": 119,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 2,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 58,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "stabilizing escape pod",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.607496,
+      "step_max_ms": 30.093859000000002,
+      "ai_p95_ms": 0.43357,
+      "report_sha256": "fcaaf7dace377e43ab42b1aa5bbef7e9dd99ac708b9bde90b0d2cb1d1a3e37f3",
+      "non_timing_report_sha256": "3492c4ba709ed97703085626bdebdad4238387f438c46a7a2bc1ee78634e6988"
+    },
+    {
+      "host": "picade",
+      "case": "combat-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 1,
+      "deposited": 60,
+      "rejected": 0,
+      "peak_sampled_loose": 61,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 0,
+      "late_admissions": 0,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        1,
+        3
+      ],
+      "final_goals": [
+        "landing escape pod",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 0.673513,
+      "step_max_ms": 29.526531000000002,
+      "ai_p95_ms": 0.429515,
+      "report_sha256": "8cc3c430474895b833dc481354414e400fc66ebb74cbf92d85d90494d2172903",
+      "non_timing_report_sha256": "cdde286ccc776e901db7f1ca54a65c73afafba673bd207da22e84d3216e35bb9"
+    },
+    {
+      "host": "picade",
+      "case": "heavy-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 187,
+      "deposited": 2358,
+      "rejected": 46,
+      "peak_sampled_loose": 191,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 176,
+      "late_admissions": 202,
+      "late_rejections": 21,
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "recovery exceeded two-minute task budget"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 10.006256,
+      "step_max_ms": 23.041265,
+      "ai_p95_ms": 0.515663,
+      "report_sha256": "916dd0f1651addbcb37cb8b0f777f85cd6cb3f0e8c506eab27b1bafcb7dc4e88",
+      "non_timing_report_sha256": "fc6aa732dbe2ecf533c935b0ab6087ccc3a08aec0bec78010340b93253954946"
+    },
+    {
+      "host": "picade",
+      "case": "heavy-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 129,
+      "deposited": 3488,
+      "rejected": 16,
+      "peak_sampled_loose": 189,
+      "terrain_cannon_hits": 0,
+      "asteroid_terrain_contacts": 224,
+      "late_admissions": 448,
+      "late_rejections": 6,
+      "completed_recoveries": [
+        0,
+        1
+      ],
+      "final_goals": [
+        "no supported claim progress",
+        "patrol / opponent recovering"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 8.936449000000001,
+      "step_max_ms": 28.398184999999998,
+      "ai_p95_ms": 0.622569,
+      "report_sha256": "6e6ee6245fa34403776128ae404636ded39a4c7222a24b84019872f6e9cba74e",
+      "non_timing_report_sha256": "60c649eb4302bcdcf00774f082c12117856e1be55ee3771ab91086dae767a74a"
+    },
+    {
+      "host": "picade",
+      "case": "mixed-42-weak-angular",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-angular",
+      "seconds": 300,
+      "loose": 30,
+      "deposited": 263,
+      "rejected": 0,
+      "peak_sampled_loose": 89,
+      "terrain_cannon_hits": 1,
+      "asteroid_terrain_contacts": 20,
+      "late_admissions": 170,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        2,
+        2
+      ],
+      "final_goals": [
+        "patrol / opponent recovering",
+        "landing escape pod"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 3.3604,
+      "step_max_ms": 29.907601,
+      "ai_p95_ms": 0.5277189999999999,
+      "report_sha256": "1476c5a196b457bdb647260c3be518c776b01ef7b7dce21fd0b37e58daa046fe",
+      "non_timing_report_sha256": "bbfef9feec024c224a3366c1fc088b64102bb9e430207fed8f1ed13eaaa65d6d"
+    },
+    {
+      "host": "picade",
+      "case": "mixed-42-weak-round",
+      "game": "spacewars",
+      "seed": 42,
+      "shape": "weak-round",
+      "seconds": 300,
+      "loose": 24,
+      "deposited": 525,
+      "rejected": 0,
+      "peak_sampled_loose": 83,
+      "terrain_cannon_hits": 5,
+      "asteroid_terrain_contacts": 16,
+      "late_admissions": 114,
+      "late_rejections": 0,
+      "completed_recoveries": [
+        3,
+        2
+      ],
+      "final_goals": [
+        "flyby / weapons off",
+        "engage ship"
+      ],
+      "ground_failure_reports": 0,
+      "capture": null,
+      "step_p95_ms": 2.168872,
+      "step_max_ms": 32.436414,
+      "ai_p95_ms": 0.40797799999999995,
+      "report_sha256": "9c7c5c82073d1be6893da3fea06b6e3638e2224736ef6b023935c8fe92fb9f4c",
+      "non_timing_report_sha256": "0eaa1741d7e9b55c243944b0d5de325961d0f16489823b2f528e43f33d95f9e9"
+    }
+  ],
+  "artifacts": "/home/data/workspace/space-wars2/target/dirt-late-match-review",
+  "commands": {
+    "scorched-runs.json": [
+      {
+        "label": "scorched-duel-42-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "42",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 3.609279766002146
+      },
+      {
+        "label": "scorched-duel-42-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "42",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 1.6703787310034386
+      },
+      {
+        "label": "scorched-duel-777-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "777",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 5.664253142000234
+      },
+      {
+        "label": "scorched-duel-777-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "777",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.990547487002914
+      },
+      {
+        "label": "scorched-duel-4242-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "4242",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.808471812000789
+      },
+      {
+        "label": "scorched-duel-4242-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "4242",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.057384630003071
+      },
+      {
+        "label": "scorched-barrage-42-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "42",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 18.656534518995613
+      },
+      {
+        "label": "scorched-barrage-42-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "42",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 13.240495746002125
+      },
+      {
+        "label": "scorched-barrage-777-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "777",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 13.543173159996513
+      },
+      {
+        "label": "scorched-barrage-777-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "777",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 14.716864383000939
+      },
+      {
+        "label": "scorched-barrage-4242-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "4242",
+          "--shape",
+          "angular",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 23.879298356005165
+      },
+      {
+        "label": "scorched-barrage-4242-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/before/scorched_benchmark",
+          "--seed",
+          "4242",
+          "--shape",
+          "round",
+          "--seconds",
+          "300",
+          "--cohesion",
+          "weak",
+          "--slumping",
+          "--breakup",
+          "--diagnostics",
+          "--replay",
+          "--bombardment-seconds",
+          "240"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 13.664791064002202
+      }
+    ],
+    "combat-runs.json": [
+      {
+        "label": "combat-42-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-42-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.2309429939996335
+      },
+      {
+        "label": "combat-42-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-42-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.2176159559967346
+      },
+      {
+        "label": "combat-777-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-777-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.3147511939969263
+      },
+      {
+        "label": "combat-777-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-777-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.236838427998009
+      },
+      {
+        "label": "combat-4242-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-4242-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 1.9770743929984747
+      },
+      {
+        "label": "combat-4242-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/combat-4242-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.069974950994947
+      }
+    ],
+    "pressure-runs.json": [
+      {
+        "label": "mixed-42-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-42-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.106019366001419
+      },
+      {
+        "label": "mixed-42-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-42-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.98348712400184
+      },
+      {
+        "label": "mixed-777-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-777-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 3.549060625999118
+      },
+      {
+        "label": "mixed-777-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-777-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.607108046002395
+      },
+      {
+        "label": "mixed-4242-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-4242-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.399922693002736
+      },
+      {
+        "label": "mixed-4242-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/mixed-4242-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 2.47947611699783
+      },
+      {
+        "label": "heavy-42-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "1",
+          "--asteroid-severity",
+          "heavy",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/heavy-42-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 12.554944348004938
+      },
+      {
+        "label": "heavy-42-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "1",
+          "--asteroid-severity",
+          "heavy",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/heavy-42-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 13.374451802999829
+      },
+      {
+        "label": "capture-42-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-42-weak-angular",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.998060792000615
+      },
+      {
+        "label": "capture-42-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-42-weak-round",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.225293662006152
+      },
+      {
+        "label": "capture-777-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-777-weak-angular",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 3.5838149019982666
+      },
+      {
+        "label": "capture-777-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "777",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-777-weak-round",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 4.69815337399632
+      },
+      {
+        "label": "capture-4242-weak-angular",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-4242-weak-angular",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 5.3690215360038565
+      },
+      {
+        "label": "capture-4242-weak-round",
+        "command": [
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/tools/surface_combat_soak",
+          "--seed",
+          "4242",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--frames",
+          "true",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--out",
+          "/home/data/workspace/space-wars2/target/dirt-late-match-review/capture-4242-weak-round",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 3.5673430810056743
+      }
+    ],
+    "picade-runs.json": [
+      {
+        "label": "combat-42-weak-angular",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/combat-42-weak-angular"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 24.128317045004223
+      },
+      {
+        "label": "combat-42-weak-round",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/combat-42-weak-round"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 24.70088445500005
+      },
+      {
+        "label": "mixed-42-weak-angular",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/mixed-42-weak-angular",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 46.66555723599595
+      },
+      {
+        "label": "mixed-42-weak-round",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/mixed-42-weak-round",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 32.72571260199766
+      },
+      {
+        "label": "heavy-42-weak-angular",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/heavy-42-weak-angular",
+          "--asteroid-interval",
+          "1",
+          "--asteroid-severity",
+          "heavy"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 127.3648319779968
+      },
+      {
+        "label": "heavy-42-weak-round",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/heavy-42-weak-round",
+          "--asteroid-interval",
+          "1",
+          "--asteroid-severity",
+          "heavy"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 140.04640257500432
+      },
+      {
+        "label": "capture-42-weak-angular",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-angular",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/capture-42-weak-angular",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 54.10030497700063
+      },
+      {
+        "label": "capture-42-weak-round",
+        "command": [
+          "nice",
+          "-n",
+          "10",
+          "/tmp/spacewars-late-match-review/surface_combat_soak",
+          "--seed",
+          "42",
+          "--seconds",
+          "300",
+          "--dirt",
+          "weak-round",
+          "--break-interval",
+          "15",
+          "--out",
+          "/tmp/spacewars-late-match-review/capture-42-weak-round",
+          "--asteroid-interval",
+          "8",
+          "--asteroid-severity",
+          "mixed",
+          "--land-after",
+          "60",
+          "--landing-policy",
+          "tactical"
+        ],
+        "exit_code": 0,
+        "wall_seconds": 41.74424817399995
+      }
+    ]
+  },
+  "local_review": {
+    "ui": {
+      "schema_version": 1,
+      "revision": 65,
+      "screen": "pause.main",
+      "active_scenario": "spacewars-terrain-combat",
+      "selected_scenario": "spacewars-terrain-combat",
+      "selected_control": "pause.resume",
+      "controls": [
+        {
+          "id": "pause.resume",
+          "label": "Resume",
+          "enabled": true
+        },
+        {
+          "id": "pause.restart",
+          "label": "Restart Round",
+          "enabled": true
+        },
+        {
+          "id": "pause.controls",
+          "label": "Controls",
+          "enabled": true
+        },
+        {
+          "id": "pause.return-to-launcher",
+          "label": "Return to Launcher",
+          "enabled": true
+        },
+        {
+          "id": "pause.sound",
+          "label": "App Settings",
+          "enabled": true
+        }
+      ],
+      "actions": [
+        "up",
+        "down",
+        "left",
+        "right",
+        "confirm",
+        "back",
+        "start",
+        "controls"
+      ],
+      "scenario_revision": 4,
+      "paused": true,
+      "benchmark_active": false,
+      "error": null
+    },
+    "settings": {
+      "schema_version": 1,
+      "revision": 62,
+      "screen": "launcher.settings",
+      "active_scenario": null,
+      "selected_scenario": "spacewars-terrain-combat",
+      "selected_control": "launcher.settings.combat.asteroid-strength",
+      "controls": [
+        {
+          "id": "launcher.settings.renderer.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "vector"
+        },
+        {
+          "id": "launcher.settings.renderer.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "vector"
+        },
+        {
+          "id": "launcher.settings.raster-scale.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "1.0\u00d7"
+        },
+        {
+          "id": "launcher.settings.raster-scale.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "1.0\u00d7"
+        },
+        {
+          "id": "launcher.settings.combat.break-interval.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "15"
+        },
+        {
+          "id": "launcher.settings.combat.break-interval.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "15"
+        },
+        {
+          "id": "launcher.settings.combat.break-duration.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "4"
+        },
+        {
+          "id": "launcher.settings.combat.break-duration.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "4"
+        },
+        {
+          "id": "launcher.settings.combat.mission.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "Dogfight"
+        },
+        {
+          "id": "launcher.settings.combat.mission.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "Dogfight"
+        },
+        {
+          "id": "launcher.settings.combat.asteroid-interval.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "8"
+        },
+        {
+          "id": "launcher.settings.combat.asteroid-interval.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "8"
+        },
+        {
+          "id": "launcher.settings.combat.asteroid-strength.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "Mixed"
+        },
+        {
+          "id": "launcher.settings.combat.asteroid-strength.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "Mixed"
+        },
+        {
+          "id": "launcher.settings.combat.loose-dirt.previous",
+          "label": "\u2039",
+          "enabled": true,
+          "value": "Weak \u00b7 Angular"
+        },
+        {
+          "id": "launcher.settings.combat.loose-dirt.next",
+          "label": "\u203a",
+          "enabled": true,
+          "value": "Weak \u00b7 Angular"
+        },
+        {
+          "id": "launcher.settings.back",
+          "label": "Back",
+          "enabled": true
+        },
+        {
+          "id": "launcher.settings.start",
+          "label": "Start Game",
+          "enabled": true
+        }
+      ],
+      "actions": [
+        "up",
+        "down",
+        "left",
+        "right",
+        "confirm",
+        "back",
+        "start",
+        "controls"
+      ],
+      "scenario_revision": null,
+      "paused": false,
+      "benchmark_active": false,
+      "error": null
+    },
+    "client_sha256": "205db8c1c00d05b727bbde618939d7e0a42620b900a14c3125c1a73d13f8b9b0",
+    "socket": "/tmp/spacewars-partial-review.sock",
+    "settings_path": "target/dirt-partial-packing-review/local-angular/settings.toml",
+    "settings_sha256": "a86b356791b5590341191761a044b2ef696add02774628f692e9bdd3afc0c3a9",
+    "note": "Fresh paused human versus bot combat; Weak/Angular and mixed asteroids every eight seconds. Local Scorched smoke used launcher seed 0 and bounded virtual controller input."
+  },
+  "picade_environment": {
+    "ui_before": {
+      "schema_version": 1,
+      "revision": 2,
+      "screen": "game-over",
+      "active_scenario": "spacewars",
+      "selected_scenario": "spacewars",
+      "selected_control": "game-over.play-again",
+      "controls": [
+        {
+          "id": "game-over.play-again",
+          "label": "Rematch",
+          "enabled": true,
+          "value": "12221433596253629601"
+        },
+        {
+          "id": "game-over.new-match",
+          "label": "New Match",
+          "enabled": true
+        },
+        {
+          "id": "game-over.return-to-launcher",
+          "label": "Launcher",
+          "enabled": true
+        },
+        {
+          "id": "game-over.world-seed",
+          "label": "World seed",
+          "enabled": false,
+          "value": "12221433596253629601"
+        },
+        {
+          "id": "game-over.scoreboard.round",
+          "label": "Round",
+          "enabled": false,
+          "value": "Round 18 \u00b7 02:50"
+        },
+        {
+          "id": "game-over.scoreboard.planets",
+          "label": "Planets at finish",
+          "enabled": false,
+          "value": "Planets at finish   \u00b7   P1 2   /   P2 0"
+        },
+        {
+          "id": "game-over.scoreboard.p1.controller",
+          "label": "Player 1 Controller",
+          "enabled": false,
+          "value": "Legacy bot v9"
+        },
+        {
+          "id": "game-over.scoreboard.p1.wins",
+          "label": "Player 1 Wins",
+          "enabled": false,
+          "value": "10"
+        },
+        {
+          "id": "game-over.scoreboard.p1.losses",
+          "label": "Player 1 Losses",
+          "enabled": false,
+          "value": "8"
+        },
+        {
+          "id": "game-over.scoreboard.p1.draws",
+          "label": "Player 1 Draws",
+          "enabled": false,
+          "value": "0"
+        },
+        {
+          "id": "game-over.scoreboard.p2.controller",
+          "label": "Player 2 Controller",
+          "enabled": false,
+          "value": "Planner bot v10"
+        },
+        {
+          "id": "game-over.scoreboard.p2.wins",
+          "label": "Player 2 Wins",
+          "enabled": false,
+          "value": "8"
+        },
+        {
+          "id": "game-over.scoreboard.p2.losses",
+          "label": "Player 2 Losses",
+          "enabled": false,
+          "value": "10"
+        },
+        {
+          "id": "game-over.scoreboard.p2.draws",
+          "label": "Player 2 Draws",
+          "enabled": false,
+          "value": "0"
+        }
+      ],
+      "actions": [
+        "up",
+        "down",
+        "left",
+        "right",
+        "confirm",
+        "back",
+        "start"
+      ],
+      "scenario_revision": 18,
+      "paused": false,
+      "benchmark_active": false,
+      "error": null
+    },
+    "kiosk_paused_for_measurement": false,
+    "nice": 10,
+    "redeployed": false
+  },
+  "logs": {
+    "build-combat.log": "99b3632af9da90957ff7b8443e818cf2ec56d2e2b505195df59df8c3b2548104",
+    "build-picade.log": "f0b97b3a4edafd23127821cea9e9665eb6a326795b6db13a1105b0f9bac93c7e",
+    "clippy-combat.log": "133d627e1969687318e78c0ad5274f9f7fbde119c476cb8176c32d6d8214587f",
+    "scorched-summary.log": "822ca37d639a74b633644d4d9570be2fc842bbc197924952242e4fb9cdcc1ce6",
+    "combat-summary.log": "5041164bc53f86bc91c030121c051da6e5811c9eacbbee458d51a3b2d32fee93",
+    "pressure-summary.log": "40e0f05db42a26fa916763f06d890af4ee9ce27d0ec652c4e7cdcde53e4cbe76",
+    "picade-summary.log": "fc68dc608ebfad4aa7f426e647e6ce05f9dbe586e1dd3676b63adbb600c3db9a"
+  }
+}
