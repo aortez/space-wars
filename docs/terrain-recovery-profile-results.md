@@ -1,5 +1,9 @@
 # Named recovery candidate reproduces the qualified matches
 
+The [publication follow-up](terrain-recovery-publication.md) records the current
+PR integration and merge order. The match evidence below retains its original
+runtime identities and dated publication status.
+
 **`terrain_recovery_supported_hatch_v1` now selects the tested recovery
 combination through one public mission profile.** Two full matches reproduce
 the preceding explicit-switch candidates exactly: all 52,611 action records,

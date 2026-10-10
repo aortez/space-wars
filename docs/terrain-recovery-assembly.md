@@ -1,5 +1,9 @@
 # Recovery changes are separated and the combined tree is verified
 
+See the [publication follow-up](terrain-recovery-publication.md) for the prepared
+PRs and current integration gates. This report records the earlier local
+separation pass and retains its original source identities.
+
 The recovery work can now advance #178 without copying #174's unpublished
 terrain implementation into its branch. The local
 `bot-recovery-integration-prep` branch extends #178's `cada1eb` checkpoint with
