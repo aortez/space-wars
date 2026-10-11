@@ -154,19 +154,20 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
     });
 }
 
-fn assert_recovery_profiles(harness: &FunctionalHarness, p1: &str, p2: &str) {
-    let diagnostics = harness.client.request("status\n").unwrap();
+fn assert_recovery_profiles(harness: &mut FunctionalHarness, p1: &str, p2: &str) {
+    // Gameplay becomes visible before the first runtime diagnostics sample.
+    let diagnostics = performance::wait_status(harness, |status| {
+        status.contains_key("mission_recovery_profile_p1")
+            && status.contains_key("mission_recovery_profile_p2")
+    });
     for (seat, controller) in [p1, p2].iter().enumerate() {
         let profile = if *controller == "recovery v1" {
             "terrain_recovery_supported_hatch_ordinary_offsets_v1"
         } else {
             "standard"
         };
-        let expected = format!("mission_recovery_profile_p{}={profile}", seat + 1);
-        assert!(
-            diagnostics.lines().any(|line| line == expected),
-            "{diagnostics}"
-        );
+        let key = format!("mission_recovery_profile_p{}", seat + 1);
+        assert_eq!(diagnostics[&key], profile, "{diagnostics:?}");
     }
 }
 
