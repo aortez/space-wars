@@ -22,6 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod angular_diagnosis;
 mod connectivity;
 mod evidence;
 mod ground_rejoin;
