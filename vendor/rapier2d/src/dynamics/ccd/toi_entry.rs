@@ -49,6 +49,38 @@ impl TOIEntry {
         end_time: Real,
         smallest_contact_dist: Real,
     ) -> Option<Self> {
+        Self::try_from_colliders_with_thickness(
+            query_dispatcher,
+            ch1,
+            ch2,
+            co1,
+            co2,
+            rb1,
+            rb2,
+            frozen1,
+            frozen2,
+            start_time,
+            end_time,
+            smallest_contact_dist,
+            || co1.shape.0.ccd_thickness() + co2.shape.0.ccd_thickness(),
+        )
+    }
+
+    pub(super) fn try_from_colliders_with_thickness<QD: ?Sized + QueryDispatcher>(
+        query_dispatcher: &QD,
+        ch1: ColliderHandle,
+        ch2: ColliderHandle,
+        co1: &Collider,
+        co2: &Collider,
+        rb1: Option<&RigidBody>,
+        rb2: Option<&RigidBody>,
+        frozen1: Option<Real>,
+        frozen2: Option<Real>,
+        start_time: Real,
+        end_time: Real,
+        smallest_contact_dist: Real,
+        shape_thickness_sum: impl FnOnce() -> Real,
+    ) -> Option<Self> {
         #[cfg(feature = "ccd-diagnostics")]
         let _toi_span = crate::counters::ccd_probe::Span::new(false);
         assert!(start_time <= end_time);
@@ -80,8 +112,7 @@ impl TOIEntry {
         let thickness = {
             #[cfg(feature = "ccd-diagnostics")]
             let _thickness_span = crate::counters::ccd_probe::Span::new(true);
-            (co1.shape.0.ccd_thickness() + co2.shape.0.ccd_thickness())
-                + smallest_contact_dist.max(0.0)
+            shape_thickness_sum() + smallest_contact_dist.max(0.0)
         };
         let is_pseudo_intersection_test = co1.is_sensor()
             || co2.is_sensor()
