@@ -46,6 +46,32 @@ function Write-EvidenceManifest($Identity, [string]$Directory) {
     $manifest.files = $files
     Write-Json $manifest (Join-Path $Directory 'manifest.json')
 }
+# One declaration drives PE-import checks, loaded-module checks and bundle metadata.
+$windowsRuntimeDlls = @('ucrtbase.dll', 'msvcp_win.dll', 'msvcrt.dll')
+$vcRuntimeDlls = @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll', 'msvcp140_codecvt_ids.dll', 'concrt140.dll')
+function Get-RuntimeClass([string]$Name) {
+    # These Windows components do not use the separately installed v14 version.
+    if ($Name -in $windowsRuntimeDlls) { return 'windows' }
+    if ($Name -in $vcRuntimeDlls) { return 'redistributable' }
+    if ($Name -match '^(vcruntime|msvcp|concrt|vcomp|mfc|msvcr)') {
+        throw "Undeclared MSVC dependency: $Name"
+    }
+    return 'windows'
+}
+function Assert-RuntimeModule($Module, [version]$MinimumRuntime, [string]$Executable, [string]$SystemRoot) {
+    if ((Get-RuntimeClass $Module.name) -eq 'redistributable') {
+        $version = [version]([regex]::Match($Module.version, '\d+\.\d+\.\d+(\.\d+)?').Value)
+        if ($version -lt $MinimumRuntime) { throw "Runtime below documented minimum: $($Module.name)" }
+    }
+    if ($Module.path -ine $Executable -and -not $Module.path.StartsWith($SystemRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unbundled dependency outside Windows: $($Module.path)"
+    }
+}
+function Get-VcInstructions([version]$MinimumRuntime) {
+    # Microsoft's current supported v14 permalink; the VS 2022-specific link
+    # offered 14.44 while the retained 14.51 toolset required a newer runtime.
+    return "Install Microsoft Visual C++ v14 Redistributable (x64), version $MinimumRuntime or newer: https://aka.ms/vc14/vc_redist.x64.exe . Check the installer's Product version meets this minimum before installing. See https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist for supported downloads."
+}
 if ($FunctionsOnly) { return }
 if (-not $IsWindows) { throw 'Release validation requires Windows.' }
 if ($SourceCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'Expected a full lowercase source SHA.' }
@@ -90,7 +116,7 @@ try {
     if (-not $dumpbin) { throw 'MSVC dumpbin is required for the runtime inventory.' }
     $toolsetVersion = [version]([regex]::Match($dumpbin.FullName.Replace('\', '/'), '/MSVC/([0-9.]+)/').Groups[1].Value)
     if ($toolsetVersion -gt $minimumRuntime) { $minimumRuntime = $toolsetVersion }
-    $vcInstructions = "Install Microsoft Visual C++ v14 Redistributable (x64), version $minimumRuntime or newer: https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    $vcInstructions = Get-VcInstructions $minimumRuntime
     $imports = & $dumpbin.FullName /DEPENDENTS "$stage/engine-client.exe" 2>&1
     $importExit = $LASTEXITCODE
     $imports | Set-Content "$OutputDirectory/pe-dependencies.txt" -Encoding utf8
@@ -98,9 +124,7 @@ try {
     foreach ($line in $imports) {
         if ([string]$line -match '^\s+([A-Za-z0-9_.-]+\.dll)\s*$') {
             $dll = $Matches[1]
-            if ($dll -match '^(vcruntime|msvcp|concrt|vcomp|mfc|msvcr)' -and $dll -notin @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll', 'msvcp140_codecvt_ids.dll', 'concrt140.dll')) {
-                throw "Undeclared MSVC dependency: $dll"
-            }
+            $null = Get-RuntimeClass $dll
             if ($dll -notmatch '^api-ms-' -and -not (Test-Path (Join-Path $env:SystemRoot "System32/$dll"))) {
                 throw "Missing unbundled import: $dll"
             }
@@ -110,8 +134,8 @@ try {
     $info.profile = 'release'; $info.target = 'x86_64-pc-windows-msvc'
     $info.required_runtime_files = @('engine-client.exe')
     $info.runtime_prerequisites = @(
-        @{ name = 'Microsoft Visual C++ v14 x64'; dlls = @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll', 'msvcp140_codecvt_ids.dll', 'concrt140.dll'); instructions = $vcInstructions },
-        @{ name = 'Windows x64 and Universal CRT'; dlls = @('ucrtbase.dll'); instructions = $osInstructions }
+        @{ name = 'Microsoft Visual C++ v14 x64'; dlls = $vcRuntimeDlls; instructions = $vcInstructions },
+        @{ name = 'Windows x64 and Universal CRT'; dlls = $windowsRuntimeDlls; instructions = $osInstructions }
     )
     Write-Json $info "$stage/build-info.json"
     @"
@@ -162,13 +186,7 @@ SHA256SUMS covers every bundled file except itself. build-info.json records prov
             if (-not $phase.PSObject.Properties['modules']) { continue }
             foreach ($module in $phase.modules) {
                 $audit += $module
-                if ($module.name -match '^(vcruntime|msvcp|concrt)') {
-                    $version = [version]([regex]::Match($module.version, '\d+\.\d+\.\d+(\.\d+)?').Value)
-                    if ($version -lt $minimumRuntime) { throw "Runtime below documented minimum: $($module.name)" }
-                }
-                if ($module.path -ine $exe -and -not $module.path.StartsWith($env:SystemRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                    throw "Unbundled dependency outside Windows: $($module.path)"
-                }
+                Assert-RuntimeModule $module $minimumRuntime $exe $env:SystemRoot
             }
         }
     }

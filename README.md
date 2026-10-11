@@ -681,9 +681,12 @@ run-software.cmd --scenario falling
 
 Use Windows 10 version 1809 or newer (x64), or Windows 11, with current graphics
 drivers and Microsoft Visual C++ v14 Redistributable (x64) **14.44.35211 or newer**
-([Microsoft download](https://aka.ms/vs/17/release/vc_redist.x64.exe)). The bundled
+([Microsoft download](https://aka.ms/vc14/vc_redist.x64.exe)). The bundled
 README.txt specifies the exact minimum for its MSVC toolset; use that version
-or newer if it exceeds this baseline. No Rust
+or newer if it exceeds this baseline. Check the downloaded installer’s Product
+version against that minimum before installing. Use Microsoft’s
+[current supported v14 downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist);
+the VS 2022-specific installer can be too old for newer build tools. No Rust
 installation or source checkout is needed. The UI and Falling ROM are embedded;
 Windows supplies system fonts. Optional user NES ROMs are not included.
 The bundle includes run instructions, commit/target metadata and SHA256SUMS for

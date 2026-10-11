@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -27,6 +28,75 @@ class PackagingTests(unittest.TestCase):
             [pwsh, '-NoProfile', '-File', str(driver)], capture_output=True, text=True,
             env={**os.environ, 'RELEASE_SCRIPT': str(SCRIPT), 'TEST_DIRECTORY': str(directory)},
         )
+
+    def test_os_and_redistributable_classification(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.invoke(r"""
+                @('msvcp_win.dll', 'MSVCP_WIN.DLL', 'ucrtbase.dll', 'VCRUNTIME140.dll', 'msvcp140_atomic_wait.dll') |
+                    ForEach-Object { Get-RuntimeClass $_ }
+                Assert-RuntimeModule @{name='msvcp_win.dll'; version='10.0.26100.33438 (WinBuild.160101.0800)'; path='C:\Windows\System32\msvcp_win.dll'} ([version]'14.51.36231') 'D:\app\engine-client.exe' 'C:\Windows'
+            """, Path(tmp))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), ['windows', 'windows', 'windows', 'redistributable', 'redistributable'])
+
+    def test_windows_msvcrt_classification_and_path_validation(self):
+        for name in ('msvcrt.dll', 'MSVCRT.DLL'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                result = self.invoke(
+                    f"Get-RuntimeClass '{name}'; "
+                    f"Assert-RuntimeModule @{{name='{name}'; version='7.0.26100.33438 (WinBuild.160101.0800)'; path='C:\\Windows\\System32\\{name}'}} ([version]'14.51.36231') 'D:\\app\\engine-client.exe' 'C:\\Windows'",
+                    Path(tmp))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), 'windows')
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.invoke(r"""
+                Assert-RuntimeModule @{name='msvcrt.dll'; version='7.0.26100.33438'; path='D:\tools\msvcrt.dll'} ([version]'14.51.36231') 'D:\app\engine-client.exe' 'C:\Windows'
+            """, Path(tmp))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Unbundled dependency outside Windows', result.stderr)
+
+    def test_actual_redistributable_minimum_is_enforced(self):
+        for name in ('VCRUNTIME140.dll', 'msvcp140.dll', 'concrt140.dll'):
+            for version, succeeds in [('14.44.35211.0', False), ('14.51.36247.0', True)]:
+                with self.subTest(name=name, version=version), tempfile.TemporaryDirectory() as tmp:
+                    result = self.invoke(
+                        f"Assert-RuntimeModule @{{name='{name}'; version='{version}'; path='C:\\Windows\\System32\\{name}'}} ([version]'14.51.36231') 'D:\\app\\engine-client.exe' 'C:\\Windows'",
+                        Path(tmp))
+                    self.assertEqual(result.returncode == 0, succeeds, result.stderr)
+                    if not succeeds:
+                        self.assertIn('Runtime below documented minimum', result.stderr)
+
+    def test_undeclared_dependencies_still_fail(self):
+        for body, message in [
+            ("Get-RuntimeClass 'msvcr120.dll'", 'Undeclared MSVC dependency'),
+            ("Get-RuntimeClass 'msvcp120.dll'", 'Undeclared MSVC dependency'),
+            ("Assert-RuntimeModule @{name='vcomp140.dll'; version='14.51.36247.0'; path='C:\\Windows\\System32\\vcomp140.dll'} ([version]'14.51.36231') 'D:\\app\\engine-client.exe' 'C:\\Windows'", 'Undeclared MSVC dependency'),
+            ("Assert-RuntimeModule @{name='extra.dll'; version='1.0'; path='D:\\tools\\extra.dll'} ([version]'14.51.36231') 'D:\\app\\engine-client.exe' 'C:\\Windows'", 'Unbundled dependency outside Windows'),
+        ]:
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as tmp:
+                result = self.invoke(body, Path(tmp))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+
+    def test_installer_guidance_matches_retained_toolset_minimum(self):
+        # Operator audit, 2026-10-11: current v14 installer 14.51.36247.0;
+        # VS 2022-specific installer 14.44.35211.0. Data, not an installer run.
+        observed_installers = {
+            'https://aka.ms/vc14/vc_redist.x64.exe': (14, 51, 36247),
+            'https://aka.ms/vs/17/release/vc_redist.x64.exe': (14, 44, 35211),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.invoke("Get-VcInstructions ([version]'14.51.36231')", Path(tmp))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('version 14.51.36231 or newer', result.stdout)
+            url = 'https://aka.ms/vc14/vc_redist.x64.exe'
+            selected_url = re.search(r'https://aka.ms/[^ ]+', result.stdout).group()
+            minimum = tuple(map(int, re.search(r'version ([0-9.]+) or newer', result.stdout).group(1).split('.')))
+            self.assertGreaterEqual(observed_installers[selected_url], minimum)
+            self.assertEqual(selected_url, url)
+            self.assertIn(url, (ROOT / 'README.md').read_text())
+            self.assertIn('Product version', result.stdout)
+            self.assertNotIn('vs/17/release', result.stdout)
 
     def test_complete_checksums_include_nested_runtime_and_wrapper(self):
         with tempfile.TemporaryDirectory() as tmp:
