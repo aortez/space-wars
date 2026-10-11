@@ -21,6 +21,7 @@ class CombatOpportunityTests(unittest.TestCase):
                           last_source=None, last_damage_percent=0)
             rows = [dict(seat=s, tick=0, target=None, aim=None, queries_ready=True,
                          laser_available=True, reason=None, combat_active=False,
+                         controls_armed=True,
                          combat_goal='takeoff', goal='transfer', cannon=False,
                          laser=False, break_until=None, supply=None, damage=damage,
                          pilot_damage=None) for s in range(2)]
@@ -48,10 +49,11 @@ class CombatOpportunityTests(unittest.TestCase):
                    aim=dict(direct_window=True), queries_ready=True, laser_available=True,
                    reason=None, combat_active=True, combat_goal='engage ship',
                    goal='hunt', cannon=False, break_until=None, tick=10)
+        row['controls_armed'] = True
         self.assertEqual(A.opportunities(row), (True, True))
         self.assertEqual(A.opportunities({**row, 'goal': 'patrol', 'combat_active': False}),
                          (True, True))
-        for change in [dict(cannon=True), dict(break_until=20),
+        for change in [dict(cannon=True), dict(break_until=20), dict(controls_armed=False),
                        dict(reason='climbing for a firing pass'),
                        dict(combat_active=False, goal='capture')]:
             self.assertEqual(A.opportunities({**row, **change}), (True, False))
@@ -66,7 +68,8 @@ class CombatOpportunityTests(unittest.TestCase):
             for name in ['control', 'candidate']:
                 path = Path(directory) / name / 'output'
                 path.mkdir(parents=True)
-                cases.append(dict(directory=str(path.parent), case=dict(candidate_seat=1)))
+                cases.append(dict(directory=str(path.parent), case=dict(candidate_seat=1),
+                                  end_tick=2, outcome=dict(winner='player_1')))
             actions = [{'Scenario': dict(kind=kind, payload=payload)} for kind, payload in
                        [(1, [0, 0]), (2, [0, 0]), (3, [0, 0, 0]),
                         (1, [1, 0]), (2, [1, 0]), (3, [1, 0, 0])]]
@@ -76,7 +79,9 @@ class CombatOpportunityTests(unittest.TestCase):
 
             def check(candidate):
                 for case, row in zip(cases, [old, candidate]):
-                    (Path(case['directory']) / 'output/actions.jsonl').write_text(json.dumps(row)+'\n')
+                    stream = [row, {**row, 'tick': 1}]
+                    (Path(case['directory']) / 'output/actions.jsonl').write_text(
+                        ''.join(json.dumps(r)+'\n' for r in stream))
                 return A.first_change(*cases)
 
             self.assertEqual(check(new)['tick'], 0)
@@ -91,6 +96,22 @@ class CombatOpportunityTests(unittest.TestCase):
             bad = {**new, 'scenario_before_step_fnv64': 'different'}
             with self.assertRaises(AssertionError):
                 check(bad)
+            check(new)
+            candidate_path = Path(cases[1]['directory']) / 'output/actions.jsonl'
+            candidate_path.write_text(json.dumps(new)+'\n')
+            with self.assertRaisesRegex(AssertionError, 'incomplete action trace'):
+                A.first_change(*cases)
+            candidate_path.write_text((json.dumps(new)+'\n')*2)
+            with self.assertRaisesRegex(AssertionError, 'unordered action row'):
+                A.first_change(*cases)
+
+    def test_missing_matrix_case_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'matrix.json').write_text('[{}, {}]')
+            (root / 'results.json').write_text('[{"index":0,"case":{},"exit_code":0}]')
+            with self.assertRaisesRegex(AssertionError, 'incomplete matrix'):
+                A.analyze_root(root)
 
 
 if __name__ == '__main__':

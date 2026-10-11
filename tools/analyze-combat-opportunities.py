@@ -43,7 +43,8 @@ def opportunities(row):
                   and row['queries_ready'] and row['laser_available']
                   and aim['direct_window'])
     breaking = row['break_until'] is not None and row['tick'] < row['break_until']
-    eligible = usable and mode(row) == 'engage' and not row['cannon'] and not breaking
+    eligible = (usable and row['controls_armed'] and mode(row) == 'engage'
+                and not row['cannon'] and not breaking)
     return usable, eligible
 
 
@@ -147,9 +148,14 @@ def analyze_case(case_dir):
 
 def analyze_root(root):
     results = read(root / 'results.json')
+    matrix = read(root / 'matrix.json')
+    assert len(results) == len(matrix), 'incomplete matrix'
+    assert [r['index'] for r in results] == list(range(len(matrix)))
+    assert [r['case'] for r in results] == matrix, 'results differ from frozen matrix'
     assert all(r['exit_code'] == 0 for r in results), 'incomplete/failed matrix'
     cases = [analyze_case(path.parent) for path in sorted(root.glob('*/result.json'))]
     assert len(cases) == len(results)
+    assert [c['case'] for c in cases] == matrix, 'summaries differ from frozen matrix'
     return {'directory': str(root), 'runtime': read(root / 'runtime.json'), 'cases': cases}
 
 
@@ -157,12 +163,18 @@ def first_change(control, candidate):
     a = rows(Path(control['directory']) / 'output/actions.jsonl')
     b = rows(Path(candidate['directory']) / 'output/actions.jsonl')
     seat = candidate['case']['candidate_seat']
-    compared = 0
+    counts = [0, 0]
+    first = None
     for old, new in itertools.zip_longest(a, b):
+        # Validate both complete streams, including the suffix after divergence.
+        for i, row in enumerate([old, new]):
+            if row is not None:
+                assert row['tick'] == counts[i], 'missing, repeated or unordered action row'
+                counts[i] += 1
+        if first is not None:
+            continue
         assert old is not None and new is not None, 'endings differ before any input change'
         assert old['tick'] == new['tick']
-        assert old['tick'] == compared
-        compared += 1
         assert old['scenario_before_step_fnv64'] == new['scenario_before_step_fnv64'], (
             'physics differs before first changed input')
         if old['actions'] != new['actions']:
@@ -173,13 +185,15 @@ def first_change(control, candidate):
             # Scenario actions are externally tagged; only the laser payload byte changes.
             before, after = old_weapon['Scenario'], new_weapon['Scenario']
             assert before['kind'] == after['kind']
+            assert len(before['payload']) == len(after['payload']) == 3
             assert before['payload'][0] == after['payload'][0] == seat
             assert before['payload'][2] == after['payload'][2]
             assert before['payload'][1] != after['payload'][1]
-            return {'tick': old['tick'], 'before': old_weapon, 'after': new_weapon}
-    assert compared == control['end_tick'] == candidate['end_tick'], 'incomplete action trace'
-    assert control['outcome'] == candidate['outcome']
-    return None
+            first = {'tick': old['tick'], 'before': old_weapon, 'after': new_weapon}
+    assert counts == [control['end_tick'], candidate['end_tick']], 'incomplete action trace'
+    if first is None:
+        assert control['outcome'] == candidate['outcome']
+    return first
 
 
 def compare(control, candidate):

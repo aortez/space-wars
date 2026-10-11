@@ -101,7 +101,7 @@ the result does not establish a general win rate or device performance.
 | Eligible direct-aim windows taken / available | 7,862 / 9,478 | 13,908 / 13,908 |
 
 An eligible window requires the present-bearing/range test, target visibility,
-query and laser readiness, active combat, no scheduled break, and no cannon
+query and laser readiness, armed controls, active combat, no scheduled break, and no cannon
 request suppressing the laser. It is an opportunity gate, not guaranteed damage:
 the beam still has to grow and intersect the actual moving collision shape.
 The waiting-for-a-site patrol delegates to the same combat pilot and is included.
@@ -159,7 +159,7 @@ interrupted transfer would have completed if play continued.
 ## Validation and retained evidence
 
 The final source passes **461 AI unit tests**, **21 physical combat/mission
-integration tests**, three analysis tests, formatting, required Clippy and the
+integration tests**, four analysis tests, formatting, required Clippy and the
 client build. Standard constructors leave the option disabled; both mission and
 combat resets preserve an explicitly selected profile.
 Merged main's [eight CI checks](https://github.com/aortez/space-wars/actions/runs/38169193384)
@@ -186,3 +186,42 @@ python3 tools/analyze-combat-opportunities.py target/combat-155/control-v1 \
   --candidate target/combat-155/candidate-v1 --out /tmp/combat-comparison.json
 python3 -m unittest discover -s tools/tests -p test_combat_opportunities.py
 ```
+
+## Review and independent confirmation
+
+The local review found no blocking runtime defect in the opt-in change. It
+tightened the analyzer to exclude unarmed controls despite a stale combat label,
+check every action row after the first changed input, and reject a missing case
+against the frozen matrix. Regression tests cover these evidence failures.
+Reanalysis preserves every original comparison result; all five laser tests and
+four analyzer tests pass. The confirmation uses the same binary SHA-256 recorded
+above, so the gameplay candidate has not changed during review.
+
+Before running further matches, freeze one confirmation batch:
+
+- Four new world seeds, derived from the first eight SHA-256 bytes of
+  `combat-155-confirmation-v1:0` through `:3` in little-endian order:
+  **16775363816852070040**, **2178709192992772276**,
+  **8780702509180422506**, **14910522168241314925**.
+- Both Weak Round/Angular shapes with slumping, asteroid intervals 0/8 seconds,
+  both evaluated seats: **32 pairs / 64 games**, each capped by the native
+  600-second ending. Use the same frozen binary in both arms with probes off.
+- Retain the candidate unchanged: only the evaluated Recovery v1 seat enables
+  `material_direct_laser_window_v1`; keep recovery, health, opponent, planning
+  quota and 15s/4s combat breaks fixed.
+- Apply the original advance screen to this batch independently: physical/work
+  audits pass, the demonstrated defect is exercised and eliminated, total points
+  do not fall, and pilot deaths and ship losses do not rise. Report results by
+  world and terrain/asteroid/seat strata as well as aggregate totals.
+- Review every lost win and reduced completion count with the actual terminal
+  time, failed committed missions and recovery state. Keep the earlier lost win.
+  Earlier victories censor subsequent completion opportunities; they do not
+  establish success of an unfinished mission.
+- A failed screen retains the current defaults and stops rollout qualification.
+  Do not alter the candidate or add seeds to obtain a passing result. A pass
+  advances to device testing at 1× on `spacewars.local`, followed by restoring
+  automatic Clock mode, before deciding on default selection.
+
+The firing change is staged separately from the unresolved attack/avoidance
+investigation in #155. This confirmation adds four independent worlds; the
+conditions within each world remain correlated.
