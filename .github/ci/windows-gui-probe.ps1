@@ -62,7 +62,7 @@ function Invoke-WindowProbe([string]$Name, [string[]]$ExtraArguments) {
         $arguments = @('--windowed', '--config-dir', ('"' + $config + '"')) + $ExtraArguments
         if ($Backend -eq 'software') { $arguments += @('--renderer', 'raster') }
         $phase.arguments = $arguments
-        $process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru `
+        $process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru -NoNewWindow `
             -WorkingDirectory ([IO.Path]::GetDirectoryName($Executable)) `
             -RedirectStandardOutput "$OutputDirectory/$Name-stdout.log" `
             -RedirectStandardError "$OutputDirectory/$Name-stderr.log"
@@ -77,10 +77,11 @@ function Invoke-WindowProbe([string]$Name, [string[]]$ExtraArguments) {
         } while ($watch.Elapsed.TotalSeconds -lt 45)
         if ($handle -eq [IntPtr]::Zero) { throw "$Name did not create a window within 45 seconds." }
         if (-not [ProbeWindow]::IsWindowVisible($handle)) { throw "$Name window is not visible." }
-        $screen = [Windows.Forms.SystemInformation]::VirtualScreen
+        $screen = [Windows.Forms.Screen]::FromHandle($handle).WorkingArea
         $width = [Math]::Min(1100, $screen.Width - 40)
         $height = [Math]::Min(780, $screen.Height - 40)
-        if (-not [ProbeWindow]::SetWindowPos($handle, [IntPtr]::Zero, $screen.X + 20, $screen.Y + 20, $width, $height, 0x0040)) {
+        # Keep the client inside the taskbar-free area and above other runner windows.
+        if (-not [ProbeWindow]::SetWindowPos($handle, [IntPtr]::new(-1), $screen.X + 20, $screen.Y + 20, $width, $height, 0x0040)) {
             throw 'Could not position the application window.'
         }
         $phase.foreground_requested = [ProbeWindow]::SetForegroundWindow($handle)
@@ -92,15 +93,20 @@ function Invoke-WindowProbe([string]$Name, [string[]]$ExtraArguments) {
             Start-Sleep -Seconds 3
             $process.Refresh()
             if ($process.HasExited) { throw "$Name exited while capturing (exit $($process.ExitCode))." }
+            $null = [ProbeWindow]::SetForegroundWindow($handle)
+            Start-Sleep -Milliseconds 200
+            if ([ProbeWindow]::GetForegroundWindow() -ne $handle) { throw "$Name lost foreground before capture." }
             $rect = [ProbeWindow+Rect]::new()
             $point = [ProbeWindow+Point]::new()
             if (-not [ProbeWindow]::GetClientRect($handle, [ref]$rect) -or -not [ProbeWindow]::ClientToScreen($handle, [ref]$point)) {
                 throw 'Could not locate the application client area.'
             }
             $bounds = [Drawing.Rectangle]::new($point.X, $point.Y, $rect.Right, $rect.Bottom)
-            if (-not $screen.Contains($bounds)) { throw 'The application client area is outside the desktop.' }
+            if (-not $screen.Contains($bounds)) { throw 'The application client area is outside the desktop working area.' }
             $capture = Save-Capture $bounds "$OutputDirectory/$Name-$frame.png"
+            $capture.foreground_verified = [ProbeWindow]::GetForegroundWindow() -eq $handle
             $phase.captures += $capture
+            if (-not $capture.foreground_verified) { throw "$Name lost foreground during capture." }
             if ($capture.sampled_colors -lt 4) { throw "$Name capture appears blank." }
         }
         $phase.status = 'captured'
@@ -142,6 +148,7 @@ public static class ProbeWindow {
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr handle, out Rect rect);
     [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr handle, ref Point point);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr handle, IntPtr after, int x, int y, int width, int height, uint flags);
@@ -178,7 +185,7 @@ public static class ProbeWindow {
     else { $env:SLINT_BACKEND = $null }
     $env:RUST_LOG = 'info'
     $record.slint_backend = $env:SLINT_BACKEND
-    $help = Start-Process -FilePath $Executable -ArgumentList '--help' -PassThru `
+    $help = Start-Process -FilePath $Executable -ArgumentList '--help' -PassThru -NoNewWindow `
         -WorkingDirectory ([IO.Path]::GetDirectoryName($Executable)) `
         -RedirectStandardOutput "$OutputDirectory/help.txt" -RedirectStandardError "$OutputDirectory/help-stderr.log"
     try {

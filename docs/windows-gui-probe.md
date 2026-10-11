@@ -17,6 +17,10 @@ source SHA, executable and ZIP hashes, workflow run/attempt, help output, loaded
 DLLs, and two client-area captures for each of two separately started processes:
 the launcher and `--scenario falling`. The built-in Falling ROM and Slint UI
 are compiled into the executable. Process startup and cleanup are bounded.
+The probe suppresses extra console windows, places the client above other
+windows inside the desktop's taskbar-free working area, and checks foreground
+ownership immediately before and after each capture. Manual image inspection
+is still required to detect overlays and confirm the displayed content.
 
 Two configurations are measured independently:
 
