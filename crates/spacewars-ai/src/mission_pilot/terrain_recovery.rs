@@ -10,7 +10,20 @@ impl MaterialMissionPilot {
             "configure before the first intent"
         );
         self.terrain_recovery = enabled;
+        self.native_rebuild_refinement = enabled;
         self.configure_recovery_task();
+    }
+
+    pub(crate) fn configure_native_rebuild_refinement(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(
+            !enabled || self.terrain_recovery,
+            "native refinement requires terrain recovery"
+        );
+        self.native_rebuild_refinement = enabled;
     }
 
     pub(super) fn configure_recovery_task(&mut self) {
@@ -34,6 +47,11 @@ impl MaterialMissionPilot {
 
     pub fn terrain_recovery_active(&self) -> bool {
         self.terrain_recovery && self.recovery.is_some()
+    }
+
+    /// Physical-step selection; enhanced recovery observations remain independent.
+    pub fn native_rebuild_refinement_active(&self) -> bool {
+        self.native_rebuild_refinement && self.terrain_recovery_active()
     }
 
     /// Host-only pairing: one cadenced observation, the unchanged mission intent
@@ -70,7 +88,7 @@ impl MaterialMissionPilot {
             }
         }
         let intent = self.intent_with_evaluation(&observation, evaluation);
-        assert!(state.set_rebuild_refinement(seat, self.terrain_recovery_active()));
+        assert!(state.set_rebuild_refinement(seat, self.native_rebuild_refinement_active()));
         (observation, intent)
     }
 }

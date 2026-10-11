@@ -236,6 +236,8 @@ pub struct MaterialMissionPilot {
     #[cfg(feature = "sensor-profile")]
     terrain_recovery: bool,
     #[cfg(feature = "sensor-profile")]
+    native_rebuild_refinement: bool,
+    #[cfg(feature = "sensor-profile")]
     hatch_supported_arrival: bool,
     patrol: RulePilotV4,
     deferred: Vec<(usize, u64)>,
@@ -318,6 +320,8 @@ impl MaterialMissionPilot {
             #[cfg(feature = "sensor-profile")]
             terrain_recovery: false,
             #[cfg(feature = "sensor-profile")]
+            native_rebuild_refinement: false,
+            #[cfg(feature = "sensor-profile")]
             hatch_supported_arrival: false,
             patrol: RulePilotV4::with_combat_breaks(context, breaks),
             deferred: Vec::new(),
@@ -348,6 +352,8 @@ impl MaterialMissionPilot {
         #[cfg(feature = "sensor-profile")]
         let terrain_recovery = self.terrain_recovery;
         #[cfg(feature = "sensor-profile")]
+        let native_rebuild_refinement = self.native_rebuild_refinement;
+        #[cfg(feature = "sensor-profile")]
         let hatch_supported_arrival = self.hatch_supported_arrival;
         let pursuit_health = self.telemetry.pursuit_health.is_some();
         let pursuit_climb_laser = self.telemetry.pursuit_climb_laser.is_some();
@@ -375,6 +381,8 @@ impl MaterialMissionPilot {
         *self = Self::with_policy(context, self.breaks, self.policy);
         #[cfg(feature = "sensor-profile")]
         self.configure_terrain_recovery(terrain_recovery);
+        #[cfg(feature = "sensor-profile")]
+        self.configure_native_rebuild_refinement(native_rebuild_refinement);
         #[cfg(feature = "sensor-profile")]
         self.set_hatch_supported_arrival(hatch_supported_arrival);
         self.configure_pursuit_health(pursuit_health);

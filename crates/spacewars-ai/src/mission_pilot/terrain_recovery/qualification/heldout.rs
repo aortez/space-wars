@@ -11,16 +11,30 @@ struct HeldoutCase {
 #[test]
 #[ignore = "frozen held-out recovery matrix; explicit case and fresh output required"]
 fn named_recovery_heldout_match() {
+    run_match(MissionRecoveryProfile::SupportedHatchV1, true);
+}
+
+#[test]
+#[ignore = "ordinary offsets candidate qualification; explicit profile and fresh output required"]
+fn ordinary_offsets_recovery_match() {
+    let profile = std::env::var("SPACEWARS_RECOVERY_PROFILE")
+        .expect("explicit profile required")
+        .parse()
+        .unwrap();
+    run_match(profile, false);
+}
+
+fn run_match(profile: MissionRecoveryProfile, fresh_only: bool) {
     let spec = std::env::var_os("SPACEWARS_MISSION_CASE").expect("case JSON required");
     let case: HeldoutCase = serde_json::from_slice(&fs::read(spec).unwrap()).unwrap();
-    assert!(![10101, 20202].contains(&case.mission.seed));
+    assert!(!fresh_only || ![10101, 20202].contains(&case.mission.seed));
     assert!([0, 8].contains(&case.asteroid_interval_seconds));
     let out = std::env::var_os("SPACEWARS_RECOVERY_OUT").expect("fresh output required");
     let out = Path::new(&out);
     fs::create_dir(out).expect("retain prior evidence");
     save(out.join("case.json"), &case);
     let mut run = case.mission.initialize_match(
-        MissionRecoveryProfile::SupportedHatchV1,
+        profile,
         MaterialAsteroidSettings {
             interval_seconds: case.asteroid_interval_seconds,
             severity: MaterialAsteroidSeverity::Mixed,
@@ -28,7 +42,7 @@ fn named_recovery_heldout_match() {
     );
     let profiles = [0, 1].map(|seat| {
         if case.mission.candidate_seat == Some(seat) {
-            MissionRecoveryProfile::SupportedHatchV1
+            profile
         } else {
             MissionRecoveryProfile::Standard
         }

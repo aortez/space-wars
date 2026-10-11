@@ -147,6 +147,13 @@ impl MissionBot {
         self.0.configure_terrain_recovery(enabled);
         self
     }
+    /// Select physical rebuild search independently of enhanced recovery sensing.
+    /// Configure after enabling terrain recovery and before the first intent.
+    #[cfg(feature = "sensor-profile")]
+    pub fn with_native_rebuild_refinement(mut self, enabled: bool) -> Self {
+        self.0.configure_native_rebuild_refinement(enabled);
+        self
+    }
     /// Select a complete experimental recovery profile before the first intent.
     /// Use `decide_with_terrain_recovery` to pair its sensors and native options.
     #[cfg(feature = "sensor-profile")]
@@ -154,7 +161,9 @@ impl MissionBot {
         self.0
             .configure_terrain_recovery(profile != MissionRecoveryProfile::Standard);
         self.0
-            .set_hatch_supported_arrival(profile == MissionRecoveryProfile::SupportedHatchV1);
+            .set_hatch_supported_arrival(profile.supported_hatch_arrival());
+        self.0
+            .configure_native_rebuild_refinement(profile.native_refinement());
         self
     }
     /// Opt-in v13 route/controller comparison, configured before the first intent.

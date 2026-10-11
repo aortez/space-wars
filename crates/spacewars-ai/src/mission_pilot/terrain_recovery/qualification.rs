@@ -211,7 +211,9 @@ impl Run {
         for seat in 0..2 {
             assert_eq!(
                 self.state.rebuild_refinement_enabled(seat),
-                Some(candidate == Some(seat) && self.brains[seat].terrain_recovery_active())
+                Some(
+                    candidate == Some(seat) && self.brains[seat].native_rebuild_refinement_active()
+                )
             );
         }
         (

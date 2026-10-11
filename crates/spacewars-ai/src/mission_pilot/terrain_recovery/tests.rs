@@ -52,7 +52,7 @@ fn mission_losses_create_configured_tasks_without_renewing_an_existing_task() {
     SurfaceSortieScenario::step(&mut state, &[], DT);
     for profile in MissionRecoveryProfile::ALL {
         let enabled = profile != MissionRecoveryProfile::Standard;
-        let hatch = profile == MissionRecoveryProfile::SupportedHatchV1;
+        let hatch = profile.supported_hatch_arrival();
         let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context(), Default::default())
             .with_recovery_profile(profile);
         for generation in 1..=2 {
@@ -79,9 +79,11 @@ fn mission_losses_create_configured_tasks_without_renewing_an_existing_task() {
         }
         let copy = bot.clone();
         assert_eq!(copy.terrain_recovery, enabled);
+        assert_eq!(copy.native_rebuild_refinement, profile.native_refinement());
         assert_eq!(copy.hatch_supported_arrival, hatch);
         bot.reset(context());
         assert_eq!(bot.terrain_recovery, enabled);
+        assert_eq!(bot.native_rebuild_refinement, profile.native_refinement());
         assert_eq!(bot.hatch_supported_arrival, hatch);
         assert!(bot.recovery.is_none());
     }
@@ -185,8 +187,8 @@ fn named_profiles_preserve_the_complete_qualified_initial_controllers() {
             let mut explicit =
                 MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
                     .with_terrain_recovery(profile != MissionRecoveryProfile::Standard);
-            explicit
-                .set_hatch_supported_arrival(profile == MissionRecoveryProfile::SupportedHatchV1);
+            explicit.set_hatch_supported_arrival(profile.supported_hatch_arrival());
+            explicit = explicit.with_native_rebuild_refinement(profile.native_refinement());
             let selected =
                 MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default())
                     .with_recovery_profile(profile);
@@ -197,6 +199,47 @@ fn named_profiles_preserve_the_complete_qualified_initial_controllers() {
             assert_eq!(format!("{standard:?}"), format!("{ordinary:?}"));
         }
     }
+}
+
+#[test]
+fn ordinary_offsets_profile_preserves_sensing_but_clears_physical_refinement() {
+    let profile = MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1;
+    assert_eq!(
+        profile.id().parse::<MissionRecoveryProfile>().unwrap(),
+        profile
+    );
+    assert_eq!(serde_json::to_value(profile).unwrap(), profile.id());
+    let mut state = SurfaceSortieScenario::init_material_combat(42);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context(), Default::default())
+        .with_recovery_profile(profile);
+    bot.recovery = Some(RecoverShipTask::new(context()));
+    bot.configure_recovery_task();
+    assert!(bot.terrain_recovery_active());
+    assert!(!bot.native_rebuild_refinement_active());
+    assert!(
+        bot.recovery
+            .as_ref()
+            .unwrap()
+            .rebuild_search_request()
+            .is_some()
+    );
+    assert!(state.set_rebuild_refinement(0, true));
+    assert!(state.set_rebuild_refinement(1, true));
+    bot.decide_with_terrain_recovery(&mut state, Default::default(), &MissionEvaluator::new(2));
+    assert_eq!(state.rebuild_refinement_enabled(0), Some(false));
+    assert_eq!(state.rebuild_refinement_enabled(1), Some(true));
+    assert_eq!(bot.telemetry().completed_recoveries, 1);
+}
+
+#[test]
+#[should_panic(expected = "configure before the first intent")]
+fn native_refinement_selection_cannot_change_after_a_decision() {
+    let state = SurfaceSortieScenario::init_material_combat(42);
+    let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context(), Default::default())
+        .with_recovery_profile(MissionRecoveryProfile::SupportedHatchV1);
+    bot.intent(&state.mission_observation(0, None));
+    let _ = bot.with_native_rebuild_refinement(false);
 }
 
 #[test]
