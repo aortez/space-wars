@@ -10,7 +10,7 @@ StateDirectory=spacewars
 StateDirectoryMode=0755
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
 Environment=ALSA_CARD=Audio
-Environment=SLINT_BACKEND=linuxkms-software
+Environment=SLINT_BACKEND=linuxkms
 Environment=SLINT_KMS_ROTATION=90
 ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster
 Restart=on-failure

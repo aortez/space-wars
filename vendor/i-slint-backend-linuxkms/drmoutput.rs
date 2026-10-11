@@ -211,6 +211,7 @@ impl DrmOutput {
                 .page_flip(self.crtc, framebuffer_handle, drm::control::PageFlipFlags::EVENT, None)
                 .map_err(|e| format!("Error presenting framebuffer on screen: {e}"))?;
             profiling::count(Counter::FlipSubmissions);
+            profiling::page_flip_submitted();
 
             *self.page_flip_state.borrow_mut() =
                 PageFlipState::WaitingForPageFlip { _buffer_to_keep_alive_until_flip: last_buffer };
@@ -247,11 +248,15 @@ impl DrmOutput {
                 return;
             };
 
-            if event_it.any(|event| matches!(event, drm::control::Event::PageFlip(..))) {
+            if let Some(event) = event_it.find_map(|event| match event {
+                drm::control::Event::PageFlip(event) => Some(event),
+                _ => None,
+            }) {
                 if let PageFlipState::WaitingForPageFlip { .. } =
                     self.page_flip_state.replace(PageFlipState::ReadyForNextBuffer)
                 {
                     profiling::count(Counter::FlipCompletions);
+                    profiling::page_flip_completed(event.frame, event.duration);
                     return;
                 }
             }

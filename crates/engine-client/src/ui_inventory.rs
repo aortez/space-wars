@@ -895,7 +895,7 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
         }),
     );
     controls.push(
-        UiControl::new("settings.fps-counter", "FPS Counter", true).with_value(
+        UiControl::new("settings.fps-counter", "Performance Overlay", true).with_value(
             if context.performance_overlay_enabled {
                 "on"
             } else {

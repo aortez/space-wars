@@ -28,6 +28,16 @@ pub(super) fn frame_with_camera(
     camera: Camera2,
     viewport: Option<RenderPoint>,
 ) -> RenderFrame {
+    frame_with_storage(state, player, camera, viewport, None)
+}
+
+pub(super) fn frame_with_storage(
+    state: &SurfaceSortieState,
+    player: usize,
+    camera: Camera2,
+    viewport: Option<RenderPoint>,
+    mut points: Option<&mut engine_common::RenderPointPool>,
+) -> RenderFrame {
     let observation = state.observation(player);
     let center = Vec2::new(camera.center.x, camera.center.y);
     let height = camera.height;
@@ -46,6 +56,8 @@ pub(super) fn frame_with_camera(
             bounds
         });
     let mut frame = RenderFrame::new(camera);
+    let mut art =
+        cfg!(feature = "render-hints").then(|| state.world.terrain.render_art.borrow_mut());
     if let Some(sun) = state.world.sun {
         draw_corona(&mut frame, state, sun, -22);
         circle(
@@ -60,13 +72,15 @@ pub(super) fn frame_with_camera(
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
         if let Some(material) = state.world.terrain.planets.get(&planet_index) {
             let motion = motion::SurfaceFrame::read(&state.world.physics, planet_index);
-            terrain::render_body_in_view(
+            terrain::render_body_with_storage(
                 &mut frame,
                 &material.field,
                 &material.geometry,
                 motion.position,
                 motion.angle,
                 view,
+                art.as_deref_mut(),
+                points.as_deref_mut(),
             );
         } else {
             circle(
@@ -107,13 +121,15 @@ pub(super) fn frame_with_camera(
     }
     for fragment in state.world.terrain.fragments.values() {
         if let Some(body) = state.world.physics.world.motion(fragment.assembly.body()) {
-            terrain::render_body_in_view(
+            terrain::render_body_with_storage(
                 &mut frame,
                 &fragment.terrain,
                 &fragment.geometry,
                 body.position,
                 body.angle,
                 view,
+                art.as_deref_mut(),
+                points.as_deref_mut(),
             );
         }
     }

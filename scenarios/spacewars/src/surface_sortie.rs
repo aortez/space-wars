@@ -1014,6 +1014,18 @@ impl SurfaceSortieScenario {
         render::frame_with_camera(state, player, camera, viewport)
     }
 
+    /// Same owned render contract, optionally supplied with reusable point
+    /// allocations. Every terrain point/style is still produced afresh.
+    pub fn player_frame_with_storage(
+        state: &SurfaceSortieState,
+        player: usize,
+        camera: Camera2,
+        viewport: Option<engine_common::RenderPoint>,
+        points: &mut engine_common::RenderPointPool,
+    ) -> RenderFrame {
+        render::frame_with_storage(state, player, camera, viewport, Some(points))
+    }
+
     /// Omit terrain chunks outside this player's pixel viewport before creating
     /// draw primitives. Pass the smallest raster viewport that may display it;
     /// this keeps conservative stroke padding when the image is downscaled.

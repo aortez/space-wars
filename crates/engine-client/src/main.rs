@@ -6,6 +6,7 @@
 
 mod autostart;
 mod bluetooth;
+mod camera_probe;
 mod client_scenarios;
 mod clock_controls;
 mod clock_fonts;
@@ -15,7 +16,10 @@ mod controller_profile;
 #[cfg(test)]
 mod crow_visual_tests;
 mod device_info;
+mod frame_trace;
 mod gamepad;
+mod gpu_scene;
+mod gpu_text;
 mod host;
 mod input;
 mod ipc;
@@ -330,7 +334,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // This experiment must not load/write settings, open a control socket,
-    // initialize audio/input, or create a desktop/KMS display connection.
+    // initialize audio/input, or create a desktop/KMS display connection. The
+    // explicit upload probe only opens a GPU render node for offscreen work.
     if args.presentation.benchmark_presentation {
         return presentation_probe::run(
             &args.presentation,
@@ -350,12 +355,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     needs_writeback |= normalize_launch_settings(&mut loaded);
     needs_writeback |= normalize_spacewars_settings(&mut loaded);
     needs_writeback |= normalize_pizza_settings(&mut loaded);
-    // CPU-only vector benchmarks still work; this is a display restriction.
-    let raster_only = cfg!(feature = "pi-kiosk") && !args.benchmark_headless;
-    needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
     let mut effective_launch = effective_launch_options(&args, &loaded);
-    effective_launch.renderer =
-        renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let config_directory = settings_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
@@ -438,11 +438,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let launch_directly = should_launch_directly(&args);
+    // Select an explicit presentation renderer and successfully create its
+    // window before applying capability restrictions or writing preferences.
+    // A failed GPU experiment must not change saved rendering preferences.
+    // Headless conversion returned above and never opens a graphics device.
+    let raster_only = select_slint_backend(&args)?;
+    let window = MainWindow::new()?;
+    renderer_policy::initialize(&window)?;
+    needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
+    effective_launch.renderer =
+        renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let settings = Arc::new(RwLock::new(loaded));
     save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
 
-    select_slint_backend(&args)?;
-    let window = MainWindow::new()?;
     window.set_raster_only(raster_only);
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
     let _settings_status = settings_writer::install_status(&window, settings_writer.clone());
@@ -1981,8 +1989,11 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
 }
 
 fn clear_runtime_diagnostics(window: &MainWindow) {
+    camera_probe::end_session();
+    gpu_scene::end_session();
     window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
     window.set_performance_overlay_text("".into());
+    window.set_performance_overlay_details("".into());
 }
 
 fn hide_launcher_surfaces(window: &MainWindow) {
@@ -2717,21 +2728,46 @@ fn bool_from_label(label: &str) -> Result<bool, String> {
     }
 }
 
-fn select_slint_backend(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-    let selector = slint::BackendSelector::new();
-    let selector = if let Some(backend_name) = forced_slint_backend(args) {
-        selector.backend_name(backend_name.into())
-    } else {
-        selector
-    };
-    selector.select()?;
-    Ok(())
+fn select_slint_backend(_args: &Args) -> Result<bool, Box<dyn std::error::Error>> {
+    #[cfg(feature = "pi-kiosk")]
+    {
+        let backend = env::var("SLINT_BACKEND");
+        let backend = match &backend {
+            Ok(value) => Some(value.as_str()),
+            Err(env::VarError::NotPresent) => None,
+            Err(error) => return Err(error.to_string().into()),
+        };
+        let selected =
+            renderer_policy::KioskRenderer::select(backend, cfg!(feature = "pi-kiosk-gpu"))?;
+        slint::BackendSelector::new()
+            .backend_name("linuxkms".into())
+            .renderer_name(selected.name().into())
+            .select()?;
+        tracing::info!(
+            presentation = selected.name(),
+            "selected kiosk presentation renderer."
+        );
+        Ok(selected.raster_only())
+    }
+    #[cfg(not(feature = "pi-kiosk"))]
+    {
+        let selector = slint::BackendSelector::new();
+        let selector = if let Some(backend_name) = forced_slint_backend(_args) {
+            selector.backend_name(backend_name.into())
+        } else {
+            selector
+        };
+        selector.select()?;
+        Ok(false)
+    }
 }
 
+#[cfg(not(feature = "pi-kiosk"))]
 fn forced_slint_backend(args: &Args) -> Option<&'static str> {
     forced_slint_backend_for_env(args, env::var_os("SLINT_BACKEND").is_some())
 }
 
+#[cfg(any(not(feature = "pi-kiosk"), test))]
 fn forced_slint_backend_for_env(args: &Args, slint_backend_is_set: bool) -> Option<&'static str> {
     if slint_backend_is_set || args.kiosk {
         None
@@ -2813,6 +2849,186 @@ fn log_settings_load_status(path: &Path, status: &LoadStatus) {
 mod tests {
     use super::*;
     use engine_common::DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT;
+
+    #[test]
+    fn source_profile_requires_geometry_and_excludes_plan_experiment() {
+        let base = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-source-profile",
+        ];
+        assert!(Args::try_parse_from(base).is_ok());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-source-profile"]).is_err());
+        for option in [
+            "--geometry-plan-profile",
+            "--geometry-live-retained",
+            "--geometry-stream-history",
+            "--geometry-in-flight=1",
+            "--scenario=clock",
+        ] {
+            assert!(Args::try_parse_from(base.into_iter().chain([option])).is_err());
+        }
+    }
+
+    #[test]
+    fn admission_image_check_is_explicit_and_excludes_timing_experiments() {
+        let base = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-admission-check",
+        ];
+        assert!(Args::try_parse_from(base).is_ok());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-admission-check"]).is_err());
+        for option in [
+            "--geometry-stroke-profile",
+            "--geometry-stream-history",
+            "--geometry-live-retained",
+            "--geometry-cases=clock-idle",
+            "--geometry-in-flight=1",
+            "--presentation-frames=1",
+            "--presentation-repeats=1",
+            "--scenario=clock",
+        ] {
+            assert!(
+                Args::try_parse_from(base.into_iter().chain([option])).is_err(),
+                "{option}"
+            );
+        }
+    }
+
+    #[test]
+    fn plan_profile_is_explicit_and_excludes_other_experiments() {
+        let base = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-plan-profile",
+        ];
+        assert!(Args::try_parse_from(base).is_ok());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-plan-profile"]).is_err());
+        for option in [
+            "--geometry-stream-history",
+            "--geometry-submit-profile",
+            "--geometry-encode-profile",
+            "--geometry-build-profile",
+            "--geometry-churn",
+            "--geometry-live-retained",
+            "--geometry-terrain",
+            "--geometry-layouts",
+            "--geometry-cases=clock-idle",
+            "--geometry-modes=triangles",
+            "--geometry-in-flight=1",
+            "--geometry-no-gpu-timing",
+            "--scenario=clock",
+        ] {
+            assert!(
+                Args::try_parse_from(base.into_iter().chain([option])).is_err(),
+                "{option}"
+            );
+        }
+    }
+
+    #[test]
+    fn stream_history_probe_has_explicit_selection_and_bounded_queue() {
+        let base = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stream-history",
+        ];
+        assert!(Args::try_parse_from(base).is_ok());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-stream-history"]).is_err());
+        assert!(
+            Args::try_parse_from(base.into_iter().chain([
+                "--geometry-in-flight=8",
+                "--geometry-stream-cases=close-up-zoom,terrain-edit-replace"
+            ]))
+            .is_ok()
+        );
+        for option in [
+            "--geometry-in-flight=0",
+            "--geometry-in-flight=9",
+            "--geometry-stream-cases=unknown",
+            "--geometry-submit-profile",
+            "--geometry-churn",
+            "--geometry-live-retained",
+            "--geometry-layouts",
+            "--geometry-terrain",
+            "--geometry-encode-profile",
+            "--geometry-build-profile",
+            "--geometry-no-gpu-timing",
+            "--scenario=clock",
+        ] {
+            assert!(
+                Args::try_parse_from(base.into_iter().chain([option])).is_err(),
+                "{option}"
+            );
+        }
+        assert!(
+            Args::try_parse_from([
+                "engine-client",
+                "--benchmark-presentation",
+                "--presentation-geometry",
+                "--geometry-stream-cases=close-up-zoom"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn submission_probe_is_explicit_and_excludes_unrelated_probes() {
+        let base = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-submit-profile",
+        ];
+        assert!(Args::try_parse_from(base).is_ok());
+        assert!(Args::try_parse_from(base.into_iter().chain(["--geometry-submit-passes"])).is_ok());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-submit-passes"]).is_err());
+        assert!(
+            Args::try_parse_from(base.into_iter().chain(["--geometry-submit-capacity"])).is_ok()
+        );
+        assert!(Args::try_parse_from(["engine-client", "--geometry-submit-capacity"]).is_err());
+        assert!(
+            Args::try_parse_from(
+                base.into_iter()
+                    .chain(["--geometry-submit-passes", "--geometry-submit-capacity"])
+            )
+            .is_err()
+        );
+        for option in ["--geometry-submit-api", "--geometry-submit-plain-only"] {
+            assert!(Args::try_parse_from(base.into_iter().chain([option])).is_ok());
+            assert!(Args::try_parse_from(["engine-client", option]).is_err());
+        }
+        assert!(
+            Args::try_parse_from(
+                base.into_iter()
+                    .chain(["--geometry-submit-api", "--geometry-submit-plain-only"])
+            )
+            .is_ok()
+        );
+        for option in ["--geometry-submit-passes", "--geometry-submit-capacity"] {
+            assert!(
+                Args::try_parse_from(base.into_iter().chain(["--geometry-submit-api", option]))
+                    .is_err()
+            );
+        }
+        for option in [
+            "--geometry-live-retained",
+            "--geometry-encode-profile",
+            "--geometry-churn",
+            "--geometry-layouts",
+            "--scenario=clock",
+        ] {
+            assert!(
+                Args::try_parse_from(base.into_iter().chain([option])).is_err(),
+                "{option}"
+            );
+        }
+    }
 
     fn base_args() -> Args {
         Args {
@@ -2906,6 +3122,680 @@ mod tests {
             ])
             .is_err()
         );
+    }
+
+    #[test]
+    fn round_join_probe_requires_profile_and_rejects_other_stroke_experiments() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-round-joins",
+        ];
+        Args::try_parse_from(args).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--geometry-round-joins"]).is_err());
+        for conflicting in [
+            "--geometry-small-strokes",
+            "--geometry-stroke-rejection",
+            "--geometry-build-profile",
+        ] {
+            assert!(Args::try_parse_from(args.into_iter().chain([conflicting])).is_err());
+        }
+    }
+
+    #[test]
+    fn small_strokes_probe_requires_explicit_profile_and_is_not_rejection_mode() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+        ];
+        Args::try_parse_from(args.into_iter().chain(["--geometry-small-strokes"])).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--geometry-small-strokes"]).is_err());
+        assert!(
+            Args::try_parse_from([
+                "engine-client",
+                "--benchmark-presentation",
+                "--presentation-geometry",
+                "--geometry-small-strokes"
+            ])
+            .is_err()
+        );
+        assert!(
+            Args::try_parse_from(
+                args.into_iter()
+                    .chain(["--geometry-small-strokes", "--geometry-stroke-rejection"])
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn gpu_ui_probe_requires_explicit_opt_in_and_rejects_unused_options() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-ui",
+        ];
+        Args::try_parse_from(args).unwrap();
+        Args::try_parse_from(args.into_iter().chain([
+            "--gpu-ui-device",
+            "/dev/dri/renderD128",
+            "--gpu-ui-output",
+            "unused",
+        ]))
+        .unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--presentation-gpu-ui"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--gpu-ui-output", "unused"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--gpu-ui-device", "unused"]).is_err());
+        for conflicting in [
+            vec!["--presentation-gpu-text"],
+            vec!["--presentation-text"],
+            vec!["--presentation-geometry"],
+            vec!["--presentation-upload"],
+            vec!["--presentation-memory"],
+            vec!["--presentation-raster"],
+            vec!["--presentation-republish"],
+            vec!["--presentation-detail"],
+            vec!["--presentation-frames", "1"],
+            vec!["--presentation-repeats", "1"],
+        ] {
+            assert!(Args::try_parse_from(args.into_iter().chain(conflicting)).is_err());
+        }
+    }
+
+    #[test]
+    fn gpu_text_probe_is_opt_in_and_does_not_ignore_other_experiments() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-text",
+        ];
+        Args::try_parse_from(args).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--presentation-gpu-text"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--gpu-text-output", "unused"]).is_err());
+        for conflicting in [
+            vec!["--presentation-text"],
+            vec!["--presentation-geometry"],
+            vec!["--presentation-upload"],
+            vec!["--presentation-memory"],
+            vec!["--presentation-raster"],
+            vec!["--presentation-republish"],
+            vec!["--presentation-detail"],
+            vec!["--presentation-frames", "1"],
+        ] {
+            assert!(Args::try_parse_from(args.into_iter().chain(conflicting)).is_err());
+        }
+    }
+
+    #[test]
+    fn live_text_probe_policy_requires_its_probe_and_excludes_standalone_masks() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-text",
+        ];
+        for policy in ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"] {
+            Args::try_parse_from(args.into_iter().chain(["--gpu-text-policy", policy])).unwrap();
+        }
+        assert!(Args::try_parse_from(["engine-client", "--gpu-text-policy", "cpu"]).is_err());
+        assert!(
+            Args::try_parse_from(args.into_iter().chain(["--gpu-text-policy", "auto"])).is_err()
+        );
+        assert!(
+            Args::try_parse_from(args.into_iter().chain([
+                "--gpu-text-policy",
+                "cpu",
+                "--gpu-text-masks",
+                "--gpu-text-font-regular",
+                "r.ttf",
+                "--gpu-text-font-bold",
+                "b.ttf"
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn text_detail_clocks_require_the_live_text_probe() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-text",
+            "--gpu-text-detail",
+        ];
+        Args::try_parse_from(args).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--gpu-text-detail"]).is_err());
+        assert!(
+            Args::try_parse_from(args.into_iter().chain([
+                "--gpu-text-masks",
+                "--gpu-text-font-regular",
+                "r.ttf",
+                "--gpu-text-font-bold",
+                "b.ttf",
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn cpu_mask_probe_requires_both_explicit_fonts_and_text_opt_in() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-text",
+            "--gpu-text-masks",
+            "--gpu-text-font-regular",
+            "regular.ttf",
+            "--gpu-text-font-bold",
+            "bold.ttf",
+        ];
+        Args::try_parse_from(args).unwrap();
+        assert!(Args::try_parse_from(&args[..4]).is_err());
+        assert!(Args::try_parse_from(&args[..6]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--gpu-text-masks"]).is_err());
+        assert!(
+            Args::try_parse_from(["engine-client", "--gpu-text-font-regular", "font.ttf"]).is_err()
+        );
+    }
+
+    #[test]
+    fn shaping_probe_requires_fonts_and_rejects_gpu_only_options() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-gpu-text",
+            "--gpu-text-shaping",
+            "--gpu-text-font-regular",
+            "regular.ttf",
+            "--gpu-text-font-bold",
+            "bold.ttf",
+        ];
+        Args::try_parse_from(args).unwrap();
+        Args::try_parse_from(args.into_iter().chain(["--gpu-text-detail"])).unwrap();
+        for policy in ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"] {
+            Args::try_parse_from(args.into_iter().chain(["--gpu-text-policy", policy])).unwrap();
+        }
+        assert!(Args::try_parse_from(&args[..4]).is_err());
+        assert!(Args::try_parse_from(&args[..6]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--gpu-text-shaping"]).is_err());
+        for conflicting in [
+            vec!["--gpu-text-masks"],
+            vec!["--gpu-text-output", "unused"],
+            vec!["--gpu-text-device", "/dev/dri/renderD128"],
+        ] {
+            assert!(Args::try_parse_from(args.into_iter().chain(conflicting)).is_err());
+        }
+    }
+
+    #[test]
+    fn upload_probe_requires_opt_in_and_rejects_mixed_experiments() {
+        Args::try_parse_from(["engine-client"]).unwrap();
+        Args::try_parse_from([
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-upload",
+        ])
+        .unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--presentation-upload"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--presentation-upload-reuse"]).is_err());
+        Args::try_parse_from([
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-upload",
+            "--presentation-upload-reuse",
+        ])
+        .unwrap();
+        for option in [
+            "--presentation-raster",
+            "--presentation-memory",
+            "--presentation-text",
+            "--presentation-detail",
+            "--presentation-republish",
+        ] {
+            assert!(
+                Args::try_parse_from([
+                    "engine-client",
+                    "--benchmark-presentation",
+                    "--presentation-upload",
+                    option,
+                ])
+                .is_err(),
+                "{option} must not silently change or be ignored by the upload probe"
+            );
+        }
+        assert!(
+            Args::try_parse_from([
+                "engine-client",
+                "--benchmark-presentation",
+                "--presentation-upload",
+                "--presentation-frames",
+                "0",
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn bulk_join_probe_requires_explicit_round_join_comparison() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+        ];
+        Args::try_parse_from(
+            probe
+                .into_iter()
+                .chain(["--geometry-round-joins", "--geometry-stroke-bulk"]),
+        )
+        .unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--geometry-stroke-bulk"]).is_err());
+        assert!(Args::try_parse_from(probe.into_iter().chain(["--geometry-stroke-bulk"])).is_err());
+        for conflicting in ["--geometry-small-strokes", "--geometry-stroke-rejection"] {
+            assert!(
+                Args::try_parse_from(probe.into_iter().chain([
+                    "--geometry-round-joins",
+                    "--geometry-stroke-bulk",
+                    conflicting
+                ]))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn static_stroke_probe_requires_explicit_bulk_and_join_controls() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+        ];
+        Args::try_parse_from(probe.into_iter().chain([
+            "--geometry-round-joins",
+            "--geometry-stroke-bulk",
+            "--geometry-stroke-static",
+        ]))
+        .unwrap();
+        for partial in [
+            vec!["--geometry-stroke-static"],
+            vec!["--geometry-round-joins", "--geometry-stroke-static"],
+            vec!["--geometry-stroke-bulk", "--geometry-stroke-static"],
+            vec![
+                "--geometry-round-joins",
+                "--geometry-stroke-bulk",
+                "--geometry-stroke-static",
+                "--geometry-small-strokes",
+            ],
+            vec![
+                "--geometry-round-joins",
+                "--geometry-stroke-bulk",
+                "--geometry-stroke-static",
+                "--geometry-stroke-rejection",
+            ],
+        ] {
+            assert!(Args::try_parse_from(probe.into_iter().chain(partial)).is_err());
+        }
+    }
+
+    #[test]
+    fn polygon_stroke_probe_requires_explicit_static_controls() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-round-joins",
+            "--geometry-stroke-bulk",
+        ];
+        Args::try_parse_from(
+            probe
+                .into_iter()
+                .chain(["--geometry-stroke-static", "--geometry-stroke-polygon"]),
+        )
+        .unwrap();
+        assert!(
+            Args::try_parse_from(probe.into_iter().chain(["--geometry-stroke-polygon"])).is_err()
+        );
+        assert!(Args::try_parse_from(["engine-client", "--geometry-stroke-polygon"]).is_err());
+    }
+
+    #[test]
+    fn prepared_stroke_probe_requires_explicit_static_controls_and_is_exclusive() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-round-joins",
+            "--geometry-stroke-bulk",
+        ];
+        let prepared = ["--geometry-stroke-static", "--geometry-stroke-prepared"];
+        Args::try_parse_from(probe.into_iter().chain(prepared)).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--geometry-stroke-prepared"]).is_err());
+        assert!(
+            Args::try_parse_from(probe.into_iter().chain(["--geometry-stroke-prepared"])).is_err()
+        );
+        for conflict in [
+            "--geometry-stroke-polygon",
+            "--geometry-stroke-edges",
+            "--geometry-stroke-attribution",
+            "--geometry-stroke-invariants",
+            "--geometry-small-strokes",
+            "--geometry-stroke-rejection",
+        ] {
+            assert!(
+                Args::try_parse_from(probe.into_iter().chain(prepared).chain([conflict])).is_err(),
+                "accepted conflicting control {conflict}"
+            );
+        }
+        Args::try_parse_from(probe.into_iter().chain(prepared).chain([
+            "--geometry-stroke-cases",
+            "clock-idle,clock-rain,pizza-300,pizza-5000,mixed-interleaved",
+        ]))
+        .unwrap();
+    }
+
+    #[test]
+    fn topology_stroke_probe_requires_attribution_and_is_exclusive() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-stroke-attribution",
+            "--geometry-stroke-topology",
+        ];
+        Args::try_parse_from(probe).unwrap();
+        for missing in 1..5 {
+            assert!(
+                Args::try_parse_from(
+                    probe
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, s)| (i != missing).then_some(*s))
+                )
+                .is_err()
+            );
+        }
+        for conflict in [
+            "--geometry-stroke-invariants",
+            "--geometry-round-joins",
+            "--geometry-stroke-rejection",
+            "--geometry-small-strokes",
+        ] {
+            assert!(Args::try_parse_from(probe.into_iter().chain([conflict])).is_err());
+        }
+    }
+
+    #[test]
+    fn stroke_adapter_probe_requires_topology_and_keeps_other_probes_exclusive() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-stroke-attribution",
+            "--geometry-stroke-topology",
+            "--geometry-stroke-adapter",
+        ];
+        Args::try_parse_from(probe).unwrap();
+        for missing in 1..6 {
+            assert!(
+                Args::try_parse_from(
+                    probe
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, arg)| (i != missing).then_some(*arg))
+                )
+                .is_err()
+            );
+        }
+        for conflict in [
+            "--geometry-stroke-invariants",
+            "--geometry-round-joins",
+            "--geometry-stroke-single-pass",
+            "--geometry-stroke-rejection",
+        ] {
+            assert!(Args::try_parse_from(probe.into_iter().chain([conflict])).is_err());
+        }
+    }
+
+    #[test]
+    fn single_pass_renderer_probe_requires_explicit_controls_and_is_exclusive() {
+        let args = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+            "--geometry-round-joins",
+            "--geometry-stroke-bulk",
+            "--geometry-stroke-static",
+            "--geometry-stroke-single-pass",
+        ];
+        Args::try_parse_from(args).unwrap();
+        for missing in 1..7 {
+            assert!(
+                Args::try_parse_from(
+                    args.iter()
+                        .enumerate()
+                        .filter_map(|(i, s)| (i != missing).then_some(*s))
+                )
+                .is_err()
+            );
+        }
+        for conflict in [
+            "--geometry-stroke-polygon",
+            "--geometry-stroke-edges",
+            "--geometry-stroke-prepared",
+            "--geometry-stroke-attribution",
+            "--geometry-stroke-topology",
+            "--geometry-small-strokes",
+            "--geometry-stroke-rejection",
+        ] {
+            assert!(
+                Args::try_parse_from(args.into_iter().chain([conflict])).is_err(),
+                "accepted {conflict}"
+            );
+        }
+        Args::try_parse_from(
+            args.into_iter()
+                .chain(["--geometry-stroke-cases", "clock-idle,mixed-interleaved"]),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn broad_stroke_probe_requires_exact_controls_and_known_scenes() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+            "--geometry-stroke-profile",
+        ];
+        let scenes = "clock-idle,clock-rain,pizza-300,pizza-5000,mixed-interleaved";
+        for writer in [
+            vec![],
+            vec!["--geometry-stroke-bulk"],
+            vec!["--geometry-stroke-bulk", "--geometry-stroke-static"],
+        ] {
+            Args::try_parse_from(
+                probe
+                    .into_iter()
+                    .chain(["--geometry-round-joins", "--geometry-stroke-cases", scenes])
+                    .chain(writer),
+            )
+            .unwrap();
+        }
+        for args in [
+            vec!["--geometry-stroke-cases", "clock-rain"],
+            vec![
+                "--geometry-round-joins",
+                "--geometry-stroke-cases",
+                "unknown",
+            ],
+            vec![
+                "--geometry-round-joins",
+                "--geometry-stroke-cases",
+                "clock-rain",
+                "--geometry-small-strokes",
+            ],
+            vec![
+                "--geometry-round-joins",
+                "--geometry-stroke-cases",
+                "clock-rain",
+                "--geometry-cases",
+                "clock-rain",
+            ],
+        ] {
+            assert!(Args::try_parse_from(probe.into_iter().chain(args)).is_err());
+        }
+    }
+
+    #[test]
+    fn geometry_probe_requires_opt_in_and_bounded_work() {
+        let probe = [
+            "engine-client",
+            "--benchmark-presentation",
+            "--presentation-geometry",
+        ];
+        Args::try_parse_from(probe).unwrap();
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-layouts"])).unwrap();
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-terrain"])).unwrap();
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-live-retained"])).unwrap();
+        Args::try_parse_from(probe.into_iter().chain([
+            "--geometry-live-retained",
+            "--geometry-live-modes",
+            "retained-memoized,retained-scan,retained-ranges",
+        ]))
+        .unwrap();
+        assert!(
+            Args::try_parse_from(
+                probe
+                    .into_iter()
+                    .chain(["--geometry-live-modes", "retained-scan"])
+            )
+            .is_err()
+        );
+        assert!(
+            Args::try_parse_from(probe.into_iter().chain([
+                "--geometry-live-retained",
+                "--geometry-live-modes",
+                "not-a-mode"
+            ]))
+            .is_err()
+        );
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-churn"])).unwrap();
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-build-profile"])).unwrap();
+        Args::try_parse_from(probe.into_iter().chain(["--geometry-encode-profile"])).unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--geometry-encode-profile"]).is_err());
+        for conflicting in [
+            "--geometry-build-profile",
+            "--geometry-live-retained",
+            "--geometry-churn",
+            "--geometry-terrain",
+            "--geometry-layouts",
+        ] {
+            assert!(
+                Args::try_parse_from(
+                    probe
+                        .into_iter()
+                        .chain(["--geometry-encode-profile", conflicting])
+                )
+                .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["engine-client", "--geometry-build-profile"]).is_err());
+        for conflicting in [
+            "--geometry-churn",
+            "--geometry-terrain",
+            "--geometry-layouts",
+            "--geometry-live-retained",
+        ] {
+            assert!(
+                Args::try_parse_from(
+                    probe
+                        .into_iter()
+                        .chain(["--geometry-build-profile", conflicting])
+                )
+                .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["engine-client", "--geometry-churn"]).is_err());
+        for conflicting in [
+            "--geometry-terrain",
+            "--geometry-layouts",
+            "--geometry-live-retained",
+        ] {
+            assert!(
+                Args::try_parse_from(probe.into_iter().chain(["--geometry-churn", conflicting]))
+                    .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["engine-client", "--geometry-live-retained"]).is_err());
+        for conflicting in ["--geometry-terrain", "--geometry-layouts"] {
+            assert!(
+                Args::try_parse_from(
+                    probe
+                        .into_iter()
+                        .chain(["--geometry-live-retained", conflicting])
+                )
+                .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["engine-client", "--geometry-terrain"]).is_err());
+        assert!(
+            Args::try_parse_from(
+                probe
+                    .into_iter()
+                    .chain(["--geometry-terrain", "--geometry-layouts"])
+            )
+            .is_err()
+        );
+        assert!(Args::try_parse_from(["engine-client", "--geometry-layouts"]).is_err());
+        assert!(
+            Args::try_parse_from(probe.into_iter().chain([
+                "--geometry-layouts",
+                "--geometry-modes",
+                "triangles"
+            ]))
+            .is_err()
+        );
+        Args::try_parse_from(probe.into_iter().chain([
+            "--geometry-cases",
+            "pizza-10000,overlap-128,meshes-grouped,meshes-interleaved,meshes-churn,ships-pair,ships-fleet,ships-zoom,ships-pair-local,ships-fleet-local,ships-zoom-local",
+            "--geometry-in-flight",
+            "8",
+            "--geometry-modes",
+            "triangles,triangles-split,triangles-programs,circles,circles-expanded,circles-uniforms,circles-bindings,circles-submission,circles-unified,circles-unified-instanced,circles-unified-layout,circles-unified-vao,meshes-streamed,meshes,meshes-expanded",
+        ]))
+        .unwrap();
+        assert!(Args::try_parse_from(["engine-client", "--presentation-geometry"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-no-gpu-timing"]).is_err());
+        assert!(Args::try_parse_from(["engine-client", "--geometry-modes", "circles"]).is_err());
+        for args in [
+            vec!["--geometry-cases", "unknown"],
+            vec!["--geometry-modes", "auto"],
+            vec!["--geometry-in-flight", "0"],
+            vec!["--geometry-in-flight", "9"],
+            vec!["--presentation-frames", "0"],
+            vec!["--presentation-frames", "10001"],
+            vec!["--presentation-repeats", "0"],
+            vec!["--presentation-upload"],
+            vec!["--presentation-memory"],
+            vec!["--presentation-text"],
+            vec!["--presentation-raster"],
+            vec!["--presentation-republish"],
+            vec!["--presentation-detail"],
+        ] {
+            assert!(
+                Args::try_parse_from(probe.into_iter().chain(args.clone())).is_err(),
+                "{args:?}"
+            );
+        }
     }
 
     #[test]
@@ -3204,7 +4094,9 @@ mod tests {
         assert!(!window.get_ingame_controls_visible());
         assert!(!window.get_game_over_visible());
 
+        camera_probe::request(&window, camera_probe::ZoomMode::Sweep);
         clear_runtime_diagnostics(&window);
+        assert!(camera_probe::diagnostics().contains("camera_zoom_mode=off"));
         assert_eq!(
             window.get_runtime_diagnostics().as_str(),
             NO_ACTIVE_SCENARIO_DIAGNOSTICS

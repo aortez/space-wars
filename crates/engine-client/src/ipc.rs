@@ -34,6 +34,8 @@ use crate::{MainWindow, host};
 #[cfg(unix)]
 mod input;
 #[cfg(unix)]
+mod screenshot;
+#[cfg(unix)]
 use input::InputAutomation;
 #[cfg(unix)]
 use spacewars_control::{INPUT_PRESS_COMMAND, InputPressRequest};
@@ -59,6 +61,20 @@ enum ControlCommand {
     ClockTrigger(ClockTriggerRequest),
     ClockMessage(ClockMessageRequest),
     HostBenchmark,
+    RasterUpload(crate::raster::publication::UploadFormat),
+    RasterTextures(crate::raster::texture_upload::Mode),
+    GpuScene(crate::gpu_scene::Mode),
+    GpuStream(crate::gpu_scene::StreamMode),
+    GpuStrokes(crate::gpu_scene::StrokeMode),
+    GpuJoins(crate::gpu_scene::JoinMode),
+    GpuStrokeWriter(crate::gpu_scene::StrokeWriter),
+    GpuAdmission(crate::gpu_scene::AdmissionMode),
+    GpuPlan(crate::gpu_scene::PlanMode),
+    GpuSource(crate::gpu_scene::SourceMode),
+    GpuText(crate::gpu_text::Mode),
+    CameraZoom(crate::camera_probe::ZoomMode),
+    RenderTrace(&'static str),
+    ClockBenchmark(crate::client_scenarios::ClockBenchmarkCase),
 }
 
 #[cfg(unix)]
@@ -389,6 +405,211 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
             }
             Ok(ControlCommand::HostBenchmark)
         }
+        Some("host raster-upload") => {
+            let value = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("missing rgb or rgba"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "raster-upload accepts exactly one format line",
+                ));
+            }
+            crate::raster::publication::UploadFormat::parse(value)
+                .map(ControlCommand::RasterUpload)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host raster-textures") => {
+            let value = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("missing texture mode"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "raster-textures accepts exactly one mode line",
+                ));
+            }
+            crate::raster::texture_upload::Mode::parse(value)
+                .map(ControlCommand::RasterTextures)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-scene") => {
+            let mode = match lines.next() {
+                Some("on" | "triangles") => crate::gpu_scene::Mode::Triangles,
+                Some("paths") => crate::gpu_scene::Mode::Paths,
+                Some("circles") => crate::gpu_scene::Mode::Circles,
+                Some("retained") => crate::gpu_scene::Mode::Retained,
+                Some("retained-cold") => crate::gpu_scene::Mode::RetainedCold,
+                Some("retained-adaptive") => crate::gpu_scene::Mode::RetainedAdaptive,
+                Some("retained-zoom") => crate::gpu_scene::Mode::RetainedZoom,
+                Some("retained-hybrid") => crate::gpu_scene::Mode::RetainedHybrid,
+                Some("retained-outlines") => crate::gpu_scene::Mode::RetainedOutlines,
+                Some("retained-paced") => crate::gpu_scene::Mode::RetainedPaced,
+                Some("retained-memoized") => crate::gpu_scene::Mode::RetainedMemoized,
+                Some("retained-scan") => crate::gpu_scene::Mode::RetainedScan,
+                Some("retained-ranges") => crate::gpu_scene::Mode::RetainedRanges,
+                Some("retained-culled") => crate::gpu_scene::Mode::RetainedCulled,
+                Some("retained-resident") => crate::gpu_scene::Mode::RetainedResident,
+                Some("retained-resident-passes") => crate::gpu_scene::Mode::RetainedResidentPasses,
+                Some("retained-resident-buffers") => {
+                    crate::gpu_scene::Mode::RetainedResidentBuffers
+                }
+                Some("retained-resident-uniforms") => {
+                    crate::gpu_scene::Mode::RetainedResidentUniforms
+                }
+                Some("off") => crate::gpu_scene::Mode::Off,
+                _ => {
+                    return Err(invalid_mutation_request(
+                        "gpu-scene requires triangles, circles, retained, retained-cold, retained-adaptive, retained-zoom, retained-hybrid, retained-outlines, retained-paced, retained-memoized, retained-scan, retained-ranges, retained-culled, retained-resident, retained-resident-passes, retained-resident-buffers, retained-resident-uniforms, paths or off (on selects triangles)",
+                    ));
+                }
+            };
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-scene accepts exactly one mode line",
+                ));
+            }
+            Ok(ControlCommand::GpuScene(mode))
+        }
+        Some("host gpu-stream") => {
+            let value = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("missing stream policy"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-stream accepts exactly one policy line",
+                ));
+            }
+            crate::gpu_scene::StreamMode::parse(value)
+                .map(ControlCommand::GpuStream)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-strokes") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-strokes accepts exactly one mode line",
+                ));
+            }
+            crate::gpu_scene::StrokeMode::parse(value)
+                .map(ControlCommand::GpuStrokes)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-joins") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-joins accepts exactly one mode line",
+                ));
+            }
+            crate::gpu_scene::JoinMode::parse(value)
+                .map(ControlCommand::GpuJoins)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-stroke-writer") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-stroke-writer accepts exactly one mode line",
+                ));
+            }
+            crate::gpu_scene::StrokeWriter::parse(value)
+                .map(ControlCommand::GpuStrokeWriter)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-admission") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-admission accepts exactly one policy line",
+                ));
+            }
+            crate::gpu_scene::AdmissionMode::parse(value)
+                .map(ControlCommand::GpuAdmission)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-plan") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-plan accepts exactly one policy line",
+                ));
+            }
+            crate::gpu_scene::PlanMode::parse(value)
+                .map(ControlCommand::GpuPlan)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-source") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-source accepts exactly one policy line",
+                ));
+            }
+            crate::gpu_scene::SourceMode::parse(value)
+                .map(ControlCommand::GpuSource)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host gpu-text") => {
+            let value = lines.next().unwrap_or_default();
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "gpu-text accepts exactly one mode line",
+                ));
+            }
+            crate::gpu_text::Mode::parse(value)
+                .map(ControlCommand::GpuText)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host camera-zoom" | "host gpu-zoom") => {
+            let value = lines
+                .next()
+                .ok_or_else(|| invalid_mutation_request("missing zoom mode"))?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "camera-zoom accepts exactly one mode line",
+                ));
+            }
+            crate::camera_probe::ZoomMode::parse(value)
+                .map(ControlCommand::CameraZoom)
+                .map_err(invalid_mutation_request)
+        }
+        Some("host render-trace") => {
+            let command = match lines.next() {
+                Some("start") => "start",
+                Some("start-text") => "start-text",
+                Some("start-work") => "start-work",
+                Some("start-geometry") => "start-geometry",
+                Some("read") => "read",
+                Some("cancel") => "cancel",
+                _ => {
+                    return Err(invalid_mutation_request(
+                        "render-trace requires start, start-text, start-work, start-geometry, read or cancel",
+                    ));
+                }
+            };
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "render-trace accepts exactly one command line",
+                ));
+            }
+            Ok(ControlCommand::RenderTrace(command))
+        }
+        Some("host clock-benchmark") => {
+            let case = match lines.next() {
+                Some("idle") => crate::client_scenarios::ClockBenchmarkCase::Idle,
+                Some("rain") => crate::client_scenarios::ClockBenchmarkCase::Rain,
+                _ => {
+                    return Err(invalid_mutation_request(
+                        "clock-benchmark requires idle or rain",
+                    ));
+                }
+            };
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "clock-benchmark accepts exactly one fixture line",
+                ));
+            }
+            Ok(ControlCommand::ClockBenchmark(case))
+        }
         Some(command) => Err(CommandParseError::Legacy(format!(
             "unknown command {command:?}"
         ))),
@@ -439,31 +660,23 @@ fn handle_request(
             scenario_controls,
         ),
         ControlCommand::Screenshot { output } => {
-            // FemtoVG reads the existing framebuffer. Let an idle window draw
-            // before capturing it, including immediately after process startup.
-            window.window().request_redraw();
-            let weak = window.as_weak();
-            Timer::single_shot(Duration::from_millis(50), move || {
-                let Some(window) = weak.upgrade() else {
-                    request
-                        .response
-                        .error("window closed before screenshot capture");
-                    return;
-                };
-                match write_window_screenshot(&window, &output) {
-                    Ok(()) => request
-                        .response
-                        .ok(format!("screenshot saved to {}", output.display())),
-                    Err(err) => request.response.error(err.to_string()),
-                }
-            });
+            screenshot::request(window, output, request.response);
         }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
             diagnostics.push_str(&format!(
-                "\nperformance_overlay_enabled={}\nperformance_overlay_text={}",
+                "\nraster_upload_format={}",
+                crate::raster::publication::requested_format().name(),
+            ));
+            diagnostics.push_str(&crate::raster::texture_upload::diagnostics());
+            diagnostics.push_str(&crate::gpu_scene::diagnostics());
+            diagnostics.push_str(&crate::camera_probe::diagnostics());
+            diagnostics.push_str(&crate::gpu_text::diagnostics());
+            diagnostics.push_str(&format!(
+                "\nperformance_overlay_enabled={}\nperformance_overlay_text={}\nperformance_overlay_details={}",
                 window.get_performance_overlay_enabled(),
                 window.get_performance_overlay_text(),
+                window.get_performance_overlay_details().replace('\n', " | "),
             ));
             #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
             diagnostics.push_str(&i_slint_backend_linuxkms::profiling::diagnostics());
@@ -531,7 +744,276 @@ fn handle_request(
                 request.response.ok("benchmark requested");
             }
         }
+        ControlCommand::RasterUpload(format) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("raster-upload requires an active raster scene (not native video)");
+            } else {
+                match crate::raster::publication::request_format(format) {
+                    Ok(()) => {
+                        window.window().request_redraw();
+                        tracing::info!(
+                            format = format.name(),
+                            "experimental raster upload format requested."
+                        );
+                        request.response.ok(format!(
+                            "raster_upload_format={} (from next raster frame; not saved)",
+                            format.name()
+                        ));
+                    }
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::RasterTextures(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("raster-textures requires an active raster scene (not native video)");
+            } else {
+                match crate::raster::texture_upload::request(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "raster_texture_mode={} (from next raster frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuScene(mode) => {
+            let diagnostics = window.get_runtime_diagnostics();
+            let active_scene = gpu_scene_source_supported(mode, diagnostics.as_str());
+            if mode != crate::gpu_scene::Mode::Off
+                && (window.get_launcher_visible()
+                    || window.get_launcher_busy()
+                    || !window.get_raster_visible()
+                    || window.get_native_video_visible()
+                    || !active_scene)
+            {
+                request
+                    .response
+                    .error("gpu-scene requires an active raster scene at 1x; paths reference is Clock-only");
+            } else {
+                match crate::gpu_scene::request(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_requested={} mode={} (from next frame; not saved)",
+                        mode != crate::gpu_scene::Mode::Off,
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuStream(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("gpu-stream requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_stream(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_stream_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuStrokes(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("gpu-strokes requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_strokes(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_stroke_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuJoins(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+                || !crate::gpu_scene::requested()
+            {
+                request
+                    .response
+                    .error("gpu-joins requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_joins(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_join_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuStrokeWriter(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+                || !crate::gpu_scene::requested()
+            {
+                request
+                    .response
+                    .error("gpu-stroke-writer requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_writer(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_stroke_writer_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuAdmission(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+                || !crate::gpu_scene::requested()
+            {
+                request
+                    .response
+                    .error("gpu-admission requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_admission(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_admission_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuSource(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("gpu-source requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_source(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_source_policy={} (from next frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuPlan(mode) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !window.get_raster_visible()
+                || window.get_native_video_visible()
+            {
+                request
+                    .response
+                    .error("gpu-plan requires an active GPU scene");
+            } else {
+                match crate::gpu_scene::request_plan(window, mode) {
+                    Ok(()) => request.response.ok(format!(
+                        "gpu_scene_plan_policy={} (from next GPU frame; not saved)",
+                        mode.name()
+                    )),
+                    Err(error) => request.response.error(error),
+                }
+            }
+        }
+        ControlCommand::GpuText(mode) => match crate::gpu_text::request(window, mode) {
+            Ok(()) => request.response.ok(format!(
+                "gpu_text_requested={} (fresh cache from next safe text frame; not saved)",
+                mode.name()
+            )),
+            Err(error) => request.response.error(error),
+        },
+        ControlCommand::CameraZoom(mode) => {
+            if mode != crate::camera_probe::ZoomMode::Off
+                && (window.get_launcher_visible()
+                    || window.get_launcher_busy()
+                    || window.get_native_video_visible()
+                    || !window
+                        .get_runtime_diagnostics()
+                        .lines()
+                        .any(|line| line == "scenario=spacewars"))
+            {
+                request
+                    .response
+                    .error("camera-zoom requires an active Spacewars scene");
+            } else {
+                crate::camera_probe::request(window, mode);
+                request.response.ok(format!(
+                    "camera_zoom_mode={} (presentation only; not saved)",
+                    mode.name()
+                ));
+            }
+        }
+        ControlCommand::RenderTrace(command) => {
+            #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+            match i_slint_backend_linuxkms::profiling::render_trace(command) {
+                Ok(report) => request.response.ok(report),
+                Err(error) => request.response.error(error),
+            }
+            #[cfg(not(all(target_os = "linux", feature = "pi-kiosk")))]
+            {
+                let _ = command;
+                request
+                    .response
+                    .error("render-trace requires the LinuxKMS kiosk build");
+            }
+        }
+        ControlCommand::ClockBenchmark(case) => {
+            if window.get_launcher_visible()
+                || window.get_launcher_busy()
+                || !scenario_controls.borrow_mut().request_clock_benchmark(case)
+            {
+                request
+                    .response
+                    .error("clock-benchmark requires an active Clock with no pending host request");
+            } else {
+                request
+                    .response
+                    .ok("Clock benchmark requested; fixture settings are not saved");
+            }
+        }
     }
+}
+
+#[cfg(unix)]
+fn gpu_scene_source_supported(mode: crate::gpu_scene::Mode, diagnostics: &str) -> bool {
+    diagnostics.lines().any(|line| line == "renderer=raster")
+        && diagnostics.lines().any(|line| line == "raster_scale=1.00")
+        && (mode != crate::gpu_scene::Mode::Paths
+            || diagnostics.lines().any(|line| line == "scenario=clock"))
 }
 
 #[cfg(unix)]
@@ -1071,22 +1553,6 @@ fn runtime_status_for_screen(
 }
 
 #[cfg(unix)]
-fn write_window_screenshot(
-    window: &MainWindow,
-    output: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(parent) = output.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    let snapshot = window.window().take_snapshot()?;
-    write_rgba_png(output, &snapshot)?;
-    Ok(())
-}
-
-#[cfg(unix)]
 fn write_rgba_png(
     output: &Path,
     pixels: &SharedPixelBuffer<Rgba8Pixel>,
@@ -1294,6 +1760,159 @@ mod tests {
     }
 
     #[test]
+    fn clock_benchmark_parser_accepts_only_one_known_fixture() {
+        use crate::client_scenarios::ClockBenchmarkCase;
+        for (name, expected) in [
+            ("idle", ClockBenchmarkCase::Idle),
+            ("rain", ClockBenchmarkCase::Rain),
+        ] {
+            assert!(matches!(
+                parse_command(&format!("host clock-benchmark\n{name}\n")),
+                Ok(ControlCommand::ClockBenchmark(case)) if case == expected
+            ));
+        }
+        for body in [
+            "host clock-benchmark\n",
+            "host clock-benchmark\nfalling\n",
+            "host clock-benchmark\nRAIN\n",
+            "host clock-benchmark\nrain\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err(), "{body:?}");
+        }
+    }
+
+    #[test]
+    fn parse_plan_control_rejects_missing_invalid_or_extra_input() {
+        for mode in [
+            crate::gpu_scene::PlanMode::Reference,
+            crate::gpu_scene::PlanMode::Reserved,
+            crate::gpu_scene::PlanMode::Scratch,
+            crate::gpu_scene::PlanMode::Prepared,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-plan\n{}\n", mode.name())),
+                Ok(ControlCommand::GpuPlan(actual)) if actual == mode)
+            );
+        }
+        for command in [
+            "host gpu-plan\n",
+            "host gpu-plan\non\n",
+            "host gpu-plan\nreserved\nstatus\n",
+        ] {
+            assert!(parse_command(command).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_source_control_is_explicit_and_bounded() {
+        for mode in [
+            crate::gpu_scene::SourceMode::Reference,
+            crate::gpu_scene::SourceMode::Pooled,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-source\n{}\n", mode.name())), Ok(ControlCommand::GpuSource(actual)) if actual == mode)
+            );
+        }
+        for body in [
+            "host gpu-source\n",
+            "host gpu-source\non\n",
+            "host gpu-source\npooled\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_stroke_control_is_explicit_and_bounded() {
+        for mode in [
+            crate::gpu_scene::StrokeMode::Off,
+            crate::gpu_scene::StrokeMode::Conservative,
+            crate::gpu_scene::StrokeMode::Checked,
+        ] {
+            assert!(matches!(
+                parse_command(&format!("host gpu-strokes\n{}\n", mode.name())),
+                Ok(ControlCommand::GpuStrokes(actual)) if actual == mode
+            ));
+        }
+        for body in [
+            "host gpu-strokes\n",
+            "host gpu-strokes\non\n",
+            "host gpu-strokes\nconservative\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_join_control_is_explicit_and_bounded() {
+        for mode in [
+            crate::gpu_scene::JoinMode::Reference,
+            crate::gpu_scene::JoinMode::Exact,
+            crate::gpu_scene::JoinMode::Checked,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-joins\n{}\n", mode.name())),
+                Ok(ControlCommand::GpuJoins(actual)) if actual == mode)
+            );
+        }
+        for body in [
+            "host gpu-joins\n",
+            "host gpu-joins\non\n",
+            "host gpu-joins\nexact\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_stroke_writer_control_is_explicit_and_bounded() {
+        for mode in [
+            crate::gpu_scene::StrokeWriter::Stock,
+            crate::gpu_scene::StrokeWriter::Bulk,
+            crate::gpu_scene::StrokeWriter::BulkStatic,
+            crate::gpu_scene::StrokeWriter::BulkPolygon,
+            crate::gpu_scene::StrokeWriter::BulkEdges,
+            crate::gpu_scene::StrokeWriter::BulkEdgesChecked,
+            crate::gpu_scene::StrokeWriter::BulkPrepared,
+            crate::gpu_scene::StrokeWriter::BulkPreparedChecked,
+            crate::gpu_scene::StrokeWriter::BulkSinglePass,
+            crate::gpu_scene::StrokeWriter::BulkSinglePassChecked,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-stroke-writer\n{}\n", mode.name())),
+                Ok(ControlCommand::GpuStrokeWriter(actual)) if actual == mode)
+            );
+        }
+        for body in [
+            "host gpu-stroke-writer\n",
+            "host gpu-stroke-writer\non\n",
+            "host gpu-stroke-writer\nbulk\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_admission_control_is_explicit_and_bounded() {
+        for mode in [
+            crate::gpu_scene::AdmissionMode::Repeated,
+            crate::gpu_scene::AdmissionMode::Settled,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-admission\n{}\n", mode.name())),
+                Ok(ControlCommand::GpuAdmission(actual)) if actual == mode)
+            );
+        }
+        for body in [
+            "host gpu-admission\n",
+            "host gpu-admission\non\n",
+            "host gpu-admission\nsettled\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
     fn parse_screenshot_command() {
         let command = parse_command("screenshot\n/tmp/shot.png\n").unwrap();
         match command {
@@ -1309,7 +1928,21 @@ mod tests {
             | ControlCommand::ClockState
             | ControlCommand::ClockTrigger(_)
             | ControlCommand::ClockMessage(_)
-            | ControlCommand::HostBenchmark => {
+            | ControlCommand::HostBenchmark
+            | ControlCommand::ClockBenchmark(_)
+            | ControlCommand::RasterTextures(_)
+            | ControlCommand::GpuScene(_)
+            | ControlCommand::GpuStream(_)
+            | ControlCommand::GpuStrokes(_)
+            | ControlCommand::GpuJoins(_)
+            | ControlCommand::GpuStrokeWriter(_)
+            | ControlCommand::GpuAdmission(_)
+            | ControlCommand::GpuPlan(_)
+            | ControlCommand::GpuSource(_)
+            | ControlCommand::GpuText(_)
+            | ControlCommand::CameraZoom(_)
+            | ControlCommand::RenderTrace(_)
+            | ControlCommand::RasterUpload(_) => {
                 panic!("expected screenshot command")
             }
         }
@@ -1485,6 +2118,212 @@ mod tests {
             Ok(ControlCommand::HostBenchmark)
         ));
         assert!(parse_command("host benchmark\nextra\n").is_err());
+    }
+
+    #[test]
+    fn parse_raster_upload_is_strict_and_never_ignores_extra_lines() {
+        use crate::raster::publication::UploadFormat;
+        for (name, expected) in [("rgb", UploadFormat::Rgb), ("rgba", UploadFormat::Rgba)] {
+            assert!(matches!(
+                parse_command(&format!("host raster-upload\n{name}\n")),
+                Ok(ControlCommand::RasterUpload(format)) if format == expected
+            ));
+        }
+        for body in [
+            "host raster-upload\n",
+            "host raster-upload\nbgra\n",
+            "host raster-upload\nrgba\nextra\n",
+            "host raster-upload\nrgba rgb\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn texture_lifetime_parser_rejects_unknown_modes_and_extra_lines() {
+        for name in ["slint", "fresh", "single", "triple"] {
+            assert!(
+                matches!(parse_command(&format!("host raster-textures\n{name}\n")),
+                Ok(ControlCommand::RasterTextures(mode)) if mode.name() == name)
+            );
+        }
+        for body in [
+            "host raster-textures\n",
+            "host raster-textures\ndouble\n",
+            "host raster-textures\nsingle\nstatus\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn direct_scene_parser_is_explicit_and_strict() {
+        for (name, mode) in [
+            ("triangles", crate::gpu_scene::Mode::Triangles),
+            ("paths", crate::gpu_scene::Mode::Paths),
+            ("circles", crate::gpu_scene::Mode::Circles),
+            ("retained", crate::gpu_scene::Mode::Retained),
+            ("retained-cold", crate::gpu_scene::Mode::RetainedCold),
+            (
+                "retained-adaptive",
+                crate::gpu_scene::Mode::RetainedAdaptive,
+            ),
+            ("retained-zoom", crate::gpu_scene::Mode::RetainedZoom),
+            ("retained-hybrid", crate::gpu_scene::Mode::RetainedHybrid),
+            (
+                "retained-outlines",
+                crate::gpu_scene::Mode::RetainedOutlines,
+            ),
+            ("retained-paced", crate::gpu_scene::Mode::RetainedPaced),
+            ("retained-scan", crate::gpu_scene::Mode::RetainedScan),
+            ("retained-ranges", crate::gpu_scene::Mode::RetainedRanges),
+            ("retained-culled", crate::gpu_scene::Mode::RetainedCulled),
+            (
+                "retained-resident",
+                crate::gpu_scene::Mode::RetainedResident,
+            ),
+            (
+                "retained-resident-passes",
+                crate::gpu_scene::Mode::RetainedResidentPasses,
+            ),
+            (
+                "retained-resident-buffers",
+                crate::gpu_scene::Mode::RetainedResidentBuffers,
+            ),
+            (
+                "retained-resident-uniforms",
+                crate::gpu_scene::Mode::RetainedResidentUniforms,
+            ),
+            (
+                "retained-memoized",
+                crate::gpu_scene::Mode::RetainedMemoized,
+            ),
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-scene\n{name}\n")), Ok(ControlCommand::GpuScene(actual)) if actual == mode)
+            );
+        }
+        assert!(matches!(
+            parse_command("host gpu-scene\non\n"),
+            Ok(ControlCommand::GpuScene(crate::gpu_scene::Mode::Triangles))
+        ));
+        assert!(matches!(
+            parse_command("host gpu-scene\noff\n"),
+            Ok(ControlCommand::GpuScene(crate::gpu_scene::Mode::Off))
+        ));
+        for body in [
+            "host gpu-scene\n",
+            "host gpu-scene\ntrue\n",
+            "host gpu-scene\non\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn render_trace_parser_rejects_implicit_or_extra_commands() {
+        for command in [
+            "start",
+            "start-text",
+            "start-work",
+            "start-geometry",
+            "read",
+            "cancel",
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host render-trace\n{command}\n")),
+                Ok(ControlCommand::RenderTrace(parsed)) if parsed == command)
+            );
+        }
+        for body in [
+            "host render-trace\n",
+            "host render-trace\non\n",
+            "host render-trace\nstart\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn gpu_text_parser_requires_one_explicit_policy() {
+        for name in ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"] {
+            assert!(matches!(parse_command(&format!("host gpu-text\n{name}\n")),
+                Ok(ControlCommand::GpuText(mode)) if mode.name() == name));
+        }
+        for body in [
+            "host gpu-text\n",
+            "host gpu-text\ngpu\n",
+            "host gpu-text\ncpu\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn camera_zoom_parser_accepts_only_one_explicit_mode_and_legacy_alias() {
+        for command in ["host camera-zoom", "host gpu-zoom"] {
+            for mode in [
+                crate::camera_probe::ZoomMode::Off,
+                crate::camera_probe::ZoomMode::Sweep,
+                crate::camera_probe::ZoomMode::SweepStop,
+            ] {
+                assert!(
+                    matches!(parse_command(&format!("{command}\n{}\n", mode.name())),
+                    Ok(ControlCommand::CameraZoom(actual)) if actual == mode)
+                );
+            }
+            for value in ["", "on", "sweep\nstatus"] {
+                assert!(parse_command(&format!("{command}\n{value}\n")).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn gpu_stream_parser_accepts_only_one_explicit_policy() {
+        for mode in [
+            crate::gpu_scene::StreamMode::Shared,
+            crate::gpu_scene::StreamMode::Exact,
+            crate::gpu_scene::StreamMode::Bucketed,
+        ] {
+            assert!(
+                matches!(parse_command(&format!("host gpu-stream\n{}\n", mode.name())), Ok(ControlCommand::GpuStream(actual)) if actual == mode)
+            );
+        }
+        for body in [
+            "host gpu-stream\n",
+            "host gpu-stream\non\n",
+            "host gpu-stream\nbucketed\nstatus\n",
+        ] {
+            assert!(parse_command(body).is_err());
+        }
+    }
+
+    #[test]
+    fn gpu_scene_allows_split_raster_scenes_but_not_vector_or_scaled_sources() {
+        use crate::gpu_scene::Mode;
+        for scenario in ["spacewars", "clock", "pizza"] {
+            let source = format!("scenario={scenario}\nrenderer=raster\nraster_scale=1.00");
+            assert!(gpu_scene_source_supported(Mode::Triangles, &source));
+            assert!(gpu_scene_source_supported(Mode::Circles, &source));
+            assert_eq!(
+                gpu_scene_source_supported(Mode::Paths, &source),
+                scenario == "clock"
+            );
+            assert!(!gpu_scene_source_supported(
+                Mode::Triangles,
+                &source.replace("renderer=raster", "renderer=vector")
+            ));
+            assert!(!gpu_scene_source_supported(
+                Mode::Triangles,
+                &source.replace("1.00", "2.00")
+            ));
+        }
     }
 
     #[test]

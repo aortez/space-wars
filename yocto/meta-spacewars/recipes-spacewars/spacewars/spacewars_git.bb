@@ -9,7 +9,9 @@ inherit externalsrc cargo_bin systemd deploy
 SPACEWARS_SRCROOT = "${@os.path.realpath('${THISDIR}/../../../..')}"
 EXTERNALSRC = "${SPACEWARS_SRCROOT}"
 CARGO_MANIFEST_PATH = "${SPACEWARS_SRCROOT}/Cargo.toml"
-EXTRA_CARGO_FLAGS = "--locked --workspace --no-default-features --features engine-client/pi-kiosk"
+SPACEWARS_GPU ?= "0"
+SPACEWARS_KIOSK_FEATURE = "${@'pi-kiosk-gpu' if d.getVar('SPACEWARS_GPU') == '1' else 'pi-kiosk'}"
+EXTRA_CARGO_FLAGS = "--locked --workspace --no-default-features --features engine-client/${SPACEWARS_KIOSK_FEATURE}"
 EXTRA_RUSTFLAGS += "--remap-path-prefix=${WORKDIR}=${TARGET_DBGSRC_DIR}"
 
 DEPENDS += " \
@@ -23,6 +25,7 @@ DEPENDS += " \
     udev \
     util-linux \
 "
+DEPENDS:append = "${@' virtual/egl virtual/libgles2 virtual/libgbm' if d.getVar('SPACEWARS_GPU') == '1' else ''}"
 
 RDEPENDS:${PN} += " \
     alsa-lib \
@@ -39,6 +42,9 @@ RDEPENDS:${PN} += " \
     util-linux-setpriv \
     xkeyboard-config \
 "
+# EGL and the driver are loaded at runtime; automatic ELF dependencies alone
+# are insufficient. The explicit software-only image needs none of these.
+RDEPENDS:${PN}:append = "${@' libegl-mesa libgles2-mesa libgbm mesa-megadriver' if d.getVar('SPACEWARS_GPU') == '1' else ''}"
 
 INSANE_SKIP:${PN}-dbg += "buildpaths"
 
@@ -57,6 +63,9 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sudoers:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sudoers:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.conf:True",
     ]
 
     for top in ("crates", "scenarios", "vendor"):
@@ -65,7 +74,7 @@ python () {
             continue
         for root, _, files in os.walk(root_dir):
             for name in sorted(files):
-                if name.endswith((".rs", ".toml", ".slint")):
+                if name.endswith((".rs", ".toml", ".slint", ".glsl", ".wgsl")):
                     tracked.append(f"{os.path.join(root, name)}:True")
 
     d.appendVarFlag("do_compile", "file-checksums", " " + " ".join(tracked))
@@ -92,6 +101,13 @@ do_install() {
     install -m 0644 ${WORKDIR}/spacewars-kiosk.service ${D}${systemd_system_unitdir}/spacewars-kiosk.service
     install -m 0644 ${WORKDIR}/spacewars-seatd.service ${D}${systemd_system_unitdir}/spacewars-seatd.service
 
+    if [ "${SPACEWARS_GPU}" = "1" ]; then
+        install -m 0755 ${WORKDIR}/spacewars-renderer.sh ${D}${sbindir}/spacewars-renderer
+        install -m 0440 ${WORKDIR}/spacewars-renderer.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-renderer
+        install -d ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d
+        install -m 0644 ${WORKDIR}/spacewars-renderer.conf ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf
+    fi
+
     install -d ${D}/var/lib
 }
 
@@ -103,6 +119,9 @@ SRC_URI += " \
     file://spacewars-fast-update.sh \
     file://spacewars-logs.sh \
     file://spacewars-logs.sudoers \
+    file://spacewars-renderer.sh \
+    file://spacewars-renderer.sudoers \
+    file://spacewars-renderer.conf \
 "
 
 do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/fast_update.py:True"
@@ -115,6 +134,10 @@ python write_spacewars_fast_compatibility() {
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
         "spacewars-logs.sh", "spacewars-logs.sudoers",
     )]
+    if d.getVar("SPACEWARS_GPU") == "1":
+        assets.extend(Path(d.getVar("WORKDIR")) / name for name in (
+            "spacewars-renderer.sh", "spacewars-renderer.sudoers", "spacewars-renderer.conf",
+        ))
     variables = {key: d.getVar(key) or "" for key in (
         "MACHINE", "TARGET_SYS", "TUNE_FEATURES", "DISTRO", "DISTRO_VERSION",
         "DISTRO_FEATURES", "TCLIBC",
@@ -168,6 +191,9 @@ FILES:${PN} = " \
     ${sbindir}/spacewars-fast-update \
     ${sbindir}/spacewars-logs \
     ${sysconfdir}/sudoers.d/spacewars-logs \
+    ${sbindir}/spacewars-renderer \
+    ${sysconfdir}/sudoers.d/spacewars-renderer \
+    ${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf \
     ${datadir}/spacewars/fast-update-compat \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \

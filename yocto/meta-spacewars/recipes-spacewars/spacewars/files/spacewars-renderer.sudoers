@@ -1,0 +1,2 @@
+# No general systemctl, file-writing, or arbitrary argument permission.
+spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-renderer software, /usr/sbin/spacewars-renderer gpu

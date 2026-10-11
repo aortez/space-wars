@@ -1,0 +1,2 @@
+# Match upstream Slint's compact formatting to keep the local patch small.
+use_small_heuristics = "Max"

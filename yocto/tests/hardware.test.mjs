@@ -34,7 +34,7 @@ function fixture(t, profile) {
 
 test('build and artifact paths isolate the unified machine from older checkouts', () => {
   assert.match(readFileSync(join(YOCTO_DIR, 'kas-spacewars.yml'), 'utf8'), new RegExp(`machine: ${MACHINE}\\n`));
-  if (!process.env.KAS_BUILD_DIR) assert.ok(defaultBuildDir().endsWith(`-yocto-build-${MACHINE}`));
+  if (!process.env.KAS_BUILD_DIR) assert.ok(defaultBuildDir().endsWith(`-yocto-build-${MACHINE}${process.env.SPACEWARS_GPU === '0' ? '' : '-gpu'}`));
   assert.equal(defaultImageDir(), join(defaultBuildDir(), 'tmp/deploy/images', MACHINE));
   assert.equal(preferredImages('wic.gz')[0], `spacewars-image-${MACHINE}.rootfs.wic.gz`);
 });

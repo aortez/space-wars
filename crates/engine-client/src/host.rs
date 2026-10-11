@@ -35,6 +35,7 @@ use crate::nes_realtime::{
 use crate::raster;
 use crate::render::{self, Viewport};
 
+mod performance_overlay;
 mod profiling;
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
@@ -86,6 +87,7 @@ enum ScenarioControlRequest {
     Restart,
     NewMatch,
     Benchmark,
+    ClockBenchmark(client_scenarios::ClockBenchmarkCase),
     ClockEvent(engine_common::ClockEventKind),
     ClockSettings(engine_common::ClockSettings),
     ClockPreview(engine_common::ClockEventKind),
@@ -98,6 +100,14 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
 }
 
 impl ScenarioControls {
+    pub fn request_clock_benchmark(&mut self, case: client_scenarios::ClockBenchmarkCase) -> bool {
+        if self.request.is_some() || self.clock_state.is_none() {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::ClockBenchmark(case));
+        true
+    }
+
     pub fn set_audio_settings(&mut self, settings: engine_common::AudioSettings) {
         self.audio = Some(settings.normalized());
     }
@@ -317,6 +327,7 @@ pub fn start_debug_render_loop(
     let mut frame_count = 0_u64;
     let mut performance = PerformanceStats::new(TickModel::Variable, start);
     window.set_performance_overlay_text(performance.overlay_text(false, false).into());
+    window.set_performance_overlay_details("".into());
     let mut raster_renderer = raster::RasterRenderer::new();
 
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
@@ -329,6 +340,7 @@ pub fn start_debug_render_loop(
         let scene_item_count = present_frame(&window, frame, renderer, &mut raster_renderer);
         if performance.record_frame(Instant::now(), 1, 0) {
             window.set_performance_overlay_text(performance.overlay_text(false, false).into());
+            performance.publish_overlay_details(&window, false, false, renderer, false);
         }
 
         frame_count += 1;
@@ -490,6 +502,8 @@ pub fn start_scenario_loop(
     seed: u64,
     options: ScenarioLoopOptions,
 ) -> Result<Timer, HostError> {
+    crate::camera_probe::end_session();
+    crate::gpu_scene::end_session();
     let ScenarioLoopOptions {
         start_benchmark,
         benchmark_configuration,
@@ -517,6 +531,16 @@ pub fn start_scenario_loop(
         &asset,
     )?;
     scenario.set_viewport(initial_viewport);
+    crate::gpu_scene::start_session(
+        window,
+        renderer,
+        raster_scale,
+        scenario.registration().capabilities.native_video,
+    )
+    .map_err(|detail| HostError::Presentation {
+        name: scenario_name.clone(),
+        detail,
+    })?;
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
     let input = input.unwrap_or_else(|| Rc::new(RefCell::new(ClientInput::default())));
@@ -547,6 +571,7 @@ pub fn start_scenario_loop(
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let initial_game_over = scenario.is_game_over();
     window.set_performance_overlay_text(performance.overlay_text(false, initial_game_over).into());
+    window.set_performance_overlay_details("".into());
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
     window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
         &scenario_name,
@@ -637,6 +662,7 @@ pub fn start_scenario_loop(
             return;
         }
 
+        let _host_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostTick);
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
@@ -670,6 +696,7 @@ pub fn start_scenario_loop(
 
         let mut input = input.borrow_mut();
         let step_started = Instant::now();
+        let step_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostStep);
         let step_result = step_scenario(
             &mut scenario,
             &scenario_name,
@@ -688,6 +715,7 @@ pub fn start_scenario_loop(
             &input_projections,
         );
         let step_cpu = step_started.elapsed();
+        drop(step_trace);
         if step_result.return_to_launcher {
             // The launcher callback clears shared input; release the loop's
             // borrow before re-entering UI code (e.g. the keyboard Q shortcut).
@@ -712,11 +740,16 @@ pub fn start_scenario_loop(
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             last_realtime_submitted_frames = 0;
-            match replace_realtime_presenter(
+            let presentation = crate::gpu_scene::start_session(
                 &window,
-                &realtime_presenter,
-                scenario.realtime_video_consumer(),
-            ) {
+                renderer,
+                raster_scale,
+                scenario.registration().capabilities.native_video,
+            )
+            .and_then(|()| replace_realtime_presenter(
+                &window, &realtime_presenter, scenario.realtime_video_consumer(),
+            ));
+            match presentation {
                 Ok(_) => {}
                 Err(error) => {
                     paused = true;
@@ -743,13 +776,13 @@ pub fn start_scenario_loop(
 
         controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
         let clock_settings = controls.borrow().clock_state.as_ref().map(|clock| clock.settings);
-        if let Some(clock_settings) = clock_settings
-            && (settings.clock != clock_settings || step_result.clock_settings_applied)
-        {
-            settings.clock = clock_settings;
-            crate::clock_controls::publish_settings(&window, clock_settings);
-            window.invoke_clock_settings_applied();
-        }
+        publish_runtime_clock_settings(
+            &window,
+            &mut settings,
+            clock_settings,
+            benchmark_active,
+            step_result.clock_settings_applied,
+        );
         window.set_clock_controls_pending(controls.borrow().clock_controls_pending());
         scenario.record_realtime_displayed_loop_iteration();
         let (updates, mut submitted_frames) = if let Some(telemetry) = scenario.realtime_telemetry() {
@@ -770,6 +803,7 @@ pub fn start_scenario_loop(
             performance.cpu_profile.clear();
         }
         let game_over = scenario.is_game_over();
+        let result_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostResult);
         if game_over && !scoreboard.has_recorded(scenario_revision)
             && let Some(result) = scenario.inner.round_result()
         {
@@ -779,6 +813,7 @@ pub fn start_scenario_loop(
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
+        drop(result_trace);
         if scenario.has_realtime_runtime() {
             input_projections.clear();
             projection_viewport = viewport;
@@ -802,13 +837,16 @@ pub fn start_scenario_loop(
             }
         } else {
             let scene_started = Instant::now();
+            let scene_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostScene);
             let frames = scenario.render_frames(renderer, viewport);
             let primitives = raster::primitive_count(&frames);
             input_projections =
                 render::frame_projections(&frames, viewport, scenario.frame_layout());
             projection_viewport = viewport;
             let scene_cpu = scene_started.elapsed();
+            drop(scene_trace);
             let prepare_started = Instant::now();
+            let publish_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostPublish);
             present_frames(
                 &window,
                 frames,
@@ -817,6 +855,7 @@ pub fn start_scenario_loop(
                 raster_scale,
                 &mut raster_renderer,
             );
+            drop(publish_trace);
             submitted_frames = 1;
             if !paused {
                 let internal = if renderer == RenderBackend::Raster {
@@ -827,7 +866,7 @@ pub fn start_scenario_loop(
                     step: step_cpu,
                     scene: scene_cpu,
                     prepare: prepare_started.elapsed(),
-                    raster: if renderer == RenderBackend::Raster {
+                    raster: if renderer == RenderBackend::Raster && !crate::gpu_scene::requested() {
                         raster_renderer.last_timings()
                     } else {
                         raster::RasterTimings::default()
@@ -840,6 +879,7 @@ pub fn start_scenario_loop(
         }
         // Sample submissions, not host polls: NES/Falling can submit several
         // frames between ticks, or none (including duplicate/paused polls).
+        let _diagnostics_trace = crate::frame_trace::Scope::new(crate::frame_trace::Stage::HostDiagnostics);
         if paused != last_diagnostics_paused || game_over != last_diagnostics_game_over {
             performance.reset_rates(now);
         }
@@ -873,6 +913,8 @@ pub fn start_scenario_loop(
                 window.set_runtime_diagnostics(format!("{}\n{details}", window.get_runtime_diagnostics()).into());
             }
             window.set_performance_overlay_text(performance.overlay_text(paused, game_over).into());
+            performance.publish_overlay_details(&window, paused, game_over, renderer,
+                scenario.registration().capabilities.native_video);
             last_diagnostics_revision = diagnostics_revision;
             last_diagnostics_scenario_revision = scenario_revision;
             last_diagnostics_paused = paused;
@@ -1098,8 +1140,15 @@ fn step_scenario_inner(
                     }
                 };
             }
-            ScenarioControlRequest::Benchmark => {
-                if scenario.registration().capabilities.benchmark {
+            ScenarioControlRequest::Benchmark | ScenarioControlRequest::ClockBenchmark(_) => {
+                let clock_case = match request {
+                    ScenarioControlRequest::ClockBenchmark(case) if scenario_name == "clock" => {
+                        Some(case)
+                    }
+                    ScenarioControlRequest::ClockBenchmark(_) => return HostStepResult::default(),
+                    _ => None,
+                };
+                if scenario.registration().capabilities.benchmark || clock_case.is_some() {
                     return match start_benchmark_scenario(
                         scenario,
                         scenario_name,
@@ -1110,6 +1159,7 @@ fn step_scenario_inner(
                         benchmark_active,
                         settings,
                         viewport,
+                        clock_case,
                     ) {
                         Ok(()) => HostStepResult::scenario_restarted(),
                         Err(error) => {
@@ -1146,6 +1196,7 @@ fn step_scenario_inner(
                 benchmark_active,
                 settings,
                 viewport,
+                None,
             ) {
                 Ok(()) => HostStepResult::scenario_restarted(),
                 Err(error) => {
@@ -1356,15 +1407,20 @@ fn start_benchmark_scenario(
     benchmark_active: &mut bool,
     settings: &Settings,
     viewport: Viewport,
+    clock_case: Option<client_scenarios::ClockBenchmarkCase>,
 ) -> Result<(), HostError> {
     let asset = scenario.asset.clone();
+    let mut configuration = BenchmarkConfiguration::default();
+    if let Some(case) = clock_case {
+        configuration.clock.case = case;
+    }
     replace_scenario(scenario, || {
         HostedScenario::new_with_asset(
             scenario_name,
             seed,
             settings,
             viewport,
-            ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
+            ScenarioStartMode::Benchmark(configuration),
             &asset,
         )
     })?;
@@ -1375,6 +1431,24 @@ fn start_benchmark_scenario(
     input.reset_spacewars_controls();
     tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
     Ok(())
+}
+
+fn publish_runtime_clock_settings(
+    window: &MainWindow,
+    settings: &mut Settings,
+    clock_settings: Option<engine_common::ClockSettings>,
+    benchmark_active: bool,
+    explicitly_applied: bool,
+) {
+    // Diagnostic fixtures use their own settings, not the user's preferences.
+    if let Some(clock_settings) = clock_settings
+        && !benchmark_active
+        && (settings.clock != clock_settings || explicitly_applied)
+    {
+        settings.clock = clock_settings;
+        crate::clock_controls::publish_settings(window, clock_settings);
+        window.invoke_clock_settings_applied();
+    }
 }
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
@@ -1398,6 +1472,7 @@ fn set_ingame_menu(window: &MainWindow, paused: bool) {
 #[derive(Debug, Clone)]
 struct PerformanceStats {
     cpu_profile: profiling::CpuProfile,
+    process_cpu: performance_overlay::ProcessCpu,
     target_label: String,
     sample_started: Instant,
     frames_in_sample: u64,
@@ -1410,8 +1485,11 @@ struct PerformanceStats {
 
 impl PerformanceStats {
     fn new(tick_model: TickModel, now: Instant) -> Self {
+        let mut process_cpu = performance_overlay::ProcessCpu::default();
+        process_cpu.sample();
         Self {
             cpu_profile: profiling::CpuProfile::default(),
+            process_cpu,
             target_label: performance_target_label(tick_model),
             sample_started: now,
             frames_in_sample: 0,
@@ -1439,6 +1517,7 @@ impl PerformanceStats {
 
         self.measured_fps = Some(self.frames_in_sample as f32 / elapsed_secs);
         self.measured_ups = Some(self.updates_in_sample as f32 / elapsed_secs);
+        self.process_cpu.sample();
         self.sample_started = now;
         self.frames_in_sample = 0;
         self.updates_in_sample = 0;
@@ -1446,6 +1525,7 @@ impl PerformanceStats {
     }
 
     fn reset_rates(&mut self, now: Instant) {
+        self.process_cpu.reset();
         self.sample_started = now;
         self.frames_in_sample = 0;
         self.updates_in_sample = 0;
@@ -1465,6 +1545,33 @@ impl PerformanceStats {
                 measured_label(self.measured_ups)
             )
         }
+    }
+
+    fn publish_overlay_details(
+        &self,
+        window: &MainWindow,
+        paused: bool,
+        game_over: bool,
+        renderer: RenderBackend,
+        native_video: bool,
+    ) {
+        let details = if !window.get_performance_overlay_enabled() || paused || game_over {
+            String::new()
+        } else {
+            performance_overlay::details(
+                self.process_cpu.percent,
+                self.cpu_profile.prepare_average_ms(),
+                if native_video {
+                    "video"
+                } else if crate::gpu_scene::applied() {
+                    "direct geometry"
+                } else {
+                    renderer.label()
+                },
+                &performance_overlay::Presentation::current(),
+            )
+        };
+        window.set_performance_overlay_details(details.into());
     }
 
     fn display_text(&self) -> String {
@@ -1567,6 +1674,7 @@ pub(crate) fn present_frames(
     window.set_native_video_visible(false);
     let scene_item_count = match renderer {
         RenderBackend::Vector => {
+            crate::gpu_scene::end_session();
             let presentation =
                 render::scene_presentation_from_frames_with_layout(&frames, viewport, layout);
             let scene_item_count = presentation.scene_item_count();
@@ -1576,18 +1684,35 @@ pub(crate) fn present_frames(
         }
         RenderBackend::Raster => {
             let primitive_count = raster::primitive_count(&frames);
+            if crate::gpu_scene::stage(&frames, viewport, layout, raster_scale) {
+                let overlay_trace =
+                    crate::frame_trace::Scope::new(crate::frame_trace::Stage::SceneOverlay);
+                update_scene_primitives(
+                    window,
+                    render::raster_text_overlay(&frames, viewport, layout),
+                );
+                window.set_vector_minimaps_visible(false);
+                window.set_raster_visible(true);
+                window.window().request_redraw();
+                drop(overlay_trace);
+                // Make the existing end-of-function cleanup separately measurable.
+                let _source_drop =
+                    crate::frame_trace::Scope::new(crate::frame_trace::Stage::SourceDrop);
+                crate::gpu_scene::source_control::recycle(frames);
+                return primitive_count;
+            }
             let image = raster_renderer.image_from_frames_with_layout(
                 &frames,
                 scaled_viewport(viewport, raster_scale),
                 layout,
                 raster::RasterOptions::for_scale(raster_scale),
             );
-            update_raster_text_overlay(
+            update_scene_primitives(
                 window,
                 render::raster_text_overlay(&frames, viewport, layout),
             );
             window.set_vector_minimaps_visible(false);
-            window.set_raster_frame(image);
+            raster::texture_upload::present(window, image);
             window.set_raster_visible(true);
             primitive_count
         }
@@ -1596,8 +1721,9 @@ pub(crate) fn present_frames(
     scene_item_count
 }
 
-/// Keep unchanged text items and their layout caches alive between frames.
-pub(crate) fn update_raster_text_overlay(window: &MainWindow, rows: Vec<crate::ScenePrimitive>) {
+/// Keep scene items and their layout caches alive between frames. Only changed
+/// rows notify Slint; both vector scenes and raster text overlays use this model.
+pub(crate) fn update_scene_primitives(window: &MainWindow, rows: Vec<crate::ScenePrimitive>) {
     let current = window.get_primitives();
     let Some(model) = current
         .as_any()
@@ -1649,7 +1775,7 @@ fn present_native_video(
 }
 
 fn set_vector_presentation(window: &MainWindow, presentation: render::VectorPresentation) {
-    window.set_primitives(ModelRc::new(VecModel::from(presentation.main_primitives)));
+    update_scene_primitives(window, presentation.main_primitives);
     window.set_minimap_opacity(render::SPACEWARS_MINIMAP_OPACITY);
 
     let mut minimaps = presentation.minimaps.into_iter();
@@ -2385,6 +2511,14 @@ impl HostedScenario {
         renderer: RenderBackend,
         viewport: Viewport,
     ) -> Vec<RenderFrame> {
+        if renderer == RenderBackend::Raster
+            && crate::gpu_scene::requested()
+            && let Some(frames) = crate::gpu_scene::source_control::render(|points| {
+                self.inner.render_frames_pooled(renderer, viewport, points)
+            })
+        {
+            return frames;
+        }
         self.inner.render_frames(renderer, viewport)
     }
 
@@ -2565,9 +2699,7 @@ mod tests {
         assert!(controls.request_clock_preview(ClockEventKind::Marquee));
     }
 
-    #[test]
-    fn vector_minimap_groups_switch_between_two_one_and_none_without_stale_maps() {
-        use slint::Model;
+    fn render_test_window() -> MainWindow {
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
         use slint::platform::{Platform, PlatformError, WindowAdapter};
         struct TestPlatform;
@@ -2577,7 +2709,57 @@ mod tests {
             }
         }
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
-        let window = MainWindow::new().unwrap();
+        MainWindow::new().unwrap()
+    }
+
+    #[test]
+    fn vector_scene_publication_retains_model_across_changes_and_empty_frames() {
+        let window = render_test_window();
+        let path = crate::ScenePrimitive {
+            commands: "M 0 0 L 10 0 L 10 10 Z".into(),
+            width: 100.0,
+            height: 80.0,
+            ..Default::default()
+        };
+        let text = crate::ScenePrimitive {
+            kind: crate::PrimitiveKind::Text,
+            text: "Clock".into(),
+            ..path.clone()
+        };
+        let moved = crate::ScenePrimitive {
+            x: 20.0,
+            commands: "M 1 1 L 20 1 L 20 20 Z".into(),
+            ..path.clone()
+        };
+        let frames = [
+            vec![path.clone(), text.clone()],
+            vec![path.clone(), text.clone()], // Unchanged frame.
+            vec![moved, text.clone(), path.clone()], // Change and grow.
+            vec![text, path.clone()],         // Reorder, change kind, and shrink.
+            vec![],
+            vec![path],
+        ];
+        let mut retained_model = None;
+        for rows in frames {
+            set_vector_presentation(
+                &window,
+                render::VectorPresentation {
+                    main_primitives: rows.clone(),
+                    minimaps: Vec::new(),
+                },
+            );
+            let model = window.get_primitives();
+            if let Some(previous) = &retained_model {
+                assert_eq!(&model, previous, "do not replace the scene's UI model");
+            }
+            assert_eq!(model.iter().collect::<Vec<_>>(), rows);
+            retained_model = Some(model);
+        }
+    }
+
+    #[test]
+    fn vector_minimap_groups_switch_between_two_one_and_none_without_stale_maps() {
+        let window = render_test_window();
         for count in [2, 1, 0, 2] {
             let presentation = render::VectorPresentation {
                 main_primitives: Vec::new(),
@@ -3905,6 +4087,142 @@ mod tests {
         assert!(result.return_to_launcher);
         assert_eq!(accumulator, Duration::ZERO);
         assert!(!paused);
+    }
+
+    #[test]
+    fn clock_benchmark_fixture_settings_do_not_publish_or_save() {
+        let window = render_test_window();
+        let saves = Rc::new(std::cell::Cell::new(0));
+        let callback_saves = saves.clone();
+        window.on_clock_settings_applied(move || callback_saves.set(callback_saves.get() + 1));
+        let mut settings = Settings::default();
+        settings.clock.event_profile = engine_common::ClockEventProfile::Demo;
+        let original = settings.clock;
+        crate::clock_controls::publish_settings(&window, original);
+        let mut fixture = original;
+        fixture.event_profile = engine_common::ClockEventProfile::Off;
+
+        for explicitly_applied in [false, true] {
+            publish_runtime_clock_settings(
+                &window,
+                &mut settings,
+                Some(fixture),
+                true,
+                explicitly_applied,
+            );
+            assert_eq!(settings.clock, original);
+            assert_eq!(saves.get(), 0);
+        }
+        publish_runtime_clock_settings(&window, &mut settings, Some(fixture), false, false);
+        assert_eq!(settings.clock, fixture);
+        assert_eq!(saves.get(), 1, "normal Clock changes still save");
+    }
+
+    #[test]
+    fn clock_benchmark_control_matches_headless_fixtures_and_restart_exits() {
+        use client_scenarios::ClockBenchmarkCase;
+        let dt = Duration::from_nanos(16_666_667);
+        let mut settings = Settings::default();
+        settings.clock.event_profile = engine_common::ClockEventProfile::Demo;
+        for case in [ClockBenchmarkCase::Idle, ClockBenchmarkCase::Rain] {
+            let mut scenario = HostedScenario::new(
+                "clock",
+                42,
+                &settings,
+                TEST_VIEWPORT,
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+            let mut configuration = BenchmarkConfiguration::default();
+            configuration.clock.case = case;
+            let mut expected = HostedScenario::new(
+                "clock",
+                42,
+                &settings,
+                TEST_VIEWPORT,
+                ScenarioStartMode::Benchmark(configuration),
+            )
+            .unwrap();
+            let mut controls = ScenarioControls::default();
+            assert!(
+                !controls.request_clock_benchmark(case),
+                "needs active Clock"
+            );
+            controls.publish_clock_state(&scenario, 1, true);
+            assert!(controls.request_clock_benchmark(case));
+            assert!(
+                !controls.request_clock_benchmark(case),
+                "must not overwrite a request"
+            );
+            let mut input = ClientInput::default();
+            let mut accumulator = Duration::from_secs(1);
+            let mut paused = true;
+            let mut benchmark_active = false;
+            let result = step_scenario(
+                &mut scenario,
+                "clock",
+                42,
+                TickModel::FixedTimestep { hz: 60 },
+                Some(dt),
+                Duration::ZERO,
+                &mut accumulator,
+                &mut input,
+                &mut controls,
+                &mut paused,
+                &mut benchmark_active,
+                false,
+                &settings,
+                TEST_VIEWPORT,
+                &[],
+            );
+            assert!(result.scenario_replaced);
+            assert!(benchmark_active);
+            assert!(!paused);
+            assert_eq!(accumulator, Duration::ZERO);
+            assert!(
+                !scenario.registration().capabilities.benchmark,
+                "no new menu button"
+            );
+            for _ in 0..120 {
+                assert_eq!(
+                    scenario.render_frames(RenderBackend::Raster, TEST_VIEWPORT),
+                    expected.render_frames(RenderBackend::Raster, TEST_VIEWPORT),
+                );
+                scenario.step(&[], dt);
+                expected.step(&[], dt);
+            }
+            let state = scenario.inner.clock_state().unwrap();
+            assert_eq!(
+                state.settings.event_profile,
+                engine_common::ClockEventProfile::Off
+            );
+            assert_eq!(state.event_kind.is_some(), case == ClockBenchmarkCase::Rain);
+
+            controls.request_restart();
+            let result = step_scenario(
+                &mut scenario,
+                "clock",
+                42,
+                TickModel::FixedTimestep { hz: 60 },
+                Some(dt),
+                Duration::ZERO,
+                &mut accumulator,
+                &mut input,
+                &mut controls,
+                &mut paused,
+                &mut benchmark_active,
+                false,
+                &settings,
+                TEST_VIEWPORT,
+                &[],
+            );
+            assert!(result.scenario_replaced);
+            assert!(!benchmark_active);
+            assert_eq!(
+                scenario.inner.clock_state().unwrap().settings,
+                settings.clock
+            );
+        }
     }
 
     #[test]

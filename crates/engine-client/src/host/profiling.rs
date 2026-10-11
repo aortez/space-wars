@@ -40,6 +40,16 @@ impl CpuProfile {
         self.samples.push_back(sample);
     }
 
+    pub fn prepare_average_ms(&self) -> Option<f64> {
+        (!self.samples.is_empty()).then(|| {
+            self.samples
+                .iter()
+                .map(|s| s.prepare.as_secs_f64() * 1000.0)
+                .sum::<f64>()
+                / self.samples.len() as f64
+        })
+    }
+
     pub fn diagnostics(&self) -> String {
         if self.samples.is_empty() {
             return String::new();
@@ -108,6 +118,18 @@ impl CpuProfile {
                 s.raster.other_frames
             }),
             ("raster_image", |s: &FrameSample| s.raster.image),
+            ("raster_image_buffers", |s: &FrameSample| {
+                s.raster.publication.buffers
+            }),
+            ("raster_image_make_mut", |s: &FrameSample| {
+                s.raster.publication.make_mut
+            }),
+            ("raster_image_convert", |s: &FrameSample| {
+                s.raster.publication.convert
+            }),
+            ("raster_image_wrap", |s: &FrameSample| {
+                s.raster.publication.wrap
+            }),
         ] {
             let mut values = [Duration::ZERO; SAMPLE_LIMIT];
             for (value, sample) in values.iter_mut().zip(&self.samples) {
@@ -126,6 +148,22 @@ impl CpuProfile {
                 millis(*values.last().unwrap())
             );
         }
+        let _ = write!(
+            result,
+            "\nhost_raster_image_new_buffers_window={}\nhost_raster_image_cow_copies_window={}\nhost_raster_image_alignment_prefix_pixels_window={}",
+            self.samples
+                .iter()
+                .map(|s| s.raster.publication.new_buffers)
+                .sum::<u64>(),
+            self.samples
+                .iter()
+                .map(|s| s.raster.publication.cow_copies)
+                .sum::<u64>(),
+            self.samples
+                .iter()
+                .map(|s| s.raster.publication.alignment_prefix_pixels)
+                .sum::<u64>(),
+        );
         result
     }
 }
@@ -138,12 +176,14 @@ mod tests {
     fn samples_are_bounded_and_timings_have_explicit_units() {
         let mut profile = CpuProfile::default();
         assert_eq!(profile.diagnostics(), "");
+        assert_eq!(profile.prepare_average_ms(), None);
         for i in 0..150 {
             profile.record(
                 FrameSample {
                     interval: Duration::from_millis(i),
                     step: Duration::from_millis(1),
                     total: Duration::from_millis(5),
+                    prepare: Duration::from_millis(3),
                     updates: 2,
                     ..Default::default()
                 },
@@ -152,6 +192,7 @@ mod tests {
             );
         }
         assert_eq!(profile.samples.len(), SAMPLE_LIMIT);
+        assert_eq!(profile.prepare_average_ms(), Some(3.0));
         let text = profile.diagnostics();
         assert!(text.contains("host_interval_avg_ms=89.500"));
         assert!(text.contains("host_interval_p95_ms=143.000"));
@@ -161,6 +202,55 @@ mod tests {
         assert!(text.contains("host_updates_per_callback=2.000"));
         profile.clear();
         assert_eq!(profile.diagnostics(), "");
+        assert_eq!(profile.prepare_average_ms(), None);
+    }
+
+    #[test]
+    fn publication_counts_and_substages_use_the_same_bounded_window() {
+        let mut profile = CpuProfile::default();
+        for i in 0..150 {
+            let mut raster = crate::raster::RasterTimings::default();
+            raster.publication.buffers = Duration::from_millis(1);
+            raster.publication.make_mut = Duration::from_millis(2);
+            raster.publication.convert = Duration::from_millis(3);
+            raster.publication.wrap = Duration::from_millis(4);
+            raster.publication.new_buffers = u64::from(i < 3);
+            raster.publication.cow_copies = u64::from(i >= 100);
+            raster.publication.alignment_prefix_pixels = 2;
+            profile.record(
+                FrameSample {
+                    raster,
+                    ..Default::default()
+                },
+                [8, 8, 8, 8],
+                1,
+            );
+        }
+        let text = profile.diagnostics();
+        assert!(text.contains("host_raster_image_buffers_avg_ms=1.000"));
+        assert!(text.contains("host_raster_image_make_mut_avg_ms=2.000"));
+        assert!(text.contains("host_raster_image_convert_avg_ms=3.000"));
+        assert!(text.contains("host_raster_image_wrap_avg_ms=4.000"));
+        assert!(text.contains("host_raster_image_new_buffers_window=0"));
+        assert!(text.contains("host_raster_image_cow_copies_window=50"));
+        assert!(text.contains("host_raster_image_alignment_prefix_pixels_window=240"));
+        profile.clear();
+        assert!(profile.diagnostics().is_empty());
+
+        let mut total = crate::raster::RasterTimings::default();
+        let mut next = total;
+        next.publication.convert = Duration::from_millis(3);
+        next.publication.new_buffers = 1;
+        next.publication.cow_copies = 2;
+        next.publication.alignment_prefix_pixels = 3;
+        total += next;
+        total += next;
+        assert_eq!(total.publication.convert, Duration::from_millis(6));
+        assert_eq!(
+            (total.publication.new_buffers, total.publication.cow_copies),
+            (2, 4)
+        );
+        assert_eq!(total.publication.alignment_prefix_pixels, 6);
     }
 
     #[test]

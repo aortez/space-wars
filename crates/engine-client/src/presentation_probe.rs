@@ -1,6 +1,6 @@
-//! Fixed-image software presentation lab. No real-time simulation, input,
-//! settings or frame pacing. Only the explicit memory probe opens a DRM device;
-//! its private allocation is never presented.
+//! Fixed-image presentation lab. No real-time simulation, input, settings or
+//! frame pacing. The memory probe opens a private DRM allocation; the opt-in
+//! GPU upload probe opens a render-node context. Neither takes over scanout.
 
 use engine_common::{ClockEventProfile, Scenario};
 use i_slint_core::software_renderer::{
@@ -17,13 +17,32 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(any(test, all(target_os = "linux", feature = "pi-kiosk-gpu")))]
+mod geometry;
+#[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+mod gpu_text;
+#[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+mod gpu_ui;
 #[cfg(target_os = "linux")]
 mod memory;
 mod raster;
 mod text;
+#[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+mod upload;
 
 #[derive(Debug, Default, clap::Args)]
 pub struct Options {
+    /// Check rounded borders, clipping and stroke overlap in a private GPU context.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_gpu_text", "presentation_geometry", "presentation_upload", "presentation_text", "presentation_memory", "presentation_raster", "presentation_republish", "presentation_detail", "presentation_frames", "presentation_repeats"])]
+    presentation_gpu_ui: bool,
+    #[arg(
+        long,
+        requires = "presentation_gpu_ui",
+        default_value = "/dev/dri/renderD128"
+    )]
+    gpu_ui_device: std::path::PathBuf,
+    #[arg(long, requires = "presentation_gpu_ui")]
+    gpu_ui_output: Option<std::path::PathBuf>,
     /// Compare frozen images in a bare window and the full UI; print CSV, without a display.
     #[arg(long, conflicts_with_all = ["scenario", "rom", "benchmark", "benchmark_headless", "debug_render", "debug_triangles", "kiosk", "touch_test", "benchmark_report", "renderer", "raster_scale"])]
     pub benchmark_presentation: bool,
@@ -77,6 +96,205 @@ pub struct Options {
     /// Save frozen geometry and output PNGs, outside all measurement timers.
     #[arg(long, requires = "presentation_raster")]
     presentation_output: Option<std::path::PathBuf>,
+    /// Compare RGB/RGBA texture uploads offscreen on an explicit GPU render node.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_memory", "presentation_raster", "presentation_republish", "presentation_detail"])]
+    presentation_upload: bool,
+    /// DRM render node used by the upload probe; never a display/scanout node.
+    #[arg(
+        long,
+        requires = "presentation_upload",
+        default_value = "/dev/dri/renderD128"
+    )]
+    presentation_upload_device: std::path::PathBuf,
+    /// Frozen production image; both formats use the same pixels at native size.
+    #[arg(long, requires = "presentation_upload", default_value = "clock-1024", value_parser = ["clock-1024", "falling-256"])]
+    presentation_upload_fixture: String,
+    /// Hold RGBA fixed and compare fresh, single and triple-buffered textures.
+    #[arg(long, requires = "presentation_upload")]
+    presentation_upload_reuse: bool,
+    /// Isolate cold/cached UI text and row preparation in a private offscreen surface.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_memory", "presentation_raster", "presentation_upload", "presentation_geometry", "presentation_republish", "presentation_detail", "presentation_frames"])]
+    presentation_gpu_text: bool,
+    /// Explicit GPU render node for the text-cache probe; never owns scanout.
+    #[arg(
+        long,
+        requires = "presentation_gpu_text",
+        default_value = "/dev/dri/renderD128"
+    )]
+    gpu_text_device: std::path::PathBuf,
+    /// New directory for text reference PNGs and exact image-validation records.
+    #[arg(long, requires = "presentation_gpu_text")]
+    gpu_text_output: Option<std::path::PathBuf>,
+    /// Text policy in the Slint/shaping fixtures; the default stays vector.
+    #[arg(long, requires = "presentation_gpu_text", conflicts_with = "gpu_text_masks", default_value = "vector", value_parser = ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"])]
+    gpu_text_policy: String,
+    /// Add intrusive per-run text/path clocks; omit for the timing-overhead control.
+    #[arg(
+        long,
+        requires = "presentation_gpu_text",
+        conflicts_with = "gpu_text_masks"
+    )]
+    gpu_text_detail: bool,
+    /// Compare vector-generated and CPU-generated glyph atlases, not the live UI.
+    #[arg(long, group = "gpu_text_font_probe", requires_all = ["presentation_gpu_text", "gpu_text_font_regular", "gpu_text_font_bold"])]
+    gpu_text_masks: bool,
+    /// CPU-only fresh-context shaping lab; no Slint window, GPU, atlas or display.
+    /// --gpu-text-detail adds intrusive word-level clocks in this lab only.
+    #[arg(long, group = "gpu_text_font_probe", requires_all = ["presentation_gpu_text", "gpu_text_font_regular", "gpu_text_font_bold"], conflicts_with_all = ["gpu_text_masks", "gpu_text_output", "gpu_text_device"])]
+    gpu_text_shaping: bool,
+    /// Explicit regular font for the mask/shaping probes; exact bytes, face 0.
+    #[arg(long, requires = "gpu_text_font_probe")]
+    gpu_text_font_regular: Option<std::path::PathBuf>,
+    /// Explicit bold font for the mask/shaping probes; no system-font assumption.
+    #[arg(long, requires = "gpu_text_font_probe")]
+    gpu_text_font_bold: Option<std::path::PathBuf>,
+    /// Replay scene geometry or regenerate ship artwork, without simulation or vsync.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_memory", "presentation_raster", "presentation_upload", "presentation_republish", "presentation_detail"])]
+    presentation_geometry: bool,
+    /// Explicit render node; no display ownership or implicit software fallback.
+    #[arg(
+        long,
+        requires = "presentation_geometry",
+        default_value = "/dev/dri/renderD128"
+    )]
+    geometry_device: std::path::PathBuf,
+    /// Production snapshots or deterministic synthetic animation/overdraw.
+    #[arg(long, requires = "presentation_geometry", value_delimiter = ',', default_value = "clock-idle,clock-rain,mixed-grouped,mixed-interleaved,moving-circles,pizza-300,pizza-1000,pizza-5000,pizza-10000,overlap-1,overlap-8,overlap-32,overlap-128", value_parser = ["clock-idle", "clock-rain", "mixed-grouped", "mixed-interleaved", "moving-circles", "meshes-grouped", "meshes-interleaved", "meshes-churn", "ships-pair", "ships-fleet", "ships-zoom", "ships-pair-local", "ships-fleet-local", "ships-zoom-local", "pizza-300", "pizza-1000", "pizza-5000", "pizza-10000", "overlap-1", "overlap-8", "overlap-32", "overlap-128"])]
+    geometry_cases: Vec<String>,
+    /// Compare geometry and submission controls; normal rendering is unaffected.
+    #[arg(long, requires = "presentation_geometry", value_delimiter = ',', default_value = "triangles", value_parser = ["triangles", "triangles-split", "triangles-programs", "circles", "circles-expanded", "circles-uniforms", "circles-bindings", "circles-submission", "circles-unified", "circles-unified-instanced", "circles-unified-layout", "circles-unified-vao", "meshes-streamed", "meshes", "meshes-expanded"])]
+    geometry_modes: Vec<String>,
+    /// New directory for GPU and raster-reference captures (never overwrite).
+    #[arg(long, requires = "presentation_geometry")]
+    geometry_output: Option<std::path::PathBuf>,
+    /// Maximum submitted frames awaiting completion; bounds queue/resource growth.
+    #[arg(long, requires = "presentation_geometry", default_value_t = 3, value_parser = clap::value_parser!(u32).range(1..=8))]
+    geometry_in_flight: u32,
+    /// Compare instrumentation overhead with GPU queries disabled.
+    #[arg(long, requires = "presentation_geometry")]
+    geometry_no_gpu_timing: bool,
+    /// Validate and time split views, grouped minimaps and resize/resource history.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_layouts: bool,
+    /// Compare uncached, cold and retained production terrain chunks, including edits.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_terrain: bool,
+    /// Replay real Spacewars matches through the live split-screen retained path.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_live_retained: bool,
+    /// Limit timed live-replay modes; all modes still undergo image validation.
+    #[arg(long, requires = "geometry_live_retained", value_delimiter = ',', value_parser = ["triangles", "retained-cold", "retained", "retained-adaptive", "retained-zoom", "retained-hybrid", "retained-outlines", "retained-paced", "retained-memoized", "retained-scan", "retained-ranges", "retained-culled", "retained-resident", "retained-resident-passes", "retained-resident-buffers", "retained-resident-uniforms"])]
+    geometry_live_modes: Vec<String>,
+    /// Replay terrain edits, visibility changes and cold admission without hiding startup frames.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_churn: bool,
+    /// Profile cold template construction on production artwork, without drawing.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_build_profile: bool,
+    /// Profile warm CPU mesh encoding on moving production replays, without drawing.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_encode_profile: bool,
+    /// Attribute GL submission CPU wall time; paired controls compile out stage clocks.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_submit_profile: bool,
+    /// Also compare bounded per-pass vertex/index buffers against the shared pair.
+    #[arg(long, requires = "geometry_submit_profile")]
+    geometry_submit_passes: bool,
+    /// Compare per-pass exact stores against grow-only bucketed stores plus subdata.
+    #[arg(
+        long,
+        requires = "geometry_submit_profile",
+        conflicts_with = "geometry_submit_passes"
+    )]
+    geometry_submit_capacity: bool,
+    /// Isolate the upload API: exact combined, exact split, and bucketed split stores.
+    #[arg(long, requires = "geometry_submit_profile", conflicts_with_all = ["geometry_submit_passes", "geometry_submit_capacity"])]
+    geometry_submit_api: bool,
+    /// Time only uninstrumented controls; still validate every mode in the selected family.
+    #[arg(long, requires = "geometry_submit_profile")]
+    geometry_submit_plain_only: bool,
+    /// Compare exact/bucketed streams with bounded completion overlap and terrain histories.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_submit_profile", "geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_no_gpu_timing"])]
+    geometry_stream_history: bool,
+    /// Prepared histories for the stream-overlap probe (1..128 frames, no simulation in timing).
+    #[arg(long, requires = "geometry_stream_history", value_delimiter = ',', default_value = "bots-early,bots-late,close-up-zoom,terrain-reveal-zoom,terrain-edit-replace", value_parser = ["bots-early", "bots-late", "close-up-zoom", "terrain-reveal-zoom", "terrain-edit-replace"])]
+    geometry_stream_cases: Vec<String>,
+    /// Compare CPU plan allocation policies on identical moving production frames.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_stream_history", "geometry_submit_profile", "geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_plan_profile: bool,
+    /// Compare source point allocation on matched freshly generated moving states.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_plan_profile", "geometry_stream_history", "geometry_submit_profile", "geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_source_profile: bool,
+    /// Compare uncached stroke writers on identical moving scenes, including completed GPU draws.
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_source_profile", "geometry_plan_profile", "geometry_stream_history", "geometry_submit_profile", "geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing"])]
+    geometry_stroke_profile: bool,
+    /// Replay bounded captured outlines with separate join/output timing controls.
+    #[arg(long, requires = "geometry_stroke_profile", conflicts_with_all = ["geometry_stroke_rejection", "geometry_small_strokes", "geometry_round_joins"])]
+    geometry_stroke_attribution: bool,
+    /// Compare only plain/prepared/checked fixed-width guards, without region clocks.
+    #[arg(long, requires = "geometry_stroke_attribution")]
+    geometry_stroke_invariants: bool,
+    /// Compare bounded triangle-layout reuse with ordinary captured stroke tessellation.
+    #[arg(
+        long,
+        requires = "geometry_stroke_attribution",
+        conflicts_with = "geometry_stroke_invariants"
+    )]
+    geometry_stroke_topology: bool,
+    /// Compare the actual renderer adapter with direct replay, split by stroke outcome.
+    #[arg(long, requires = "geometry_stroke_topology")]
+    geometry_stroke_adapter: bool,
+    /// Compare guarded stroke rejection with ordinary tessellation, keeping the stock writer.
+    #[arg(long, requires = "geometry_stroke_profile")]
+    geometry_stroke_rejection: bool,
+    /// Compare one-pixel opaque polygon bevels with the reference; report image differences.
+    #[arg(
+        long,
+        requires = "geometry_stroke_profile",
+        conflicts_with = "geometry_stroke_rejection"
+    )]
+    geometry_small_strokes: bool,
+    /// Compare exact zero-subdivision round-join skipping with the original calculation.
+    #[arg(long, requires = "geometry_stroke_profile", conflicts_with_all = ["geometry_stroke_rejection", "geometry_small_strokes"])]
+    geometry_round_joins: bool,
+    /// Use the bulk writer in both exact round-join controls; cached templates stay stock.
+    #[arg(long, requires = "geometry_round_joins")]
+    geometry_stroke_bulk: bool,
+    /// Keep the bulk writer's concrete type through fixed-width polygon/line tessellation.
+    #[arg(long, requires = "geometry_stroke_bulk")]
+    geometry_stroke_static: bool,
+    /// Compare direct polygon input with path events; both use concrete bulk output and exact joins.
+    #[arg(long, requires = "geometry_stroke_static")]
+    geometry_stroke_polygon: bool,
+    /// Compare adjacent-edge reuse with ordinary concrete-output path-event strokes.
+    #[arg(
+        long,
+        requires = "geometry_stroke_static",
+        conflicts_with = "geometry_stroke_polygon"
+    )]
+    geometry_stroke_edges: bool,
+    /// Compare per-stroke prepared join bounds against bulk-static with exact joins.
+    #[arg(long, requires = "geometry_stroke_static", conflicts_with_all = ["geometry_stroke_edges", "geometry_stroke_polygon", "geometry_stroke_attribution", "geometry_stroke_invariants"])]
+    geometry_stroke_prepared: bool,
+    /// Compare bounded single-pass polygon output against ordinary bulk-static.
+    #[arg(long, requires = "geometry_stroke_static", conflicts_with_all = ["geometry_stroke_edges", "geometry_stroke_polygon", "geometry_stroke_prepared", "geometry_stroke_attribution", "geometry_stroke_invariants", "geometry_stroke_topology", "geometry_small_strokes", "geometry_stroke_rejection"])]
+    geometry_stroke_single_pass: bool,
+    /// Single-pass experiment; prefix compares scratch reuse with the original single-pass path.
+    #[arg(long, requires = "geometry_stroke_single_pass", value_parser = ["all", "layouts", "arcs", "classify", "prefix"], conflicts_with = "geometry_stroke_encoder_profile")]
+    geometry_stroke_selection: Option<String>,
+    /// Attribute complete single-pass encoding, with separate uninstrumented controls.
+    #[arg(
+        long,
+        requires = "geometry_stroke_single_pass",
+        conflicts_with = "geometry_stroke_cases"
+    )]
+    geometry_stroke_encoder_profile: bool,
+    /// Use existing scene snapshots/animations instead of the Spacewars stroke replay.
+    #[arg(long, requires = "geometry_round_joins", value_delimiter = ',', value_parser = ["clock-idle", "clock-rain", "pizza-300", "pizza-5000", "mixed-interleaved"])]
+    geometry_stroke_cases: Vec<String>,
+    /// Validate cold/moving/stopped admission histories against ordinary geometry (no timing).
+    #[arg(long, requires = "presentation_geometry", conflicts_with_all = ["geometry_stroke_profile", "geometry_source_profile", "geometry_plan_profile", "geometry_stream_history", "geometry_submit_profile", "geometry_encode_profile", "geometry_build_profile", "geometry_churn", "geometry_live_retained", "geometry_terrain", "geometry_layouts", "geometry_cases", "geometry_modes", "geometry_in_flight", "geometry_no_gpu_timing", "presentation_frames", "presentation_repeats"])]
+    geometry_admission_check: bool,
 }
 
 slint::slint! {
@@ -326,6 +544,30 @@ fn render(
 pub fn run(options: &Options, width: u32, height: u32) -> Result<(), Box<dyn std::error::Error>> {
     if width > 2048 || height > 2048 {
         return Err("presentation viewport must be at most 2048×2048".into());
+    }
+    if options.presentation_gpu_ui {
+        #[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+        return gpu_ui::run(options);
+        #[cfg(not(all(target_os = "linux", feature = "pi-kiosk-gpu")))]
+        return Err("--presentation-gpu-ui requires Linux and the pi-kiosk-gpu feature".into());
+    }
+    if options.presentation_gpu_text {
+        #[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+        return gpu_text::run(options, width, height);
+        #[cfg(not(all(target_os = "linux", feature = "pi-kiosk-gpu")))]
+        return Err("--presentation-gpu-text requires Linux and the pi-kiosk-gpu feature".into());
+    }
+    if options.presentation_geometry {
+        #[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+        return geometry::run(options, width, height);
+        #[cfg(not(all(target_os = "linux", feature = "pi-kiosk-gpu")))]
+        return Err("--presentation-geometry requires Linux and the pi-kiosk-gpu feature".into());
+    }
+    if options.presentation_upload {
+        #[cfg(all(target_os = "linux", feature = "pi-kiosk-gpu"))]
+        return upload::run(options);
+        #[cfg(not(all(target_os = "linux", feature = "pi-kiosk-gpu")))]
+        return Err("--presentation-upload requires Linux and the pi-kiosk-gpu feature".into());
     }
     if options.presentation_memory {
         #[cfg(target_os = "linux")]

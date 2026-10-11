@@ -14,6 +14,7 @@ path = "src/main.rs"
 chrono = { workspace = true }
 engine-common = { workspace = true }
 engine-core = { workspace = true }
+engine-terrain = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true }
 spacewars-control = { workspace = true }
@@ -47,6 +48,11 @@ tracing-subscriber = { workspace = true }
 async-channel = "2"
 async-io = "2"
 futures-lite = "2"
+# Tessellate typed scene paths into one ordered colored triangle stream.
+lyon_tessellation = { version = "=1.0.20", optional = true }
+
+[dev-dependencies]
+lyon_tessellation = "=1.0.20"
 
 [build-dependencies]
 slint-build = { workspace = true }
@@ -58,6 +64,15 @@ drm = "0.14.1"
 nix = { version = "0.30.1", default-features = false, features = ["fs", "net", "hostname", "time"] }
 # Public diagnostics from our existing vendored LinuxKMS backend, on its UI thread.
 i-slint-backend-linuxkms = { version = "=1.13.1", default-features = false, optional = true }
+# Opt-in upload probe uses the same pinned texture implementation as Slint.
+femtovg = { version = "=0.17.0", default-features = false, features = ["cpu-glyph-cache", "render-diagnostics"], optional = true }
+# Offscreen text-cache experiment uses the same renderer as the kiosk UI.
+i-slint-renderer-femtovg = { version = "=1.13.1", default-features = false, features = ["opengl"], optional = true }
+# Offscreen glyph-mask experiment only; both are already locked transitive dependencies.
+ab_glyph_rasterizer = { version = "=0.1.10", optional = true }
+ttf-parser = { version = "=0.25.1", optional = true }
+glow = { version = "=0.16.0", default-features = false, optional = true }
+glutin = { version = "=0.32.3", default-features = false, features = ["egl"], optional = true }
 
 [features]
 default = ["desktop"]
@@ -77,4 +92,18 @@ pi-kiosk = [
     # Retain desktop keyboard compatibility; native pad input uses evdev through
     # gilrs and does not depend on the display backend.
     "slint/unstable-winit-030",
+]
+# Direct-KMS GPU build, used by the normal Pi image. Software remains available
+# with SLINT_BACKEND=linuxkms-software for recovery and comparisons.
+pi-kiosk-gpu = [
+    "scenario-spacewars/render-hints",
+    "pi-kiosk",
+    "i-slint-backend-linuxkms/renderer-femtovg",
+    "dep:femtovg",
+    "dep:i-slint-renderer-femtovg",
+    "dep:ab_glyph_rasterizer",
+    "dep:ttf-parser",
+    "dep:glow",
+    "dep:glutin",
+    "dep:lyon_tessellation",
 ]

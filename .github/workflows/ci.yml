@@ -47,7 +47,7 @@ jobs:
       - run: npm --prefix yocto test
         env:
           SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
-      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
+      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh yocto/meta-spacewars/recipes-connectivity/spacewars-bluetooth/files/spacewars-bluetooth-data-init.sh
       - name: Report sandbox configuration and kernel denials
         if: failure()
         run: |
@@ -100,8 +100,9 @@ jobs:
           workspaces: |
             . -> target
             vendor/i-slint-backend-linuxkms -> target
+            vendor/lyon_tessellation -> target
       - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+        run: sudo apt-get update && sudo apt-get install --yes dbus-daemon libasound2-dev libdrm-dev libgbm-dev libinput-dev libseat-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports, build identity, and input diagnostic safety
         run: |
           python3 -m unittest discover -s .github/ci -p 'test_*.py'
@@ -148,17 +149,33 @@ jobs:
             xvfb-run -a -s "-screen 0 1280x1024x24" \
             cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
               -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
-      - name: Test vendored LinuxKMS input and software rendering
+      - name: Test vendored LinuxKMS input and presentation renderers
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/kms.seconds" \
-            cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software --lib
+            cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software,renderer-femtovg --lib
+      - name: Test exact round-join shortcut against vendored tessellator reference
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/lyon.seconds" \
+            cargo test --locked --release --manifest-path vendor/lyon_tessellation/Cargo.toml --lib
+      - name: Check default GPU kiosk client (no display required)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-check.seconds" \
+            cargo check --locked --profile ci -p engine-client --no-default-features --features pi-kiosk-gpu
+      - name: Test GPU defaults, startup safety, text and rotation (no display required)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/gpu-text.seconds" \
+            cargo test --locked --profile ci -p femtovg -p i-slint-renderer-femtovg -p engine-client \
+              --no-default-features --features engine-client/pi-kiosk-gpu --lib --bins --test backend_startup
       - name: Summarize build and test timings
         if: always()
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
             --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
-            --phase build --phase workspace --phase ui --phase kms \
+            --phase build --phase workspace --phase ui --phase kms --phase lyon --phase gpu-check --phase gpu-text \
             target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload build and per-test timings
         if: always()

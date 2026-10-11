@@ -13,6 +13,9 @@ PHASES = {
     "workspace": "Execute workspace tests",
     "ui": "Execute UI tests (serial, real-time application)",
     "kms": "Build and test vendored LinuxKMS",
+    "lyon": "Build and test exact round-join tessellator",
+    "gpu-check": "Check GPU kiosk client",
+    "gpu-text": "Test GPU text and rotation helpers",
 }
 
 

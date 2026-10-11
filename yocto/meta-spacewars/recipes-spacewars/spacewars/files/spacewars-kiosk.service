@@ -10,7 +10,7 @@ User=spacewars
 Group=spacewars
 SupplementaryGroups=input video audio
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
-Environment=SLINT_BACKEND=linuxkms-software
+Environment=SLINT_BACKEND=linuxkms
 EnvironmentFile=/run/spacewars-hardware/hardware.env
 # Optional per-device overrides; the shared boot partition survives A/B updates.
 EnvironmentFile=-/boot/spacewars-kiosk.env

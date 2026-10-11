@@ -108,7 +108,7 @@ fn compare(
                     if index == 0 {
                         uis[index].set_primitives(ModelRc::new(VecModel::from(next)));
                     } else {
-                        host::update_raster_text_overlay(&uis[index], next);
+                        host::update_scene_primitives(&uis[index], next);
                     }
                     let publish_time = started.elapsed();
                     MEASUREMENTS.with(|m| {

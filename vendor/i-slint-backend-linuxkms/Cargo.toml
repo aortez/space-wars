@@ -36,6 +36,7 @@ default = []
 libseat = ["dep:libseat"]
 renderer-femtovg = [
     "i-slint-renderer-femtovg/opengl",
+    "dep:femtovg",
     "drm",
     "gbm",
     "glutin",
@@ -75,6 +76,8 @@ features = ["std", "compat-1-2"]
 
 [patch.crates-io]
 i-slint-core = { path = "../i-slint-core" }
+femtovg = { path = "../femtovg" }
+i-slint-renderer-femtovg = { path = "../i-slint-renderer-femtovg" }
 
 [dependencies.i-slint-common]
 version = "=1.13.1"
@@ -93,6 +96,12 @@ default-features = false
 [dependencies.i-slint-renderer-femtovg]
 version = "=1.13.1"
 features = ["default"]
+optional = true
+default-features = false
+
+[dependencies.femtovg]
+version = "=0.17.0"
+features = ["render-diagnostics"]
 optional = true
 default-features = false
 

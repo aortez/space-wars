@@ -177,7 +177,7 @@ pub(super) fn run(
                         let started = Instant::now();
                         // Keep the previous image alive until publication, as in
                         // the real host, to exercise triple-buffer ownership.
-                        host::update_raster_text_overlay(&uis[index], rows.clone());
+                        host::update_scene_primitives(&uis[index], rows.clone());
                         uis[index].set_raster_frame(raster.image);
                         let publish_elapsed = started.elapsed();
                         MEASUREMENTS.with(|m| {
