@@ -1,0 +1,544 @@
+{
+  "source_base": "ca9b22950309ab5277733c6869bb6cb3efea935e",
+  "scope": "Diagnostic-only changes. Live samples and fixed-input cases are distinct worlds; no optimization or paired FPS comparison.",
+  "runs": [
+    {
+      "label": "first-counted",
+      "command": "/data/spacewars/physics-cost.g3HD9M01/probe --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/physics-cost.g3HD9M01/first-counted --counts",
+      "binary_sha256": "f42a9c928e6500310f27986f1c5e6738ed92e321fe30f9c9cac4fb971530e6e5",
+      "elapsed_seconds": 150.4750523879993,
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": true,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "means_ms": {
+        "physics_ms": 36.325288775,
+        "ccd_ms": 22.608010433333334,
+        "lifecycle_ms": 3.868332308333333,
+        "step_ms": 42.89163499166667,
+        "narrow_phase_ms": 5.150877216666666,
+        "solver_ms": 5.184860225
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "all_retained_states_and_artifacts_match": true,
+      "ccd_prefilter_means": {
+        "bounds_calls": 1972.4666666666667,
+        "bounds_ns": 468699.9583333333,
+        "bvh_update_calls": 986.225,
+        "bvh_update_ns": 221694.35833333334,
+        "candidate_next_calls": 8168.925,
+        "candidate_next_ns": 2003215.0333333334,
+        "clamp_candidates": 3570.383333333333,
+        "clamp_search_ns": 10040525.591666667,
+        "clamp_setup_ns": 498216.2083333333,
+        "contact_lookup_calls": 4604.075,
+        "contact_lookup_ns": 2480130.191666667,
+        "first_candidates": 3612.233333333333,
+        "first_search_ns": 11444148.308333334,
+        "first_setup_ns": 428809.4583333333,
+        "resweep_candidates": 0.06666666666666667,
+        "resweep_ns": 441.51666666666665,
+        "thickness_calls": 4604.075,
+        "thickness_ns": 10718491.725,
+        "thickness_rejected": 4594,
+        "toi_calls": 4604.075,
+        "toi_ns": 12869079.391666668
+      },
+      "lifecycle_means_ms": {
+        "lifecycle.reconcile": 0.153394725,
+        "terrain.cohesion": 0.00025724166666666665,
+        "terrain.commit": 3.7120718,
+        "terrain.deposits": 3.6387807333333333,
+        "terrain.edits": 0.0017220083333333335,
+        "terrain.impacts": 0.000374375,
+        "terrain.releases": 0.05937824166666667,
+        "terrain.slumping": 0.00077395,
+        "terrain.support": 0.0026413083333333334
+      },
+      "lifecycle_calls": {
+        "lifecycle.reconcile": 120,
+        "terrain.cohesion": 120,
+        "terrain.commit": 120,
+        "terrain.deposits": 120,
+        "terrain.edits": 120,
+        "terrain.impacts": 120,
+        "terrain.releases": 120,
+        "terrain.slumping": 120,
+        "terrain.support": 120
+      },
+      "material_profile_means_ms": {
+        "collider_sync": 0.11893714166666666,
+        "deposit_commit": 0.18815464166666665,
+        "deposit_geometry": 0.14172861666666667,
+        "packing": 1.7719173916666666,
+        "packing_assign": 0.05552945833333334,
+        "packing_candidates": 0.0383112,
+        "packing_clearance": 0.319480425,
+        "packing_dependencies": 0.04532651666666667,
+        "packing_match": 0.0398651,
+        "packing_surface": 0.96826625,
+        "release_commit": 0.005678808333333333,
+        "release_prepare": 0.03669491666666667,
+        "settle": 3.5370749333333333,
+        "support_graph": 1.0788575916666667,
+        "world_step": 37.481862575
+      },
+      "material_profile_calls": {
+        "collider_sync": 8,
+        "deposit_commit": 8,
+        "deposit_geometry": 8,
+        "packing": 37,
+        "packing_assign": 89,
+        "packing_candidates": 126,
+        "packing_clearance": 77,
+        "packing_dependencies": 31,
+        "packing_match": 89,
+        "packing_surface": 77,
+        "release_commit": 1,
+        "release_prepare": 1,
+        "settle": 120,
+        "support_graph": 120,
+        "world_step": 120
+      },
+      "shape_cast_means": {
+        "Ball/Polyline": {
+          "queries": 2.5083333333333333,
+          "elapsed_ns": 53923.683333333334,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 2.5083333333333333
+        },
+        "Compound/Compound": {
+          "queries": 2.683333333333333,
+          "elapsed_ns": 849392.5583333333,
+          "nodes": 259.31666666666666,
+          "leaves": 52.75,
+          "primitive_queries": 46.61666666666667
+        },
+        "Compound/Polyline": {
+          "queries": 4.883333333333334,
+          "elapsed_ns": 384549.875,
+          "nodes": 29.3,
+          "leaves": 19.533333333333335,
+          "primitive_queries": 19.533333333333335
+        }
+      },
+      "temperature_c_range": [
+        70.601,
+        77.419
+      ],
+      "cpu_khz_samples": [
+        1300000,
+        1500000
+      ]
+    },
+    {
+      "label": "first-uncounted",
+      "command": "/data/spacewars/physics-cost.g3HD9M01/probe --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/physics-cost.g3HD9M01/first-uncounted",
+      "binary_sha256": "f42a9c928e6500310f27986f1c5e6738ed92e321fe30f9c9cac4fb971530e6e5",
+      "elapsed_seconds": 150.43463907799742,
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "means_ms": {
+        "physics_ms": 31.5920386,
+        "ccd_ms": 18.096732433333333,
+        "lifecycle_ms": 3.7729131833333334,
+        "step_ms": 37.960998225,
+        "narrow_phase_ms": 5.101260875,
+        "solver_ms": 5.157302366666666
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "all_retained_states_and_artifacts_match": true,
+      "temperature_c_range": [
+        74.984,
+        78.88
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "second-counted",
+      "command": "/data/spacewars/physics-cost.g3HD9M01/probe --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/physics-cost.g3HD9M01/second-counted --counts",
+      "binary_sha256": "f42a9c928e6500310f27986f1c5e6738ed92e321fe30f9c9cac4fb971530e6e5",
+      "elapsed_seconds": 102.53013033999741,
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": true,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "means_ms": {
+        "physics_ms": 14.601946408333333,
+        "ccd_ms": 9.207702791666666,
+        "lifecycle_ms": 4.264066166666667,
+        "step_ms": 21.327982691666666,
+        "narrow_phase_ms": 2.07191145,
+        "solver_ms": 1.9719924916666667
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "all_retained_states_and_artifacts_match": true,
+      "ccd_prefilter_means": {
+        "bounds_calls": 792.7583333333333,
+        "bounds_ns": 194628.43333333332,
+        "bvh_update_calls": 396.35,
+        "bvh_update_ns": 97679.975,
+        "candidate_next_calls": 2908.9083333333333,
+        "candidate_next_ns": 746872.9916666667,
+        "clamp_candidates": 1234.7666666666667,
+        "clamp_search_ns": 4347465.175,
+        "clamp_setup_ns": 188185.91666666666,
+        "contact_lookup_calls": 1516.2833333333333,
+        "contact_lookup_ns": 891514.0583333333,
+        "first_candidates": 1277.5,
+        "first_search_ns": 4431134.516666667,
+        "first_setup_ns": 177535.94166666668,
+        "resweep_candidates": 0.23333333333333334,
+        "resweep_ns": 636.3916666666667,
+        "thickness_calls": 1516.2833333333333,
+        "thickness_ns": 4978635.8,
+        "thickness_rejected": 1498.4083333333333,
+        "toi_calls": 1516.2833333333333,
+        "toi_ns": 5689300.275
+      },
+      "lifecycle_means_ms": {
+        "lifecycle.reconcile": 0.1337289083333333,
+        "terrain.cohesion": 0.00023820833333333335,
+        "terrain.commit": 4.127401241666667,
+        "terrain.deposits": 4.0777393250000005,
+        "terrain.edits": 0.001699075,
+        "terrain.impacts": 0.00034905833333333334,
+        "terrain.releases": 0.03778156666666667,
+        "terrain.slumping": 0.0007425916666666667,
+        "terrain.support": 0.0012324916666666666
+      },
+      "lifecycle_calls": {
+        "lifecycle.reconcile": 120,
+        "terrain.cohesion": 120,
+        "terrain.commit": 120,
+        "terrain.deposits": 120,
+        "terrain.edits": 120,
+        "terrain.impacts": 120,
+        "terrain.releases": 120,
+        "terrain.slumping": 120,
+        "terrain.support": 120
+      },
+      "material_profile_means_ms": {
+        "collider_sync": 0.214098825,
+        "deposit_commit": 0.31232813333333337,
+        "deposit_geometry": 0.23193636666666667,
+        "packing": 1.9856323583333333,
+        "packing_assign": 0.05338185,
+        "packing_candidates": 0.04111293333333333,
+        "packing_clearance": 0.33217138333333335,
+        "packing_dependencies": 0.042956408333333335,
+        "packing_match": 0.03782326666666667,
+        "packing_surface": 1.04708205,
+        "release_commit": 0.011361041666666667,
+        "release_prepare": 0.0019138749999999998,
+        "settle": 3.9790197916666665,
+        "support_graph": 1.1348396,
+        "world_step": 15.41610135
+      },
+      "material_profile_calls": {
+        "collider_sync": 14,
+        "deposit_commit": 13,
+        "deposit_geometry": 13,
+        "packing": 45,
+        "packing_assign": 92,
+        "packing_candidates": 137,
+        "packing_clearance": 92,
+        "packing_dependencies": 35,
+        "packing_match": 92,
+        "packing_surface": 92,
+        "release_commit": 1,
+        "release_prepare": 1,
+        "settle": 120,
+        "support_graph": 120,
+        "world_step": 120
+      },
+      "shape_cast_means": {
+        "Ball/Ball": {
+          "queries": 0.10833333333333334,
+          "elapsed_ns": 962.65,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 0.10833333333333334
+        },
+        "Ball/Compound": {
+          "queries": 3.1333333333333333,
+          "elapsed_ns": 93566.98333333334,
+          "nodes": 56.38333333333333,
+          "leaves": 4.975,
+          "primitive_queries": 4.975
+        },
+        "Ball/Polyline": {
+          "queries": 14.633333333333333,
+          "elapsed_ns": 315754.7166666667,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 14.633333333333333
+        }
+      },
+      "temperature_c_range": [
+        77.419,
+        79.367
+      ],
+      "cpu_khz_samples": [
+        1400000,
+        1500000
+      ]
+    },
+    {
+      "label": "first-cache-detail",
+      "command": "/data/spacewars/physics-cost.3px21yoy/probe --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/physics-cost.3px21yoy/first-cache-detail --counts",
+      "binary_sha256": "ed01825d3bbd4edd8482018e0b61ab7fa94caf49aa711af4b1f50c83578dfb8b",
+      "kiosk_suspended_during_replay": true,
+      "elapsed_seconds": 108.89132679100294,
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": true,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "means_ms": {
+        "physics_ms": 27.977651883333333,
+        "ccd_ms": 18.24873,
+        "lifecycle_ms": 2.8894653833333335,
+        "step_ms": 32.890505641666664,
+        "narrow_phase_ms": 3.496235825,
+        "solver_ms": 4.049750125
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "all_retained_states_and_artifacts_match": true,
+      "ccd_prefilter_means": {
+        "bounds_calls": 1972.4666666666667,
+        "bounds_ns": 291685.925,
+        "bvh_update_calls": 986.225,
+        "bvh_update_ns": 167579.98333333334,
+        "candidate_next_calls": 8168.925,
+        "candidate_next_ns": 1713081.4916666667,
+        "clamp_candidates": 3570.383333333333,
+        "clamp_search_ns": 8299807.933333334,
+        "clamp_setup_ns": 349542.3416666667,
+        "compound_children": 24920.025,
+        "compound_compute_ns": 6735218.241666666,
+        "compound_lookups": 1922.925,
+        "compound_misses": 160.60833333333332,
+        "contact_lookup_calls": 4604.075,
+        "contact_lookup_ns": 1785045.575,
+        "first_candidates": 3612.233333333333,
+        "first_search_ns": 9186457.95,
+        "first_setup_ns": 331392.225,
+        "primitive_thickness_calls": 7285.225,
+        "primitive_thickness_ns": 588976.6666666666,
+        "resweep_candidates": 0.06666666666666667,
+        "resweep_ns": 172.68333333333334,
+        "thickness_calls": 4604.075,
+        "thickness_ns": 8747916.275,
+        "thickness_rejected": 4594,
+        "toi_calls": 4604.075,
+        "toi_ns": 10712939.725
+      },
+      "lifecycle_means_ms": {
+        "lifecycle.reconcile": 0.10896782499999999,
+        "terrain.cohesion": 0.000139825,
+        "terrain.commit": 2.7783809416666667,
+        "terrain.deposits": 2.7279618083333332,
+        "terrain.edits": 0.0015663083333333334,
+        "terrain.impacts": 0.00035556666666666667,
+        "terrain.releases": 0.041631175000000006,
+        "terrain.slumping": 0.00047435833333333335,
+        "terrain.support": 0.0016706916666666665
+      },
+      "lifecycle_calls": {
+        "lifecycle.reconcile": 120,
+        "terrain.cohesion": 120,
+        "terrain.commit": 120,
+        "terrain.deposits": 120,
+        "terrain.edits": 120,
+        "terrain.impacts": 120,
+        "terrain.releases": 120,
+        "terrain.slumping": 120,
+        "terrain.support": 120
+      },
+      "material_profile_means_ms": {
+        "collider_sync": 0.077124475,
+        "deposit_commit": 0.12656998333333333,
+        "deposit_geometry": 0.11252085,
+        "packing": 1.3704406583333333,
+        "packing_assign": 0.040439108333333335,
+        "packing_candidates": 0.0298925,
+        "packing_clearance": 0.2034418,
+        "packing_dependencies": 0.023865266666666666,
+        "packing_match": 0.029728508333333334,
+        "packing_surface": 0.8443528,
+        "release_commit": 0.004260616666666666,
+        "release_prepare": 0.0268455,
+        "settle": 2.6294885916666666,
+        "support_graph": 0.804806825,
+        "world_step": 28.800011741666665
+      },
+      "material_profile_calls": {
+        "collider_sync": 8,
+        "deposit_commit": 8,
+        "deposit_geometry": 8,
+        "packing": 37,
+        "packing_assign": 89,
+        "packing_candidates": 126,
+        "packing_clearance": 77,
+        "packing_dependencies": 31,
+        "packing_match": 89,
+        "packing_surface": 77,
+        "release_commit": 1,
+        "release_prepare": 1,
+        "settle": 120,
+        "support_graph": 120,
+        "world_step": 120
+      },
+      "shape_cast_means": {
+        "Ball/Polyline": {
+          "queries": 2.5083333333333333,
+          "elapsed_ns": 46691.316666666666,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 2.5083333333333333
+        },
+        "Compound/Compound": {
+          "queries": 2.683333333333333,
+          "elapsed_ns": 766830.2083333334,
+          "nodes": 259.31666666666666,
+          "leaves": 52.75,
+          "primitive_queries": 46.61666666666667
+        },
+        "Compound/Polyline": {
+          "queries": 4.883333333333334,
+          "elapsed_ns": 332410.6583333333,
+          "nodes": 29.3,
+          "leaves": 19.533333333333335,
+          "primitive_queries": 19.533333333333335
+        }
+      },
+      "temperature_c_range": [
+        73.036,
+        74.984
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    }
+  ],
+  "live": {
+    "samples": 25,
+    "seeds": [
+      "9286148569070392789"
+    ],
+    "tick_range": [
+      24124,
+      30084
+    ],
+    "seconds": 140.10179233551025,
+    "metrics_min_median_max": {
+      "fps": [
+        6.7,
+        8.3,
+        14.3
+      ],
+      "ups": [
+        33.7,
+        41.7,
+        56.3
+      ],
+      "host_updates_per_callback": [
+        4.692,
+        4.975,
+        5
+      ],
+      "mission_world_physics_avg_ms": [
+        10.604,
+        14.024,
+        16.005
+      ],
+      "mission_rapier_ccd_avg_ms": [
+        7.687,
+        9.861,
+        11.005
+      ],
+      "mission_world_lifecycle_avg_ms": [
+        1.943,
+        3.082,
+        5.03
+      ],
+      "kms_render_cpu_avg_ms": [
+        7.077,
+        7.706,
+        9.506
+      ]
+    },
+    "temperature_c_range": [
+      69.14,
+      71.575
+    ],
+    "cpu_khz_samples": [
+      1300000,
+      1500000
+    ]
+  },
+  "verification": {
+    "arm_replayed_ticks": 35520,
+    "retained_observation_checks": 592,
+    "measured_native_states": 480,
+    "engine_tests_passed": 157,
+    "engine_tests_ignored": 1,
+    "scenario_tests_passed": 583,
+    "normal_configuration_check": "passed",
+    "device_app_and_settings_unchanged": true
+  },
+  "evidence_directory": "target/physics-cost-investigation.wycn2MHN"
+}

@@ -1,0 +1,60 @@
+{
+  "source_base": "ca9b22950309ab5277733c6869bb6cb3efea935e",
+  "source_identity": "Uncommitted candidate; all 10 final_candidate source hashes in picade-ccd-step-cache-v1.json verified unchanged before deployment.",
+  "device": "sw-picade.local",
+  "hardware": "Raspberry Pi 4, 1024x768, Broadcom V3D 4.2.14.0",
+  "build": "Yocto Rust 1.94.0, release fat LTO, pi-kiosk-gpu; extra ccd-diagnostics probes disabled",
+  "deployment": "./update.sh --fast --target sw-picade.local --yes",
+  "client_sha256": "70d1e1086e8656de7dec3810b060945ea1f0c7056e2b36d49ab361cac11b916d",
+  "cli_sha256_unchanged": "e6ff442f690bf9df29968264eafd6ada02b76df3a03e6f8d14d29e96153666bf",
+  "settings_sha256_unchanged": "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef",
+  "other_devices_changed": false,
+  "started": "2026-10-11T08:56:21.467Z",
+  "ended": "2026-10-11T09:01:21.604Z",
+  "elapsed_seconds": 300.137,
+  "sample_interval_seconds": 5,
+  "samples": { "total": 61, "active_gameplay": 57, "launcher": 2, "result": 2 },
+  "method": "Read-only live qualification, not matched A/B. Summary is of sampled rolling means, not all ticks. No FPS speedup claim; different pre-deploy seed/tick/state.",
+  "rounds": [
+    { "seed": "3706749222645332783", "first_active_sample_tick": 242, "last_active_sample_tick": 12573, "result_tick": 12706 },
+    { "seed": "3972511307554219699", "first_active_sample_tick": 236, "last_active_sample_tick": 2912 }
+  ],
+  "health": {
+    "pid": 4381,
+    "service_states": ["active"],
+    "unexpected_restarts": 0,
+    "gpu_scene_modes": ["retained-culled"],
+    "gpu_scene_errors": ["none"],
+    "gpu_text_errors": 0,
+    "journal": "No new failure; existing gamepad default-mapping warning. Automatic next-round start observed.",
+    "active_temperature_c_min_max": [67.192, 73.523],
+    "active_sampled_cpu_khz_min_max": [1200000, 1500000]
+  },
+  "first_round_tick_9000_plus": {
+    "active_samples": 15,
+    "column_order": ["min", "median", "max"],
+    "physics_window_mean_ms_per_update": [4.355, 7.344, 11.680],
+    "ccd_window_mean_ms_per_update_included_in_physics": [1.998, 3.515, 5.336],
+    "lifecycle_window_mean_ms_per_update": [2.851, 4.258, 5.873],
+    "drawing_cpu_window_mean_ms_per_rendered_loop": [6.175, 10.866, 14.703],
+    "updates_per_host_callback": [2.183, 3.425, 4.900],
+    "fps": [8.4, 16.8, 27.9],
+    "ups": [41.8, 53.1, 56.8],
+    "process_cpu_percent": [98.21428571428642, 99.41634241246263, 99.61759082218805],
+    "sampled_cpu_khz": [1500000, 1500000, 1500000],
+    "temperature_c": [71.575, 72.062, 73.523]
+  },
+  "heavy_window_at_tick_6400": {
+    "physics_mean_ms": 18.992,
+    "ccd_mean_ms": 6.440,
+    "contact_narrow_phase_mean_ms": 4.348,
+    "solver_mean_ms": 5.916,
+    "ccd_substeps_mean": 4.000,
+    "lifecycle_mean_ms": 4.788
+  },
+  "maximum_reported_lifecycle_tick_ms": 38.883,
+  "screenshot_sha256": "8ff940ea609f55df19cb4183bd6e7d5ce7dee55db1ccb28d4e2ffb6335541b60",
+  "evidence": "spacewars-handoffs/ccd-step-cache-live-20261011",
+  "working_evidence": "target/ccd-live-deploy.VVpDoDmU",
+  "final_state": "Candidate left running unpaused Spacewars autoplay; no commit or push. Clock devices unchanged."
+}

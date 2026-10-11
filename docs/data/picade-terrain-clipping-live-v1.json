@@ -1,0 +1,144 @@
+{
+  "runtime_commit": "df0b642e6bcc8d72fc9bb0780c44206efd3a8449",
+  "merged_main": "a483fa41cf85e351436b2d10314b715a2077c60a",
+  "device": "sw-picade.local",
+  "hardware": "Raspberry Pi 4, 1024x768, Broadcom V3D 4.2.14.0",
+  "build": "Yocto Rust 1.94.0, release fat LTO, pi-kiosk-gpu; ccd-diagnostics disabled",
+  "deployment": "./update.sh --fast --target sw-picade.local --yes",
+  "binaries": {
+    "engine-client": {
+      "sha256": "0ebdb797f78393cf3c4ed5e5931432b74ad2bbc0809cb2ddd6fb0be6086247c6",
+      "size": 23334392
+    },
+    "spacewars-cli": {
+      "sha256": "c426233e023d4cdc988d4b5a072b27e4d7ae93cd33e470485f54e219aefc08dd",
+      "size": 1658968
+    }
+  },
+  "settings_sha256_unchanged": "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef",
+  "other_devices_changed": false,
+  "started": "2026-10-11T17:56:00.018Z",
+  "ended": "2026-10-11T18:01:00.189Z",
+  "elapsed_seconds": 300.171,
+  "samples": {
+    "total": 61,
+    "active_gameplay": 57,
+    "result": 2
+  },
+  "method": "Read-only live observation, not a matched A/B comparison. Metrics summarize sampled rolling windows, not all ticks. Physics/CCD/lifecycle are per update; draw is per rendered loop; host step covers multiple updates.",
+  "seeds": [
+    {
+      "seed": "257173399963879949",
+      "first_tick": 243,
+      "last_tick": 9755
+    },
+    {
+      "seed": "12050722794648709960",
+      "first_tick": 178,
+      "last_tick": 6720
+    }
+  ],
+  "observed_results": [
+    {
+      "seed": "257173399963879949",
+      "tick": 10013
+    }
+  ],
+  "health": {
+    "pid": 1636,
+    "service_states": [
+      "active"
+    ],
+    "unexpected_restarts": 0,
+    "gpu_scene_modes": [
+      "retained-culled"
+    ],
+    "gpu_scene_errors": [
+      "none"
+    ],
+    "gpu_text_error_counts": [
+      "0"
+    ],
+    "journal": "No errors for the deployed PID in the final bounded journal read; existing gamepad default-mapping warning.",
+    "sampled_temperature_c": {
+      "count": 57,
+      "min": 64.757,
+      "median": 67.679,
+      "max": 69.627
+    },
+    "sampled_cpu_khz": {
+      "count": 57,
+      "min": 1400000,
+      "median": 1500000,
+      "max": 1500000
+    }
+  },
+  "mature_tick_9000_plus": {
+    "active_samples": 3,
+    "column_order": [
+      "min",
+      "median",
+      "max"
+    ],
+    "physics_window_mean_ms_per_update": [
+      6.242,
+      8.137,
+      10.463
+    ],
+    "ccd_window_mean_ms_included_in_physics": [
+      3.576,
+      3.686,
+      5.091
+    ],
+    "lifecycle_window_mean_ms_per_update": [
+      1.384,
+      1.558,
+      2.627
+    ],
+    "drawing_cpu_window_mean_ms_per_rendered_loop": [
+      7.365,
+      8.041,
+      8.338
+    ],
+    "fps": [
+      10.4,
+      24.9,
+      33.7
+    ],
+    "ups": [
+      51.2,
+      57.7,
+      60.6
+    ],
+    "process_cpu_percent": [
+      98.61111111110293,
+      99.59677419355678,
+      99.60474308300503
+    ]
+  },
+  "tests": [
+    {
+      "file": "post-merge-tests.log",
+      "passed": 1205,
+      "ignored": 5
+    },
+    {
+      "file": "post-merge-diagnostic-tests.log",
+      "passed": 742,
+      "ignored": 1
+    },
+    {
+      "file": "post-merge-client-tests.log",
+      "passed": 687,
+      "ignored": 3
+    }
+  ],
+  "other_checks": [
+    "engine-terrain all-target strict Clippy",
+    "cargo fmt --check",
+    "git diff --check"
+  ],
+  "final_state": "Combined CCD and clipping build left running unpaused Spacewars autoplay.",
+  "evidence": "spacewars-handoffs/terrain-clip-live-20261011",
+  "working_evidence": "target/terrain-clip-live.JOhhD7pY"
+}

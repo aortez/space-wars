@@ -2,6 +2,8 @@
 
 #[cfg(feature = "alloc")]
 pub use self::ccd::CCDSolver;
+#[cfg(feature = "alloc")]
+pub(crate) use self::ccd::ThicknessCache;
 pub use self::coefficient_combine_rule::CoefficientCombineRule;
 pub use self::integration_parameters::{IntegrationParameters, SpringCoefficients};
 #[cfg(feature = "alloc")]

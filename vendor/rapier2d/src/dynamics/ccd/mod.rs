@@ -1,3 +1,4 @@
+pub(crate) use self::ccd_solver::ThicknessCache;
 // TODO: not sure why it complains about PredictedImpacts being unused,
 //       making it private or pub(crate) triggers a different error.
 #[allow(unused_imports)]

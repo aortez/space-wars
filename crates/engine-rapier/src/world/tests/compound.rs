@@ -1,5 +1,155 @@
 use super::*;
 
+fn thickness_wall(collider: ColliderId, parts: usize, half_width: f32) -> ColliderSpec {
+    ColliderSpec {
+        shape: ColliderShape::Compound {
+            children: (0..parts)
+                .map(|i| CompoundChild {
+                    shape: ColliderShape::Cuboid {
+                        half_width,
+                        half_height: 1.0,
+                    },
+                    position: Vec2::new(0.0, i as f32 * 2.0),
+                    angle: 0.0,
+                })
+                .collect(),
+        },
+        ..ColliderSpec::ball(collider, 1.0)
+    }
+}
+
+fn thickness_test_world(substeps: usize) -> PhysicsWorld {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        max_ccd_substeps: substeps,
+        ..Default::default()
+    });
+    let (_, wall, wall_collider) = ball_ids(1);
+    assert!(world.insert_body(
+        wall,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            ..Default::default()
+        },
+        &[thickness_wall(wall_collider, 2, 0.2)]
+    ));
+    let (_, ball, ball_collider) = ball_ids(2);
+    assert!(world.insert_body(
+        ball,
+        BodySpec {
+            position: Vec2::new(-1.0, 0.0),
+            linear_velocity: Vec2::new(100.0, 0.0),
+            ccd_enabled: true,
+            can_sleep: false,
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(ball_collider, 0.1)]
+    ));
+    world
+}
+
+#[cfg(feature = "ccd-diagnostics")]
+#[test]
+fn ccd_compound_thickness_is_shared_across_passes_but_not_steps() {
+    use rapier2d::counters::ccd_probe;
+
+    for substeps in [0, 1, 4] {
+        let mut world = thickness_test_world(substeps);
+        // The engine normalizes its public setting to at least one. Exercise
+        // Rapier's disabled-CCD branch directly as well.
+        world.raw.integration_parameters.max_ccd_substeps = substeps;
+        for tick in 0..3 {
+            // Establish Rapier's integrated CCD velocity without an impact;
+            // new bodies otherwise start with zero previous-step CCD velocity.
+            world.set_pose(ball_ids(2).1, Vec2::new(-4.0, 0.0), 0.0, true);
+            world.set_velocity(ball_ids(2).1, Vec2::new(100.0, 0.0), 0.0, true);
+            world.step(1.0 / 60.0);
+            // Re-arm the same collision each tick, including after the first
+            // contact. A persistent cache would incorrectly report no misses.
+            world.set_pose(ball_ids(2).1, Vec2::new(-1.0, 0.0), 0.0, true);
+            world.set_velocity(ball_ids(2).1, Vec2::new(100.0, 0.0), 0.0, true);
+            ccd_probe::begin();
+            world.step(1.0 / 60.0);
+            let counts = ccd_probe::finish();
+            if substeps == 0 {
+                assert_eq!(counts.compound_lookups, 0);
+                assert_eq!(counts.compound_misses, 0);
+            } else {
+                assert_eq!(counts.compound_misses, 1, "tick={tick}: {counts:?}");
+                assert_eq!(counts.compound_children, 2);
+                assert!(counts.clamp_candidates > 0);
+                if substeps > 1 {
+                    assert!(world.raw.physics_pipeline.counters.ccd.num_substeps > 1);
+                    assert!(counts.first_candidates > 0);
+                    assert!(counts.compound_lookups > counts.compound_misses);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn ccd_thickness_shape_edits_and_handle_reuse_keep_snapshot_continuation() {
+    for substeps in [1, 4] {
+        let mut world = thickness_test_world(substeps);
+        let (_, wall, collider) = ball_ids(1);
+        let original_handle = world.collider_handle(collider).unwrap();
+        for stage in 0..5 {
+            let spec = match stage {
+                0 => thickness_wall(collider, 2, 0.2),
+                1 => thickness_wall(collider, 1, 0.01),
+                2 => ColliderSpec::ball(collider, 0.3),
+                3 => thickness_wall(collider, 3, 0.05),
+                _ => thickness_wall(collider, 4, 0.1),
+            };
+            if stage == 4 {
+                assert!(world.replace_colliders(wall, collider.role, &[spec]));
+                let new_handle = world.collider_handle(collider).unwrap();
+                assert_eq!(
+                    new_handle.into_raw_parts().0,
+                    original_handle.into_raw_parts().0
+                );
+                assert_ne!(new_handle, original_handle, "exercise a reused arena slot");
+            } else if stage > 0 {
+                // Exercise an edit under the same raw handle as well as
+                // compound -> primitive -> compound transitions.
+                let shape = build_collider(&spec, true).unwrap().shared_shape().clone();
+                world.raw.colliders[original_handle].set_shape(shape);
+            }
+            world.set_pose(ball_ids(2).1, Vec2::new(-1.0, 0.0), 0.0, true);
+            world.set_velocity(ball_ids(2).1, Vec2::new(100.0, 0.0), 0.0, true);
+            let mut restored =
+                PhysicsWorld::from_snapshot_bytes(&world.snapshot_bytes().unwrap()).unwrap();
+            #[cfg(feature = "ccd-diagnostics")]
+            rapier2d::counters::ccd_probe::begin();
+            world.step(1.0 / 60.0);
+            #[cfg(feature = "ccd-diagnostics")]
+            {
+                let counts = rapier2d::counters::ccd_probe::finish();
+                let children = match stage {
+                    0 => 2,
+                    1 => 1,
+                    2 => 0,
+                    3 => 3,
+                    _ => 4,
+                };
+                assert_eq!(counts.compound_misses, u64::from(children > 0));
+                assert_eq!(counts.compound_children, children);
+            }
+            restored.step(1.0 / 60.0);
+            assert_eq!(world.contact_events(), restored.contact_events());
+            assert_eq!(
+                world.snapshot_bytes().unwrap(),
+                restored.snapshot_bytes().unwrap(),
+                "substeps={substeps}, stage={stage}"
+            );
+            assert!(
+                world.motion(ball_ids(2).1).unwrap().position.x < 0.0,
+                "CCD must stop the ball before it passes through the edited wall"
+            );
+        }
+    }
+}
+
 #[test]
 fn compound_sweep_pruning_preserves_physics_and_snapshot_continuation() {
     use rapier2d::parry::query::DefaultQueryDispatcher;

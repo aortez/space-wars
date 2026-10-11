@@ -45,12 +45,23 @@ described in `docs/compound-ccd-pruning.md`:
 
 The pruning algorithm is in the engine adapter. The late-match CCD experiment
 also changes `src/dynamics/ccd/ccd_solver.rs` and `toi_entry.rs` to reuse compound
-shape thickness within one first-impact or clamping pass. Collider geometry is
-immutably borrowed throughout each pass; the local cache is discarded before
-any subsequent pass or shape edit. Primitive shapes retain direct property
-queries. The original public `TOIEntry::try_from_colliders` API remains available
-and computes its own thickness. The same thickness sum, comparison, cast order
-and response are retained; no cache enters snapshots or persistent solver state.
+shape thickness across a complete `PhysicsPipeline::step`. After applying user
+changes, the pipeline shares one local cache across its first-impact searches,
+motion clamping and CCD substeps. Poses change during the step, but collider
+geometry does not; the cache is discarded before callers can edit shapes or
+remove/reuse handles. Primitive shapes retain direct property queries. The
+original public `CCDSolver` methods still allocate a per-call cache, and
+`TOIEntry::try_from_colliders` still computes its own thickness. Their public
+signatures and the serialized unit `CCDSolver` are unchanged. The same thickness
+sum, comparison, cast order and response are retained; no cache enters snapshots
+or persistent solver state. Private re-exports in `src/dynamics/mod.rs` and
+`src/dynamics/ccd/mod.rs` expose the cache only to the pipeline.
+
+The compound regressions also cover first-impact/clamping reuse with multiple
+CCD substeps, reset between steps, in-place shape edits, compound/primitive
+transitions, reused collider arena slots and exact snapshot continuation. Run
+the feature-gated work-count assertion with `--features ccd-diagnostics`; it
+fails against a per-pass cache (five compound evaluations instead of one).
 
 The opt-in `ccd-diagnostics` Cargo feature enables `src/counters/ccd_probe.rs`
 through `src/counters/mod.rs`, with counters around the existing TOI prefilter.
@@ -58,7 +69,14 @@ The engine adapter separately counts shape casts and compound tree visits.
 These clocks and counters are absent from normal builds. Instrumented timings
 include their overhead; comparison timings disable collection.
 
-These eight Rust files and the diagnostic feature in `Cargo.toml` are the
+The residual-cost follow-up extends those opt-in counters to CCD setup/search,
+swept bounds, BVH updates, candidate traversal, existing-contact lookups and
+compound-thickness cache misses. The counters themselves do not change CCD
+filtering, cached values, shape-cast ordering or response. See the GPU-default
+follow-up in the same investigation document; its timings include diagnostic
+overhead and are not a new optimization result.
+
+These ten Rust files and the diagnostic feature in `Cargo.toml` are the
 complete source/configuration differences from the published crate. See
 `docs/picade-late-match-physics.md` for the retained inputs and qualification.
 

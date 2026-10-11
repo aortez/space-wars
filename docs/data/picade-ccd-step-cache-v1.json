@@ -1,0 +1,866 @@
+{
+  "source_base": "ca9b22950309ab5277733c6869bb6cb3efea935e",
+  "scope": "Step-local compound CCD thickness cache. Fixed-input headless Pi timing; no application deployment or FPS claim.",
+  "device": "sw-picade.local (Pi 4)",
+  "toolchain": "Rust 1.89.0; release fat LTO; aarch64-unknown-linux-gnu; -C target-feature=+crt-static; ccd-diagnostics feature",
+  "timing_method": "Two collection-disabled replays per variant/case in ABBA/BAAB order, kiosk process suspended with timeout/resume trap. A final-source first-case replay confirms the profiling-attribute relocation made after the initial binary was frozen.",
+  "source_hashes": {
+    "control": {
+      "scenarios/spacewars/examples/ccd_fixed_input.rs": "fed68eaae6509012905ce6545f85a79696933b3e9e992abd94b8238fb2a1b7ef",
+      "scenarios/spacewars/src/lib.rs": "0e1cda8be2513c7e962a97f26c09a8bd9be72804927d4b00f138489a5944cabd",
+      "scenarios/spacewars/src/step_diagnostics.rs": "71020cbd3ef0d442b43b10ba36857bcee18d2a728658be64508fbba302b0eed1",
+      "scenarios/spacewars/src/terrain.rs": "a9a0b67586dc46dd249743a0b188bb63185074593fa167adf9e141278c07506d",
+      "vendor/rapier2d/src/counters/ccd_probe.rs": "eb32a07431a39271f3b0dd1c6f3ec97c9b45249779a95638885f4d9439b95ad6",
+      "vendor/rapier2d/src/dynamics/ccd/ccd_solver.rs": "2858f40fc08b6bba88afbbbc519a9432d2033fb17d5c46601e67ac4d9a3e4bb1",
+      "vendor/rapier2d/src/dynamics/ccd/mod.rs": "e9f06ea7d303003d8a486daa8dc181e42338079b183364fa308cf946d65e0463",
+      "vendor/rapier2d/src/dynamics/mod.rs": "4a4609437e7c2021bc484f5089b63b1519a03bde82855e1d2f52ffa5c53e75c9",
+      "vendor/rapier2d/src/pipeline/physics_pipeline.rs": "91e0bf24cbccf0aa21676c5c7c3b23bc5d3366ce7623cb50ed6984b14fbab1e0"
+    },
+    "final_candidate": {
+      "crates/engine-rapier/src/world/tests/compound.rs": "e483fc76a803683aa1c6ddb8248cfe34493620343b398edd1d0e09a57c417f91",
+      "scenarios/spacewars/examples/ccd_fixed_input.rs": "fed68eaae6509012905ce6545f85a79696933b3e9e992abd94b8238fb2a1b7ef",
+      "scenarios/spacewars/src/lib.rs": "0e1cda8be2513c7e962a97f26c09a8bd9be72804927d4b00f138489a5944cabd",
+      "scenarios/spacewars/src/step_diagnostics.rs": "71020cbd3ef0d442b43b10ba36857bcee18d2a728658be64508fbba302b0eed1",
+      "scenarios/spacewars/src/terrain.rs": "a9a0b67586dc46dd249743a0b188bb63185074593fa167adf9e141278c07506d",
+      "vendor/rapier2d/src/counters/ccd_probe.rs": "94e036c6e327fcc7d2d4d79f8be493145b8c6224109a42534c01b6c133f401c0",
+      "vendor/rapier2d/src/dynamics/ccd/ccd_solver.rs": "b519eb8d7b9ef3137d66dca76acc6fe1bd3a40a623eaf73658cf758cb03b2779",
+      "vendor/rapier2d/src/dynamics/ccd/mod.rs": "dce6202f00587b739517595e4318153ed32c9d170c8abad565cf5b6cba884fc7",
+      "vendor/rapier2d/src/dynamics/mod.rs": "0245e2cc1725a6928ab8a85b44c526c0e959ed9134322ab3e1ebeaf92dde6e2b",
+      "vendor/rapier2d/src/pipeline/physics_pipeline.rs": "385b5c93dbf2e13165a73a7c1d973778cabd8ebf67d336a5b955875921248d68"
+    }
+  },
+  "comparisons": {
+    "first": {
+      "ordered_labels": [
+        "first-01-control",
+        "first-02-candidate",
+        "first-03-candidate",
+        "first-04-control"
+      ],
+      "means_ms": {
+        "control": {
+          "physics_ms": 23.402392095833335,
+          "ccd_ms": 13.682358016666667,
+          "lifecycle_ms": 2.899271608333333,
+          "step_ms": 28.3111749625,
+          "narrow_phase_ms": 3.484465520833333,
+          "solver_ms": 4.038466995833334
+        },
+        "candidate": {
+          "physics_ms": 16.949214879166668,
+          "ccd_ms": 7.256719562500001,
+          "lifecycle_ms": 2.8896192791666664,
+          "step_ms": 21.908333295833334,
+          "narrow_phase_ms": 3.5049817333333335,
+          "solver_ms": 4.054883341666667
+        }
+      },
+      "per_run_physics_ms": {
+        "control": [
+          23.420052383333335,
+          23.384731808333335
+        ],
+        "candidate": [
+          17.004496808333332,
+          16.89393295
+        ]
+      },
+      "reduction_percent": {
+        "physics_ms": 27.574861536550443,
+        "ccd_ms": 46.962946345502054,
+        "lifecycle_ms": 0.3329225567871297,
+        "step_ms": 22.615951740426343,
+        "narrow_phase_ms": -0.5887908024153399,
+        "solver_ms": -0.406499442740782
+      },
+      "pooled_tick_distributions_ms": {
+        "control": {
+          "physics_ms": {
+            "median": 24.06474,
+            "p95_nearest_rank": 26.105281,
+            "max": 28.563961999999997
+          },
+          "step_ms": {
+            "median": 27.624897499999996,
+            "p95_nearest_rank": 35.216747,
+            "max": 44.950094
+          }
+        },
+        "candidate": {
+          "physics_ms": {
+            "median": 17.4011055,
+            "p95_nearest_rank": 19.512497,
+            "max": 21.992828999999997
+          },
+          "step_ms": {
+            "median": 21.042133,
+            "p95_nearest_rank": 28.465298,
+            "max": 39.501269
+          }
+        }
+      }
+    },
+    "second": {
+      "ordered_labels": [
+        "second-retry-01-candidate",
+        "second-retry-02-control",
+        "second-retry-03-control",
+        "second-retry-04-candidate"
+      ],
+      "means_ms": {
+        "control": {
+          "physics_ms": 9.600444829166667,
+          "ccd_ms": 5.656839225000001,
+          "lifecycle_ms": 3.252999620833333,
+          "step_ms": 14.703698916666667,
+          "narrow_phase_ms": 1.4399145375,
+          "solver_ms": 1.5602397666666667
+        },
+        "candidate": {
+          "physics_ms": 7.640008266666667,
+          "ccd_ms": 3.717600733333333,
+          "lifecycle_ms": 3.250858995833333,
+          "step_ms": 12.752135779166666,
+          "narrow_phase_ms": 1.4584191458333333,
+          "solver_ms": 1.5608668708333333
+        }
+      },
+      "per_run_physics_ms": {
+        "control": [
+          9.5928038,
+          9.608085858333334
+        ],
+        "candidate": [
+          7.664364325,
+          7.615652208333334
+        ]
+      },
+      "reduction_percent": {
+        "physics_ms": 20.420267991583973,
+        "ccd_ms": 34.28130824535971,
+        "lifecycle_ms": 0.06580464953916954,
+        "step_ms": 13.272599966583243,
+        "narrow_phase_ms": -1.2851185158156087,
+        "solver_ms": -0.04019280754561372
+      },
+      "pooled_tick_distributions_ms": {
+        "control": {
+          "physics_ms": {
+            "median": 8.985337,
+            "p95_nearest_rank": 16.848236999999997,
+            "max": 24.848100000000002
+          },
+          "step_ms": {
+            "median": 12.309199,
+            "p95_nearest_rank": 24.875341,
+            "max": 30.443111
+          }
+        },
+        "candidate": {
+          "physics_ms": {
+            "median": 7.3513125,
+            "p95_nearest_rank": 12.082256,
+            "max": 16.768089
+          },
+          "step_ms": {
+            "median": 10.697721,
+            "p95_nearest_rank": 21.969252,
+            "max": 27.994761
+          }
+        }
+      }
+    }
+  },
+  "final_source_first_case_confirmation": {
+    "label": "final-first-01-candidate",
+    "case": "first",
+    "variant": "candidate",
+    "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/final-first-01-candidate",
+    "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+    "summary": {
+      "checked": 153,
+      "completed": true,
+      "count_queries": false,
+      "first": 9061,
+      "last": 9180,
+      "mismatches": 0,
+      "seed": "3057324812542282494",
+      "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+    },
+    "kiosk_suspended_during_replay": true,
+    "all_retained_states_and_artifacts_match": true,
+    "elapsed_seconds": 87.7713371610007,
+    "means_ms": {
+      "physics_ms": 17.009538225,
+      "ccd_ms": 7.3299860416666665,
+      "lifecycle_ms": 2.8810380416666668,
+      "step_ms": 21.956565383333334,
+      "narrow_phase_ms": 3.5346261666666665,
+      "solver_ms": 4.0554911
+    },
+    "artifact_sha256": {
+      "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+      "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+      "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+      "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+      "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+    },
+    "temperature_c_range": [
+      71.088,
+      73.036
+    ],
+    "cpu_khz_samples": [
+      1500000
+    ]
+  },
+  "count_comparison": {
+    "first": {
+      "unchanged_work_counts": {
+        "toi_calls": 4604.075,
+        "thickness_calls": 4604.075,
+        "thickness_rejected": 4594,
+        "compound_lookups": 1922.925,
+        "primitive_thickness_calls": 7285.225,
+        "first_candidates": 3612.233333333333,
+        "clamp_candidates": 3570.383333333333,
+        "resweep_candidates": 0.06666666666666667,
+        "candidate_next_calls": 8168.925,
+        "contact_lookup_calls": 4604.075
+      },
+      "control_compound_misses_per_tick": 160.60833333333332,
+      "candidate_compound_misses_per_tick": 27.066666666666666,
+      "control_compound_children_per_tick": 24920.025,
+      "candidate_compound_children_per_tick": 4218.175,
+      "unchanged_shape_cast_counts": {
+        "Ball/Polyline": {
+          "queries": 2.5083333333333333,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 2.5083333333333333
+        },
+        "Compound/Compound": {
+          "queries": 2.683333333333333,
+          "nodes": 259.31666666666666,
+          "leaves": 52.75,
+          "primitive_queries": 46.61666666666667
+        },
+        "Compound/Polyline": {
+          "queries": 4.883333333333334,
+          "nodes": 29.3,
+          "leaves": 19.533333333333335,
+          "primitive_queries": 19.533333333333335
+        }
+      },
+      "note": "Count comparison only; previous control timings are not a paired performance measurement. Null means the older second-case control did not collect cache counts."
+    },
+    "second": {
+      "unchanged_work_counts": {
+        "toi_calls": 1516.2833333333333,
+        "thickness_calls": 1516.2833333333333,
+        "thickness_rejected": 1498.4083333333333,
+        "first_candidates": 1277.5,
+        "clamp_candidates": 1234.7666666666667,
+        "resweep_candidates": 0.23333333333333334,
+        "candidate_next_calls": 2908.9083333333333,
+        "contact_lookup_calls": 1516.2833333333333
+      },
+      "control_compound_misses_per_tick": null,
+      "candidate_compound_misses_per_tick": 28.633333333333333,
+      "control_compound_children_per_tick": null,
+      "candidate_compound_children_per_tick": 5371.841666666666,
+      "unchanged_shape_cast_counts": {
+        "Ball/Ball": {
+          "queries": 0.10833333333333334,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 0.10833333333333334
+        },
+        "Ball/Compound": {
+          "queries": 3.1333333333333333,
+          "nodes": 56.38333333333333,
+          "leaves": 4.975,
+          "primitive_queries": 4.975
+        },
+        "Ball/Polyline": {
+          "queries": 14.633333333333333,
+          "nodes": 0,
+          "leaves": 0,
+          "primitive_queries": 14.633333333333333
+        }
+      },
+      "note": "Count comparison only; previous control timings are not a paired performance measurement. Null means the older second-case control did not collect cache counts."
+    }
+  },
+  "extra_checks": {
+    "native_final_candidate": {
+      "folder": "native-first-counted",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": true,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "all_retained_states_and_artifacts_match": true
+    },
+    "excluded_arm_run": {
+      "folder": "interrupted-second-01-candidate",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": false,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "all_retained_states_and_artifacts_match": true,
+      "reason": "Pause revision changed to gameplay at replay completion; guard stopped batch. All timing data excluded; rerun after user confirmed availability."
+    }
+  },
+  "verification": {
+    "replay_runs": 11,
+    "total_ticks": 94980,
+    "original_observation_checks": 1583,
+    "measured_native_state_and_substep_checks": 1320,
+    "start_end_snapshots_observations_and_audits_byte_identical": true,
+    "normal_tests_passed": 1157,
+    "normal_tests_existing_ignored": 5,
+    "diagnostic_tests_passed": 742,
+    "diagnostic_tests_existing_ignored": 1,
+    "regression_mutation_check": "Per-pass cache fails the work-count fixture: 5 compound misses instead of 1. Step-local cache passes.",
+    "strict_clippy": "Blocked by pre-existing lints in unchanged spaceling/surface_sortie/Spacewars code; not fixed in this scope."
+  },
+  "runs": [
+    {
+      "label": "first-01-control",
+      "case": "first",
+      "variant": "control",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/control --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/first-01-control",
+      "binary_sha256": "ed01825d3bbd4edd8482018e0b61ab7fa94caf49aa711af4b1f50c83578dfb8b",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 109.4313114050019,
+      "means_ms": {
+        "physics_ms": 23.420052383333335,
+        "ccd_ms": 13.689759233333334,
+        "lifecycle_ms": 2.894864775,
+        "step_ms": 28.3255589,
+        "narrow_phase_ms": 3.497249875,
+        "solver_ms": 4.032860475
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        69.627,
+        71.575
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "first-02-candidate",
+      "case": "first",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/first-02-candidate",
+      "binary_sha256": "2e66e2b9fa7b99491cefc2a3c3ce9176631bd22e45423aee1d43761421720688",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 86.01100375199894,
+      "means_ms": {
+        "physics_ms": 17.004496808333332,
+        "ccd_ms": 7.254991858333334,
+        "lifecycle_ms": 2.9012362416666666,
+        "step_ms": 21.986356125,
+        "narrow_phase_ms": 3.518859433333333,
+        "solver_ms": 4.054036241666666
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        70.601,
+        72.549
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "first-03-candidate",
+      "case": "first",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/first-03-candidate",
+      "binary_sha256": "2e66e2b9fa7b99491cefc2a3c3ce9176631bd22e45423aee1d43761421720688",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 91.1999178479964,
+      "means_ms": {
+        "physics_ms": 16.89393295,
+        "ccd_ms": 7.258447266666667,
+        "lifecycle_ms": 2.8780023166666666,
+        "step_ms": 21.830310466666667,
+        "narrow_phase_ms": 3.4911040333333334,
+        "solver_ms": 4.055730441666666
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        72.062,
+        75.958
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "first-04-control",
+      "case": "first",
+      "variant": "control",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/control --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/first-04-control",
+      "binary_sha256": "ed01825d3bbd4edd8482018e0b61ab7fa94caf49aa711af4b1f50c83578dfb8b",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 107.56603171499592,
+      "means_ms": {
+        "physics_ms": 23.384731808333335,
+        "ccd_ms": 13.6749568,
+        "lifecycle_ms": 2.9036784416666666,
+        "step_ms": 28.296791025,
+        "narrow_phase_ms": 3.4716811666666665,
+        "solver_ms": 4.044073516666667
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        71.575,
+        73.523
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "final-first-01-candidate",
+      "case": "first",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/final-first-01-candidate",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": false,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 87.7713371610007,
+      "means_ms": {
+        "physics_ms": 17.009538225,
+        "ccd_ms": 7.3299860416666665,
+        "lifecycle_ms": 2.8810380416666668,
+        "step_ms": 21.956565383333334,
+        "narrow_phase_ms": 3.5346261666666665,
+        "solver_ms": 4.0554911
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        71.088,
+        73.036
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "second-retry-01-candidate",
+      "case": "second",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/second-retry-01-candidate",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": false,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 68.4897422819995,
+      "means_ms": {
+        "physics_ms": 7.664364325,
+        "ccd_ms": 3.7213562166666665,
+        "lifecycle_ms": 3.2575654916666665,
+        "step_ms": 12.784099683333332,
+        "narrow_phase_ms": 1.4677528083333333,
+        "solver_ms": 1.5679868583333334
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "temperature_c_range": [
+        70.114,
+        72.549
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "second-retry-02-control",
+      "case": "second",
+      "variant": "control",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/control --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/second-retry-02-control",
+      "binary_sha256": "ed01825d3bbd4edd8482018e0b61ab7fa94caf49aa711af4b1f50c83578dfb8b",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": false,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 75.863077961003,
+      "means_ms": {
+        "physics_ms": 9.5928038,
+        "ccd_ms": 5.660066783333334,
+        "lifecycle_ms": 3.253209808333333,
+        "step_ms": 14.700091308333333,
+        "narrow_phase_ms": 1.4385753666666667,
+        "solver_ms": 1.5564646666666666
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "temperature_c_range": [
+        70.601,
+        72.062
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "second-retry-03-control",
+      "case": "second",
+      "variant": "control",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/control --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/second-retry-03-control",
+      "binary_sha256": "ed01825d3bbd4edd8482018e0b61ab7fa94caf49aa711af4b1f50c83578dfb8b",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": false,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 79.63658955800202,
+      "means_ms": {
+        "physics_ms": 9.608085858333334,
+        "ccd_ms": 5.6536116666666665,
+        "lifecycle_ms": 3.252789433333333,
+        "step_ms": 14.707306525,
+        "narrow_phase_ms": 1.4412537083333334,
+        "solver_ms": 1.5640148666666667
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "temperature_c_range": [
+        70.114,
+        71.575
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ]
+    },
+    {
+      "label": "second-retry-04-candidate",
+      "case": "second",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/second-retry-04-candidate",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": false,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 70.07972263199918,
+      "means_ms": {
+        "physics_ms": 7.615652208333334,
+        "ccd_ms": 3.71384525,
+        "lifecycle_ms": 3.2441525,
+        "step_ms": 12.720171875,
+        "narrow_phase_ms": 1.4490854833333333,
+        "solver_ms": 1.5537468833333334
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "temperature_c_range": [
+        70.114,
+        72.549
+      ],
+      "cpu_khz_samples": [
+        1400000,
+        1500000
+      ]
+    },
+    {
+      "label": "counts-01-candidate",
+      "case": "first",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/counts-01-candidate --counts",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "summary": {
+        "checked": 153,
+        "completed": true,
+        "count_queries": true,
+        "first": 9061,
+        "last": 9180,
+        "mismatches": 0,
+        "seed": "3057324812542282494",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 86.45701857200038,
+      "means_ms": {
+        "physics_ms": 21.581804891666668,
+        "ccd_ms": 11.803222633333334,
+        "lifecycle_ms": 2.8941703333333333,
+        "step_ms": 26.541352858333333,
+        "narrow_phase_ms": 3.5773258666666665,
+        "solver_ms": 4.049834158333334
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "3cb132d1d612c1d0fb565fe1cfe4376aaa7a81402be4a4de5b5401302f291218",
+        "final-physics.bin": "5b291a44595fc98f394db0325910687315b0c05586f6b6f1444a9d35142983c1",
+        "start-observation.json": "809ec154a8c33d7d2aed540afbd9909fad8cc3715e10b782a1f7e245a2a841fd",
+        "final-observation.json": "fffca2cff332316468e645429dd4fb854ae4589d3d2625541254382c5c94da2c",
+        "audits.jsonl": "83813258ed9e4d7a5aa9e88c563430c52e3ee775f5591b981ac0c6c4f8591ff4"
+      },
+      "temperature_c_range": [
+        70.114,
+        72.549
+      ],
+      "cpu_khz_samples": [
+        1400000,
+        1500000
+      ],
+      "ccd_prefilter_means": {
+        "bounds_calls": 1972.4666666666667,
+        "bounds_ns": 272580.7,
+        "bvh_update_calls": 986.225,
+        "bvh_update_ns": 167741.35,
+        "candidate_next_calls": 8168.925,
+        "candidate_next_ns": 1658677.7416666667,
+        "clamp_candidates": 3570.383333333333,
+        "clamp_search_ns": 4421229.158333333,
+        "clamp_setup_ns": 340076.375,
+        "compound_children": 4218.175,
+        "compound_compute_ns": 1151920.4833333334,
+        "compound_lookups": 1922.925,
+        "compound_misses": 27.066666666666666,
+        "contact_lookup_calls": 4604.075,
+        "contact_lookup_ns": 1385783.6666666667,
+        "first_candidates": 3612.233333333333,
+        "first_search_ns": 6635356.633333334,
+        "first_setup_ns": 330118.89166666666,
+        "primitive_thickness_calls": 7285.225,
+        "primitive_thickness_ns": 545599.0083333333,
+        "resweep_candidates": 0.06666666666666667,
+        "resweep_ns": 167.44166666666666,
+        "thickness_calls": 4604.075,
+        "thickness_ns": 3044879.441666667,
+        "thickness_rejected": 4594,
+        "toi_calls": 4604.075,
+        "toi_ns": 4995137.091666667
+      }
+    },
+    {
+      "label": "counts-02-candidate",
+      "case": "second",
+      "variant": "candidate",
+      "command": "/data/spacewars/ccd-step-cache.rty13kSI/candidate-final --seed 1978168328740471875 --first 7861 --last 7980 --actions /data/spacewars/picade-physics-20261011/static-probe/current-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/current-seed/samples.jsonl --out /data/spacewars/ccd-step-cache.rty13kSI/counts-02-candidate --counts",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "summary": {
+        "checked": 133,
+        "completed": true,
+        "count_queries": true,
+        "first": 7861,
+        "last": 7980,
+        "mismatches": 0,
+        "seed": "1978168328740471875",
+        "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+      },
+      "kiosk_suspended_during_replay": true,
+      "all_retained_states_and_artifacts_match": true,
+      "elapsed_seconds": 70.48347074000048,
+      "means_ms": {
+        "physics_ms": 9.247084300000001,
+        "ccd_ms": 5.330645775,
+        "lifecycle_ms": 3.262529408333333,
+        "step_ms": 14.381047525,
+        "narrow_phase_ms": 1.4547840166666666,
+        "solver_ms": 1.5608111416666666
+      },
+      "artifact_sha256": {
+        "start-physics.bin": "82ff475d06a3bcaf6d644425b61fa640a93e5204781c90b36f5199547a905f59",
+        "final-physics.bin": "875476fe48741439ef9e545683743e42a6947c07bb0c9355ad2bf842ad9d9c70",
+        "start-observation.json": "9e16848ca2f02f353161cb7cb9e3a56da55e9ae9325b64dc8eb7c6c0db685a5c",
+        "final-observation.json": "fee404c76e9bff4609346a03df7836283a5034fd55778741cb50ada9427af0ad",
+        "audits.jsonl": "b234b9b8c6c527523d07592f3f8a2fb7499a3d9d2699f753aad1d19db57a842f"
+      },
+      "temperature_c_range": [
+        70.601,
+        72.549
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ],
+      "ccd_prefilter_means": {
+        "bounds_calls": 792.7583333333333,
+        "bounds_ns": 117630.88333333333,
+        "bvh_update_calls": 396.35,
+        "bvh_update_ns": 75481.61666666667,
+        "candidate_next_calls": 2908.9083333333333,
+        "candidate_next_ns": 623821.8416666667,
+        "clamp_candidates": 1234.7666666666667,
+        "clamp_search_ns": 1623399.1583333334,
+        "clamp_setup_ns": 137033.46666666667,
+        "compound_children": 5371.841666666666,
+        "compound_compute_ns": 1478277.4083333334,
+        "compound_lookups": 497.5,
+        "compound_misses": 28.633333333333333,
+        "contact_lookup_calls": 1516.2833333333333,
+        "contact_lookup_ns": 543062.25,
+        "first_candidates": 1277.5,
+        "first_search_ns": 3398858.9166666665,
+        "first_setup_ns": 138913.49166666667,
+        "primitive_thickness_calls": 2535.0666666666666,
+        "primitive_thickness_ns": 198491.75,
+        "resweep_candidates": 0.23333333333333334,
+        "resweep_ns": 562.1833333333333,
+        "thickness_calls": 1516.2833333333333,
+        "thickness_ns": 2132526.9916666667,
+        "thickness_rejected": 1498.4083333333333,
+        "toi_calls": 1516.2833333333333,
+        "toi_ns": 2744200.9166666665
+      }
+    }
+  ],
+  "local_evidence": "/home/data/workspace/space-wars/target/ccd-step-cache.JmZG0nN5",
+  "retained_evidence": "/home/data/workspace/spacewars-handoffs/ccd-step-cache-20261011",
+  "native_binary_sha256": "bf993306b28350869f8b9892abdb4127e6f0253e8cbb94f449027aa6dbab4756",
+  "remote_evidence": "/data/spacewars/ccd-step-cache.rty13kSI"
+}

@@ -15,6 +15,7 @@ pub struct SurfaceAdditionPreview<'a> {
     owners: BTreeMap<(i32, i32), Vec<Polygon>>,
     tiles: BTreeMap<(i32, i32), Vec<Polygon>>,
     alternatives: BTreeMap<(i32, i32), Vec<TileAddition>>,
+    clipping: PolygonScratch,
 }
 
 struct TileAddition {
@@ -30,6 +31,7 @@ impl TerrainSurface {
             owners: BTreeMap::new(),
             tiles: BTreeMap::new(),
             alternatives: BTreeMap::new(),
+            clipping: PolygonScratch::default(),
         }
     }
 
@@ -75,6 +77,8 @@ impl SurfaceAdditionPreview<'_> {
         // polygons once per immutable field, retaining the original tile,
         // owner, polygon and clipping order (including very thin patches).
         let mut new_owners = BTreeMap::new();
+        let mut pieces = Vec::new();
+        let mut remaining = Vec::new();
         let epsilon_area = f64::from(terrain.cell_size()).powi(2) * 1.0e-10;
         for (y, x) in tiles {
             let cell = CellCoord::new(x, y);
@@ -96,6 +100,7 @@ impl SurfaceAdditionPreview<'_> {
                     CellCoord::new(x, y),
                     &clip,
                     &mut self.owners,
+                    &mut self.clipping,
                 )
             });
             let mut added = Vec::new();
@@ -105,13 +110,14 @@ impl SurfaceAdditionPreview<'_> {
                 CellCoord::new(x, y),
                 &clip,
                 &mut new_owners,
+                &mut self.clipping,
             ) {
-                let mut pieces = vec![polygon];
+                pieces.push(polygon);
                 for obstacle in old.iter() {
-                    pieces = pieces
-                        .into_iter()
-                        .flat_map(|p| subtract(p, obstacle))
-                        .collect();
+                    for p in pieces.drain(..) {
+                        self.clipping.subtract_into(p, obstacle, &mut remaining);
+                    }
+                    std::mem::swap(&mut pieces, &mut remaining);
                     pieces.retain(|p| area(p) > epsilon_area);
                     if pieces.is_empty() {
                         break;
@@ -119,7 +125,7 @@ impl SurfaceAdditionPreview<'_> {
                 }
                 added.extend(
                     pieces
-                        .into_iter()
+                        .drain(..)
                         .filter(|p| area(p) > epsilon_area)
                         .map(|p| {
                             p.into_iter()
@@ -166,6 +172,7 @@ fn patches_in_tile(
     cell: CellCoord,
     clip: &Polygon,
     owners: &mut BTreeMap<(i32, i32), Vec<Polygon>>,
+    clipping: &mut PolygonScratch,
 ) -> Vec<Polygon> {
     let mut result = Vec::new();
     let halo = i32::from(surface != TerrainSurface::Blocks);
@@ -200,7 +207,7 @@ fn patches_in_tile(
             for polygon in polygons {
                 let mut p = polygon.clone();
                 for (a, b) in edges(clip) {
-                    p = half_plane(&p, a, b, true);
+                    clipping.clip(&mut p, a, b, true);
                 }
                 if !p.is_empty() {
                     result.push(p);
@@ -235,8 +242,37 @@ fn area(p: &[Point]) -> f64 {
         .abs()
         * 0.5
 }
-fn half_plane(p: &[Point], a: Point, b: Point, inside: bool) -> Polygon {
-    let mut out = Vec::new();
+// Scratch belongs to a single preview, never terrain state. Keep the same
+// half-plane arithmetic, vertex order and degenerate-polygon handling while
+// reusing intermediate storage between edges, tiles and alternative edits.
+#[derive(Default)]
+struct PolygonScratch {
+    clipped: Polygon,
+    outside: Polygon,
+}
+
+impl PolygonScratch {
+    fn clip(&mut self, p: &mut Polygon, a: Point, b: Point, inside: bool) {
+        half_plane_into(p, a, b, inside, &mut self.clipped);
+        std::mem::swap(p, &mut self.clipped);
+    }
+
+    fn subtract_into(&mut self, mut subject: Polygon, clip: &Polygon, outside: &mut Vec<Polygon>) {
+        for (a, b) in edges(clip) {
+            half_plane_into(&subject, a, b, false, &mut self.outside);
+            if !self.outside.is_empty() {
+                outside.push(std::mem::take(&mut self.outside));
+            }
+            self.clip(&mut subject, a, b, true);
+            if subject.is_empty() {
+                break;
+            }
+        }
+    }
+}
+
+fn half_plane_into(p: &[Point], a: Point, b: Point, inside: bool, out: &mut Polygon) {
+    out.clear();
     for (start, end) in edges(p) {
         let ds = cross(a, b, start) * if inside { 1.0 } else { -1.0 };
         let de = cross(a, b, end) * if inside { 1.0 } else { -1.0 };
@@ -258,21 +294,6 @@ fn half_plane(p: &[Point], a: Point, b: Point, inside: bool) -> Polygon {
     if out.len() < 3 {
         out.clear();
     }
-    out
-}
-fn subtract(mut subject: Polygon, clip: &Polygon) -> Vec<Polygon> {
-    let mut outside = Vec::new();
-    for (a, b) in edges(clip) {
-        let piece = half_plane(&subject, a, b, false);
-        if !piece.is_empty() {
-            outside.push(piece);
-        }
-        subject = half_plane(&subject, a, b, true);
-        if subject.is_empty() {
-            break;
-        }
-    }
-    outside
 }
 
 #[cfg(test)]

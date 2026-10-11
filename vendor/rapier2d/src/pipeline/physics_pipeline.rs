@@ -9,7 +9,7 @@ use crate::dynamics::IslandSolver;
 use crate::dynamics::JointGraphEdge;
 use crate::dynamics::{
     CCDSolver, ImpulseJointSet, IntegrationParameters, IslandManager, MultibodyJointSet,
-    RigidBodyChanges, RigidBodyType,
+    RigidBodyChanges, RigidBodyType, ThicknessCache,
 };
 use crate::geometry::{
     BroadPhaseBvh, BroadPhasePairEvent, ColliderChanges, ColliderHandle, ColliderPair,
@@ -374,12 +374,13 @@ impl PhysicsPipeline {
         broad_phase: &mut BroadPhaseBvh,
         narrow_phase: &NarrowPhase,
         ccd_solver: &mut CCDSolver,
+        thicknesses: &mut ThicknessCache,
         hooks: &dyn PhysicsHooks,
         events: &dyn EventHandler,
     ) {
         self.counters.ccd.toi_computation_time.resume();
         // Handle CCD
-        let impacts = ccd_solver.predict_impacts_at_next_positions(
+        let impacts = ccd_solver.predict_impacts_at_next_positions_with_cache(
             integration_parameters,
             islands,
             bodies,
@@ -388,6 +389,7 @@ impl PhysicsPipeline {
             narrow_phase,
             hooks,
             events,
+            thicknesses,
         );
         ccd_solver.clamp_motions(integration_parameters.dt, bodies, &impacts);
         self.counters.ccd.toi_computation_time.pause();
@@ -607,6 +609,9 @@ impl PhysicsPipeline {
 
         let mut remaining_time = integration_parameters.dt;
         let mut integration_parameters = *integration_parameters;
+        // User shape edits have been applied. The substep loop only changes
+        // poses/contact data, so one cache safely covers all CCD passes here.
+        let mut thicknesses = ThicknessCache::default();
 
         let (ccd_is_enabled, mut remaining_substeps) =
             if integration_parameters.max_ccd_substeps == 0 {
@@ -634,7 +639,7 @@ impl PhysicsPipeline {
                     ccd_solver.update_ccd_active_flags(islands, bodies, remaining_time, true);
                 let first_impact = if ccd_active {
                     self.counters.ccd.first_impact_time.resume();
-                    let impact = ccd_solver.find_first_impact(
+                    let impact = ccd_solver.find_first_impact_with_cache(
                         remaining_time,
                         &integration_parameters,
                         islands,
@@ -643,6 +648,7 @@ impl PhysicsPipeline {
                         broad_phase,
                         narrow_phase,
                         hooks,
+                        &mut thicknesses,
                     );
                     self.counters.ccd.first_impact_time.pause();
                     impact
@@ -718,6 +724,7 @@ impl PhysicsPipeline {
                         broad_phase,
                         narrow_phase,
                         ccd_solver,
+                        &mut thicknesses,
                         hooks,
                         events,
                     );

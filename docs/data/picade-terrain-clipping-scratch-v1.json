@@ -1,0 +1,353 @@
+{
+  "source_base": "6b9992ab17657f0eb0116daa649db52a8e373772",
+  "scope": "Temporary polygon clipping buffers; no arithmetic, patch order, plan budget, placement or simulation-state change.",
+  "device": "sw-picade.local (Pi 4)",
+  "method": "One retained stress case, ticks 9061–9180; two collection-disabled runs per variant in ABBA order. Kiosk process suspended with 300-second timeout/resume trap. The two subsequent instrumented runs are attribution only, not part of the speedup calculation.",
+  "toolchain": "Rust 1.89.0, release fat LTO, ARM static glibc, ccd-diagnostics compiled; collection disabled for paired timings.",
+  "source_sha256": {
+    "crates/engine-terrain/src/additions.rs": "377f2ddfb39f222af2ebacd8f0281546b9706d9815bdc27f42175a00939790f7",
+    "crates/engine-terrain/src/additions/tests.rs": "02e2adfb7beb27a7145424ee393624f2634a730b6192a57fd51c7f626c8085b9"
+  },
+  "binary_sha256": {
+    "control-native": "bf993306b28350869f8b9892abdb4127e6f0253e8cbb94f449027aa6dbab4756",
+    "candidate-native": "ba570f9fcd3f076025c2374fd34fda08d815396cf563449bbde46c991d1bfdbd",
+    "control-aarch64": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+    "candidate-aarch64": "e2d56fcc44348fec73f22e55553e9020fe3e98f46df8f164c08bce33d30cb0d1"
+  },
+  "comparison": {
+    "ordered_labels": [
+      "first-01-control",
+      "first-02-candidate",
+      "first-03-candidate",
+      "first-04-control"
+    ],
+    "means_ms": {
+      "control": {
+        "physics_ms": 16.83636945,
+        "ccd_ms": 7.215036116666667,
+        "lifecycle_ms": 2.8507392958333333,
+        "step_ms": 21.727660495833334,
+        "narrow_phase_ms": 3.499569504166667,
+        "solver_ms": 4.022906491666667
+      },
+      "candidate": {
+        "physics_ms": 16.761258516666665,
+        "ccd_ms": 7.209169537499999,
+        "lifecycle_ms": 2.6373663958333333,
+        "step_ms": 21.414585004166668,
+        "narrow_phase_ms": 3.4019178083333337,
+        "solver_ms": 4.024327075
+      }
+    },
+    "per_run_lifecycle_ms": {
+      "control": [
+        2.848943108333333,
+        2.8525354833333334
+      ],
+      "candidate": [
+        2.63993425,
+        2.6347985416666666
+      ]
+    },
+    "reduction_percent": {
+      "physics_ms": 0.4461231000923105,
+      "ccd_ms": 0.08131046153900812,
+      "lifecycle_ms": 7.484826841650083,
+      "step_ms": 1.4409075092401413,
+      "narrow_phase_ms": 2.7903916672341156,
+      "solver_ms": -0.03531236274758598
+    },
+    "pooled_tick_distributions_ms": {
+      "control": {
+        "lifecycle_ms": {
+          "median": 1.2459585,
+          "p95": 9.531047000000001,
+          "max": 18.102132
+        },
+        "step_ms": {
+          "median": 20.957966499999998,
+          "p95": 28.186939000000002,
+          "max": 38.158908
+        }
+      },
+      "candidate": {
+        "lifecycle_ms": {
+          "median": 1.227265,
+          "p95": 8.431609,
+          "max": 16.719793
+        },
+        "step_ms": {
+          "median": 20.765415,
+          "p95": 27.300303000000003,
+          "max": 36.572765
+        }
+      }
+    }
+  },
+  "instrumented_attribution": {
+    "component_means_ms_instrumented": {
+      "control": {
+        "collider_sync": 0.07454045833333334,
+        "deposit_commit": 0.12256863333333333,
+        "deposit_geometry": 0.112209225,
+        "packing": 1.3659551333333333,
+        "packing_assign": 0.039464425,
+        "packing_candidates": 0.029365083333333333,
+        "packing_clearance": 0.19948428333333335,
+        "packing_dependencies": 0.023618033333333333,
+        "packing_match": 0.028952041666666664,
+        "packing_surface": 0.8489621166666667,
+        "release_commit": 0.003876075,
+        "release_prepare": 0.027305975,
+        "settle": 2.6033718416666667,
+        "support_graph": 0.7847648333333334,
+        "world_step": 22.218900175
+      },
+      "candidate": {
+        "collider_sync": 0.07596945,
+        "deposit_commit": 0.12413714166666667,
+        "deposit_geometry": 0.11441401666666666,
+        "packing": 1.153562675,
+        "packing_assign": 0.039445491666666666,
+        "packing_candidates": 0.03018315,
+        "packing_clearance": 0.1959287,
+        "packing_dependencies": 0.022744883333333334,
+        "packing_match": 0.0288049,
+        "packing_surface": 0.64215035,
+        "release_commit": 0.0037567833333333332,
+        "release_prepare": 0.028684374999999998,
+        "settle": 2.3906735083333333,
+        "support_graph": 0.7808613916666667,
+        "world_step": 22.1185738
+      }
+    },
+    "unchanged_material_calls": {
+      "collider_sync": 8,
+      "deposit_commit": 8,
+      "deposit_geometry": 8,
+      "packing": 37,
+      "packing_assign": 89,
+      "packing_candidates": 126,
+      "packing_clearance": 77,
+      "packing_dependencies": 31,
+      "packing_match": 89,
+      "packing_surface": 77,
+      "release_commit": 1,
+      "release_prepare": 1,
+      "settle": 120,
+      "support_graph": 120,
+      "world_step": 120
+    },
+    "ccd_work_counts_match": true,
+    "note": "Instrumented component timings include overhead; use the separate collection-disabled pairs for speedup."
+  },
+  "verification": {
+    "arm_runs": 6,
+    "arm_ticks": 55080,
+    "original_observation_checks": 918,
+    "measured_native_states_and_substeps": 720,
+    "all_states_snapshots_observations_audits_match": true,
+    "native_checks": {
+      "control-first-native": {
+        "summary": {
+          "checked": 153,
+          "completed": true,
+          "count_queries": true,
+          "first": 9061,
+          "last": 9180,
+          "mismatches": 0,
+          "seed": "3057324812542282494",
+          "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+        },
+        "all_states_and_artifacts_match": true
+      },
+      "candidate-first-native": {
+        "summary": {
+          "checked": 153,
+          "completed": true,
+          "count_queries": true,
+          "first": 9061,
+          "last": 9180,
+          "mismatches": 0,
+          "seed": "3057324812542282494",
+          "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+        },
+        "all_states_and_artifacts_match": true
+      },
+      "candidate-second-native": {
+        "summary": {
+          "checked": 133,
+          "completed": true,
+          "count_queries": true,
+          "first": 7861,
+          "last": 7980,
+          "mismatches": 0,
+          "seed": "1978168328740471875",
+          "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+        },
+        "all_states_and_artifacts_match": true
+      }
+    },
+    "normal_tests_passed": 1205,
+    "normal_existing_ignored": 5,
+    "diagnostic_tests_passed": 742,
+    "diagnostic_existing_ignored": 1,
+    "strict_clippy": "engine-terrain --all-targets passes; no workspace-wide clean-Clippy claim",
+    "format_and_diff_check": "pass"
+  },
+  "runs": [
+    {
+      "label": "first-01-control",
+      "seed": "3057324812542282494",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "counts": false,
+      "means_ms": {
+        "physics_ms": 16.836954758333334,
+        "ccd_ms": 7.2226407083333335,
+        "lifecycle_ms": 2.848943108333333,
+        "step_ms": 21.723872183333334,
+        "narrow_phase_ms": 3.498447008333333,
+        "solver_ms": 4.015138558333334
+      },
+      "temperature_c_range": [
+        58.913,
+        61.348
+      ],
+      "cpu_khz_samples": [
+        1100000,
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    },
+    {
+      "label": "first-02-candidate",
+      "seed": "3057324812542282494",
+      "binary_sha256": "e2d56fcc44348fec73f22e55553e9020fe3e98f46df8f164c08bce33d30cb0d1",
+      "counts": false,
+      "means_ms": {
+        "physics_ms": 16.798978191666667,
+        "ccd_ms": 7.2078859,
+        "lifecycle_ms": 2.63993425,
+        "step_ms": 21.451070525,
+        "narrow_phase_ms": 3.4146383166666667,
+        "solver_ms": 4.021026141666667
+      },
+      "temperature_c_range": [
+        60.861,
+        63.296
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    },
+    {
+      "label": "first-03-candidate",
+      "seed": "3057324812542282494",
+      "binary_sha256": "e2d56fcc44348fec73f22e55553e9020fe3e98f46df8f164c08bce33d30cb0d1",
+      "counts": false,
+      "means_ms": {
+        "physics_ms": 16.723538841666667,
+        "ccd_ms": 7.210453175,
+        "lifecycle_ms": 2.6347985416666666,
+        "step_ms": 21.378099483333333,
+        "narrow_phase_ms": 3.3891973,
+        "solver_ms": 4.027628008333333
+      },
+      "temperature_c_range": [
+        61.348,
+        63.783
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    },
+    {
+      "label": "first-04-control",
+      "seed": "3057324812542282494",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "counts": false,
+      "means_ms": {
+        "physics_ms": 16.835784141666668,
+        "ccd_ms": 7.207431525,
+        "lifecycle_ms": 2.8525354833333334,
+        "step_ms": 21.731448808333333,
+        "narrow_phase_ms": 3.500692,
+        "solver_ms": 4.030674425
+      },
+      "temperature_c_range": [
+        62.809,
+        64.757
+      ],
+      "cpu_khz_samples": [
+        1100000,
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    },
+    {
+      "label": "counts-01-control",
+      "seed": "3057324812542282494",
+      "binary_sha256": "85df553956318de0d7ea60f36eecd065626eed671b58f2a84b97a6989ed5d7a2",
+      "counts": true,
+      "means_ms": {
+        "physics_ms": 21.378538583333334,
+        "ccd_ms": 11.71819815,
+        "lifecycle_ms": 2.8629428,
+        "step_ms": 26.277006225,
+        "narrow_phase_ms": 3.523250375,
+        "solver_ms": 4.013959708333333
+      },
+      "temperature_c_range": [
+        63.296,
+        65.731
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    },
+    {
+      "label": "counts-02-candidate",
+      "seed": "3057324812542282494",
+      "binary_sha256": "e2d56fcc44348fec73f22e55553e9020fe3e98f46df8f164c08bce33d30cb0d1",
+      "counts": true,
+      "means_ms": {
+        "physics_ms": 21.2937504,
+        "ccd_ms": 11.768388916666666,
+        "lifecycle_ms": 2.6544568083333333,
+        "step_ms": 25.971704275,
+        "narrow_phase_ms": 3.404905275,
+        "solver_ms": 4.003464825
+      },
+      "temperature_c_range": [
+        64.27,
+        66.705
+      ],
+      "cpu_khz_samples": [
+        1500000
+      ],
+      "all_retained_states_and_artifacts_match": true
+    }
+  ],
+  "thermal_note": "The two timing controls each have one 1.1 GHz sample in the first 0.3 seconds, before the measured window; other timing-run clock samples are 1.5 GHz. Samples are not continuous throttling telemetry.",
+  "final_device_state": {
+    "pid": 416,
+    "active": true,
+    "unexpected_restarts": 0,
+    "screen": "gameplay",
+    "paused": false,
+    "unchanged_checksums": [
+      "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef  /var/lib/spacewars/settings.toml",
+      "70d1e1086e8656de7dec3810b060945ea1f0c7056e2b36d49ab361cac11b916d  /usr/bin/engine-client",
+      "e6ff442f690bf9df29968264eafd6ada02b76df3a03e6f8d14d29e96153666bf  /usr/bin/spacewars-cli"
+    ],
+    "clipping_candidate_installed": false,
+    "clock_devices_changed": false
+  },
+  "retained_evidence": "spacewars-handoffs/terrain-clip-scratch-20261011",
+  "working_evidence": "target/terrain-clip-scratch.mEzCOWNP",
+  "remote_evidence": "/data/spacewars/terrain-clip-scratch.bHNn6eDO",
+  "limitations": "Small CPU optimization: about 1.4% of the complete scenario step in this case. No live FPS gain or second-case Pi speedup claim. No placement checks, scheduling, material, rendering, or physics quality changes."
+}

@@ -129,15 +129,138 @@ fn additions_match_surface_area_across_corners_holes_and_chunk_seams() {
 fn convex_subtraction_preserves_holes_as_nonoverlapping_pieces() {
     let subject = rectangle(Vec2::ZERO, Vec2::new(4.0, 4.0));
     let hole = rectangle(Vec2::new(1.0, 1.0), Vec2::new(3.0, 3.0));
-    let result = subtract(subject, &hole);
+    let mut clipping = PolygonScratch::default();
+    let mut result = Vec::new();
+    clipping.subtract_into(subject, &hole, &mut result);
     assert_eq!(result.len(), 4);
     assert_eq!(result.iter().map(|p| area(p)).sum::<f64>(), 12.0);
     for p in &result {
         let mut intersection = p.clone();
         for (a, b) in edges(&hole) {
-            intersection = half_plane(&intersection, a, b, true);
+            clipping.clip(&mut intersection, a, b, true);
         }
         assert_eq!(area(&intersection), 0.0);
+    }
+}
+
+// Original allocating implementation, retained as an independent arithmetic
+// and ordering oracle. In particular, do not replace it with half_plane_into.
+fn reference_half_plane(p: &[Point], a: Point, b: Point, inside: bool) -> Polygon {
+    let mut out = Vec::new();
+    for (start, end) in edges(p) {
+        let ds = cross(a, b, start) * if inside { 1.0 } else { -1.0 };
+        let de = cross(a, b, end) * if inside { 1.0 } else { -1.0 };
+        if ds >= 0.0 {
+            out.push(start);
+        }
+        if (ds >= 0.0) != (de >= 0.0) {
+            let t = ds / (ds - de);
+            out.push([
+                start[0] + t * (end[0] - start[0]),
+                start[1] + t * (end[1] - start[1]),
+            ]);
+        }
+    }
+    out.dedup();
+    if out.first() == out.last() {
+        out.pop();
+    }
+    if out.len() < 3 {
+        out.clear();
+    }
+    out
+}
+
+fn reference_subtract(mut subject: Polygon, clip: &Polygon) -> Vec<Polygon> {
+    let mut outside = Vec::new();
+    for (a, b) in edges(clip) {
+        let piece = reference_half_plane(&subject, a, b, false);
+        if !piece.is_empty() {
+            outside.push(piece);
+        }
+        subject = reference_half_plane(&subject, a, b, true);
+        if subject.is_empty() {
+            break;
+        }
+    }
+    outside
+}
+
+fn bits(p: &Polygon) -> Vec<[u64; 2]> {
+    p.iter().map(|p| p.map(f64::to_bits)).collect()
+}
+
+#[test]
+fn clipping_scratch_preserves_vertex_bits_and_piece_order() {
+    let polygons = [
+        vec![],
+        vec![[0.0, -0.0]],
+        vec![[0.0, 0.0], [1.0, 1.0]],
+        vec![[0.0, -0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+        vec![[0.0, 0.0], [2.0, 0.0], [0.5, 1.0]],
+        vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0e-10], [0.0, 1.0e-10]],
+        vec![[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [0.0, 0.0]],
+    ];
+    let mut scratch = PolygonScratch::default();
+    for scale in [1.0e-6, 0.5, 1.0, 91.0] {
+        for offset in [-32.125, 0.0, 1.0e6] {
+            let transform = |p: Point| [p[0] * scale + offset, p[1] * scale - offset];
+            for polygon in &polygons {
+                let subject: Polygon = polygon.iter().copied().map(transform).collect();
+                for shift in [-2.0, 0.0, 0.5, 1.0, 2.0] {
+                    let clip: Polygon = [
+                        [shift, -1.0],
+                        [shift + 1.0, 0.0],
+                        [shift, 1.0],
+                        [shift - 1.0, 0.0],
+                    ]
+                    .into_iter()
+                    .map(transform)
+                    .collect();
+                    for inside in [true, false] {
+                        let mut expected = subject.clone();
+                        let mut actual = subject.clone();
+                        for (a, b) in edges(&clip) {
+                            expected = reference_half_plane(&expected, a, b, inside);
+                            scratch.clip(&mut actual, a, b, inside);
+                            assert_eq!(bits(&actual), bits(&expected));
+                        }
+                    }
+                    let expected = reference_subtract(subject.clone(), &clip);
+                    // Subtraction appends to an existing output list, including
+                    // empty/fully-covered calls after prior nonempty results.
+                    let mut actual = vec![subject.clone()];
+                    scratch.subtract_into(subject.clone(), &clip, &mut actual);
+                    assert_eq!(bits(&actual[0]), bits(&subject));
+                    assert_eq!(
+                        actual[1..].iter().map(bits).collect::<Vec<_>>(),
+                        expected.iter().map(bits).collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn clipping_reuses_warmed_vertex_buffers() {
+    let mut scratch = PolygonScratch::default();
+    let clip = rectangle(Vec2::ZERO, Vec2::new(4.0, 4.0));
+    let mut subject = clip.clone();
+    for (a, b) in edges(&clip) {
+        scratch.clip(&mut subject, a, b, true);
+    }
+    let storage = BTreeSet::from([subject.as_ptr(), scratch.clipped.as_ptr()]);
+    assert_eq!(storage.len(), 2);
+    for _ in 0..100 {
+        for (a, b) in edges(&clip) {
+            scratch.clip(&mut subject, a, b, true);
+            assert_eq!(bits(&subject), bits(&clip));
+            assert_eq!(
+                BTreeSet::from([subject.as_ptr(), scratch.clipped.as_ptr()]),
+                storage
+            );
+        }
     }
 }
 

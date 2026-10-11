@@ -84,6 +84,10 @@ fn main() {
             )
             .unwrap();
         }
+        let capture_counts = input.tick >= first - 1 && count_queries;
+        if capture_counts {
+            engine_rapier::profile::set_enabled(true);
+        }
         let started = Instant::now();
         let mut step = || {
             SurfaceSortieScenario::step(
@@ -92,13 +96,20 @@ fn main() {
                 Duration::from_nanos(16_666_667),
             )
         };
-        let profile = if input.tick >= first - 1 && count_queries {
-            Some(ccd_diagnostics::measure(step).1)
+        let (profile, lifecycle) = if capture_counts {
+            let ((_, ccd), lifecycle) =
+                scenario_spacewars::step_diagnostics::measure(|| ccd_diagnostics::measure(step));
+            (Some(ccd), Some(lifecycle))
         } else {
             step();
-            None
+            (None, None)
         };
         let elapsed = started.elapsed();
+        let material_profile = capture_counts.then(|| {
+            let timings = engine_rapier::profile::take();
+            engine_rapier::profile::set_enabled(false);
+            timings
+        });
         if input.tick >= first - 1 {
             let metrics = state.last_step_metrics();
             serde_json::to_writer(
@@ -106,8 +117,12 @@ fn main() {
                 &json!({
                     "tick":state.tick(), "step_ms":elapsed.as_secs_f64()*1000.0,
                     "physics_ms":metrics.physics_time.as_secs_f64()*1000.0,
+                    "lifecycle_ms":metrics.lifecycle_time.as_secs_f64()*1000.0,
+                    "narrow_phase_ms":metrics.rapier.narrow_phase_time.as_secs_f64()*1000.0,
+                    "solver_ms":metrics.rapier.solver_time.as_secs_f64()*1000.0,
                     "ccd_ms":metrics.rapier.ccd_time.map(|d| d.as_secs_f64()*1000.0),
-                    "substeps":metrics.rapier.ccd_substeps, "profile":profile,
+                    "substeps":metrics.rapier.ccd_substeps, "profile":profile, "lifecycle":lifecycle,
+                    "material_profile":material_profile,
                     "physics_fnv64":fnv64(&state.ccd_physics_snapshot()),
                     "scenario_fnv64":fnv64(&SurfaceSortieScenario::observe(&state).payload),
                 }),

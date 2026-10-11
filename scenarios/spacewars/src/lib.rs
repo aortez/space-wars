@@ -7,6 +7,8 @@
 mod physics;
 pub mod ship_geometry;
 pub mod spaceling_geometry;
+#[cfg(feature = "ccd-diagnostics")]
+pub mod step_diagnostics;
 pub mod surface_sortie;
 mod terrain;
 pub mod terrain_art;
@@ -2793,6 +2795,8 @@ fn split_gravity_id(id: GravityId) -> (u64, u64) {
 }
 
 fn reconcile_physics(state: &mut SpacewarsState, dt_seconds: f32) -> physics::PhysicsLifecycle {
+    #[cfg(feature = "ccd-diagnostics")]
+    let _span = step_diagnostics::Scope::new("lifecycle.reconcile");
     let mut docked_planets = [None; 2];
     for contact in &state.spaceport_contacts {
         if let Some(docked) = docked_planets
