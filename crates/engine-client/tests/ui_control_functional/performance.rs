@@ -45,6 +45,17 @@ fn fps_counter_is_shared_by_scene_and_native_video_lifecycles() {
                     .is_some_and(|text| text.starts_with("FPS ") && !text.contains("--"))
             });
             assert_eq!(status["performance_overlay_enabled"], "true");
+            assert!(status["performance_overlay_details"].starts_with("CPU "));
+            assert!(status["performance_overlay_details"].contains("Draw CPU "));
+            assert!(
+                status["performance_overlay_details"].contains(if scenario == "falling" {
+                    "video -> desktop"
+                } else if scenario == "clock" {
+                    "raster -> desktop"
+                } else {
+                    "vector -> desktop"
+                })
+            );
             assert_eq!(status["fps_source"], "submitted-frames");
             for rate in ["fps", "ups"] {
                 let value: f64 = status[rate].parse().unwrap();
@@ -61,6 +72,9 @@ fn fps_counter_is_shared_by_scene_and_native_video_lifecycles() {
             );
             wait_status(harness, |status| {
                 status.get("performance_overlay_text").map(String::as_str) == Some("Paused")
+                    && status
+                        .get("performance_overlay_details")
+                        .is_some_and(String::is_empty)
             });
 
             let preferences = harness.activate_guarded("pause.sound", &pause);
@@ -118,6 +132,7 @@ fn fps_counter_is_shared_by_scene_and_native_video_lifecycles() {
                 status["performance_overlay_enabled"], "true",
                 "returning to launcher does not reset the preference"
             );
+            assert_eq!(status["performance_overlay_details"], "");
         }
     });
 }

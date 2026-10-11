@@ -1,7 +1,7 @@
 // Copyright © Space-Wars contributors
 // SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0
 
-//! Local, bounded LinuxKMS software-presentation diagnostics. These measure CPU
+//! Local, bounded LinuxKMS presentation diagnostics. These measure CPU
 //! rendering and DRM calls, not GPU execution or verified physical scanouts.
 //! Read on the UI thread. Set SPACEWARS_KMS_PROFILE=0 before startup to disable.
 
@@ -14,8 +14,14 @@ use std::{
 };
 
 const SAMPLE_LIMIT: usize = 120;
-const STAGE_COUNT: usize = 30;
-const COUNTER_COUNT: usize = 8;
+const STAGE_COUNT: usize = 64;
+const COUNTER_COUNT: usize = 11;
+
+pub mod application;
+pub mod geometry;
+#[cfg(feature = "renderer-femtovg")]
+mod text;
+mod trace;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Stage {
@@ -49,6 +55,40 @@ pub(crate) enum Stage {
     CoreTextGlyphRun,
     CoreTextTexture,
     CoreTextFallback,
+    EglSwap,
+    GlTextureAllocate,
+    GlTextureUpload,
+    GlTextureDelete,
+    GlBufferUpload,
+    GlDraw,
+    GlCompile,
+    GlLink,
+    FemtoBuildItems,
+    FemtoAfterItems,
+    FemtoTextMeasure,
+    FemtoTextBreak,
+    FemtoTextShape,
+    FemtoTextShapeMiss,
+    FemtoTextDraw,
+    FemtoCpuMaskBuild,
+    FemtoCpuMaskUpload,
+    FemtoGlyphQuads,
+    FemtoPathFill,
+    FemtoPathStroke,
+    AppHostTick,
+    AppHostStep,
+    AppHostResult,
+    AppHostScene,
+    AppHostPublish,
+    AppHostDiagnostics,
+    AppBeforeRender,
+    AppAfterRender,
+    AppSceneProject,
+    AppSceneStage,
+    AppSceneOverlay,
+    AppSourceDrop,
+    AppSceneDraw,
+    AppPlanDrop,
 }
 
 const STAGES: [(Stage, &str); STAGE_COUNT] = [
@@ -82,6 +122,40 @@ const STAGES: [(Stage, &str); STAGE_COUNT] = [
     (Stage::CoreTextGlyphRun, "core_text_glyph_run"),
     (Stage::CoreTextTexture, "core_text_texture"),
     (Stage::CoreTextFallback, "core_text_fallback"),
+    (Stage::EglSwap, "egl_swap"),
+    (Stage::GlTextureAllocate, "gl_texture_allocate"),
+    (Stage::GlTextureUpload, "gl_texture_upload"),
+    (Stage::GlTextureDelete, "gl_texture_delete"),
+    (Stage::GlBufferUpload, "gl_buffer_upload"),
+    (Stage::GlDraw, "gl_draw"),
+    (Stage::GlCompile, "gl_compile"),
+    (Stage::GlLink, "gl_link"),
+    (Stage::FemtoBuildItems, "femto_build_items"),
+    (Stage::FemtoAfterItems, "femto_after_items"),
+    (Stage::FemtoTextMeasure, "femto_text_measure"),
+    (Stage::FemtoTextBreak, "femto_text_break"),
+    (Stage::FemtoTextShape, "femto_text_shape"),
+    (Stage::FemtoTextShapeMiss, "femto_text_shape_miss"),
+    (Stage::FemtoTextDraw, "femto_text_draw"),
+    (Stage::FemtoCpuMaskBuild, "femto_cpu_mask_build"),
+    (Stage::FemtoCpuMaskUpload, "femto_cpu_mask_upload"),
+    (Stage::FemtoGlyphQuads, "femto_glyph_quads"),
+    (Stage::FemtoPathFill, "femto_path_fill"),
+    (Stage::FemtoPathStroke, "femto_path_stroke"),
+    (Stage::AppHostTick, "app_host_tick"),
+    (Stage::AppHostStep, "app_host_step"),
+    (Stage::AppHostResult, "app_host_result"),
+    (Stage::AppHostScene, "app_host_scene"),
+    (Stage::AppHostPublish, "app_host_publish"),
+    (Stage::AppHostDiagnostics, "app_host_diagnostics"),
+    (Stage::AppBeforeRender, "app_before_render"),
+    (Stage::AppAfterRender, "app_after_render"),
+    (Stage::AppSceneProject, "app_scene_project"),
+    (Stage::AppSceneStage, "app_scene_stage"),
+    (Stage::AppSceneOverlay, "app_scene_overlay"),
+    (Stage::AppSourceDrop, "app_source_drop"),
+    (Stage::AppSceneDraw, "app_scene_draw"),
+    (Stage::AppPlanDrop, "app_plan_drop"),
 ];
 
 #[derive(Clone, Copy)]
@@ -94,6 +168,13 @@ pub(crate) enum Counter {
     CopyBytes,
     RgbBlits,
     RgbPixels,
+    // Keep diagnostic field indices stable in builds without the GL renderer.
+    #[cfg_attr(not(feature = "renderer-femtovg"), allow(dead_code))]
+    GlUploadBytes,
+    #[cfg_attr(not(feature = "renderer-femtovg"), allow(dead_code))]
+    GlDrawCalls,
+    #[cfg_attr(not(feature = "renderer-femtovg"), allow(dead_code))]
+    GlBufferBytes,
 }
 
 const COUNTERS: [&str; COUNTER_COUNT] = [
@@ -105,6 +186,9 @@ const COUNTERS: [&str; COUNTER_COUNT] = [
     "copy_bytes",
     "rgb_blits",
     "rgb_pixels",
+    "gl_upload_bytes",
+    "gl_draw_calls",
+    "gl_buffer_bytes",
 ];
 
 #[derive(Clone, Copy)]
@@ -116,21 +200,36 @@ struct Stamp {
 impl Stamp {
     fn now() -> Self {
         let wall = Instant::now();
-        let cpu = clock_gettime(ClockId::CLOCK_THREAD_CPUTIME_ID).ok().and_then(|time| {
-            Some(Duration::new(time.tv_sec().try_into().ok()?, time.tv_nsec().try_into().ok()?))
-        });
+        let cpu = clock_gettime(ClockId::CLOCK_THREAD_CPUTIME_ID)
+            .ok()
+            .and_then(|time| {
+                Some(Duration::new(
+                    time.tv_sec().try_into().ok()?,
+                    time.tv_nsec().try_into().ok()?,
+                ))
+            });
         Self { wall, cpu }
     }
 
     fn wall_only() -> Self {
-        Self { wall: Instant::now(), cpu: None }
+        Self {
+            wall: Instant::now(),
+            cpu: None,
+        }
     }
 
     fn elapsed(self) -> Elapsed {
-        let end = if self.cpu.is_some() { Self::now() } else { Self::wall_only() };
+        let end = if self.cpu.is_some() {
+            Self::now()
+        } else {
+            Self::wall_only()
+        };
         Elapsed {
             wall: end.wall.duration_since(self.wall),
-            cpu: self.cpu.zip(end.cpu).and_then(|(start, end)| end.checked_sub(start)),
+            cpu: self
+                .cpu
+                .zip(end.cpu)
+                .and_then(|(start, end)| end.checked_sub(start)),
         }
     }
 }
@@ -159,16 +258,46 @@ impl StageSample {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct LoopSample {
     stages: [StageSample; STAGE_COUNT],
     counters: [u64; COUNTER_COUNT],
     dirty_pixels: u64,
+    trace_marker: u8,
+    presentation: PresentationSample,
+    geometry: geometry::Sample,
+}
+
+/// Only populated during an explicit trace. Kernel flip timestamps are kept
+/// separate from our capture-relative CPU clock; never subtract their epochs.
+#[derive(Clone, Copy, Default)]
+struct PresentationSample {
+    loop_start: Option<Duration>,
+    submitted: Option<Duration>,
+    flip_observed: Option<Duration>,
+    flip_sequence: Option<u32>,
+    flip_kernel_time: Option<Duration>,
+}
+
+impl Default for LoopSample {
+    fn default() -> Self {
+        Self {
+            stages: [StageSample::default(); STAGE_COUNT],
+            counters: [0; COUNTER_COUNT],
+            dirty_pixels: 0,
+            trace_marker: 0,
+            presentation: PresentationSample::default(),
+            geometry: geometry::Sample::default(),
+        }
+    }
 }
 
 struct Profile {
     active: bool,
     enabled: bool,
+    renderer: &'static str,
+    gl_driver: Option<[String; 3]>,
+    gl_stencil_bits: Option<u8>,
     size: (u32, u32),
     format: &'static str,
     buffer_bytes: usize,
@@ -181,6 +310,7 @@ struct Profile {
     samples: VecDeque<LoopSample>,
     loops_total: u64,
     counters_total: [u64; COUNTER_COUNT],
+    trace: trace::Capture,
 }
 
 impl Default for Profile {
@@ -188,6 +318,9 @@ impl Default for Profile {
         Self {
             active: false,
             enabled: false,
+            renderer: "software",
+            gl_driver: None,
+            gl_stencil_bits: None,
             size: (0, 0),
             format: "unknown",
             buffer_bytes: 0,
@@ -200,6 +333,7 @@ impl Default for Profile {
             samples: VecDeque::new(),
             loops_total: 0,
             counters_total: [0; COUNTER_COUNT],
+            trace: trace::Capture::default(),
         }
     }
 }
@@ -215,6 +349,7 @@ impl Profile {
         self.record(Stage::Loop, elapsed);
         if let Some(sample) = self.current.take() {
             self.loops_total += 1;
+            self.trace.record(self.loops_total, &sample);
             if self.samples.len() == SAMPLE_LIMIT {
                 self.samples.pop_front();
             }
@@ -241,10 +376,24 @@ impl Profile {
             return String::new();
         }
         let mut text = format!(
-            "\nkms_profile_version=6\nkms_profile_enabled={}\nkms_loop_samples={}\nkms_loops_total={}\nkms_output_width={}\nkms_output_height={}\nkms_pixel_format={}\nkms_buffer_bytes={}\nkms_buffer_age={}\nkms_buffer_mode={}\nkms_shadow_bytes={}\nkms_texture_mode={}\nkms_draw_detail={}",
+            "\nkms_profile_version=13\nkms_profile_enabled={}\nkms_loop_samples={}\nkms_loops_total={}\nkms_output_width={}\nkms_output_height={}\nkms_pixel_format={}\nkms_buffer_bytes={}\nkms_buffer_age={}\nkms_buffer_mode={}\nkms_shadow_bytes={}\nkms_texture_mode={}\nkms_draw_detail={}",
             self.enabled, self.samples.len(), self.loops_total, self.size.0, self.size.1,
             self.format, self.buffer_bytes, self.buffer_age, self.buffer_mode, self.shadow_bytes, self.texture_mode, self.draw_detail,
         );
+        text.push_str(&self.trace.status());
+        let _ = write!(
+            text,
+            "\nkms_renderer={}\nkms_gpu_memory_measured=false",
+            self.renderer
+        );
+        if let Some([vendor, renderer, version]) = &self.gl_driver {
+            let _ =
+                write!(text,
+                "\nkms_gl_vendor={vendor}\nkms_gl_renderer={renderer}\nkms_gl_version={version}");
+        }
+        if let Some(bits) = self.gl_stencil_bits {
+            let _ = write!(text, "\nkms_gl_stencil_bits={bits}");
+        }
         let window_wall = self
             .samples
             .iter()
@@ -273,8 +422,10 @@ impl Profile {
                 .collect();
             let calls = samples.iter().map(|s| s.calls).sum::<u64>();
             let cpu_samples = samples.iter().filter(|s| s.elapsed.cpu.is_some()).count();
-            let _ =
-                write!(text, "\nkms_{name}_calls={calls}\nkms_{name}_cpu_samples={cpu_samples}");
+            let _ = write!(
+                text,
+                "\nkms_{name}_calls={calls}\nkms_{name}_cpu_samples={cpu_samples}"
+            );
             if samples.is_empty() {
                 continue;
             }
@@ -319,18 +470,151 @@ pub(crate) fn activate(size: (u32, u32)) {
     });
 }
 
+#[cfg(any(feature = "renderer-femtovg", test))]
+pub(crate) fn activate_femtovg(
+    size: (u32, u32),
+    driver_info: Option<[String; 3]>,
+    stencil_bits: Option<u8>,
+) {
+    activate(size);
+    PROFILE.with(|profile| {
+        let mut profile = profile.borrow_mut();
+        profile.renderer = "femtovg";
+        profile.gl_driver = driver_info;
+        profile.gl_stencil_bits = stencil_bits;
+        profile.buffer_mode = "gpu";
+        profile.texture_mode = "gpu";
+        profile.draw_detail = false;
+    });
+}
+
 #[cfg(test)]
 pub(crate) fn activate_for_test(size: (u32, u32)) {
     PROFILE.with(|profile| {
-        *profile.borrow_mut() =
-            Profile { active: true, enabled: true, draw_detail: true, size, ..Profile::default() };
+        *profile.borrow_mut() = Profile {
+            active: true,
+            enabled: true,
+            draw_detail: true,
+            size,
+            ..Profile::default()
+        };
     });
 }
 
 /// Snapshot completed loop iterations on the UI thread. Formatting/sorting is
-/// only done on request, never in the rendering hot path. Empty on other renderers.
+/// only done on request, never in the rendering hot path. Empty before activation.
 pub fn diagnostics() -> String {
     PROFILE.with(|profile| profile.borrow().diagnostics())
+}
+
+/// Bounded, explicitly armed CPU trace. Read/cancel never enable profiling.
+/// Captures 240 complete event-loop iterations, then stops its extra clocks.
+/// No file I/O, GL synchronization, shader modification or persistent settings.
+pub fn render_trace(command: &str) -> Result<String, &'static str> {
+    let result = PROFILE.with(|profile| {
+        let mut p = profile.borrow_mut();
+        match command {
+            "start" | "start-text" | "start-work" | "start-geometry" => {
+                if !p.enabled || p.renderer != "femtovg" {
+                    return Err("render-trace requires active LinuxKMS FemtoVG profiling");
+                }
+                p.trace.start(command != "start", matches!(command, "start-work" | "start-geometry"))?;
+                p.trace.geometry_detail = command == "start-geometry";
+                Ok(p.trace.status())
+            }
+            "read" => Ok(p.trace.report()),
+            "cancel" => {
+                p.trace.cancel();
+                Ok(p.trace.status())
+            }
+            _ => Err("render-trace requires start, start-text, start-work, start-geometry, read or cancel"),
+        }
+    });
+    #[cfg(feature = "renderer-femtovg")]
+    text::enable(PROFILE.with(|p| p.borrow().trace.text_recording()));
+    result
+}
+
+/// Optional application marker on the current loop; zero means unspecified.
+/// Used immediately before drawing to correlate UI state with the same sample.
+pub fn render_trace_marker(marker: u8) {
+    PROFILE.with(|profile| {
+        let mut p = profile.borrow_mut();
+        if p.trace.recording() {
+            if let Some(sample) = &mut p.current {
+                sample.trace_marker = marker;
+            }
+        }
+    });
+}
+
+/// Record successful DRM submission, not GPU completion or physical latency.
+/// Only populate the fixed trace fields and read a clock while recording.
+pub(crate) fn page_flip_submitted() {
+    PROFILE.with_borrow_mut(|p| {
+        if !p.trace.recording() {
+            return;
+        }
+        if let Some(current) = &mut p.current {
+            current.presentation.submitted = p.trace.offset(Instant::now());
+        }
+    });
+}
+
+/// The DRM event's timestamp is the raw kernel vblank timestamp despite the
+/// drm-rs field name `duration`. Sequence differences wrap at u32::MAX.
+pub(crate) fn page_flip_completed(sequence: u32, kernel_time: Duration) {
+    PROFILE.with_borrow_mut(|p| {
+        if !p.trace.recording() {
+            return;
+        }
+        if let Some(current) = &mut p.current {
+            let sample = &mut current.presentation;
+            sample.flip_observed = p.trace.offset(Instant::now());
+            sample.flip_sequence = Some(sequence);
+            sample.flip_kernel_time = Some(kernel_time);
+        }
+    });
+}
+
+/// Small, unsorted snapshot for an occasional on-screen overlay. Draw CPU is
+/// CPU time per completed drawing loop, not GPU time or a vsync-inclusive wait.
+#[derive(Debug)]
+pub struct OverlaySummary {
+    pub renderer: &'static str,
+    pub gl_renderer: Option<String>,
+    pub draw_cpu_ms: Option<f64>,
+}
+
+pub fn overlay_summary() -> Option<OverlaySummary> {
+    PROFILE.with(|profile| profile.borrow().overlay_summary())
+}
+
+impl Profile {
+    fn overlay_summary(&self) -> Option<OverlaySummary> {
+        if !self.active {
+            return None;
+        }
+        let mut total = Duration::ZERO;
+        let mut count = 0;
+        let mut complete = self.enabled;
+        for sample in &self.samples {
+            let draw = sample.stages[Stage::Draw as usize];
+            if draw.calls > 0 {
+                count += 1;
+                if let Some(cpu) = draw.elapsed.cpu {
+                    total += cpu;
+                } else {
+                    complete = false;
+                }
+            }
+        }
+        Some(OverlaySummary {
+            renderer: self.renderer,
+            gl_renderer: self.gl_driver.as_ref().map(|info| info[1].clone()),
+            draw_cpu_ms: (complete && count > 0).then(|| millis(total) / count as f64),
+        })
+    }
 }
 
 pub(crate) struct Scope {
@@ -343,9 +627,32 @@ impl Scope {
         let enabled = PROFILE.with(|p| p.borrow().enabled);
         let start = enabled.then(Stamp::now);
         if matches!(stage, Stage::Loop) && enabled {
-            PROFILE.with(|p| p.borrow_mut().current = Some(LoopSample::default()));
+            PROFILE.with(|p| {
+                let mut p = p.borrow_mut();
+                let now = start.as_ref().unwrap().wall;
+                p.trace.begin_loop(now);
+                p.current = Some(LoopSample {
+                    presentation: PresentationSample {
+                        loop_start: p.trace.offset(now),
+                        ..PresentationSample::default()
+                    },
+                    ..LoopSample::default()
+                });
+            });
+            #[cfg(feature = "renderer-femtovg")]
+            text::enable(PROFILE.with(|p| p.borrow().trace.text_recording()));
         }
         Self { stage, start }
+    }
+
+    /// Expensive per-GL-call clocks are active only during an armed capture.
+    #[cfg(any(feature = "renderer-femtovg", test))]
+    pub(crate) fn trace(stage: Stage) -> Self {
+        let enabled = PROFILE.with(|p| p.borrow().trace.recording());
+        Self {
+            stage,
+            start: enabled.then(Stamp::now),
+        }
     }
 }
 
@@ -361,6 +668,10 @@ impl Drop for Scope {
                     profile.record(self.stage, elapsed);
                 }
             });
+            #[cfg(feature = "renderer-femtovg")]
+            if matches!(self.stage, Stage::Loop) {
+                text::enable(PROFILE.with(|p| p.borrow().trace.text_recording()));
+            }
         }
     }
 }
@@ -371,6 +682,21 @@ pub(crate) fn count(counter: Counter) {
 
 pub(crate) fn copied(bytes: usize) {
     PROFILE.with(|p| p.borrow_mut().add(Counter::CopyBytes, bytes as u64));
+}
+
+#[cfg(feature = "renderer-femtovg")]
+pub(crate) fn gl_uploaded(bytes: u64) {
+    PROFILE.with(|p| p.borrow_mut().add(Counter::GlUploadBytes, bytes));
+}
+
+#[cfg(feature = "renderer-femtovg")]
+pub(crate) fn gl_buffer_uploaded(bytes: u64) {
+    PROFILE.with(|p| p.borrow_mut().add(Counter::GlBufferBytes, bytes));
+}
+
+#[cfg(feature = "renderer-femtovg")]
+pub(crate) fn enabled() -> bool {
+    PROFILE.with(|p| p.borrow().enabled)
 }
 
 pub(crate) fn rgb_blit(pixels: usize) {
@@ -482,13 +808,70 @@ pub(crate) fn buffer(age: u8, bytes: usize, format: &'static str, dirty_pixels: 
 mod tests {
     use super::*;
 
+    #[test]
+    fn gpu_profile_names_the_path_without_claiming_gpu_time_or_memory() {
+        activate_femtovg(
+            (480, 800),
+            Some(["vendor", "driver", "version"].map(str::to_owned)),
+            Some(8),
+        );
+        let text = diagnostics();
+        assert!(text.contains("kms_renderer=femtovg\n"));
+        assert!(text.contains("kms_gl_renderer=driver\n"));
+        assert!(text.contains("kms_gl_stencil_bits=8\n"));
+        assert!(text.contains("kms_gpu_memory_measured=false"));
+        assert!(text.contains("kms_buffer_mode=gpu\n"));
+        assert!(text.contains("kms_draw_detail=false\n"));
+        assert!(!text.contains("kms_egl_swap_cpu_avg_ms"));
+        activate_for_test((800, 480));
+        assert!(diagnostics().contains("kms_renderer=software\n"));
+        assert!(!diagnostics().contains("kms_gl_renderer="));
+        assert!(!diagnostics().contains("kms_gl_stencil_bits="));
+    }
+
     fn elapsed(wall: u64, cpu: Option<u64>) -> Elapsed {
-        Elapsed { wall: Duration::from_millis(wall), cpu: cpu.map(Duration::from_millis) }
+        Elapsed {
+            wall: Duration::from_millis(wall),
+            cpu: cpu.map(Duration::from_millis),
+        }
+    }
+
+    #[test]
+    fn overlay_uses_completed_draw_cpu_not_waits_or_idle_loops() {
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            ..Profile::default()
+        };
+        assert!(p.overlay_summary().unwrap().draw_cpu_ms.is_none());
+        for cpu in [2, 4] {
+            p.current = Some(LoopSample::default());
+            p.record(Stage::Draw, elapsed(15, Some(cpu)));
+            p.finish_loop(elapsed(20, Some(cpu + 1)));
+        }
+        p.current = Some(LoopSample::default());
+        p.finish_loop(elapsed(100, Some(0)));
+        p.current = Some(LoopSample::default());
+        p.record(Stage::Draw, elapsed(999, Some(999)));
+        assert_eq!(p.overlay_summary().unwrap().draw_cpu_ms, Some(3.0));
+        p.finish_loop(elapsed(999, Some(999)));
+        p.current = Some(LoopSample::default());
+        p.record(Stage::Draw, elapsed(1, None));
+        p.finish_loop(elapsed(1, None));
+        assert!(p.overlay_summary().unwrap().draw_cpu_ms.is_none());
+        p.enabled = false;
+        assert!(p.overlay_summary().unwrap().draw_cpu_ms.is_none());
+        p.active = false;
+        assert!(p.overlay_summary().is_none());
     }
 
     #[test]
     fn completed_windows_are_bounded_and_do_not_mix_inflight_work() {
-        let mut p = Profile { active: true, enabled: true, ..Profile::default() };
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            ..Profile::default()
+        };
         for i in 0..150 {
             p.current = Some(LoopSample::default());
             p.record(Stage::Draw, elapsed(i, Some(2)));
@@ -508,7 +891,11 @@ mod tests {
 
     #[test]
     fn idle_loops_waits_and_missing_cpu_clocks_are_explicit() {
-        let mut p = Profile { active: true, enabled: true, ..Profile::default() };
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            ..Profile::default()
+        };
         p.current = Some(LoopSample::default());
         p.record(Stage::Draw, elapsed(4, None));
         p.count(Counter::Draws);
@@ -526,7 +913,11 @@ mod tests {
 
     #[test]
     fn counters_distinguish_initial_modesets_submissions_and_completions() {
-        let mut p = Profile { active: true, enabled: true, ..Profile::default() };
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            ..Profile::default()
+        };
         p.current = Some(LoopSample::default());
         p.count(Counter::Modesets);
         p.count(Counter::FlipSubmissions);
@@ -543,7 +934,11 @@ mod tests {
 
     #[test]
     fn copy_accounting_records_bytes_and_keeps_background_nested_in_draw() {
-        let mut p = Profile { active: true, enabled: true, ..Profile::default() };
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            ..Profile::default()
+        };
         p.current = Some(LoopSample::default());
         p.record(Stage::Background, elapsed(2, Some(2)));
         p.record(Stage::Draw, elapsed(5, Some(5)));
@@ -559,8 +954,12 @@ mod tests {
 
     #[test]
     fn rgb_blit_accounting_is_nested_in_draw_and_counts_only_handled_pixels() {
-        let mut p =
-            Profile { active: true, enabled: true, texture_mode: "rgb", ..Profile::default() };
+        let mut p = Profile {
+            active: true,
+            enabled: true,
+            texture_mode: "rgb",
+            ..Profile::default()
+        };
         p.current = Some(LoopSample::default());
         p.record(Stage::RgbBlit, elapsed(1, Some(1)));
         p.record(Stage::Draw, elapsed(4, Some(4)));
@@ -568,7 +967,7 @@ mod tests {
         p.add(Counter::RgbPixels, 1024 * 768);
         p.finish_loop(elapsed(6, Some(6)));
         let text = p.diagnostics();
-        assert!(text.contains("kms_profile_version=6"));
+        assert!(text.contains("kms_profile_version=13"));
         assert!(text.contains("kms_texture_mode=rgb"));
         assert!(text.contains("kms_rgb_blit_cpu_avg_ms=1.000"));
         assert!(text.contains("kms_draw_cpu_avg_ms=4.000"));
@@ -585,13 +984,22 @@ mod tests {
         {
             let _iteration = Scope::new(Stage::Loop);
             for (op, begin) in [
-                (D::Image, true), (D::Texture, true),
-                (D::Texture, false), (D::Image, false),
-                (D::Text, true), (D::TextFont, true), (D::TextFont, false),
-                (D::TextGlyphRun, true), (D::Texture, true),
-                (D::Texture, true), (D::Texture, false),
-                (D::TextureFallback, true), (D::TextureFallback, false),
-                (D::Texture, false), (D::TextGlyphRun, false), (D::Text, false),
+                (D::Image, true),
+                (D::Texture, true),
+                (D::Texture, false),
+                (D::Image, false),
+                (D::Text, true),
+                (D::TextFont, true),
+                (D::TextFont, false),
+                (D::TextGlyphRun, true),
+                (D::Texture, true),
+                (D::Texture, true),
+                (D::Texture, false),
+                (D::TextureFallback, true),
+                (D::TextureFallback, false),
+                (D::Texture, false),
+                (D::TextGlyphRun, false),
+                (D::Text, false),
             ] {
                 draw_event(op, begin);
             }
@@ -600,15 +1008,29 @@ mod tests {
             let p = p.borrow();
             let s = &p.samples[0].stages;
             assert_eq!(s[Stage::CoreTexture as usize].calls, 2);
-            for stage in [Stage::CoreText, Stage::CoreTextFont, Stage::CoreTextGlyphRun,
-                Stage::CoreTextTexture, Stage::CoreTextFallback] {
+            for stage in [
+                Stage::CoreText,
+                Stage::CoreTextFont,
+                Stage::CoreTextGlyphRun,
+                Stage::CoreTextTexture,
+                Stage::CoreTextFallback,
+            ] {
                 assert_eq!(s[stage as usize].calls, 1);
                 assert!(s[stage as usize].elapsed.cpu.is_none());
             }
-            assert!(s[Stage::CoreText as usize].elapsed.wall >=
-                s[Stage::CoreTextFont as usize].elapsed.wall + s[Stage::CoreTextGlyphRun as usize].elapsed.wall);
-            assert!(s[Stage::CoreTextGlyphRun as usize].elapsed.wall >= s[Stage::CoreTextTexture as usize].elapsed.wall);
-            assert_eq!(s[Stage::CoreTextFallback as usize].elapsed.wall, s[Stage::CoreFallback as usize].elapsed.wall);
+            assert!(
+                s[Stage::CoreText as usize].elapsed.wall
+                    >= s[Stage::CoreTextFont as usize].elapsed.wall
+                        + s[Stage::CoreTextGlyphRun as usize].elapsed.wall
+            );
+            assert!(
+                s[Stage::CoreTextGlyphRun as usize].elapsed.wall
+                    >= s[Stage::CoreTextTexture as usize].elapsed.wall
+            );
+            assert_eq!(
+                s[Stage::CoreTextFallback as usize].elapsed.wall,
+                s[Stage::CoreFallback as usize].elapsed.wall
+            );
         });
         PROFILE.with(|p| *p.borrow_mut() = Profile::default());
     }
@@ -628,7 +1050,11 @@ mod tests {
     #[test]
     fn scopes_commit_completed_work_on_early_return() {
         PROFILE.with(|p| {
-            *p.borrow_mut() = Profile { active: true, enabled: true, ..Profile::default() };
+            *p.borrow_mut() = Profile {
+                active: true,
+                enabled: true,
+                ..Profile::default()
+            };
         });
         let render = || -> Result<(), ()> {
             let _iteration = Scope::new(Stage::Loop);

@@ -559,6 +559,7 @@ export component MainWindow inherits Window {
     in property <bool> sound-muted: false;
     in property <bool> performance-overlay-enabled: false;
     in property <string> performance-overlay-text: "";
+    in property <string> performance-overlay-details: "";
     in property <bool> settings-save-pending: false;
     in property <string> settings-save-error: "";
     in-out property <bool> game-over-visible: false;
@@ -978,22 +979,31 @@ export component MainWindow inherits Window {
     // Host-submitted frames, not a measurement of physical display scanout.
     if root.performance-overlay-enabled && root.performance-overlay-text != "" && !root.launcher-visible && !root.launcher-busy: Rectangle {
         x: 12px;
-        y: root.compact-hud-visible ? 8px : root.spacewars-ui-visible ? 78px : 12px;
-        width: root.compact-hud-visible ? Math.min(156px, (parent.width - 184px) / 2) : Math.min(184px, parent.width - 24px);
-        height: root.compact-hud-visible ? 26px : 32px;
+        y: root.compact-hud-visible ? 60px : root.spacewars-ui-visible ? 78px : 12px;
+        width: Math.min(260px, parent.width - 24px);
+        height: root.performance-overlay-details == "" ? 32px : 82px;
         background: #080a12b8;
         border-color: #59627388;
         border-width: 1px;
         border-radius: 5px;
         Text {
-            width: parent.width;
-            height: parent.height;
+            x: 8px; y: 6px;
+            width: parent.width - 16px;
+            height: 20px;
             text: root.performance-overlay-text;
             color: #e6edf7;
-            font-size: root.compact-hud-visible ? 12px : 14px;
+            font-size: 14px;
             overflow: elide;
-            horizontal-alignment: center;
             vertical-alignment: center;
+        }
+        if root.performance-overlay-details != "": Text {
+            x: 8px; y: 28px;
+            width: parent.width - 16px;
+            height: parent.height - 34px;
+            text: root.performance-overlay-details;
+            color: #b7d4e6;
+            font-size: 12px;
+            overflow: elide;
         }
     }
 
@@ -2727,7 +2737,7 @@ export component MainWindow inherits Window {
                     SettingsRow {
                         y: 2 * (settings-scroll.row-height + 10px);
                         width: parent.width; height: settings-scroll.row-height;
-                        label: "FPS Counter"; checked: root.performance-overlay-enabled; selected: root.sound-focus-index == 2;
+                        label: "Performance Overlay"; checked: root.performance-overlay-enabled; selected: root.sound-focus-index == 2;
                         activated => { root.sound-adjust(2, 0); }
                     }
                     SettingsRow {

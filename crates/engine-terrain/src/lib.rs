@@ -631,6 +631,7 @@ fn rectangles_matching(
 
 #[derive(Debug, Clone)]
 pub struct ChunkGeometry {
+    identity: std::sync::Arc<()>,
     pub id: ChunkId,
     pub revision: u64,
     /// Includes changes in neighbouring material used to reconstruct this chunk.
@@ -642,6 +643,13 @@ pub struct ChunkGeometry {
 }
 
 impl ChunkGeometry {
+    /// Process-local identity of this immutable reconstruction. Rebuilt chunks
+    /// (including neighbor-dependent rebuilds) and replacement worlds get new
+    /// identities even when revision numbers repeat. Not simulation/wire state.
+    pub fn identity(&self) -> &std::sync::Arc<()> {
+        &self.identity
+    }
+
     /// Tight local-space min/max of all derived vertices, including patches
     /// extending outside their source cells. Empty chunks have no bounds.
     pub fn local_bounds(&self) -> Option<(Vec2, Vec2)> {
@@ -721,6 +729,7 @@ impl TerrainGeometry {
             }
         }
         ChunkGeometry {
+            identity: std::sync::Arc::new(()),
             id,
             revision: t.chunk_revision(id).unwrap(),
             generation: t.revision(),

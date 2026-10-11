@@ -1472,6 +1472,7 @@ dependencies = [
 name = "engine-client"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph_rasterizer",
  "async-channel",
  "async-io",
  "bytemuck",
@@ -1483,10 +1484,16 @@ dependencies = [
  "engine-common",
  "engine-core",
  "engine-nes",
+ "engine-terrain",
+ "femtovg",
  "futures-lite",
  "gilrs",
+ "glow",
+ "glutin",
  "i-slint-backend-linuxkms",
  "i-slint-core",
+ "i-slint-renderer-femtovg",
+ "lyon_tessellation",
  "nix 0.30.1",
  "png 0.17.16",
  "scenario-clock",
@@ -1511,6 +1518,7 @@ dependencies = [
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "ttf-parser 0.25.1",
  "zbus",
 ]
 
@@ -1729,9 +1737,8 @@ dependencies = [
 [[package]]
 name = "femtovg"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deda049f5a6dc3152b23263f72c575847f6aa0ace0045299d151f36af7aca136"
 dependencies = [
+ "ab_glyph_rasterizer",
  "bitflags 2.11.1",
  "bytemuck",
  "fnv",
@@ -1791,6 +1798,12 @@ name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+
+[[package]]
+name = "float_next_after"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bf7cc16383c4b8d58b9905a8509f02926ce3058053c056376248d958c9df1e8"
 
 [[package]]
 name = "fnv"
@@ -2321,6 +2334,7 @@ dependencies = [
  "bytemuck",
  "calloop 0.14.4",
  "drm",
+ "femtovg",
  "gbm",
  "glutin",
  "i-slint-common",
@@ -2490,8 +2504,6 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-femtovg"
 version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4ce7ca8b5316585f3db1ce902318c93980b09ab14aafc30846cad36da67acd"
 dependencies = [
  "cfg-if",
  "const-field-offset",
@@ -3139,6 +3151,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c463f9c428b7fc5ec885dcd39ce4aa61e29111d0e33483f6f98c74e89d8621e"
 dependencies = [
  "lyon_geom",
+ "num-traits",
+]
+
+[[package]]
+name = "lyon_tessellation"
+version = "1.0.20"
+dependencies = [
+ "float_next_after",
+ "lyon_path",
  "num-traits",
 ]
 

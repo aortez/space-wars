@@ -6,6 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+mod geometry;
+pub use geometry::{PolygonGeometry, PolygonGeometryHint};
+mod point_pool;
+pub use point_pool::RenderPointPool;
+
 /// Pixel storage carried directly from a scenario to a native-video host.
 ///
 /// The first format keeps the emulator's compact palette-index framebuffer
@@ -92,10 +97,21 @@ impl NativeVideoFrame<'_> {
 }
 
 /// Draw list emitted by a scenario's `render_frame`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderFrame {
     pub camera: Camera2,
     pub layers: Vec<RenderLayer>,
+    /// Optional presentation-only hints. Not part of equality, replay or wire
+    /// data. Consumers must validate ranges against the ordinary primitives:
+    /// callers may edit those public lists after a producer returns the frame.
+    #[serde(skip)]
+    pub geometry_hints: Vec<PolygonGeometryHint>,
+}
+
+impl PartialEq for RenderFrame {
+    fn eq(&self, other: &Self) -> bool {
+        self.camera == other.camera && self.layers == other.layers
+    }
 }
 
 impl RenderFrame {
@@ -103,6 +119,7 @@ impl RenderFrame {
         Self {
             camera,
             layers: Vec::new(),
+            geometry_hints: Vec::new(),
         }
     }
 

@@ -49,7 +49,7 @@ impl FrameLayout {
         }
     }
 
-    fn is_minimap(self, frames: usize, index: usize) -> bool {
+    pub(crate) fn is_minimap(self, frames: usize, index: usize) -> bool {
         match self {
             Self::SpacewarsLocalPlay => frames >= 4 && (2..4).contains(&index),
             Self::PlayerViewsWithMinimaps => self

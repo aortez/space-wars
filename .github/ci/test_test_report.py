@@ -1,13 +1,40 @@
 from pathlib import Path
+import re
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
 
-from test_report import seconds, summarize
+from test_report import PHASES, seconds, summarize
 
 
 class ReportTests(unittest.TestCase):
+    def test_gpu_unit_test_command_includes_the_binary_only_client(self):
+        workflow = Path(__file__).resolve().parents[1] / "workflows" / "ci.yml"
+        command = re.search(r"cargo test [^\n]*-p engine-client[^\n]*\\\n[^\n]*", workflow.read_text())
+        self.assertIsNotNone(command)
+        self.assertIn("--bins", command.group())
+        self.assertIn("--lib", command.group())
+
+    def test_all_literal_workflow_phase_names_are_supported(self):
+        workflows = Path(__file__).resolve().parents[1] / "workflows"
+        phases = set()
+        for workflow in workflows.glob("*.yml"):
+            phases.update(re.findall(r"--phase ([a-z][a-z-]*)", workflow.read_text()))
+        self.assertTrue({"lyon", "gpu-check", "gpu-text"}.issubset(phases))
+        self.assertEqual(phases - PHASES.keys(), set())
+
+    def test_renderer_phases_are_accepted_by_cli(self):
+        with TemporaryDirectory() as directory:
+            command = [sys.executable, str(Path(__file__).with_name("test_report.py")),
+                       "--timings-dir", directory]
+            for phase in ("lyon", "gpu-check", "gpu-text"):
+                command.extend(["--phase", phase])
+            command.append(str(Path(directory) / "missing.xml"))
+            result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.count("Not recorded"), 3)
+
     def test_wall_time_is_separate_from_overlapping_test_durations(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -36,7 +63,7 @@ class ReportTests(unittest.TestCase):
             text = summarize(root, [root / "absent.xml", root / "empty.xml"])
             self.assertIn("Not produced", text)
             self.assertEqual(text.count("Not produced"), 2)
-            self.assertEqual(text.count("Not recorded"), 4)
+            self.assertEqual(text.count("Not recorded"), len(PHASES))
             self.assertNotIn("| PASS |", text)
 
     def test_test_names_are_escaped_and_slowest_list_is_bounded(self):

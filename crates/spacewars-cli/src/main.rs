@@ -264,6 +264,105 @@ enum HostCommand {
         #[arg(long, default_value = "3s", value_parser = parse_timeout)]
         timeout: Duration,
     },
+
+    /// Experimental raster RGB/RGBA publication for live GPU A/B tests; not saved.
+    /// Requires a GPU-enabled kiosk currently presenting a raster scene with FemtoVG.
+    RasterUpload {
+        #[arg(value_parser = ["rgb", "rgba"])]
+        format: String,
+    },
+
+    /// Session-only GPU texture-lifetime experiment; select RGBA upload first.
+    RasterTextures {
+        #[arg(value_parser = ["slint", "fresh", "single", "triple"])]
+        mode: String,
+    },
+
+    /// Session-only GPU scenes at 1x, including split views/minimaps. Paths is Clock-only.
+    GpuScene {
+        #[arg(value_parser = ["on", "off", "triangles", "circles", "retained", "retained-cold", "retained-adaptive", "retained-zoom", "retained-hybrid", "retained-outlines", "retained-paced", "retained-memoized", "retained-scan", "retained-ranges", "retained-culled", "retained-resident", "retained-resident-passes", "retained-resident-buffers", "retained-resident-uniforms", "paths"])]
+        mode: String,
+    },
+
+    /// Session-only triangle upload policy; enable a non-resident GPU scene first.
+    /// Does not change geometry mode or frame pacing. Resets when leaving the scene.
+    GpuStream {
+        #[arg(value_parser = ["shared", "exact", "bucketed"])]
+        policy: String,
+    },
+
+    /// Session-only guarded stroke rejection; non-off modes require retained-culled.
+    /// Checked verifies skipped geometry, not performance. Nothing is saved.
+    GpuStrokes {
+        #[arg(value_parser = ["off", "conservative", "checked"])]
+        mode: String,
+    },
+
+    /// Session-only exact round-join shortcut; exact/checked require retained-culled.
+    /// Checked verifies the original math, not performance. Nothing is saved.
+    GpuJoins {
+        #[arg(value_parser = ["reference", "exact", "checked"])]
+        mode: String,
+    },
+
+    /// Session-only stroke output experiment; non-stock requires retained-culled.
+    /// Emits the same geometry and resets when leaving the scene. Nothing is saved.
+    GpuStrokeWriter {
+        #[arg(value_parser = ["stock", "bulk", "bulk-static", "bulk-polygon", "bulk-edges", "bulk-edges-checked", "bulk-prepared", "bulk-prepared-checked", "bulk-single-pass", "bulk-single-pass-checked", "bulk-single-pass-layouts", "bulk-single-pass-arcs", "bulk-single-pass-classify", "bulk-single-pass-prefix", "bulk-single-pass-prefix-checked"])]
+        mode: String,
+    },
+
+    /// Session-only exact-scale cache promotion experiment; settled requires retained-culled.
+    /// Settled requires three consecutive presentations; nothing is saved.
+    GpuAdmission {
+        #[arg(value_parser = ["repeated", "settled"])]
+        policy: String,
+    },
+
+    /// Session-only CPU plan preparation experiment; requires an active GPU scene.
+    /// Prepared adds per-camera/object transforms to bounded scratch; nothing is saved.
+    GpuPlan {
+        #[arg(value_parser = ["reference", "reserved", "scratch", "prepared"])]
+        policy: String,
+    },
+    /// Session-only source point-buffer allocation experiment; no scene contents are cached.
+    GpuSource {
+        #[arg(value_parser = ["reference", "pooled"])]
+        policy: String,
+    },
+
+    /// Select vector or CPU-generated GPU glyph masks; reset the session cache.
+    GpuText {
+        #[arg(value_parser = ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"])]
+        mode: String,
+    },
+    /// Session-only Spacewars camera sweep (44..640 world units, 480-tick cycle).
+    /// Shared by software, raster-to-GPU and direct geometry; not physics/settings.
+    /// sweep-stop holds both heights after tick 1920 to measure settled-view reuse.
+    #[command(visible_alias = "gpu-zoom")]
+    CameraZoom {
+        #[arg(value_parser = ["off", "sweep", "sweep-stop"])]
+        mode: String,
+    },
+
+    /// Capture 240 complete LinuxKMS GPU loops with opt-in driver CPU clocks.
+    /// start-text also times nested text and path work; start is the overhead control.
+    /// start-work adds coarse host and scene callbacks to start-text.
+    /// start-geometry also enables detailed retained-geometry encoding clocks.
+    /// Read returns CSV with UI markers; cancel retains completed samples. Not saved.
+    RenderTrace {
+        #[arg(value_parser = ["start", "start-text", "start-work", "start-geometry", "read", "cancel"])]
+        command: String,
+    },
+
+    /// Run the existing deterministic Clock fixture visibly, without changing saved settings.
+    /// Requires an active Clock; restarts the fixture at 08:08. Normal restart exits it.
+    ClockBenchmark {
+        #[arg(value_parser = ["idle", "rain"])]
+        fixture: String,
+        #[arg(long, default_value = "3s", value_parser = parse_timeout)]
+        timeout: Duration,
+    },
 }
 
 enum CliError {
@@ -369,6 +468,170 @@ fn run() -> Result<(), CliError> {
         Command::Host {
             command: HostCommand::Benchmark { timeout },
         } => request_benchmark(&client, timeout).map_err(human_error),
+        Command::Host {
+            command: HostCommand::RasterUpload { format },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host raster-upload\n{format}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::RasterTextures { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host raster-textures\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuScene { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-scene\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuStream { policy },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-stream\n{policy}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuStrokes { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-strokes\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuJoins { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-joins\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuText { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-text\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuStrokeWriter { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-stroke-writer\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuAdmission { policy },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-admission\n{policy}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuPlan { policy },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-plan\n{policy}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::GpuSource { policy },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host gpu-source\n{policy}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::CameraZoom { mode },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host camera-zoom\n{mode}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::RenderTrace { command },
+        } => {
+            let reply = client
+                .request_before(
+                    &format!("host render-trace\n{command}\n"),
+                    Instant::now() + Duration::from_secs(3),
+                )
+                .map_err(human_error)?;
+            println!("{reply}");
+            Ok(())
+        }
+        Command::Host {
+            command: HostCommand::ClockBenchmark { fixture, timeout },
+        } => request_benchmark_command(
+            &client,
+            timeout,
+            &format!("host clock-benchmark\n{fixture}\n"),
+        )
+        .map_err(human_error),
     }
 }
 
@@ -491,13 +754,21 @@ fn request_benchmark(
     client: &ControlClient,
     timeout: Duration,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    request_benchmark_command(client, timeout, "host benchmark\n")
+}
+
+fn request_benchmark_command(
+    client: &ControlClient,
+    timeout: Duration,
+    command: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let deadline = Instant::now()
         .checked_add(timeout)
         .ok_or("benchmark timeout is too large")?;
     let initial_status = fetch_status_before(client, deadline)?;
     let initial = parse_runtime_status(&initial_status)?;
 
-    client.request_before("host benchmark\n", deadline)?;
+    client.request_before(command, deadline)?;
 
     let mut last_status = initial_status;
     loop {
@@ -672,6 +943,284 @@ mod tests {
                 }
             } if timeout == Duration::from_millis(750)
         ));
+    }
+
+    #[test]
+    fn parses_only_explicit_clock_benchmark_fixtures() {
+        for expected in ["idle", "rain"] {
+            let args = Args::try_parse_from([
+                "spacewars-cli",
+                "host",
+                "clock-benchmark",
+                expected,
+                "--timeout",
+                "10s",
+            ])
+            .unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::ClockBenchmark { fixture, timeout } }
+                    if fixture == expected && timeout == Duration::from_secs(10)
+            ));
+        }
+        for invalid in ["falling", "RAIN", "idle\nstatus", ""] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "clock-benchmark", invalid])
+                    .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "clock-benchmark"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_raster_upload_formats() {
+        for expected in ["rgb", "rgba"] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "raster-upload", expected]).unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::RasterUpload { format } } if format == expected
+            ));
+        }
+        for invalid in ["RGB", "bgra", "rgba\nstatus", ""] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "raster-upload", invalid]).is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "raster-upload"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_texture_lifetime_modes() {
+        for expected in ["slint", "fresh", "single", "triple"] {
+            let args = Args::try_parse_from(["spacewars-cli", "host", "raster-textures", expected])
+                .unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::RasterTextures { mode } } if mode == expected)
+            );
+        }
+        for invalid in ["", "rgba", "single\nstatus", "TRIPLE", "double"] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "raster-textures", invalid])
+                    .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "raster-textures"]).is_err());
+    }
+
+    #[test]
+    fn render_trace_accepts_only_explicit_bounded_commands() {
+        for command in [
+            "start",
+            "start-text",
+            "start-work",
+            "start-geometry",
+            "read",
+            "cancel",
+        ] {
+            let args = Args::try_parse_from(["cli", "host", "render-trace", command]).unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::RenderTrace { command: parsed } } if parsed == command)
+            );
+        }
+        for command in ["", "on", "forever", "start\nstatus"] {
+            assert!(Args::try_parse_from(["cli", "host", "render-trace", command]).is_err());
+        }
+        assert!(Args::try_parse_from(["cli", "host", "render-trace"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_text_policies() {
+        for expected in ["vector", "cpu", "cpu-run-faces", "cpu-shape-faces"] {
+            let args = Args::try_parse_from(["cli", "host", "gpu-text", expected]).unwrap();
+            assert!(matches!(args.command,
+                Command::Host {command: HostCommand::GpuText { mode }} if mode == expected));
+        }
+        for invalid in ["on", "", "cpu\nstatus"] {
+            assert!(Args::try_parse_from(["cli", "host", "gpu-text", invalid]).is_err());
+        }
+        assert!(Args::try_parse_from(["cli", "host", "gpu-text"]).is_err());
+    }
+
+    #[test]
+    fn parses_explicit_camera_zoom_modes_and_legacy_alias() {
+        for command in ["camera-zoom", "gpu-zoom"] {
+            for expected in ["off", "sweep", "sweep-stop"] {
+                let args =
+                    Args::try_parse_from(["spacewars-cli", "host", command, expected]).unwrap();
+                assert!(matches!(args.command,
+                    Command::Host {command: HostCommand::CameraZoom { mode }} if mode == expected));
+            }
+            for invalid in ["on", "auto", "", "sweep\nstatus"] {
+                assert!(Args::try_parse_from(["spacewars-cli", "host", command, invalid]).is_err());
+            }
+            assert!(Args::try_parse_from(["spacewars-cli", "host", command]).is_err());
+        }
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_plan_policies() {
+        for policy in ["reference", "reserved", "scratch", "prepared"] {
+            let args = Args::try_parse_from(["spacewars-cli", "host", "gpu-plan", policy]).unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::GpuPlan { policy: actual } } if actual == policy)
+            );
+        }
+        for invalid in ["", "on", "auto", "reserved\nstatus"] {
+            assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-plan", invalid]).is_err());
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-plan"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_source_policies() {
+        for policy in ["reference", "pooled"] {
+            let args = Args::try_parse_from(["cli", "host", "gpu-source", policy]).unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::GpuSource { policy: actual }} if actual == policy)
+            );
+        }
+        for value in ["", "on", "pooled\nstatus"] {
+            assert!(Args::try_parse_from(["cli", "host", "gpu-source", value]).is_err());
+        }
+        assert!(Args::try_parse_from(["cli", "host", "gpu-source"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_stream_policies() {
+        for expected in ["shared", "exact", "bucketed"] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-stream", expected]).unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::GpuStream { policy } } if policy == expected)
+            );
+        }
+        for invalid in ["on", "off", "auto", "split", "bucketed\nstatus"] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-stream", invalid]).is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-stream"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_stroke_modes() {
+        for expected in ["off", "conservative", "checked"] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-strokes", expected]).unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::GpuStrokes { mode } } if mode == expected));
+        }
+        for invalid in ["on", "auto", "fast", "conservative\nstatus"] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-strokes", invalid]).is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-strokes"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_join_modes() {
+        for expected in ["reference", "exact", "checked"] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-joins", expected]).unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::GpuJoins { mode } } if mode == expected));
+        }
+        for invalid in ["on", "off", "auto", "fast", "exact\nstatus"] {
+            assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-joins", invalid]).is_err());
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-joins"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_admission_modes() {
+        for expected in ["repeated", "settled"] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-admission", expected]).unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::GpuAdmission { policy } } if policy == expected));
+        }
+        for invalid in ["on", "off", "auto", "settled\nstatus"] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-admission", invalid]).is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-admission"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_stroke_writer_modes() {
+        for expected in [
+            "stock",
+            "bulk",
+            "bulk-static",
+            "bulk-polygon",
+            "bulk-edges",
+            "bulk-edges-checked",
+            "bulk-prepared",
+            "bulk-prepared-checked",
+            "bulk-single-pass",
+            "bulk-single-pass-checked",
+            "bulk-single-pass-layouts",
+            "bulk-single-pass-arcs",
+            "bulk-single-pass-classify",
+            "bulk-single-pass-prefix",
+            "bulk-single-pass-prefix-checked",
+        ] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-stroke-writer", expected])
+                    .unwrap();
+            assert!(matches!(args.command,
+                Command::Host { command: HostCommand::GpuStrokeWriter { mode } } if mode == expected));
+        }
+        for invalid in [
+            "on",
+            "off",
+            "auto",
+            "fast",
+            "bulk\nstatus",
+            "bulk-single-pass-prefix\nstatus",
+        ] {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-stroke-writer", invalid])
+                    .is_err()
+            );
+        }
+        assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-stroke-writer"]).is_err());
+    }
+
+    #[test]
+    fn parses_only_explicit_gpu_scene_modes() {
+        for expected in [
+            "on",
+            "off",
+            "triangles",
+            "circles",
+            "retained",
+            "retained-cold",
+            "retained-adaptive",
+            "retained-zoom",
+            "retained-hybrid",
+            "retained-outlines",
+            "retained-paced",
+            "retained-memoized",
+            "retained-scan",
+            "retained-ranges",
+            "retained-culled",
+            "retained-resident",
+            "retained-resident-passes",
+            "retained-resident-buffers",
+            "retained-resident-uniforms",
+            "paths",
+        ] {
+            let args =
+                Args::try_parse_from(["spacewars-cli", "host", "gpu-scene", expected]).unwrap();
+            assert!(
+                matches!(args.command, Command::Host { command: HostCommand::GpuScene { mode } } if mode == expected)
+            );
+        }
+        for invalid in ["", "yes", "true", "ON", "on\nstatus"] {
+            assert!(Args::try_parse_from(["spacewars-cli", "host", "gpu-scene", invalid]).is_err());
+        }
     }
 
     #[test]

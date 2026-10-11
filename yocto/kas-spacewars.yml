@@ -99,6 +99,16 @@ local_conf_header:
     PREFERRED_VERSION_rust-bin-cross-aarch64 = "1.94.0"
     PREFERRED_VERSION_cargo-bin-cross-aarch64 = "1.94.0"
 
+  graphics: |
+    SPACEWARS_GPU = "1"
+    DISTRO_FEATURES:append = " opengl"
+    PREFERRED_PROVIDER_virtual/egl = "mesa"
+    PREFERRED_PROVIDER_virtual/libgles2 = "mesa"
+    PREFERRED_PROVIDER_virtual/libgbm = "mesa"
+    PREFERRED_VERSION_mesa = "25.1.6"
+    # Direct KMS/GBM, no compositor. meta-raspberrypi supplies VC4/V3D.
+    PACKAGECONFIG:pn-mesa = "gallium opengl egl gles gbm"
+
   rpi: |
     DISABLE_SPLASH = "1"
     CMDLINE:append = " console=tty1 fbcon=map:01"

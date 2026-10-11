@@ -700,6 +700,14 @@ impl ClientScenario for SurfaceSortieClientScenario {
     fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
         Some(self.frames_for_view(viewport, false))
     }
+    fn render_frames_pooled(
+        &self,
+        _renderer: RenderBackend,
+        viewport: Viewport,
+        points: &mut engine_common::RenderPointPool,
+    ) -> Option<Vec<RenderFrame>> {
+        Some(self.frames_with_storage(viewport, true, Some(points)))
+    }
     fn runtime_diagnostics(&self) -> String {
         let mut text = String::new();
         for player in 0..self.state.player_count() {
@@ -742,6 +750,15 @@ impl SurfaceSortieClientScenario {
     }
 
     fn frames_for_view(&self, viewport: Viewport, cull: bool) -> Vec<RenderFrame> {
+        self.frames_with_storage(viewport, cull, None)
+    }
+
+    fn frames_with_storage(
+        &self,
+        viewport: Viewport,
+        cull: bool,
+        mut points: Option<&mut engine_common::RenderPointPool>,
+    ) -> Vec<RenderFrame> {
         let count = self.state.player_count();
         let aspect = viewport.aspect_ratio() / count as f32;
         // Scene construction is independent of the selected raster scale. Use
@@ -753,12 +770,26 @@ impl SurfaceSortieClientScenario {
         );
         let mut frames = Vec::with_capacity(count * 2 + 1);
         for player in 0..count {
-            frames.push(SurfaceSortieScenario::player_frame_with_camera(
-                &self.state,
-                player,
+            let camera = crate::camera_probe::camera(
                 self.cameras[player].displayed(aspect),
-                cull.then_some(pane),
-            ));
+                player,
+                self.state.tick(),
+            );
+            frames.push(match points.as_deref_mut() {
+                Some(points) => SurfaceSortieScenario::player_frame_with_storage(
+                    &self.state,
+                    player,
+                    camera,
+                    cull.then_some(pane),
+                    points,
+                ),
+                None => SurfaceSortieScenario::player_frame_with_camera(
+                    &self.state,
+                    player,
+                    camera,
+                    cull.then_some(pane),
+                ),
+            });
         }
         for player in 0..count {
             frames.push(SurfaceSortieScenario::minimap_frame_with_camera(

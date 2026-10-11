@@ -1,0 +1,6 @@
+# Compatibility alias: GPU rendering is now the normal image configuration.
+header:
+  version: 14
+  includes:
+    - kas-spacewars.yml
+

@@ -669,7 +669,7 @@ fn clock_calendar_date_renders_in_band_through_native_text_overlay() {
 
 #[test]
 fn retained_text_updates_match_replaced_models_and_full_repaints() {
-    use crate::{PrimitiveKind, ScenePrimitive, host::update_raster_text_overlay};
+    use crate::{PrimitiveKind, ScenePrimitive, host::update_scene_primitives};
     use slint::{Color, ModelRc, VecModel};
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
@@ -730,7 +730,7 @@ fn retained_text_updates_match_replaced_models_and_full_repaints() {
                 9 => rows[0].width = 30.0,
                 _ => {}
             }
-            update_raster_text_overlay(&uis[0], rows.clone());
+            update_scene_primitives(&uis[0], rows.clone());
             uis[1].set_primitives(ModelRc::new(VecModel::from(rows.clone())));
             for index in 0..2 {
                 windows[index].request_redraw();
@@ -887,6 +887,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_controllers_visible(false);
     ui.set_performance_overlay_enabled(false);
     ui.set_performance_overlay_text("".into());
+    ui.set_performance_overlay_details("".into());
     ui.set_launcher_busy(false);
     ui.set_spacewars_ui_visible(false);
     ui.set_launcher_scenario("clock".into());
@@ -949,6 +950,23 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ("overlay-enabled", |ui| {
             ui.set_performance_overlay_enabled(true);
             ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
+            ui.set_performance_overlay_details(
+                "CPU 74% | Prep 6.2ms\nDraw CPU 5.1ms\nraster -> CPU software".into(),
+            );
+        }),
+        ("overlay-gpu", |ui| {
+            ui.set_performance_overlay_enabled(true);
+            ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
+            ui.set_performance_overlay_details(
+                "CPU 124% | Prep 6.2ms\nDraw CPU 1.2ms | GPU n/a\nraster -> GPU (V3D)".into(),
+            );
+        }),
+        ("overlay-native", |ui| {
+            ui.set_performance_overlay_enabled(true);
+            ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
+            ui.set_performance_overlay_details(
+                "CPU 124% | Prep --\nDraw CPU -- | GPU n/a\nvideo -> desktop".into(),
+            );
         }),
         ("overlay-paused", |ui| {
             ui.set_performance_overlay_enabled(true);

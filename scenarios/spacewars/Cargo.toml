@@ -9,6 +9,8 @@ rust-version.workspace = true
 [features]
 # Opt-in read-only mission sensor profiling for diagnostic runners.
 sensor-profile = []
+# Optional presentation metadata for retained-renderer experiments.
+render-hints = []
 
 [dependencies]
 engine-common = { workspace = true }

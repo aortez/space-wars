@@ -25,8 +25,11 @@ members = [
     "scenarios/spacewars",
 ]
 exclude = [
+    "vendor/femtovg",
     "vendor/i-slint-backend-linuxkms",
     "vendor/i-slint-core",
+    "vendor/i-slint-renderer-femtovg",
+    "vendor/lyon_tessellation",
     "vendor/rapier2d",
 ]
 
@@ -87,6 +90,10 @@ scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
+# Exact round joins for the Pi GPU profile, with reference diagnostic controls.
+lyon_tessellation = { path = "vendor/lyon_tessellation" }
+# Pi-selected CPU glyph masks; the library retains its vector default/control.
+femtovg = { path = "vendor/femtovg" }
 # Retain kinematic velocity for CCD's relative-speed checks; zeroing it can
 # mistake shared transport for impact speed and trap small actors in the ground.
 # See vendor/rapier2d/SPACEWARS_PATCH.md for provenance and regression coverage.
@@ -101,6 +108,9 @@ i-slint-core = { path = "vendor/i-slint-core" }
 # LinuxKMS rotates rendered output but leaves absolute libinput coordinates in
 # panel orientation. Apply the inverse output rotation before dispatching them.
 i-slint-backend-linuxkms = { path = "vendor/i-slint-backend-linuxkms" }
+# Keep the physical canvas through rendering callbacks and return upright
+# screenshots for rotated outputs. See the vendored SPACEWARS_PATCH.md.
+i-slint-renderer-femtovg = { path = "vendor/i-slint-renderer-femtovg" }
 
 [profile.release]
 # Cross-crate inlining materially improves the tightly interleaved NES

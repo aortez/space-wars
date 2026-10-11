@@ -310,6 +310,18 @@ impl ClientScenario for MaterialMissionClientScenario {
         self.append_controller_hud(&mut frames, viewport);
         frames
     }
+    fn render_frames_pooled(
+        &self,
+        renderer: RenderBackend,
+        viewport: Viewport,
+        points: &mut engine_common::RenderPointPool,
+    ) -> Option<Vec<RenderFrame>> {
+        let mut frames = self
+            .sortie
+            .render_frames_pooled(renderer, viewport, points)?;
+        self.append_controller_hud(&mut frames, viewport);
+        Some(frames)
+    }
     fn frame_layout(&self) -> FrameLayout {
         self.sortie.frame_layout()
     }

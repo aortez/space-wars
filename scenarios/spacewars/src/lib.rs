@@ -5,9 +5,11 @@
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
 mod physics;
+pub mod ship_geometry;
 pub mod spaceling_geometry;
 pub mod surface_sortie;
 mod terrain;
+pub mod terrain_art;
 pub mod thrusters;
 pub mod weapons;
 pub use terrain::{
@@ -15,6 +17,7 @@ pub use terrain::{
     TerrainMotionPeaks, TerrainMotionStage, fixture_controls as terrain_fixture_controls,
 };
 
+use ship_geometry::{Part as ShipArtPart, Sink as ShipArtSink};
 use std::{
     collections::{BTreeMap, BTreeSet, BinaryHeap},
     num::NonZeroU64,
@@ -6827,7 +6830,7 @@ fn render_rover_build_marker(
     }
 }
 
-fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
+fn render_ship(frame: &mut impl ShipArtSink, ship: &ShipState) {
     if ship.form == ShipForm::EscapePod {
         render_cockpit(frame, ship);
         return;
@@ -6855,28 +6858,25 @@ fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
         dim(base, 0.72),
         outline,
     );
-    push_filled_polygon(
-        frame,
+    frame.rigid_polygon(
         SHIP_LAYER,
+        ShipArtPart::WingMount,
         transform,
-        &SHIP_WING_MOUNT,
         RenderColor::rgba(10.0 / 255.0, 180.0 / 255.0, 50.0 / 255.0, 1.0),
         outline,
     );
-    push_filled_polygon(
-        frame,
+    frame.rigid_polygon(
         SHIP_LAYER,
+        ShipArtPart::Thruster,
         transform,
-        &SHIP_THRUSTER,
         dim(base, 0.58),
         outline,
     );
-    push_filled_polygon(frame, SHIP_LAYER, transform, &SHIP_BODY, base, outline);
-    push_filled_polygon(
-        frame,
+    frame.rigid_polygon(SHIP_LAYER, ShipArtPart::Hull, transform, base, outline);
+    frame.rigid_polygon(
         SHIP_LAYER,
+        ShipArtPart::Laser,
         transform,
-        &SHIP_LASER,
         dim(base, 1.15),
         outline,
     );
@@ -6894,25 +6894,23 @@ fn cockpit_transform(ship: &ShipState) -> Transform2 {
     }
 }
 
-fn render_cockpit(frame: &mut RenderFrame, ship: &ShipState) {
+fn render_cockpit(frame: &mut impl ShipArtSink, ship: &ShipState) {
     let transform = cockpit_transform(ship);
     let base = render_color(ship.color);
     let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.9);
 
-    push_filled_polygon(frame, SHIP_LAYER, transform, &POD_BODY, base, outline);
-    push_filled_polygon(
-        frame,
+    frame.rigid_polygon(SHIP_LAYER, ShipArtPart::PodHull, transform, base, outline);
+    frame.rigid_polygon(
         SHIP_LAYER,
+        ShipArtPart::PodThruster,
         transform,
-        &POD_THRUSTER,
         dim(base, 0.72),
         outline,
     );
-    push_filled_polygon(
-        frame,
+    frame.rigid_polygon(
         SHIP_LAYER,
+        ShipArtPart::PodLaser,
         transform,
-        &POD_LASER,
         RenderColor::BLUE,
         outline,
     );
@@ -7006,7 +7004,7 @@ fn render_ship_label(frame: &mut RenderFrame, state: &SpacewarsState, ship: &Shi
 }
 
 fn push_filled_polygon(
-    frame: &mut RenderFrame,
+    frame: &mut (impl ShipArtSink + ?Sized),
     layer: i32,
     transform: Transform2,
     points: &[Vec2],
