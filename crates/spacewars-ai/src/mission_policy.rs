@@ -190,6 +190,11 @@ impl MissionBot {
         self.0.configure_pursuit_climb_laser(enabled);
         self
     }
+    /// Opt-in v13 present-heading laser gate; flight and cannon aim are unchanged.
+    pub fn with_direct_laser_window(mut self, enabled: bool) -> Self {
+        self.0.configure_direct_laser_window(enabled);
+        self
+    }
     /// Opt-in v13 defense while airborne and still awaiting the first capture site.
     pub fn with_acquisition_defense(mut self, enabled: bool) -> Self {
         self.0.configure_acquisition_defense(enabled);

@@ -357,6 +357,7 @@ impl MaterialMissionPilot {
         let hatch_supported_arrival = self.hatch_supported_arrival;
         let pursuit_health = self.telemetry.pursuit_health.is_some();
         let pursuit_climb_laser = self.telemetry.pursuit_climb_laser.is_some();
+        let direct_laser_window = self.patrol.telemetry().laser_window_profile.is_some();
         let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
@@ -387,6 +388,7 @@ impl MaterialMissionPilot {
         self.set_hatch_supported_arrival(hatch_supported_arrival);
         self.configure_pursuit_health(pursuit_health);
         self.configure_pursuit_climb_laser(pursuit_climb_laser);
+        self.configure_direct_laser_window(direct_laser_window);
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
@@ -1227,6 +1229,15 @@ impl MaterialMissionPilot {
         true
     }
 
+    pub(crate) fn configure_direct_laser_window(&mut self, enabled: bool) {
+        assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        self.patrol.set_direct_laser_window(enabled);
+    }
+
     fn hunt(&mut self, o: &MissionObservationV1) -> CombatIntent {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
@@ -1576,6 +1587,23 @@ mod acquisition_tests {
     use engine_common::Scenario;
     use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
     use std::time::Duration;
+
+    #[test]
+    fn direct_laser_window_is_opt_in_and_survives_mission_reset() {
+        use crate::mission_policy::{MissionBot, MissionPolicy};
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut bot = MissionBot::new(MissionPolicy::ValuePlanner, context, Default::default());
+        assert!(bot.patrol.telemetry().laser_window_profile.is_none());
+        bot = bot.with_direct_laser_window(true);
+        let profile = Some(crate::combat_pilot::DIRECT_LASER_WINDOW_PROFILE);
+        assert_eq!(bot.patrol.telemetry().laser_window_profile, profile);
+        bot.reset(context);
+        assert_eq!(bot.patrol.telemetry().laser_window_profile, profile);
+        assert_eq!(bot.clone().patrol.telemetry().laser_window_profile, profile);
+    }
 
     #[test]
     fn active_flight_checks_are_opt_in_and_survive_clone_and_reset() {
