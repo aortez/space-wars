@@ -1,17 +1,32 @@
-# Space-Wars
+# Space Wars
 
-A reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
-as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
+This is my vision for a 2d physics-based game and AI playground. It will soon
+be a playground for evolving and training neural nets to play various scenarios
+within it, including a "Space Wars" scenario, in which 2 players compete, at the
+most direct level, this involves controlling a small ship to destroy your opponent
+so you will rule the galaxy.
+
+It also contains a very fancy clock mode. Beyond just showing the correct time, the
+clock contains an event system and various organisms. Currently we have nice things
+like rain, a drain, exploding letters, melting letters, a parkour rubber ducky, a
+cautious crow... etc. Some events can overlap.
+
+## Why is it Called Space Wars?
+Being able to support my vision of the old 1985 Spacewar DOS game is a primary goal
+of this project. I can only hope to emulate the glory of this game's combat.
+
+## Other Fancy Features
 
 # On target hardware
-Below is a zoomed out view of a CTF game mode.
+Below is a zoomed out view of a CTF game mode. This picture definitely needs updating.
 ![Gameplay example](./space-wars.webp "Gameplay example")
 
 ## Status
 
 The local launcher includes the following scenarios and presets:
 
-- **Spacewars** — a complete round on three generated destructible planets:
+- **Spacewars** —
+- a complete round on three generated destructible planets:
   natural landing, on-foot flags, mining, combat, escape pods and rebuilding.
   Each player can be human or a mission bot, including bot versus bot. A living
   pilot can recover after losing every ship and flag; pilot death ends the round.
@@ -25,6 +40,8 @@ The local launcher includes the following scenarios and presets:
 - **Spacewars Classic** — the previous berth-based game and historical visual
   benchmark, under `spacewars-classic`. Its world presets, legacy bot and
   no-ship/no-planets defeat rules remain available for comparison.
+  This is supposed to be a reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
+  as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation.
   Rapier owns rigid-body motion and contacts while the scenario supplies mutual
   gravity and gameplay damage. Click empty space to make a ball, or grab and
@@ -102,6 +119,14 @@ The local launcher includes the following scenarios and presets:
   collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
   craters and tunnels, inspect chunk colliders, and watch ray queries and physical
   support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
+- **terrain-grains** — the live loose-dirt sandbox: blast terrain into conserved
+  grains, drop a physical box onto the pile, and blast it again. Compare round,
+  grippy and angular grains on flat, sloped and moving planetary ground. See
+  [Live granular terrain](docs/granular-terrain-lab.md).
+- **Scorched Earth** — two physical tanks on seeded hills, with adjustable
+  elevation/power and a returning-fire opponent. Shells displace conserved dirt
+  through the same release and deposition layer as Spacewars. Compare Round and
+  Angular dirt or run a repeatable CPU duel. See [Scorched Earth](docs/scorched-earth.md).
 - **Spacewars Terrain** — the Expedition loop on destructible ground: land, exit,
   claim with a surface flag, mine material, and rebuild after ship loss. Destroyed
   flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).
@@ -215,7 +240,9 @@ models. See [controller setup and cabinet layouts](docs/controller-profiles.md).
 NetworkManager. Use saved settings or the controller/touch-friendly password
 keyboard, then explicitly keep the trial connection. Cancel or timeout restores
 the previous configuration. Credentials stay with NetworkManager, not app
-settings. See [Wi-Fi setup and safety checks](docs/network-setup.md).
+settings. **Saved networks** also manages out-of-range profiles, automatic
+connection, preferred-network fallback, and confirmed removal. Preferences do
+not switch the current connection. See [Wi-Fi setup and safety checks](docs/network-setup.md).
 
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames
@@ -425,6 +452,10 @@ xvfb-run -a cargo test --profile ci -p engine-client --test ui_control_functiona
 The dedicated CI step runs these tests under the software renderer. See
 [Functional UI tests](docs/functional-tests.md) for local display options,
 current workflow coverage, and failure artifacts.
+To check an already-running cabinet, use `spacewars-cli functional settings
+--settings-file /var/lib/spacewars/settings.toml --artifacts /tmp/device-check-01`.
+The shared `settings` and `clock-pause` workflows retain reports/screenshots and
+verify session/settings preservation; see [device workflow usage and limits](docs/functional-tests.md#run-against-the-current-app-or-a-picade).
 The [CI performance guide](docs/ci-performance.md) covers the optimized test
 profile, matching headless/UI commands, caching, and per-test timing reports.
 

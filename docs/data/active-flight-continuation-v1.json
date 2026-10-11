@@ -1,0 +1,3470 @@
+{
+  "schema": 1,
+  "complete": true,
+  "implementation_commit": "4d360d135d7373d1d8ff063f6268150251db2dfc",
+  "binary_sha256": "a2a0d26bb95d2b47a35a3b4b3f7953f6fad7656ad5e526f2ae829dbab8fdbae0",
+  "summary": {
+    "path": "target/flight-continuation/v1/summary.json",
+    "sha256": "73eee49482fd6a1b46ba4838be65d5080824c60759a636bc306225c860397a8a"
+  },
+  "inputs": {
+    "path": "docs/data/active-flight-continuation-v1.json.gz",
+    "sha256": "50e77d839178cbf9cd16dae5c14a04cd3ae02e73a5151c4e06f16690fdce7a9d",
+    "documents": 68
+  },
+  "raw_files": {
+    "path": "target/flight-continuation/raw-v1-files.json",
+    "sha256": "68bfe2f96e20706f1077d3780d6129ed692aa64f0d3f4f2b00d677df67075d9c",
+    "count": 288
+  },
+  "diagnostic": {
+    "result_sha256": "2a9ef34afee3a7796a210f89a95bc9ef6c70d29f84423a080ce549678204a57e",
+    "binary_sha256": "93e8f285af5b4d85889c0f39526b9a3d8ba5bef6a492f0ed505ddf83807e8c83",
+    "patch_sha256": "5bc03a47855d88f23f489c840ef9b92c77daba5932547bb14a34bc951105a34e",
+    "replay_parity": {
+      "exact_streams": [
+        "trace.jsonl",
+        "mission-evaluations.jsonl",
+        "mission-evaluation-work.jsonl",
+        "flag-survey.jsonl",
+        "flag-survey-work.jsonl",
+        "destination-cover.jsonl",
+        "capture-evidence.jsonl"
+      ],
+      "sensor_parity": {
+        "rows": 27094,
+        "work_sha256": "e002e31776a8c12e8b86c4f70df44c22859ffd9c996ba9bd3c3f58c98cd5d5f2"
+      },
+      "exact_allocation_ledger": true,
+      "reused_ground_before": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      },
+      "reused_ground_after": {
+        "nodes": 0,
+        "physics_queries": 0,
+        "walks": 0
+      }
+    },
+    "raw_files": {
+      "path": "target/flight-continuation/diagnostic-raw-v1-files.json",
+      "sha256": "4acaa648cf9264b59278f65d76992f0c8315008e04aab292f2dd925def760a68",
+      "count": 12
+    }
+  },
+  "totals": {
+    "retention_replays": 7,
+    "new_runs": 14,
+    "walking_replays_retained": 7,
+    "identical_new_action_sequences": 13,
+    "new_dispatch_ticks": 273037,
+    "pilot_rows": 481274,
+    "publications": 47301,
+    "powered_entries": 268,
+    "powered_delivering_requests": 7,
+    "continuation_flights": 1,
+    "continuation_approvals": 16,
+    "approvals_without_launch_forecast": 12,
+    "continuation_rejections": {},
+    "completed_crossings": 1,
+    "live_work_change": {
+      "graph": 2457,
+      "physics_queries": 12954
+    },
+    "old_armed_wins": 2,
+    "new_armed_wins": 2,
+    "armed_runs_with_more_departures": 0,
+    "armed_runs_with_fewer_departures": 0
+  },
+  "checks": {
+    "rust_tests": 1017,
+    "python_tests": 657,
+    "strict_ai_clippy": "passed with --no-deps",
+    "scenario_clippy": "seven existing findings in unchanged code",
+    "format": "passed",
+    "profiled_and_ordinary_builds": "passed",
+    "all_physics_method_and_continuation_audits_pass": true,
+    "max_charged": {
+      "graph": 4,
+      "physics_queries": 384
+    },
+    "max_published_age": 120
+  },
+  "runs": {
+    "shared-failure-cover-on-walking": {
+      "item": {
+        "group": "shared-failure-cover-on",
+        "name": "shared-failure-cover-on-walking",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": -0.8,
+        "cover": true,
+        "powered": false,
+        "seconds": 180
+      },
+      "old_sorties": [
+        1,
+        0
+      ],
+      "new_sorties": [
+        1,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 10800,
+          "work_sha256": "54981df2b201afc14fe0d96d68ae6a54ee68fdd0fc9ad6bb2739203598b3ada1"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        }
+      },
+      "old_claims": 1,
+      "new_claims": 1,
+      "old_departures": 1,
+      "new_departures": 1,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2863,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2863,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 4512,
+          "reason": "cover route evidence deadline exhausted"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6313,
+          "initial_owner": null,
+          "physical": {
+            "landed": 7975,
+            "exited": 7976,
+            "claimed": 8161,
+            "boarded": 8162,
+            "departed": 8385
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8386,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 9713,
+          "reason": "cover route evidence deadline exhausted"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 738,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 8536,
+          "evaluation_graph": 5999,
+          "flags_graph": 2725,
+          "native_and_neutral_physics_queries": 163896,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 3676
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-failure-cover-on-powered": {
+      "item": {
+        "group": "shared-failure-cover-on",
+        "name": "shared-failure-cover-on-powered",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": -0.8,
+        "cover": true,
+        "powered": true,
+        "seconds": 180
+      },
+      "old_sorties": [
+        1,
+        0
+      ],
+      "new_sorties": [
+        1,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 1,
+      "new_claims": 1,
+      "old_departures": 1,
+      "new_departures": 1,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2863,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2863,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 4512,
+          "reason": "cover route evidence deadline exhausted"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6313,
+          "initial_owner": null,
+          "physical": {
+            "landed": 7975,
+            "exited": 7976,
+            "claimed": 8161,
+            "boarded": 8162,
+            "departed": 8385
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8386,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 9713,
+          "reason": "cover route evidence deadline exhausted"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 1004,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 8201,
+          "evaluation_graph": 6174,
+          "flags_graph": 2857,
+          "native_and_neutral_physics_queries": 185443,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 3676
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-failure-cover-off-walking": {
+      "item": {
+        "group": "shared-failure-cover-off",
+        "name": "shared-failure-cover-off-walking",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": -0.8,
+        "cover": false,
+        "powered": false,
+        "seconds": 180
+      },
+      "old_sorties": [
+        1,
+        0
+      ],
+      "new_sorties": [
+        1,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 10800,
+          "work_sha256": "47ac5dbc13d51cc86a65ba8de917ef19cb04687c0841955755443b21f727f4a7"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        }
+      },
+      "old_claims": 1,
+      "new_claims": 1,
+      "old_departures": 1,
+      "new_departures": 1,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2863,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2863,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 4769,
+          "reason": "capture approach exhausted its time or retry budget"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6570,
+          "initial_owner": null,
+          "physical": {
+            "landed": 8263,
+            "exited": 8264,
+            "claimed": 8449,
+            "boarded": 8450,
+            "departed": 8677
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8678,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 1886,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 12552,
+          "evaluation_graph": 5595,
+          "flags_graph": 2770,
+          "native_and_neutral_physics_queries": 149309,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 3676
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-failure-cover-off-powered": {
+      "item": {
+        "group": "shared-failure-cover-off",
+        "name": "shared-failure-cover-off-powered",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": -0.8,
+        "cover": false,
+        "powered": true,
+        "seconds": 180
+      },
+      "old_sorties": [
+        1,
+        0
+      ],
+      "new_sorties": [
+        1,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 1,
+      "new_claims": 1,
+      "old_departures": 1,
+      "new_departures": 1,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2863,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2863,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 4767,
+          "reason": "capture approach exhausted its time or retry budget"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6568,
+          "initial_owner": null,
+          "physical": {
+            "landed": 8190,
+            "exited": 8191,
+            "claimed": 8376,
+            "boarded": 8377,
+            "departed": 8605
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8606,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 2764,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 12766,
+          "evaluation_graph": 5591,
+          "flags_graph": 2770,
+          "native_and_neutral_physics_queries": 186952,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 3676
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-successful-control-walking": {
+      "item": {
+        "group": "shared-successful-control",
+        "name": "shared-successful-control-walking",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": 0.8,
+        "cover": true,
+        "powered": false,
+        "seconds": 180
+      },
+      "old_sorties": [
+        2,
+        0
+      ],
+      "new_sorties": [
+        2,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 10800,
+          "work_sha256": "1b2b75224a6f91f41306beadf2b1b8e191047ce5478553a9599dd2afefad4b27"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 5,
+          "physics_queries": 10,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 5,
+          "physics_queries": 10,
+          "walks": 0
+        }
+      },
+      "old_claims": 2,
+      "new_claims": 2,
+      "old_departures": 2,
+      "new_departures": 2,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2799,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2799,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 4925,
+            "exited": 4973,
+            "claimed": 6395,
+            "boarded": 7381,
+            "departed": 7606
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 7607,
+          "initial_owner": null,
+          "physical": {
+            "landed": 8920,
+            "exited": 8921,
+            "claimed": 9106,
+            "boarded": 9107,
+            "departed": 9333
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 1249,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 7075,
+          "evaluation_graph": 4138,
+          "flags_graph": 1393,
+          "native_and_neutral_physics_queries": 111462,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 2163
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-successful-control-powered": {
+      "item": {
+        "group": "shared-successful-control",
+        "name": "shared-successful-control-powered",
+        "kind": "directed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 42,
+        "world": "value-destination",
+        "bearing": 0.8,
+        "cover": true,
+        "powered": true,
+        "seconds": 180
+      },
+      "old_sorties": [
+        2,
+        0
+      ],
+      "new_sorties": [
+        2,
+        0
+      ],
+      "old_outcome": null,
+      "new_outcome": null,
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": null,
+      "new_end_tick": null,
+      "end_reason": null,
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 2,
+      "new_claims": 2,
+      "old_departures": 2,
+      "new_departures": 2,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 553,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2353,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2799,
+          "reason": "better supported capture value"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 2799,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 4915,
+            "exited": 4922,
+            "claimed": 5829,
+            "boarded": 6325,
+            "departed": 6549
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6550,
+          "initial_owner": null,
+          "physical": {
+            "landed": 7870,
+            "exited": 7871,
+            "claimed": 8056,
+            "boarded": 8057,
+            "departed": 8283
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 1617,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10800,
+        "charges": {
+          "native_and_neutral_graph": 6604,
+          "evaluation_graph": 4330,
+          "flags_graph": 1436,
+          "native_and_neutral_physics_queries": 126564,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 2163
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world0-p1-walking": {
+      "item": {
+        "group": "shared-armed-world0-p1",
+        "name": "shared-armed-world0-p1-walking",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 670492658028466742,
+        "seed_namespace": "powered-mission-integration-v1:0",
+        "world": "generated",
+        "cover": true,
+        "powered": false,
+        "seconds": 600
+      },
+      "old_sorties": [
+        4,
+        4
+      ],
+      "new_sorties": [
+        4,
+        4
+      ],
+      "old_outcome": {
+        "winner": "player_2"
+      },
+      "new_outcome": {
+        "winner": "player_2"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 21907,
+      "new_end_tick": 21907,
+      "end_reason": "pilot_death",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 43814,
+          "work_sha256": "8e715c6284fee3a41cd852762170e5b3e4abf3bc7834bea54bbbba4f3df6a55a"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 56,
+          "physics_queries": 112,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 56,
+          "physics_queries": 112,
+          "walks": 0
+        }
+      },
+      "old_claims": 4,
+      "new_claims": 4,
+      "old_departures": 4,
+      "new_departures": 4,
+      "visits": [
+        {
+          "planet": 2,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 2655,
+            "exited": 2656,
+            "claimed": 2841,
+            "boarded": 2842,
+            "departed": 3069
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 3070,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 6706,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6707,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 7404,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 7405,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 9470,
+            "exited": 9593,
+            "claimed": 9995,
+            "boarded": 9996,
+            "departed": 10224
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 10225,
+          "initial_owner": null,
+          "physical": {
+            "landed": 12525,
+            "exited": 12903,
+            "claimed": 13268,
+            "boarded": 13269,
+            "departed": 13494
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 13495,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 14273,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 16073,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 18010,
+            "exited": 18011,
+            "claimed": 18196,
+            "boarded": 18197,
+            "departed": 18421
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 18422,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 18738,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 19941,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 21220,
+          "reason": "cover route evidence deadline exhausted"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 3807,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 21907,
+        "charges": {
+          "native_and_neutral_graph": 31218,
+          "evaluation_graph": 13633,
+          "flags_graph": 4084,
+          "native_and_neutral_physics_queries": 349506,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 6242
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world0-p1-powered": {
+      "item": {
+        "group": "shared-armed-world0-p1",
+        "name": "shared-armed-world0-p1-powered",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 670492658028466742,
+        "seed_namespace": "powered-mission-integration-v1:0",
+        "world": "generated",
+        "cover": true,
+        "powered": true,
+        "seconds": 600
+      },
+      "old_sorties": [
+        5,
+        4
+      ],
+      "new_sorties": [
+        5,
+        4
+      ],
+      "old_outcome": {
+        "winner": "player_1"
+      },
+      "new_outcome": {
+        "winner": "player_1"
+      },
+      "old_seat_won": true,
+      "new_seat_won": true,
+      "old_end_tick": 36000,
+      "new_end_tick": 36000,
+      "end_reason": "time_limit",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 5,
+      "new_claims": 5,
+      "old_departures": 5,
+      "new_departures": 5,
+      "visits": [
+        {
+          "planet": 2,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 2655,
+            "exited": 2656,
+            "claimed": 2841,
+            "boarded": 2842,
+            "departed": 3069
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 3070,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 6706,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 6707,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 7404,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 7405,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 9470,
+            "exited": 9473,
+            "claimed": 9875,
+            "boarded": 9876,
+            "departed": 10104
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 10105,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 12149,
+            "exited": 12153,
+            "claimed": 12519,
+            "boarded": 12520,
+            "departed": 12746
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 12747,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 13406,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 15206,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 19110,
+            "exited": 19112,
+            "claimed": 19510,
+            "boarded": 19511,
+            "departed": 19740
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 19741,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 22995,
+            "exited": 22997,
+            "claimed": 23362,
+            "boarded": 23363,
+            "departed": 23587
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 8413,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 36000,
+        "charges": {
+          "native_and_neutral_graph": 39753,
+          "evaluation_graph": 17286,
+          "flags_graph": 3821,
+          "native_and_neutral_physics_queries": 530222,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 5475
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world0-p2-powered": {
+      "item": {
+        "group": "shared-armed-world0-p2",
+        "name": "shared-armed-world0-p2-powered",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 1,
+        "seed": 670492658028466742,
+        "seed_namespace": "powered-mission-integration-v1:0",
+        "world": "generated",
+        "cover": true,
+        "powered": true,
+        "seconds": 600
+      },
+      "old_sorties": [
+        4,
+        3
+      ],
+      "new_sorties": [
+        4,
+        3
+      ],
+      "old_outcome": {
+        "winner": "player_2"
+      },
+      "new_outcome": {
+        "winner": "player_2"
+      },
+      "old_seat_won": true,
+      "new_seat_won": true,
+      "old_end_tick": 26264,
+      "new_end_tick": 26264,
+      "end_reason": "pilot_death",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 3,
+      "new_claims": 3,
+      "old_departures": 3,
+      "new_departures": 3,
+      "visits": [
+        {
+          "planet": 0,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 3279,
+            "exited": 3280,
+            "claimed": 3466,
+            "boarded": 3467,
+            "departed": 3696
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 3697,
+          "initial_owner": null,
+          "physical": {
+            "landed": 5177,
+            "exited": 5178,
+            "claimed": 5363,
+            "boarded": 5364,
+            "departed": 5589
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 5590,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 9029,
+            "exited": 9032,
+            "claimed": 9397,
+            "boarded": 9398,
+            "departed": 9624
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 9730,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 16168,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 16169,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 17521,
+          "reason": "ship or surface recovery required"
+        },
+        {
+          "planet": 2,
+          "selected_tick": 26172,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 7194,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 26264,
+        "charges": {
+          "native_and_neutral_graph": 51254,
+          "evaluation_graph": 12003,
+          "flags_graph": 3797,
+          "native_and_neutral_physics_queries": 703746,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 6842
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world0-p2-walking": {
+      "item": {
+        "group": "shared-armed-world0-p2",
+        "name": "shared-armed-world0-p2-walking",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 1,
+        "seed": 670492658028466742,
+        "seed_namespace": "powered-mission-integration-v1:0",
+        "world": "generated",
+        "cover": true,
+        "powered": false,
+        "seconds": 600
+      },
+      "old_sorties": [
+        4,
+        4
+      ],
+      "new_sorties": [
+        4,
+        4
+      ],
+      "old_outcome": {
+        "winner": "player_1"
+      },
+      "new_outcome": {
+        "winner": "player_1"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 26591,
+      "new_end_tick": 26591,
+      "end_reason": "pilot_death",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 53182,
+          "work_sha256": "c1011bba07db5d1e3ca4eaa456f6b8d8b5008f714121e073f2f4ea0a26f3b2b9"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 56,
+          "physics_queries": 112,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 56,
+          "physics_queries": 112,
+          "walks": 0
+        }
+      },
+      "old_claims": 4,
+      "new_claims": 4,
+      "old_departures": 4,
+      "new_departures": 4,
+      "visits": [
+        {
+          "planet": 0,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 3279,
+            "exited": 3280,
+            "claimed": 3466,
+            "boarded": 3467,
+            "departed": 3696
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 3697,
+          "initial_owner": null,
+          "physical": {
+            "landed": 5177,
+            "exited": 5178,
+            "claimed": 5447,
+            "boarded": 5448,
+            "departed": 5673
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 5674,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 9167,
+            "exited": 10034,
+            "claimed": 10399,
+            "boarded": 10400,
+            "departed": 10626
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 10627,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 12564,
+            "exited": 13026,
+            "claimed": 13404,
+            "boarded": 13405,
+            "departed": 13633
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 13634,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 14273,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 2,
+          "selected_tick": 22191,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 26407,
+          "reason": "ship or surface recovery required"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 5944,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 26591,
+        "charges": {
+          "native_and_neutral_graph": 42564,
+          "evaluation_graph": 13840,
+          "flags_graph": 6454,
+          "native_and_neutral_physics_queries": 477602,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 9494
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world1-p1-powered": {
+      "item": {
+        "group": "shared-armed-world1-p1",
+        "name": "shared-armed-world1-p1-powered",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 5827714609754469454,
+        "seed_namespace": "powered-mission-integration-v1:1",
+        "world": "generated",
+        "cover": true,
+        "powered": true,
+        "seconds": 600
+      },
+      "old_sorties": [
+        2,
+        3
+      ],
+      "new_sorties": [
+        2,
+        3
+      ],
+      "old_outcome": {
+        "winner": "player_2"
+      },
+      "new_outcome": {
+        "winner": "player_2"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 13547,
+      "new_end_tick": 15435,
+      "end_reason": "pilot_death",
+      "exact_visits_round_and_combat": false,
+      "walking_retention": null,
+      "old_claims": 2,
+      "new_claims": 2,
+      "old_departures": 2,
+      "new_departures": 2,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 2148,
+            "exited": 2149,
+            "claimed": 2334,
+            "boarded": 2335,
+            "departed": 2570
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2571,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2882,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 4925,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": 7982,
+            "exited": 8273,
+            "claimed": 10713,
+            "boarded": 12297,
+            "departed": 12520
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 16,
+        "rejected": {},
+        "flights": 1,
+        "approved_without_launch_forecast": 12
+      },
+      "continuation_sensor_cost": {
+        "calls": 16,
+        "inclusive_total_ms": 1.270306,
+        "inclusive_max_ms": 0.145485,
+        "inclusive_mean_ms": 0.079394125
+      },
+      "old_launches": [
+        {
+          "seat": 0,
+          "tick": 8282,
+          "equipment": {
+            "burn_seconds": 0.0,
+            "burning": false,
+            "charge": 1.0,
+            "crossing": null,
+            "gravity": {
+              "x": 13.662237167358398,
+              "y": -13.031672477722168
+            },
+            "reference_velocity": {
+              "x": 15.299870491027832,
+              "y": 10.356239318847656
+            },
+            "surveyed": false,
+            "terrain_crossings": []
+          },
+          "latest_forecast": {
+            "flights": [
+              {
+                "arrival_speed": 3.356396198272705,
+                "burn_seconds": 2.4999983310699463,
+                "seconds": 8.116666793823242
+              },
+              {
+                "arrival_speed": 3.1944503784179688,
+                "burn_seconds": 2.4833316802978516,
+                "seconds": 7.950000286102295
+              }
+            ],
+            "launch_until_tick": 8400,
+            "measured_tick": 8280,
+            "nodes": [
+              261,
+              282
+            ],
+            "plan": {
+              "anchor": {
+                "Vehicle": {
+                  "angle": 3.331430196762085,
+                  "form": "ship",
+                  "index": 0,
+                  "position": {
+                    "x": 12.230819702148438,
+                    "y": -63.60175704956055
+                  }
+                }
+              },
+              "cruise_radius": 70.76708984375,
+              "destination": {
+                "x": 18.62999725341797,
+                "y": -56.39396667480469
+              },
+              "direction": "Left",
+              "planet": 0,
+              "revision": 1,
+              "start": {
+                "x": 3.641956329345703,
+                "y": -59.28013610839844
+              }
+            },
+            "version": 2
+          },
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "continuous_walk": true,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": {
+              "claimed": false,
+              "completed_tick": null,
+              "crossings": 0,
+              "goal": "Lift",
+              "lowest_charge": 1.0,
+              "plan": {
+                "anchor": {
+                  "Vehicle": {
+                    "angle": 3.331430196762085,
+                    "form": "ship",
+                    "index": 0,
+                    "position": {
+                      "x": 12.230819702148438,
+                      "y": -63.60175704956055
+                    }
+                  }
+                },
+                "cruise_radius": 70.76708984375,
+                "destination": {
+                  "x": 18.62999725341797,
+                  "y": -56.39396667480469
+                },
+                "direction": "Left",
+                "planet": 0,
+                "revision": 1,
+                "start": {
+                  "x": 3.641956329345703,
+                  "y": -59.28013610839844
+                }
+              },
+              "policy": "jetpack_crossing_v3",
+              "reason": null,
+              "started_tick": 8281
+            },
+            "destination": "flag",
+            "displacements": 0,
+            "flag_approach": {
+              "boarding_hatches": [
+                {
+                  "x": 3.2575511932373047,
+                  "y": -59.30289077758789
+                },
+                {
+                  "x": 18.96994400024414,
+                  "y": -56.28252410888672
+                }
+              ],
+              "crossing": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4908835887908936,
+                    "burn_seconds": 2.449998378753662,
+                    "seconds": 8.0
+                  },
+                  {
+                    "arrival_speed": 3.4590582847595215,
+                    "burn_seconds": 2.466665029525757,
+                    "seconds": 7.950000286102295
+                  }
+                ],
+                "launch_until_tick": 8317,
+                "measured_tick": 8197,
+                "nodes": [
+                  261,
+                  282
+                ],
+                "plan": {
+                  "anchor": {
+                    "Vehicle": {
+                      "angle": 3.331388473510742,
+                      "form": "ship",
+                      "index": 0,
+                      "position": {
+                        "x": 12.229888916015625,
+                        "y": -63.60228729248047
+                      }
+                    }
+                  },
+                  "cruise_radius": 70.76744079589844,
+                  "destination": {
+                    "x": 18.629961013793945,
+                    "y": -56.393951416015625
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 1,
+                  "start": {
+                    "x": 3.641988754272461,
+                    "y": -59.280113220214844
+                  }
+                },
+                "version": 2
+              },
+              "endpoint": {
+                "id": 431,
+                "normal": {
+                  "x": 0.836534321308136,
+                  "y": 0.5479145646095276
+                },
+                "position": {
+                  "x": 49.783023834228516,
+                  "y": 32.387351989746094
+                }
+              },
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.32807922363281,
+                  "y": 34.51996994018555
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "reached": false,
+              "tick": 8280
+            },
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "jetpack_lift",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 8282,
+            "partial_routes": 0,
+            "path": [
+              260,
+              261
+            ],
+            "policy": "ground_navigation_v12",
+            "reason": null,
+            "replans": 1,
+            "return_failure": null,
+            "revision": 1,
+            "route": {
+              "closest_reachable_distance": 7.93787112343125e-05,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 1,
+              "jumps": 0,
+              "length": 124.59072875976562,
+              "nearest_destination_distance": 7.93787112343125e-05,
+              "partial": false,
+              "reachable_nodes": 374,
+              "start_distance": 0.3486798107624054,
+              "start_node": 260
+            },
+            "start_repositions": 0,
+            "started_tick": 8274,
+            "target": {
+              "x": 50.16023635864258,
+              "y": 32.632728576660156
+            },
+            "waypoint": 1
+          },
+          "kind": "forecast_vehicle"
+        }
+      ],
+      "launches": [
+        {
+          "seat": 0,
+          "tick": 8282,
+          "equipment": {
+            "burn_seconds": 0.0,
+            "burning": false,
+            "charge": 1.0,
+            "crossing": null,
+            "gravity": {
+              "x": 13.662237167358398,
+              "y": -13.031672477722168
+            },
+            "reference_velocity": {
+              "x": 15.299870491027832,
+              "y": 10.356239318847656
+            },
+            "surveyed": false,
+            "terrain_crossings": []
+          },
+          "latest_forecast": {
+            "flights": [
+              {
+                "arrival_speed": 3.356396198272705,
+                "burn_seconds": 2.4999983310699463,
+                "seconds": 8.116666793823242
+              },
+              {
+                "arrival_speed": 3.1944503784179688,
+                "burn_seconds": 2.4833316802978516,
+                "seconds": 7.950000286102295
+              }
+            ],
+            "launch_until_tick": 8400,
+            "measured_tick": 8280,
+            "nodes": [
+              261,
+              282
+            ],
+            "plan": {
+              "anchor": {
+                "Vehicle": {
+                  "angle": 3.331430196762085,
+                  "form": "ship",
+                  "index": 0,
+                  "position": {
+                    "x": 12.230819702148438,
+                    "y": -63.60175704956055
+                  }
+                }
+              },
+              "cruise_radius": 70.76708984375,
+              "destination": {
+                "x": 18.62999725341797,
+                "y": -56.39396667480469
+              },
+              "direction": "Left",
+              "planet": 0,
+              "revision": 1,
+              "start": {
+                "x": 3.641956329345703,
+                "y": -59.28013610839844
+              }
+            },
+            "version": 2
+          },
+          "ground": {
+            "claim_relocations": 0,
+            "claim_target": null,
+            "continuous_walk": true,
+            "crawl_direction": null,
+            "crawl_target": null,
+            "crossing": {
+              "claimed": false,
+              "completed_tick": null,
+              "crossings": 0,
+              "goal": "Lift",
+              "lowest_charge": 1.0,
+              "plan": {
+                "anchor": {
+                  "Vehicle": {
+                    "angle": 3.331430196762085,
+                    "form": "ship",
+                    "index": 0,
+                    "position": {
+                      "x": 12.230819702148438,
+                      "y": -63.60175704956055
+                    }
+                  }
+                },
+                "cruise_radius": 70.76708984375,
+                "destination": {
+                  "x": 18.62999725341797,
+                  "y": -56.39396667480469
+                },
+                "direction": "Left",
+                "planet": 0,
+                "revision": 1,
+                "start": {
+                  "x": 3.641956329345703,
+                  "y": -59.28013610839844
+                }
+              },
+              "policy": "jetpack_crossing_v3",
+              "reason": null,
+              "started_tick": 8281
+            },
+            "destination": "flag",
+            "displacements": 0,
+            "flag_approach": {
+              "boarding_hatches": [
+                {
+                  "x": 3.2575511932373047,
+                  "y": -59.30289077758789
+                },
+                {
+                  "x": 18.96994400024414,
+                  "y": -56.28252410888672
+                }
+              ],
+              "crossing": {
+                "flights": [
+                  {
+                    "arrival_speed": 3.4908835887908936,
+                    "burn_seconds": 2.449998378753662,
+                    "seconds": 8.0
+                  },
+                  {
+                    "arrival_speed": 3.4590582847595215,
+                    "burn_seconds": 2.466665029525757,
+                    "seconds": 7.950000286102295
+                  }
+                ],
+                "launch_until_tick": 8317,
+                "measured_tick": 8197,
+                "nodes": [
+                  261,
+                  282
+                ],
+                "plan": {
+                  "anchor": {
+                    "Vehicle": {
+                      "angle": 3.331388473510742,
+                      "form": "ship",
+                      "index": 0,
+                      "position": {
+                        "x": 12.229888916015625,
+                        "y": -63.60228729248047
+                      }
+                    }
+                  },
+                  "cruise_radius": 70.76744079589844,
+                  "destination": {
+                    "x": 18.629961013793945,
+                    "y": -56.393951416015625
+                  },
+                  "direction": "Left",
+                  "planet": 0,
+                  "revision": 1,
+                  "start": {
+                    "x": 3.641988754272461,
+                    "y": -59.280113220214844
+                  }
+                },
+                "version": 2
+              },
+              "endpoint": {
+                "id": 431,
+                "normal": {
+                  "x": 0.836534321308136,
+                  "y": 0.5479145646095276
+                },
+                "position": {
+                  "x": 49.783023834228516,
+                  "y": 32.387351989746094
+                }
+              },
+              "objective": {
+                "owner": "player_2",
+                "planet": 0,
+                "position": {
+                  "x": 48.32807922363281,
+                  "y": 34.51996994018555
+                },
+                "range": 2.799999952316284,
+                "revision": 1
+              },
+              "reached": false,
+              "tick": 8280
+            },
+            "flight_interruptions": 0,
+            "get_up_repositions": 0,
+            "goal": "jetpack_lift",
+            "invalidations": 0,
+            "jetpack_crossings": 0,
+            "jumps": 0,
+            "last_progress_tick": 8282,
+            "partial_routes": 0,
+            "path": [
+              260,
+              261
+            ],
+            "policy": "ground_navigation_v12",
+            "reason": null,
+            "replans": 1,
+            "return_failure": null,
+            "revision": 1,
+            "route": {
+              "closest_reachable_distance": 7.93787112343125e-05,
+              "destination_nodes": 1,
+              "failure": null,
+              "flights": 1,
+              "jumps": 0,
+              "length": 124.59072875976562,
+              "nearest_destination_distance": 7.93787112343125e-05,
+              "partial": false,
+              "reachable_nodes": 374,
+              "start_distance": 0.3486798107624054,
+              "start_node": 260
+            },
+            "start_repositions": 0,
+            "started_tick": 8274,
+            "target": {
+              "x": 50.16023635864258,
+              "y": 32.632728576660156
+            },
+            "waypoint": 1
+          },
+          "kind": "forecast_vehicle"
+        }
+      ],
+      "old_completed_crossings": [],
+      "completed_crossings": [
+        [
+          0,
+          8765
+        ]
+      ],
+      "forecasts": {
+        "approved": 7,
+        "rejected": {
+          "fuel_reserve": 6
+        },
+        "started": 17
+      },
+      "publications": {
+        "deliveries": 2181,
+        "powered_entries": 268
+      },
+      "powered_delivering_requests": 7,
+      "allocation": {
+        "ticks": 15435,
+        "charges": {
+          "native_and_neutral_graph": 20493,
+          "evaluation_graph": 11190,
+          "flags_graph": 377,
+          "native_and_neutral_physics_queries": 419114,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 644
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 2457,
+        "physics_queries": 12954
+      }
+    },
+    "shared-armed-world1-p1-walking": {
+      "item": {
+        "group": "shared-armed-world1-p1",
+        "name": "shared-armed-world1-p1-walking",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 0,
+        "seed": 5827714609754469454,
+        "seed_namespace": "powered-mission-integration-v1:1",
+        "world": "generated",
+        "cover": true,
+        "powered": false,
+        "seconds": 600
+      },
+      "old_sorties": [
+        1,
+        1
+      ],
+      "new_sorties": [
+        1,
+        1
+      ],
+      "old_outcome": {
+        "winner": "player_2"
+      },
+      "new_outcome": {
+        "winner": "player_2"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 10040,
+      "new_end_tick": 10040,
+      "end_reason": "pilot_death",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 20080,
+          "work_sha256": "60384e44e13d9709cce259effd424688dc7d5fe028a15613efddc30fc9837976"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 0,
+          "physics_queries": 0,
+          "walks": 0
+        }
+      },
+      "old_claims": 1,
+      "new_claims": 1,
+      "old_departures": 1,
+      "new_departures": 1,
+      "visits": [
+        {
+          "planet": 1,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 2148,
+            "exited": 2149,
+            "claimed": 2334,
+            "boarded": 2335,
+            "departed": 2570
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 2571,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 2882,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 4925,
+          "initial_owner": "player_2",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 7598,
+          "reason": "ship or surface recovery required"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 597,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 10040,
+        "charges": {
+          "native_and_neutral_graph": 7661,
+          "evaluation_graph": 8521,
+          "flags_graph": 330,
+          "native_and_neutral_physics_queries": 111468,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 644
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world1-p2-walking": {
+      "item": {
+        "group": "shared-armed-world1-p2",
+        "name": "shared-armed-world1-p2-walking",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 1,
+        "seed": 5827714609754469454,
+        "seed_namespace": "powered-mission-integration-v1:1",
+        "world": "generated",
+        "cover": true,
+        "powered": false,
+        "seconds": 600
+      },
+      "old_sorties": [
+        2,
+        3
+      ],
+      "new_sorties": [
+        2,
+        3
+      ],
+      "old_outcome": {
+        "winner": "player_1"
+      },
+      "new_outcome": {
+        "winner": "player_1"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 36000,
+      "new_end_tick": 36000,
+      "end_reason": "time_limit",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": {
+        "exact_streams": [
+          "trace.jsonl",
+          "mission-evaluations.jsonl",
+          "mission-evaluation-work.jsonl",
+          "flag-survey.jsonl",
+          "flag-survey-work.jsonl",
+          "destination-cover.jsonl",
+          "capture-evidence.jsonl"
+        ],
+        "sensor_parity": {
+          "rows": 72000,
+          "work_sha256": "bbee7567b8efb2131efb2408bdf9d9fa7e5b27bef04d08990b8a9a76fc88339a"
+        },
+        "exact_allocation_ledger": true,
+        "reused_ground_before": {
+          "nodes": 140,
+          "physics_queries": 280,
+          "walks": 0
+        },
+        "reused_ground_after": {
+          "nodes": 140,
+          "physics_queries": 280,
+          "walks": 0
+        }
+      },
+      "old_claims": 3,
+      "new_claims": 3,
+      "old_departures": 3,
+      "new_departures": 3,
+      "visits": [
+        {
+          "planet": 0,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 3620,
+            "exited": 3621,
+            "claimed": 3806,
+            "boarded": 3807,
+            "departed": 4031
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 5832,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 6552,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8486,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 10690,
+            "exited": 10789,
+            "claimed": 11154,
+            "boarded": 11155,
+            "departed": 11384
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 11385,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 12608,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 12609,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 12619,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 14419,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 15573,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 17374,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 19472,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 19473,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 22875,
+            "exited": 22943,
+            "claimed": 23308,
+            "boarded": 23309,
+            "departed": 23532
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 23533,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 24796,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 24797,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 25218,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 25219,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 25661,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 25662,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 26073,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 26074,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 26594,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 26595,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 28193,
+            "exited": 32056,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 35758,
+          "reason": "capture approach exhausted its time or retry budget"
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 4629,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 36000,
+        "charges": {
+          "native_and_neutral_graph": 58665,
+          "evaluation_graph": 20677,
+          "flags_graph": 3031,
+          "native_and_neutral_physics_queries": 501771,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 4253
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    },
+    "shared-armed-world1-p2-powered": {
+      "item": {
+        "group": "shared-armed-world1-p2",
+        "name": "shared-armed-world1-p2-powered",
+        "kind": "armed",
+        "delivery": "shared",
+        "seat": 1,
+        "seed": 5827714609754469454,
+        "seed_namespace": "powered-mission-integration-v1:1",
+        "world": "generated",
+        "cover": true,
+        "powered": true,
+        "seconds": 600
+      },
+      "old_sorties": [
+        2,
+        3
+      ],
+      "new_sorties": [
+        2,
+        3
+      ],
+      "old_outcome": {
+        "winner": "player_1"
+      },
+      "new_outcome": {
+        "winner": "player_1"
+      },
+      "old_seat_won": false,
+      "new_seat_won": false,
+      "old_end_tick": 36000,
+      "new_end_tick": 36000,
+      "end_reason": "time_limit",
+      "exact_visits_round_and_combat": true,
+      "walking_retention": null,
+      "old_claims": 3,
+      "new_claims": 3,
+      "old_departures": 3,
+      "new_departures": 3,
+      "visits": [
+        {
+          "planet": 0,
+          "selected_tick": 1,
+          "initial_owner": null,
+          "physical": {
+            "landed": 3620,
+            "exited": 3621,
+            "claimed": 3806,
+            "boarded": 3807,
+            "departed": 4031
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 2,
+          "selected_tick": 5832,
+          "initial_owner": null,
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 6552,
+          "reason": "pausing travel for nearby opponent"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 8486,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 10690,
+            "exited": 10692,
+            "claimed": 11057,
+            "boarded": 11058,
+            "departed": 11288
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 0,
+          "selected_tick": 11289,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 13567,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 15001,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 15931,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 0,
+          "selected_tick": 16531,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": 18982,
+            "exited": 18984,
+            "claimed": 19438,
+            "boarded": 19483,
+            "departed": 19706
+          },
+          "abandoned_tick": null,
+          "reason": null
+        },
+        {
+          "planet": 1,
+          "selected_tick": 19707,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 24145,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 24146,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 24973,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 24974,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 25717,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 25718,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 26581,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 26582,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 27263,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 27264,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 27854,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 27855,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 28485,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 28486,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 31450,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 31451,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": 34464,
+          "reason": "left destination approach frame"
+        },
+        {
+          "planet": 1,
+          "selected_tick": 34465,
+          "initial_owner": "player_1",
+          "physical": {
+            "landed": null,
+            "exited": null,
+            "claimed": null,
+            "boarded": null,
+            "departed": null
+          },
+          "abandoned_tick": null,
+          "reason": null
+        }
+      ],
+      "continuation": {
+        "approved": 0,
+        "rejected": {},
+        "flights": 0,
+        "approved_without_launch_forecast": 0
+      },
+      "continuation_sensor_cost": {
+        "calls": 0,
+        "inclusive_total_ms": 0,
+        "inclusive_max_ms": 0,
+        "inclusive_mean_ms": null
+      },
+      "old_launches": [],
+      "launches": [],
+      "old_completed_crossings": [],
+      "completed_crossings": [],
+      "forecasts": {
+        "approved": 0,
+        "rejected": {},
+        "started": 0
+      },
+      "publications": {
+        "deliveries": 5278,
+        "powered_entries": 0
+      },
+      "powered_delivering_requests": 0,
+      "allocation": {
+        "ticks": 36000,
+        "charges": {
+          "native_and_neutral_graph": 64637,
+          "evaluation_graph": 20917,
+          "flags_graph": 1687,
+          "native_and_neutral_physics_queries": 835994,
+          "evaluation_physics_queries": 0,
+          "flags_physics_queries": 2229
+        },
+        "maximum": {
+          "graph": 4,
+          "physics_queries": 384
+        },
+        "scope": "Combined native/neutral, evaluation and flag dispatch work. Synchronous sensors, snapshot construction and publication validation are timed separately and outside operation quotas."
+      },
+      "live_work_change": {
+        "graph": 0,
+        "physics_queries": 0
+      }
+    }
+  },
+  "comparisons": {
+    "shared-failure-cover-on-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "shared-failure-cover-on-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "shared-failure-cover-off-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "shared-failure-cover-off-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "shared-successful-control-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "shared-successful-control-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 10800,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    "shared-armed-world0-p1-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 43814,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          4
+        ]
+      ]
+    },
+    "shared-armed-world0-p1-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 72000,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          5,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    "shared-armed-world0-p2-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 52528,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          3
+        ]
+      ]
+    },
+    "shared-armed-world0-p2-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 53182,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          4
+        ]
+      ]
+    },
+    "shared-armed-world1-p1-powered": {
+      "first_control_difference": {
+        "seat": 0,
+        "tick": 8430
+      },
+      "matching_control_prefix_rows": 16860,
+      "same_final_planets": false,
+      "completed_sorties": [
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "shared-armed-world1-p1-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 20080,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ]
+    },
+    "shared-armed-world1-p2-walking": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 72000,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "shared-armed-world1-p2-powered": {
+      "first_control_difference": null,
+      "matching_control_prefix_rows": 72000,
+      "same_final_planets": true,
+      "completed_sorties": [
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    }
+  },
+  "limitations": [
+    "An approved continuation is not a completed crossing, claim, return, departure or win.",
+    "Local failed or omitted routes remain unknown, never negative route certificates.",
+    "Two generated worlds and seat swaps are a small correlated sample; no broad effectiveness claim.",
+    "Continuation prediction is synchronous sensor work outside shared planner operation quotas; no Pi performance claim.",
+    "The option and bot defaults remain disabled."
+  ]
+}

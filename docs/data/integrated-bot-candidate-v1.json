@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "candidate": "mission_execution_candidate_v1",
+  "control": "mission_value_control_v1",
+  "host": "shared_execution_routes_v1",
+  "frozen_commit": "5724c95e962f6c7f17c7e933f4dbf74f6ed56be7",
+  "status": "configuration_verified_evaluation_not_run",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/integrated-bot/comparison-v1/surface_mission_soak",
+    "source_path": "/home/data/workspace/space-wars3/target/integrated-bot/smoke-v1/surface_mission_soak",
+    "sha256": "3801be7ce18226c62e283d694eafce88711b5808501e0245b8bab49ceb79bb42"
+  },
+  "validation": {
+    "python_tests_passed": 801,
+    "smoke_configurations_verified": 12,
+    "smoke_simulated_seconds_per_case": 1,
+    "smoke_seed": 42,
+    "build": "cargo +1.89.0 build --release --locked -p spacewars-ai --example surface_mission_soak --features sensor-profile"
+  },
+  "evaluation": {
+    "qualification_cases_planned": 16,
+    "fresh_matches_planned": 96,
+    "completed_qualification_cases": 0,
+    "completed_fresh_matches": 0,
+    "independent_fresh_world_seeds": 4,
+    "defaults_changed": false
+  },
+  "plan": {
+    "path": "target/integrated-bot/comparison-v1/plan.json",
+    "sha256": "8595ee8fdb80300f8c7dca462a16f93ea824429983c72efaf4a65450b3b3f98a"
+  },
+  "archive": {
+    "path": "docs/data/integrated-bot-candidate-v1.json.gz",
+    "sha256": "450acdbfbf0fd18e5603aed220e0451ed10e53cb95d86c66e85610db1d58e185",
+    "documents": 16,
+    "bytes": 114616
+  }
+}

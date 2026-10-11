@@ -98,6 +98,7 @@ fn create(
             marquee_preset: settings.clock.marquee_preset,
             marquee_message: settings.clock.marquee_message,
             rain_amount: settings.clock.rain_amount,
+            crow_water_tolerance: settings.clock.crow_water_tolerance,
         },
         seed,
     );

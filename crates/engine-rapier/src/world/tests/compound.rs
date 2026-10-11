@@ -1,6 +1,130 @@
 use super::*;
 
 #[test]
+fn compound_sweep_pruning_preserves_physics_and_snapshot_continuation() {
+    use rapier2d::parry::query::DefaultQueryDispatcher;
+
+    for kind in [
+        BodyKind::Fixed,
+        BodyKind::KinematicPosition,
+        BodyKind::KinematicVelocity,
+    ] {
+        for substeps in [1, 4] {
+            let mut filtered = PhysicsWorld::new(PhysicsWorldConfig {
+                gravity: Vec2::new(0.0, -50.0),
+                max_ccd_substeps: substeps,
+                ..Default::default()
+            });
+            let (_, ground, ground_collider) = ball_ids(1);
+            assert!(
+                filtered.insert_body(
+                    ground,
+                    BodySpec {
+                        kind,
+                        ..Default::default()
+                    },
+                    &[ColliderSpec {
+                        shape: ColliderShape::Compound {
+                            children: (-12..=12)
+                                .map(|x| CompoundChild {
+                                    shape: ColliderShape::Cuboid {
+                                        half_width: 0.5,
+                                        half_height: 0.1
+                                    },
+                                    position: Vec2::new(x as f32, 0.0),
+                                    angle: 0.0,
+                                })
+                                .collect(),
+                        },
+                        ..ColliderSpec::ball(ground_collider, 1.0)
+                    }]
+                )
+            );
+            let (_, clump, clump_collider) = ball_ids(2);
+            assert!(
+                filtered.insert_body(
+                    clump,
+                    BodySpec {
+                        position: Vec2::new(0.0, 6.0),
+                        linear_velocity: Vec2::new(3.0, -20.0),
+                        angular_velocity: 2.0,
+                        ccd_enabled: true,
+                        ..Default::default()
+                    },
+                    &[ColliderSpec {
+                        shape: ColliderShape::Compound {
+                            children: (0..4)
+                                .map(|x| CompoundChild {
+                                    shape: ColliderShape::Cuboid {
+                                        half_width: 0.5,
+                                        half_height: 0.3
+                                    },
+                                    position: Vec2::new(x as f32 - 1.5, (x % 2) as f32 * 0.2),
+                                    angle: 0.0,
+                                })
+                                .collect(),
+                        },
+                        ..ColliderSpec::ball(clump_collider, 1.0)
+                    }]
+                )
+            );
+            let (_, ball, ball_collider) = ball_ids(3);
+            assert!(filtered.insert_body(
+                ball,
+                BodySpec {
+                    position: Vec2::new(-4.0, 14.0),
+                    linear_velocity: Vec2::new(1.0, -100.0),
+                    ccd_enabled: true,
+                    ..Default::default()
+                },
+                &[ColliderSpec::ball(ball_collider, 0.15)]
+            ));
+            let mut reference = filtered.clone();
+            reference
+                .raw
+                .narrow_phase
+                .set_query_dispatcher(DefaultQueryDispatcher);
+            let mut impacted = false;
+            for tick in 1..=180 {
+                for world in [&mut filtered, &mut reference] {
+                    if kind == BodyKind::KinematicPosition {
+                        let t = tick as f32 / 60.0;
+                        world.set_next_kinematic_pose(ground, Vec2::new(t * 0.5, 0.0), t * 0.02);
+                    } else if kind == BodyKind::KinematicVelocity {
+                        world.set_velocity(ground, Vec2::new(0.5, 0.0), 0.02, true);
+                    }
+                    world.step(1.0 / 60.0);
+                }
+                impacted |= !filtered.contact_events().is_empty();
+                assert_eq!(
+                    filtered.contact_events(),
+                    reference.contact_events(),
+                    "kind={kind:?}, substeps={substeps}, tick={tick}"
+                );
+                assert_eq!(
+                    filtered.snapshot_bytes().unwrap(),
+                    reference.snapshot_bytes().unwrap(),
+                    "kind={kind:?}, substeps={substeps}, tick={tick}"
+                );
+                if tick == 90 {
+                    filtered =
+                        PhysicsWorld::from_snapshot_bytes(&filtered.snapshot_bytes().unwrap())
+                            .unwrap();
+                    reference =
+                        PhysicsWorld::from_snapshot_bytes(&reference.snapshot_bytes().unwrap())
+                            .unwrap();
+                    reference
+                        .raw
+                        .narrow_phase
+                        .set_query_dispatcher(DefaultQueryDispatcher);
+                }
+            }
+            assert!(impacted);
+        }
+    }
+}
+
+#[test]
 fn ccd_uses_ground_velocity_when_rejecting_slow_relative_motion() {
     for kind in [BodyKind::KinematicPosition, BodyKind::KinematicVelocity] {
         for compound in [false, true] {

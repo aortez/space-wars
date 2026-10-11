@@ -3,10 +3,20 @@ use super::*;
 use crate::jetpack_crossing::CrossingGoal;
 use scenario_spacewars::surface_sortie::{
     ground_navigation::{GroundRoute, GroundRoutes},
-    jetpack::{CrossingAnchor, MAX_TERRAIN_CROSSINGS},
+    jetpack::{
+        CrossingAnchor, MAX_TERRAIN_CROSSINGS, flight::FlightPhase, forecast::VehicleFlightRequest,
+    },
 };
 
 impl GroundNavigationTask {
+    pub fn set_active_flight_checks(&mut self, enabled: bool) {
+        self.active_flight_checks = enabled && self.powered_flag;
+    }
+    pub fn vehicle_flight_request(&self) -> Option<VehicleFlightRequest> {
+        self.active_flight_checks
+            .then_some(self.active_flight)
+            .flatten()
+    }
     pub(super) fn route_with_jetpack(
         &self,
         map: &GroundMap,
@@ -151,14 +161,34 @@ impl GroundNavigationTask {
         if !jetpack.charge.is_finite() || !(0.0..=1.0).contains(&jetpack.charge) {
             return self.interrupt_crossing(p.tick);
         }
-        let old = task.telemetry().plan.as_ref().unwrap();
-        if self.powered_flag
+        let old = *task.telemetry().plan.as_ref().unwrap();
+        let active = self.vehicle_flight_request();
+        if let Some(request) = active {
+            if !request.valid_at(p.tick)
+                || self
+                    .last_flight_check
+                    .is_none_or(|tick| p.tick < tick || p.tick - tick > 30)
+                || (jetpack.surveyed
+                    && jetpack
+                        .vehicle_continuation
+                        .is_none_or(|c| !c.valid_for(request, p.tick, jetpack.charge)))
+            {
+                return self.interrupt_crossing(p.tick);
+            }
+            if jetpack.surveyed {
+                self.last_flight_check = Some(p.tick);
+            }
+        } else if self.powered_flag
             && jetpack.surveyed
             && jetpack.vehicle_forecast.is_none_or(|f| !f.valid_at(p.tick))
         {
             return self.interrupt_crossing(p.tick);
         }
-        let observation = jetpack.for_crossing(p, old);
+        let mut observation = jetpack.for_crossing(p, &old);
+        if active.is_some() && jetpack.surveyed {
+            observation.plan = jetpack.vehicle_continuation.and_then(|c| c.plan);
+        }
+        let task = self.crossing_task.as_mut().unwrap();
         if jetpack.surveyed {
             if observation
                 .plan
@@ -175,6 +205,38 @@ impl GroundNavigationTask {
         }
         let action = task.step(&observation);
         let t = task.telemetry().clone();
+        if self.active_flight_checks {
+            let phase = match t.goal {
+                CrossingGoal::Lift => Some(FlightPhase::Lift),
+                CrossingGoal::Cross => Some(FlightPhase::Cross),
+                CrossingGoal::Descend => Some(FlightPhase::Descend),
+                _ => None,
+            };
+            if let Some(phase) = phase {
+                if self.active_flight.is_none() && action.primary_held {
+                    // Entering Lift releases the approach control first. Start
+                    // continuation only with the actual launch press, after the
+                    // ordinary launch gate has accepted this tick.
+                    let Some(launch) = self.launch_forecast.filter(|f| {
+                        f.valid_at(p.tick)
+                            && f.plan.revision == old.revision
+                            && (old.same_corridor(&f.plan) || old.same_corridor(&f.plan.reversed()))
+                    }) else {
+                        return self.interrupt_crossing(p.tick);
+                    };
+                    self.active_flight = Some(VehicleFlightRequest {
+                        launch,
+                        launched_tick: p.tick,
+                        plan: t.plan.unwrap(),
+                        phase,
+                    });
+                    self.last_flight_check = Some(p.tick);
+                } else if let Some(request) = self.active_flight.as_mut() {
+                    request.phase = phase;
+                    request.plan = t.plan.unwrap();
+                }
+            }
+        }
         self.telemetry.crossing = Some(t.clone());
         self.telemetry.last_progress_tick = p.tick;
         self.telemetry.goal = match t.goal {
@@ -186,6 +248,9 @@ impl GroundNavigationTask {
             CrossingGoal::Complete => {
                 self.telemetry.jetpack_crossings += 1;
                 self.crossing_task = None;
+                self.active_flight = None;
+                self.launch_forecast = None;
+                self.last_flight_check = None;
                 self.clear_route();
                 GroundGoal::Survey
             }
@@ -199,6 +264,9 @@ impl GroundNavigationTask {
         self.telemetry.flight_interruptions += 1;
         self.telemetry.invalidations += 1;
         self.crossing_task = None;
+        self.active_flight = None;
+        self.launch_forecast = None;
+        self.last_flight_check = None;
         self.clear_route();
         self.map = None;
         self.settling_after_interrupt = true;

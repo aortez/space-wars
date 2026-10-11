@@ -1472,7 +1472,9 @@ impl SpacewarsScenario {
             );
         }
 
+        terrain::loose::capture_impacts(state, dt);
         let rapier = state.physics.step(dt);
+        terrain::loose::sample_impacts(state);
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
         state
             .physics
@@ -2543,6 +2545,10 @@ fn apply_world_gravity_with_pilots(
         terrain,
         ..
     } = state;
+    // Forces persist in Rapier. Each tick owns a fresh gravity/control force
+    // budget, including ticks where a source disappears or its field is zero.
+    physics.world.clear_forces();
+    physics.distributed_gravity = terrain.loose.is_some();
     gravity_participants.clear();
     for pilot in pilots.iter_mut() {
         pilot.ship_gravity_delta = Vec2::ZERO;
@@ -2638,6 +2644,18 @@ fn apply_world_gravity_with_pilots(
             1.0,
         ));
     }
+    if let Some(pool) = &terrain.loose {
+        for grain in pool.iter() {
+            gravity_participants.push(GravityParticipant::target(
+                tagged_gravity_id(GRAVITY_TERRAIN_FRAGMENT_TAG, grain.id().value()),
+                physics
+                    .world
+                    .center_of_mass(grain.body())
+                    .expect("loose mass"),
+                1.0,
+            ));
+        }
+    }
     let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
     gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
         GravityParticipant::target(
@@ -2706,15 +2724,17 @@ fn apply_world_gravity_with_pilots(
                 {
                     pilot.ship_gravity_delta = output.velocity_delta;
                 }
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::Ship(index),
+                assert!(physics.apply_gravity_delta(
+                    physics.ship_body(index),
                     output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_DEBRIS_TAG => {
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::Debris(payload),
+                assert!(physics.apply_gravity_delta(
+                    physics::primary_body(engine_rapier::world::PhysicsId::new(payload)),
                     output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_PARTICLE_TAG => {
@@ -2727,16 +2747,18 @@ fn apply_world_gravity_with_pilots(
                     .get(&rover_id)
                     .copied()
                     .unwrap_or(Vec2::ZERO);
-                assert!(physics.apply_rover_velocity_delta(
+                assert!(physics.apply_rover_gravity_delta(
                     rover_id,
                     body_index,
                     output.velocity_delta - frame_delta,
+                    dt,
                 ));
             }
             GRAVITY_TERRAIN_FRAGMENT_TAG => {
-                assert!(physics.apply_velocity_delta(
-                    MechanicalEntity::TerrainFragment(payload),
-                    output.velocity_delta
+                assert!(physics.apply_gravity_delta(
+                    physics::primary_body(engine_rapier::world::PhysicsId::new(payload)),
+                    output.velocity_delta,
+                    dt,
                 ));
             }
             GRAVITY_BODY_TAG | GRAVITY_ROVER_FRAME_TAG => {}
@@ -6011,6 +6033,8 @@ fn render_state_with_camera(
             );
         }
     }
+
+    terrain::render_loose(&mut frame, state, None);
 
     for rover in &state.rovers {
         let Some(snapshot) = state.physics.rover_snapshot(rover) else {

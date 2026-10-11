@@ -1,0 +1,845 @@
+{
+  "schema": 1,
+  "complete": true,
+  "source_commit": "cf5935d02e6d4b2ef360a95810b31f9d920d8fa5",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/integrated-bot/comparison-v1/surface_mission_soak",
+    "source_path": "/home/data/workspace/space-wars3/target/integrated-bot/smoke-v1/surface_mission_soak",
+    "sha256": "3801be7ce18226c62e283d694eafce88711b5808501e0245b8bab49ceb79bb42"
+  },
+  "prior_summary": {
+    "path": "target/integrated-bot/evaluation-v2/summary.json",
+    "sha256": "0fdf0c3a2e287116bd3af324a38f1b8ae93155aa17dcf2e980e1f40895f5d99d"
+  },
+  "diagnostic_summary": {
+    "path": "target/integrated-bot/regression-v1/summary.json",
+    "sha256": "63fb78d8400a904414b6df1f1b0b82f257f5cbe135e723fabe089d237bddcc0a"
+  },
+  "scope": "Two diagnostic replays of the existing v10 pair, not new strength samples. Native policies, physics, horizons, configuration and defaults unchanged.",
+  "validation": {
+    "python_tests_passed": 816,
+    "exact_gameplay_replays": 2,
+    "existing_case_audits_passed": 2,
+    "dense_pilot_rows": 86628,
+    "original_observations_matched": 12291,
+    "impact_rows": 56228,
+    "control_overrides": 0,
+    "raw_replay_files_verified": 26,
+    "raw_replay_bytes": 1750907660,
+    "tool_inputs_verified": 39,
+    "defaults_changed": false
+  },
+  "runs": {
+    "fresh-world0-v10-asteroids3-p1-control": {
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "parity": {
+        "exact_streams": [
+          "capture-evidence.jsonl",
+          "destination-behavior.jsonl",
+          "destination-cover.jsonl",
+          "flag-survey-work.jsonl",
+          "flag-survey.jsonl",
+          "landing-handoffs.jsonl",
+          "mission-evaluation-work.jsonl",
+          "mission-evaluations.jsonl"
+        ],
+        "non_timing_report": true,
+        "sensor_rows": 50966,
+        "planning_rows": 14652,
+        "players": true
+      },
+      "losses": {
+        "0": [],
+        "1": [
+          {
+            "tick": 8504,
+            "source": "cannon",
+            "amount": 28.2830867767334,
+            "spawn_tick": 8487,
+            "contact_age_ticks": 17,
+            "cannon_request_seats_at_spawn": [
+              0
+            ]
+          },
+          {
+            "tick": 22947,
+            "source": "laser",
+            "amount": 0.080082967877388
+          }
+        ]
+      },
+      "mode_counts": {
+        "0": {
+          "mission:select": {
+            "ticks": 8,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 1,
+            "laser_blocked_visibility": 4,
+            "laser_blocked_readiness": 1,
+            "laser_blocked_aim": 8,
+            "laser_blocked_range": 7,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 1,
+            "cannon_blocked_visibility": 4,
+            "cannon_blocked_readiness": 1,
+            "cannon_blocked_aim": 8,
+            "cannon_blocked_range": 7
+          },
+          "mission:launch": {
+            "ticks": 303,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 245,
+            "laser_blocked_aim": 303,
+            "laser_blocked_range": 303,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 245,
+            "cannon_blocked_aim": 303,
+            "cannon_blocked_range": 303
+          },
+          "mission:transfer": {
+            "ticks": 6891,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 4136,
+            "laser_blocked_aim": 6772,
+            "laser_blocked_range": 6071,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 4136,
+            "cannon_blocked_aim": 6772,
+            "cannon_blocked_range": 6134,
+            "laser_blocked_readiness": 82,
+            "cannon_blocked_readiness": 9
+          },
+          "mission:capture": {
+            "ticks": 13282,
+            "laser_requests": 0,
+            "laser_window": 75,
+            "laser_indeterminate": 1,
+            "laser_blocked_aim": 13096,
+            "laser_blocked_range": 11871,
+            "cannon_requests": 0,
+            "cannon_window": 63,
+            "cannon_indeterminate": 1,
+            "cannon_blocked_aim": 13096,
+            "cannon_blocked_range": 12208,
+            "laser_blocked_visibility": 8631,
+            "cannon_blocked_visibility": 8631,
+            "laser_blocked_controls_or_queries_unready": 12,
+            "laser_blocked_not_aboard_full_ship": 1321,
+            "laser_blocked_readiness": 1327,
+            "cannon_blocked_controls_or_queries_unready": 12,
+            "cannon_blocked_not_aboard_full_ship": 1321,
+            "cannon_blocked_readiness": 1327
+          },
+          "mission:hunt": {
+            "ticks": 833,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 616,
+            "laser_blocked_range": 833,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 616,
+            "cannon_blocked_range": 833,
+            "laser_blocked_visibility": 9,
+            "cannon_blocked_visibility": 9,
+            "cannon_blocked_readiness": 13,
+            "laser_blocked_readiness": 60
+          },
+          "combat:engage ship": {
+            "ticks": 2309,
+            "laser_requests": 1603,
+            "laser_window": 1603,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 569,
+            "cannon_requests": 21,
+            "cannon_window": 21,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 569,
+            "cannon_blocked_range": 135,
+            "cannon_blocked_readiness": 1751,
+            "laser_blocked_visibility": 138,
+            "cannon_blocked_visibility": 138,
+            "laser_blocked_readiness": 38
+          },
+          "mission:climbing for a firing pass": {
+            "ticks": 1365,
+            "laser_requests": 0,
+            "laser_window": 39,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 15,
+            "cannon_requests": 0,
+            "cannon_window": 24,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 15,
+            "cannon_blocked_readiness": 250,
+            "laser_blocked_aim": 1314,
+            "cannon_blocked_aim": 1314,
+            "laser_blocked_readiness": 60,
+            "cannon_blocked_range": 203,
+            "laser_blocked_range": 44
+          },
+          "combat:flyby / weapons off": {
+            "ticks": 409,
+            "laser_requests": 0,
+            "laser_window": 22,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 389,
+            "laser_blocked_aim": 387,
+            "cannon_blocked_aim": 387,
+            "laser_blocked_readiness": 120
+          },
+          "mission:avoid_sun": {
+            "ticks": 81,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 81,
+            "laser_blocked_range": 81,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 81,
+            "cannon_blocked_range": 81
+          },
+          "combat:climb clear of ground": {
+            "ticks": 2,
+            "laser_requests": 0,
+            "laser_window": 2,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 2
+          }
+        },
+        "1": {
+          "mission:select": {
+            "ticks": 6,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 1,
+            "laser_blocked_visibility": 4,
+            "laser_blocked_readiness": 1,
+            "laser_blocked_aim": 6,
+            "laser_blocked_range": 4,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 1,
+            "cannon_blocked_visibility": 4,
+            "cannon_blocked_readiness": 1,
+            "cannon_blocked_aim": 6,
+            "cannon_blocked_range": 4
+          },
+          "mission:launch": {
+            "ticks": 777,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 741,
+            "laser_blocked_aim": 777,
+            "laser_blocked_range": 549,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 741,
+            "cannon_blocked_aim": 777,
+            "cannon_blocked_range": 612
+          },
+          "mission:transfer": {
+            "ticks": 2974,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 2153,
+            "laser_blocked_aim": 2855,
+            "laser_blocked_range": 2831,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 2153,
+            "cannon_blocked_aim": 2855,
+            "cannon_blocked_range": 2965
+          },
+          "mission:capture": {
+            "ticks": 12247,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 7741,
+            "laser_blocked_aim": 11896,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 7741,
+            "cannon_blocked_aim": 11896,
+            "cannon_blocked_range": 11515,
+            "laser_blocked_range": 11330,
+            "laser_blocked_controls_or_queries_unready": 6,
+            "laser_blocked_not_aboard_full_ship": 1350,
+            "laser_blocked_readiness": 1353,
+            "cannon_blocked_controls_or_queries_unready": 6,
+            "cannon_blocked_not_aboard_full_ship": 1350,
+            "cannon_blocked_readiness": 1353
+          },
+          "combat:engage ship": {
+            "ticks": 341,
+            "laser_requests": 30,
+            "laser_window": 30,
+            "laser_indeterminate": 1,
+            "laser_blocked_aim": 304,
+            "cannon_requests": 2,
+            "cannon_window": 2,
+            "cannon_indeterminate": 1,
+            "cannon_blocked_aim": 304,
+            "laser_blocked_visibility": 21,
+            "cannon_blocked_visibility": 21,
+            "cannon_blocked_readiness": 95
+          },
+          "mission:recover": {
+            "ticks": 7541,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 5,
+            "laser_blocked_not_aboard_full_ship": 7540,
+            "laser_blocked_readiness": 7541,
+            "laser_blocked_aim": 7487,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 5,
+            "cannon_blocked_not_aboard_full_ship": 7540,
+            "cannon_blocked_readiness": 7541,
+            "cannon_blocked_aim": 7487,
+            "laser_blocked_visibility": 2521,
+            "cannon_blocked_visibility": 2521,
+            "cannon_blocked_range": 4553,
+            "laser_blocked_range": 4377
+          },
+          "mission:avoid_sun": {
+            "ticks": 116,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 116,
+            "laser_blocked_aim": 116,
+            "laser_blocked_range": 116,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 116,
+            "cannon_blocked_aim": 116,
+            "cannon_blocked_range": 116
+          },
+          "combat:ship recovered": {
+            "ticks": 1,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 1,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 1
+          },
+          "combat:climb clear of ground": {
+            "ticks": 1,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 1,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 1,
+            "cannon_blocked_aim": 1
+          },
+          "mission:climbing for a firing pass": {
+            "ticks": 1479,
+            "laser_requests": 0,
+            "laser_window": 23,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 1455,
+            "cannon_requests": 0,
+            "cannon_window": 13,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 24,
+            "cannon_blocked_aim": 1455,
+            "cannon_blocked_range": 139,
+            "laser_blocked_visibility": 8,
+            "cannon_blocked_visibility": 8
+          }
+        }
+      }
+    },
+    "fresh-world0-v10-asteroids3-p1-candidate": {
+      "outcomes": [
+        "loss",
+        "win"
+      ],
+      "parity": {
+        "exact_streams": [
+          "capture-evidence.jsonl",
+          "destination-behavior.jsonl",
+          "destination-cover.jsonl",
+          "flag-survey-work.jsonl",
+          "flag-survey.jsonl",
+          "landing-handoffs.jsonl",
+          "mission-evaluation-work.jsonl",
+          "mission-evaluations.jsonl"
+        ],
+        "non_timing_report": true,
+        "sensor_rows": 35662,
+        "planning_rows": 10251,
+        "players": true
+      },
+      "losses": {
+        "0": [
+          {
+            "tick": 9749,
+            "source": "cannon",
+            "amount": 16.452777862548828,
+            "spawn_tick": 9734,
+            "contact_age_ticks": 15,
+            "cannon_request_seats_at_spawn": [
+              1
+            ]
+          },
+          {
+            "tick": 17539,
+            "source": "cannon",
+            "amount": 25.60329818725586,
+            "spawn_tick": 17527,
+            "contact_age_ticks": 12,
+            "cannon_request_seats_at_spawn": [
+              1
+            ]
+          }
+        ],
+        "1": []
+      },
+      "mode_counts": {
+        "0": {
+          "mission:select": {
+            "ticks": 6,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 1,
+            "laser_blocked_visibility": 4,
+            "laser_blocked_readiness": 1,
+            "laser_blocked_aim": 5,
+            "laser_blocked_range": 6,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 1,
+            "cannon_blocked_visibility": 4,
+            "cannon_blocked_readiness": 1,
+            "cannon_blocked_aim": 5,
+            "cannon_blocked_range": 6
+          },
+          "mission:launch": {
+            "ticks": 960,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 664,
+            "laser_blocked_aim": 751,
+            "laser_blocked_range": 960,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 664,
+            "cannon_blocked_aim": 751,
+            "cannon_blocked_range": 960
+          },
+          "mission:transfer": {
+            "ticks": 4896,
+            "laser_requests": 0,
+            "laser_window": 10,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 3151,
+            "laser_blocked_aim": 4781,
+            "laser_blocked_range": 4838,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 3151,
+            "cannon_blocked_aim": 4781,
+            "cannon_blocked_range": 4838,
+            "cannon_blocked_readiness": 58
+          },
+          "mission:capture": {
+            "ticks": 6850,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 6767,
+            "laser_blocked_range": 6056,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 6767,
+            "cannon_blocked_range": 6313,
+            "laser_blocked_visibility": 5432,
+            "cannon_blocked_visibility": 5432,
+            "laser_blocked_controls_or_queries_unready": 8,
+            "laser_blocked_not_aboard_full_ship": 973,
+            "laser_blocked_readiness": 977,
+            "cannon_blocked_controls_or_queries_unready": 8,
+            "cannon_blocked_not_aboard_full_ship": 973,
+            "cannon_blocked_readiness": 977
+          },
+          "mission:hunt": {
+            "ticks": 261,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 261,
+            "laser_blocked_range": 261,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 261,
+            "cannon_blocked_range": 261,
+            "laser_blocked_visibility": 19,
+            "cannon_blocked_visibility": 19
+          },
+          "combat:engage ship": {
+            "ticks": 1712,
+            "laser_requests": 1144,
+            "laser_window": 1144,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 450,
+            "cannon_requests": 11,
+            "cannon_window": 11,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 450,
+            "cannon_blocked_range": 87,
+            "cannon_blocked_readiness": 1278,
+            "laser_blocked_visibility": 124,
+            "cannon_blocked_visibility": 124,
+            "laser_blocked_readiness": 60
+          },
+          "combat:flyby / weapons off": {
+            "ticks": 348,
+            "laser_requests": 0,
+            "laser_window": 9,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 234,
+            "laser_blocked_aim": 339,
+            "cannon_blocked_aim": 339,
+            "laser_blocked_readiness": 60,
+            "laser_blocked_visibility": 15,
+            "cannon_blocked_visibility": 15
+          },
+          "mission:recover": {
+            "ticks": 1977,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 5,
+            "laser_blocked_not_aboard_full_ship": 1976,
+            "laser_blocked_visibility": 565,
+            "laser_blocked_readiness": 1977,
+            "laser_blocked_aim": 1672,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 5,
+            "cannon_blocked_not_aboard_full_ship": 1976,
+            "cannon_blocked_visibility": 565,
+            "cannon_blocked_readiness": 1977,
+            "cannon_blocked_aim": 1672,
+            "cannon_blocked_range": 735,
+            "laser_blocked_range": 658
+          },
+          "mission:avoid_sun": {
+            "ticks": 360,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_not_aboard_full_ship": 244,
+            "laser_blocked_readiness": 244,
+            "laser_blocked_aim": 356,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_not_aboard_full_ship": 244,
+            "cannon_blocked_readiness": 244,
+            "cannon_blocked_aim": 356,
+            "laser_blocked_visibility": 116,
+            "laser_blocked_range": 116,
+            "cannon_blocked_visibility": 116,
+            "cannon_blocked_range": 116
+          },
+          "combat:ship recovered": {
+            "ticks": 1,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 1,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 1,
+            "cannon_blocked_range": 1
+          },
+          "combat:climb clear of ground": {
+            "ticks": 1,
+            "laser_requests": 0,
+            "laser_window": 1,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 1
+          },
+          "mission:climbing for a firing pass": {
+            "ticks": 459,
+            "laser_requests": 0,
+            "laser_window": 8,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 88,
+            "laser_blocked_aim": 451,
+            "cannon_blocked_aim": 451
+          }
+        },
+        "1": {
+          "mission:select": {
+            "ticks": 5,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_controls_or_queries_unready": 1,
+            "laser_blocked_visibility": 4,
+            "laser_blocked_readiness": 1,
+            "laser_blocked_aim": 5,
+            "laser_blocked_range": 4,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_controls_or_queries_unready": 1,
+            "cannon_blocked_visibility": 4,
+            "cannon_blocked_readiness": 1,
+            "cannon_blocked_aim": 5,
+            "cannon_blocked_range": 4
+          },
+          "mission:launch": {
+            "ticks": 586,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 554,
+            "laser_blocked_aim": 586,
+            "laser_blocked_range": 358,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 554,
+            "cannon_blocked_aim": 586,
+            "cannon_blocked_range": 421
+          },
+          "mission:transfer": {
+            "ticks": 3884,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 2583,
+            "laser_blocked_aim": 3730,
+            "laser_blocked_range": 3469,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 2583,
+            "cannon_blocked_aim": 3730,
+            "cannon_blocked_range": 3633
+          },
+          "mission:capture": {
+            "ticks": 10270,
+            "laser_requests": 0,
+            "laser_window": 60,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 6724,
+            "laser_blocked_aim": 9821,
+            "cannon_requests": 0,
+            "cannon_window": 60,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 6724,
+            "cannon_blocked_aim": 9821,
+            "cannon_blocked_range": 9007,
+            "laser_blocked_range": 8897,
+            "laser_blocked_controls_or_queries_unready": 6,
+            "laser_blocked_not_aboard_full_ship": 1328,
+            "laser_blocked_readiness": 1331,
+            "cannon_blocked_controls_or_queries_unready": 6,
+            "cannon_blocked_not_aboard_full_ship": 1328,
+            "cannon_blocked_readiness": 1331
+          },
+          "mission:climbing for a firing pass": {
+            "ticks": 1196,
+            "laser_requests": 0,
+            "laser_window": 18,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 1178,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 1178,
+            "cannon_blocked_readiness": 248,
+            "laser_blocked_readiness": 120,
+            "laser_blocked_visibility": 8,
+            "cannon_blocked_visibility": 8
+          },
+          "combat:engage ship": {
+            "ticks": 1530,
+            "laser_requests": 871,
+            "laser_window": 871,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 545,
+            "cannon_requests": 12,
+            "cannon_window": 12,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 545,
+            "laser_blocked_visibility": 135,
+            "cannon_blocked_visibility": 135,
+            "cannon_blocked_readiness": 1050,
+            "cannon_blocked_range": 85
+          },
+          "combat:climb clear of ground": {
+            "ticks": 1,
+            "laser_requests": 0,
+            "laser_window": 1,
+            "laser_indeterminate": 0,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_readiness": 1
+          },
+          "combat:flyby / weapons off": {
+            "ticks": 192,
+            "laser_requests": 0,
+            "laser_window": 7,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 185,
+            "cannon_requests": 0,
+            "cannon_window": 7,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 185
+          },
+          "mission:avoid_sun": {
+            "ticks": 98,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_visibility": 98,
+            "laser_blocked_range": 98,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_visibility": 98,
+            "cannon_blocked_range": 98,
+            "laser_blocked_aim": 95,
+            "cannon_blocked_aim": 95
+          },
+          "mission:hunt": {
+            "ticks": 69,
+            "laser_requests": 0,
+            "laser_window": 0,
+            "laser_indeterminate": 0,
+            "laser_blocked_aim": 48,
+            "laser_blocked_range": 69,
+            "cannon_requests": 0,
+            "cannon_window": 0,
+            "cannon_indeterminate": 0,
+            "cannon_blocked_aim": 48,
+            "cannon_blocked_range": 69,
+            "laser_blocked_visibility": 9,
+            "cannon_blocked_visibility": 9
+          }
+        }
+      }
+    }
+  },
+  "retained_v16_report_checks": {
+    "control": {
+      "sources": [
+        {
+          "path": "target/integrated-bot/comparison-v1/fresh-world0-v10-asteroids3-p1-control/report.json",
+          "sha256": "6c19fe6a3ebe9305da310989a4d2722cf350c1a02546ea87b119b829a0b48f4b"
+        },
+        {
+          "path": "target/integrated-bot/comparison-v1/fresh-world0-v16-asteroids3-p1-control/report.json",
+          "sha256": "24af2e2f150001dab73ea8e1f8432e6321a6c441200227a0d130051ca86c513c"
+        }
+      ],
+      "equal_fields": {
+        "round": true,
+        "metrics": true,
+        "final_pilots": true,
+        "final_combat": true,
+        "asteroid_events": true,
+        "p1_pilot_damage_receipts": true
+      },
+      "scope": "Retained report fields and P1 pilot damage receipts only; v16 not replayed with dense diagnostics, no claim of complete per-tick identity."
+    },
+    "candidate": {
+      "sources": [
+        {
+          "path": "target/integrated-bot/comparison-v1/fresh-world0-v10-asteroids3-p1-candidate/report.json",
+          "sha256": "d608863e107c7d9106140e622b4558d5cfdb67786090de65f814803627186823"
+        },
+        {
+          "path": "target/integrated-bot/comparison-v1/fresh-world0-v16-asteroids3-p1-candidate/report.json",
+          "sha256": "fdd39a8d897d18b8905c279573bf7541715f5cb8336c175d9b09ead844160609"
+        }
+      ],
+      "equal_fields": {
+        "round": true,
+        "metrics": true,
+        "final_pilots": true,
+        "final_combat": true,
+        "asteroid_events": true,
+        "p1_pilot_damage_receipts": true
+      },
+      "scope": "Retained report fields and P1 pilot damage receipts only; v16 not replayed with dense diagnostics, no claim of complete per-tick identity."
+    }
+  },
+  "archive": {
+    "path": "docs/data/integrated-bot-regression-v1.json.gz",
+    "sha256": "d5ab7a815e9b4c9c4f1552691e750d21e1a0c4ef03177ed707f957f4a52b0fc7",
+    "bytes": 9577946,
+    "documents": 11,
+    "verified_document_hashes": 11,
+    "scope": "Exact prior/diagnostic summaries, frozen plan, both physical audits, complete derived per-tick diagnostics, selected exact source rows, rollup and logs. Full raw streams remain under target and are hash-bound by the diagnostic summary."
+  }
+}

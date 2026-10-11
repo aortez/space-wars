@@ -1,0 +1,711 @@
+suite,build,case,runs,metric,median_ms,min_ms,max_ms
+loose_terrain_benchmark,current,combat / off,3,step_mean_ms,0.33,0.318,0.346
+loose_terrain_benchmark,current,combat / off,3,step_p50_ms,0.312,0.296,0.325
+loose_terrain_benchmark,current,combat / off,3,step_p95_ms,0.662,0.642,0.705
+loose_terrain_benchmark,current,combat / off,3,step_p99_ms,0.935,0.935,1.008
+loose_terrain_benchmark,current,combat / off,3,step_max_ms,1.83,1.818,1.87
+loose_terrain_benchmark,current,combat / off,3,frame_p95_ms,0.15,0.139,0.153
+loose_terrain_benchmark,current,match / off,3,step_mean_ms,1.44,1.389,1.503
+loose_terrain_benchmark,current,match / off,3,step_p50_ms,1.368,1.3,1.413
+loose_terrain_benchmark,current,match / off,3,step_p95_ms,1.875,1.836,1.941
+loose_terrain_benchmark,current,match / off,3,step_p99_ms,2.483,2.459,2.6
+loose_terrain_benchmark,current,match / off,3,step_max_ms,9.945,9.771,10.652
+loose_terrain_benchmark,current,match / off,3,frame_p95_ms,4.678,4.416,5.399
+loose_terrain_benchmark,current,combat / round,3,step_mean_ms,3.6,3.358,3.624
+loose_terrain_benchmark,current,combat / round,3,step_p50_ms,4.761,4.451,4.81
+loose_terrain_benchmark,current,combat / round,3,step_p95_ms,6.495,6.13,6.521
+loose_terrain_benchmark,current,combat / round,3,step_p99_ms,6.963,6.573,6.988
+loose_terrain_benchmark,current,combat / round,3,step_max_ms,8.705,8.222,8.834
+loose_terrain_benchmark,current,combat / round,3,frame_p95_ms,0.296,0.273,0.297
+loose_terrain_benchmark,current,match / round,3,step_mean_ms,11.374,10.898,11.808
+loose_terrain_benchmark,current,match / round,3,step_p50_ms,12.374,11.776,12.866
+loose_terrain_benchmark,current,match / round,3,step_p95_ms,15.196,14.622,15.545
+loose_terrain_benchmark,current,match / round,3,step_p99_ms,18.418,18.026,19.49
+loose_terrain_benchmark,current,match / round,3,step_max_ms,48.466,46.091,50.557
+loose_terrain_benchmark,current,match / round,3,frame_p95_ms,4.363,4.013,4.388
+loose_terrain_benchmark,current,combat / angular,3,step_mean_ms,3.905,3.799,4.177
+loose_terrain_benchmark,current,combat / angular,3,step_p50_ms,4.69,4.555,5.078
+loose_terrain_benchmark,current,combat / angular,3,step_p95_ms,7.144,6.996,7.516
+loose_terrain_benchmark,current,combat / angular,3,step_p99_ms,7.953,7.779,8.273
+loose_terrain_benchmark,current,combat / angular,3,step_max_ms,19.446,15.455,22.231
+loose_terrain_benchmark,current,combat / angular,3,frame_p95_ms,0.33,0.32,0.346
+loose_terrain_benchmark,current,match / angular,3,step_mean_ms,12.038,11.62,12.506
+loose_terrain_benchmark,current,match / angular,3,step_p50_ms,13.252,12.799,13.651
+loose_terrain_benchmark,current,match / angular,3,step_p95_ms,16.008,15.507,16.468
+loose_terrain_benchmark,current,match / angular,3,step_p99_ms,17.12,16.415,17.753
+loose_terrain_benchmark,current,match / angular,3,step_max_ms,26.982,23.665,29.401
+loose_terrain_benchmark,current,match / angular,3,frame_p95_ms,3.9,3.82,4.153
+soil_mpm_lab,current,flat / pour / mpm,3,max_ms,3.910737,3.708776,6.678819
+soil_mpm_lab,current,flat / pour / mpm,3,mean_ms,2.5383227049999997,2.4217682300000014,2.8643638783333327
+soil_mpm_lab,current,flat / pour / mpm,3,p50_ms,2.757823,2.6238609999999998,2.990201
+soil_mpm_lab,current,flat / pour / mpm,3,p95_ms,3.1432249999999997,3.133616,3.687766
+soil_mpm_lab,current,flat / bank / mpm,3,max_ms,6.476599,5.7719570000000004,14.12885
+soil_mpm_lab,current,flat / bank / mpm,3,mean_ms,4.92676361,4.6243248316666685,5.509903213333328
+soil_mpm_lab,current,flat / bank / mpm,3,p50_ms,4.925652,4.667765,5.2855039999999995
+soil_mpm_lab,current,flat / bank / mpm,3,p95_ms,5.586015,5.138704,6.454229
+soil_mpm_lab,current,flat / blasts / mpm,3,max_ms,12.064226000000001,10.860365999999999,22.78768
+soil_mpm_lab,current,flat / blasts / mpm,3,mean_ms,9.318777801666664,8.873399618333336,10.54117925666668
+soil_mpm_lab,current,flat / blasts / mpm,3,p50_ms,9.338493999999999,8.950775,10.155329
+soil_mpm_lab,current,flat / blasts / mpm,3,p95_ms,10.419799000000001,9.845488,12.126375999999999
+soil_mpm_lab,current,moving-planet / pour / mpm,3,max_ms,7.612105,3.5892950000000003,7.61764
+soil_mpm_lab,current,moving-planet / pour / mpm,3,mean_ms,3.0228812799999996,2.774159178333334,3.1571044850000005
+soil_mpm_lab,current,moving-planet / pour / mpm,3,p50_ms,3.3438169999999996,3.033412,3.465214
+soil_mpm_lab,current,moving-planet / pour / mpm,3,p95_ms,3.633666,3.226317,3.819801
+soil_mpm_lab,current,moving-planet / bank / mpm,3,max_ms,9.259811,7.964638,17.126811
+soil_mpm_lab,current,moving-planet / bank / mpm,3,mean_ms,7.796208683333336,7.037474023333331,8.155570943333327
+soil_mpm_lab,current,moving-planet / bank / mpm,3,p50_ms,7.8423620000000005,7.064332,7.968691999999999
+soil_mpm_lab,current,moving-planet / bank / mpm,3,p95_ms,8.375097,7.374496000000001,8.721663
+soil_mpm_lab,current,moving-planet / blasts / mpm,3,max_ms,13.645672,12.347906,27.912058
+soil_mpm_lab,current,moving-planet / blasts / mpm,3,mean_ms,11.36293134333334,10.27494826166667,12.040163473333342
+soil_mpm_lab,current,moving-planet / blasts / mpm,3,p50_ms,11.283623,10.225762,11.616051
+soil_mpm_lab,current,moving-planet / blasts / mpm,3,p95_ms,12.474518,11.087622999999999,13.380176
+soil_mpm_lab,current,flat / pour / grains,3,max_ms,14.171525,12.731384,18.108384
+soil_mpm_lab,current,flat / pour / grains,3,mean_ms,4.250087881666665,4.016387358333337,4.356437663333337
+soil_mpm_lab,current,flat / pour / grains,3,p50_ms,4.051272,3.87607,4.234586999999999
+soil_mpm_lab,current,flat / pour / grains,3,p95_ms,7.014168000000001,6.321099,7.135115
+soil_mpm_lab,current,flat / bank / grains,3,max_ms,25.807266,25.489358,31.257763
+soil_mpm_lab,current,flat / bank / grains,3,mean_ms,11.002974028333334,10.599351155000013,11.577954570000001
+soil_mpm_lab,current,flat / bank / grains,3,p50_ms,9.534806999999999,9.107255,10.005419
+soil_mpm_lab,current,flat / bank / grains,3,p95_ms,18.84621,18.679654,19.634712
+soil_mpm_lab,current,flat / blasts / grains,3,max_ms,71.790276,71.34062300000001,75.909189
+soil_mpm_lab,current,flat / blasts / grains,3,mean_ms,25.070026563333315,24.13900275333333,25.98588667833334
+soil_mpm_lab,current,flat / blasts / grains,3,p50_ms,23.62592,22.620798,24.556497
+soil_mpm_lab,current,flat / blasts / grains,3,p95_ms,31.482703,31.34745,32.597472
+soil_mpm_lab,current,moving-planet / pour / grains,3,max_ms,13.385823,12.518394,13.719743
+soil_mpm_lab,current,moving-planet / pour / grains,3,mean_ms,4.635672171666667,4.4555181416666665,4.816008478333333
+soil_mpm_lab,current,moving-planet / pour / grains,3,p50_ms,4.6199509999999995,4.3916379999999995,4.826026
+soil_mpm_lab,current,moving-planet / pour / grains,3,p95_ms,7.5870690000000005,7.462940000000001,7.9889209999999995
+soil_mpm_lab,current,moving-planet / bank / grains,3,max_ms,27.373005999999997,25.269643000000002,29.596427000000002
+soil_mpm_lab,current,moving-planet / bank / grains,3,mean_ms,11.419663221666656,10.946706361666672,11.84194708333334
+soil_mpm_lab,current,moving-planet / bank / grains,3,p50_ms,10.898348,10.370835,11.334090999999999
+soil_mpm_lab,current,moving-planet / bank / grains,3,p95_ms,14.275443000000001,13.841761,14.409801999999999
+soil_mpm_lab,current,moving-planet / blasts / grains,3,max_ms,56.811461,55.732522,57.961738
+soil_mpm_lab,current,moving-planet / blasts / grains,3,mean_ms,28.454566591666662,27.201801935000017,29.005315391666656
+soil_mpm_lab,current,moving-planet / blasts / grains,3,p50_ms,26.032802,24.961014,26.635493999999998
+soil_mpm_lab,current,moving-planet / blasts / grains,3,p95_ms,45.922335000000004,43.368708,46.905589
+soil_mpm_lab,current,flat / pour / frictionless,3,max_ms,4.252196,3.857867,4.299512999999999
+soil_mpm_lab,current,flat / pour / frictionless,3,mean_ms,2.937140701666668,2.784164195,2.994019394999998
+soil_mpm_lab,current,flat / pour / frictionless,3,p50_ms,3.173801,3.083394,3.207744
+soil_mpm_lab,current,flat / pour / frictionless,3,p95_ms,3.8373299999999997,3.483649,3.8386280000000004
+soil_mpm_lab,current,flat / bank / frictionless,3,max_ms,7.082592,6.55106,7.138763
+soil_mpm_lab,current,flat / bank / frictionless,3,mean_ms,5.642570653333332,5.4402791933333345,5.839850391666672
+soil_mpm_lab,current,flat / bank / frictionless,3,p50_ms,5.50639,5.359591,5.755735
+soil_mpm_lab,current,flat / bank / frictionless,3,p95_ms,6.470232,6.278156,6.792781000000001
+soil_mpm_lab,current,flat / blasts / frictionless,3,max_ms,12.781744,12.144613,13.542729
+soil_mpm_lab,current,flat / blasts / frictionless,3,mean_ms,10.701284544999982,10.134275463333326,10.761929574999995
+soil_mpm_lab,current,flat / blasts / frictionless,3,p50_ms,10.555518,10.01295,10.66332
+soil_mpm_lab,current,flat / blasts / frictionless,3,p95_ms,11.953418000000001,11.430879999999998,12.577793999999999
+soil_mpm_lab,current,moving-planet / pour / frictionless,3,max_ms,4.150493,4.100605,4.4295860000000005
+soil_mpm_lab,current,moving-planet / pour / frictionless,3,mean_ms,3.216270591666667,3.111243143333334,3.3695421650000013
+soil_mpm_lab,current,moving-planet / pour / frictionless,3,p50_ms,3.5542030000000002,3.4132979999999997,3.702154
+soil_mpm_lab,current,moving-planet / pour / frictionless,3,p95_ms,3.883682,3.861737,4.01722
+soil_mpm_lab,current,moving-planet / bank / frictionless,3,max_ms,10.866892,10.071023,11.235289
+soil_mpm_lab,current,moving-planet / bank / frictionless,3,mean_ms,8.780439703333334,8.296021008333328,8.95944014333333
+soil_mpm_lab,current,moving-planet / bank / frictionless,3,p50_ms,8.748093,8.271801,9.019972
+soil_mpm_lab,current,moving-planet / bank / frictionless,3,p95_ms,9.908507,9.323105,10.133975999999999
+soil_mpm_lab,current,moving-planet / blasts / frictionless,3,max_ms,14.274461,13.348934,28.809690999999997
+soil_mpm_lab,current,moving-planet / blasts / frictionless,3,mean_ms,12.141274934999993,11.550233246666664,12.603097064999996
+soil_mpm_lab,current,moving-planet / blasts / frictionless,3,p50_ms,12.038226000000002,11.447083000000001,12.552000000000001
+soil_mpm_lab,current,moving-planet / blasts / frictionless,3,p95_ms,13.276157,12.633682,13.666780999999999
+terrain_benchmark,baseline,1 / craters,3,generation_ms,1.572,1.494,1.665
+terrain_benchmark,baseline,1 / craters,3,initial_geometry_ms,1.622,1.605,1.712
+terrain_benchmark,baseline,1 / craters,3,initial_physics_ms,1.35,1.263,1.373
+terrain_benchmark,baseline,1 / craters,3,edit_p95_ms,0.008,0.008,0.009
+terrain_benchmark,baseline,1 / craters,3,geometry_p95_ms,0.051,0.05,0.057
+terrain_benchmark,baseline,1 / craters,3,collider_p95_ms,0.083,0.081,0.09
+terrain_benchmark,baseline,1 / craters,3,step_p95_ms,0.168,0.16,0.178
+terrain_benchmark,baseline,1 / craters,3,commit_max_ms,0.186,0.158,0.194
+terrain_benchmark,baseline,1 / tunnels,3,generation_ms,1.371,1.345,1.518
+terrain_benchmark,baseline,1 / tunnels,3,initial_geometry_ms,1.552,1.528,1.748
+terrain_benchmark,baseline,1 / tunnels,3,initial_physics_ms,0.942,0.935,1.017
+terrain_benchmark,baseline,1 / tunnels,3,edit_p95_ms,0.178,0.17,0.2
+terrain_benchmark,baseline,1 / tunnels,3,geometry_p95_ms,0.23,0.23,0.261
+terrain_benchmark,baseline,1 / tunnels,3,collider_p95_ms,0.22,0.217,0.274
+terrain_benchmark,baseline,1 / tunnels,3,step_p95_ms,0.167,0.165,0.243
+terrain_benchmark,baseline,1 / tunnels,3,commit_max_ms,0.652,0.642,0.797
+terrain_benchmark,baseline,0.5 / craters,3,generation_ms,6.558,6.157,6.767
+terrain_benchmark,baseline,0.5 / craters,3,initial_geometry_ms,7.483,6.871,7.929
+terrain_benchmark,baseline,0.5 / craters,3,initial_physics_ms,3.86,3.382,4.014
+terrain_benchmark,baseline,0.5 / craters,3,edit_p95_ms,0.026,0.025,0.033
+terrain_benchmark,baseline,0.5 / craters,3,geometry_p95_ms,0.113,0.103,0.127
+terrain_benchmark,baseline,0.5 / craters,3,collider_p95_ms,0.204,0.19,0.279
+terrain_benchmark,baseline,0.5 / craters,3,step_p95_ms,0.723,0.67,0.939
+terrain_benchmark,baseline,0.5 / craters,3,commit_max_ms,0.392,0.332,0.652
+terrain_benchmark,baseline,0.5 / tunnels,3,generation_ms,5.705,5.361,6.496
+terrain_benchmark,baseline,0.5 / tunnels,3,initial_geometry_ms,7.477,7.271,8.048
+terrain_benchmark,baseline,0.5 / tunnels,3,initial_physics_ms,3.782,3.535,4.366
+terrain_benchmark,baseline,0.5 / tunnels,3,edit_p95_ms,0.468,0.46,0.493
+terrain_benchmark,baseline,0.5 / tunnels,3,geometry_p95_ms,0.548,0.536,0.622
+terrain_benchmark,baseline,0.5 / tunnels,3,collider_p95_ms,0.7,0.696,0.726
+terrain_benchmark,baseline,0.5 / tunnels,3,step_p95_ms,0.907,0.904,1.075
+terrain_benchmark,baseline,0.5 / tunnels,3,commit_max_ms,2.033,1.88,2.086
+terrain_benchmark,current,1 / craters,3,generation_ms,1.611,1.525,1.744
+terrain_benchmark,current,1 / craters,3,initial_geometry_ms,1.661,1.618,1.872
+terrain_benchmark,current,1 / craters,3,initial_physics_ms,1.426,1.39,1.435
+terrain_benchmark,current,1 / craters,3,edit_p95_ms,0.012,0.011,0.018
+terrain_benchmark,current,1 / craters,3,geometry_p95_ms,0.059,0.058,0.082
+terrain_benchmark,current,1 / craters,3,collider_p95_ms,0.11,0.102,0.192
+terrain_benchmark,current,1 / craters,3,step_p95_ms,0.193,0.191,0.273
+terrain_benchmark,current,1 / craters,3,commit_max_ms,0.222,0.211,0.398
+terrain_benchmark,current,1 / tunnels,3,generation_ms,1.472,1.383,1.559
+terrain_benchmark,current,1 / tunnels,3,initial_geometry_ms,1.808,1.555,1.871
+terrain_benchmark,current,1 / tunnels,3,initial_physics_ms,1.2,1.135,1.306
+terrain_benchmark,current,1 / tunnels,3,edit_p95_ms,0.207,0.187,0.216
+terrain_benchmark,current,1 / tunnels,3,geometry_p95_ms,0.268,0.254,0.295
+terrain_benchmark,current,1 / tunnels,3,collider_p95_ms,0.316,0.24,0.36
+terrain_benchmark,current,1 / tunnels,3,step_p95_ms,0.289,0.206,0.293
+terrain_benchmark,current,1 / tunnels,3,commit_max_ms,0.835,0.748,0.961
+terrain_benchmark,current,0.5 / craters,3,generation_ms,6.664,6.118,6.673
+terrain_benchmark,current,0.5 / craters,3,initial_geometry_ms,7.081,6.434,7.083
+terrain_benchmark,current,0.5 / craters,3,initial_physics_ms,3.709,3.404,3.788
+terrain_benchmark,current,0.5 / craters,3,edit_p95_ms,0.034,0.031,0.037
+terrain_benchmark,current,0.5 / craters,3,geometry_p95_ms,0.16,0.155,0.167
+terrain_benchmark,current,0.5 / craters,3,collider_p95_ms,0.321,0.311,0.355
+terrain_benchmark,current,0.5 / craters,3,step_p95_ms,0.995,0.983,1.034
+terrain_benchmark,current,0.5 / craters,3,commit_max_ms,0.709,0.675,0.757
+terrain_benchmark,current,0.5 / tunnels,3,generation_ms,6.179,6.173,6.351
+terrain_benchmark,current,0.5 / tunnels,3,initial_geometry_ms,6.715,6.485,6.926
+terrain_benchmark,current,0.5 / tunnels,3,initial_physics_ms,3.453,3.409,3.521
+terrain_benchmark,current,0.5 / tunnels,3,edit_p95_ms,0.492,0.456,0.531
+terrain_benchmark,current,0.5 / tunnels,3,geometry_p95_ms,0.55,0.545,0.606
+terrain_benchmark,current,0.5 / tunnels,3,collider_p95_ms,0.705,0.636,0.707
+terrain_benchmark,current,0.5 / tunnels,3,step_p95_ms,0.995,0.945,0.997
+terrain_benchmark,current,0.5 / tunnels,3,commit_max_ms,2.045,1.971,2.108
+fragment_benchmark,baseline,equator / 20,3,cut_step_ms,0.778,0.728,0.831
+fragment_benchmark,baseline,equator / 20,3,connectivity_ms,0.274,0.261,0.285
+fragment_benchmark,baseline,equator / 20,3,step_p95_ms,0.137,0.131,0.152
+fragment_benchmark,baseline,equator / 20,3,step_max_ms,0.367,0.358,0.615
+fragment_benchmark,baseline,equator / 20,3,frame_p95_ms,0.054,0.052,0.06
+fragment_benchmark,baseline,equator / 20,3,frame_max_ms,0.104,0.087,0.145
+fragment_benchmark,baseline,blocks / 20,3,cut_step_ms,2.079,1.927,2.38
+fragment_benchmark,baseline,blocks / 20,3,connectivity_ms,0.388,0.37,0.435
+fragment_benchmark,baseline,blocks / 20,3,step_p95_ms,3.355,3.188,3.418
+fragment_benchmark,baseline,blocks / 20,3,step_max_ms,3.872,3.804,4.616
+fragment_benchmark,baseline,blocks / 20,3,frame_p95_ms,0.24,0.236,0.266
+fragment_benchmark,baseline,blocks / 20,3,frame_max_ms,0.7,0.5,0.75
+fragment_benchmark,baseline,equator / 150,3,cut_step_ms,37.957,34.779,39.384
+fragment_benchmark,baseline,equator / 150,3,connectivity_ms,19.787,19.13,21.521
+fragment_benchmark,baseline,equator / 150,3,step_p95_ms,3.13,3.034,3.216
+fragment_benchmark,baseline,equator / 150,3,step_max_ms,3.549,3.549,3.814
+fragment_benchmark,baseline,equator / 150,3,frame_p95_ms,1.02,0.972,1.025
+fragment_benchmark,baseline,equator / 150,3,frame_max_ms,1.399,1.393,1.473
+fragment_benchmark,current,equator / 20,3,cut_step_ms,0.717,0.71,0.802
+fragment_benchmark,current,equator / 20,3,connectivity_ms,0.258,0.25,0.287
+fragment_benchmark,current,equator / 20,3,step_p95_ms,0.135,0.131,0.14
+fragment_benchmark,current,equator / 20,3,step_max_ms,0.336,0.332,0.376
+fragment_benchmark,current,equator / 20,3,frame_p95_ms,0.053,0.053,0.059
+fragment_benchmark,current,equator / 20,3,frame_max_ms,0.107,0.096,0.118
+fragment_benchmark,current,blocks / 20,3,cut_step_ms,2.06,1.968,2.111
+fragment_benchmark,current,blocks / 20,3,connectivity_ms,0.388,0.388,0.404
+fragment_benchmark,current,blocks / 20,3,step_p95_ms,3.238,3.143,3.348
+fragment_benchmark,current,blocks / 20,3,step_max_ms,3.887,3.816,4.079
+fragment_benchmark,current,blocks / 20,3,frame_p95_ms,0.231,0.227,0.251
+fragment_benchmark,current,blocks / 20,3,frame_max_ms,0.531,0.414,0.593
+fragment_benchmark,current,equator / 150,3,cut_step_ms,39.824,35.783,40.677
+fragment_benchmark,current,equator / 150,3,connectivity_ms,21.884,18.888,22.203
+fragment_benchmark,current,equator / 150,3,step_p95_ms,3.046,3.022,3.129
+fragment_benchmark,current,equator / 150,3,step_max_ms,3.625,3.579,3.697
+fragment_benchmark,current,equator / 150,3,frame_p95_ms,1.036,1.017,1.093
+fragment_benchmark,current,equator / 150,3,frame_max_ms,1.397,1.392,1.491
+mining_benchmark,baseline,Precision / 20,3,step_p95_ms,0.344,0.321,0.354
+mining_benchmark,baseline,Precision / 20,3,step_max_ms,0.546,0.415,0.72
+mining_benchmark,baseline,Precision / 20,3,frame_build_p95_ms,0.059,0.051,0.065
+mining_benchmark,baseline,Precision / 20,3,frame_build_max_ms,0.159,0.127,0.165
+mining_benchmark,baseline,Drill / 20,3,step_p95_ms,0.158,0.136,0.172
+mining_benchmark,baseline,Drill / 20,3,step_max_ms,0.721,0.514,0.911
+mining_benchmark,baseline,Drill / 20,3,frame_build_p95_ms,0.065,0.056,0.069
+mining_benchmark,baseline,Drill / 20,3,frame_build_max_ms,0.189,0.127,0.193
+mining_benchmark,baseline,Excavator / 20,3,step_p95_ms,0.153,0.142,0.164
+mining_benchmark,baseline,Excavator / 20,3,step_max_ms,0.697,0.557,0.769
+mining_benchmark,baseline,Excavator / 20,3,frame_build_p95_ms,0.074,0.066,0.077
+mining_benchmark,baseline,Excavator / 20,3,frame_build_max_ms,0.117,0.114,0.18
+mining_benchmark,baseline,Precision / 150,3,step_p95_ms,4.686,4.329,4.704
+mining_benchmark,baseline,Precision / 150,3,step_max_ms,21.35,20.328,24.024
+mining_benchmark,baseline,Precision / 150,3,frame_build_p95_ms,0.831,0.83,0.847
+mining_benchmark,baseline,Precision / 150,3,frame_build_max_ms,1.306,1.286,1.344
+mining_benchmark,baseline,Drill / 150,3,step_p95_ms,4.714,4.469,4.866
+mining_benchmark,baseline,Drill / 150,3,step_max_ms,22.052,20.111,22.062
+mining_benchmark,baseline,Drill / 150,3,frame_build_p95_ms,0.893,0.838,0.919
+mining_benchmark,baseline,Drill / 150,3,frame_build_max_ms,1.308,1.13,1.434
+mining_benchmark,baseline,Excavator / 150,3,step_p95_ms,4.564,4.249,4.712
+mining_benchmark,baseline,Excavator / 150,3,step_max_ms,21.481,19.877,22.061
+mining_benchmark,baseline,Excavator / 150,3,frame_build_p95_ms,0.959,0.949,1.008
+mining_benchmark,baseline,Excavator / 150,3,frame_build_max_ms,1.418,1.385,1.504
+mining_benchmark,current,Precision / 20,3,step_p95_ms,0.357,0.322,0.377
+mining_benchmark,current,Precision / 20,3,step_max_ms,0.651,0.557,0.788
+mining_benchmark,current,Precision / 20,3,frame_build_p95_ms,0.06,0.052,0.063
+mining_benchmark,current,Precision / 20,3,frame_build_max_ms,0.15,0.12,0.179
+mining_benchmark,current,Drill / 20,3,step_p95_ms,0.153,0.139,0.166
+mining_benchmark,current,Drill / 20,3,step_max_ms,0.855,0.559,0.865
+mining_benchmark,current,Drill / 20,3,frame_build_p95_ms,0.066,0.058,0.072
+mining_benchmark,current,Drill / 20,3,frame_build_max_ms,0.148,0.117,0.172
+mining_benchmark,current,Excavator / 20,3,step_p95_ms,0.145,0.139,0.155
+mining_benchmark,current,Excavator / 20,3,step_max_ms,0.731,0.433,0.812
+mining_benchmark,current,Excavator / 20,3,frame_build_p95_ms,0.077,0.075,0.079
+mining_benchmark,current,Excavator / 20,3,frame_build_max_ms,0.185,0.157,0.291
+mining_benchmark,current,Precision / 150,3,step_p95_ms,4.646,4.511,4.874
+mining_benchmark,current,Precision / 150,3,step_max_ms,23.641,22.239,24.844
+mining_benchmark,current,Precision / 150,3,frame_build_p95_ms,0.887,0.808,0.887
+mining_benchmark,current,Precision / 150,3,frame_build_max_ms,1.428,1.359,1.437
+mining_benchmark,current,Drill / 150,3,step_p95_ms,4.751,4.495,4.883
+mining_benchmark,current,Drill / 150,3,step_max_ms,22.163,20.902,23.114
+mining_benchmark,current,Drill / 150,3,frame_build_p95_ms,0.891,0.866,0.987
+mining_benchmark,current,Drill / 150,3,frame_build_max_ms,1.284,1.218,1.558
+mining_benchmark,current,Excavator / 150,3,step_p95_ms,4.591,4.408,4.677
+mining_benchmark,current,Excavator / 150,3,step_max_ms,21.515,20.997,23.563
+mining_benchmark,current,Excavator / 150,3,frame_build_p95_ms,1.011,1.002,1.069
+mining_benchmark,current,Excavator / 150,3,frame_build_max_ms,1.419,1.403,1.501
+impact_benchmark,baseline,equator / 20 / false,3,cut_ms,0.793,0.778,0.853
+impact_benchmark,baseline,equator / 20 / false,3,step_p95_ms,0.148,0.133,0.293
+impact_benchmark,baseline,equator / 20 / false,3,step_max_ms,0.37,0.363,0.503
+impact_benchmark,baseline,equator / 20 / false,3,frame_p95_ms,0.055,0.052,0.102
+impact_benchmark,baseline,equator / 20 / false,3,frame_max_ms,0.238,0.107,0.276
+impact_benchmark,baseline,equator / 20 / true,3,cut_ms,0.761,0.692,0.786
+impact_benchmark,baseline,equator / 20 / true,3,step_p95_ms,0.157,0.148,0.158
+impact_benchmark,baseline,equator / 20 / true,3,step_max_ms,0.545,0.487,0.699
+impact_benchmark,baseline,equator / 20 / true,3,frame_p95_ms,0.06,0.056,0.06
+impact_benchmark,baseline,equator / 20 / true,3,frame_max_ms,0.125,0.107,0.148
+impact_benchmark,baseline,blocks / 20 / true,3,cut_ms,2.5,2.103,2.752
+impact_benchmark,baseline,blocks / 20 / true,3,step_p95_ms,4.241,4.074,4.324
+impact_benchmark,baseline,blocks / 20 / true,3,step_max_ms,4.783,4.755,8.556
+impact_benchmark,baseline,blocks / 20 / true,3,frame_p95_ms,0.357,0.345,0.358
+impact_benchmark,baseline,blocks / 20 / true,3,frame_max_ms,0.703,0.701,0.79
+impact_benchmark,baseline,blocks / 40 / true,3,cut_ms,9.438,9.239,10.356
+impact_benchmark,baseline,blocks / 40 / true,3,step_p95_ms,17.935,17.433,18.279
+impact_benchmark,baseline,blocks / 40 / true,3,step_max_ms,20.286,19.778,20.826
+impact_benchmark,baseline,blocks / 40 / true,3,frame_p95_ms,0.96,0.948,0.979
+impact_benchmark,baseline,blocks / 40 / true,3,frame_max_ms,1.428,1.37,1.466
+impact_benchmark,baseline,equator / 150 / true,3,cut_ms,38.274,34.761,38.652
+impact_benchmark,baseline,equator / 150 / true,3,step_p95_ms,3.261,3.104,3.296
+impact_benchmark,baseline,equator / 150 / true,3,step_max_ms,23.325,23.301,23.879
+impact_benchmark,baseline,equator / 150 / true,3,frame_p95_ms,1.102,1.09,1.143
+impact_benchmark,baseline,equator / 150 / true,3,frame_max_ms,1.696,1.636,1.794
+impact_benchmark,current,equator / 20 / false,3,cut_ms,0.745,0.699,0.82
+impact_benchmark,current,equator / 20 / false,3,step_p95_ms,0.135,0.13,0.141
+impact_benchmark,current,equator / 20 / false,3,step_max_ms,0.347,0.329,0.402
+impact_benchmark,current,equator / 20 / false,3,frame_p95_ms,0.053,0.05,0.056
+impact_benchmark,current,equator / 20 / false,3,frame_max_ms,0.101,0.096,0.215
+impact_benchmark,current,equator / 20 / true,3,cut_ms,0.698,0.691,0.738
+impact_benchmark,current,equator / 20 / true,3,step_p95_ms,0.147,0.145,0.161
+impact_benchmark,current,equator / 20 / true,3,step_max_ms,0.634,0.498,0.638
+impact_benchmark,current,equator / 20 / true,3,frame_p95_ms,0.058,0.057,0.064
+impact_benchmark,current,equator / 20 / true,3,frame_max_ms,0.13,0.128,0.207
+impact_benchmark,current,blocks / 20 / true,3,cut_ms,2.399,2.37,2.943
+impact_benchmark,current,blocks / 20 / true,3,step_p95_ms,4.172,3.991,4.37
+impact_benchmark,current,blocks / 20 / true,3,step_max_ms,4.751,4.605,7.204
+impact_benchmark,current,blocks / 20 / true,3,frame_p95_ms,0.345,0.343,0.366
+impact_benchmark,current,blocks / 20 / true,3,frame_max_ms,0.64,0.624,0.669
+impact_benchmark,current,blocks / 40 / true,3,cut_ms,9.379,8.374,9.409
+impact_benchmark,current,blocks / 40 / true,3,step_p95_ms,17.659,16.993,17.923
+impact_benchmark,current,blocks / 40 / true,3,step_max_ms,19.544,19.211,19.672
+impact_benchmark,current,blocks / 40 / true,3,frame_p95_ms,0.933,0.92,0.937
+impact_benchmark,current,blocks / 40 / true,3,frame_max_ms,1.402,1.397,1.421
+impact_benchmark,current,equator / 150 / true,3,cut_ms,34.244,33.954,35.532
+impact_benchmark,current,equator / 150 / true,3,step_p95_ms,3.149,3.057,3.193
+impact_benchmark,current,equator / 150 / true,3,step_max_ms,22.696,21.527,24.265
+impact_benchmark,current,equator / 150 / true,3,frame_p95_ms,1.182,1.062,1.194
+impact_benchmark,current,equator / 150 / true,3,frame_max_ms,1.749,1.655,1.939
+granular_sandbox,baseline,flat / Round,3,native_update.max_ms,4.355492,4.087179,4.869179000000001
+granular_sandbox,baseline,flat / Round,3,native_update.mean_ms,1.688000867449664,1.5830529328859062,1.742116243288591
+granular_sandbox,baseline,flat / Round,3,native_update.p95_ms,3.2769660000000003,3.074598,3.3972719999999996
+granular_sandbox,baseline,flat / Round,3,event_update.max_ms,6.090973,4.991067,6.4330810000000005
+granular_sandbox,baseline,flat / Round,3,event_update.mean_ms,3.35256675,3.22266325,3.8394275
+granular_sandbox,baseline,flat / Round,3,event_update.p95_ms,6.090973,4.991067,6.4330810000000005
+granular_sandbox,baseline,flat / Round,3,frame_construction.max_ms,0.424199,0.392885,0.6407710000000001
+granular_sandbox,baseline,flat / Round,3,frame_construction.mean_ms,0.10307733666666664,0.09723266166666669,0.10494927499999997
+granular_sandbox,baseline,flat / Round,3,frame_construction.p95_ms,0.185831,0.17855400000000002,0.186498
+granular_sandbox,baseline,flat / Round + grip,3,native_update.max_ms,4.600563,4.24353,4.676589
+granular_sandbox,baseline,flat / Round + grip,3,native_update.mean_ms,1.6333623506711406,1.5111458624161078,1.657304825503355
+granular_sandbox,baseline,flat / Round + grip,3,native_update.p95_ms,3.0720169999999998,3.055172,3.1007830000000003
+granular_sandbox,baseline,flat / Round + grip,3,event_update.max_ms,4.36177,3.9890689999999998,4.381593
+granular_sandbox,baseline,flat / Round + grip,3,event_update.mean_ms,2.9690012500000003,2.6459815,3.00288325
+granular_sandbox,baseline,flat / Round + grip,3,event_update.p95_ms,4.36177,3.9890689999999998,4.381593
+granular_sandbox,baseline,flat / Round + grip,3,frame_construction.max_ms,0.34244,0.302034,0.40807
+granular_sandbox,baseline,flat / Round + grip,3,frame_construction.mean_ms,0.1056133516666666,0.09723706166666675,0.10690958999999997
+granular_sandbox,baseline,flat / Round + grip,3,frame_construction.p95_ms,0.18212799999999998,0.17859,0.182479
+granular_sandbox,baseline,flat / Angular,3,native_update.max_ms,6.12446,5.790144,6.738041
+granular_sandbox,baseline,flat / Angular,3,native_update.mean_ms,1.797069927852348,1.7000351459731544,1.8570667902684566
+granular_sandbox,baseline,flat / Angular,3,native_update.p95_ms,3.7384150000000003,3.422223,3.782979
+granular_sandbox,baseline,flat / Angular,3,event_update.max_ms,5.496702,4.312399,6.300679
+granular_sandbox,baseline,flat / Angular,3,event_update.mean_ms,3.08531525,2.8999235,3.43293775
+granular_sandbox,baseline,flat / Angular,3,event_update.p95_ms,5.496702,4.312399,6.300679
+granular_sandbox,baseline,flat / Angular,3,frame_construction.max_ms,0.404551,0.35768099999999997,0.460643
+granular_sandbox,baseline,flat / Angular,3,frame_construction.mean_ms,0.1270126699999999,0.12192806000000002,0.1325612616666666
+granular_sandbox,baseline,flat / Angular,3,frame_construction.p95_ms,0.220201,0.218164,0.236053
+granular_sandbox,baseline,slope / Round,3,native_update.max_ms,3.6345359999999998,3.598499,3.7055830000000003
+granular_sandbox,baseline,slope / Round,3,native_update.mean_ms,1.3752834731543633,1.3186273355704703,1.4052051929530203
+granular_sandbox,baseline,slope / Round,3,native_update.p95_ms,2.738947,2.5972690000000003,2.77386
+granular_sandbox,baseline,slope / Round,3,event_update.max_ms,4.004061,3.836312,4.087513
+granular_sandbox,baseline,slope / Round,3,event_update.mean_ms,2.37573425,2.28567025,2.378609
+granular_sandbox,baseline,slope / Round,3,event_update.p95_ms,4.004061,3.836312,4.087513
+granular_sandbox,baseline,slope / Round,3,frame_construction.max_ms,0.346995,0.308571,0.491495
+granular_sandbox,baseline,slope / Round,3,frame_construction.mean_ms,0.10387738166666666,0.10019977333333337,0.10530849166666664
+granular_sandbox,baseline,slope / Round,3,frame_construction.p95_ms,0.19185,0.191034,0.195498
+granular_sandbox,baseline,slope / Round + grip,3,native_update.max_ms,3.633591,3.5553999999999997,4.1545119999999995
+granular_sandbox,baseline,slope / Round + grip,3,native_update.mean_ms,1.3373430469798664,1.253379803691275,1.3550831409395963
+granular_sandbox,baseline,slope / Round + grip,3,native_update.p95_ms,2.633726,2.420086,2.638639
+granular_sandbox,baseline,slope / Round + grip,3,event_update.max_ms,4.022264,3.5725919999999998,4.953171
+granular_sandbox,baseline,slope / Round + grip,3,event_update.mean_ms,2.52995425,2.14660675,2.68522675
+granular_sandbox,baseline,slope / Round + grip,3,event_update.p95_ms,4.022264,3.5725919999999998,4.953171
+granular_sandbox,baseline,slope / Round + grip,3,frame_construction.max_ms,0.380033,0.352514,0.442829
+granular_sandbox,baseline,slope / Round + grip,3,frame_construction.mean_ms,0.10417756166666649,0.09907261833333339,0.10659695333333342
+granular_sandbox,baseline,slope / Round + grip,3,frame_construction.p95_ms,0.19257200000000002,0.18658999999999998,0.197943
+granular_sandbox,baseline,slope / Angular,3,native_update.max_ms,5.271704000000001,5.13938,5.953031
+granular_sandbox,baseline,slope / Angular,3,native_update.mean_ms,1.8790310352348993,1.805821696308725,1.901697167785234
+granular_sandbox,baseline,slope / Angular,3,native_update.p95_ms,4.065264,3.812331,4.1759379999999995
+granular_sandbox,baseline,slope / Angular,3,event_update.max_ms,5.083744,4.653692,5.309711
+granular_sandbox,baseline,slope / Angular,3,event_update.mean_ms,3.12320175,2.9159420000000003,3.234133
+granular_sandbox,baseline,slope / Angular,3,event_update.p95_ms,5.083744,4.653692,5.309711
+granular_sandbox,baseline,slope / Angular,3,frame_construction.max_ms,0.390644,0.341736,0.394996
+granular_sandbox,baseline,slope / Angular,3,frame_construction.mean_ms,0.13648888500000003,0.1344432850000001,0.13661924000000006
+granular_sandbox,baseline,slope / Angular,3,frame_construction.p95_ms,0.24155300000000002,0.23335,0.243016
+granular_sandbox,baseline,moving-planet / Round,3,native_update.max_ms,4.143512,4.016514,4.4183699999999995
+granular_sandbox,baseline,moving-planet / Round,3,native_update.mean_ms,1.5627555234899337,1.4981528003355709,1.6036278372483221
+granular_sandbox,baseline,moving-planet / Round,3,native_update.p95_ms,3.3205880000000003,3.168282,3.397854
+granular_sandbox,baseline,moving-planet / Round,3,event_update.max_ms,4.48712,4.417149,5.0473360000000005
+granular_sandbox,baseline,moving-planet / Round,3,event_update.mean_ms,2.77766075,2.71744725,2.7929987499999998
+granular_sandbox,baseline,moving-planet / Round,3,event_update.p95_ms,4.48712,4.417149,5.0473360000000005
+granular_sandbox,baseline,moving-planet / Round,3,frame_construction.max_ms,0.321089,0.299608,0.336681
+granular_sandbox,baseline,moving-planet / Round,3,frame_construction.mean_ms,0.10297335166666664,0.09888749166666656,0.10385858833333339
+granular_sandbox,baseline,moving-planet / Round,3,frame_construction.p95_ms,0.195849,0.187924,0.196164
+granular_sandbox,baseline,moving-planet / Round + grip,3,native_update.max_ms,4.441981,4.330603,4.465990000000001
+granular_sandbox,baseline,moving-planet / Round + grip,3,native_update.mean_ms,1.5300111963087253,1.4352997248322148,1.534697347315436
+granular_sandbox,baseline,moving-planet / Round + grip,3,native_update.p95_ms,3.225626,2.938155,3.259911
+granular_sandbox,baseline,moving-planet / Round + grip,3,event_update.max_ms,4.426454,4.37713,5.356536999999999
+granular_sandbox,baseline,moving-planet / Round + grip,3,event_update.mean_ms,2.8356725000000003,2.5590055,2.8646967500000002
+granular_sandbox,baseline,moving-planet / Round + grip,3,event_update.p95_ms,4.426454,4.37713,5.356536999999999
+granular_sandbox,baseline,moving-planet / Round + grip,3,frame_construction.max_ms,0.341941,0.298107,0.433051
+granular_sandbox,baseline,moving-planet / Round + grip,3,frame_construction.mean_ms,0.10111767333333331,0.09626081500000007,0.10318262666666668
+granular_sandbox,baseline,moving-planet / Round + grip,3,frame_construction.p95_ms,0.185497,0.185147,0.187331
+granular_sandbox,baseline,moving-planet / Angular,3,native_update.max_ms,4.896291,4.6473770000000005,5.183409
+granular_sandbox,baseline,moving-planet / Angular,3,native_update.mean_ms,1.8505864429530203,1.7654468775167798,1.8827583288590612
+granular_sandbox,baseline,moving-planet / Angular,3,native_update.p95_ms,3.979598,3.6148320000000003,4.048976000000001
+granular_sandbox,baseline,moving-planet / Angular,3,event_update.max_ms,4.913727,4.7539690000000006,5.881593
+granular_sandbox,baseline,moving-planet / Angular,3,event_update.mean_ms,2.8969329999999998,2.86529425,3.14886325
+granular_sandbox,baseline,moving-planet / Angular,3,event_update.p95_ms,4.913727,4.7539690000000006,5.881593
+granular_sandbox,baseline,moving-planet / Angular,3,frame_construction.max_ms,0.38610700000000003,0.36953199999999997,0.390755
+granular_sandbox,baseline,moving-planet / Angular,3,frame_construction.mean_ms,0.12568376500000003,0.12040683500000003,0.12595219500000004
+granular_sandbox,baseline,moving-planet / Angular,3,frame_construction.p95_ms,0.225887,0.216035,0.22797900000000001
+granular_sandbox,current,flat / Round,3,native_update.max_ms,4.086661,4.037329,4.336038
+granular_sandbox,current,flat / Round,3,native_update.mean_ms,1.5144305503355708,1.4588551879194627,1.579534305369127
+granular_sandbox,current,flat / Round,3,native_update.p95_ms,2.9262099999999998,2.7312130000000003,3.046239
+granular_sandbox,current,flat / Round,3,event_update.max_ms,5.34424,4.4082870000000005,5.565077
+granular_sandbox,current,flat / Round,3,event_update.mean_ms,3.261338,2.80364625,3.2898870000000002
+granular_sandbox,current,flat / Round,3,event_update.p95_ms,5.34424,4.4082870000000005,5.565077
+granular_sandbox,current,flat / Round,3,frame_construction.max_ms,0.292459,0.277163,0.33988399999999996
+granular_sandbox,current,flat / Round,3,frame_construction.mean_ms,0.09762883833333327,0.09305378500000007,0.09853666166666657
+granular_sandbox,current,flat / Round,3,frame_construction.p95_ms,0.174313,0.17249799999999998,0.176275
+granular_sandbox,current,flat / Round + grip,3,native_update.max_ms,4.230734,3.933033,4.523406
+granular_sandbox,current,flat / Round + grip,3,native_update.mean_ms,1.4499705704697985,1.4276498942953026,1.5484228204697987
+granular_sandbox,current,flat / Round + grip,3,native_update.p95_ms,3.02608,2.9036359999999997,3.164256
+granular_sandbox,current,flat / Round + grip,3,event_update.max_ms,4.901466999999999,3.957014,5.6459470000000005
+granular_sandbox,current,flat / Round + grip,3,event_update.mean_ms,2.80160975,2.49514525,3.0106375000000005
+granular_sandbox,current,flat / Round + grip,3,event_update.p95_ms,4.901466999999999,3.957014,5.6459470000000005
+granular_sandbox,current,flat / Round + grip,3,frame_construction.max_ms,0.472236,0.30033000000000004,0.482179
+granular_sandbox,current,flat / Round + grip,3,frame_construction.mean_ms,0.09896575666666671,0.09809265333333335,0.10248144666666667
+granular_sandbox,current,flat / Round + grip,3,frame_construction.p95_ms,0.183332,0.18236899999999998,0.187627
+granular_sandbox,current,flat / Angular,3,native_update.max_ms,5.073132,4.786376,5.414709
+granular_sandbox,current,flat / Angular,3,native_update.mean_ms,1.7717345385906036,1.7377439748322143,1.8973754043624163
+granular_sandbox,current,flat / Angular,3,native_update.p95_ms,3.605426,3.569926,3.7511189999999996
+granular_sandbox,current,flat / Angular,3,event_update.max_ms,4.771273000000001,4.725951,5.311204
+granular_sandbox,current,flat / Angular,3,event_update.mean_ms,3.0105682500000004,3.00772325,3.09145375
+granular_sandbox,current,flat / Angular,3,event_update.p95_ms,4.771273000000001,4.725951,5.311204
+granular_sandbox,current,flat / Angular,3,frame_construction.max_ms,0.38481099999999996,0.376811,0.429218
+granular_sandbox,current,flat / Angular,3,frame_construction.mean_ms,0.12518815166666664,0.12455862000000004,0.13215158666666688
+granular_sandbox,current,flat / Angular,3,frame_construction.p95_ms,0.22220099999999998,0.220941,0.223127
+granular_sandbox,current,slope / Round,3,native_update.max_ms,4.387684999999999,3.694109,4.447083999999999
+granular_sandbox,current,slope / Round,3,native_update.mean_ms,1.468628531879195,1.453454414429529,1.6057958389261737
+granular_sandbox,current,slope / Round,3,native_update.p95_ms,2.97258,2.902378,3.1627
+granular_sandbox,current,slope / Round,3,event_update.max_ms,4.348269,4.245252,5.227914999999999
+granular_sandbox,current,slope / Round,3,event_update.mean_ms,2.97074675,2.6768192500000003,3.05021125
+granular_sandbox,current,slope / Round,3,event_update.p95_ms,4.348269,4.245252,5.227914999999999
+granular_sandbox,current,slope / Round,3,frame_construction.max_ms,0.40031,0.363126,0.46584699999999996
+granular_sandbox,current,slope / Round,3,frame_construction.mean_ms,0.1073473050000001,0.10378762166666675,0.11477797833333336
+granular_sandbox,current,slope / Round,3,frame_construction.p95_ms,0.196164,0.187924,0.20629399999999998
+granular_sandbox,current,slope / Round + grip,3,native_update.max_ms,3.539,3.407483,3.561825
+granular_sandbox,current,slope / Round + grip,3,native_update.mean_ms,1.3078267684563765,1.26701047147651,1.3759261862416106
+granular_sandbox,current,slope / Round + grip,3,native_update.p95_ms,2.574973,2.516511,2.683744
+granular_sandbox,current,slope / Round + grip,3,event_update.max_ms,3.806423,3.67124,4.135781
+granular_sandbox,current,slope / Round + grip,3,event_update.mean_ms,2.315138,2.29897625,2.51650975
+granular_sandbox,current,slope / Round + grip,3,event_update.p95_ms,3.806423,3.67124,4.135781
+granular_sandbox,current,slope / Round + grip,3,frame_construction.max_ms,0.45236499999999996,0.297089,0.611586
+granular_sandbox,current,slope / Round + grip,3,frame_construction.mean_ms,0.10303640166666667,0.09706904500000002,0.10342132833333331
+granular_sandbox,current,slope / Round + grip,3,frame_construction.p95_ms,0.186331,0.180184,0.194665
+granular_sandbox,current,slope / Angular,3,native_update.max_ms,5.65346,5.612831000000001,5.748223
+granular_sandbox,current,slope / Angular,3,native_update.mean_ms,1.9065203171140923,1.8297888104026843,2.0194286761745
+granular_sandbox,current,slope / Angular,3,native_update.p95_ms,4.097698,3.907237,4.319168
+granular_sandbox,current,slope / Angular,3,event_update.max_ms,5.05277,5.006633,5.511387
+granular_sandbox,current,slope / Angular,3,event_update.mean_ms,3.17420025,3.14397175,3.27360925
+granular_sandbox,current,slope / Angular,3,event_update.p95_ms,5.05277,5.006633,5.511387
+granular_sandbox,current,slope / Angular,3,frame_construction.max_ms,0.376311,0.335347,0.385996
+granular_sandbox,current,slope / Angular,3,frame_construction.mean_ms,0.13427340500000004,0.13102913499999994,0.1389736150000001
+granular_sandbox,current,slope / Angular,3,frame_construction.p95_ms,0.234312,0.225664,0.236016
+granular_sandbox,current,moving-planet / Round,3,native_update.max_ms,4.439195,4.0694490000000005,4.759303
+granular_sandbox,current,moving-planet / Round,3,native_update.mean_ms,1.5408803255033545,1.4973160369127514,1.6150631879194621
+granular_sandbox,current,moving-planet / Round,3,native_update.p95_ms,3.216059,3.11943,3.471271
+granular_sandbox,current,moving-planet / Round,3,event_update.max_ms,4.644303,4.186698,5.527189
+granular_sandbox,current,moving-planet / Round,3,event_update.mean_ms,2.7433052499999997,2.684407,3.117576
+granular_sandbox,current,moving-planet / Round,3,event_update.p95_ms,4.644303,4.186698,5.527189
+granular_sandbox,current,moving-planet / Round,3,frame_construction.max_ms,0.351996,0.33846,0.40014299999999997
+granular_sandbox,current,moving-planet / Round,3,frame_construction.mean_ms,0.10050626666666665,0.0984075950000001,0.10548801166666667
+granular_sandbox,current,moving-planet / Round,3,frame_construction.p95_ms,0.18809,0.18468400000000001,0.19375699999999998
+granular_sandbox,current,moving-planet / Round + grip,3,native_update.max_ms,3.788564,3.659758,4.024477
+granular_sandbox,current,moving-planet / Round + grip,3,native_update.mean_ms,1.4201030436241613,1.3197478775167792,1.4670048557046966
+granular_sandbox,current,moving-planet / Round + grip,3,native_update.p95_ms,2.786601,2.709083,2.905149
+granular_sandbox,current,moving-planet / Round + grip,3,event_update.max_ms,3.754072,3.72722,4.189225
+granular_sandbox,current,moving-planet / Round + grip,3,event_update.mean_ms,2.23701375,2.1408065,2.50300075
+granular_sandbox,current,moving-planet / Round + grip,3,event_update.p95_ms,3.754072,3.72722,4.189225
+granular_sandbox,current,moving-planet / Round + grip,3,frame_construction.max_ms,0.472234,0.461717,0.476754
+granular_sandbox,current,moving-planet / Round + grip,3,frame_construction.mean_ms,0.10196707833333338,0.0950763466666666,0.10302575000000003
+granular_sandbox,current,moving-planet / Round + grip,3,frame_construction.p95_ms,0.187257,0.184832,0.19064599999999998
+granular_sandbox,current,moving-planet / Angular,3,native_update.max_ms,5.374296,5.291686,5.503690000000001
+granular_sandbox,current,moving-planet / Angular,3,native_update.mean_ms,1.8802484161073854,1.8556084614093968,2.0045880906040288
+granular_sandbox,current,moving-planet / Angular,3,native_update.p95_ms,4.104550000000001,3.9887550000000003,4.250502
+granular_sandbox,current,moving-planet / Angular,3,event_update.max_ms,6.693968,4.746543,6.700304
+granular_sandbox,current,moving-planet / Angular,3,event_update.mean_ms,3.56762,2.9024002500000003,3.6312317499999995
+granular_sandbox,current,moving-planet / Angular,3,event_update.p95_ms,6.693968,4.746543,6.700304
+granular_sandbox,current,moving-planet / Angular,3,frame_construction.max_ms,0.407126,0.382606,0.448347
+granular_sandbox,current,moving-planet / Angular,3,frame_construction.mean_ms,0.1272010549999999,0.12645309666666674,0.13144036166666656
+granular_sandbox,current,moving-planet / Angular,3,frame_construction.p95_ms,0.229645,0.228571,0.241423
+spacewars_terrain_benchmark,baseline,fixture,3,cut_ms,0.124,0.118,0.132
+spacewars_terrain_benchmark,baseline,fixture,3,step_p95_ms,1.085,1.033,1.087
+spacewars_terrain_benchmark,baseline,fixture,3,step_max_ms,1.702,1.628,2.014
+spacewars_terrain_benchmark,baseline,fixture,3,draw_p95_ms,0.611,0.569,0.622
+spacewars_terrain_benchmark,baseline,fixture,3,draw_max_ms,1.106,0.991,1.438
+spacewars_terrain_benchmark,baseline,tunnel,3,cut_ms,1.596,1.535,1.711
+spacewars_terrain_benchmark,baseline,tunnel,3,step_p95_ms,2.117,1.964,2.247
+spacewars_terrain_benchmark,baseline,tunnel,3,step_max_ms,3.989,3.957,4.26
+spacewars_terrain_benchmark,baseline,tunnel,3,draw_p95_ms,0.498,0.458,0.545
+spacewars_terrain_benchmark,baseline,tunnel,3,draw_max_ms,0.902,0.639,0.976
+spacewars_terrain_benchmark,baseline,blocks,3,cut_ms,3.385,3.136,3.59
+spacewars_terrain_benchmark,baseline,blocks,3,step_p95_ms,8.749,8.461,8.816
+spacewars_terrain_benchmark,baseline,blocks,3,step_max_ms,21.695,20.899,22.318
+spacewars_terrain_benchmark,baseline,blocks,3,draw_p95_ms,0.994,0.927,0.995
+spacewars_terrain_benchmark,baseline,blocks,3,draw_max_ms,2.167,1.677,2.268
+spacewars_terrain_benchmark,baseline,multi_planet,3,cut_ms,0.615,0.518,0.924
+spacewars_terrain_benchmark,baseline,multi_planet,3,step_p95_ms,3.019,2.884,3.085
+spacewars_terrain_benchmark,baseline,multi_planet,3,step_max_ms,6.469,6.163,6.716
+spacewars_terrain_benchmark,baseline,multi_planet,3,draw_p95_ms,3.524,3.47,3.555
+spacewars_terrain_benchmark,baseline,multi_planet,3,draw_max_ms,4.808,4.138,5.008
+spacewars_terrain_benchmark,current,fixture,3,cut_ms,0.132,0.12,0.143
+spacewars_terrain_benchmark,current,fixture,3,step_p95_ms,1.054,0.999,1.061
+spacewars_terrain_benchmark,current,fixture,3,step_max_ms,2.144,1.599,2.26
+spacewars_terrain_benchmark,current,fixture,3,draw_p95_ms,0.574,0.528,0.592
+spacewars_terrain_benchmark,current,fixture,3,draw_max_ms,1.007,0.901,1.026
+spacewars_terrain_benchmark,current,tunnel,3,cut_ms,2.007,1.557,2.114
+spacewars_terrain_benchmark,current,tunnel,3,step_p95_ms,1.988,1.964,2.174
+spacewars_terrain_benchmark,current,tunnel,3,step_max_ms,4.165,3.814,4.399
+spacewars_terrain_benchmark,current,tunnel,3,draw_p95_ms,0.503,0.501,0.56
+spacewars_terrain_benchmark,current,tunnel,3,draw_max_ms,0.803,0.761,0.837
+spacewars_terrain_benchmark,current,blocks,3,cut_ms,3.418,3.198,3.46
+spacewars_terrain_benchmark,current,blocks,3,step_p95_ms,8.52,8.328,9.091
+spacewars_terrain_benchmark,current,blocks,3,step_max_ms,20.065,17.019,20.275
+spacewars_terrain_benchmark,current,blocks,3,draw_p95_ms,1.024,0.945,1.111
+spacewars_terrain_benchmark,current,blocks,3,draw_max_ms,2.009,1.906,2.518
+spacewars_terrain_benchmark,current,multi_planet,3,cut_ms,0.923,0.857,1.291
+spacewars_terrain_benchmark,current,multi_planet,3,step_p95_ms,3.028,2.813,3.096
+spacewars_terrain_benchmark,current,multi_planet,3,step_max_ms,6.308,5.852,6.455
+spacewars_terrain_benchmark,current,multi_planet,3,draw_p95_ms,3.813,3.494,3.997
+spacewars_terrain_benchmark,current,multi_planet,3,draw_max_ms,4.626,4.47,4.767
+surface_geometry_benchmark,baseline,0 / Interpolated,9,initial_build_ms,1.152932,1.0190270000000001,2.5442649999999998
+surface_geometry_benchmark,baseline,0 / Interpolated,9,edits.max_ms,0.12635000000000002,0.117129,0.215108
+surface_geometry_benchmark,baseline,0 / Interpolated,9,edits.mean_ms,0.048305066666666674,0.04604331666666665,0.06656331666666665
+surface_geometry_benchmark,baseline,0 / Interpolated,9,edits.p50_ms,0.034907,0.029851,0.056241
+surface_geometry_benchmark,baseline,0 / Interpolated,9,edits.p95_ms,0.120221,0.110629,0.20071999999999998
+surface_geometry_benchmark,baseline,0 / Interpolated,9,edits.p99_ms,0.12635000000000002,0.117129,0.215108
+surface_geometry_benchmark,baseline,0 / Interpolated,9,refresh.max_ms,2.876489,2.2603459999999997,5.2919339999999995
+surface_geometry_benchmark,baseline,0 / Interpolated,9,refresh.mean_ms,1.4062634499999997,1.3412517666666663,2.0803158333333327
+surface_geometry_benchmark,baseline,0 / Interpolated,9,refresh.p50_ms,1.265839,1.2138579999999999,2.4214890000000002
+surface_geometry_benchmark,baseline,0 / Interpolated,9,refresh.p95_ms,2.649991,2.224273,3.057425
+surface_geometry_benchmark,baseline,0 / Interpolated,9,refresh.p99_ms,2.876489,2.2603459999999997,5.2919339999999995
+surface_geometry_benchmark,baseline,1 / Interpolated,9,initial_build_ms,9.703436,9.248866,10.942494
+surface_geometry_benchmark,baseline,1 / Interpolated,9,edits.max_ms,0.9065460000000001,0.8268989999999999,0.937858
+surface_geometry_benchmark,baseline,1 / Interpolated,9,edits.mean_ms,0.2706941333333333,0.25781956666666667,0.29006525
+surface_geometry_benchmark,baseline,1 / Interpolated,9,edits.p50_ms,0.124554,0.11924,0.132998
+surface_geometry_benchmark,baseline,1 / Interpolated,9,edits.p95_ms,0.869842,0.795454,0.9299510000000001
+surface_geometry_benchmark,baseline,1 / Interpolated,9,edits.p99_ms,0.9065460000000001,0.8268989999999999,0.937858
+surface_geometry_benchmark,baseline,1 / Interpolated,9,refresh.max_ms,20.299770000000002,18.590659,21.247996
+surface_geometry_benchmark,baseline,1 / Interpolated,9,refresh.mean_ms,4.907822266666668,4.674241283333333,5.22750805
+surface_geometry_benchmark,baseline,1 / Interpolated,9,refresh.p50_ms,1.3283749999999999,1.258116,1.424594
+surface_geometry_benchmark,baseline,1 / Interpolated,9,refresh.p95_ms,18.483881,17.157248,19.910126
+surface_geometry_benchmark,baseline,1 / Interpolated,9,refresh.p99_ms,20.299770000000002,18.590659,21.247996
+surface_geometry_benchmark,baseline,2 / Interpolated,9,initial_build_ms,5.594671,5.195538,5.7631440000000005
+surface_geometry_benchmark,baseline,2 / Interpolated,9,edits.max_ms,0.5107539999999999,0.481125,0.5448080000000001
+surface_geometry_benchmark,baseline,2 / Interpolated,9,edits.mean_ms,0.16717016666666665,0.16423286666666664,0.18418506666666665
+surface_geometry_benchmark,baseline,2 / Interpolated,9,edits.p50_ms,0.11244299999999999,0.103222,0.114221
+surface_geometry_benchmark,baseline,2 / Interpolated,9,edits.p95_ms,0.49005,0.46744,0.530604
+surface_geometry_benchmark,baseline,2 / Interpolated,9,edits.p99_ms,0.5107539999999999,0.481125,0.5448080000000001
+surface_geometry_benchmark,baseline,2 / Interpolated,9,refresh.max_ms,15.179786,14.575719,17.499247
+surface_geometry_benchmark,baseline,2 / Interpolated,9,refresh.mean_ms,4.129351083333334,3.9974292333333334,4.4487529666666665
+surface_geometry_benchmark,baseline,2 / Interpolated,9,refresh.p50_ms,1.307987,1.188043,1.353023
+surface_geometry_benchmark,baseline,2 / Interpolated,9,refresh.p95_ms,14.383758,12.979217,14.828686000000001
+surface_geometry_benchmark,baseline,2 / Interpolated,9,refresh.p99_ms,15.179786,14.575719,17.499247
+surface_geometry_benchmark,current,0 / Interpolated,9,initial_build_ms,1.10797,0.9770639999999999,1.16584
+surface_geometry_benchmark,current,0 / Interpolated,9,edits.max_ms,0.125258,0.11812800000000001,0.171776
+surface_geometry_benchmark,current,0 / Interpolated,9,edits.mean_ms,0.048762749999999994,0.04690698333333334,0.055706083333333316
+surface_geometry_benchmark,current,0 / Interpolated,9,edits.p50_ms,0.034721999999999996,0.026999,0.03924
+surface_geometry_benchmark,current,0 / Interpolated,9,edits.p95_ms,0.11998,0.114721,0.134795
+surface_geometry_benchmark,current,0 / Interpolated,9,edits.p99_ms,0.125258,0.11812800000000001,0.171776
+surface_geometry_benchmark,current,0 / Interpolated,9,refresh.max_ms,2.5913009999999996,2.275236,2.9300620000000004
+surface_geometry_benchmark,current,0 / Interpolated,9,refresh.mean_ms,1.4078239166666664,1.3447527666666663,1.6153432000000003
+surface_geometry_benchmark,current,0 / Interpolated,9,refresh.p50_ms,1.297024,1.1739870000000001,1.497166
+surface_geometry_benchmark,current,0 / Interpolated,9,refresh.p95_ms,2.587542,2.2564949999999997,2.816397
+surface_geometry_benchmark,current,0 / Interpolated,9,refresh.p99_ms,2.5913009999999996,2.275236,2.9300620000000004
+surface_geometry_benchmark,current,1 / Interpolated,9,initial_build_ms,9.565901,9.249478,10.897568
+surface_geometry_benchmark,current,1 / Interpolated,9,edits.max_ms,0.925637,0.853065,0.950118
+surface_geometry_benchmark,current,1 / Interpolated,9,edits.mean_ms,0.27209816666666664,0.26003586666666656,0.2935362
+surface_geometry_benchmark,current,1 / Interpolated,9,edits.p50_ms,0.12711,0.117887,0.135405
+surface_geometry_benchmark,current,1 / Interpolated,9,edits.p95_ms,0.876584,0.8109919999999999,0.910193
+surface_geometry_benchmark,current,1 / Interpolated,9,edits.p99_ms,0.925637,0.853065,0.950118
+surface_geometry_benchmark,current,1 / Interpolated,9,refresh.max_ms,20.086218,19.2853,21.040184
+surface_geometry_benchmark,current,1 / Interpolated,9,refresh.mean_ms,4.9313934333333345,4.751607216666667,5.335832850000001
+surface_geometry_benchmark,current,1 / Interpolated,9,refresh.p50_ms,1.3550229999999999,1.288246,1.446927
+surface_geometry_benchmark,current,1 / Interpolated,9,refresh.p95_ms,18.638806000000002,17.389931,20.631578
+surface_geometry_benchmark,current,1 / Interpolated,9,refresh.p99_ms,20.086218,19.2853,21.040184
+surface_geometry_benchmark,current,2 / Interpolated,9,initial_build_ms,5.426832,5.090632,6.1706080000000005
+surface_geometry_benchmark,current,2 / Interpolated,9,edits.max_ms,0.530605,0.48429099999999997,0.5845680000000001
+surface_geometry_benchmark,current,2 / Interpolated,9,edits.mean_ms,0.1722578,0.1627498166666667,0.18428350000000002
+surface_geometry_benchmark,current,2 / Interpolated,9,edits.p50_ms,0.106851,0.09924000000000001,0.12097999999999999
+surface_geometry_benchmark,current,2 / Interpolated,9,edits.p95_ms,0.49773500000000004,0.468662,0.526642
+surface_geometry_benchmark,current,2 / Interpolated,9,edits.p99_ms,0.530605,0.48429099999999997,0.5845680000000001
+surface_geometry_benchmark,current,2 / Interpolated,9,refresh.max_ms,15.285490000000001,14.742198,17.463265
+surface_geometry_benchmark,current,2 / Interpolated,9,refresh.mean_ms,4.207794349999999,3.969062466666666,4.493668033333334
+surface_geometry_benchmark,current,2 / Interpolated,9,refresh.p50_ms,1.292542,1.19834,1.430075
+surface_geometry_benchmark,current,2 / Interpolated,9,refresh.p95_ms,13.931299,13.537841,15.029333000000001
+surface_geometry_benchmark,current,2 / Interpolated,9,refresh.p99_ms,15.285490000000001,14.742198,17.463265
+terrain_collider_benchmark,baseline,Blocks / Separate,3,steps.max_ms,12.663423,12.085393,13.09617
+terrain_collider_benchmark,baseline,Blocks / Separate,3,steps.mean_ms,7.170781008055546,7.110583319166668,7.3704784169444615
+terrain_collider_benchmark,baseline,Blocks / Separate,3,steps.p95_ms,10.131691,10.118758999999999,10.208079
+terrain_collider_benchmark,baseline,Blocks / Separate,3,broad_phase.max_ms,5.385110999999999,5.332093,5.477939999999999
+terrain_collider_benchmark,baseline,Blocks / Separate,3,broad_phase.mean_ms,3.016510537222217,2.9958478805555626,3.107288226111117
+terrain_collider_benchmark,baseline,Blocks / Separate,3,broad_phase.p95_ms,4.1378639999999995,4.136046,4.168345
+terrain_collider_benchmark,baseline,Blocks / Separate,3,synchronize.max_ms,2.018312,1.638982,2.082108
+terrain_collider_benchmark,baseline,Blocks / Separate,3,synchronize.mean_ms,0.39582464102564113,0.3906641025641026,0.4055033333333333
+terrain_collider_benchmark,baseline,Blocks / Separate,3,synchronize.p95_ms,0.8418059999999999,0.7974370000000001,0.941045
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,steps.max_ms,0.713697,0.598901,0.81951
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,steps.mean_ms,0.27996050916666604,0.27449289833333423,0.29015387722222236
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,steps.p95_ms,0.330218,0.319182,0.341571
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,broad_phase.max_ms,0.38186699999999996,0.357274,0.417348
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,broad_phase.mean_ms,0.14345743305555547,0.1421246522222223,0.15042787694444468
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,broad_phase.p95_ms,0.16425700000000001,0.162275,0.17405400000000001
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,synchronize.max_ms,0.34097799999999995,0.293367,0.37733
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,synchronize.mean_ms,0.1207855128205128,0.11908371794871794,0.12100684615384616
+terrain_collider_benchmark,baseline,Blocks / ChunkCompound,3,synchronize.p95_ms,0.28208999999999995,0.277294,0.28696
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,steps.max_ms,195.536056,194.02497499999998,199.064941
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,steps.mean_ms,129.94135832916663,129.38139396611103,132.48053159750015
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,steps.p95_ms,168.86099800000002,167.909552,173.187809
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,broad_phase.max_ms,105.347335,103.538819,107.669497
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,broad_phase.mean_ms,65.48549158694438,65.28408122055548,67.04369198833321
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,broad_phase.p95_ms,85.688116,85.472307,87.574113
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,synchronize.max_ms,23.979906,23.963318,25.216942
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,synchronize.mean_ms,6.72102264102564,6.576347820512821,6.722762666666667
+terrain_collider_benchmark,baseline,Interpolated / Separate,3,synchronize.p95_ms,22.086827,21.297197999999998,22.936469000000002
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,steps.max_ms,0.775154,0.710233,0.923713
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,steps.mean_ms,0.27909594861111126,0.2786369266666659,0.30141348361111153
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,steps.p95_ms,0.328849,0.327293,0.361587
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,broad_phase.max_ms,0.402181,0.39458800000000005,0.44977100000000003
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,broad_phase.mean_ms,0.1439338402777777,0.1427679741666664,0.15445347055555547
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,broad_phase.p95_ms,0.166351,0.16209199999999999,0.180442
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,synchronize.max_ms,6.514172,6.1545499999999995,8.04876
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,synchronize.mean_ms,2.192535564102564,2.15928841025641,2.2352028974358973
+terrain_collider_benchmark,baseline,Interpolated / ChunkCompound,3,synchronize.p95_ms,6.242453,5.9569209999999995,6.403118999999999
+terrain_collider_benchmark,current,Blocks / Separate,3,steps.max_ms,12.846556,12.04005,13.221523000000001
+terrain_collider_benchmark,current,Blocks / Separate,3,steps.mean_ms,7.2669183327777676,7.2032251697222165,7.376891645277778
+terrain_collider_benchmark,current,Blocks / Separate,3,steps.p95_ms,10.260855,10.126565000000001,10.306205
+terrain_collider_benchmark,current,Blocks / Separate,3,broad_phase.max_ms,5.444913,5.416057,5.520469
+terrain_collider_benchmark,current,Blocks / Separate,3,broad_phase.mean_ms,3.0463917097222155,3.0162440294444477,3.1140791313888827
+terrain_collider_benchmark,current,Blocks / Separate,3,broad_phase.p95_ms,4.1514120000000005,4.063477000000001,4.204172
+terrain_collider_benchmark,current,Blocks / Separate,3,synchronize.max_ms,2.171039,1.9761650000000002,2.2923430000000002
+terrain_collider_benchmark,current,Blocks / Separate,3,synchronize.mean_ms,0.4001204615384615,0.39780502564102566,0.4053671282051281
+terrain_collider_benchmark,current,Blocks / Separate,3,synchronize.p95_ms,0.840602,0.8231539999999999,0.9102659999999999
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,steps.max_ms,0.648066,0.604087,0.7838390000000001
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,steps.mean_ms,0.2935970644444445,0.28080658277777776,0.30120020333333297
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,steps.p95_ms,0.337107,0.33008899999999997,0.350605
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,broad_phase.max_ms,0.378476,0.359978,0.388551
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,broad_phase.mean_ms,0.15125197888888886,0.1466771277777778,0.15487594861111126
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,broad_phase.p95_ms,0.172721,0.167702,0.17634899999999998
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,synchronize.max_ms,0.308181,0.29640299999999997,0.421181
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,synchronize.mean_ms,0.12902548717948717,0.1262814615384615,0.13010174358974355
+terrain_collider_benchmark,current,Blocks / ChunkCompound,3,synchronize.p95_ms,0.28996,0.27951400000000004,0.382552
+terrain_collider_benchmark,current,Interpolated / Separate,3,steps.max_ms,202.499979,190.850908,202.740619
+terrain_collider_benchmark,current,Interpolated / Separate,3,steps.mean_ms,132.8936262433335,132.53399234638871,135.2144029036112
+terrain_collider_benchmark,current,Interpolated / Separate,3,steps.p95_ms,173.465901,170.72404799999998,174.70065200000002
+terrain_collider_benchmark,current,Interpolated / Separate,3,broad_phase.max_ms,103.63182599999999,103.005601,105.914406
+terrain_collider_benchmark,current,Interpolated / Separate,3,broad_phase.mean_ms,67.9496033655555,67.69800762833319,69.35135168916665
+terrain_collider_benchmark,current,Interpolated / Separate,3,broad_phase.p95_ms,88.499543,87.887938,89.579778
+terrain_collider_benchmark,current,Interpolated / Separate,3,synchronize.max_ms,25.879284,23.869138000000003,26.392274
+terrain_collider_benchmark,current,Interpolated / Separate,3,synchronize.mean_ms,6.814506358974358,6.730962769230769,6.826437897435897
+terrain_collider_benchmark,current,Interpolated / Separate,3,synchronize.p95_ms,21.909813,20.953613,22.362720999999997
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,steps.max_ms,0.798508,0.6807519999999999,0.872713
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,steps.mean_ms,0.28983440194444376,0.2872883711111115,0.29565408638888924
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,steps.p95_ms,0.34190400000000004,0.338478,0.348551
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,broad_phase.max_ms,0.41981,0.384106,0.43318
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,broad_phase.mean_ms,0.14944851861111097,0.14907312194444441,0.15277744750000016
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,broad_phase.p95_ms,0.172812,0.172702,0.175924
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,synchronize.max_ms,6.981590000000001,6.682378,7.199463
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,synchronize.mean_ms,2.1962230512820518,2.0946696666666664,2.220005230769231
+terrain_collider_benchmark,current,Interpolated / ChunkCompound,3,synchronize.p95_ms,6.41088,6.104236,6.551946
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,generation_ms,1.627,1.505,1.737
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,initial_geometry_ms,1.6764999999999999,1.595,1.78
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,initial_physics_ms,1.3685,1.304,1.514
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,edit_p95_ms,0.0115,0.008,0.019
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,geometry_p95_ms,0.058,0.053,0.085
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,collider_p95_ms,0.10250000000000001,0.085,0.156
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,step_p95_ms,0.20550000000000002,0.174,0.269
+terrain_benchmark_fixed_cpu,baseline,1 / craters,10,commit_max_ms,0.2545,0.167,0.642
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,generation_ms,1.4169999999999998,1.352,1.81
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,initial_geometry_ms,1.6515,1.529,1.8
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,initial_physics_ms,0.9755,0.908,1.268
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,edit_p95_ms,0.191,0.171,0.204
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,geometry_p95_ms,0.2445,0.23,0.272
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,collider_p95_ms,0.2815,0.216,0.346
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,step_p95_ms,0.23,0.164,0.294
+terrain_benchmark_fixed_cpu,baseline,1 / tunnels,10,commit_max_ms,0.8425,0.639,1.056
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,generation_ms,6.3155,6.045,6.77
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,initial_geometry_ms,7.0695,6.479,7.469
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,initial_physics_ms,3.6875,3.369,4.226
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,edit_p95_ms,0.033,0.028,0.038
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,geometry_p95_ms,0.14700000000000002,0.125,0.172
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,collider_p95_ms,0.32799999999999996,0.242,0.393
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,step_p95_ms,0.995,0.812,1.081
+terrain_benchmark_fixed_cpu,baseline,0.5 / craters,10,commit_max_ms,0.6615,0.447,0.915
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,generation_ms,5.787,5.454,6.602
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,initial_geometry_ms,7.1274999999999995,6.502,8.306
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,initial_physics_ms,3.6260000000000003,3.418,4.376
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,edit_p95_ms,0.474,0.46,0.508
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,geometry_p95_ms,0.559,0.51,0.629
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,collider_p95_ms,0.716,0.669,0.794
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,step_p95_ms,0.9435,0.812,1.073
+terrain_benchmark_fixed_cpu,baseline,0.5 / tunnels,10,commit_max_ms,1.9575,1.754,2.271
+terrain_benchmark_fixed_cpu,current,1 / craters,10,generation_ms,1.605,1.505,1.788
+terrain_benchmark_fixed_cpu,current,1 / craters,10,initial_geometry_ms,1.6755,1.586,1.78
+terrain_benchmark_fixed_cpu,current,1 / craters,10,initial_physics_ms,1.3615,1.28,1.469
+terrain_benchmark_fixed_cpu,current,1 / craters,10,edit_p95_ms,0.01,0.008,0.018
+terrain_benchmark_fixed_cpu,current,1 / craters,10,geometry_p95_ms,0.0565,0.05,0.084
+terrain_benchmark_fixed_cpu,current,1 / craters,10,collider_p95_ms,0.0955,0.083,0.197
+terrain_benchmark_fixed_cpu,current,1 / craters,10,step_p95_ms,0.1905,0.165,0.243
+terrain_benchmark_fixed_cpu,current,1 / craters,10,commit_max_ms,0.23199999999999998,0.158,0.405
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,generation_ms,1.4175,1.367,1.558
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,initial_geometry_ms,1.7045,1.586,1.967
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,initial_physics_ms,1.0310000000000001,0.92,1.216
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,edit_p95_ms,0.193,0.178,0.205
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,geometry_p95_ms,0.255,0.23,0.278
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,collider_p95_ms,0.246,0.218,0.367
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,step_p95_ms,0.191,0.167,0.299
+terrain_benchmark_fixed_cpu,current,1 / tunnels,10,commit_max_ms,0.739,0.641,0.983
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,generation_ms,6.484999999999999,6.191,7.223
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,initial_geometry_ms,6.9719999999999995,6.579,8.032
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,initial_physics_ms,3.6045,3.554,4.284
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,edit_p95_ms,0.032,0.023,0.038
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,geometry_p95_ms,0.1565,0.107,0.171
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,collider_p95_ms,0.3115,0.203,0.353
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,step_p95_ms,0.9935,0.671,1.072
+terrain_benchmark_fixed_cpu,current,0.5 / craters,10,commit_max_ms,0.573,0.352,0.947
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,generation_ms,5.655,5.371,6.666
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,initial_geometry_ms,6.958,6.471,8.292
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,initial_physics_ms,3.5375,3.33,4.194
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,edit_p95_ms,0.473,0.468,0.509
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,geometry_p95_ms,0.563,0.533,0.574
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,collider_p95_ms,0.7084999999999999,0.653,0.776
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,step_p95_ms,0.875,0.817,1.001
+terrain_benchmark_fixed_cpu,current,0.5 / tunnels,10,commit_max_ms,1.9285,1.776,2.1

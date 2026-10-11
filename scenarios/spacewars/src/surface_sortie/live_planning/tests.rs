@@ -1,13 +1,21 @@
 use super::*;
 use pilot::LandingSiteQuery;
 
+mod actual_failure;
+mod actual_probe;
+mod covered_handoff;
 mod destinations;
 mod diagnostics;
 mod early_candidates;
+mod extended_corridors;
 mod flight_dependencies;
+mod focused;
 mod gravity_dependencies;
 mod measurement_work;
+mod powered_corridors;
+mod requested_corridors;
 mod route_dependencies;
+mod walk_feedback;
 
 const DT: Duration = Duration::from_nanos(16_666_667);
 fn state() -> SurfaceSortieState {

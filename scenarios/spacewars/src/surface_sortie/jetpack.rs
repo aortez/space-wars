@@ -111,6 +111,8 @@ impl CrossingPlan {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JetpackNavigationObservation {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub vehicle_continuation: Option<forecast::VehicleFlightContinuation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vehicle_forecast: Option<forecast::VehicleCrossingForecast>,
 
     pub charge: f32,
@@ -196,6 +198,7 @@ impl SurfaceSortieState {
             && !self.world.physics.material_queries_dirty
             && (self.world.tick + player as u64 * 15).is_multiple_of(30);
         Some(JetpackNavigationObservation {
+            vehicle_continuation: None,
             vehicle_forecast: None,
             charge,
             reference_velocity: pack.map_or(Vec2::ZERO, |p| p.reference_velocity),

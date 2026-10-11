@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "complete": true,
+  "source_commit": "67c46a9cf402008c93afd9fee6c8bf940ce92e62",
+  "source": {
+    "path": "target/projectile-response-sweep/v1/summary.json",
+    "sha256": "aaeea92ed3c022db0c0ffd95091171e8b63496a55c0f00601120baa5f663a483"
+  },
+  "surveyor_sha256": "a78d1e14a99197bf54aab4accded16f818237638d4141204be8e12875e2de6cb",
+  "archive": {
+    "path": "docs/data/transfer-projectile-survey-v1.json.gz",
+    "sha256": "ca52610750e76a1f9e1cc24f179f7158230c372356851b2bab1d8e6a01cf5386"
+  },
+  "raw_files": {
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-walking-observe/capture-evidence.jsonl": "d4c092030ee7d9c1716e262cb29087a4aff43c0135b3334c4712ea3b6752525b",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-walking-observe/projectiles.jsonl": "e46d6a9913e616442ff5c36f8d6c1ead69d3a8c3e9bfa3f5f43fa418c51af95c",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-walking-observe/projectile-response.jsonl": "821db39a4a155b785ddcddd1d3dd5f6947b1aebaa2c32c62141ec61e4ae54934",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-powered-observe/capture-evidence.jsonl": "037ab6d521f4ea1a7e71edfc26f9a78e9c0bd146ad660f0cd7b289a7d1498d21",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-powered-observe/projectiles.jsonl": "dd5c4ca01ebf78568b14e631b09958af46e9a558d5a7025da0800146b2ce2f20",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p1-powered-observe/projectile-response.jsonl": "c40461ca8ccdcade7bcffdcdbe46ff8d28e7f01a857a6521532443d49f45a09e",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-powered-observe/capture-evidence.jsonl": "ffdf0f9aa0c2cd0b928bcb9bc5bce01986017fb78b59f6a510c513332e9c768b",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-powered-observe/projectiles.jsonl": "9b1b65d2f116675baa629090df775da6ef93ae9d2641730431535ac7fec5b659",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-powered-observe/projectile-response.jsonl": "fac60bf55b7776606ce4a9f3afdd5f157e5d78272d19440e381d5506dcb5feec",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-walking-observe/capture-evidence.jsonl": "4722889f2764affe3cb05e91a9c64459c2e73d24d3a78199afc6e8d06b938245",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-walking-observe/projectiles.jsonl": "5a3559577b7e52fc2f82b46148fecf189636b101cece504afbbaf150dd91c824",
+    "target/projectile-response-sweep/v1/shared-armed-world0-p2-walking-observe/projectile-response.jsonl": "9540161602bb7eaeb3eca72b6dc60e1bda4b8fb407186b52ab3a40c28ce31774",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-powered-observe/capture-evidence.jsonl": "de65d46af4ff835a61c1186ee24a8e4cddbd3ca706be79f2a803ae62c3d21527",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-powered-observe/projectiles.jsonl": "11772f3863223f58a997ab631bb27b8f409267db43f7717d5770db3584ba2d4a",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-powered-observe/projectile-response.jsonl": "f3bd036da6793e8cac11ccaf6617db4bfdfa01611e1ceaa237ec3cd609a1a7fc",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-walking-observe/capture-evidence.jsonl": "caad377c217f681a9b377e6d86138c851b2ebd9e76d9e4c70a0e4de9461dc9fc",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-walking-observe/projectiles.jsonl": "a22b1a224b395971da59f1539a26a013fb8c28eb7e61bd83cc811e6ffb10f5ed",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p1-walking-observe/projectile-response.jsonl": "ad620260d12a189208db891a5159ab196f3285675b05862111387a4898cf98cf",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-walking-observe/capture-evidence.jsonl": "1145ef810b11d9dde2e7246ab2176d2f85db93832e54ba61817bfaa6b6e8a9b6",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-walking-observe/projectiles.jsonl": "6c174d55d236f767b868fc10054b8e7fb5561c9253f9db1bc766cc8c4473de12",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-walking-observe/projectile-response.jsonl": "6946cbb0db3a18bb397280a64e9c9ededa0586ac46ef296b7eb0795d5947e788",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-powered-observe/capture-evidence.jsonl": "d9c6a0997e18537c10a1a48af6ace9141df1bfbdfedda81682af3f2dd1a632c2",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-powered-observe/projectiles.jsonl": "8e463d89b6755575a4853af14fb8673651270e4539687aacfdfc463e8242bed8",
+    "target/projectile-response-sweep/v1/shared-armed-world1-p2-powered-observe/projectile-response.jsonl": "807ffe5949650a8cfafa418f923725a8aef0d3d6ae6395e22621f5ab64a86efd",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-walking-observe/capture-evidence.jsonl": "daed781a460cedadea92d0febda50b2a96264d2cfab513e418d774749e5f31b1",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-walking-observe/projectiles.jsonl": "9ae792a8635debd54b3b01430a07d6fce0574190d3d103e02c3f48ceebfc3970",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-walking-observe/projectile-response.jsonl": "4dcb56b27fb4264e488fb689c005377ce36ebbca37f38d13b7c31480b7f6115b",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-powered-observe/capture-evidence.jsonl": "92197105818f6b2f9ea06f23313c50fe2881770e58c1819c11fd6dce0b569cb7",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-powered-observe/projectiles.jsonl": "1e43d7d82dc62fdb545e4d252cdf1ace808f756691b5d6abbe22630e642f07bd",
+    "target/projectile-response-sweep/v1/health-shared-armed-world0-p1-powered-observe/projectile-response.jsonl": "ef210d701de6afadc1983f7bafe2359344f2d8a5552d31ceb872d6b3d9ccfc31",
+    "target/projectile-response-sweep/v1/health-shared-armed-world1-p1-powered-observe/capture-evidence.jsonl": "7e8af36191cc58b6e6839ce341a2ce7516104da05d83f0aab93c50e4e17951cd",
+    "target/projectile-response-sweep/v1/health-shared-armed-world1-p1-powered-observe/projectiles.jsonl": "11772f3863223f58a997ab631bb27b8f409267db43f7717d5770db3584ba2d4a",
+    "target/projectile-response-sweep/v1/health-shared-armed-world1-p1-powered-observe/projectile-response.jsonl": "f3bd036da6793e8cac11ccaf6617db4bfdfa01611e1ceaa237ec3cd609a1a7fc",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p1-powered-observe/capture-evidence.jsonl": "bb0d99dbace6782e0f10fcc59562eac01ec7197fe563d5ecedd897b431186ab7",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p1-powered-observe/projectiles.jsonl": "4d93935dc7a823cfd30f74e36f9c56566fed641e1b95218541691fddcb201a25",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p1-powered-observe/projectile-response.jsonl": "ff48eeb3bc00a807f63d54a6e256d256144e61e2d83bee77e70d16552bce95bf",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p2-powered-observe/capture-evidence.jsonl": "e87282fbea72998f0b29912336ead7e7de1ff0c702eedc1795d690286712b967",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p2-powered-observe/projectiles.jsonl": "dc75c7f52e2beee34d114eed9e4df0fcb108fe767d029bad798977e8b69737df",
+    "target/projectile-response-sweep/v1/shared-armed-world2-p2-powered-observe/projectile-response.jsonl": "a4ae9b3a9dbcb717fad3a3ce5ca355ca061dbd67b6850d57e82212ae2375243a",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p1-powered-observe/capture-evidence.jsonl": "721130fbd0cf151e48b1fc65adea13675e306ba784e5907424c67ed6e4fbb7d3",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p1-powered-observe/projectiles.jsonl": "f88ad65d26eab79b9fdeb8094d24058d96694441f5acbd3acbb06bdf160853fd",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p1-powered-observe/projectile-response.jsonl": "dfd0d617073ec269af56510df41eb9b81242f999ec56c9ecf09ee62656d4c710",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p2-powered-observe/capture-evidence.jsonl": "38b95c4823eeee2facf1cf990b2a7a6d3afe5edf83d8961536e0fbde3ed51905",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p2-powered-observe/projectiles.jsonl": "7d1217126c22ec70bd22c81bf702c51fadae43fa24e9f16af7652fa93d8392d1",
+    "target/projectile-response-sweep/v1/shared-armed-world3-p2-powered-observe/projectile-response.jsonl": "ae3f51975b6366fd46d3c8b6a10be699c90644f6e2196c1f44eaccefafd47c96"
+  },
+  "runs": {
+    "shared-armed-world0-p1-walking": {
+      "seat": 0,
+      "group": "retained",
+      "eligible_ticks": 5928,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world0-p1-powered": {
+      "seat": 0,
+      "group": "retained",
+      "eligible_ticks": 7914,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world0-p2-powered": {
+      "seat": 1,
+      "group": "retained",
+      "eligible_ticks": 5798,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world0-p2-walking": {
+      "seat": 1,
+      "group": "retained",
+      "eligible_ticks": 6827,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world1-p1-powered": {
+      "seat": 0,
+      "group": "retained",
+      "eligible_ticks": 2137,
+      "post_escape_ticks": 516,
+      "warning_ticks": 55,
+      "overlap_ticks": 2,
+      "episodes": 1,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": {
+        "tick": 8837,
+        "threat": {
+          "id": 100025,
+          "spawn_tick": 7977,
+          "entry_seconds": 0.8997741881791749
+        },
+        "owner": "player_2",
+        "post_escape": true
+      }
+    },
+    "shared-armed-world1-p1-walking": {
+      "seat": 0,
+      "group": "retained",
+      "eligible_ticks": 1648,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world1-p2-walking": {
+      "seat": 1,
+      "group": "retained",
+      "eligible_ticks": 6923,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world1-p2-powered": {
+      "seat": 1,
+      "group": "retained",
+      "eligible_ticks": 8900,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "health-shared-armed-world0-p1-walking": {
+      "seat": 0,
+      "group": "health",
+      "eligible_ticks": 4992,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "health-shared-armed-world0-p1-powered": {
+      "seat": 0,
+      "group": "health",
+      "eligible_ticks": 4793,
+      "post_escape_ticks": 0,
+      "warning_ticks": 28,
+      "overlap_ticks": 1,
+      "episodes": 1,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": {
+        "tick": 13515,
+        "threat": {
+          "id": 100001,
+          "spawn_tick": 13514,
+          "entry_seconds": 0.44152054403768
+        },
+        "owner": "player_2",
+        "post_escape": false
+      }
+    },
+    "health-shared-armed-world1-p1-powered": {
+      "seat": 0,
+      "group": "health",
+      "eligible_ticks": 2137,
+      "post_escape_ticks": 516,
+      "warning_ticks": 55,
+      "overlap_ticks": 2,
+      "episodes": 1,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": {
+        "tick": 8837,
+        "threat": {
+          "id": 100025,
+          "spawn_tick": 7977,
+          "entry_seconds": 0.8997741881791749
+        },
+        "owner": "player_2",
+        "post_escape": true
+      }
+    },
+    "shared-armed-world2-p1-powered": {
+      "seat": 0,
+      "group": "fresh",
+      "eligible_ticks": 1784,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world2-p2-powered": {
+      "seat": 1,
+      "group": "fresh",
+      "eligible_ticks": 3236,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    },
+    "shared-armed-world3-p1-powered": {
+      "seat": 0,
+      "group": "fresh",
+      "eligible_ticks": 3113,
+      "post_escape_ticks": 0,
+      "warning_ticks": 37,
+      "overlap_ticks": 1,
+      "episodes": 6,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": {
+        "tick": 12087,
+        "threat": {
+          "id": 100022,
+          "spawn_tick": 12086,
+          "entry_seconds": 0.04149241577772362
+        },
+        "owner": "player_2",
+        "post_escape": false
+      }
+    },
+    "shared-armed-world3-p2-powered": {
+      "seat": 1,
+      "group": "fresh",
+      "eligible_ticks": 4169,
+      "post_escape_ticks": 0,
+      "warning_ticks": 0,
+      "overlap_ticks": 0,
+      "episodes": 0,
+      "own_episodes": 0,
+      "maximum_contact_increment": 1,
+      "first_warning": null
+    }
+  }
+}

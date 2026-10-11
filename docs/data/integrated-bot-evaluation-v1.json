@@ -1,0 +1,800 @@
+{
+  "schema": 1,
+  "candidate": "mission_execution_candidate_v1",
+  "control": "mission_value_control_v1",
+  "host": "shared_execution_routes_v1",
+  "complete": true,
+  "source_commit": "5724c95e962f6c7f17c7e933f4dbf74f6ed56be7",
+  "runner_commit": "4238ec0250705b87e7f69b0ed1770cb5a3418389",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/integrated-bot/comparison-v1/surface_mission_soak",
+    "source_path": "/home/data/workspace/space-wars3/target/integrated-bot/smoke-v1/surface_mission_soak",
+    "sha256": "3801be7ce18226c62e283d694eafce88711b5808501e0245b8bab49ceb79bb42"
+  },
+  "plan": {
+    "path": "target/integrated-bot/comparison-v1/plan.json",
+    "sha256": "8595ee8fdb80300f8c7dca462a16f93ea824429983c72efaf4a65450b3b3f98a"
+  },
+  "validation": {
+    "python_tests_passed": 808,
+    "qualification_cases_completed": 16,
+    "fresh_matches_completed": 96,
+    "unique_games": 112,
+    "corrected_case_audits_passed": 112,
+    "original_games_reaudited_without_rerun": 18,
+    "fresh_world_clusters": 4,
+    "defaults_changed": false,
+    "post_run_raw_hashes_verified": true,
+    "post_run_log_hashes_verified": 112,
+    "tool_input_hashes_verified": 36
+  },
+  "decision": {
+    "decision": "retain",
+    "reasons": [
+      "match_points_regressed:seat:0",
+      "match_points_regressed:interval:3",
+      "ships_lost_increased"
+    ],
+    "fresh": {
+      "control": {
+        "loss": 24,
+        "completed_departures": 111,
+        "claims": 111,
+        "completed_recoveries": 12,
+        "ships_lost": 32,
+        "pilot_deaths": 16,
+        "abandoned_visits": 188,
+        "unfinished_visits": 7,
+        "owned_planet_ticks": 1109849,
+        "eligible_ticks": 897962,
+        "distance_observed_ticks": 525406,
+        "ticks_after_20s_without_progress": 232503,
+        "worst_no_progress_ticks": 15154,
+        "win": 24,
+        "points": 24.0,
+        "no_progress_fraction": 0.25892298337791575
+      },
+      "candidate": {
+        "loss": 21,
+        "completed_departures": 113,
+        "claims": 114,
+        "completed_recoveries": 19,
+        "ships_lost": 36,
+        "pilot_deaths": 15,
+        "abandoned_visits": 236,
+        "unfinished_visits": 14,
+        "owned_planet_ticks": 1254812,
+        "eligible_ticks": 902076,
+        "distance_observed_ticks": 552554,
+        "ticks_after_20s_without_progress": 212448,
+        "worst_no_progress_ticks": 14952,
+        "win": 24,
+        "draw": 3,
+        "points": 25.5,
+        "no_progress_fraction": 0.23551009005893073
+      }
+    },
+    "strata": {
+      "opponent:9": {
+        "control": {
+          "loss": 8,
+          "completed_departures": 35,
+          "claims": 35,
+          "completed_recoveries": 4,
+          "ships_lost": 12,
+          "pilot_deaths": 6,
+          "abandoned_visits": 68,
+          "unfinished_visits": 3,
+          "owned_planet_ticks": 356741,
+          "eligible_ticks": 302544,
+          "distance_observed_ticks": 174590,
+          "ticks_after_20s_without_progress": 78437,
+          "worst_no_progress_ticks": 14952,
+          "win": 8,
+          "points": 8.0,
+          "no_progress_fraction": 0.2592581574911418
+        },
+        "candidate": {
+          "loss": 7,
+          "completed_departures": 40,
+          "claims": 40,
+          "completed_recoveries": 4,
+          "ships_lost": 10,
+          "pilot_deaths": 5,
+          "abandoned_visits": 88,
+          "unfinished_visits": 5,
+          "owned_planet_ticks": 433266,
+          "eligible_ticks": 309205,
+          "distance_observed_ticks": 192352,
+          "ticks_after_20s_without_progress": 68076,
+          "worst_no_progress_ticks": 14952,
+          "win": 8,
+          "draw": 1,
+          "points": 8.5,
+          "no_progress_fraction": 0.22016461570802542
+        }
+      },
+      "opponent:10": {
+        "control": {
+          "win": 8,
+          "completed_departures": 38,
+          "claims": 38,
+          "completed_recoveries": 4,
+          "ships_lost": 10,
+          "pilot_deaths": 5,
+          "abandoned_visits": 60,
+          "unfinished_visits": 2,
+          "owned_planet_ticks": 376554,
+          "eligible_ticks": 297709,
+          "distance_observed_ticks": 175408,
+          "ticks_after_20s_without_progress": 77033,
+          "worst_no_progress_ticks": 15154,
+          "loss": 8,
+          "points": 8.0,
+          "no_progress_fraction": 0.2587526745916314
+        },
+        "candidate": {
+          "win": 8,
+          "completed_departures": 38,
+          "claims": 39,
+          "completed_recoveries": 8,
+          "ships_lost": 13,
+          "pilot_deaths": 5,
+          "abandoned_visits": 75,
+          "unfinished_visits": 4,
+          "owned_planet_ticks": 434841,
+          "eligible_ticks": 306710,
+          "distance_observed_ticks": 188491,
+          "ticks_after_20s_without_progress": 72186,
+          "worst_no_progress_ticks": 14418,
+          "loss": 7,
+          "draw": 1,
+          "points": 8.5,
+          "no_progress_fraction": 0.23535587362655278
+        }
+      },
+      "opponent:16": {
+        "control": {
+          "win": 8,
+          "completed_departures": 38,
+          "claims": 38,
+          "completed_recoveries": 4,
+          "ships_lost": 10,
+          "pilot_deaths": 5,
+          "abandoned_visits": 60,
+          "unfinished_visits": 2,
+          "owned_planet_ticks": 376554,
+          "eligible_ticks": 297709,
+          "distance_observed_ticks": 175408,
+          "ticks_after_20s_without_progress": 77033,
+          "worst_no_progress_ticks": 15154,
+          "loss": 8,
+          "points": 8.0,
+          "no_progress_fraction": 0.2587526745916314
+        },
+        "candidate": {
+          "win": 8,
+          "completed_departures": 35,
+          "claims": 35,
+          "completed_recoveries": 7,
+          "ships_lost": 13,
+          "pilot_deaths": 5,
+          "abandoned_visits": 73,
+          "unfinished_visits": 5,
+          "owned_planet_ticks": 386705,
+          "eligible_ticks": 286161,
+          "distance_observed_ticks": 171711,
+          "ticks_after_20s_without_progress": 72186,
+          "worst_no_progress_ticks": 14418,
+          "loss": 7,
+          "draw": 1,
+          "points": 8.5,
+          "no_progress_fraction": 0.2522565968108862
+        }
+      },
+      "seat:0": {
+        "control": {
+          "loss": 8,
+          "completed_departures": 56,
+          "claims": 56,
+          "completed_recoveries": 5,
+          "ships_lost": 10,
+          "pilot_deaths": 4,
+          "abandoned_visits": 117,
+          "unfinished_visits": 3,
+          "owned_planet_ticks": 475967,
+          "eligible_ticks": 419178,
+          "distance_observed_ticks": 281290,
+          "ticks_after_20s_without_progress": 74756,
+          "worst_no_progress_ticks": 12881,
+          "win": 16,
+          "points": 16.0,
+          "no_progress_fraction": 0.17833951209271479
+        },
+        "candidate": {
+          "loss": 10,
+          "completed_departures": 56,
+          "claims": 56,
+          "completed_recoveries": 11,
+          "ships_lost": 17,
+          "pilot_deaths": 6,
+          "abandoned_visits": 152,
+          "unfinished_visits": 9,
+          "owned_planet_ticks": 555709,
+          "eligible_ticks": 463557,
+          "distance_observed_ticks": 301114,
+          "ticks_after_20s_without_progress": 84821,
+          "worst_no_progress_ticks": 12881,
+          "win": 11,
+          "draw": 3,
+          "points": 12.5,
+          "no_progress_fraction": 0.18297857652888425
+        }
+      },
+      "seat:1": {
+        "control": {
+          "win": 8,
+          "completed_departures": 55,
+          "claims": 55,
+          "completed_recoveries": 7,
+          "ships_lost": 22,
+          "pilot_deaths": 12,
+          "abandoned_visits": 71,
+          "unfinished_visits": 4,
+          "owned_planet_ticks": 633882,
+          "eligible_ticks": 478784,
+          "distance_observed_ticks": 244116,
+          "ticks_after_20s_without_progress": 157747,
+          "worst_no_progress_ticks": 15154,
+          "loss": 16,
+          "points": 8.0,
+          "no_progress_fraction": 0.3294742514369737
+        },
+        "candidate": {
+          "win": 13,
+          "completed_departures": 57,
+          "claims": 58,
+          "completed_recoveries": 8,
+          "ships_lost": 19,
+          "pilot_deaths": 9,
+          "abandoned_visits": 84,
+          "unfinished_visits": 5,
+          "owned_planet_ticks": 699103,
+          "eligible_ticks": 438519,
+          "distance_observed_ticks": 251440,
+          "ticks_after_20s_without_progress": 127627,
+          "worst_no_progress_ticks": 14952,
+          "loss": 11,
+          "points": 13.0,
+          "no_progress_fraction": 0.2910409811205444
+        }
+      },
+      "interval:0": {
+        "control": {
+          "loss": 13,
+          "completed_departures": 52,
+          "claims": 52,
+          "completed_recoveries": 7,
+          "ships_lost": 15,
+          "pilot_deaths": 10,
+          "abandoned_visits": 86,
+          "unfinished_visits": 1,
+          "owned_planet_ticks": 460858,
+          "eligible_ticks": 347460,
+          "distance_observed_ticks": 239058,
+          "ticks_after_20s_without_progress": 51665,
+          "worst_no_progress_ticks": 15154,
+          "win": 11,
+          "points": 11.0,
+          "no_progress_fraction": 0.14869337477695274
+        },
+        "candidate": {
+          "loss": 9,
+          "completed_departures": 54,
+          "claims": 54,
+          "completed_recoveries": 10,
+          "ships_lost": 15,
+          "pilot_deaths": 8,
+          "abandoned_visits": 80,
+          "unfinished_visits": 4,
+          "owned_planet_ticks": 431237,
+          "eligible_ticks": 297209,
+          "distance_observed_ticks": 241271,
+          "ticks_after_20s_without_progress": 18529,
+          "worst_no_progress_ticks": 6122,
+          "win": 15,
+          "points": 15.0,
+          "no_progress_fraction": 0.06234333415206134
+        }
+      },
+      "interval:3": {
+        "control": {
+          "win": 13,
+          "completed_departures": 59,
+          "claims": 59,
+          "completed_recoveries": 5,
+          "ships_lost": 17,
+          "pilot_deaths": 6,
+          "abandoned_visits": 102,
+          "unfinished_visits": 6,
+          "owned_planet_ticks": 648991,
+          "eligible_ticks": 550502,
+          "distance_observed_ticks": 286348,
+          "ticks_after_20s_without_progress": 180838,
+          "worst_no_progress_ticks": 14952,
+          "loss": 11,
+          "points": 13.0,
+          "no_progress_fraction": 0.32849653588906125
+        },
+        "candidate": {
+          "win": 9,
+          "completed_departures": 59,
+          "claims": 60,
+          "completed_recoveries": 9,
+          "ships_lost": 21,
+          "pilot_deaths": 7,
+          "abandoned_visits": 156,
+          "unfinished_visits": 10,
+          "owned_planet_ticks": 823575,
+          "eligible_ticks": 604867,
+          "distance_observed_ticks": 311283,
+          "ticks_after_20s_without_progress": 193919,
+          "worst_no_progress_ticks": 14952,
+          "loss": 12,
+          "draw": 3,
+          "points": 10.5,
+          "no_progress_fraction": 0.32059775124118195
+        }
+      },
+      "seed:4180701290234409703": {
+        "control": {
+          "loss": 6,
+          "completed_departures": 41,
+          "claims": 41,
+          "completed_recoveries": 3,
+          "ships_lost": 7,
+          "pilot_deaths": 5,
+          "abandoned_visits": 32,
+          "unfinished_visits": 0,
+          "owned_planet_ticks": 284258,
+          "eligible_ticks": 236922,
+          "distance_observed_ticks": 171411,
+          "ticks_after_20s_without_progress": 29374,
+          "worst_no_progress_ticks": 14236,
+          "win": 6,
+          "points": 6.0,
+          "no_progress_fraction": 0.12398173238449785
+        },
+        "candidate": {
+          "loss": 6,
+          "completed_departures": 40,
+          "claims": 41,
+          "completed_recoveries": 7,
+          "ships_lost": 11,
+          "pilot_deaths": 5,
+          "abandoned_visits": 37,
+          "unfinished_visits": 1,
+          "owned_planet_ticks": 337049,
+          "eligible_ticks": 187536,
+          "distance_observed_ticks": 158221,
+          "ticks_after_20s_without_progress": 6708,
+          "worst_no_progress_ticks": 6122,
+          "win": 6,
+          "points": 6.0,
+          "no_progress_fraction": 0.035769132326593296
+        }
+      },
+      "seed:8710290346039743052": {
+        "control": {
+          "win": 7,
+          "completed_departures": 24,
+          "claims": 24,
+          "completed_recoveries": 0,
+          "ships_lost": 6,
+          "pilot_deaths": 3,
+          "abandoned_visits": 63,
+          "unfinished_visits": 3,
+          "owned_planet_ticks": 255679,
+          "eligible_ticks": 229416,
+          "distance_observed_ticks": 111300,
+          "ticks_after_20s_without_progress": 84115,
+          "worst_no_progress_ticks": 14952,
+          "loss": 5,
+          "points": 7.0,
+          "no_progress_fraction": 0.3666483593123409
+        },
+        "candidate": {
+          "win": 4,
+          "completed_departures": 21,
+          "claims": 21,
+          "completed_recoveries": 0,
+          "ships_lost": 6,
+          "pilot_deaths": 3,
+          "abandoned_visits": 63,
+          "unfinished_visits": 3,
+          "owned_planet_ticks": 237574,
+          "eligible_ticks": 229416,
+          "distance_observed_ticks": 102450,
+          "ticks_after_20s_without_progress": 96502,
+          "worst_no_progress_ticks": 14952,
+          "loss": 5,
+          "draw": 3,
+          "points": 5.5,
+          "no_progress_fraction": 0.4206419778916902
+        }
+      },
+      "seed:13733067193015154789": {
+        "control": {
+          "loss": 7,
+          "completed_departures": 16,
+          "claims": 16,
+          "completed_recoveries": 0,
+          "ships_lost": 4,
+          "pilot_deaths": 4,
+          "abandoned_visits": 60,
+          "unfinished_visits": 3,
+          "owned_planet_ticks": 291953,
+          "eligible_ticks": 241222,
+          "distance_observed_ticks": 117928,
+          "ticks_after_20s_without_progress": 84419,
+          "worst_no_progress_ticks": 12881,
+          "win": 5,
+          "points": 5.0,
+          "no_progress_fraction": 0.34996393363789374
+        },
+        "candidate": {
+          "loss": 7,
+          "completed_departures": 15,
+          "claims": 15,
+          "completed_recoveries": 0,
+          "ships_lost": 4,
+          "pilot_deaths": 4,
+          "abandoned_visits": 56,
+          "unfinished_visits": 6,
+          "owned_planet_ticks": 286231,
+          "eligible_ticks": 244413,
+          "distance_observed_ticks": 118663,
+          "ticks_after_20s_without_progress": 86416,
+          "worst_no_progress_ticks": 12881,
+          "win": 5,
+          "points": 5.0,
+          "no_progress_fraction": 0.3535654813778318
+        }
+      },
+      "seed:17474294387885593063": {
+        "control": {
+          "loss": 6,
+          "completed_departures": 30,
+          "claims": 30,
+          "completed_recoveries": 9,
+          "ships_lost": 15,
+          "pilot_deaths": 4,
+          "abandoned_visits": 33,
+          "unfinished_visits": 1,
+          "owned_planet_ticks": 277959,
+          "eligible_ticks": 190402,
+          "distance_observed_ticks": 124767,
+          "ticks_after_20s_without_progress": 34595,
+          "worst_no_progress_ticks": 15154,
+          "win": 6,
+          "points": 6.0,
+          "no_progress_fraction": 0.18169452001554606
+        },
+        "candidate": {
+          "loss": 3,
+          "completed_departures": 37,
+          "claims": 37,
+          "completed_recoveries": 12,
+          "ships_lost": 15,
+          "pilot_deaths": 3,
+          "abandoned_visits": 80,
+          "unfinished_visits": 4,
+          "owned_planet_ticks": 393958,
+          "eligible_ticks": 240711,
+          "distance_observed_ticks": 173220,
+          "ticks_after_20s_without_progress": 22822,
+          "worst_no_progress_ticks": 6160,
+          "win": 9,
+          "points": 9.0,
+          "no_progress_fraction": 0.09481078970217398
+        }
+      }
+    },
+    "qualification": {
+      "control": {
+        "unfinished": 4,
+        "completed_departures": 20,
+        "claims": 20,
+        "completed_recoveries": 4,
+        "ships_lost": 5,
+        "pilot_deaths": 0,
+        "abandoned_visits": 37,
+        "unfinished_visits": 2,
+        "owned_planet_ticks": 251888,
+        "eligible_ticks": 140972,
+        "distance_observed_ticks": 100990,
+        "ticks_after_20s_without_progress": 24357,
+        "worst_no_progress_ticks": 12424,
+        "win": 2,
+        "loss": 2,
+        "points": 2.0,
+        "no_progress_fraction": 0.1727789915727946
+      },
+      "candidate": {
+        "unfinished": 4,
+        "completed_departures": 17,
+        "claims": 17,
+        "completed_recoveries": 2,
+        "ships_lost": 4,
+        "pilot_deaths": 2,
+        "abandoned_visits": 33,
+        "unfinished_visits": 5,
+        "owned_planet_ticks": 238287,
+        "eligible_ticks": 123858,
+        "distance_observed_ticks": 91662,
+        "ticks_after_20s_without_progress": 16712,
+        "worst_no_progress_ticks": 8463,
+        "win": 1,
+        "loss": 3,
+        "points": 1.0,
+        "no_progress_fraction": 0.13492870868252355
+      }
+    },
+    "changed_fresh_pairs": 31,
+    "useful_changed_fresh_pairs": 23,
+    "combat_review_cases": {
+      "first_changed_loss_v9": "fresh-world0-v9-asteroids0-p1-candidate",
+      "first_changed_loss_v10": "fresh-world0-v10-asteroids3-p1-candidate",
+      "first_changed_loss_v16": "fresh-world0-v16-asteroids0-p2-candidate",
+      "longest_candidate_no_progress": "fresh-world2-v9-asteroids3-p2-candidate"
+    },
+    "default_promotion": false
+  },
+  "world_totals": {
+    "0": {
+      "candidate": {
+        "seed": 4180701290234409703,
+        "matches": 12,
+        "wins": 6,
+        "draws": 0,
+        "losses": 6,
+        "points": 6.0,
+        "completed_departures": 40,
+        "ships_lost": 11
+      },
+      "control": {
+        "seed": 4180701290234409703,
+        "matches": 12,
+        "wins": 6,
+        "draws": 0,
+        "losses": 6,
+        "points": 6.0,
+        "completed_departures": 41,
+        "ships_lost": 7
+      }
+    },
+    "1": {
+      "control": {
+        "seed": 17474294387885593063,
+        "matches": 12,
+        "wins": 6,
+        "draws": 0,
+        "losses": 6,
+        "points": 6.0,
+        "completed_departures": 30,
+        "ships_lost": 15
+      },
+      "candidate": {
+        "seed": 17474294387885593063,
+        "matches": 12,
+        "wins": 9,
+        "draws": 0,
+        "losses": 3,
+        "points": 9.0,
+        "completed_departures": 37,
+        "ships_lost": 15
+      }
+    },
+    "2": {
+      "candidate": {
+        "seed": 8710290346039743052,
+        "matches": 12,
+        "wins": 4,
+        "draws": 3,
+        "losses": 5,
+        "points": 5.5,
+        "completed_departures": 21,
+        "ships_lost": 6
+      },
+      "control": {
+        "seed": 8710290346039743052,
+        "matches": 12,
+        "wins": 7,
+        "draws": 0,
+        "losses": 5,
+        "points": 7.0,
+        "completed_departures": 24,
+        "ships_lost": 6
+      }
+    },
+    "3": {
+      "control": {
+        "seed": 13733067193015154789,
+        "matches": 12,
+        "wins": 5,
+        "draws": 0,
+        "losses": 7,
+        "points": 5.0,
+        "completed_departures": 16,
+        "ships_lost": 4
+      },
+      "candidate": {
+        "seed": 13733067193015154789,
+        "matches": 12,
+        "wins": 5,
+        "draws": 0,
+        "losses": 7,
+        "points": 5.0,
+        "completed_departures": 15,
+        "ships_lost": 4
+      }
+    }
+  },
+  "evidence": {
+    "raw_file_count": 1344,
+    "raw_bytes": 45805302400,
+    "dense_pilot_rows": 4996450,
+    "simulated_ticks": 2541425,
+    "max_publication_age": 120,
+    "combined_work_maximum": {
+      "graph": 4,
+      "physics_queries": 384
+    },
+    "unchanged_recorded_games_reaudited": 18,
+    "fresh_outcome_changes": {
+      "loss_to_win": 5,
+      "win_to_loss": 2,
+      "win_to_draw": 3
+    },
+    "active_flight_approvals": 48,
+    "active_flights": [
+      {
+        "case": "fresh-world1-v9-asteroids0-p1-candidate",
+        "continuation": {
+          "approved": 16,
+          "rejected": {},
+          "flights": 1,
+          "approved_without_launch_forecast": 0
+        },
+        "crossings": [
+          [
+            0,
+            3302
+          ]
+        ],
+        "launches": [
+          {
+            "seat": 0,
+            "tick": 2822,
+            "kind": "forecast_vehicle"
+          }
+        ]
+      },
+      {
+        "case": "fresh-world1-v10-asteroids0-p1-candidate",
+        "continuation": {
+          "approved": 16,
+          "rejected": {},
+          "flights": 1,
+          "approved_without_launch_forecast": 0
+        },
+        "crossings": [
+          [
+            0,
+            3302
+          ]
+        ],
+        "launches": [
+          {
+            "seat": 0,
+            "tick": 2822,
+            "kind": "forecast_vehicle"
+          }
+        ]
+      },
+      {
+        "case": "fresh-world1-v16-asteroids0-p1-candidate",
+        "continuation": {
+          "approved": 16,
+          "rejected": {},
+          "flights": 1,
+          "approved_without_launch_forecast": 0
+        },
+        "crossings": [
+          [
+            0,
+            3302
+          ]
+        ],
+        "launches": [
+          {
+            "seat": 0,
+            "tick": 2822,
+            "kind": "forecast_vehicle"
+          }
+        ]
+      }
+    ]
+  },
+  "prediction_summary": {
+    "control": {
+      "first_supported_visit_outcomes": {
+        "completed": 80,
+        "abandoned": 24
+      },
+      "departure_error_count": 80,
+      "departure_median_absolute_error_seconds": 2.7607397063333288,
+      "departure_max_absolute_error_seconds": 43.683332627000006,
+      "departure_signed_error_range_seconds": [
+        -43.683332627000006,
+        13.200000266333333
+      ],
+      "unknown_candidate_records": {
+        "remote or local surface unmeasured": 167575,
+        "moving body requires an unmodelled transfer detour": 6138,
+        "transfer requires an unmodelled planet detour": 8326,
+        "ship or pilot recovery required": 88941,
+        "capture already landed; retain its return task": 11911,
+        "transfer requires an unmodelled solar detour": 9253,
+        "objective route unmeasured": 4509,
+        "site round trip unmeasured": 954,
+        "transfer exceeds short direct reference horizon": 152,
+        "alternative landing unavailable or incomplete": 754
+      }
+    },
+    "candidate": {
+      "first_supported_visit_outcomes": {
+        "completed": 96,
+        "abandoned": 46
+      },
+      "departure_error_count": 96,
+      "departure_median_absolute_error_seconds": 8.902202833333334,
+      "departure_max_absolute_error_seconds": 53.10192779366667,
+      "departure_signed_error_range_seconds": [
+        -53.10192779366667,
+        13.276845373
+      ],
+      "unknown_candidate_records": {
+        "transfer requires an unmodelled planet detour": 20539,
+        "remote or local surface unmeasured": 138977,
+        "moving body requires an unmodelled transfer detour": 14150,
+        "ship or pilot recovery required": 74100,
+        "capture already landed; retain its return task": 12734,
+        "transfer requires an unmodelled solar detour": 16987,
+        "objective route unmeasured": 7364,
+        "transfer exceeds short direct reference horizon": 141,
+        "alternative landing unavailable or incomplete": 1726,
+        "powered or jumping trip outside timing calibration": 24,
+        "site round trip unmeasured": 46,
+        "transfer requires unmodelled boundary guidance": 189
+      }
+    }
+  },
+  "prediction_scope": "First numeric current-destination forecasts; completed-duration errors condition on completion. Cohorts and measurement epochs differ between arms; not a paired predictor accuracy estimate.",
+  "failed_summary": {
+    "path": "target/integrated-bot/evaluation-v1/summary.json",
+    "sha256": "d7f3546cdb3b37ecbd56e2762d5acb18647d32ddd857b826336943c88be557f2"
+  },
+  "final_summary": {
+    "path": "target/integrated-bot/evaluation-v2/summary.json",
+    "sha256": "0fdf0c3a2e287116bd3af324a38f1b8ae93155aa17dcf2e980e1f40895f5d99d"
+  },
+  "archive": {
+    "path": "docs/data/integrated-bot-evaluation-v1.json.gz",
+    "sha256": "2f198926ca975f37bc7cc038f57d5b2bad42d665d4126e3548f3cfed416af095",
+    "bytes": 4396812,
+    "documents": 118,
+    "scope": "Exact failed/final summaries, frozen plan, 112 full audits, derived evidence analysis, reduced report projections and four first-divergence source rows. Full raw reports, per-tick streams and logs remain in ignored target storage, identified by hashes in the summaries; they are not copied into this archive.",
+    "verified_document_hashes": 118
+  }
+}

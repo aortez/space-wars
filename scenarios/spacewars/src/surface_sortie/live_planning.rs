@@ -17,11 +17,13 @@ use std::{
     time::Instant,
 };
 
+mod actual_probe;
 mod avoiding;
 mod destinations;
 mod diagnostics;
 pub use diagnostics::{
-    ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence, RouteResultCounts,
+    ActualLocalAttemptFailure, ExhaustedWalkingAttempt, ObjectiveWorkEvidence, PublicationDecision,
+    PublicationEvidence, RouteResultCounts, UnsupportedWalkingCorridor,
 };
 mod early_candidates;
 mod flag_survey;
@@ -29,8 +31,10 @@ pub use flag_survey::{
     FlagSurveyEnvelope, FlagSurveyGeometry, FlagSurveyPlanner, FlagSurveyRequest, FlagSurveySample,
     FlagSurveyTelemetry, FlagSurveyValidation,
 };
+mod covered_handoff;
 mod objective_job;
 mod query_budget;
+pub use covered_handoff::{COVERED_HANDOFF_PROFILE, CoveredRequestHandoff};
 pub use destinations::DestinationCoverTelemetry;
 use destinations::Destinations;
 use query_budget::QueryBudget;
@@ -83,6 +87,35 @@ pub struct ObjectiveMeasurementWork {
     pub successful_candidates: u64,
     pub powered_candidates: u64,
     pub failures: BTreeMap<&'static str, u64>,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub focused_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub corridor_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub extended_successes: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_started: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_completed: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub powered_corridor_successes: u64,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub powered_corridor_failures: BTreeMap<&'static str, u64>,
+}
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 impl ObjectiveMeasurementWork {
     fn record(&mut self, route: &LandingObjectiveRoute) {
@@ -102,6 +135,29 @@ impl ObjectiveMeasurementWork {
         }
     }
     fn add_since(&mut self, new: &Self, old: &Self) {
+        for (&reason, &count) in &new.powered_corridor_failures {
+            *self.powered_corridor_failures.entry(reason).or_default() += count
+                - old
+                    .powered_corridor_failures
+                    .get(reason)
+                    .copied()
+                    .unwrap_or(0);
+        }
+        self.powered_corridor_started +=
+            new.powered_corridor_started - old.powered_corridor_started;
+        self.powered_corridor_completed +=
+            new.powered_corridor_completed - old.powered_corridor_completed;
+        self.powered_corridor_successes +=
+            new.powered_corridor_successes - old.powered_corridor_successes;
+        self.extended_started += new.extended_started - old.extended_started;
+        self.extended_completed += new.extended_completed - old.extended_completed;
+        self.extended_successes += new.extended_successes - old.extended_successes;
+        self.corridor_started += new.corridor_started - old.corridor_started;
+        self.corridor_completed += new.corridor_completed - old.corridor_completed;
+        self.corridor_successes += new.corridor_successes - old.corridor_successes;
+        self.focused_started += new.focused_started - old.focused_started;
+        self.focused_completed += new.focused_completed - old.focused_completed;
+        self.focused_successes += new.focused_successes - old.focused_successes;
         self.finished_surveys += new.finished_surveys - old.finished_surveys;
         self.finished_candidates += new.finished_candidates - old.finished_candidates;
         self.successful_candidates += new.successful_candidates - old.successful_candidates;
@@ -115,6 +171,12 @@ impl ObjectiveMeasurementWork {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct LivePlanningTelemetry {
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub covered_request_handoffs: BTreeMap<usize, u64>,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub walk_probe_restarts: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub unsupported_walk_probe_restarts: u64,
     pub submitted: u64,
     /// Completed surveys that passed publication-time validation at least once.
     pub completed: u64,
@@ -178,17 +240,39 @@ pub struct LivePlanningTelemetry {
     pub max_parked_requests: usize,
 }
 
-#[derive(Clone, Copy)]
-struct ActualLanding {
-    vehicle: Vec2,
-    angle: f32,
-    exit: Vec2,
-    boarding_hatches: [Option<Vec2>; 2],
+/// Source pose in the planet's local frame; it carries no route permission.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ActualLanding {
+    pub vehicle: Vec2,
+    pub angle: f32,
+    pub exit: Vec2,
+    pub boarding_hatches: [Option<Vec2>; 2],
+}
+impl ActualLanding {
+    fn changed(self, new: Self) -> bool {
+        self.vehicle.distance_to(new.vehicle) > 0.002
+            || self.exit.distance_to(new.exit) > 0.002
+            || self
+                .boarding_hatches
+                .into_iter()
+                .zip(new.boarding_hatches)
+                .any(|(old, new)| match (old, new) {
+                    (Some(a), Some(b)) => a.distance_to(b) > 0.002,
+                    (None, None) => false,
+                    _ => true,
+                })
+            || ((self.angle - new.angle) * 0.5).sin().abs() > 0.0001
+    }
+    pub fn matches(self, p: &PilotObservationV1) -> bool {
+        LiveObjectivePlanner::actual(p).is_some_and(|current| !self.changed(current))
+    }
 }
 
 #[derive(Clone)]
 struct Request {
     token: RequestToken,
+    query: LandingSiteQuery,
+    covered_handoff: Option<CoveredRequestHandoff>,
     objective: LandingObjective,
     tick: u64,
     measurement_tick: u64,
@@ -234,6 +318,15 @@ pub struct LiveObjectivePlanner {
     reuse_ground: bool,
     local_dependencies: bool,
     early_candidates: Option<EarlyCandidates>,
+    focused_candidates: bool,
+    requested_corridors: bool,
+    extended_corridors: bool,
+    walk_feedback: bool,
+    walk_bounds_feedback: bool,
+    powered_corridors: bool,
+    actual_failure_players: std::collections::BTreeSet<usize>,
+    covered_handoff_players: std::collections::BTreeSet<usize>,
+    focused_cursor: BTreeMap<usize, (LandingObjective, usize)>,
     query_budget: QueryBudget,
     destinations: Destinations,
     last_observed: Option<u64>,
@@ -252,6 +345,15 @@ impl LiveObjectivePlanner {
             reuse_ground: false,
             local_dependencies: false,
             early_candidates: None,
+            focused_candidates: false,
+            requested_corridors: false,
+            extended_corridors: false,
+            walk_feedback: false,
+            walk_bounds_feedback: false,
+            powered_corridors: false,
+            actual_failure_players: Default::default(),
+            covered_handoff_players: Default::default(),
+            focused_cursor: BTreeMap::new(),
             query_budget: QueryBudget::default(),
             destinations: Destinations::default(),
             last_observed: None,
@@ -294,6 +396,113 @@ impl LiveObjectivePlanner {
     pub fn uses_early_candidates(&self) -> bool {
         self.early_candidates.is_some()
     }
+    /// Measure one nearby walking corridor before building the whole map.
+    /// Successes use ordinary route validation and early delivery; failures
+    /// remain unknown. Rotate candidates on fresh requests to avoid starvation.
+    pub fn with_focused_candidates(mut self) -> Self {
+        assert!(
+            self.uses_early_candidates(),
+            "focused candidates require early delivery"
+        );
+        self.focused_candidates = true;
+        self
+    }
+    pub fn uses_focused_candidates(&self) -> bool {
+        self.focused_candidates
+    }
+    /// Try longer, bidirectionally measured walks for selected sites and the
+    /// actual touchdown pose. Failure never publishes a negative route result.
+    pub fn with_requested_corridors(mut self) -> Self {
+        assert!(
+            self.uses_focused_candidates(),
+            "requested corridors require focused candidates"
+        );
+        self.requested_corridors = true;
+        self
+    }
+    pub fn uses_requested_corridors(&self) -> bool {
+        self.requested_corridors
+    }
+    /// Extend selected/actual walking corridors without changing the original
+    /// short-route dispatch sequence or any query and validation thresholds.
+    pub fn with_extended_corridors(mut self) -> Self {
+        assert!(
+            self.uses_requested_corridors(),
+            "extended corridors require requested corridors"
+        );
+        self.extended_corridors = true;
+        self
+    }
+    pub fn uses_extended_corridors(&self) -> bool {
+        self.extended_corridors
+    }
+    /// Publish completed walking hypotheses for bounded cover scheduling.
+    /// No unsuccessful hypothesis becomes a route verdict or a permission.
+    pub fn with_walk_feedback(mut self) -> Self {
+        assert!(
+            self.uses_extended_corridors(),
+            "walk feedback requires extended corridors"
+        );
+        self.walk_feedback = true;
+        self
+    }
+    pub fn uses_walk_feedback(&self) -> bool {
+        self.walk_feedback
+    }
+    /// Let cover scheduling skip a walking method outside its angular bound.
+    /// This is separate from completing an unsuccessful measured attempt.
+    pub fn with_walk_bounds_feedback(mut self) -> Self {
+        assert!(
+            self.uses_walk_feedback(),
+            "walk bounds require walk feedback"
+        );
+        self.walk_bounds_feedback = true;
+        self
+    }
+    pub fn uses_walk_bounds_feedback(&self) -> bool {
+        self.walk_bounds_feedback
+    }
+    /// Measure one selected/actual powered route with the original source age.
+    pub fn with_powered_corridors(mut self) -> Self {
+        assert!(
+            self.uses_walk_bounds_feedback(),
+            "powered corridors require walking feedback and bounds"
+        );
+        self.powered_corridors = true;
+        self
+    }
+    pub fn uses_powered_corridors(&self) -> bool {
+        self.powered_corridors
+    }
+    /// Historical failure of the actual pose's completed local walk/powered
+    /// attempt. Full fallback continues; no negative route is certified.
+    pub fn with_actual_failure_feedback(
+        mut self,
+        players: impl IntoIterator<Item = usize>,
+    ) -> Self {
+        assert!(self.uses_powered_corridors());
+        self.actual_failure_players = players.into_iter().collect();
+        self
+    }
+    pub fn actual_failure_players(&self) -> &std::collections::BTreeSet<usize> {
+        &self.actual_failure_players
+    }
+    /// A current covered-site request may replace one unfinished ordinary scan.
+    /// Existing targeted work and usable results retain priority.
+    pub fn with_covered_request_handoff(
+        mut self,
+        players: impl IntoIterator<Item = usize>,
+    ) -> Self {
+        assert!(
+            self.uses_powered_corridors(),
+            "covered handoff requires the bounded route pipeline"
+        );
+        self.covered_handoff_players = players.into_iter().collect();
+        self
+    }
+    pub fn covered_handoff_players(&self) -> &std::collections::BTreeSet<usize> {
+        &self.covered_handoff_players
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -304,6 +513,7 @@ impl LiveObjectivePlanner {
         self.queue.reset();
         self.requests.clear();
         self.parked.clear();
+        self.focused_cursor.clear();
         self.shared = None;
         self.last_observed = None;
         self.last_advanced = None;
@@ -315,6 +525,7 @@ impl LiveObjectivePlanner {
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
+        self.focused_cursor.remove(&player);
         self.destinations.remove(player);
         self.remove_objective(player);
     }
@@ -329,7 +540,11 @@ impl LiveObjectivePlanner {
                 self.telemetry.retired_unpublished_queries += request.physics_queries;
             }
             let job = self.queue.take(request.token)?;
-            if job.output().is_none() && job.measurement_work().successful_candidates > 0 {
+            if job.output().is_none()
+                && (job.measurement_work().successful_candidates > 0
+                    || job.measurement_work().focused_successes > 0
+                    || job.measurement_work().corridor_successes > 0)
+            {
                 *self
                     .telemetry
                     .retired_partial_successes_by_actor
@@ -375,6 +590,9 @@ impl LiveObjectivePlanner {
         }
         if request.measurement_tick > p.tick
             || p.tick - request.measurement_tick > MAX_SURVEY_AGE_TICKS
+            || request
+                .covered_handoff
+                .is_some_and(|h| p.tick > h.deadline_tick)
         {
             return Err("expired");
         }
@@ -383,18 +601,7 @@ impl LiveObjectivePlanner {
             return Err("touchdown_changed");
         }
         if let (Some(old), Some(new)) = (request.actual, actual)
-            && (old.vehicle.distance_to(new.vehicle) > 0.002
-                || old.exit.distance_to(new.exit) > 0.002
-                || old
-                    .boarding_hatches
-                    .into_iter()
-                    .zip(new.boarding_hatches)
-                    .any(|(old, new)| match (old, new) {
-                        (Some(a), Some(b)) => a.distance_to(b) > 0.002,
-                        (None, None) => false,
-                        _ => true,
-                    })
-                || ((old.angle - new.angle) * 0.5).sin().abs() > 0.0001)
+            && old.changed(new)
         {
             return Err("hatch_moved");
         }
@@ -561,6 +768,9 @@ impl LiveObjectivePlanner {
             r.crossing
                 .is_none_or(|c| flight_valid && c.valid_at(p.tick))
         };
+        let corridor_valid = |r: &LandingObjectiveRoute| {
+            job.corridor_rise_valid(r.site, || state.objective_gravity(p))
+        };
         telemetry.flight_environment_checks += u64::from(request.flight_dependent);
         telemetry.flight_environment_mismatches += u64::from(!flight_valid);
         let excluded = [
@@ -618,7 +828,7 @@ impl LiveObjectivePlanner {
                 .sites
                 .iter()
                 .chain(survey.actual.iter())
-                .all(crossing_valid)
+                .all(|r| crossing_valid(r) && corridor_valid(r))
         {
             evidence.decision = PublicationDecision::WholeSurvey;
             evidence.retained_routes = evidence.source.entries;
@@ -635,7 +845,10 @@ impl LiveObjectivePlanner {
                 .chain(survey.actual.iter())
                 .find(|r| r.site == *site);
             if !route.is_some_and(|r| {
-                r.cost().is_some() && (gravity_valid || !uses_jump(r)) && crossing_valid(r)
+                r.cost().is_some()
+                    && (gravity_valid || !uses_jump(r))
+                    && crossing_valid(r)
+                    && corridor_valid(r)
             }) {
                 continue;
             }
@@ -762,6 +975,47 @@ impl LiveObjectivePlanner {
                 *self.telemetry.invalidations.entry(reason).or_default() += 1;
             }
         }
+        let covered_handoff = self.covered_handoff_candidate(state, player, o, objective);
+        if covered_handoff.is_some() {
+            self.retire(player);
+            // Replacement geometry and its environment share this new epoch.
+            // Charged old work remains in the ledger; never relabel its snapshot.
+            measurements = None;
+        }
+        // A new, currently scanned candidate can replace a finished walking
+        // probe's fallback. Preserve its charged work; the replacement takes a
+        // fresh snapshot instead of relabeling the old measurements as fresh.
+        let replace_probe = self.requests.get(&player).and_then(|request| {
+            if !self.walk_feedback
+                || request.actual.is_some()
+                || Self::actual(p).is_some()
+                || Self::valid(state, player, p, request, objective, true).is_err()
+            {
+                return None;
+            }
+            let job = self.queue.job(request.token)?;
+            if job.output().is_some() {
+                return None;
+            }
+            let (old, unsupported) =
+                job.exhausted_walk().map(|site| (site, false)).or_else(|| {
+                    self.walk_bounds_feedback
+                        .then(|| job.unsupported_walk())
+                        .flatten()
+                        .map(|(site, _)| (site, true))
+                })?;
+            matches!(p.site_query, LandingSiteQuery::Selected(id)
+                if id != old && p.sites.iter().any(|s| s.id == id))
+            .then_some(unsupported)
+        });
+        if let Some(unsupported) = replace_probe {
+            self.retire(player);
+            if unsupported {
+                self.telemetry.unsupported_walk_probe_restarts += 1;
+            } else {
+                self.telemetry.walk_probe_restarts += 1;
+            }
+        }
         if let Some(request) = self.requests.get_mut(&player) {
             o.objective_evidence.as_mut().unwrap().request(request);
             request.seen = p.tick;
@@ -877,6 +1131,38 @@ impl LiveObjectivePlanner {
                         }
                     }
                     JobPoll::Pending => {
+                        if self.walk_bounds_feedback {
+                            o.objective_evidence.as_mut().unwrap().unsupported_walk = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .unsupported_walk()
+                                .filter(|(site, _)| {
+                                    p.site_query == LandingSiteQuery::Selected(*site)
+                                        && p.sites.iter().any(|s| s.id == *site)
+                                })
+                                .map(|(site, bounds)| UnsupportedWalkingCorridor {
+                                    actor: p.owner,
+                                    site,
+                                    required_steps: bounds.required_steps,
+                                    max_steps: bounds.max_steps,
+                                });
+                        }
+                        if self.walk_feedback {
+                            o.objective_evidence.as_mut().unwrap().exhausted_walk = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .exhausted_walk()
+                                .filter(|&site| {
+                                    p.site_query == LandingSiteQuery::Selected(site)
+                                        && p.sites.iter().any(|s| s.id == site)
+                                })
+                                .map(|site| ExhaustedWalkingAttempt {
+                                    actor: p.owner,
+                                    site,
+                                });
+                        }
                         if let Some(early) = &mut self.early_candidates {
                             early.observe(
                                 state,
@@ -892,6 +1178,22 @@ impl LiveObjectivePlanner {
                             );
                         } else {
                             o.objective_work = Some(ObjectiveWorkState::Pending);
+                        }
+                        if self.actual_failure_players.contains(&player)
+                            && o.objective_work == Some(ObjectiveWorkState::Pending)
+                            && let Some(pose) = request.actual
+                            && let Some(reason) = self
+                                .queue
+                                .job(request.token)
+                                .unwrap()
+                                .actual_local_failure()
+                        {
+                            o.objective_evidence.as_mut().unwrap().actual_local_failure =
+                                Some(ActualLocalAttemptFailure {
+                                    actor: o.combat.recovery.flight.pilot.owner,
+                                    pose,
+                                    reason,
+                                });
                         }
                         return;
                     }
@@ -952,6 +1254,13 @@ impl LiveObjectivePlanner {
             }
             return;
         }
+        // A forecast's kinematic environment and geometry must share one source
+        // epoch. Discard warm geometry for this opt-in powered planner, including
+        // its full fallback when no selected/actual local pass is available;
+        // never relabel old measurements with the current environment's clock.
+        if self.powered_corridors && planning == ObjectivePlanning::JetpackRoundTrip {
+            measurements = None;
+        }
         let snapshot = measurements
             .as_ref()
             .map(|m| Arc::clone(&m.snapshot))
@@ -992,14 +1301,49 @@ impl LiveObjectivePlanner {
             self.local_dependencies,
             planning,
         ) {
+            let job = if self.focused_candidates {
+                let (_, cursor) = self
+                    .focused_cursor
+                    .entry(player)
+                    .and_modify(|(old, cursor)| {
+                        if !Self::same_objective(*old, objective) {
+                            *old = objective;
+                            *cursor = 0;
+                        }
+                    })
+                    .or_insert((objective, 0));
+                let job = job.with_focused_candidate(*cursor);
+                *cursor = (*cursor + 1) % landing_objective::MAX_OBJECTIVE_SITES;
+                job
+            } else {
+                job
+            };
+            let job = if self.extended_corridors {
+                job.with_extended_corridor(p.site_query)
+            } else if self.requested_corridors {
+                job.with_requested_corridor(p.site_query)
+            } else {
+                job
+            };
             let token = self
                 .queue
-                .submit(player as u64, p.tick, JobLimits::default(), job)
+                .submit(
+                    player as u64,
+                    p.tick,
+                    JobLimits::default(),
+                    if self.powered_corridors {
+                        job.with_powered_corridor(p.site_query)
+                    } else {
+                        job
+                    },
+                )
                 .unwrap();
             self.requests.insert(
                 player,
                 Request {
                     token,
+                    query: p.site_query,
+                    covered_handoff,
                     objective,
                     tick: p.tick,
                     measurement_tick,
@@ -1031,6 +1375,13 @@ impl LiveObjectivePlanner {
                 evidence.request(self.requests.get(&player).unwrap());
             }
             self.telemetry.submitted += 1;
+            if covered_handoff.is_some() {
+                *self
+                    .telemetry
+                    .covered_request_handoffs
+                    .entry(player)
+                    .or_default() += 1;
+            }
             self.telemetry.reused_requests += u64::from(reused);
             self.telemetry.max_retained_requests = self
                 .telemetry

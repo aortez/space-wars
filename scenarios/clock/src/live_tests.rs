@@ -35,6 +35,8 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                         event_profile,
                         marquee_preset,
                         rain_amount: ClockRainAmount::ALL[bits % ClockRainAmount::ALL.len()],
+                        crow_water_tolerance: ClockCrowWaterTolerance::ALL
+                            [bits % ClockCrowWaterTolerance::ALL.len()],
                         marquee_message: "Hi, it's 12:34!".parse().unwrap(),
                         events: ClockEvents {
                             falling: bits & 1 != 0,
@@ -90,9 +92,36 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     else {
         panic!()
     };
+    let longest = ClockSettings {
+        marquee_message: "A"
+            .repeat(engine_common::MAX_CLOCK_MESSAGE_BYTES)
+            .parse()
+            .unwrap(),
+        ..ClockSettings::default()
+    };
+    assert_eq!(
+        ClockAction::decode(&ClockAction::configure(longest)),
+        Some(ClockAction::Configure(longest))
+    );
+    let mut previous_version = payload.clone();
+    previous_version[0] = 11;
+    previous_version.remove(12);
+    assert_eq!(
+        ClockAction::decode(&Action::scenario(kind, previous_version)),
+        None
+    );
     // Exercise the current encoding too, rather than rejecting these merely
     // because they have an older version prefix.
-    for (offset, invalid) in [(2, 13), (3, 3), (5, 2), (6, 255), (7, 4), (8, 2), (9, 0xff)] {
+    for (offset, invalid) in [
+        (2, 13),
+        (3, 3),
+        (5, 2),
+        (6, 255),
+        (7, 4),
+        (8, 2),
+        (9, 0xff),
+        (12, 3),
+    ] {
         let mut bytes = payload.clone();
         bytes[offset] = invalid;
         assert_eq!(ClockAction::decode(&Action::scenario(kind, bytes)), None);
@@ -142,6 +171,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,
+        crow_water_tolerance: ClockCrowWaterTolerance::Varied,
         marquee_message: ClockMarqueeMessage::default(),
     };
     ClockScenario::step(

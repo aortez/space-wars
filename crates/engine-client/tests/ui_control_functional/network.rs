@@ -26,6 +26,18 @@ fn network_settings_handle_missing_service_and_preserve_paused_session() {
         assert!(!control_ids(&network).contains(&"network.cancel"));
         h.expect_press_failure(UiAction::Start, Some(UiScreen::LauncherNetwork), None);
         h.capture_screenshot("launcher-network.png");
+        let saved = h.activate("network.saved", Some(UiScreen::LauncherNetwork), None);
+        assert!(control_ids(&saved).contains(&"network.refresh"));
+        assert!(!control_ids(&saved).contains(&"network.forget"));
+        assert!(
+            !control_ids(&saved)
+                .iter()
+                .any(|id| id.starts_with("network.profile."))
+        );
+        h.capture_screenshot("launcher-saved-networks-unavailable.png");
+        h.activate("network.refresh", Some(UiScreen::LauncherNetwork), None);
+        let nearby = h.activate("network.back", Some(UiScreen::LauncherNetwork), None);
+        assert!(control_ids(&nearby).contains(&"network.saved"));
         // Background availability updates can revise this page at any time.
         let settings = h.activate("network.back", Some(UiScreen::LauncherNetwork), None);
         assert_eq!(settings.screen, UiScreen::LauncherSound);
@@ -57,6 +69,11 @@ fn network_settings_handle_missing_service_and_preserve_paused_session() {
         // or resuming a paused scenario.
         h.expect_press_failure(UiAction::Start, Some(UiScreen::PauseNetwork), None);
         h.capture_screenshot("pause-network.png");
+        let saved = h.activate("network.saved", Some(UiScreen::PauseNetwork), None);
+        assert!(saved.paused);
+        assert_eq!(saved.scenario_revision, game.scenario_revision);
+        assert!(control_ids(&saved).contains(&"network.refresh"));
+        h.activate("network.back", Some(UiScreen::PauseNetwork), None);
         let settings = h.activate("network.back", Some(UiScreen::PauseNetwork), None);
         assert_eq!(settings.screen, UiScreen::PauseSound);
         assert!(settings.paused);

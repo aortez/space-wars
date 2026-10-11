@@ -1,0 +1,21 @@
+Host: sw-picade.local
+Client SHA256: f7df26d3a6e10e0b4b25a172026865d83bc6ec3b909df96f9854b99edaf8bc88
+CLI SHA256: 970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5
+Verified service: MainPID=2816; NRestarts=0; ActiveState=active
+Final UI: {"revision": 7, "screen": "pause.main", "active_scenario": "scorched-earth", "scenario_revision": 2, "paused": true}
+Complete Round barrage plus quiet tail and Angular barrage; images inspected. Fresh Round/collapse-on 60-second barrage left paused.
+
+Visual HUD samples:
+{"image": "picade-actors-rest.png", "shape": "Round", "collapse": true, "phase": "Rest 28s", "loose": 47, "returned": 922, "impacts": 30, "capacity_rejections": 0, "bank_cells_released": 23, "fps": 32, "ups": 60}
+{"image": "picade-actors-angular.png", "shape": "Angular", "collapse": true, "phase": "Barrage 48s remaining", "loose": 147, "returned": 84, "impacts": 6, "capacity_rejections": 0, "bank_cells_released": 17, "fps": 16, "ups": 56}
+
+Selected CLI status samples (outside benchmarks):
+{"scenario": "scorched-earth", "fps": "24.6", "ups": "60.0", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "16.6", "ups": "57.8", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "17.6", "ups": "57.6", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "25.2", "ups": "60.1", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "24.2", "ups": "60.1", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "32.2", "ups": "60.6", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "26.5", "ups": "59.7", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "32.4", "ups": "60.0", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "15.0", "ups": "55.9", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}

@@ -113,6 +113,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) match_length: String,
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
+    pub(crate) loose_dirt: bool,
+    pub(crate) dirt_mode: String,
     pub(crate) combat_mission: String,
     pub(crate) combat_asteroid_interval: String,
     pub(crate) combat_asteroid_strength: String,
@@ -132,7 +134,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_color_cycle_enabled: bool,
     pub(crate) clock_meltdown_enabled: bool,
     pub(crate) clock_duck_enabled: bool,
-    pub(crate) clock_crow_enabled: bool,
+    pub(crate) clock_crow: String,
     pub(crate) clock_explosion_enabled: bool,
     pub(crate) clock_marquee_enabled: bool,
     pub(crate) clock_digit_slide_enabled: bool,
@@ -440,6 +442,15 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
             ] {
                 push_choice(&mut controls, id, &value);
             }
+            push_choice(
+                &mut controls,
+                "launcher.settings.match.loose-dirt",
+                if context.loose_dirt {
+                    &context.dirt_mode
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -450,6 +461,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.match.asteroid-interval",
                 "launcher.settings.match.asteroid-strength",
                 "launcher.settings.match.length",
+                "launcher.settings.match.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -536,6 +548,15 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.asteroid-strength",
                 &context.combat_asteroid_strength,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.loose-dirt",
+                if context.loose_dirt {
+                    &context.dirt_mode
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -544,6 +565,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.mission",
                 "launcher.settings.combat.asteroid-interval",
                 "launcher.settings.combat.asteroid-strength",
+                "launcher.settings.combat.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -571,11 +593,21 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.travel.asteroid-strength",
                 &context.combat_asteroid_strength,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.loose-dirt",
+                if context.loose_dirt {
+                    &context.dirt_mode
+                } else {
+                    "Off"
+                },
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.travel.asteroid-interval",
                 "launcher.settings.travel.asteroid-strength",
+                "launcher.settings.travel.loose-dirt",
                 "launcher.settings.back",
             ]
         }
@@ -644,7 +676,6 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     context.clock_meltdown_enabled,
                 ),
                 ("launcher.settings.clock.duck", context.clock_duck_enabled),
-                ("launcher.settings.clock.crow", context.clock_crow_enabled),
                 (
                     "launcher.settings.clock.explosion",
                     context.clock_explosion_enabled,
@@ -669,6 +700,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 &mut controls,
                 "launcher.settings.clock.rain",
                 &context.clock_rain,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.crow",
+                &context.clock_crow,
             );
             controls.push(UiControl::new(
                 "launcher.settings.clock.fonts",
@@ -990,13 +1026,10 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     push_choice(&mut controls, "pause.clock.rain", &context.clock_rain);
-    controls.push(UiControl::new("pause.clock.crow", "Crow", true).with_value(
-        if context.clock_crow_enabled {
-            "On"
-        } else {
-            "Off"
-        },
-    ));
+    controls.push(
+        UiControl::new("pause.clock.crow", "Crow water tolerance", true)
+            .with_value(&context.clock_crow),
+    );
     controls.push(
         UiControl::new("pause.clock.explosion", "Explosion", true).with_value(
             if context.clock_explosion_enabled {
@@ -1085,7 +1118,7 @@ mod tests {
             clock_color_cycle_enabled: true,
             clock_meltdown_enabled: true,
             clock_duck_enabled: true,
-            clock_crow_enabled: true,
+            clock_crow: "Varied".into(),
             clock_explosion_enabled: true,
             clock_marquee_enabled: true,
             clock_digit_slide_enabled: true,
@@ -1313,7 +1346,7 @@ mod tests {
     #[test]
     fn settings_inventory_matches_each_scenario() {
         let cases = [
-            ("spacewars", 20, "launcher.settings.match.player-2"),
+            ("spacewars", 22, "launcher.settings.match.player-2"),
             (
                 "spacewars-classic",
                 16,

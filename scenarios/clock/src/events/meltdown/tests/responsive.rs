@@ -171,10 +171,13 @@ fn responsive_meltdown_sweep_conserves_material_and_releases_its_floor() {
                 let mut peak_load = 0;
                 let mut previous_open = 0;
                 let mut saw_closing = false;
+                let mut splash_bursts = 0;
                 for elapsed in 0..510 {
                     assert_volume(&state);
                     assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
                     let stats = state.meltdown_state().unwrap();
+                    splash_bursts = stats.drain_splash_bursts;
+                    assert!(splash_bursts <= elapsed / 15 + 1);
                     assert_eq!(stats, replay.meltdown_state().unwrap());
                     assert_eq!(
                         stats.floor_motion_deferrals, 0,
@@ -198,6 +201,15 @@ fn responsive_meltdown_sweep_conserves_material_and_releases_its_floor() {
                     let floor = event.floor.as_ref().unwrap();
                     for (side, pool) in event.water.pools().iter().enumerate() {
                         let points = floor.shape.panel_points(side, floor.opening);
+                        let (center, angle) = floor.shape.panel_pose(side, floor.opening);
+                        let half = floor.shape.panel_half_extents();
+                        for p in event.water.parcels() {
+                            let local = (p.position - center).rotate_radians(-angle);
+                            assert!(
+                                local.x.abs() >= half.x - 0.001 || local.y.abs() >= half.y - 0.001,
+                                "water inside Meltdown panel: aspect={aspect} seed={seed} tick={elapsed} {p:?}"
+                            );
+                        }
                         for c in pool.columns() {
                             for (x, y) in
                                 [(c.left, c.bed_edges[0]), (c.left + c.width, c.bed_edges[1])]
@@ -226,6 +238,15 @@ fn responsive_meltdown_sweep_conserves_material_and_releases_its_floor() {
                     "{aspect} {hour} {seed}: {peak_open} {peak_load}"
                 );
                 assert!(state.meltdown_state().is_none());
+                if hour == 8 {
+                    assert!(
+                        splash_bursts > 0,
+                        "no drain splashes: aspect={aspect} format={format:?} seed={seed}"
+                    );
+                }
+                eprintln!(
+                    "meltdown splashes aspect={aspect:.3} hour={hour} format={format:?} seed={seed}: bursts={splash_bursts}"
+                );
                 assert!(
                     saw_closing,
                     "floor never started closing: {aspect} {hour} {seed}"
@@ -292,6 +313,7 @@ fn crowded_parcels_defer_geometry_atomically_not_just_the_art() {
             .unwrap();
     }
     let stats = event.water.stats();
+    let solids = event.water.solid_boxes().to_vec();
     let before: Vec<_> = event
         .water
         .pools()
@@ -302,6 +324,7 @@ fn crowded_parcels_defer_geometry_atomically_not_just_the_art() {
     assert_eq!(event.floor.as_ref().unwrap().opening, 0.0);
     assert_eq!(event.floor.as_ref().unwrap().deferrals, 1);
     assert_eq!(stats, event.water.stats());
+    assert_eq!(solids, event.water.solid_boxes());
     assert_eq!(
         before,
         event

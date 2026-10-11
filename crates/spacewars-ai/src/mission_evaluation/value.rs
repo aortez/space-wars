@@ -28,6 +28,7 @@ pub struct ValueDecision {
 
 pub(super) fn enabled(policy: &str) -> bool {
     policy == crate::mission_policy::MissionPolicy::ValuePlanner.id()
+        || super::flag_evidence::enabled(policy)
 }
 
 pub(super) fn finish(report: &mut MissionEvaluation) {

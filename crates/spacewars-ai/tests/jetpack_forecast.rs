@@ -15,6 +15,15 @@ const DT: Duration = Duration::from_nanos(16_666_667);
 
 #[test]
 fn predicted_vehicle_crossings_land_both_directions_with_charge_in_both_seats() {
+    check_vehicle_crossings(false);
+}
+
+#[test]
+fn active_vehicle_crossings_finish_without_another_launch_forecast() {
+    check_vehicle_crossings(true);
+}
+
+fn check_vehicle_crossings(active: bool) {
     for seat in 0..2 {
         let owner = PlayerId::from_index(seat).unwrap();
         let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);
@@ -65,6 +74,8 @@ fn predicted_vehicle_crossings_land_both_directions_with_charge_in_both_seats() 
                     position: destination,
                 },
             );
+            task.set_active_flight_checks(active);
+            let mut checked_continuation = false;
             let mut lowest: f32 = 1.0;
             let before = state
                 .jetpack_navigation_observation(seat)
@@ -88,6 +99,81 @@ fn predicted_vehicle_crossings_land_both_directions_with_charge_in_both_seats() 
                     j.vehicle_forecast = fresh;
                     j.crossing = fresh.map(|f| f.plan);
                     j.terrain_crossings.clear();
+                }
+                if let Some(request) = task.vehicle_flight_request()
+                    && o.jetpack.as_ref().unwrap().surveyed
+                {
+                    let before = state.recovery_task_observation(seat, None);
+                    let continuation = state.vehicle_flight_continuation(seat, &o, request);
+                    assert!(
+                        continuation.valid_for(
+                            request,
+                            o.flight.pilot.tick,
+                            o.jetpack.as_ref().unwrap().charge
+                        ),
+                        "seat={seat} leg={leg} continuation={continuation:?}"
+                    );
+                    assert_eq!(state.recovery_task_observation(seat, None), before);
+                    let j = o.jetpack.as_mut().unwrap();
+                    j.vehicle_continuation = Some(continuation);
+                    // The active maneuver uses current physical continuation,
+                    // even when a new launch/reverse/window forecast is absent.
+                    j.vehicle_forecast = None;
+                    j.crossing = None;
+                    if !checked_continuation {
+                        for mutation in 0..5 {
+                            let mut invalid = o.clone();
+                            let j = invalid.jetpack.as_mut().unwrap();
+                            match mutation {
+                                0 => j.vehicle_continuation = None,
+                                1 => j.vehicle_continuation.as_mut().unwrap().tick -= 1,
+                                2 => {
+                                    j.vehicle_continuation
+                                        .as_mut()
+                                        .unwrap()
+                                        .request
+                                        .launched_tick += 1
+                                }
+                                3 => j.vehicle_continuation.as_mut().unwrap().remaining = None,
+                                _ => {
+                                    j.vehicle_continuation.as_mut().unwrap().rejection =
+                                        Some("world_clearance")
+                                }
+                            }
+                            let mut copy = task.clone();
+                            let action = copy.step(&invalid);
+                            assert_eq!(copy.telemetry().flight_interruptions, 1);
+                            assert!(!action.primary_held);
+                        }
+                        let mut low = o.clone();
+                        low.jetpack.as_mut().unwrap().charge = 0.05;
+                        assert_eq!(
+                            state
+                                .vehicle_flight_continuation(seat, &low, request)
+                                .rejection,
+                            Some("fuel_reserve")
+                        );
+                        let mut missing = o.clone();
+                        missing
+                            .ground
+                            .as_mut()
+                            .unwrap()
+                            .nodes
+                            .retain(|n| n.id != request.launch.nodes[0]);
+                        assert_eq!(
+                            state
+                                .vehicle_flight_continuation(seat, &missing, request)
+                                .rejection,
+                            Some("endpoints_unavailable")
+                        );
+                        let mut late = request;
+                        late.launched_tick = late.launch.launch_until_tick + 1;
+                        assert_eq!(
+                            state.vehicle_flight_continuation(seat, &o, late).rejection,
+                            Some("flight_identity_or_deadline")
+                        );
+                        checked_continuation = true;
+                    }
                 }
                 lowest = lowest.min(o.jetpack.as_ref().unwrap().charge);
                 let action = task.step(&o);
@@ -114,6 +200,7 @@ fn predicted_vehicle_crossings_land_both_directions_with_charge_in_both_seats() 
                 SurfaceSortieScenario::step(&mut state, &[action.encode(owner)], DT);
             }
             assert!(launched && (leg == 0 || recharge_ticks >= 180));
+            assert_eq!(checked_continuation, active);
             assert!(
                 finished && task.telemetry().jetpack_crossings == 1 && lowest > 0.0,
                 "seat={seat} leg={leg} lowest={lowest}: {:?}",
@@ -126,6 +213,15 @@ fn predicted_vehicle_crossings_land_both_directions_with_charge_in_both_seats() 
 
 #[test]
 fn moving_vehicle_crossing_forecasts_match_physical_flights() {
+    check_moving_crossings(false);
+}
+
+#[test]
+fn active_moving_crossings_revalidate_both_directions_from_actual_motion() {
+    check_moving_crossings(true);
+}
+
+fn check_moving_crossings(active: bool) {
     for (radius, spin, orbit) in [
         (30.0, 0.02, 0.04),
         (30.0, -0.02, -0.04),
@@ -192,6 +288,7 @@ fn moving_vehicle_crossing_forecasts_match_physical_flights() {
                         position: destination,
                     },
                 );
+                task.set_active_flight_checks(active);
                 let before = state
                     .jetpack_navigation_observation(seat)
                     .unwrap()
@@ -220,6 +317,22 @@ fn moving_vehicle_crossing_forecasts_match_physical_flights() {
                             latest = f;
                         }
                         j.terrain_crossings.clear();
+                    }
+                    if let Some(request) = task.vehicle_flight_request()
+                        && o.jetpack.as_ref().unwrap().surveyed
+                    {
+                        let continuation = state.vehicle_flight_continuation(seat, &o, request);
+                        assert!(
+                            continuation.valid_for(
+                                request,
+                                o.flight.pilot.tick,
+                                o.jetpack.as_ref().unwrap().charge
+                            ),
+                            "radius={radius} seat={seat} leg={leg} {continuation:?}"
+                        );
+                        o.jetpack.as_mut().unwrap().vehicle_continuation = Some(continuation);
+                        o.jetpack.as_mut().unwrap().vehicle_forecast = None;
+                        o.jetpack.as_mut().unwrap().crossing = None;
                     }
                     let action = task.step(&o);
                     lowest = lowest.min(o.jetpack.as_ref().unwrap().charge);

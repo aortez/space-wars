@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-02",
+  "base": "a98559a48d10a8c755ff6a27e912468cf626d0f5",
+  "description": "Native full Clock cycles, selected varied Lively preset, global scenario seed 7; not a performance profile or device capture.",
+  "simulation_hz": 60,
+  "rain_seconds": 42,
+  "meltdown_seconds": 8.5,
+  "source_sha256": {
+    "crates/engine-water/src/splash.rs": "8ed3f6be29f1475f17b7b692a3691e26a6310463aa3ac45a203cf685990f36a0",
+    "scenarios/clock/src/floor/responsive.rs": "1b437283facb5be8a54954b317e599d56a32744191fbe994baabc76960168083",
+    "scenarios/clock/src/rain/surfaces.rs": "88f25d3d1dcf5e64823f9ef000154ea4664d9d1c70c78488a6503149a7c0a3de",
+    "scenarios/clock/src/events/meltdown.rs": "1f3f7677656628f9f6db1598387398ca2e3e5f05e6d40cda3ad4eeba2588dd0f",
+    "crates/engine-client/src/water_visual_tests/splash.rs": "a61c15948e41e3273635c60493c90557816cfd65b3b0c63292c0a9a82759f6fb"
+  },
+  "cycles": [
+    {
+      "bursts": 92,
+      "captured_burst_tick": 602,
+      "event": "rain",
+      "first_burst_tick": 107,
+      "height": 768,
+      "peak_parcels": 257,
+      "redirected_microunits": 1611288,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 1024
+    },
+    {
+      "bursts": 16,
+      "captured_burst_tick": 198,
+      "event": "meltdown",
+      "first_burst_tick": 120,
+      "height": 768,
+      "peak_parcels": 106,
+      "redirected_microunits": 414619,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 1024
+    },
+    {
+      "bursts": 95,
+      "captured_burst_tick": 619,
+      "event": "rain",
+      "first_burst_tick": 107,
+      "height": 480,
+      "peak_parcels": 263,
+      "redirected_microunits": 1459800,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 800
+    },
+    {
+      "bursts": 16,
+      "captured_burst_tick": 197,
+      "event": "meltdown",
+      "first_burst_tick": 119,
+      "height": 480,
+      "peak_parcels": 106,
+      "redirected_microunits": 251459,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 800
+    },
+    {
+      "bursts": 63,
+      "captured_burst_tick": 605,
+      "event": "rain",
+      "first_burst_tick": 257,
+      "height": 800,
+      "peak_parcels": 259,
+      "redirected_microunits": 1585241,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 480
+    },
+    {
+      "bursts": 16,
+      "captured_burst_tick": 193,
+      "event": "meltdown",
+      "first_burst_tick": 115,
+      "height": 800,
+      "peak_parcels": 116,
+      "redirected_microunits": 546851,
+      "seed": 7,
+      "suppressed": 0,
+      "width": 480
+    }
+  ]
+}

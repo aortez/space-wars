@@ -11,7 +11,11 @@ engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-gravity = { workspace = true }
 engine-rapier = { workspace = true }
+engine-soil = { workspace = true }
 engine-terrain = { workspace = true }
 
 [dev-dependencies]
 bincode = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

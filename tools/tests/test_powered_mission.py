@@ -1,0 +1,123 @@
+import copy
+import importlib.util
+from pathlib import Path
+import unittest
+
+from test_capture_execution import fixture
+
+spec=importlib.util.spec_from_file_location('powered_mission',Path(__file__).parents[1]/'validate-powered-mission.py')
+M=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(M)
+
+
+def publication(live=True):
+    return dict(pilot=dict(tick=100,owner='player_1',planet=dict(index=1)),
+        landing_objective=dict(planning='jetpack_round_trip',actor='player_1',tick=90 if live else 100,
+            validated_tick=100 if live else None,objective=dict(planet=1,revision=0),sites=[],actual=None),
+        objective_work='ready' if live else None,
+        objective_evidence=dict(measurement_tick=90,publication=dict(retained_routes=1)) if live else None)
+
+
+def visits():
+    _,rows,_=fixture()
+    visit=dict(planet=1,recorded=dict(departed_tick=106),physical=dict.fromkeys(['landed','exited','claimed','boarded','departed']))
+    converted=[]
+    for row in rows:
+        p=copy.deepcopy(row['observation']['combat']['recovery']['flight']['pilot'])
+        converted.append(dict(pilot=p,planets=[None,copy.deepcopy(p['planet'])],capture=None))
+    return visit,converted
+
+
+class PoweredMissionTests(unittest.TestCase):
+    def test_all_pairs_share_commands_except_the_declared_route_option(self):
+        plan=M.plan()
+        self.assertEqual(len(plan),28)
+        self.assertEqual(len({p['group'] for p in plan}),14)
+        for group in sorted({p['group'] for p in plan}):
+            arms=[p for p in plan if p['group']==group]
+            self.assertEqual({a['powered'] for a in arms},{False,True})
+            commands=[M.arguments(p) for p in arms]
+            for command in commands:
+                self.assertEqual(command[command.index('--objective-graph-budget')+1],'4')
+                self.assertEqual(command[command.index('--objective-query-budget')+1],'384')
+                i=command.index('--powered-capture-seats');del command[i:i+2]
+            self.assertEqual(*commands)
+        self.assertEqual(len({p['seed'] for p in plan if p['kind']=='armed'}),2)
+
+    def test_live_and_native_evidence_have_distinct_clock_contracts(self):
+        self.assertEqual(M.audit_publication(publication(),'jetpack_round_trip')['age'],10)
+        self.assertEqual(M.audit_publication(publication(False),'jetpack_round_trip')['age'],0)
+        for field,value in [('tick',-21),('validated_tick',99),('planning','joint_round_trip'),('actor','player_2')]:
+            row=publication();row['landing_objective'][field]=value
+            with self.assertRaises(AssertionError,msg=field): M.audit_publication(row,'jetpack_round_trip')
+        row=publication();row['objective_work']='pending'
+        with self.assertRaises(AssertionError): M.audit_publication(row,'jetpack_round_trip')
+        row=publication(False);row['landing_objective']['tick']=99
+        with self.assertRaises(AssertionError): M.audit_publication(row,'jetpack_round_trip')
+
+    def test_powered_delivery_cannot_renew_an_expired_launch_window(self):
+        row=publication()
+        row['landing_objective']['sites']=[dict(crossing=dict(measured_tick=90,launch_until_tick=99,plan=dict(planet=1,revision=0)))]
+        with self.assertRaises(AssertionError): M.audit_publication(row,'jetpack_round_trip')
+        row['landing_objective']['sites'][0]['crossing']['launch_until_tick']=120
+        self.assertEqual(M.audit_publication(row,'jetpack_round_trip')['powered'],1)
+
+    def test_mission_departure_uses_the_target_frame_and_earned_capture(self):
+        visit,rows=visits()
+        rows[-1]['pilot']['planet']=dict(index=2)
+        for row in rows: M.observe_visit(visit,row)
+        self.assertEqual(visit['physical'],dict(landed=101,exited=102,claimed=104,boarded=105,departed=106))
+
+    def test_unearned_claim_wrong_ship_and_grounded_departure_fail(self):
+        for change in ['owner','capture_count','vehicle','clearance']:
+            visit,rows=visits()
+            if change=='owner':
+                for row in rows: row['planets'][1]['claim']['owner']='player_2'
+            elif change=='capture_count':
+                for row in rows: row['planets'][1]['claim']['captures']=0
+            elif change=='vehicle':
+                for row in rows[5:]: row['pilot']['location']={'aboard':1}
+            else: rows[-1]['pilot']['ship']['position']['y']=70
+            with self.assertRaises(AssertionError,msg=change):
+                for row in rows: M.observe_visit(visit,row)
+
+    def test_recapture_does_not_erase_an_earlier_physical_claim(self):
+        visit,rows=visits();rows[-1]['planets'][1]['claim']['owner']='player_2'
+        for row in rows: M.observe_visit(visit,row)
+        self.assertEqual(visit['physical']['claimed'],104)
+
+    def test_existing_terrain_hop_is_not_a_forecasted_vehicle_flight(self):
+        plan=dict(planet=0,revision=2,direction='Right',start=dict(x=38,y=39),destination=dict(x=43,y=41),
+            cruise_radius=62,anchor=dict(GroundGap=dict(from_=446,to=449)))
+        plan['anchor']['GroundGap']['from']=plan['anchor']['GroundGap'].pop('from_')
+        equipment=dict(charge=1.0,terrain_crossings=[copy.deepcopy(plan)],crossing=None)
+        launch=dict(tick=101,equipment=equipment,latest_forecast=None,
+            ground=dict(policy='ground_navigation_v10',crossing=dict(plan=plan)))
+        survey=dict(tick=90,equipment=equipment)
+        self.assertEqual(M.audit_launch(launch,survey),'existing_ground_gap')
+        launch['ground']['policy']='ground_navigation_v12'
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['ground']['policy']='ground_navigation_v10'
+        launch['equipment']['charge']=0.84
+        self.assertEqual(M.audit_corridor(launch,survey),'existing_ground_gap')
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['equipment']['charge']=1.0
+        launch['tick']=120
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+        launch['tick']=101
+        launch['ground']['crossing']['plan']['start']['x']+=2
+        with self.assertRaises(AssertionError): M.audit_launch(launch,survey)
+
+    def test_resuming_lift_keeps_the_original_takeoff_identity(self):
+        seen=set()
+        ground=dict(started_tick=100,crossing=dict(started_tick=120,goal='Lift'))
+        self.assertTrue(M.first_launch(0,ground,seen))
+        # The same crossing resumes after a fresh terrain survey. Its fuel
+        # has already been spent by the original flight, not by a new takeoff.
+        self.assertFalse(M.first_launch(0,ground,seen))
+        self.assertTrue(M.first_launch(1,ground,seen))
+        ground['crossing']['started_tick']=200
+        self.assertTrue(M.first_launch(0,ground,seen))
+
+
+if __name__=='__main__': unittest.main()

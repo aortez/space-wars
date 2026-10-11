@@ -85,49 +85,7 @@ impl Terrain {
             if index == largest {
                 continue;
             }
-            let mut bounds = component.bounds;
-            if self.distances.is_some() {
-                // Retain a void sample halo: tight material cropping would lose
-                // the original edge-crossing positions around the fragment.
-                bounds.min.x = (bounds.min.x - 1).max(0);
-                bounds.min.y = (bounds.min.y - 1).max(0);
-                bounds.max.x = (bounds.max.x + 1).min(self.width as i32 - 1);
-                bounds.max.y = (bounds.max.y + 1).min(self.height as i32 - 1);
-            }
-            let width = (bounds.max.x - bounds.min.x + 1) as u32;
-            let height = (bounds.max.y - bounds.min.y + 1) as u32;
-            let mut terrain = Terrain::generate(
-                width,
-                height,
-                self.cell_size,
-                self.materials.clone(),
-                |_| MaterialId::VOID,
-            )?;
-            for &source in &component.indices {
-                let x = source % self.width - bounds.min.x as u32;
-                let y = source / self.width - bounds.min.y as u32;
-                terrain.cells[(y * width + x) as usize] = self.cells[source as usize];
-            }
-            if self.distances.is_some() {
-                terrain.version = 2;
-                terrain.distances = Some(
-                    (0..height)
-                        .flat_map(|y| (0..width).map(move |x| (x, y)))
-                        .map(|(x, y)| {
-                            let c = CellCoord::new(x as i32, y as i32);
-                            let original = CellCoord::new(c.x + bounds.min.x, c.y + bounds.min.y);
-                            let solid = terrain.cell(c).unwrap().material != MaterialId::VOID;
-                            self.bound_distance(self.distance(original), solid)
-                        })
-                        .collect(),
-                );
-                terrain.validate()?;
-            }
-            fragments.push(DetachedTerrain {
-                terrain,
-                parent_offset: self.cell_center(bounds.min)
-                    + Vec2::new(width as f32 - 1.0, height as f32 - 1.0) * (self.cell_size * 0.5),
-            });
+            fragments.push(self.copy_region_cells(&component.indices, component.bounds)?);
         }
         self.revision += 1;
         let columns = self.width.div_ceil(CHUNK_SIZE);

@@ -1,0 +1,18 @@
+Runtime: 5d02c6dc0b3c65e1b3a6d5d5a9b584baedcbcc12
+Client SHA256: 54a18110715c9d11ece57a988fa70644fcc46ecb88f6e741636215e71714c45c
+CLI SHA256: 970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5
+Service: MainPID=1145 NRestarts=0 ActiveState=active
+Snapshots: Angular/off, Round/off, Round/on, Angular/off quiet tail, fresh Angular/off barrage paused.
+
+Sample 1: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=26.5, ups=59.9, host_step_avg_ms=5.024, host_step_p95_ms=10.994, host_step_max_ms=16.908
+Sample 2: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=27.1, ups=59.9, host_step_avg_ms=6.211, host_step_p95_ms=14.754, host_step_max_ms=41.796
+Sample 3: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=22.9, ups=60.7, host_step_avg_ms=10.570, host_step_p95_ms=27.988, host_step_max_ms=65.381
+Sample 4: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=29.6, ups=60.2, host_step_avg_ms=4.465, host_step_p95_ms=8.850, host_step_max_ms=15.684
+Sample 5: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=28.1, ups=60.0, host_step_avg_ms=7.057, host_step_p95_ms=14.071, host_step_max_ms=22.407
+Sample 6: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=25.9, ups=60.5, host_step_avg_ms=8.301, host_step_p95_ms=16.164, host_step_max_ms=25.361
+Sample 7: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=26.6, ups=60.2, host_step_avg_ms=7.150, host_step_p95_ms=13.148, host_step_max_ms=24.074
+Sample 8: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=22.1, ups=59.7, host_step_avg_ms=10.643, host_step_p95_ms=20.180, host_step_max_ms=42.572
+Sample 9: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=32.0, ups=59.9, host_step_avg_ms=5.334, host_step_p95_ms=16.141, host_step_max_ms=25.546
+Sample 10: scenario=scorched-earth, scenario_revision=3, paused=false, renderer=raster, raster_scale=2.00, fps=32.8, ups=59.6, host_step_avg_ms=0.568, host_step_p95_ms=4.868, host_step_max_ms=5.035
+
+Final state: {"schema_version":1,"revision":11,"screen":"pause.main","active_scenario":"scorched-earth","selected_scenario":"scorched-earth","selected_control":"pause.resume","controls":[{"id":"pause.resume","label":"Resume","enabled":true},{"id":"pause.restart","label":"Restart Round","enabled":true},{"id":"pause.controls","label":"Controls","enabled":true},{"id":"pause.return-to-launcher","label":"Return to Launcher","enabled":true},{"id":"pause.sound","label":"App Settings","enabled":true}],"actions":["up","down","left","right","confirm","back","start","controls"],"scenario_revision":4,"paused":true,"benchmark_active":false,"error":null}

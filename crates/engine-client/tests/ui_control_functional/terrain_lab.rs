@@ -6,6 +6,18 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
     run_terrain_lifecycle("terrain-lab");
 }
 
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn terrain_grains_launch_pause_restart_and_both_renderers() {
+    run_terrain_lifecycle("terrain-grains");
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn scorched_earth_launch_pause_restart_and_both_renderers() {
+    run_terrain_lifecycle("scorched-earth");
+}
+
 pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
     // Slint's software backend does not draw Path items. Femtovg exercises
     // actual vector paths as well as our software raster image and text overlay.
@@ -18,6 +30,35 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 scenario,
                 "spacewars-terrain-combat" | "spacewars-terrain-duel"
             ) {
+                let loose = "launcher.settings.combat.loose-dirt.next";
+                if renderer == "vector" {
+                    assert_eq!(control_value(&state, loose), Some("Off"));
+                    let choices = [
+                        "Off",
+                        "Round grains",
+                        "Angular grains",
+                        "Weak · Round",
+                        "Weak · Angular",
+                        "Strong · Round",
+                        "Strong · Angular",
+                    ];
+                    for expected in choices.iter().skip(1).chain(choices.first()) {
+                        state = harness.activate_guarded(loose, &state);
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
+                    for expected in choices.iter().rev() {
+                        state = harness.activate_guarded(
+                            "launcher.settings.combat.loose-dirt.previous",
+                            &state,
+                        );
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
+                    for expected in choices.iter().skip(1).take(4) {
+                        state = harness.activate_guarded(loose, &state);
+                        assert_eq!(control_value(&state, loose), Some(*expected));
+                    }
+                }
+                assert_eq!(control_value(&state, loose), Some("Weak · Angular"));
                 let interval = "launcher.settings.combat.break-interval.next";
                 let duration = "launcher.settings.combat.break-duration.next";
                 let mission = "launcher.settings.combat.mission.next";
@@ -132,6 +173,82 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 &format!("{scenario}-{renderer}.png"),
                 minimum_scene_pixels,
             );
+            if scenario == "scorched-earth" {
+                for button in [
+                    spacewars_control::InputButton::East,
+                    spacewars_control::InputButton::LeftShoulder,
+                ] {
+                    let request = spacewars_control::InputPressRequest::new(&state, button);
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(4))
+                        .unwrap()
+                        .state;
+                }
+                for _ in 0..2 {
+                    let mut request = spacewars_control::InputPressRequest::new(
+                        &state,
+                        spacewars_control::InputButton::South,
+                    );
+                    request.hold_ms = 2000;
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(4))
+                        .unwrap()
+                        .state;
+                }
+                let path = harness.capture_screenshot(&format!("{scenario}-{renderer}-impact.png"));
+                let mut reader = png::Decoder::new(File::open(path).unwrap())
+                    .read_info()
+                    .unwrap();
+                let mut buffer = vec![0; reader.output_buffer_size()];
+                let info = reader.next_frame(&mut buffer).unwrap();
+                let grains = buffer[..info.buffer_size()]
+                    .chunks_exact(4)
+                    .filter(|p| {
+                        (194..=198).contains(&p[0])
+                            && (148..=152).contains(&p[1])
+                            && (85..=89).contains(&p[2])
+                    })
+                    .count();
+                assert!(
+                    grains > 10,
+                    "shell did not displace visible dirt on {renderer}: {grains} pixels"
+                );
+            }
+            if scenario == "terrain-grains" {
+                for button in [
+                    spacewars_control::InputButton::South,
+                    spacewars_control::InputButton::West,
+                ] {
+                    let mut request = spacewars_control::InputPressRequest::new(&state, button);
+                    request.hold_ms = 2000;
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(5))
+                        .unwrap()
+                        .state;
+                }
+                let path = harness
+                    .capture_screenshot(&format!("{scenario}-{renderer}-box-and-grains.png"));
+                let mut reader = png::Decoder::new(File::open(path).unwrap())
+                    .read_info()
+                    .unwrap();
+                let mut buffer = vec![0; reader.output_buffer_size()];
+                let info = reader.next_frame(&mut buffer).unwrap();
+                let grains = buffer[..info.buffer_size()]
+                    .chunks_exact(4)
+                    .filter(|p| {
+                        (174..=179).contains(&p[0])
+                            && (120..=125).contains(&p[1])
+                            && (64..=69).contains(&p[2])
+                    })
+                    .count();
+                assert!(
+                    grains > 100,
+                    "blasted grains are absent from {renderer}: {grains} pixels"
+                );
+            }
             let first_instance = state.scenario_revision;
             let pause = harness.pause_guarded(&state);
             state = harness.wait_for(
@@ -187,7 +304,8 @@ pub(super) fn wait_for_terrain_frame(
     let deadline = Instant::now() + TRANSITION_TIMEOUT;
     loop {
         let path = harness.capture_screenshot(name);
-        let (terrain_pixels, text_pixels) = terrain_pixel_counts(&path);
+        let (terrain_pixels, text_pixels) =
+            terrain_pixel_counts(&path, name.starts_with("scorched-earth-"));
         if terrain_pixels > minimum_scene_pixels && text_pixels > 150 {
             return;
         }
@@ -199,7 +317,7 @@ pub(super) fn wait_for_terrain_frame(
     }
 }
 
-fn terrain_pixel_counts(path: &Path) -> (usize, usize) {
+fn terrain_pixel_counts(path: &Path, centered_hud: bool) -> (usize, usize) {
     let mut reader = png::Decoder::new(File::open(path).unwrap())
         .read_info()
         .unwrap();
@@ -220,7 +338,10 @@ fn terrain_pixel_counts(path: &Path) -> (usize, usize) {
             let y = *index / width;
             // Terrain Lab retains its title. Gameplay instead places the
             // persistent labels beside the bottom radars; prompts may be absent.
-            (y < height / 8
+            // Scorched Earth fits its full canvas in narrow windows, including
+            // its HUD; the title can therefore be below the top screen edge.
+            (centered_hud
+                || y < height / 8
                 || hud_regions::vitals(x, y, width, height, 0)
                 || hud_regions::vitals(x, y, width, height, 1))
                 && p[0] > 170

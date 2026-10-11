@@ -173,9 +173,11 @@ impl MissionEvaluator {
             let fresh = if local {
                 model::observe_local(o, mission)
             } else {
-                state
-                    .and_then(|s| survey::evidence(&s.survey, o))
-                    .filter(|s| s.key.planet == destination)
+                state.and_then(|s| {
+                    survey::evidence(&s.survey, o)
+                        .into_iter()
+                        .find(|sample| sample.key.planet == destination)
+                })
             };
             let sample = match fresh {
                 Some(mut sample) => {
@@ -318,7 +320,7 @@ impl LocalChoice {
             observed_tick: p.tick,
             visit,
             site,
-            key: old.map_or(key, |c| c.key.clone()),
+            key: old.map_or(key, |c| c.key),
             gravity: old.map_or(o.local.objective_gravity, |c| c.gravity),
         })
     }

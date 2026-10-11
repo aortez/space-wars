@@ -65,3 +65,8 @@ Broader strategy and any default-policy promotion should be separate changes
 with their own comparison criteria and Pi playtesting.
 
 The [long-term design](design/budgeted-bot-planning.md) remains the roadmap.
+
+The later [mission-execution checkpoint](bot-route-evidence-checkpoint.md)
+records the local follow-through from destination estimates into actual route
+delivery, capture, recovery and travel under fire. It retains the experimental
+options and their regressions as a separate review boundary.

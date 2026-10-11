@@ -1,0 +1,21 @@
+Host: sw-picade.local
+engine-client SHA256: 268471885a7f4a8e4b507f76c5f5c036e8dc9e3af4cc0f57b37b1440ab547579
+spacewars-cli SHA256: 970fb7c88423601fef4889226ba5d8f88fc258054b2e855c1375424ccee5fae5
+Service: {"MainPID": "2837", "NRestarts": "0", "ActiveState": "active"}
+Final UI: {"revision": 45, "screen": "pause.main", "active_scenario": "scorched-earth", "scenario_revision": 2, "paused": true}
+Visual inspection passed for combat duel with loose dirt/heavy asteroids and both Scorched shapes with collapse/barrage. Restored combat settings. Fresh Round/collapse-on barrage paused. Live scenes are distinct from headless seed-42 benchmarks; rendering is not included in benchmark timings. Changes uncommitted; PR #174 unchanged.
+Restored combat settings: {"launcher.settings.combat.loose-dirt": "On · 192 grains", "launcher.settings.combat.asteroid-interval": "3", "launcher.settings.combat.asteroid-strength": "Heavy"}
+
+Visual HUD samples (docs/screenshots/dirt-packing-cost):
+{"image": "picade-packing-cost-combat.png", "scenario": "spacewars-terrain-duel", "loose": 25, "returned": 237, "grain_limit": 192, "fps": 57, "ups": 60}
+{"image": "picade-packing-cost-round.png", "scenario": "scorched-earth", "shape": "Round", "collapse": true, "phase": "Barrage 48s remaining", "loose": 76, "returned": 159, "impacts": 6, "capacity_rejections": 0, "bank_cells_released": 21, "fps": 24, "ups": 60}
+{"image": "picade-packing-cost-angular.png", "scenario": "scorched-earth", "shape": "Angular", "collapse": true, "phase": "Barrage 49s remaining", "loose": 147, "returned": 84, "impacts": 6, "capacity_rejections": 0, "bank_cells_released": 17, "fps": 18, "ups": 58}
+
+Selected CLI status samples (outside benchmarks):
+{"scenario": "spacewars-terrain-duel", "fps": "53.4", "ups": "60.3", "renderer": "raster", "launch_scenario": "spacewars-terrain-duel", "paused": "false"}
+{"scenario": "spacewars-terrain-duel", "fps": "59.2", "ups": "60.2", "renderer": "raster", "launch_scenario": "spacewars-terrain-duel", "paused": "false"}
+{"scenario": "spacewars-terrain-duel", "fps": "59.5", "ups": "59.5", "renderer": "raster", "launch_scenario": "spacewars-terrain-duel", "paused": "false"}
+{"scenario": "spacewars-terrain-duel", "fps": "56.9", "ups": "59.8", "renderer": "raster", "launch_scenario": "spacewars-terrain-duel", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "24.1", "ups": "59.8", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "16.2", "ups": "58.2", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "false"}
+{"scenario": "scorched-earth", "fps": "12.0", "ups": "0.0", "renderer": "raster", "launch_scenario": "scorched-earth", "paused": "true"}

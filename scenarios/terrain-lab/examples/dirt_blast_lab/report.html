@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dirt blast experiments</title>
+<style>
+  :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #111820; color: #e6edf3; }
+  body { margin: 0 auto; padding: 24px; max-width: 1200px; }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  p { color: #b5c2cc; line-height: 1.5; }
+  .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+  button, select { min-height: 44px; padding: 8px 12px; background: #25333f; color: inherit; border: 1px solid #526474; border-radius: 4px; font: inherit; }
+  label { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { width: 100%; margin-bottom: 16px; }
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  figure { margin: 0; min-width: 0; }
+  figcaption { margin-bottom: 8px; font-weight: 600; }
+  canvas { display: block; width: 100%; aspect-ratio: 8 / 5; background: #080e17; }
+  output { display: block; margin-top: 8px; white-space: pre-line; font-variant-numeric: tabular-nums; line-height: 1.5; }
+  .metric { color: #b5c2cc; font-size: 14px; }
+  .failure { color: #ffad9c; }
+  details { margin-top: 20px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+  @media (max-width: 850px) { body { padding: 16px; } .comparison { grid-template-columns: 1fr; } }
+</style>
+<h1>Dirt blast experiments</h1>
+<p>Recorded Rust simulation. Compare crater removal, rigid pieces, and rounded grains carrying the same terrain material. The pulse spreads the same radial velocity-change budget over several ticks.</p>
+<div class="controls">
+  <label>Fixture <select id="fixture"><option value="flat">Flat ground</option><option value="slope">Slope</option><option value="moving-planet">Moving planet</option></select></label>
+  <button type="button" id="play">Play</button>
+  <button type="button" id="reset">Start</button>
+  <button type="button" id="step">Next tick</button>
+  <label>Speed <select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label>
+  <label>View <select id="view"><option value="surface">Surface</option><option value="whole">Whole fixture</option></select></label>
+  <span id="time"></span>
+</div>
+<input id="seek" type="range" min="0" value="0" step="1" aria-label="Simulation tick">
+<div class="comparison">
+  <figure>
+    <figcaption><label>Left model <select id="left-model"><option value="remove">Crater removal</option><option value="release" selected>Rigid pieces</option><option value="grains">Rounded grains</option><option value="grain-pulse">Grains + pulse</option></select></label></figcaption>
+    <canvas id="left" role="img" aria-label="Recorded geometry and material motion for the left model"></canvas>
+    <output id="left-state"></output>
+    <p class="metric" id="left-metrics"></p>
+  </figure>
+  <figure>
+    <figcaption><label>Right model <select id="right-model"><option value="remove">Crater removal</option><option value="release">Rigid pieces</option><option value="grains" selected>Rounded grains</option><option value="grain-pulse">Grains + pulse</option></select></label></figcaption>
+    <canvas id="right" role="img" aria-label="Recorded geometry and material motion for the right model"></canvas>
+    <output id="right-state"></output>
+    <p class="metric" id="right-metrics"></p>
+  </figure>
+</div>
+<p id="status" aria-live="polite"></p>
+<p class="metric">“Above surface” counts loose cell centers more than one cell above the original surface. “Supported &amp; slow” requires a contact path to ground and motion below 0.2 units/s relative to it; it is an instantaneous diagnostic. Counts are cells.</p>
+<p class="metric">Grains preserve cell mass and inertia, using smaller round collision footprints that introduce pore space. These are experimental contact models; pressure, cohesion, compression, and deposition are absent. Simulation timing excludes audits, recording, replay, export, and browser rendering.</p>
+<details><summary>Experiment settings and build</summary><pre id="settings"></pre></details>
+<details><summary>Recorded blasts</summary><pre id="events"></pre></details>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const $ = id => document.getElementById(id);
+  const initial = new URLSearchParams(location.hash.slice(1));
+  if (['slope', 'moving-planet'].includes(initial.get('fixture'))) $('fixture').value = initial.get('fixture');
+  let tick = Number(initial.get('tick')) || 0;
+  let playing = false, last = null, animation = null;
+  let displayedComparison = null;
+  const slots = ['left', 'right'];
+  const models = ['remove', 'release', 'grains', 'grain-pulse'];
+  for (const slot of slots) if (models.includes(initial.get(slot))) $(slot + '-model').value = initial.get(slot);
+  function cases() { return slots.map(slot => data.cases.find(c => c.fixture === $('fixture').value && c.mode === $(slot + '-model').value)); }
+  function stop() {
+    playing = false; last = null; $('play').textContent = 'Play';
+    if (animation !== null) cancelAnimationFrame(animation);
+    animation = null;
+  }
+  function draw() {
+    const selected = cases();
+    const max = Math.min(...selected.map(c => c.frames[c.frames.length - 1].tick));
+    tick = Math.max(0, Math.min(tick, max));
+    $('seek').max = max; $('seek').value = Math.floor(tick);
+    $('time').textContent = `${(Math.floor(tick) / data.hz).toFixed(2)} s · tick ${Math.floor(tick)}`;
+    for (const [index, slot] of slots.entries()) {
+      const c = selected[index], f = c.frames[Math.floor(tick)];
+      const canvas = $(slot), ratio = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.fillStyle = '#080e17'; ctx.fillRect(0, 0, w, h);
+      const whole = $('view').value === 'whole';
+      const worldHeight = whole ? 58 : 30;
+      const scale = h / worldHeight;
+      const centerY = whole ? -7 : 2;
+      ctx.translate(w / 2, h / 2 + centerY * scale); ctx.scale(scale, -scale);
+      for (const [shape, x, y, angle] of f.poses) {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+        for (const [cx, cy, rw, rh, material] of c.shapes[shape].rects) {
+          ctx.fillStyle = material === 2 ? '#9b8953' : '#806346';
+          ctx.fillRect(cx - rw / 2, cy - rh / 2, rw, rh);
+        }
+        for (const [cx, cy, radius, material] of c.shapes[shape].circles || []) {
+          ctx.fillStyle = material === 2 ? '#9b8953' : '#806346';
+          ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+      for (const event of c.events) {
+        const age = f.tick - event.tick;
+        if (age < 0 || age > 18) continue;
+        ctx.beginPath(); ctx.arc(event.center[0], event.center[1], event.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = event.admitted ? '#ffcf83' : '#ff766f';
+        ctx.lineWidth = 1.5 / scale; ctx.stroke();
+      }
+      $(slot + '-state').textContent = `Ground ${f.ground} · Loose ${f.loose} · Removed ${f.removed}\n${f.fragments} pieces · ${f.grains} grains · ${f.contacts} contacts\nAbove surface ${f.above_surface_cells} · Supported & slow ${f.supported_slow_cells}`;
+      $(slot + '-metrics').textContent = `Peak above surface ${c.peak_above_surface_cells} cells · Simulation p95 ${c.simulation_ms.p95.toFixed(3)} ms · max ${c.simulation_ms.max.toFixed(3)} ms · ${c.rejected_blasts} rejected blasts`;
+    }
+    const status = selected.some(c => c.failure)
+      ? selected.filter(c => c.failure).map(c => `${c.mode}: ${c.failure}`).join(' · ')
+      : 'Material and geometry audits passed · Recorded-shot replay matched every tick';
+    if ($('status').textContent !== status) $('status').textContent = status;
+    $('status').className = selected.some(c => c.failure) ? 'failure' : '';
+    const comparison = [$('fixture').value, ...selected.map(c => c.mode)].join('/');
+    if (displayedComparison !== comparison) {
+      $('events').textContent = JSON.stringify(selected.map(c => ({mode:c.mode, events:c.events})), null, 2);
+      displayedComparison = comparison;
+    }
+  }
+  function frame(now) {
+    animation = null;
+    if (!playing) return;
+    if (last !== null) tick += Math.min(0.1, (now - last) / 1000) * data.hz * Number($('speed').value);
+    last = now; draw();
+    if (tick >= Number($('seek').max)) stop();
+    else animation = requestAnimationFrame(frame);
+  }
+  $('play').addEventListener('click', () => {
+    if (playing) { stop(); return; }
+    if (tick >= Number($('seek').max)) tick = 0;
+    playing = true; last = null; $('play').textContent = 'Pause'; animation = requestAnimationFrame(frame);
+  });
+  $('reset').addEventListener('click', () => { stop(); tick = 0; draw(); });
+  $('step').addEventListener('click', () => { stop(); tick = Math.floor(tick) + 1; draw(); });
+  $('seek').addEventListener('input', () => { stop(); tick = Number($('seek').value); draw(); });
+  $('fixture').addEventListener('change', () => { stop(); draw(); });
+  for (const slot of slots) $(slot + '-model').addEventListener('change', () => { stop(); draw(); });
+  $('view').addEventListener('change', draw);
+  $('settings').textContent = JSON.stringify({model:data.model, settings:data.settings, build:data.build}, null, 2);
+  new ResizeObserver(draw).observe(document.querySelector('.comparison'));
+  draw();
+})();
+</script>
+</html>

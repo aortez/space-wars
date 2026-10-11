@@ -1,6 +1,7 @@
 //! A reusable task: recover the assigned full ship and board it. The caller
 //! selects the objective and decides what to do after success or a bounded
-//! failure. Blocked tasks stay blocked until the caller resets them. No world writes.
+//! failure. A newly observed native rebuild can release a blocked task once,
+//! for a bounded boarding attempt. Other retries require caller reset. No world writes.
 use crate::{
     BrainReset,
     flight_pilot::FlightIntent,
@@ -15,7 +16,7 @@ use scenario_spacewars::{
     spaceling_geometry::HALF_HEIGHT,
     surface_sortie::{
         LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
-        TransferResult,
+        TransferResult, VehicleId,
         pilot::{LandingSiteId, PilotLandingSite, PilotObservationV1},
         rebuild_placement::RebuildStandingSite,
         recovery_sensors::RecoveryTaskObservationV1,
@@ -91,6 +92,19 @@ pub struct RecoveryTelemetry {
     pub scuttle_started_tick: Option<u64>,
     pub scuttled_tick: Option<u64>,
     pub scuttle_attempts: u32,
+    /// One boarding opportunity after new physical progress, without resetting
+    /// the original recovery clock, relocation count, or replacement history.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_boarding: Option<RebuildBoardingTelemetry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RebuildBoardingTelemetry {
+    pub native_rebuilds: u64,
+    pub started_tick: u64,
+    pub deadline_tick: u64,
+    pub previous_goal: RecoveryGoal,
+    pub previous_reason: Option<&'static str>,
 }
 
 /// A failed approach defers measured footing; it does not prove it unusable forever.
@@ -104,6 +118,7 @@ pub struct PodLandingRejection {
 }
 
 const POD_SITE_WAIT_TICKS: u64 = 15 * 60;
+const GROUND_BUDGET_TICKS: u64 = 90 * 60;
 impl RecoveryTelemetry {
     pub fn label(&self) -> &'static str {
         if let Some(reason) = self.reason {
@@ -155,13 +170,15 @@ pub struct RecoverShipTask {
     previous_claim: Option<(PlanetClaimPhase, f32)>,
     return_fallback_since: Option<u64>,
     return_route_checked: Option<(usize, u64, u64, bool)>,
+    seen_rebuilds: Option<(VehicleId, u64)>,
+    invalid_observation: bool,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v9",
+                task: "recover_ship_v10",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -187,6 +204,7 @@ impl RecoverShipTask {
                 scuttle_started_tick: None,
                 scuttled_tick: None,
                 scuttle_attempts: 0,
+                rebuild_boarding: None,
             },
             site: None,
             stabilized: false,
@@ -205,6 +223,8 @@ impl RecoverShipTask {
             previous_claim: None,
             return_fallback_since: None,
             return_route_checked: None,
+            seen_rebuilds: None,
+            invalid_observation: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -264,12 +284,19 @@ impl RecoverShipTask {
     }
     pub fn step(&mut self, o: &RecoveryTaskObservationV1) -> FlightIntent {
         let p = &o.flight.pilot;
+        if self.invalid_observation {
+            return FlightIntent::default();
+        }
         if o.version != 1
             || o.flight.version != 2
             || p.version != 1
             || p.owner != self.context.actor
+            || self
+                .seen_rebuilds
+                .is_some_and(|(vehicle, _)| vehicle != p.vehicle)
         {
             self.block("observation identity/version mismatch", p.tick);
+            self.invalid_observation = true;
             return FlightIntent::default();
         }
         if self.previous_tick == Some(p.tick) {
@@ -277,9 +304,32 @@ impl RecoverShipTask {
         }
         if self.previous_tick.is_some_and(|tick| p.tick < tick) {
             self.block("observation tick moved backwards", p.tick);
+            self.invalid_observation = true;
             return FlightIntent::default();
         }
         self.telemetry.started_tick.get_or_insert(p.tick);
+        self.observe_rebuild(p);
+        if self.telemetry.status != TaskStatus::Succeeded
+            && let Some(boarding) = &self.telemetry.rebuild_boarding
+        {
+            // Transfer on the final allowed control tick is observed one tick
+            // later, with controls disarmed. Physical success needs no retry.
+            if p.ship_available
+                && p.ship_form == ShipForm::Ship
+                && p.location == PilotLocation::Aboard(p.vehicle)
+            {
+                self.goal(RecoveryGoal::Complete, p.tick);
+                self.telemetry.completed_tick = Some(p.tick);
+            } else if self.telemetry.status == TaskStatus::Running
+                && p.tick > boarding.deadline_tick
+            {
+                self.block("rebuilt ship boarding exceeded ninety seconds", p.tick);
+            } else if self.telemetry.status == TaskStatus::Running
+                && (!p.ship_available || p.ship_form != ShipForm::Ship)
+            {
+                self.block("rebuilt ship no longer available", p.tick);
+            }
+        }
         let controls = if !p.controls_armed || self.telemetry.status == TaskStatus::Succeeded {
             SurfaceSortieAction::default()
         } else if self.telemetry.status == TaskStatus::Blocked {
@@ -287,9 +337,7 @@ impl RecoverShipTask {
                 brake_held: matches!(p.location, PilotLocation::Aboard(_)),
                 ..Default::default()
             }
-        } else if p.tick.saturating_sub(self.telemetry.started_tick.unwrap())
-            > 120 * 60 + self.telemetry.ground_budget_ticks
-        {
+        } else if self.telemetry.rebuild_boarding.is_none() && self.task_budget_exceeded(p.tick) {
             self.block(
                 if self.telemetry.ground_budget_ticks == 0 {
                     "recovery exceeded two-minute task budget"
@@ -311,6 +359,53 @@ impl RecoverShipTask {
         };
         self.previous_action
     }
+
+    fn task_budget_exceeded(&self, tick: u64) -> bool {
+        self.telemetry.started_tick.is_some_and(|start| {
+            tick.saturating_sub(start) > 120 * 60 + self.telemetry.ground_budget_ticks
+        })
+    }
+
+    fn observe_rebuild(&mut self, p: &PilotObservationV1) {
+        let Some(recovery) = &p.recovery else {
+            return;
+        };
+        let previous = self.seen_rebuilds;
+        self.seen_rebuilds = Some((
+            p.vehicle,
+            previous.map_or(recovery.rebuilds, |(_, count)| count.max(recovery.rebuilds)),
+        ));
+        if previous.is_none_or(|(_, count)| recovery.rebuilds <= count)
+            || !p.ship_available
+            || p.ship_form != ShipForm::Ship
+            || self.telemetry.status == TaskStatus::Succeeded
+            || self.telemetry.rebuild_boarding.is_some()
+            || self.telemetry.status != TaskStatus::Blocked && !self.task_budget_exceeded(p.tick)
+        {
+            return;
+        }
+        // Native rebuilds disarm controls. Record progress even during that
+        // neutral tick or dirty queries, so rearming cannot lose or renew it.
+        self.telemetry.rebuild_boarding = Some(RebuildBoardingTelemetry {
+            native_rebuilds: recovery.rebuilds,
+            started_tick: p.tick,
+            deadline_tick: p.tick.saturating_add(GROUND_BUDGET_TICKS),
+            previous_goal: self.telemetry.goal,
+            previous_reason: self.telemetry.reason,
+        });
+        self.site = None;
+        self.telemetry.site = None;
+        self.telemetry.relocation_site = None;
+        self.ground_task = None;
+        self.telemetry.ground = None;
+        self.return_fallback_since = None;
+        self.return_route_checked = None;
+        self.telemetry.rebuilt_tick.get_or_insert(p.tick);
+        self.goal(RecoveryGoal::Board, p.tick);
+        self.telemetry.last_progress_tick = p.tick;
+        self.best_distance = f32::INFINITY;
+    }
+
     fn choose(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
         let mut action = SurfaceSortieAction::default();
@@ -381,7 +476,7 @@ impl RecoverShipTask {
                             flag.position.distance_to(actor.position) > c.flag_interaction_range
                         })
                 }) {
-                    self.telemetry.ground_budget_ticks = 90 * 60;
+                    self.telemetry.ground_budget_ticks = GROUND_BUDGET_TICKS;
                 }
                 action = self.traverse(o, GroundDestination::Flag);
                 if let Some(c) = claim {
@@ -682,6 +777,10 @@ impl RecoverShipTask {
     fn replace_unreachable_ship(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
         let mut action = SurfaceSortieAction::default();
+        if self.telemetry.rebuild_boarding.is_some() {
+            self.block("rebuilt ship has no accessible return", p.tick);
+            return action;
+        }
         if !p.ship_available {
             self.telemetry.scuttled_tick = self.telemetry.scuttle_started_tick.map(|_| p.tick);
             self.return_fallback_since = None;

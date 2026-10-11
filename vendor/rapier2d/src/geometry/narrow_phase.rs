@@ -108,6 +108,15 @@ impl NarrowPhase {
         &*self.query_dispatcher
     }
 
+    /// Replace the query dispatcher without discarding the contact graph.
+    /// The new dispatcher must accept the existing contact-manifold workspaces.
+    pub fn set_query_dispatcher<D>(&mut self, dispatcher: D)
+    where
+        D: 'static + PersistentQueryDispatcher<ContactManifoldData, ContactData>,
+    {
+        self.query_dispatcher = Arc::new(dispatcher);
+    }
+
     /// The contact graph containing all contact pairs and their contact information.
     pub fn contact_graph(&self) -> &InteractionGraph<ColliderHandle, ContactPair> {
         &self.contact_graph

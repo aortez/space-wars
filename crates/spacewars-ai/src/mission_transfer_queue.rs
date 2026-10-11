@@ -63,8 +63,12 @@ struct Source {
     spaceling: SpacelingId,
     episode_seed: u64,
     policy: crate::mission_policy::MissionPolicy,
+    objective_planning: ObjectivePlanning,
     breaks: CombatBreakSettings,
     bounded_acquisition: bool,
+    cover_response: bool,
+    initial_cover: bool,
+    destination_failures: Option<Vec<DestinationFailure>>,
     disengagement: Option<(bool, bool, bool)>,
     selected_tick: u64,
     destination_switched: bool,
@@ -104,8 +108,16 @@ impl Source {
             spaceling: p.spaceling,
             episode_seed: bot.context.episode_seed,
             policy: bot.policy,
+            objective_planning: bot.objective_planning(),
             breaks: bot.breaks,
             bounded_acquisition: bot.bounded_acquisition,
+            cover_response: bot.cover_response,
+            initial_cover: bot.initial_cover,
+            destination_failures: bot
+                .telemetry
+                .destination_retry
+                .as_ref()
+                .map(|r| r.failures.clone()),
             disengagement: Self::disengagement_config(bot),
             selected_tick: bot.selected_tick,
             destination_switched: bot.destination_switched,
@@ -141,10 +153,22 @@ impl Source {
             return Err("actor or episode changed");
         }
         if bot.breaks != self.breaks
+            || bot.objective_planning() != self.objective_planning
             || bot.bounded_acquisition != self.bounded_acquisition
+            || bot.cover_response != self.cover_response
+            || bot.initial_cover != self.initial_cover
             || Self::disengagement_config(bot) != self.disengagement
         {
             return Err("controller configuration changed");
+        }
+        if bot
+            .telemetry
+            .destination_retry
+            .as_ref()
+            .map(|r| &r.failures)
+            != self.destination_failures.as_ref()
+        {
+            return Err("destination failure context changed");
         }
         if p.tick < self.environment.tick {
             return Err("clock regressed");
@@ -926,6 +950,10 @@ mod tests {
             |b, _| b.policy = crate::mission_policy::MissionPolicy::Legacy,
             |b, _| b.breaks.interval_seconds += 1,
             |b, _| b.bounded_acquisition = !b.bounded_acquisition,
+            |b, _| b.cover_response = !b.cover_response,
+            |b, _| b.initial_cover = !b.initial_cover,
+            |b, _| b.telemetry.powered_capture = !b.telemetry.powered_capture,
+            |b, _| b.enable_destination_retry(true),
             |b, _| b.enable_pursuit_disengagement(true),
             |b, _| b.selected_tick += 1,
             |b, _| b.telemetry.target = None,

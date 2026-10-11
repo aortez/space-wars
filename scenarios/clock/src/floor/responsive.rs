@@ -5,11 +5,27 @@ use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
     PhysicsWorld,
 };
-use engine_water::{Boundary, PoolGeometry, PoolSpec, WaterError, WaterWorld};
+use engine_water::{
+    Boundary, PoolGeometry, PoolSpec, SolidBox, SplashConfig, SplashVariation, WaterError,
+    WaterWorld,
+};
 
 use crate::layout::Layout;
 
 pub(crate) const MAX_COLUMNS: usize = 64;
+
+/// Varied Lively, selected in the drain testbed. An event seed changes the fan
+/// without consuming Rain's source RNG or Meltdown's material RNG.
+pub(crate) fn drain_splash(seed: u64) -> SplashConfig {
+    SplashConfig {
+        interval: 0.25,
+        variation: Some(SplashVariation {
+            seed,
+            max_interval: 0.55,
+        }),
+        ..SplashConfig::default()
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct FloorShape {
@@ -73,6 +89,15 @@ impl FloorShape {
             // every tick would detach material history and open seams.
             water.set_outlet_channel(side, 1 - side, None).unwrap();
         }
+        self.configure_solids(water, opening);
+    }
+
+    fn configure_solids(self, water: &mut WaterWorld, opening: f64) {
+        let panels = std::array::from_fn::<_, 2, _>(|side| {
+            let (center, angle) = self.panel_pose(side, opening);
+            SolidBox::new(center, self.panel_half_extents(), angle).unwrap()
+        });
+        water.set_solid_boxes(&panels).unwrap();
     }
 
     fn bed_edges(self, side: usize, opening: f64) -> [[f64; 2]; MAX_COLUMNS] {
@@ -161,7 +186,10 @@ impl FloorShape {
                 },
             ],
             dt,
-        )
+        )?;
+        // A capacity deferral must retain both the old pools and old solids.
+        self.configure_solids(water, opening);
+        Ok(())
     }
 }
 

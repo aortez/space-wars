@@ -6,6 +6,7 @@ members = [
     "crates/engine-gravity",
     "crates/engine-nes",
     "crates/engine-rapier",
+    "crates/engine-soil",
     "crates/engine-terrain",
     "crates/engine-water",
     "crates/spacewars-ai",
@@ -20,6 +21,7 @@ members = [
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
+    "scenarios/scorched-earth",
     "scenarios/spaceling-lab",
     "scenarios/terrain-lab",
     "scenarios/spacewars",
@@ -75,6 +77,7 @@ engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
+engine-soil = { path = "crates/engine-soil" }
 engine-terrain = { path = "crates/engine-terrain" }
 engine-water = { path = "crates/engine-water" }
 spacewars-ai = { path = "crates/spacewars-ai" }
@@ -85,6 +88,7 @@ scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
+scenario-scorched-earth = { path = "scenarios/scorched-earth" }
 scenario-spaceling-lab = { path = "scenarios/spaceling-lab" }
 scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
@@ -94,8 +98,8 @@ scenario-spacewars = { path = "scenarios/spacewars" }
 lyon_tessellation = { path = "vendor/lyon_tessellation" }
 # Pi-selected CPU glyph masks; the library retains its vector default/control.
 femtovg = { path = "vendor/femtovg" }
-# Retain kinematic velocity for CCD's relative-speed checks; zeroing it can
-# mistake shared transport for impact speed and trap small actors in the ground.
+# Retain kinematic velocity for CCD's relative-speed checks, time CCD stages,
+# and restore the shared compound-sweep dispatcher after snapshot loading.
 # See vendor/rapier2d/SPACEWARS_PATCH.md for provenance and regression coverage.
 rapier2d = { path = "vendor/rapier2d" }
 # Slint 1.13's software snapshot path leaves alpha unset and reuses the display

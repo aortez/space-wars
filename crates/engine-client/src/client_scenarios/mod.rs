@@ -17,9 +17,11 @@ mod nes;
 mod null;
 mod pizza;
 mod rover_lab;
+mod scorched_earth;
 mod spaceling_lab;
 mod spacewars;
 mod surface_sortie;
+mod terrain_grains;
 mod terrain_lab;
 
 pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
@@ -433,8 +435,10 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
+    scorched_earth::REGISTRATION,
     spaceling_lab::REGISTRATION,
     terrain_lab::REGISTRATION,
+    terrain_grains::REGISTRATION,
     surface_sortie::MATCH_REGISTRATION,
     spacewars::REGISTRATION,
     surface_sortie::REGISTRATION,
@@ -535,8 +539,10 @@ mod tests {
                 "nes",
                 "pizza",
                 "rover-lab",
+                "scorched-earth",
                 "spaceling-lab",
                 "terrain-lab",
+                "terrain-grains",
                 "spacewars",
                 "spacewars-classic",
                 "surface-sortie",

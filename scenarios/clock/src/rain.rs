@@ -144,12 +144,14 @@ impl RainEvent {
         let facing = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
         let (surfaces, water) = match &arena {
             RainArena::Course(geometry) => {
-                DigitSurfaces::with_floor(layout, display, geometry.water_pools())
+                // The single-drain burst budget has not been tuned for courses
+                // with several separate gaps and competing outfalls.
+                DigitSurfaces::with_floor(layout, display, geometry.water_pools(), None)
             }
             RainArena::Responsive(floor) if floor.opening != 0.0 => {
-                DigitSurfaces::on_responsive_floor(layout, display, floor)
+                DigitSurfaces::on_responsive_floor(layout, display, floor, seed)
             }
-            RainArena::Responsive(_) => DigitSurfaces::new(layout, display),
+            RainArena::Responsive(_) => DigitSurfaces::new(layout, display, seed),
         };
         let phase = if duck_joined {
             ClockRainDuckPhase::NotSpawned
@@ -499,6 +501,9 @@ impl RainEvent {
             parcels: s.parcels,
             source_limited_ticks: self.source_limited,
             water_limited_ticks: s.capacity_limited_ticks,
+            drain_splash_bursts: s.splash_bursts,
+            drain_splash_microunits: micro(s.splash_volume),
+            drain_splash_suppressed: s.splash_capacity_suppressed,
             surface_digits: self.surfaces.digits,
             surface_water_microunits: micro(
                 self.water.pools()[self.surfaces.floor_pools..]

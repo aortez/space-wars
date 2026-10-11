@@ -377,7 +377,7 @@ impl PhysicsPipeline {
         hooks: &dyn PhysicsHooks,
         events: &dyn EventHandler,
     ) {
-        self.counters.ccd.toi_computation_time.start();
+        self.counters.ccd.toi_computation_time.resume();
         // Handle CCD
         let impacts = ccd_solver.predict_impacts_at_next_positions(
             integration_parameters,
@@ -627,12 +627,14 @@ impl PhysicsPipeline {
             // If there is only one or zero CCD substep, there is no need
             // to split the timestep interval. So we can just skip this part.
             if ccd_is_enabled && remaining_substeps > 1 {
+                self.counters.stages.ccd_time.resume();
                 // NOTE: Take forces into account when updating the bodies CCD activation flags
                 //       these forces have not been integrated to the body's velocity yet.
                 let ccd_active =
                     ccd_solver.update_ccd_active_flags(islands, bodies, remaining_time, true);
                 let first_impact = if ccd_active {
-                    ccd_solver.find_first_impact(
+                    self.counters.ccd.first_impact_time.resume();
+                    let impact = ccd_solver.find_first_impact(
                         remaining_time,
                         &integration_parameters,
                         islands,
@@ -641,7 +643,9 @@ impl PhysicsPipeline {
                         broad_phase,
                         narrow_phase,
                         hooks,
-                    )
+                    );
+                    self.counters.ccd.first_impact_time.pause();
+                    impact
                 } else {
                     None
                 };
@@ -670,6 +674,7 @@ impl PhysicsPipeline {
                     integration_parameters.dt += remaining_time;
                     remaining_substeps = 0;
                 }
+                self.counters.stages.ccd_time.pause();
             } else {
                 integration_parameters.dt = remaining_time;
                 remaining_time = 0.0;
@@ -695,6 +700,7 @@ impl PhysicsPipeline {
 
             // If CCD is enabled, execute the CCD motion clamping.
             if ccd_is_enabled {
+                self.counters.stages.ccd_time.resume();
                 // NOTE: don't the forces into account when updating the CCD active flags because
                 //       they have already been integrated into the velocities by the solver.
                 let ccd_active = ccd_solver.update_ccd_active_flags(
@@ -716,6 +722,7 @@ impl PhysicsPipeline {
                         events,
                     );
                 }
+                self.counters.stages.ccd_time.pause();
             }
 
             self.counters.stages.update_time.resume();

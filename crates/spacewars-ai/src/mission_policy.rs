@@ -4,6 +4,8 @@ use engine_common::CombatBreakSettings;
 use scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning;
 use serde::Serialize;
 
+pub const POWERED_CAPTURE_PROFILE: &str = "mission_powered_capture_v1";
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub enum MissionPolicy {
     #[default]
@@ -17,17 +19,45 @@ pub enum MissionPolicy {
     DestinationPlanner,
     #[serde(rename = "material_mission_v13")]
     ValuePlanner,
+    /// Experimental remote flag evidence; selectable by the headless host.
+    #[serde(rename = "material_mission_v14")]
+    SurveyValuePlanner,
+    /// Experimental handoff of the destination's costed landing site.
+    #[serde(rename = "material_mission_v15")]
+    LandingPlanPlanner,
+    /// Experimental refresh and approach ranking of the two neutral survey sites.
+    #[serde(rename = "material_mission_v16")]
+    ApproachSurveyPlanner,
 }
 impl MissionPolicy {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 8] = [
         Self::Legacy,
         Self::Planner,
         Self::JetpackPlanner,
         Self::DestinationPlanner,
         Self::ValuePlanner,
+        Self::SurveyValuePlanner,
+        Self::LandingPlanPlanner,
+        Self::ApproachSurveyPlanner,
     ];
     pub fn selects_destination(self) -> bool {
-        matches!(self, Self::DestinationPlanner | Self::ValuePlanner)
+        matches!(
+            self,
+            Self::DestinationPlanner
+                | Self::ValuePlanner
+                | Self::SurveyValuePlanner
+                | Self::LandingPlanPlanner
+                | Self::ApproachSurveyPlanner
+        )
+    }
+    pub fn consumes_flag_surveys(self) -> bool {
+        matches!(
+            self,
+            Self::SurveyValuePlanner | Self::LandingPlanPlanner | Self::ApproachSurveyPlanner
+        )
+    }
+    pub(crate) fn carries_landing_plan(id: &str) -> bool {
+        id == Self::LandingPlanPlanner.id() || id == Self::ApproachSurveyPlanner.id()
     }
     pub fn id(self) -> &'static str {
         match self {
@@ -36,6 +66,9 @@ impl MissionPolicy {
             Self::JetpackPlanner => "material_mission_v11",
             Self::DestinationPlanner => "material_mission_v12",
             Self::ValuePlanner => "material_mission_v13",
+            Self::SurveyValuePlanner => "material_mission_v14",
+            Self::LandingPlanPlanner => "material_mission_v15",
+            Self::ApproachSurveyPlanner => "material_mission_v16",
         }
     }
     pub fn display_name(self) -> &'static str {
@@ -45,14 +78,20 @@ impl MissionPolicy {
             Self::JetpackPlanner => "Jetpack bot v11",
             Self::DestinationPlanner => "Destination bot v12",
             Self::ValuePlanner => "Value bot v13",
+            Self::SurveyValuePlanner => "Survey value bot v14",
+            Self::LandingPlanPlanner => "Landing plan bot v15",
+            Self::ApproachSurveyPlanner => "Approach survey bot v16",
         }
     }
     pub fn objective_planning(self) -> ObjectivePlanning {
         match self {
             Self::Legacy => ObjectivePlanning::Legacy,
-            Self::Planner | Self::DestinationPlanner | Self::ValuePlanner => {
-                ObjectivePlanning::JointRoundTrip
-            }
+            Self::Planner
+            | Self::DestinationPlanner
+            | Self::ValuePlanner
+            | Self::SurveyValuePlanner
+            | Self::LandingPlanPlanner
+            | Self::ApproachSurveyPlanner => ObjectivePlanning::JointRoundTrip,
             Self::JetpackPlanner => ObjectivePlanning::JetpackRoundTrip,
         }
     }
@@ -65,6 +104,9 @@ impl MissionPolicy {
                 Self::JetpackPlanner => "mission_cadenced_jetpack_routes_v1",
                 Self::DestinationPlanner => "mission_cadenced_joint_routes_capture_choice_v1",
                 Self::ValuePlanner => "mission_cadenced_joint_routes_capture_value_v1",
+                Self::SurveyValuePlanner => "mission_cadenced_joint_routes_survey_value_v1",
+                Self::LandingPlanPlanner => "mission_cadenced_joint_routes_landing_plan_v1",
+                Self::ApproachSurveyPlanner => "mission_cadenced_joint_routes_approach_survey_v1",
             },
             // Cadence bounds frequency, not work. No equal-budget claim yet.
             planning_work_quota: None,
@@ -75,7 +117,7 @@ impl std::str::FromStr for MissionPolicy {
     type Err = String;
     fn from_str(id: &str) -> Result<Self, Self::Err> {
         Self::ALL.into_iter().find(|p| p.id() == id)
-            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9, material_mission_v10, material_mission_v11, material_mission_v12 or material_mission_v13"))
+            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9 through material_mission_v16"))
     }
 }
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -93,9 +135,87 @@ impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
     }
+    /// Opt-in v13 route/controller comparison, configured before the first intent.
+    pub fn with_powered_capture(mut self, enabled: bool) -> Self {
+        self.0.configure_powered_capture(enabled);
+        self
+    }
+    pub fn with_active_flight_checks(mut self, enabled: bool) -> Self {
+        self.0.configure_active_flight_checks(enabled);
+        self
+    }
+    /// Opt-in hull comparison for new ownership-based pursuits.
+    pub fn with_pursuit_health(mut self, enabled: bool) -> Self {
+        self.0.configure_pursuit_health(enabled);
+        self
+    }
+    /// Opt-in v13 laser opportunity during required pursuit climbs.
+    pub fn with_pursuit_climb_laser(mut self, enabled: bool) -> Self {
+        self.0.configure_pursuit_climb_laser(enabled);
+        self
+    }
+    /// Opt-in v13 defense while airborne and still awaiting the first capture site.
+    pub fn with_acquisition_defense(mut self, enabled: bool) -> Self {
+        self.0.configure_acquisition_defense(enabled);
+        self
+    }
+    /// Opt-in forecast admission for an already enabled acquisition defense.
+    pub fn with_acquisition_clearance(mut self, enabled: bool) -> Self {
+        self.0.configure_acquisition_clearance(enabled);
+        self
+    }
     /// Opt-in first-site deadline and local waiting guidance for comparison.
     pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
         self.0.bounded_acquisition = enabled;
+        self
+    }
+    /// Opt-in response to confirmed cover failures; standard defaults omit it.
+    pub fn with_cover_response(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        assert!(enabled || !self.0.initial_cover);
+        self.0.cover_response = enabled;
+        self
+    }
+    /// Opt-in initial qualification; requires the bounded cover response.
+    pub fn with_initial_cover(mut self, enabled: bool) -> Self {
+        self.0.configure_initial_cover(enabled);
+        self
+    }
+    /// Opt-in bounded waiting after a failed native local actual-hatch attempt.
+    pub fn with_actual_route_recovery(mut self, enabled: bool) -> Self {
+        self.0.configure_actual_route_recovery(enabled);
+        self
+    }
+    /// Opt-in escape after a witnessed local actual-hatch capture abort.
+    pub fn with_capture_escape(mut self, enabled: bool) -> Self {
+        self.0.configure_capture_escape(enabled);
+        self
+    }
+    /// Opt-in bounded transfer commitment following actual-hatch escape.
+    pub fn with_escape_travel(mut self, enabled: bool) -> Self {
+        self.0.configure_escape_travel(enabled);
+        self
+    }
+    /// Opt-in clear entry geometry during the committed post-escape transfer.
+    pub fn with_transfer_approach(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_approach(enabled);
+        self
+    }
+    /// Opt-in relative closing-speed limits during committed transfer.
+    pub fn with_transfer_speed(mut self, enabled: bool) -> Self {
+        self.0.configure_transfer_speed(enabled);
+        self
+    }
+    /// Opt-in capture-failure context for initial and switched destinations.
+    pub fn with_destination_retry(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.enable_destination_retry(enabled);
+        self
+    }
+    /// Opt-in v13 capture retry experiment; policy defaults leave it disabled.
+    pub fn with_cover_retry_cooldown(mut self, enabled: bool) -> Self {
+        assert!(!enabled || self.0.policy() == MissionPolicy::ValuePlanner);
+        self.0.cover_retry_cooldown = enabled;
         self
     }
     /// Opt-in headless experiment; standard policy selection leaves it disabled.

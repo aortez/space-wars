@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drain splash lab</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui;background:#101521;color:#e7eef4}body{max-width:1400px;margin:28px auto;padding:0 20px}h1{font-weight:650;margin-bottom:8px}p{color:#b6c6d5;max-width:1000px;line-height:1.5}label{display:inline-flex;gap:8px;align-items:center;margin:8px 16px 8px 0}select,button{font:inherit;padding:8px 12px;background:#223046;color:inherit;border:1px solid #4d6681;border-radius:6px}button{cursor:pointer}.views{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0;background:#182334;border-radius:10px;overflow:hidden}figcaption{padding:12px 16px;font-size:18px}img{display:block;width:100%;aspect-ratio:4/3;image-rendering:auto}output{display:block;min-height:40px;padding:10px 16px;color:#9bcde3;font:14px ui-monospace,monospace}input{accent-color:#6cc9f5;vertical-align:middle;width:min(620px,60vw)}a{color:#8bd9ff}.details{display:flex;gap:20px;flex-wrap:wrap}#phase{padding:8px;background:#253950;border-radius:6px}@media(max-width:850px){.views{grid-template-columns:1fr}}
+</style>
+<h1>Drain splash lab</h1>
+<p>Compare the original regular splash with seeded variation in timing, angles and droplet sizes. Water feeds for four seconds, then the supply stops. Every droplet carries water taken from the colliding stream.</p>
+<label>Flow <select id="case"></select></label>
+<label>Strength <select id="mode"><option value="lively">Lively</option><option value="restrained">Restrained</option></select></label>
+<label>Compare <select id="comparison"><option value="fixed-varied">Fixed vs varied</option><option value="off-varied">Off vs varied</option><option value="off-fixed">Off vs fixed</option></select></label>
+<label>Seed <select id="seed"><option value="7">7</option><option value="19">19</option><option value="61">61</option></select></label>
+<label>Playback <select id="speed"><option value="1">Normal</option><option value="0.25">Quarter speed</option><option value="0.5">Half speed</option></select></label>
+<button id="play">Pause</button><button id="restart">Restart</button>
+<p id="geometry"></p>
+<div class="views"><figure><figcaption id="control-caption">Fixed splash</figcaption><img id="control" alt="Drain splash control"><output id="control-stats"></output></figure><figure><figcaption id="caption">Varied splash</figcaption><img id="experiment" alt="Drain splash experiment"><output id="experiment-stats"></output></figure></div>
+<p><input id="seek" type="range" min="0" max="240" step="1" value="0" aria-label="Simulation time"> <span id="time">0.00 s</span> · <span id="phase">Feeding</span></p>
+<div class="details"><a id="vector" target="_blank">Vector capture at 2 s</a><a id="portrait" target="_blank">Portrait capture</a><a id="cleanup" target="_blank">After 16 s of simulation</a></div>
+<p>Captured from the Rust water solver and production renderer at 60 simulation steps per second; playback uses 30 captured frames per second. The loop restarts from an empty testbed. These presets explore an authored upward fan bounded by the collision's available energy.</p>
+<p id="variation-note">Each seed gives a repeatable sequence. Replaying the loop repeats the same splashes; choose another seed for a different pattern.</p>
+<details><summary>DirtSim visual reference</summary><p>DirtSim's Meltdown impact spray, captured on its device. A reference for separated drops and upward arcs; this is water created by melting digit blocks.</p><img style="max-width:800px;aspect-ratio:auto" src="dirtsim-reference.png" alt="DirtSim Meltdown showing blue water fragments above the floor and central drain"></details>
+<script>
+const data=__MANIFEST__;
+const $=id=>document.getElementById(id), names={gentle:'Gentle trickle',opposed:'Opposing streams',heavy:'Heavy opposing streams','wall-right':'One stream → right wall','wall-left':'One stream → left wall',unequal:'Unequal opposing streams',wide:'Wide drain'};
+for(const [v,label] of Object.entries(names))$('case').add(new Option(label,v));$('case').value='heavy';
+let running=true,seconds=0,last=0,index=-1,pair=[],cache=new Map();
+function select(){
+ const comparison=$('comparison').value,mode=$('mode').value,seed=Number($('seed').value);
+ const variants=comparison==='fixed-varied'?[[mode,null],[mode,seed]]:comparison==='off-varied'?[['off',null],[mode,seed]]:[['off',null],[mode,null]];
+ pair=variants.map(([mode,seed])=>data.find(d=>d.case===$('case').value&&d.mode===mode&&d.seed===seed));
+ cache.clear();seconds=0;index=-1;const c=pair[1];
+ $('geometry').textContent=`Opening ${Math.round(c.opening*100)}% · left/right reservoir depths ${c.depths.join(' / ')} · each burst redirects 12% of the impacted slice`;
+ const label=d=>d.mode==='off'?'Spray off':`${d.seed===null?'Fixed':'Varied'} · ${d.mode}${d.seed===null?'':` · seed ${d.seed}`}`;
+ $('control-caption').textContent=label(pair[0]);$('caption').textContent=label(c);
+ $('seed').disabled=comparison==='off-fixed';
+ const delays=mode==='lively'?'0.25–0.55':'0.45–0.85';
+ $('variation-note').textContent=comparison==='off-fixed'?'Original fixed fan and interval.':`Varied spacing: ${delays} seconds between eligible bursts. Angles vary by up to 10°, constrained away from walls. Each seed replays exactly; choose another for a different pattern.`;
+ $('vector').href=`${c.directory}/picade-120.svg`;$('portrait').href=`${c.directory}/portrait-120.png`;$('cleanup').href=`${c.directory}/picade-960.png`;show();
+}
+function prefetch(d,i){const src=`${d.directory}/frame-${String(i).padStart(3,'0')}.png`;if(!cache.has(src)){const image=new Image();image.src=src;cache.set(src,image);while(cache.size>20)cache.delete(cache.keys().next().value);}}
+function show(){const i=Math.min(240,Math.round(seconds*30));if(i===index)return;index=i;pair.forEach((d,j)=>{const id=j?'experiment':'control',s=d.samples[i];$(id).src=`${d.directory}/frame-${String(i).padStart(3,'0')}.png`;for(let ahead=1;ahead<=4;ahead++)prefetch(d,Math.min(240,i+ahead));$(id+'-stats').textContent=`${s.bursts} bursts · ${s.parcels} parcels · ${s.spray.toFixed(1)} water area sent into spray`;});$('seek').value=i;$('time').textContent=(i/30).toFixed(2)+' s';$('phase').textContent=i<=120?'Feeding':'Supply stopped · draining';}
+for(const id of ['case','mode','comparison','seed'])$(id).onchange=select;$('play').onclick=()=>{running=!running;$('play').textContent=running?'Pause':'Play';};$('restart').onclick=()=>{seconds=0;show();};$('seek').oninput=()=>{running=false;$('play').textContent='Play';seconds=Number($('seek').value)/30;show();};
+function animate(t){if(last&&running){seconds+=Math.min((t-last)/1000,0.1)*Number($('speed').value);if(seconds>8.8)seconds=0;show();}last=t;requestAnimationFrame(animate);}select();requestAnimationFrame(animate);
+</script></html>

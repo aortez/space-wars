@@ -91,6 +91,7 @@ pub(crate) struct DuckEvent {
     entry_arena_opacity: Option<f32>,
     buoyant: Option<BuoyantBody>,
     water_report: BuoyancyReport,
+    paddling: bool,
     seed: u64,
     movement: Movement,
     controller: Controller,
@@ -287,6 +288,7 @@ impl DuckEvent {
             entry_arena_opacity: None,
             buoyant: None,
             water_report: BuoyancyReport::default(),
+            paddling: false,
             course: None,
             responsive_floor: None,
             drain_floor: None,
@@ -485,6 +487,25 @@ impl DuckEvent {
         })
     }
 
+    pub fn feet_moving(&self) -> bool {
+        let Some(world) = &self.world else {
+            return false;
+        };
+        let Some(motion) = world.motion(DUCK_BODY) else {
+            return false;
+        };
+        if let Some(contact) = world
+            .surface_contacts(DUCK_COLLIDER)
+            .find(|c| c.normal.y > 0.7 && c.separation <= self.radius * 0.05)
+        {
+            // Riding a panel is still standing. Ignore tiny solver corrections.
+            (motion.linear_velocity.x - contact.velocity.x).abs() > self.radius * 0.1
+        } else {
+            // Currents can carry a resting duck or hold an active swimmer still.
+            self.paddling
+        }
+    }
+
     fn supported_surface(&self) -> Option<usize> {
         let world = self.world.as_ref()?;
         let course = self.course.as_ref()?;
@@ -589,11 +610,13 @@ impl DuckEvent {
             )
         };
         let mut delta = self.movement.velocity_delta(observed, &command);
+        self.paddling = false;
         if self.water_report.submerged_fraction > 0.05 && !grounded {
             // In water, input supplies a bounded paddling acceleration instead
             // of cancelling flow with a zero-velocity target. Neutral drifts.
             delta.x =
                 command.direction * self.movement.speed(command.gait) * DT * PADDLE_ACCELERATION;
+            self.paddling = delta.x != 0.0;
         }
         if let Some(player) = &mut self.player {
             delta.y += player.water_delta(
@@ -603,6 +626,10 @@ impl DuckEvent {
                 self.water_report.submerged_fraction,
                 self.tick,
             );
+            // Keep the stroke animated between the held swim button's kicks.
+            self.paddling |= !grounded
+                && self.water_report.submerged_fraction >= player_control::SWIM_MIN_IMMERSION
+                && (player.jump_held || player.dive_held);
         }
         delta.x *= screen;
         if command.jump && grounded {
@@ -628,6 +655,7 @@ impl DuckEvent {
         }
         self.buoyant = None;
         self.water_report = BuoyancyReport::default();
+        self.paddling = false;
         if let Some(player) = &mut self.player {
             player.move_milli = 0;
             player.jump_held = false;

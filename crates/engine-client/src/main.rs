@@ -13,6 +13,8 @@ mod clock_fonts;
 mod controller_assignments;
 mod controller_controls;
 mod controller_profile;
+#[cfg(test)]
+mod crow_visual_tests;
 mod device_info;
 mod frame_trace;
 mod gamepad;
@@ -746,6 +748,8 @@ fn show_launcher(
             engine_common::MaterialCombatMission::Capture => "Capture",
         },
     ));
+    window.set_launcher_loose_dirt(settings.material_combat.loose_dirt);
+    window.set_launcher_dirt_mode(settings.material_combat.dirt_mode.label().into());
     let asteroids = settings.material_combat.asteroids.normalized();
     window.set_launcher_combat_asteroid_interval(SharedString::from(
         if asteroids.interval_seconds == 0 {
@@ -809,6 +813,9 @@ fn show_launcher(
     window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
     window.set_launcher_clock_crow_enabled(settings.clock.events.crow);
+    window.set_launcher_clock_crow_water_tolerance(
+        settings.clock.crow_water_tolerance.label().into(),
+    );
     window.set_launcher_clock_explosion_enabled(settings.clock.events.explosion);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
@@ -1474,14 +1481,14 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 10,
+        "spacewars" => 11,
         "spacewars-classic" => 8,
         "pizza" => 5,
-        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 9,
         "spacewars-terrain-travel"
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
-        | "spacewars-terrain-arena-duel" => 5,
+        | "spacewars-terrain-arena-duel" => 6,
         "clock" => 17,
         "falling" => 1,
         "nes" => 2,
@@ -1532,6 +1539,31 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         return;
     }
 
+    let loose_focus = match window.get_launcher_scenario().as_str() {
+        "spacewars" => Some(9),
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => Some(7),
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => Some(4),
+        _ => None,
+    };
+    if loose_focus == Some(focus) {
+        let current = if window.get_launcher_loose_dirt() {
+            window.get_launcher_dirt_mode()
+        } else {
+            "Off".into()
+        };
+        let labels: Vec<_> = std::iter::once("Off")
+            .chain(engine_common::DirtMode::ALL.map(|mode| mode.label()))
+            .collect();
+        let next = cycle_label(current.as_str(), &labels, delta);
+        window.set_launcher_loose_dirt(next != "Off");
+        if next != "Off" {
+            window.set_launcher_dirt_mode(next.into());
+        }
+        return;
+    }
     match window.get_launcher_scenario().as_str() {
         "surface-expedition"
         | "spacewars-terrain"
@@ -1747,7 +1779,16 @@ fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         return;
     }
     if focus == 13 {
-        window.set_launcher_clock_crow_enabled(!window.get_launcher_clock_crow_enabled());
+        let current = if window.get_launcher_clock_crow_enabled() {
+            window.get_launcher_clock_crow_water_tolerance()
+        } else {
+            "Off".into()
+        };
+        let next = cycle_label(current.as_str(), &["Off", "Varied", "Shy", "Hardy"], delta);
+        window.set_launcher_clock_crow_enabled(next != "Off");
+        if next != "Off" {
+            window.set_launcher_clock_crow_water_tolerance(next.into());
+        }
         return;
     }
     if focus == 12 {
@@ -2271,6 +2312,11 @@ fn launcher_selections_from_window(
             | "spacewars-terrain-arena-duel"
     ) {
         engine_common::MaterialCombatSettings {
+            loose_dirt: window.get_launcher_loose_dirt(),
+            dirt_mode: engine_common::DirtMode::ALL
+                .into_iter()
+                .find(|mode| mode.label() == window.get_launcher_dirt_mode().as_str())
+                .ok_or_else(|| "Unknown dirt mode.".to_owned())?,
             asteroids: engine_common::MaterialAsteroidSettings {
                 interval_seconds: match window.get_launcher_combat_asteroid_interval().as_str() {
                     "Off" => 0,
@@ -2375,6 +2421,12 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             .into_iter()
             .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
             .ok_or("Unknown Clock marquee recipe")?,
+        crow_water_tolerance: engine_common::ClockCrowWaterTolerance::ALL
+            .into_iter()
+            .find(|choice| {
+                choice.label() == window.get_launcher_clock_crow_water_tolerance().as_str()
+            })
+            .ok_or("Unknown Clock crow water tolerance")?,
         rain_amount: engine_common::ClockRainAmount::ALL
             .into_iter()
             .find(|amount| amount.label() == window.get_launcher_clock_rain_amount().as_str())
@@ -3996,6 +4048,31 @@ mod tests {
 
         slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
         let window = MainWindow::new().unwrap();
+        // The same row in match, combat and travel must cycle in both directions.
+        for (scenario, focus) in [
+            ("spacewars", 9),
+            ("spacewars-terrain-combat", 7),
+            ("spacewars-terrain-travel", 4),
+        ] {
+            window.set_launcher_scenario(scenario.into());
+            window.set_launcher_settings_focus_index(focus);
+            window.set_launcher_loose_dirt(false);
+            adjust_launcher_setting(&window, 1);
+            assert!(window.get_launcher_loose_dirt());
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Round grains");
+            for _ in 0..3 {
+                adjust_launcher_setting(&window, 1);
+            }
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Weak · Angular");
+            for _ in 0..4 {
+                adjust_launcher_setting(&window, -1);
+            }
+            assert!(!window.get_launcher_loose_dirt());
+            adjust_launcher_setting(&window, -1);
+            assert_eq!(window.get_launcher_dirt_mode().as_str(), "Strong · Angular");
+            adjust_launcher_setting(&window, 1);
+            assert!(!window.get_launcher_loose_dirt());
+        }
         window.set_launcher_visible(true);
         window.set_launcher_settings_visible(true);
         window.set_launcher_controls_visible(true);
@@ -4078,6 +4155,8 @@ mod tests {
         let selections = LauncherSelections {
             spacewars_match: engine_common::MatchSettings::default(),
             material_combat: engine_common::MaterialCombatSettings {
+                loose_dirt: true,
+                dirt_mode: engine_common::DirtMode::WeakAngular,
                 mission: engine_common::MaterialCombatMission::Capture,
                 asteroids: engine_common::MaterialAsteroidSettings {
                     interval_seconds: 3,
@@ -4117,6 +4196,7 @@ mod tests {
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),
                 rain_amount: engine_common::ClockRainAmount::Heavy,
+                crow_water_tolerance: engine_common::ClockCrowWaterTolerance::Hardy,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

@@ -1,4 +1,5 @@
 //! Headless captures of the water edge test bed through both production adapters.
+mod splash;
 use crate::{
     render::{self, Viewport},
     thruster_visual_tests::{raster, svg, write_png},
@@ -7,7 +8,8 @@ use engine_common::{
     Camera2, ClockEventKind, ClockEventProfile, ClockRainAmount, RenderPoint, Scenario,
 };
 use scenario_clock::water_fixture::{
-    DigitRainFixture, ImpactFixture, OpposedFixture, Profile, ResponsiveFloorFixture, WaterFixture,
+    DigitRainFixture, DrainFixture, ImpactFixture, OpposedFixture, Profile, ResponsiveFloorFixture,
+    WaterFixture,
 };
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use slint::{Rgb8Pixel, SharedPixelBuffer};
@@ -28,6 +30,61 @@ fn opposed_pixels(depths: [f64; 2], mixing: bool) -> SharedPixelBuffer<Rgb8Pixel
 fn is_water(pixel: Rgb8Pixel) -> bool {
     // Includes the blue fill and cyan highlight, not the gray supports or sky.
     pixel.b > 180 && pixel.g > 100 && pixel.b.saturating_sub(pixel.r) > 80
+}
+
+#[test]
+fn drain_wall_lab_keeps_rendered_water_outside_the_panels() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let viewport = Viewport::new(800.0, 600.0);
+    for mirrored in [false, true] {
+        let mut fixture = DrainFixture::new(0.25, 5.0, mirrored);
+        for tick in 1..=120 {
+            fixture.step(1.0 / 60.0);
+            if ![12, 30, 60, 120].contains(&tick) {
+                continue;
+            }
+            let frame = fixture.frame();
+            let vector =
+                render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+            assert!(vector.len() < 1500);
+            assert!(
+                vector
+                    .iter()
+                    .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+            );
+            let pixels = raster(&frame, viewport);
+            if let Some(output) = &output {
+                let name = format!("drain-mirror-{mirrored}-tick-{tick}");
+                write_png(&output.join(format!("{name}.png")), &pixels);
+                std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+            }
+            // Camera is 120 units tall, centered at (0,-25). The rasterizer
+            // fills inclusive floor/ceil x spans, reaching up to 1.5 pixels
+            // beyond an edge. Exact polygon clipping is checked separately.
+            let inside = pixels
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter(|(i, pixel)| {
+                    is_water(**pixel)
+                        && fixture.inside_panel(
+                            engine_core::Vec2::new(
+                                (*i % 800) as f32 / 5.0 + 0.1 - 80.0,
+                                35.0 - (*i / 800) as f32 / 5.0 - 0.1,
+                            ),
+                            0.31,
+                        )
+                })
+                .count();
+            assert_eq!(
+                inside, 0,
+                "water inside panel: mirror={mirrored} tick={tick}"
+            );
+        }
+    }
 }
 
 #[test]

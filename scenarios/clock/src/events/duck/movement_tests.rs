@@ -22,6 +22,7 @@ fn flat_player(aspect: f32, direction: f32) -> DuckEvent {
         duck.step();
     }
     assert!(duck.grounded());
+    assert!(!duck.feet_moving(), "a resting duck keeps its feet still");
     duck
 }
 
@@ -57,6 +58,7 @@ fn floating() -> (DuckEvent, WaterWorld) {
         duck.step_with_water(Some(&water));
     }
     assert!(!duck.grounded());
+    assert!(!duck.feet_moving(), "floating alone is not paddling");
     assert!((0.42..0.48).contains(&duck.water_report.submerged_fraction));
     (duck, water)
 }
@@ -83,6 +85,7 @@ fn run_is_faster_but_does_not_raise_jump_height_on_any_target_layout() {
                     * direction;
                 let expected = duck.movement.run_speed * if run { 1.5 } else { 1.0 };
                 assert!((speed - expected).abs() < 0.01, "{speed} vs {expected}");
+                assert!(duck.feet_moving(), "both walking and running animate");
                 let start = duck.position().unwrap();
                 let mut peak = start.y;
                 duck.set_player_input((direction * 1000.0) as i16, true, run, false);
@@ -90,6 +93,9 @@ fn run_is_faster_but_does_not_raise_jump_height_on_any_target_layout() {
                 for tick in 0..120 {
                     duck.step();
                     peak = peak.max(duck.position().unwrap().y);
+                    if !duck.grounded() {
+                        assert!(!duck.feet_moving(), "no walking in midair");
+                    }
                     if tick > 3 && duck.grounded() {
                         landed = true;
                         break;
@@ -106,6 +112,7 @@ fn run_is_faster_but_does_not_raise_jump_height_on_any_target_layout() {
                     duck.jumps, 1,
                     "holding Jump must not auto-hop after landing"
                 );
+                assert!(!duck.feet_moving(), "stopping returns to resting feet");
             }
             assert!(jumps[1].0 > jumps[0].0 * 1.45, "{jumps:?}");
             assert!((jumps[1].1 - jumps[0].1).abs() < 0.01, "{jumps:?}");
@@ -125,6 +132,11 @@ fn holding_or_mashing_swim_is_cadence_limited_and_never_becomes_air_jumps() {
             duck.set_player_input(0, !mash || tick % 2 == 0, false, false);
             duck.step_with_water(Some(&water));
             let current = duck.player_diagnostics().unwrap();
+            if duck.player.as_ref().unwrap().jump_held
+                && duck.water_report.submerged_fraction >= player_control::SWIM_MIN_IMMERSION
+            {
+                assert!(duck.feet_moving(), "swim animates between vertical kicks");
+            }
             if current.swim_strokes != strokes {
                 if let Some(previous) = last_stroke {
                     assert!(duck.tick - previous >= player_control::SWIM_COOLDOWN_TICKS);
@@ -186,6 +198,10 @@ fn dive_is_shallow_and_release_restores_float_while_jump_overrides_down() {
     );
     assert!(duck.position().unwrap().y < float_y - duck.radius * 0.3);
     assert_eq!(diving.swim_strokes, 0);
+    assert!(
+        duck.feet_moving(),
+        "diving paddles without horizontal input"
+    );
     duck.set_player_input(0, true, false, true);
     duck.step_with_water(Some(&water));
     assert_eq!(duck.player.as_ref().unwrap().swim_strokes, 1);
@@ -205,6 +221,10 @@ fn dive_is_shallow_and_release_restores_float_while_jump_overrides_down() {
     }
     assert!((duck.position().unwrap().y - float_y).abs() < duck.radius * 0.03);
     assert!((420..=480).contains(&duck.player_diagnostics().unwrap().submerged_milli));
+    assert!(
+        !duck.feet_moving(),
+        "releasing swim/dive returns to floating"
+    );
 }
 
 #[test]
@@ -324,6 +344,7 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
         }
         assert!((water.stats().pooled - ledger).abs() < 1e-6);
         assert!(!duck.grounded());
+        assert!(duck.feet_moving(), "paddling against a current animates");
         speeds.push(
             duck.world
                 .as_ref()
@@ -344,6 +365,7 @@ fn run_boosts_paddling_without_removing_a_real_opposing_current() {
             .linear_velocity
             .x;
         duck.step_with_water(Some(&water));
+        assert!(!duck.feet_moving(), "releasing the stick stops paddling");
         let after = duck
             .world
             .as_ref()

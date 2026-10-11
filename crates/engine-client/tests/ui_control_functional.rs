@@ -19,7 +19,9 @@ use tempfile::{Builder, TempDir};
 
 const ARTIFACT_REQUEST_TIMEOUT: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
-const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
+// The first femtovg launcher on a fresh CI runner has needed over 10 seconds
+// before serving control requests. Startup gets a separate budget from actions.
+const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -31,6 +33,9 @@ mod sound;
 
 #[path = "ui_control_functional/device_info.rs"]
 mod device_info;
+
+#[path = "ui_control_functional/attached.rs"]
+mod attached;
 
 #[path = "ui_control_functional/controllers.rs"]
 mod controllers;
@@ -134,6 +139,8 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings.match.asteroid-strength.next",
                 "launcher.settings.match.length.previous",
                 "launcher.settings.match.length.next",
+                "launcher.settings.match.loose-dirt.previous",
+                "launcher.settings.match.loose-dirt.next",
                 "launcher.settings.back",
                 "launcher.settings.start",
             ]
@@ -335,6 +342,94 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
         assert!(!state.paused);
         assert!(!state.benchmark_active);
         harness.capture_screenshot("clock-relaunched-gameplay.png");
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn launcher_can_run_the_pizza_menu_lifecycle() {
+    run_functional_test("launcher-pizza-menu-lifecycle", |harness| {
+        let mut state = harness.wait_until_ready();
+        assert_launcher_main(&state);
+        state = harness.activate_until_scenario("pizza", state);
+
+        let launcher_revision = state.revision;
+        harness.activate_guarded("launcher.start", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("pizza".into()),
+                revision_after: Some(launcher_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert_eq!(state.selected_scenario, "pizza");
+        let original_scenario_revision = state
+            .scenario_revision
+            .expect("Pizza gameplay must report a scenario revision");
+        assert!(!state.paused);
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("pizza".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert!(state.paused);
+        assert_eq!(state.scenario_revision, Some(original_scenario_revision));
+        harness.capture_screenshot("pause.png");
+
+        let restart_requested = harness.activate_guarded("pause.restart", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("pizza".into()),
+                revision_after: Some(restart_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("pizza"));
+        assert_eq!(state.selected_scenario, "pizza");
+        let restarted_scenario_revision = state
+            .scenario_revision
+            .expect("restarted Pizza gameplay must report a scenario revision");
+        assert_ne!(restarted_scenario_revision, original_scenario_revision);
+        assert!(!state.paused);
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("pizza".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert_eq!(state.scenario_revision, Some(restarted_scenario_revision));
+
+        let return_from_revision = state.revision;
+        harness.activate_guarded("pause.return-to-launcher", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::LauncherMain),
+                scenario: None,
+                revision_after: Some(return_from_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert!(!state.paused);
+        assert_eq!(state.active_scenario, None);
+        assert_eq!(state.scenario_revision, None);
+        assert_eq!(state.selected_scenario, "pizza");
+        assert_eq!(state.error, None);
+        harness.capture_screenshot("returned-launcher.png");
     });
 }
 
@@ -639,6 +734,7 @@ impl FunctionalHarness {
                 "elapsed_ms": 0,
                 "command": "spawn engine-client",
                 "arguments": arguments,
+                "backend": backend,
             })],
             last_state: None,
             failure: None,
@@ -677,6 +773,7 @@ impl FunctionalHarness {
                     return state;
                 }
                 Err(error) if is_retryable_readiness_error(&error) => {
+                    self.record_error("ui state (readiness)", &error);
                     last_error = Some(error.to_string());
                 }
                 Err(error) => {

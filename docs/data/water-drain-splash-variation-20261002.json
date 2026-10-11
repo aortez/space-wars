@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-02",
+  "branch": "water-drain-splash-lab",
+  "base": "a98559a48d10a8c755ff6a27e912468cf626d0f5",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "rust": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "profile": "ci (opt-level 2, debug assertions)",
+  "viewports": [
+    [
+      1024,
+      768
+    ],
+    [
+      2048,
+      1536
+    ]
+  ],
+  "measured_steps_per_run": 480,
+  "warmup_steps": 60,
+  "simulation_hz": 60,
+  "repeats": 3,
+  "feeding_seconds": 4,
+  "measured_seconds": 8,
+  "includes": "reservoir replenishment, water step, scene building, raster image generation; vector adapter construction measured separately",
+  "excludes": "PNG encoding, file IO, Slint/KMS/display presentation",
+  "comparison": "same code and fixtures: splash off, fixed Lively, and varied Lively with seed 7; three modes run in reverse order on odd repeats; no Pi timing claim",
+  "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+  "source_sha256": {
+    "Cargo.lock": "fade6a8216d60b067713a82cbd0e1d04a9bf6573c8a5a6bbb7efc8b3eb9bde44",
+    "Cargo.toml": "cd7418935f206fcabe6daf7628fd032026a9c3ec49faea6d8425b4be879fe255",
+    "crates/engine-water/src/lib.rs": "68742e12a9db4e28c408909f1a480f7642830d7b1181cc4593e812712123b5a5",
+    "crates/engine-water/src/mixing.rs": "62719a8b808574258864b0bbc3145653e72dde2b96fc5f9cd3b06632664a8b00",
+    "crates/engine-water/src/solids.rs": "c0311879067f6bda094c149dc6f1fe80ce1a9c75b86a52dfd257f98ee26b32bc",
+    "crates/engine-water/src/splash.rs": "61d9f3427487f904c10d485c0077f7db90e9f32a0ac357559509f35fbba6b2bd",
+    "scenarios/clock/src/water_fixture/drain.rs": "c0b64a58019ff9314431a0c7384fe44fae40ce78c4d54cef99a28ce409eeddbd",
+    "crates/engine-client/src/water_visual_tests/splash.rs": "66394fabb1343e92f012b5a86714637caace84a10cfaccef848a5dfffdf8dcc5"
+  },
+  "csv_sha256": "08987d5373d361e4321e10fce4365a0173d1404686d3923157f722f6044c8009",
+  "modes": [
+    "off",
+    "lively",
+    "lively-seed-7"
+  ],
+  "runs": 126,
+  "measured_frames": 60480,
+  "limitations": [
+    "Variation changes the simulation workload, including burst frequency and droplet paths; this is not an isolated RNG microbenchmark.",
+    "Desktop process-local paired runs; no exclusive-machine isolation, display presentation, or device timing."
+  ]
+}

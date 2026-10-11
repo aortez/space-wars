@@ -1,0 +1,62 @@
+{
+  "scenario": "spacewars-terrain-duel",
+  "seed": 42,
+  "loose_dirt": true,
+  "dirt_mode": "weak-angular",
+  "asteroid_interval_seconds": 1,
+  "asteroid_severity": "heavy",
+  "socket": "/tmp/spacewars-local-cave.sock",
+  "client_sha256": "a49f16a79975dd8ddfc5cf5987b7ed4c4f1db2f814d428ae96c1e871100b59e3",
+  "ui": {
+    "schema_version": 1,
+    "revision": 7,
+    "screen": "pause.main",
+    "active_scenario": "spacewars-terrain-duel",
+    "selected_scenario": "spacewars-terrain-duel",
+    "selected_control": "pause.resume",
+    "controls": [
+      {
+        "id": "pause.resume",
+        "label": "Resume",
+        "enabled": true
+      },
+      {
+        "id": "pause.restart",
+        "label": "Restart Round",
+        "enabled": true
+      },
+      {
+        "id": "pause.controls",
+        "label": "Controls",
+        "enabled": true
+      },
+      {
+        "id": "pause.return-to-launcher",
+        "label": "Return to Launcher",
+        "enabled": true
+      },
+      {
+        "id": "pause.sound",
+        "label": "App Settings",
+        "enabled": true
+      }
+    ],
+    "actions": [
+      "up",
+      "down",
+      "left",
+      "right",
+      "confirm",
+      "back",
+      "start",
+      "controls"
+    ],
+    "scenario_revision": 2,
+    "paused": true,
+    "benchmark_active": false,
+    "error": null
+  },
+  "runtime": "scenario=spacewars-terrain-duel\nscenario_revision=1\npaused=false\ngame_over=false\nbenchmark_active=false\nrenderer=vector\nraster_scale=1.00\nperformance_target=60 Hz\nfps=62.3\nups=60.4\nframes_total=4873\nupdates_total=3411\nfps_source=submitted-frames\nhost_cpu_samples=120\nhost_viewport_width=5116\nhost_viewport_height=1383\nhost_internal_width=5116\nhost_internal_height=1383\nhost_scene_primitives=1232\nhost_updates_per_callback=0.967\nhost_interval_avg_ms=16.027\nhost_interval_p95_ms=16.807\nhost_interval_max_ms=16.976\nhost_step_avg_ms=1.538\nhost_step_p95_ms=2.177\nhost_step_max_ms=2.974\nhost_scene_avg_ms=0.108\nhost_scene_p95_ms=0.133\nhost_scene_max_ms=0.221\nhost_prepare_avg_ms=1.359\nhost_prepare_p95_ms=1.523\nhost_prepare_max_ms=1.627\nhost_callback_avg_ms=3.006\nhost_callback_p95_ms=3.591\nhost_callback_max_ms=4.525\nhost_raster_buffers_avg_ms=0.000\nhost_raster_buffers_p95_ms=0.000\nhost_raster_buffers_max_ms=0.000\nhost_raster_clear_avg_ms=0.000\nhost_raster_clear_p95_ms=0.000\nhost_raster_clear_max_ms=0.000\nhost_raster_player_avg_ms=0.000\nhost_raster_player_p95_ms=0.000\nhost_raster_player_max_ms=0.000\nhost_raster_player_starfield_avg_ms=0.000\nhost_raster_player_starfield_p95_ms=0.000\nhost_raster_player_starfield_max_ms=0.000\nhost_raster_player_world_avg_ms=0.000\nhost_raster_player_world_p95_ms=0.000\nhost_raster_player_world_max_ms=0.000\nhost_raster_player_sun_planets_avg_ms=0.000\nhost_raster_player_sun_planets_p95_ms=0.000\nhost_raster_player_sun_planets_max_ms=0.000\nhost_raster_player_spaceports_avg_ms=0.000\nhost_raster_player_spaceports_p95_ms=0.000\nhost_raster_player_spaceports_max_ms=0.000\nhost_raster_player_effects_avg_ms=0.000\nhost_raster_player_effects_p95_ms=0.000\nhost_raster_player_effects_max_ms=0.000\nhost_raster_player_ships_avg_ms=0.000\nhost_raster_player_ships_p95_ms=0.000\nhost_raster_player_ships_max_ms=0.000\nhost_raster_player_debris_avg_ms=0.000\nhost_raster_player_debris_p95_ms=0.000\nhost_raster_player_debris_max_ms=0.000\nhost_raster_player_particles_avg_ms=0.000\nhost_raster_player_particles_p95_ms=0.000\nhost_raster_player_particles_max_ms=0.000\nhost_raster_player_other_avg_ms=0.000\nhost_raster_player_other_p95_ms=0.000\nhost_raster_player_other_max_ms=0.000\nhost_raster_player_hud_avg_ms=0.000\nhost_raster_player_hud_p95_ms=0.000\nhost_raster_player_hud_max_ms=0.000\nhost_raster_player_sun_corona_avg_ms=0.000\nhost_raster_player_sun_corona_p95_ms=0.000\nhost_raster_player_sun_corona_max_ms=0.000\nhost_raster_overview_refresh_avg_ms=0.000\nhost_raster_overview_refresh_p95_ms=0.000\nhost_raster_overview_refresh_max_ms=0.000\nhost_raster_overview_live_avg_ms=0.000\nhost_raster_overview_live_p95_ms=0.000\nhost_raster_overview_live_max_ms=0.000\nhost_raster_overview_blit_avg_ms=0.000\nhost_raster_overview_blit_p95_ms=0.000\nhost_raster_overview_blit_max_ms=0.000\nhost_raster_other_frames_avg_ms=0.000\nhost_raster_other_frames_p95_ms=0.000\nhost_raster_other_frames_max_ms=0.000\nhost_raster_image_avg_ms=0.000\nhost_raster_image_p95_ms=0.000\nhost_raster_image_max_ms=0.000\nNo active Spacewars diagnostics.\nperformance_overlay_enabled=false\nperformance_overlay_text=FPS 62 | UPS 60\nautostart_enabled=false\nautostart_activity=clock\nautostart_phase=disabled\nautostart_session=manual\nautostart_repeats=0\nautostart_delay_seconds=30\nmaster_volume_percent=25\nmaster_muted=false\nsettings_save_pending=false\n",
+  "screenshot_note": "The live screenshot initially updated. A later screenshot retained the prior pause overlay despite status/UI confirming running; screenshots are not used as quantitative motion evidence.",
+  "ready_note": "Reset after the live smoke check; fresh Weak/Angular material duel is paused for review."
+}

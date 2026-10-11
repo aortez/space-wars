@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "complete": true,
+  "decision": "The existing powered forecast admits sheltered routes at all six blocked snapshots. Proceed to the separately frozen physical execution comparison; retain defaults.",
+  "implementation_commit": "ba7d699c06ffa831697162d499951233c853271e",
+  "binary": {
+    "path": "target/capture-jetpack/surface_mission_soak-ba7d699",
+    "sha256": "7f1bdc5ad7829298cf7d6674f47a9ae457fce5399c448dfc7db382555511726d"
+  },
+  "study": {
+    "path": "target/capture-jetpack/v1/summary.json",
+    "sha256": "955069dac0e6e2612ff3faf89bb7fdcb92c3a94a8f890c71e91cfc4482083f8a"
+  },
+  "inputs": {
+    "path": "capture-jetpack-approaches-v1.json.gz",
+    "sha256": "e879dfcedfe99ef8381729ef540ae94077de2468c32b96e379e42ac8411c40f3",
+    "uncompressed_bytes": 15825225
+  },
+  "snapshots": [
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3270,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620666,
+        "physics_queries": 306076
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 3930,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620700,
+        "physics_queries": 306144
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 8580,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620710,
+        "physics_queries": 306164
+      }
+    },
+    {
+      "run": "failure-cover-on",
+      "world_tick": 9030,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620746,
+        "physics_queries": 306236
+      }
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9270,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620714,
+        "physics_queries": 306172
+      }
+    },
+    {
+      "run": "failure-cover-off",
+      "world_tick": 9720,
+      "outcomes": {
+        "powered_round_trip": 53,
+        "no_powered_forecast_started": 1,
+        "unchanged_walk": 5
+      },
+      "newly_reachable_covered": 37,
+      "newly_reachable_covered_shortlisted": 4,
+      "added_work": {
+        "graph": 620683,
+        "physics_queries": 306110
+      }
+    },
+    {
+      "run": "successful-control",
+      "world_tick": 3510,
+      "outcomes": {
+        "unchanged_walk": 53,
+        "powered_round_trip": 5,
+        "no_powered_forecast_started": 1
+      },
+      "newly_reachable_covered": 0,
+      "newly_reachable_covered_shortlisted": 0,
+      "added_work": {
+        "graph": 57058,
+        "physics_queries": 28810
+      }
+    }
+  ],
+  "totals": {
+    "replays": 3,
+    "snapshots": 7,
+    "paired_sites": 413,
+    "native_powered_batches": 56,
+    "single_site_jobs": 826,
+    "approved_forecasts": 323,
+    "rejected_forecasts": 0,
+    "exact_streams": 18,
+    "sensor_observations": 32400,
+    "planner_ticks": 32400,
+    "maximum_graph": 3,
+    "maximum_queries": 97
+  },
+  "limitations": [
+    "Correlated quiet-mode states, one seat and seed.",
+    "Offline completed jobs and repeated single-site surveys; no live-budget or Pi-performance claim.",
+    "No physical capture claim from route forecasts."
+  ]
+}

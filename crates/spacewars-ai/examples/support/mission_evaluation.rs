@@ -2,7 +2,9 @@ use engine_core::planning::Work;
 use scenario_spacewars::{PlayerId, surface_sortie::mission::MissionObservationV1};
 use serde_json::{Value, json};
 use spacewars_ai::{
-    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy},
+    mission_evaluation::{
+        CURRENT_NEUTRAL_MODEL, DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy,
+    },
     mission_pilot::MissionTelemetry,
 };
 use std::{
@@ -18,6 +20,7 @@ pub struct EvaluationRun {
     pub last_charged: Work,
     file: BufWriter<File>,
     work: Option<BufWriter<File>>,
+    neutral_approaches: Option<BufWriter<File>>,
     written: [Option<u64>; 2],
     budget: u32,
     construction_ms: Vec<f64>,
@@ -41,16 +44,60 @@ impl EvaluationRun {
                 || (enabled && super::arg("--live-objective-planning", "false") == "true"),
             "alternative survey requires mission evaluation and shared live planning"
         );
+        let trace_approaches = match super::arg("--trace-neutral-approaches", "false").as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!("--trace-neutral-approaches must be true or false"),
+        };
+        assert!(
+            !trace_approaches || alternative_survey,
+            "approach trace requires alternative survey"
+        );
+        let flag_cost_seats = match super::arg("--admit-flag-costs", "none").as_str() {
+            "none" => [false; 2],
+            "0" => [true, false],
+            "1" => [false, true],
+            "both" => [true; 2],
+            _ => panic!("--admit-flag-costs must be none, 0, 1 or both"),
+        };
+        for (seat, admitted) in flag_cost_seats.into_iter().enumerate() {
+            assert!(
+                !admitted
+                    || (enabled
+                        && super::arg("--survey-capture-flags", "false") == "true"
+                        && super::arg(&format!("--p{}-policy", seat + 1), "material_mission_v9")
+                            == "material_mission_v13"),
+                "flag cost candidate requires v13, evaluation and shared flag surveys"
+            );
+        }
+        let current_neutral_seats = match super::arg("--survey-current-neutral", "none").as_str() {
+            "none" => [false; 2],
+            "0" => [true, false],
+            "1" => [false, true],
+            "both" => [true; 2],
+            _ => panic!("--survey-current-neutral must be none, 0, 1 or both"),
+        };
+        assert!(
+            (0..2).all(|seat| !current_neutral_seats[seat]
+                || (flag_cost_seats[seat] && alternative_survey)),
+            "current-neutral candidate requires per-seat flag costs and neutral surveys"
+        );
         enabled.then(|| Self {
-            evaluator: MissionEvaluator::new(2),
+            evaluator: MissionEvaluator::new(2)
+                .with_flag_costs(flag_cost_seats)
+                .with_current_neutral_surveys(current_neutral_seats),
             alternative_survey,
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
             work: (super::arg("--schedule-transfer-forecast", "false") == "true"
+                || super::arg("--survey-capture-flags", "false") == "true"
                 || super::arg("--compare-transfer-sources", "none") != "none")
                 .then(|| {
                     BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
                 }),
+            neutral_approaches: trace_approaches.then(|| {
+                BufWriter::new(File::create(out.join("neutral-approach-inputs.jsonl")).unwrap())
+            }),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
                 .parse()
@@ -60,10 +107,40 @@ impl EvaluationRun {
         })
     }
     pub fn observe(&mut self, o: &MissionObservationV1, telemetry: &MissionTelemetry) -> f64 {
+        self.observe_with_flag_surveys(o, telemetry, None, &[])
+    }
+    pub fn observe_with_flag_surveys(
+        &mut self,
+        o: &MissionObservationV1,
+        telemetry: &MissionTelemetry,
+        request: Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest>,
+        samples: &[&scenario_spacewars::surface_sortie::live_planning::FlagSurveySample],
+    ) -> f64 {
         let start = Instant::now();
-        self.evaluator.observe(o, telemetry);
+        self.evaluator
+            .observe_with_flag_surveys(o, telemetry, request, samples);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.construction_ms.push(ms);
+        if telemetry.policy == "material_mission_v16"
+            && let Some(file) = &mut self.neutral_approaches
+        {
+            // This is the evaluator's immutable input, before shared dispatch.
+            // Recording adds no queries; its I/O is outside evaluator timing.
+            let p = &o.local.combat.recovery.flight.pilot;
+            serde_json::to_writer(
+                &mut *file,
+                &json!({
+                    "tick":p.tick,"actor":p.owner,"policy":telemetry.policy,
+                    "queries_ready":p.queries_ready,"ship_position":p.ship.position,
+                    "planets":o.planets,"evidence":o.destination_cover,
+                    "target":telemetry.target,
+                    "selected_tick":telemetry.events.iter().rev()
+                        .find(|e| e.kind == "selected" && e.planet == telemetry.target).map(|e| e.tick),
+                }),
+            )
+            .unwrap();
+            writeln!(file).unwrap();
+        }
         ms
     }
     pub fn advance(&mut self, tick: u64, remaining: Work) -> f64 {
@@ -102,10 +179,13 @@ impl EvaluationRun {
         if let Some(file) = &mut self.work {
             file.flush().unwrap();
         }
+        if let Some(file) = &mut self.neutral_approaches {
+            file.flush().unwrap();
+        }
         let models = ["--p1-policy", "--p2-policy"]
             .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
         let mut report = json!({
-            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13")), "requested_shared_budget":self.budget,
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13" | "material_mission_v14" | "material_mission_v15" | "material_mission_v16")), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
@@ -116,6 +196,43 @@ impl EvaluationRun {
         });
         if models != [MODEL; 2] {
             report["models_by_seat"] = json!(models);
+        }
+        let seats = [PlayerId::PLAYER_1, PlayerId::PLAYER_2]
+            .map(|actor| self.evaluator.uses_flag_costs(actor));
+        if seats.iter().any(|enabled| *enabled) {
+            report["flag_cost_admission"] = json!({"enabled_seats":seats,
+                "candidate":"capture_value_published_flags_v1", "predecessor":"capture_mission_value_v1"});
+            report["observational"] = json!(false);
+            for (seat, enabled) in seats.into_iter().enumerate() {
+                if enabled {
+                    report["models_by_seat"][seat] = json!("capture_value_published_flags_v1");
+                }
+            }
+            report["model"] = if seats == [true; 2] {
+                json!("capture_value_published_flags_v1")
+            } else {
+                json!("mixed")
+            };
+        }
+        let current_neutral = [PlayerId::PLAYER_1, PlayerId::PLAYER_2]
+            .map(|actor| self.evaluator.surveys_current_neutral(actor));
+        if current_neutral.iter().any(|enabled| *enabled) {
+            report["current_neutral_survey"] = json!({
+                "enabled_seats":current_neutral,
+                "candidate":CURRENT_NEUTRAL_MODEL,
+                "predecessor":"capture_value_published_flags_v1",
+                "scope":"current neutral plus one neutral alternative, two sites each; historical conditional costs; native arrival, acquisition and exposure remain unmodelled"
+            });
+            for (seat, enabled) in current_neutral.into_iter().enumerate() {
+                if enabled {
+                    report["models_by_seat"][seat] = json!(CURRENT_NEUTRAL_MODEL);
+                }
+            }
+            report["model"] = if report["models_by_seat"][0] == report["models_by_seat"][1] {
+                report["models_by_seat"][0].clone()
+            } else {
+                json!("mixed")
+            };
         }
         report
     }

@@ -6,6 +6,8 @@ use scenario_spacewars::surface_sortie::LandingPhase;
 pub struct DestinationPlanningTelemetry {
     pub switches: u32,
     pub last_switch: Option<DestinationSwitch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub landing_handoff: Option<super::landing_handoff::LandingHandoff>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -38,8 +40,18 @@ impl MaterialMissionPilot {
             || self.telemetry.target != Some(choice.current)
             || self.selected_tick != choice.selected_tick
             || self.capture.as_ref().and_then(|c| c.telemetry().site) != choice.site
-            || self.destination_gate(o, choice.destination).is_err()
         {
+            return;
+        }
+        if let Err(reason) = self.destination_gate(o, choice.destination) {
+            if reason == destination_retry::RETRY_PREFERENCE {
+                self.record_destination_retry_rejection(
+                    o,
+                    DestinationSelectionPath::Switch,
+                    choice.destination,
+                    self.telemetry.target,
+                );
+            }
             return;
         }
         // Drop only the uncommitted approach. The ordinary transfer controller
@@ -49,8 +61,17 @@ impl MaterialMissionPilot {
         } else {
             "shorter supported capture trip"
         };
+        self.record_destination_retry_admission(
+            o,
+            DestinationSelectionPath::Switch,
+            choice.destination,
+        );
         self.switch_destination(p.tick, choice.destination, reason);
+        self.landing_reference = choice.landing;
         let telemetry = self.telemetry.destination_planning.as_mut().unwrap();
+        telemetry.landing_handoff = choice.landing.map(|reference| {
+            super::landing_handoff::LandingHandoff::new(reference, choice.source_tick, p.tick)
+        });
         telemetry.switches += 1;
         telemetry.last_switch = Some(DestinationSwitch {
             tick: p.tick,
@@ -73,7 +94,20 @@ impl MaterialMissionPilot {
         let p = &o.local.combat.recovery.flight.pilot;
         probe.reason = self.transfer_probe_gate(o, probe.destination).err();
         probe.accepted = probe.reason.is_none();
+        if probe.reason == Some(destination_retry::RETRY_PREFERENCE) {
+            self.record_destination_retry_rejection(
+                o,
+                DestinationSelectionPath::Probe,
+                probe.destination,
+                self.telemetry.target,
+            );
+        }
         if probe.accepted {
+            self.record_destination_retry_admission(
+                o,
+                DestinationSelectionPath::Probe,
+                probe.destination,
+            );
             self.switch_destination(
                 p.tick,
                 probe.destination,
@@ -139,6 +173,8 @@ impl MaterialMissionPilot {
             .is_some_and(|c| !uncommitted(c.telemetry()))
         {
             Err("capture committed")
+        } else if !self.destination_retry_admitted(o, destination) {
+            Err(destination_retry::RETRY_PREFERENCE)
         } else {
             Ok(())
         }
@@ -212,6 +248,7 @@ mod tests {
             current_seconds: 60.0,
             destination_seconds: 30.0,
             value: None,
+            landing: None,
         };
         (bot, o, choice)
     }

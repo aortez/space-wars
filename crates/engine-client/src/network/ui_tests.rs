@@ -24,6 +24,8 @@ fn test_view() -> View {
         inventory: Inventory {
             can_connect: true,
             can_scan: true,
+            can_manage: true,
+            profiles: Vec::new(),
             devices: vec!["/wifi".into()],
             networks: vec![
                 Network {
@@ -132,7 +134,13 @@ fn network_ui_navigation_password_privacy_and_cabinet_layouts() {
                 "selected" => {
                     views.borrow().last().unwrap().lock().unwrap().phase = Phase::Idle;
                     state.borrow_mut().as_mut().unwrap().publish(&window);
-                    window.set_network_focus_index(1);
+                    window.set_network_focus_index(
+                        window
+                            .get_network_rows()
+                            .iter()
+                            .position(|r| r.id == "network.select.test")
+                            .unwrap() as i32,
+                    );
                     // Signal changes can reorder rows, but must not move the
                     // selection to a different SSID under the user's finger.
                     views
@@ -380,4 +388,251 @@ fn keyboard_vertical_navigation_covers_all_action_columns() {
             assert!((40..44).any(|i| keyboard_vertical(i, columns, true) == action));
         }
     }
+}
+
+fn saved_view() -> View {
+    let mut view = test_view();
+    view.status.clear();
+    view.inventory.profiles = (0..3)
+        .map(|index| {
+            let id = format!("0000000{index}-0000-0000-0000-00000000000{index}");
+            SavedNetwork {
+                id,
+                path: format!("/saved/{index}"),
+                name: "Home connection".into(),
+                ssid_name: "Family network".into(),
+                autoconnect: index != 1,
+                priority: if index == 0 { 50 } else { 0 },
+                connected: index == 0,
+                network: (index != 2).then(|| Network {
+                    saved: Some(format!("/saved/{index}")),
+                    connected: index == 0,
+                    security: Security::WpaPsk,
+                    ..Network::default()
+                }),
+            }
+        })
+        .collect();
+    view
+}
+
+#[test]
+fn saved_network_controller_touch_confirmation_and_stale_profile_flows() {
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.show().unwrap();
+    let adapter = windows.borrow()[0].clone();
+    let (session, latest, receiver) = Session::simulated(saved_view());
+    let once = RefCell::new(Some(session));
+    let state = install_with(&window, move || once.borrow_mut().take().unwrap());
+    let ids: Vec<_> = latest
+        .lock()
+        .unwrap()
+        .inventory
+        .profiles
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    let output = std::env::var_os("SPACEWARS_NETWORK_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    window.set_launcher_visible(true);
+    window.set_sound_visible(true);
+    window.invoke_network_open();
+    slint::platform::update_timers_and_animations();
+    let focus = |id: &str| {
+        let index = window
+            .get_network_rows()
+            .iter()
+            .position(|r| r.id == id && r.enabled)
+            .unwrap();
+        window.set_network_focus_index(index as i32);
+    };
+    let click = |x, y| {
+        slint::platform::update_timers_and_animations();
+        let position = slint::LogicalPosition::new(x, y);
+        for event in [
+            slint::platform::WindowEvent::PointerPressed {
+                position,
+                button: slint::platform::PointerEventButton::Left,
+            },
+            slint::platform::WindowEvent::PointerReleased {
+                position,
+                button: slint::platform::PointerEventButton::Left,
+            },
+        ] {
+            window.window().dispatch_event(event);
+        }
+    };
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        adapter.set_size(PhysicalSize::new(width, height));
+        *latest.lock().unwrap() = saved_view();
+        state.borrow_mut().as_mut().unwrap().page = Page::List;
+        state.borrow_mut().as_mut().unwrap().publish(&window);
+        window.set_network_focus_index(0);
+        let top = (height - (height - 24).min(680)) as f32 / 2.;
+        // Actual pointer hit testing uses the shared MenuButton, not its callback directly.
+        click(width as f32 / 2., top + 154. + 60. + 26.);
+        assert!(state.borrow().as_ref().unwrap().page == Page::Saved);
+        assert_eq!(
+            window
+                .get_network_rows()
+                .iter()
+                .filter(|r| r.id.starts_with("network.profile."))
+                .count(),
+            3
+        );
+        assert!(
+            window
+                .get_network_rows()
+                .iter()
+                .any(|r| r.badge == "Preferred")
+        );
+        for (stage, profile_index) in [
+            ("saved-profiles", None),
+            ("saved-offline", Some(2)),
+            ("forget-active", Some(0)),
+        ] {
+            if let Some(index) = profile_index {
+                state.borrow_mut().as_mut().unwrap().page = Page::Saved;
+                state.borrow_mut().as_mut().unwrap().publish(&window);
+                focus(&format!("network.profile.{}", ids[index]));
+                handle_action(&window, UiAction::Confirm);
+                assert!(state.borrow().as_ref().unwrap().page == Page::Profile(ids[index].clone()));
+                assert!(window.get_network_detail().contains(&ids[index]));
+                if index == 2 {
+                    assert!(window.get_network_subtitle().contains("Out of range"));
+                    assert!(
+                        window
+                            .get_network_rows()
+                            .iter()
+                            .any(|r| r.id == "network.profile-connect" && !r.enabled)
+                    );
+                    assert!(
+                        window
+                            .get_network_rows()
+                            .iter()
+                            .any(|r| r.id == "network.forget" && r.enabled)
+                    );
+                } else {
+                    focus("network.forget");
+                    handle_action(&window, UiAction::Confirm);
+                    assert!(window.get_network_detail().contains("remote access"));
+                    assert!(window.get_network_detail().contains(&ids[0]));
+                    assert_eq!(
+                        window.get_network_focus_index(),
+                        0,
+                        "Cancel is the safe initial choice"
+                    );
+                    assert!(receiver.is_empty());
+                }
+            }
+            let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            adapter.request_redraw();
+            for _ in 0..4 {
+                slint::platform::update_timers_and_animations();
+                adapter.draw_if_needed(|r| {
+                    r.render(pixels.make_mut_slice(), width as usize);
+                });
+            }
+            if let Some(output) = &output {
+                crate::thruster_visual_tests::write_png(
+                    &output.join(format!("network-{width}x{height}-{stage}.png")),
+                    &pixels,
+                );
+            }
+        }
+        click(width as f32 / 2., top + 90. + 144. + 26.);
+        assert!(state.borrow().as_ref().unwrap().page == Page::Profile(ids[0].clone()));
+        assert!(
+            receiver.is_empty(),
+            "touch Cancel must never enqueue deletion"
+        );
+    }
+    // A connection becoming active while its confirmation is displayed must
+    // show the stronger warning and move focus back to Cancel.
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[2].clone());
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    window.invoke_network_command("network.forget".into());
+    focus("network.forget-confirm");
+    latest.lock().unwrap().inventory.profiles[2].connected = true;
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert_eq!(window.get_network_focus_index(), 0);
+    assert!(window.get_network_detail().contains("remote access"));
+    handle_action(&window, UiAction::Down);
+    handle_action(&window, UiAction::Confirm);
+    assert!(
+        matches!(receiver.try_recv().unwrap(), Command::Manage { id, change: ProfileChange::Forget { allow_active: true } } if id == ids[2])
+    );
+    assert_eq!(latest.lock().unwrap().phase, Phase::Managing);
+    window.invoke_network_command("network.autoconnect".into());
+    assert!(receiver.is_empty());
+    // A completed deletion must not label another existing profile "forgotten".
+    *latest.lock().unwrap() = saved_view();
+    latest.lock().unwrap().status = "Saved network forgotten.".into();
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[0].clone());
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(!window.get_network_detail().contains("forgotten"));
+    assert!(
+        window
+            .get_network_detail()
+            .contains("future automatic connections")
+    );
+    window.invoke_network_command("network.autoconnect".into());
+    assert!(matches!(receiver.try_recv().unwrap(), Command::Manage { id, .. } if id == ids[0]));
+    latest.lock().unwrap().phase = Phase::Idle;
+    latest.lock().unwrap().status = "Could not save preference.".into();
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(
+        window
+            .get_network_detail()
+            .contains("Could not save preference")
+    );
+    // Manual connection is still available for an autoconnect-disabled profile.
+    *latest.lock().unwrap() = saved_view();
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[1].clone());
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(
+        window
+            .get_network_rows()
+            .iter()
+            .any(|r| r.id == "network.prefer" && !r.enabled)
+    );
+    focus("network.profile-connect");
+    handle_action(&window, UiAction::Confirm);
+    assert!(matches!(receiver.try_recv().unwrap(), Command::ConnectProfile { id } if id == ids[1]));
+    latest.lock().unwrap().phase = Phase::Confirm;
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(
+        !window
+            .get_network_rows()
+            .iter()
+            .any(|r| r.id == "network.saved" || r.id == "network.forget")
+    );
+    window.invoke_network_command("network.forget-confirm".into());
+    assert!(receiver.is_empty());
+    // Lost profiles and inventory errors cannot retarget management to a duplicate.
+    *latest.lock().unwrap() = saved_view();
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[1].clone());
+    latest.lock().unwrap().inventory.profiles.remove(1);
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(state.borrow().as_ref().unwrap().page == Page::Saved);
+    window.invoke_network_command("network.forget".into());
+    assert!(receiver.is_empty());
+    *latest.lock().unwrap() = saved_view();
+    latest.lock().unwrap().inventory.can_manage = false;
+    latest.lock().unwrap().inventory.can_connect = false;
+    latest.lock().unwrap().inventory_error = Some("Read failed".into());
+    state.borrow_mut().as_mut().unwrap().page = Page::Profile(ids[1].clone());
+    state.borrow_mut().as_mut().unwrap().publish(&window);
+    assert!(
+        window
+            .get_network_rows()
+            .iter()
+            .filter(|r| r.id != "network.back")
+            .all(|r| !r.enabled)
+    );
+    assert!(window.get_network_detail().contains("Read failed"));
 }

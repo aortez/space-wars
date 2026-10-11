@@ -17,6 +17,8 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_costs;
+mod flag_evidence;
 mod flag_survey;
 mod flag_value_shadow;
 mod model;
@@ -32,7 +34,7 @@ use model::{LocalEvidence, PlanetKey};
 pub(crate) use neutral_capture::NeutralTimingContext;
 pub(crate) use neutral_capture::neutral_capture_timing;
 pub use neutral_capture::{NeutralCaptureTiming, NeutralTimingValidation};
-pub(crate) use selection::CaptureSelection;
+pub(crate) use selection::{CaptureSelection, CostedLandingReference};
 pub(crate) use source_local::LocalReferenceContext;
 pub use source_local::{LocalCostReference, LocalEvidenceSource};
 pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
@@ -44,13 +46,16 @@ mod tests;
 
 pub const MODEL: &str = "capture_mission_reference_v1";
 pub fn model_for_policy(policy: &str) -> &'static str {
-    if value::enabled(policy) {
+    if flag_evidence::enabled(policy) {
+        flag_evidence::MODEL
+    } else if value::enabled(policy) {
         value::MODEL
     } else {
         MODEL
     }
 }
 pub const MAX_PLANETS: usize = 8;
+pub const CURRENT_NEUTRAL_MODEL: &str = "capture_value_current_neutral_v1";
 pub const MAX_OPTIONS: usize = 3;
 pub const REFRESH_TICKS: u64 = 60;
 pub const MAX_EVIDENCE_AGE: u64 = 30 * 60;
@@ -132,6 +137,10 @@ pub struct MissionEvaluation {
     pub transfer_source: Option<TransferSource>,
     pub comparison_reason: &'static str,
     pub charged_work: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_admissions: Option<Vec<FlagShadowAdmission>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_cost_scope: Option<&'static str>,
 }
 
 #[derive(Clone)]
@@ -252,6 +261,7 @@ struct Dependencies {
     gravity: f32,
     selected_tick: Option<u64>,
     selected_site: Option<LandingSiteId>,
+    handoff_invalidation: Option<(u64, u64)>,
     landed: bool,
     evidence: Vec<EvidenceIdentity>,
 }
@@ -282,6 +292,8 @@ pub struct MissionEvaluator {
     pub charged_total: u64,
     pub cancelled_total: u64,
     pub completed_total: u64,
+    flag_cost_seats: [bool; 2],
+    current_neutral_seats: [bool; 2],
 }
 impl MissionEvaluator {
     pub fn new(capacity: usize) -> Self {
@@ -293,10 +305,42 @@ impl MissionEvaluator {
             charged_total: 0,
             cancelled_total: 0,
             completed_total: 0,
+            flag_cost_seats: [false; 2],
+            current_neutral_seats: [false; 2],
         }
     }
     pub fn reset(&mut self) {
-        *self = Self::new(self.capacity);
+        *self = Self::new(self.capacity)
+            .with_flag_costs(self.flag_cost_seats)
+            .with_current_neutral_surveys(self.current_neutral_seats);
+    }
+    /// Headless candidate configuration; all ordinary constructors remain off.
+    /// Only v13 can consume these conditional historical route references.
+    pub fn with_flag_costs(mut self, seats: [bool; 2]) -> Self {
+        assert!(self.actors.is_empty(), "configure before observing actors");
+        assert!(
+            (0..2).all(|seat| !self.current_neutral_seats[seat] || seats[seat]),
+            "current-neutral candidate requires published flag costs"
+        );
+        self.flag_cost_seats = seats;
+        self
+    }
+    pub fn uses_flag_costs(&self, actor: PlayerId) -> bool {
+        self.flag_cost_seats[actor.index()]
+    }
+    /// Headless experiment: measure a neutral current target before arrival,
+    /// alongside one neutral alternative within the existing four-site limit.
+    pub fn with_current_neutral_surveys(mut self, seats: [bool; 2]) -> Self {
+        assert!(self.actors.is_empty(), "configure before observing actors");
+        assert!(
+            (0..2).all(|seat| !seats[seat] || self.flag_cost_seats[seat]),
+            "current-neutral candidate requires published flag costs"
+        );
+        self.current_neutral_seats = seats;
+        self
+    }
+    pub fn surveys_current_neutral(&self, actor: PlayerId) -> bool {
+        self.current_neutral_seats[actor.index()]
     }
     pub fn latest(&self, actor: PlayerId) -> Option<&MissionEvaluation> {
         self.actors.get(&(actor.index() as u64))?.latest.as_ref()
@@ -306,8 +350,8 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
-    /// Separate observational experiment. Its results are deliberately not
-    /// admitted to evaluation/selection until coverage and timing are tested.
+    /// Remote walking demand. Explicitly configured v13 seats and V14 can
+    /// consume published costs; neither path replaces native sensing.
     pub fn flag_request(
         &mut self,
         o: &MissionObservationV1,
@@ -321,6 +365,7 @@ impl MissionEvaluator {
             &mut self.actors.entry(actor).or_default().flag_survey,
             o,
             mission,
+            self.flag_cost_seats[actor as usize] && flag_costs::enabled(mission.policy),
         )
     }
     /// Optional demand for the host's existing remote-query dispatcher. Call
@@ -339,11 +384,28 @@ impl MissionEvaluator {
             &mut self.actors.entry(actor).or_default().survey,
             o,
             mission,
+            self.current_neutral_seats[actor as usize] && flag_costs::enabled(mission.policy),
         )
     }
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
+        self.observe_with_flag_surveys(o, mission, None, &[]);
+    }
+    /// V14 and its successors, plus explicitly configured v13 seats, may consume
+    /// remote walking costs through their separate destination models.
+    /// Call after controls and flag demand registration. The historical source
+    /// remains a timing reference; native arrival must acquire its own route.
+    pub fn observe_with_flag_surveys(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+        request: Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest>,
+        samples: &[&scenario_spacewars::surface_sortie::live_planning::FlagSurveySample],
+    ) {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
+        let flag_costs = self.uses_flag_costs(p.owner) && flag_costs::enabled(mission.policy);
+        let current_neutral =
+            self.surveys_current_neutral(p.owner) && flag_costs::enabled(mission.policy);
         if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
             return;
         }
@@ -385,6 +447,8 @@ impl MissionEvaluator {
             gravity: o.local.objective_gravity,
             selected_tick: selection_tick(mission),
             selected_site: mission.capture.as_ref().and_then(|c| c.site),
+            handoff_invalidation: handoff_invalidation(mission)
+                .map(|(h, tick)| (h.switch_tick, tick)),
             landed: mission
                 .capture
                 .as_ref()
@@ -392,7 +456,8 @@ impl MissionEvaluator {
             evidence: Vec::new(),
         };
         state.evidence.retain(|sample| {
-            sample.tick <= p.tick
+            !flag_evidence::is_flag(sample)
+                && sample.tick <= p.tick
                 && p.tick - sample.tick <= MAX_EVIDENCE_AGE
                 && dependencies
                     .planets
@@ -403,7 +468,7 @@ impl MissionEvaluator {
                     || sample.key.planet != p.planet.index
                     || (sample.gravity - dependencies.gravity).abs() <= 0.01)
         });
-        if let Some(sample) = survey::evidence(&state.survey, o) {
+        for sample in survey::evidence(&state.survey, o) {
             state
                 .evidence
                 .retain(|old| old.key.planet != sample.key.planet);
@@ -435,6 +500,25 @@ impl MissionEvaluator {
             }
             state.evidence.push(sample);
         }
+        if flag_evidence::enabled(mission.policy) {
+            let base = snapshot(o, mission, &state.evidence);
+            if let Some(sample) = flag_evidence::read(o, &base, request, samples) {
+                state
+                    .evidence
+                    .retain(|old| old.key.planet != sample.key.planet);
+                if state.evidence.len() == MAX_PLANETS {
+                    state.evidence.remove(0);
+                }
+                state.evidence.push(sample);
+            }
+        }
+        let admissions = flag_costs.then(|| flag_costs::observe(state, o, mission, samples));
+        // A rejected handoff invalidates the current journey's old cost basis,
+        // including pending/ready results. New native-selected local evidence
+        // may replace it; another remote sample cannot silently reinstate it.
+        state
+            .evidence
+            .retain(|sample| supports_handoff(mission, sample));
         dependencies.evidence = state
             .evidence
             .iter()
@@ -469,6 +553,7 @@ impl MissionEvaluator {
                 || (old.gravity - dependencies.gravity).abs() > 0.01
                 || old.selected_tick != dependencies.selected_tick
                 || old.selected_site != dependencies.selected_site
+                || old.handoff_invalidation != dependencies.handoff_invalidation
                 || old.landed != dependencies.landed
                 || old.evidence != dependencies.evidence
                 || old.finished != dependencies.finished
@@ -505,7 +590,15 @@ impl MissionEvaluator {
         {
             return;
         }
-        let report = snapshot(o, mission, &state.evidence);
+        let mut report = snapshot(o, mission, &state.evidence);
+        if let Some(admissions) = admissions {
+            report.model = flag_costs::MODEL;
+            report.flag_admissions = Some(admissions);
+            report.flag_cost_scope = Some(flag_costs::SCOPE);
+        }
+        if current_neutral {
+            report.model = CURRENT_NEUTRAL_MODEL;
+        }
         state.submitted_evidence = state.evidence.clone();
         state.dependencies = Some(dependencies);
         let token = self
@@ -566,6 +659,37 @@ fn selection_tick(mission: &MissionTelemetry) -> Option<u64> {
         .rev()
         .find(|e| e.kind == "selected" && e.planet == mission.target)
         .map(|e| e.tick)
+}
+
+fn handoff_invalidation(
+    mission: &MissionTelemetry,
+) -> Option<(&crate::mission_pilot::LandingHandoff, u64)> {
+    if !crate::mission_policy::MissionPolicy::carries_landing_plan(mission.policy) {
+        return None;
+    }
+    let h = mission
+        .destination_planning
+        .as_ref()
+        .and_then(|d| d.landing_handoff.as_ref())?;
+    let invalidated = h.invalidated_tick?;
+    if mission.target != Some(h.site.planet) || selection_tick(mission) != Some(h.switch_tick) {
+        return None;
+    }
+    Some((h, invalidated))
+}
+fn supports_handoff(mission: &MissionTelemetry, sample: &LocalEvidence) -> bool {
+    let Some((h, invalidated)) = handoff_invalidation(mission) else {
+        return true;
+    };
+    if sample.key.planet != h.site.planet {
+        return true;
+    }
+    !sample.remote
+        && sample.tick >= invalidated
+        && sample
+            .choice
+            .is_some_and(|(visit, _)| visit == h.switch_tick)
+        && mission.capture.as_ref().and_then(|c| c.site) == Some(sample.site)
 }
 
 fn candidate_planets<'a>(
@@ -710,7 +834,13 @@ fn snapshot(
                 evidence_age_ticks: sample.map(|s| p.tick - s.tick),
                 route_source_tick: sample.and_then(|s| s.route_source_tick),
                 route_validated_tick: sample.and_then(|s| s.route_validated_tick),
-                evidence_kind: if sample.is_some_and(|s| s.remote) {
+                evidence_kind: if sample.is_some_and(flag_evidence::is_flag) {
+                    if flag_evidence::enabled(mission.policy) {
+                        "historical published flag walk; cover and live feasibility unknown"
+                    } else {
+                        "published flag walk, landing, hatch and climb; acquisition and exposure unmodelled"
+                    }
+                } else if sample.is_some_and(|s| s.remote) {
                     "remote landing, hatch and climb samples; live feasibility unknown"
                 } else if sample.is_some_and(|s| s.tick == p.tick) {
                     "current local measurement"
@@ -725,6 +855,8 @@ fn snapshot(
         })
         .collect();
     MissionEvaluation {
+        flag_admissions: None,
+        flag_cost_scope: None,
         model: model_for_policy(mission.policy),
         policy: mission.policy,
         actor: p.owner,

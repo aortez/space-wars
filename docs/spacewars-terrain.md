@@ -70,6 +70,11 @@ impacts, with Off retaining the previous setup. See
 validation. The pod recovery lift lasts at most 1.5 seconds; release the chord
 before trying again and use normal turning to stand the pod upright.
 
+The existing combat, travel, arena and main Space-Wars settings now include an
+optional [Loose dirt trial](shared-loose-terrain.md): cannon and natural asteroid
+impacts transfer broken cells into conserved physical grains. It defaults to
+Off while settling/deposition and the population fallback are developed.
+
 ## Destruction, flags and recovery
 
 The flag is currently the only owned object on a planet. Removing or detaching

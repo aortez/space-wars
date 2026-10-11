@@ -1,12 +1,16 @@
 //! NetworkManager 1.46-compatible D-Bus transport. Never reads saved secrets,
-//! toggles radios, restarts networking, edits existing profiles, or uses sudo.
+//! toggles radios, restarts networking, or uses sudo. Profile edits preserve
+//! unrelated settings and use UUID identity plus optimistic version checks.
 use std::collections::HashMap;
 
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 use zbus::{Connection, Proxy};
 
 use super::worker::{Backend, CALL_TIME, ROLLBACK_SECONDS, Trial, bounded};
-use super::{Inventory, Network, Security};
+use super::{Inventory, Network, ProfileChange, Security};
+
+#[path = "nm_profiles.rs"]
+mod profiles;
 
 const SERVICE: &str = "org.freedesktop.NetworkManager";
 const ROOT: &str = "/org/freedesktop/NetworkManager";
@@ -126,7 +130,7 @@ impl NetworkManager {
             .map_err(explain)
     }
 
-    async fn saved(&self) -> Result<Vec<(String, Settings)>, String> {
+    async fn saved(&self) -> Result<(Vec<(String, Settings)>, bool), String> {
         let paths: Vec<OwnedObjectPath> = self
             .proxy(&format!("{ROOT}/Settings"), &format!("{SERVICE}.Settings"))
             .await?
@@ -134,6 +138,7 @@ impl NetworkManager {
             .await
             .map_err(explain)?;
         let mut saved = Vec::new();
+        let mut complete = paths.len() <= 128;
         for id in paths.into_iter().take(128) {
             // GetSettings never includes secrets. A disappearing/inaccessible
             // profile must not prevent the rest of the scan list from appearing.
@@ -143,11 +148,19 @@ impl NetworkManager {
                 .call::<_, _, Settings>("GetSettings", &())
                 .await
             {
-                saved.push((id.to_string(), settings));
+                let Ok(props) = self.properties(id.as_str(), PROFILE).await else {
+                    complete = false;
+                    continue;
+                };
+                if number(&props, "Flags") & 4 == 0 {
+                    saved.push((id.to_string(), settings));
+                }
+            } else {
+                complete = false;
             }
         }
         saved.sort_by(|a, b| a.0.cmp(&b.0));
-        Ok(saved)
+        Ok((saved, complete))
     }
 }
 
@@ -155,11 +168,6 @@ impl Backend for NetworkManager {
     async fn inventory(&self) -> Result<Inventory, String> {
         let manager = self.proxy(ROOT, SERVICE).await?;
         let manager_props = self.properties(ROOT, SERVICE).await?;
-        if !boolean(&manager_props, "WirelessEnabled")
-            || !boolean(&manager_props, "WirelessHardwareEnabled")
-        {
-            return Ok(Inventory { summary: "Wi-Fi is disabled or hardware-blocked. Enable it in the operating system, then Refresh.".into(), ..Inventory::default() });
-        }
         let permissions: HashMap<String, String> =
             manager.call("GetPermissions", &()).await.map_err(explain)?;
         let permitted = |suffix: &str| {
@@ -176,9 +184,37 @@ impl Backend for NetworkManager {
             .into_iter()
             .all(permitted),
             can_scan: permitted("wifi.scan"),
+            can_manage: permitted("settings.modify.system"),
             ..Inventory::default()
         };
-        let saved = self.saved().await?;
+        let (saved, complete) = self.saved().await?;
+        inventory.can_manage &= complete;
+        let active = self.active_profiles().await?;
+        inventory.profiles = saved
+            .iter()
+            .filter_map(|(path, settings)| {
+                profiles::describe(path, settings, active.contains(path))
+            })
+            .collect();
+        inventory.profiles.sort_by(|a, b| {
+            a.ssid_name
+                .cmp(&b.ssid_name)
+                .then(a.name.cmp(&b.name))
+                .then(a.id.cmp(&b.id))
+        });
+        if !boolean(&manager_props, "WirelessEnabled")
+            || !boolean(&manager_props, "WirelessHardwareEnabled")
+        {
+            inventory.can_scan = false;
+            inventory.can_connect = false;
+            inventory.summary = "Wi-Fi is disabled or hardware-blocked.".into();
+            inventory.summary.push_str(if inventory.can_manage {
+                " Saved networks can still be managed."
+            } else {
+                " Saved network changes are unavailable; refresh and check permissions."
+            });
+            return Ok(inventory);
+        }
         let devices: Vec<OwnedObjectPath> =
             manager.call("GetDevices", &()).await.map_err(explain)?;
         let mut networks: HashMap<String, Network> = HashMap::new();
@@ -242,6 +278,29 @@ impl Backend for NetworkManager {
             }
         }
         inventory.networks = networks.into_values().collect();
+        for profile in &mut inventory.profiles {
+            let Some((_, settings)) = saved.iter().find(|(path, _)| path == &profile.path) else {
+                continue;
+            };
+            profile.network = inventory
+                .networks
+                .iter()
+                .filter(|network| {
+                    matches_profile(
+                        settings,
+                        &network.ssid,
+                        network.security,
+                        &network.interface,
+                    )
+                })
+                .max_by_key(|network| (network.connected, network.strength))
+                .cloned()
+                .map(|mut network| {
+                    network.saved = Some(profile.path.clone());
+                    network.connected = profile.connected;
+                    network
+                });
+        }
         inventory.networks.sort_by(|a, b| {
             b.connected
                 .cmp(&a.connected)
@@ -262,7 +321,14 @@ impl Backend for NetworkManager {
                 "\nNetwork changes need operating system permission; use system settings.",
             );
         }
+        if !complete {
+            inventory.summary.push_str("\nSome saved profiles could not be read. Profile changes are disabled until Refresh succeeds.");
+        }
         Ok(inventory)
+    }
+
+    async fn manage(&self, id: &str, change: ProfileChange) -> Result<(), String> {
+        self.manage_profile(id, change).await
     }
 
     async fn scan(&self, devices: &[String]) -> Result<(), String> {
@@ -411,6 +477,10 @@ fn matches_profile(settings: &Settings, ssid: &[u8], security: Security, interfa
     }
     let binding = text(connection, "interface-name");
     if !binding.is_empty() && binding != interface {
+        return false;
+    }
+    let mode = text(wifi, "mode");
+    if !mode.is_empty() && mode != "infrastructure" {
         return false;
     }
     let key = settings

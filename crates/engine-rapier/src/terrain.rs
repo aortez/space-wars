@@ -12,6 +12,18 @@ use crate::world::{
     ColliderShape, ColliderSpec, CollisionGroups, CompoundChild, PhysicsId, PhysicsWorld,
 };
 
+mod grain;
+pub use grain::{GrainSeed, GrainShape, TerrainGrain};
+mod loose;
+pub use loose::{
+    CohesionConfig, CohesionDiagnostics, DepositCommit, DirtStrength, ImpactFractureConfig,
+    ImpactFractureDiagnostics, LooseTerrain, LooseTerrainConfig, MaterialEdit, MaterialQuantity,
+    PackingAttempt, PackingGrain, PackingInspection, PackingObstacle, PackingPatch,
+    PackingSnapshot, PreparedRelease, RadialImpulse, ReleaseCapacity, ReleaseCommit, ReleaseError,
+    SettlingDiagnostics, SettlingWork, SlumpCommit, SlumpingConfig, SlumpingDiagnostics,
+    TerrainBodyMut,
+};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TerrainColliders {
     Separate,
@@ -118,6 +130,7 @@ impl TerrainAssembly {
         terrain: &Terrain,
         geometry: &TerrainGeometry,
     ) -> Option<usize> {
+        let _span = crate::profile::span("collider_sync");
         if !world.contains_body(self.body)
             || self.revisions.len() != terrain.chunk_count()
             || geometry.chunks().len() != terrain.chunk_count()

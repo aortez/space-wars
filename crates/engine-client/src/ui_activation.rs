@@ -260,7 +260,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.digit-slide" => 3,
-        "launcher.settings.spacewars.asteroids"
+        "launcher.settings.travel.loose-dirt"
+        | "launcher.settings.spacewars.asteroids"
         | "launcher.settings.match.break-interval"
         | "launcher.settings.combat.mission"
         | "launcher.settings.clock.event-profile" => 4,
@@ -272,9 +273,11 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.combat.asteroid-strength"
         | "launcher.settings.match.asteroid-interval"
         | "launcher.settings.clock.color-cycle" => 6,
-        "launcher.settings.match.asteroid-strength" | "launcher.settings.clock.meltdown" => 7,
+        "launcher.settings.combat.loose-dirt"
+        | "launcher.settings.match.asteroid-strength"
+        | "launcher.settings.clock.meltdown" => 7,
         "launcher.settings.clock.duck" | "launcher.settings.match.length" => 8,
-        "launcher.settings.clock.marquee" => 9,
+        "launcher.settings.match.loose-dirt" | "launcher.settings.clock.marquee" => 9,
         "launcher.settings.clock.marquee-preset" => 10,
         "launcher.settings.clock.rain" => 11,
         "launcher.settings.clock.show-date" => 12,

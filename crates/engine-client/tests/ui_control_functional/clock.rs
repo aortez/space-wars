@@ -172,7 +172,7 @@ fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
         let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
-        let page = harness.change_clock_setting("pause.clock.crow", "On", &page);
+        let page = harness.change_clock_setting("pause.clock.crow", "Varied", &page);
         let configured = harness.clock_state();
         assert!(configured.settings.events.crow);
         assert_eq!(configured.crow, paused.crow);
@@ -437,7 +437,14 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         let initial = harness.clock_state();
         assert_eq!(initial.settings.rain_amount, ClockRainAmount::Heavy);
         assert_eq!(initial.floor, ClockFloorMode::Closed);
-        assert_eq!(initial.events.len(), 7);
+        assert_eq!(
+            initial
+                .events
+                .iter()
+                .map(|event| event.kind)
+                .collect::<Vec<_>>(),
+            ClockEventKind::ALL
+        );
         harness.clock_trigger_event(&initial, ClockEventKind::Rain);
         let raining = harness.clock_wait(&initial, "raining", 1, 300);
         assert_eq!(raining.floor, ClockFloorMode::EventOwned);
@@ -619,7 +626,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
-        page = harness.change_clock_setting("pause.clock.crow", "Off", &page);
+        assert_eq!(control_value(&page, "pause.clock.crow"), Some("Varied"));
+        for choice in ["Shy", "Hardy", "Off"] {
+            page = harness.change_clock_setting("pause.clock.crow", choice, &page);
+        }
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
@@ -969,7 +979,6 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
-            "launcher.settings.clock.crow.next",
             "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
@@ -978,6 +987,15 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             state = harness.activate_guarded(id, &state);
             assert_eq!(control_value(&state, id), Some("Off"));
         }
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Varied")
+        );
+        state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Off")
+        );
         state = harness.activate_guarded("launcher.settings.clock.rain.previous", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.rain.next"),

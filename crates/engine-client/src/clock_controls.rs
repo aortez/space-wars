@@ -24,6 +24,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.events.duck);
     window.set_launcher_clock_crow_enabled(settings.events.crow);
+    window.set_launcher_clock_crow_water_tolerance(settings.crow_water_tolerance.label().into());
     window.set_launcher_clock_explosion_enabled(settings.events.explosion);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
@@ -134,6 +135,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         old_profile = ?previous.event_profile, new_profile = ?next.event_profile,
         old_events = ?previous.events, new_events = ?next.events,
         old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
+        old_crow_water = ?previous.crow_water_tolerance, new_crow_water = ?next.crow_water_tolerance,
         old_format = ?previous.time_format, new_format = ?next.time_format,
         old_show_date = previous.show_date, new_show_date = next.show_date,
         old_marquee = ?previous.marquee_preset, new_marquee = ?next.marquee_preset,
@@ -144,7 +146,19 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
 fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
     match index {
         13 => settings.show_date = !settings.show_date,
-        14 => settings.events.crow = !settings.events.crow,
+        14 => {
+            let current = if settings.events.crow {
+                settings.crow_water_tolerance as i32 + 1
+            } else {
+                0
+            };
+            let next = ui_navigation::moved_selection(current, 4, delta);
+            settings.events.crow = next != 0;
+            if next != 0 {
+                settings.crow_water_tolerance =
+                    engine_common::ClockCrowWaterTolerance::ALL[next as usize - 1];
+            }
+        }
         15 => settings.events.explosion = !settings.events.explosion,
         0 => {
             settings.time_format = match settings.time_format {
@@ -259,6 +273,31 @@ mod tests {
             }
         );
         assert_eq!(adjusted_settings(enabled, 13, -1), Some(original));
+    }
+
+    #[test]
+    fn crow_choice_cycles_both_ways_and_preserves_tolerance_while_disabled() {
+        use engine_common::ClockCrowWaterTolerance;
+        let original = ClockSettings::default();
+        let mut settings = original;
+        for tolerance in [ClockCrowWaterTolerance::Shy, ClockCrowWaterTolerance::Hardy] {
+            settings = adjusted_settings(settings, 14, 1).unwrap();
+            assert!(settings.events.crow);
+            assert_eq!(settings.crow_water_tolerance, tolerance);
+        }
+        settings = adjusted_settings(settings, 14, 1).unwrap();
+        assert!(!settings.events.crow);
+        assert_eq!(
+            settings.crow_water_tolerance,
+            ClockCrowWaterTolerance::Hardy
+        );
+        let backwards = adjusted_settings(settings, 14, -1).unwrap();
+        assert!(backwards.events.crow);
+        assert_eq!(
+            backwards.crow_water_tolerance,
+            ClockCrowWaterTolerance::Hardy
+        );
+        assert_eq!(adjusted_settings(settings, 14, 1), Some(original));
     }
 
     #[test]

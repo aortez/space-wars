@@ -20,10 +20,13 @@ use engine_terrain::{
     TerrainGeometry,
 };
 
+pub mod blast_lab;
 mod fragments;
+pub mod granular_lab;
 mod impacts;
 mod mining;
 mod render;
+pub mod soil_lab;
 mod tools;
 mod view;
 pub use fragments::TerrainFragment;

@@ -578,6 +578,13 @@ impl ClientInput {
         (aim, held, cycle)
     }
 
+    pub(crate) fn scorched_gamepad_barrage(&self) -> bool {
+        self.gamepads
+            .borrow()
+            .seat(0)
+            .is_some_and(|pad| pad.connected && pad.left_bumper)
+    }
+
     pub(crate) fn terrain_gamepad_tools(&self) -> TerrainGamepadTools {
         let gamepads = self.gamepads.borrow();
         gamepads.seat(0).filter(|pad| pad.connected).map_or_else(

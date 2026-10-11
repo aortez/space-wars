@@ -111,6 +111,12 @@ pub struct GroundTelemetry {
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
+    active_flight_checks: bool,
+    active_flight:
+        Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleFlightRequest>,
+    launch_forecast:
+        Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleCrossingForecast>,
+    last_flight_check: Option<u64>,
     joint_flag: bool,
     powered_flag: bool,
     flag_survey_tick: Option<u64>,
@@ -139,6 +145,10 @@ pub struct GroundNavigationTask {
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
+            active_flight_checks: false,
+            active_flight: None,
+            launch_forecast: None,
+            last_flight_check: None,
             joint_flag: false,
             powered_flag: false,
             flag_survey_tick: None,
@@ -210,6 +220,7 @@ impl GroundNavigationTask {
         self.telemetry.continuous_walk = enabled;
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let active_flight_checks = self.active_flight_checks;
         let continuous_walk = self.telemetry.continuous_walk;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
@@ -219,6 +230,7 @@ impl GroundNavigationTask {
             Self::new(context, self.telemetry.destination)
         };
         self.telemetry.continuous_walk = continuous_walk;
+        self.active_flight_checks = active_flight_checks;
     }
     pub fn is_crossing(&self) -> bool {
         self.crossing_task.is_some() || self.settling_after_interrupt
@@ -251,6 +263,12 @@ impl GroundNavigationTask {
     }
     pub fn step(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
+        if self.active_flight_checks
+            && let Some(forecast) = o.jetpack.as_ref().and_then(|j| j.vehicle_forecast)
+            && forecast.valid_at(p.tick)
+        {
+            self.launch_forecast = Some(forecast);
+        }
         if o.version != 1
             || o.flight.version != 2
             || o.flight.flight.version != 1
@@ -616,6 +634,8 @@ impl GroundNavigationTask {
             && p.balanced
         {
             self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, *plan));
+            self.active_flight = None;
+            self.last_flight_check = None;
             return self.follow_crossing(o);
         }
         let node_id = self.telemetry.path[index];
