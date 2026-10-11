@@ -4,8 +4,9 @@ use super::*;
 pub const PILOT_HEALTH: f32 = 100.0;
 const EJECTION_PROTECTION_TICKS: u64 = 180;
 const SAFE_IMPACT_SPEED: f32 = 12.0;
-const IMPACT_DAMAGE_PER_SPEED: f32 = 4.0;
-const MISSILE_DAMAGE: f32 = 40.0;
+const MISSILE_DAMAGE: f32 = 25.0;
+const POD_EXPOSURE: f32 = 2.0;
+const ON_FOOT_EXPOSURE: f32 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -311,14 +312,19 @@ impl SurfaceSortieState {
     }
 }
 
-fn exposed_entity(world: &SpacewarsState, pilot: &SurfacePilot) -> Option<MechanicalEntity> {
+/// Native damage target and per-form exposure. Both forms spend the same
+/// persistent pilot health; entering a pod never creates another armor pool.
+fn exposed_pilot(world: &SpacewarsState, pilot: &SurfacePilot) -> Option<(MechanicalEntity, f32)> {
     pilot.vitals?;
     if pilot.body.is_some() {
-        Some(MechanicalEntity::Spaceling(pilot.owner.index()))
+        Some((
+            MechanicalEntity::Spaceling(pilot.owner.index()),
+            ON_FOOT_EXPOSURE,
+        ))
     } else {
         let ship = &world.ships[pilot.vehicle.0];
         (!ship.dead && ship.form == ShipForm::EscapePod)
-            .then_some(MechanicalEntity::Ship(pilot.vehicle.0))
+            .then_some((MechanicalEntity::Ship(pilot.vehicle.0), POD_EXPOSURE))
     }
 }
 
@@ -326,7 +332,7 @@ fn exposed_entity(world: &SpacewarsState, pilot: &SurfacePilot) -> Option<Mechan
 /// that destroys the full ship never also damages its newly ejected pilot.
 pub(crate) fn apply_lasers(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
     for pilot in pilots {
-        let Some(entity) = exposed_entity(world, pilot) else {
+        let Some((entity, exposure)) = exposed_pilot(world, pilot) else {
             continue;
         };
         for hit in &world.laser_hits {
@@ -337,7 +343,7 @@ pub(crate) fn apply_lasers(world: &SpacewarsState, pilots: &mut [SurfacePilot]) 
             };
             if target == entity {
                 pilot.vitals.as_mut().unwrap().damage(
-                    hit.damage,
+                    hit.damage * exposure,
                     PilotDamageCause::Laser,
                     world.tick + 1,
                 );
@@ -363,7 +369,7 @@ pub(crate) fn apply_contacts(
         .filter(|c| c.started)
     {
         for pilot in pilots.iter_mut() {
-            let Some(entity) = exposed_entity(world, pilot) else {
+            let Some((entity, exposure)) = exposed_pilot(world, pilot) else {
                 continue;
             };
             let other = if contact.a == entity {
@@ -390,14 +396,14 @@ pub(crate) fn apply_contacts(
                     if matches!(entity, MechanicalEntity::Spaceling(_)) {
                         external_hits.push((pilot.vehicle.0, shell.owner_id));
                     }
-                    (MISSILE_DAMAGE, PilotDamageCause::Missile)
+                    (MISSILE_DAMAGE * exposure, PilotDamageCause::Missile)
                 } else if debris.is_some_and(|(_, d)| d.damage_scalar == 0.0) {
                     // Breakup pieces already have zero direct damage in
                     // Spacewars. Their physical shove can still cause a crash.
                     (0.0, PilotDamageCause::Impact)
                 } else {
                     (
-                        ((contact.closing_speed - SAFE_IMPACT_SPEED) * IMPACT_DAMAGE_PER_SPEED)
+                        ((contact.closing_speed - SAFE_IMPACT_SPEED) * exposure)
                             .clamp(0.0, PILOT_HEALTH),
                         PilotDamageCause::Impact,
                     )
@@ -464,9 +470,9 @@ pub(crate) fn apply_contacts(
 pub(crate) fn apply_heat(world: &SpacewarsState, pilots: &mut [SurfacePilot], dt: f32) {
     let Some(sun) = world.sun else { return };
     for pilot in pilots {
-        if exposed_entity(world, pilot).is_none() {
+        let Some((_, exposure)) = exposed_pilot(world, pilot) else {
             continue;
-        }
+        };
         let position = pilot.snapshot(&world.physics).map_or_else(
             || world.ships[pilot.vehicle.0].position + physics::ship_pivot(ShipForm::EscapePod),
             |s| s.motion.position,
@@ -475,7 +481,7 @@ pub(crate) fn apply_heat(world: &SpacewarsState, pilots: &mut [SurfacePilot], dt
             - (position.distance_to(sun.position) - sun.radius) / solar::CORONA_WIDTH)
             .clamp(0.0, 1.0);
         pilot.vitals.as_mut().unwrap().damage(
-            PILOT_HEALTH * 0.2 * intensity * dt,
+            PILOT_HEALTH * 0.2 * intensity * dt * exposure,
             PilotDamageCause::SolarHeat,
             world.tick + 1,
         );

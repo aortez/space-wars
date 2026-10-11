@@ -1,0 +1,2707 @@
+{
+  "version": 1,
+  "baseline_commit": "a483fa41cf85e351436b2d10314b715a2077c60a",
+  "evidence_directory": "target/durability-154",
+  "settings": {
+    "ship_health_percent": 100,
+    "pilot_health": 100,
+    "step_hz": 60,
+    "match_seconds": 600,
+    "asteroid_severity": "mixed",
+    "slumping": true,
+    "break_interval_seconds": 15,
+    "break_duration_seconds": 4,
+    "policies": [
+      "material_mission_v13",
+      "material_mission_v13"
+    ],
+    "recovery_profile": "terrain_recovery_supported_hatch_ordinary_offsets_v1",
+    "candidate_seat": "swapped per case"
+  },
+  "hashes": {
+    "baseline-ai": "642cf0ee6a9591d13ffcb514d119b223ac76791380d45f12bd51948de320d0f8",
+    "tuned-ai-v1": "7d7e33fe48dfe86602a3533fba3364ba7f50e61b0e273979a056d37cec5dd552",
+    "baseline-exposure-v2.json": "3a0496a18de903f2de870167645073c129b91407b70833e3b3be8bc91b30392d",
+    "tuned-exposure-v2.json": "b8fce28f5f885cb8f918a3027c1efd59251d280725893b353c6e4dc80c0a48a7",
+    "baseline-matches/matrix.json": "260208107155a1fccdacd493c6a9c26884533f5510a880cce6e3f3d1ce67d610",
+    "run-durability-matches.py": "9706c8f51608725b02c8baa3e0ea7b47238a99341b4faf0fc17977c3415f8cb3"
+  },
+  "controlled_exposure": {
+    "baseline": {
+      "measurements": [
+        {
+          "damaging_ticks": 833,
+          "exposure": "laser_40_units",
+          "first_damage": 0.1999969482421875,
+          "first_damage_tick": 1,
+          "form": "Ship",
+          "initial_health": 100,
+          "loss_seconds": 13.883333333333333,
+          "loss_tick": 833,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 1,
+          "form": "Ship",
+          "initial_health": 100,
+          "loss_seconds": 10.016666666666667,
+          "loss_tick": 601,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "contact_tick": 2,
+          "damage": 28.962562561035156,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "Ship",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 8.69908618927002,
+            "y": 4.2287187576293945
+          },
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 2,
+          "form": "Ship",
+          "hits": 3,
+          "initial_health": 100,
+          "launched": 3,
+          "loss_seconds": 4.033333333333333,
+          "loss_tick": 242,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 9.5
+            }
+          ],
+          "closing_speed": 9.5,
+          "contact_impulse": 155.20870971679688,
+          "contact_tick": 71,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 19.5
+            }
+          ],
+          "closing_speed": 19.5,
+          "contact_impulse": 316.3451232910156,
+          "contact_tick": 35,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 29.5
+            }
+          ],
+          "closing_speed": 29.5,
+          "contact_impulse": 485.669921875,
+          "contact_tick": 24,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [
+            {
+              "damage": 0.39499998092651367,
+              "speed": 39.5
+            }
+          ],
+          "closing_speed": 39.5,
+          "contact_impulse": 644.9893188476562,
+          "contact_tick": 18,
+          "damage": 0.39499664306640625,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "damaging_ticks": 863,
+          "exposure": "laser_40_units",
+          "first_damage": 0.1999969482421875,
+          "first_damage_tick": 1,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 14.383333333333333,
+          "loss_tick": 863,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 864,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 1,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 10.016666666666667,
+          "loss_tick": 601,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 601,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "damaging_ticks": 863,
+          "exposure": "laser_40_units",
+          "first_damage": 0.115875244140625,
+          "first_damage_tick": 180,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 17.366666666666667,
+          "loss_tick": 1042,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 1043,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 180,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 13.0,
+          "loss_tick": 780,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 780,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "contact_tick": 3,
+          "damage": 40.0,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "Pod",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 171.53370666503906,
+            "y": -0.8711956739425659
+          },
+          "pilot_health_after": 60.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 3,
+          "form": "Pod",
+          "hits": 2,
+          "initial_health": 100,
+          "launched": 2,
+          "loss_seconds": 2.3833333333333333,
+          "loss_tick": 143,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 144,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 9.5
+            }
+          ],
+          "closing_speed": 9.5,
+          "contact_impulse": 4.848351955413818,
+          "contact_tick": 100,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 19.5
+            }
+          ],
+          "closing_speed": 19.5,
+          "contact_impulse": 10.197689056396484,
+          "contact_tick": 49,
+          "damage": 30.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 70.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 29.5
+            }
+          ],
+          "closing_speed": 29.5,
+          "contact_impulse": 14.881610870361328,
+          "contact_tick": 33,
+          "damage": 70.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 30.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [
+            {
+              "damage": 0.39499998092651367,
+              "speed": 39.5
+            }
+          ],
+          "closing_speed": 39.5,
+          "contact_impulse": 20.017351150512695,
+          "contact_tick": 25,
+          "damage": 100.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 25,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "damaging_ticks": 870,
+          "exposure": "laser_40_units",
+          "first_damage": 0.1999969482421875,
+          "first_damage_tick": 1,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 14.5,
+          "loss_tick": 870,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 871,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 1,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 10.016666666666667,
+          "loss_tick": 601,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 601,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "damaging_ticks": 871,
+          "exposure": "laser_40_units",
+          "first_damage": 0.11492156982421875,
+          "first_damage_tick": 180,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 17.5,
+          "loss_tick": 1050,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 1051,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 180,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 13.0,
+          "loss_tick": 780,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 780,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "contact_tick": 3,
+          "damage": 40.0,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "OnFoot",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 347.0157775878906,
+            "y": 15.82326602935791
+          },
+          "pilot_health_after": 60.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 3,
+          "form": "OnFoot",
+          "hits": 1,
+          "initial_health": 100,
+          "launched": 1,
+          "loss_seconds": 1.3333333333333333,
+          "loss_tick": 80,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 81,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [],
+          "closing_speed": 10.0,
+          "contact_impulse": 2.6322011947631836,
+          "contact_tick": 98,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [],
+          "closing_speed": 20.0,
+          "contact_impulse": 5.264403343200684,
+          "contact_tick": 50,
+          "damage": 32.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 68.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [],
+          "closing_speed": 30.0,
+          "contact_impulse": 7.896604061126709,
+          "contact_tick": 34,
+          "damage": 72.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 28.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [],
+          "closing_speed": 40.0,
+          "contact_impulse": 10.52880573272705,
+          "contact_tick": 25,
+          "damage": 100.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 25,
+          "last_pilot_damage_cause": "impact"
+        }
+      ],
+      "pilot_health": 100.0,
+      "seed": 42,
+      "ship_health_percent": 100,
+      "step_hz": 60
+    },
+    "tuned": {
+      "measurements": [
+        {
+          "damaging_ticks": 833,
+          "exposure": "laser_40_units",
+          "first_damage": 0.1999969482421875,
+          "first_damage_tick": 1,
+          "form": "Ship",
+          "initial_health": 100,
+          "loss_seconds": 13.883333333333333,
+          "loss_tick": 833,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "damaging_ticks": 601,
+          "exposure": "half_corona",
+          "first_damage": 0.16666412353515625,
+          "first_damage_tick": 1,
+          "form": "Ship",
+          "initial_health": 100,
+          "loss_seconds": 10.016666666666667,
+          "loss_tick": 601,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "contact_tick": 2,
+          "damage": 28.962562561035156,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "Ship",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 8.69908618927002,
+            "y": 4.2287187576293945
+          },
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 2,
+          "form": "Ship",
+          "hits": 3,
+          "initial_health": 100,
+          "launched": 3,
+          "loss_seconds": 4.033333333333333,
+          "loss_tick": 242,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 9.5
+            }
+          ],
+          "closing_speed": 9.5,
+          "contact_impulse": 155.20870971679688,
+          "contact_tick": 71,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 19.5
+            }
+          ],
+          "closing_speed": 19.5,
+          "contact_impulse": 316.3451232910156,
+          "contact_tick": 35,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 29.5
+            }
+          ],
+          "closing_speed": 29.5,
+          "contact_impulse": 485.669921875,
+          "contact_tick": 24,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [
+            {
+              "damage": 0.39499998092651367,
+              "speed": 39.5
+            }
+          ],
+          "closing_speed": 39.5,
+          "contact_impulse": 644.9893188476562,
+          "contact_tick": 18,
+          "damage": 0.39499664306640625,
+          "exposure": "planet_impact",
+          "form": "Ship",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "damaging_ticks": 431,
+          "exposure": "laser_40_units",
+          "first_damage": 0.40000152587890625,
+          "first_damage_tick": 1,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 7.183333333333334,
+          "loss_tick": 431,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 432,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 300,
+          "exposure": "half_corona",
+          "first_damage": 0.33333587646484375,
+          "first_damage_tick": 1,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 5.0,
+          "loss_tick": 300,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 300,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "damaging_ticks": 432,
+          "exposure": "laser_40_units",
+          "first_damage": 0.23175048828125,
+          "first_damage_tick": 180,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 10.183333333333334,
+          "loss_tick": 611,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 612,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 300,
+          "exposure": "half_corona",
+          "first_damage": 0.33333587646484375,
+          "first_damage_tick": 180,
+          "form": "Pod",
+          "initial_health": 100,
+          "loss_seconds": 7.983333333333333,
+          "loss_tick": 479,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 479,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "contact_tick": 3,
+          "damage": 50.0,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "Pod",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 171.53370666503906,
+            "y": -0.8711956739425659
+          },
+          "pilot_health_after": 50.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 3,
+          "form": "Pod",
+          "hits": 2,
+          "initial_health": 100,
+          "launched": 2,
+          "loss_seconds": 2.05,
+          "loss_tick": 123,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 124,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 9.5
+            }
+          ],
+          "closing_speed": 9.5,
+          "contact_impulse": 4.848351955413818,
+          "contact_tick": 100,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 19.5
+            }
+          ],
+          "closing_speed": 19.5,
+          "contact_impulse": 10.197689056396484,
+          "contact_tick": 49,
+          "damage": 15.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 85.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [
+            {
+              "damage": 0.0,
+              "speed": 29.5
+            }
+          ],
+          "closing_speed": 29.5,
+          "contact_impulse": 14.881610870361328,
+          "contact_tick": 33,
+          "damage": 35.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 65.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [
+            {
+              "damage": 0.39499998092651367,
+              "speed": 39.5
+            }
+          ],
+          "closing_speed": 39.5,
+          "contact_impulse": 20.017351150512695,
+          "contact_tick": 25,
+          "damage": 55.0,
+          "exposure": "planet_impact",
+          "form": "Pod",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 45.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "damaging_ticks": 217,
+          "exposure": "laser_40_units",
+          "first_damage": 0.8000030517578125,
+          "first_damage_tick": 1,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 3.6166666666666667,
+          "loss_tick": 217,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 218,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 151,
+          "exposure": "half_corona",
+          "first_damage": 0.6666641235351562,
+          "first_damage_tick": 1,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 2.5166666666666666,
+          "loss_tick": 151,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 151,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "damaging_ticks": 218,
+          "exposure": "laser_40_units",
+          "first_damage": 0.45967864990234375,
+          "first_damage_tick": 180,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 6.616666666666666,
+          "loss_tick": 397,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 398,
+          "last_pilot_damage_cause": "laser"
+        },
+        {
+          "damaging_ticks": 151,
+          "exposure": "half_corona",
+          "first_damage": 0.6666641235351562,
+          "first_damage_tick": 180,
+          "form": "OnFoot",
+          "initial_health": 100,
+          "loss_seconds": 5.5,
+          "loss_tick": 330,
+          "protection_ticks": 180,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 330,
+          "last_pilot_damage_cause": "solar_heat"
+        },
+        {
+          "contact_tick": 3,
+          "damage": 100.0,
+          "exposure": "supplied_missile_300_units_per_second",
+          "form": "OnFoot",
+          "initial_health": 100,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "velocity_after": {
+            "x": 347.0157775878906,
+            "y": 15.82326602935791
+          },
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 4,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "exposure": "incoming_missiles_every_2_seconds",
+          "first_damage_tick": 3,
+          "form": "OnFoot",
+          "hits": 1,
+          "initial_health": 100,
+          "launched": 1,
+          "loss_seconds": 0.05,
+          "loss_tick": 3,
+          "missile_mass": 1.0,
+          "protection_ticks": 0,
+          "relative_launch_speed": 300,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 4,
+          "last_pilot_damage_cause": "missile"
+        },
+        {
+          "approach_speed": 10.0,
+          "body_impacts": [],
+          "closing_speed": 10.0,
+          "contact_impulse": 2.6322011947631836,
+          "contact_tick": 98,
+          "damage": 0.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 100.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": null
+        },
+        {
+          "approach_speed": 20.0,
+          "body_impacts": [],
+          "closing_speed": 20.0,
+          "contact_impulse": 5.264403343200684,
+          "contact_tick": 50,
+          "damage": 32.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 68.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 30.0,
+          "body_impacts": [],
+          "closing_speed": 30.0,
+          "contact_impulse": 7.896604061126709,
+          "contact_tick": 34,
+          "damage": 72.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 28.0,
+          "pilot_death_tick": null,
+          "last_pilot_damage_cause": "impact"
+        },
+        {
+          "approach_speed": 40.0,
+          "body_impacts": [],
+          "closing_speed": 40.0,
+          "contact_impulse": 10.52880573272705,
+          "contact_tick": 25,
+          "damage": 100.0,
+          "exposure": "planet_impact",
+          "form": "OnFoot",
+          "held_incident_speed": true,
+          "initial_health": 100,
+          "protection_ticks": 0,
+          "pilot_health_after": 0.0,
+          "pilot_death_tick": 25,
+          "last_pilot_damage_cause": "impact"
+        }
+      ],
+      "pilot_health": 100.0,
+      "seed": 42,
+      "ship_health_percent": 100,
+      "step_hz": 60
+    }
+  },
+  "aggregate": {
+    "baseline": {
+      "8": {
+        "matches": 8,
+        "pilot_deaths": 6,
+        "death_causes": {
+          "impact": 6
+        },
+        "ships_lost": 10,
+        "rebuilds": 4,
+        "completed_recoveries": 4,
+        "median_round_seconds": 207.0916666666667,
+        "wins_by_seat": [
+          4,
+          4
+        ],
+        "time_limits": 2
+      },
+      "3": {
+        "matches": 8,
+        "pilot_deaths": 4,
+        "death_causes": {
+          "impact": 2,
+          "laser": 2
+        },
+        "ships_lost": 13,
+        "rebuilds": 6,
+        "completed_recoveries": 8,
+        "median_round_seconds": 439.19166666666666,
+        "wins_by_seat": [
+          6,
+          2
+        ],
+        "time_limits": 4
+      }
+    },
+    "tuned": {
+      "8": {
+        "matches": 8,
+        "pilot_deaths": 6,
+        "death_causes": {
+          "missile": 2,
+          "impact": 4
+        },
+        "ships_lost": 10,
+        "rebuilds": 4,
+        "completed_recoveries": 4,
+        "median_round_seconds": 206.76666666666668,
+        "wins_by_seat": [
+          4,
+          4
+        ],
+        "time_limits": 2
+      },
+      "3": {
+        "matches": 8,
+        "pilot_deaths": 4,
+        "death_causes": {
+          "impact": 2,
+          "missile": 2
+        },
+        "ships_lost": 13,
+        "rebuilds": 6,
+        "completed_recoveries": 8,
+        "median_round_seconds": 438.55833333333334,
+        "wins_by_seat": [
+          6,
+          2
+        ],
+        "time_limits": 4
+      }
+    }
+  },
+  "matches": [
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0,
+        "seed": 6365347488789871033,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 5094,
+        "round_seconds": 84.9,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 5094,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 19.6,
+            "closing_speed": 219.19667053222656
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "859b5f9d086bb0f3130a38a8936ee723fa2fb185a24061f3c32465c428027492"
+      },
+      "tuned": {
+        "end_tick": 5055,
+        "round_seconds": 84.25,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 5055,
+            "cause": "missile",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 18.95,
+            "closing_speed": 156.078857421875
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "588b07104c523dbc56bcebe393591b02bc154892f583697e5cc161873dbc778a"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1,
+        "seed": 6365347488789871033,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 5094,
+        "round_seconds": 84.9,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 5094,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 19.6,
+            "closing_speed": 219.19667053222656
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "1ba679f806ff010a8f7362d3cf92204a330ec6a86361e46d738ff3a06ebbb0c9"
+      },
+      "tuned": {
+        "end_tick": 5055,
+        "round_seconds": 84.25,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 5055,
+            "cause": "missile",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 18.95,
+            "closing_speed": 156.078857421875
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "13d205b26029d8bd150f9491f5292a90f9c9d02b929ef73a8b32663232a41c4e"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 0,
+        "seed": 6365347488789871033,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          89.82170104980469,
+          95.49378967285156
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            7323
+          ],
+          [
+            23608
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "ff32bea051a73250c5b41450a6120a98400269c0a82abe28bcc77edab03730a6"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          79.64336395263672,
+          86.40441131591797
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            7323
+          ],
+          [
+            23608
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "9c8bba94a56e909c14bcdd1bec86116ea82754043c41c7fe8779a4d693e8d1a9"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 1,
+        "seed": 6365347488789871033,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 11834,
+        "round_seconds": 197.23333333333332,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 11834,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.816666666666667,
+            "closing_speed": 105.82730102539062
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          2,
+          0
+        ],
+        "pod_ejections": [
+          2,
+          0
+        ],
+        "rebuilds": [
+          1,
+          0
+        ],
+        "completed_recoveries": [
+          1,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [
+            7287
+          ],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "6784d31490c84295d91d3ae7384fc37162ddb46c426505274104ba06fbc14eac"
+      },
+      "tuned": {
+        "end_tick": 11834,
+        "round_seconds": 197.23333333333332,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 11834,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.816666666666667,
+            "closing_speed": 105.82730102539062
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          100.0
+        ],
+        "ships_lost": [
+          2,
+          0
+        ],
+        "pod_ejections": [
+          2,
+          0
+        ],
+        "rebuilds": [
+          1,
+          0
+        ],
+        "completed_recoveries": [
+          1,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [
+            7287
+          ],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "d93afd566aedf27072f132261037c816ecd0425e75ddd41f3310d4faf2842816"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0,
+        "seed": 6365347488789871033,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 4132,
+        "round_seconds": 68.86666666666666,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 4132,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.1166666666666667,
+            "closing_speed": 117.92543029785156
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "887d56579d7bee1b01380c9280ed7140eb9a15cc84cb1ba0200ea282b57db537"
+      },
+      "tuned": {
+        "end_tick": 4132,
+        "round_seconds": 68.86666666666666,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 4132,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.1166666666666667,
+            "closing_speed": 117.92543029785156
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "887d56579d7bee1b01380c9280ed7140eb9a15cc84cb1ba0200ea282b57db537"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1,
+        "seed": 6365347488789871033,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 4132,
+        "round_seconds": 68.86666666666666,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 4132,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.1166666666666667,
+            "closing_speed": 117.92543029785156
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "65537374bbfb1f61a4d18435cb9f6e6e7da45b15d77014776b7065080c5a04c9"
+      },
+      "tuned": {
+        "end_tick": 4132,
+        "round_seconds": 68.86666666666666,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 4132,
+            "cause": "impact",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 3.1166666666666667,
+            "closing_speed": 117.92543029785156
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "65537374bbfb1f61a4d18435cb9f6e6e7da45b15d77014776b7065080c5a04c9"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 0,
+        "seed": 6365347488789871033,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          3,
+          0
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          100.0,
+          50.744937896728516
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "92205bf3768f68d0dd4203508da452f15ced07b0049890045554786836e68a05"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          3,
+          0
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          100.0,
+          34.023258209228516
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "4706ed462d4f797aaea8c572ab9782beaab71e9129c26bbff88af8bfc3c70cb5"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 1,
+        "seed": 6365347488789871033,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          3,
+          0
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          100.0,
+          50.744937896728516
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "57c39738128df8eb86421acc359ccbd00f9ad09c4ad10fbd309e73fe1ed312e6"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          3,
+          0
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          100.0,
+          34.023258209228516
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "b662589d8f2c8fd3c9187ca1fa84cdd0341404eabb10a55900d4ab7814d319ea"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0,
+        "seed": 7248310457775985154,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          99.16041564941406,
+          81.37244415283203
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            11248
+          ],
+          [
+            18886
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "f2f9ff8ad7514d65af8c60229fb8f7757e1f4fc9051507e15a7b288c165ad79d"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          98.32083892822266,
+          76.30661010742188
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            11248
+          ],
+          [
+            18886
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "d15c7810d73a7175e159a315658639c02f6aaddfe84704e12f5d73befcedc865"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1,
+        "seed": 7248310457775985154,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          99.16041564941406,
+          81.37244415283203
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            11248
+          ],
+          [
+            18886
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "67a18a4eb951c96e2561cd483abc5f9d8c530d64fbc6d50845b88d935c963fad"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          98.32083892822266,
+          76.30661010742188
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          1
+        ],
+        "completed_recovery_ticks": [
+          [
+            11248
+          ],
+          [
+            18886
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "a8e05d798d98d6773c988f9b34f8eecbb936ea542eaffd404f45293b2f9bd9ac"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 0,
+        "seed": 7248310457775985154,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 16703,
+        "round_seconds": 278.3833333333333,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 16703,
+            "cause": "laser",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 24.866666666666667,
+            "closing_speed": null
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "8250e70dc466f5aa86aea50295f2d5450a722ed0764d9ecba82dc453bd289933"
+      },
+      "tuned": {
+        "end_tick": 16627,
+        "round_seconds": 277.1166666666667,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 16627,
+            "cause": "missile",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 23.6,
+            "closing_speed": 299.1445007324219
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "4a9474c07c8a8c9c8a4778a83c00eb349f6dc1dc61b3f5c2c72aa1a8d5964322"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 1,
+        "seed": 7248310457775985154,
+        "shape": "round",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 16703,
+        "round_seconds": 278.3833333333333,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 16703,
+            "cause": "laser",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 24.866666666666667,
+            "closing_speed": null
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "39532f001ab731d87e089b8f1f710ede74b54fc660f870dcbd49c9b4acb67ebd"
+      },
+      "tuned": {
+        "end_tick": 16627,
+        "round_seconds": 277.1166666666667,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          2,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 16627,
+            "cause": "missile",
+            "form": "escape_pod",
+            "seconds_since_last_ejection": 23.6,
+            "closing_speed": 299.1445007324219
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          0,
+          1
+        ],
+        "pod_ejections": [
+          0,
+          1
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "46b29ebdb3c44feaadc8421a35ef114251b8bf0470a71db524e528fba5df3a91"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0,
+        "seed": 7248310457775985154,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 19757,
+        "round_seconds": 329.28333333333336,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          3
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 19757,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 248.36666666666667,
+            "closing_speed": 22.936084747314453
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          99.89105987548828
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "f65d99fba58964ee372dd1a1a89a829d46ac58e509cbaeb3e75b5e092096ce6f"
+      },
+      "tuned": {
+        "end_tick": 19757,
+        "round_seconds": 329.28333333333336,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          3
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 19757,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 248.36666666666667,
+            "closing_speed": 22.936084747314453
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          99.56427001953125
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "7c64aae678a59313acd3cc7a741cd9a06fe5fc136ed6f5fc51a0fc06bd49ed59"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1,
+        "seed": 7248310457775985154,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 19757,
+        "round_seconds": 329.28333333333336,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          3
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 19757,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 248.36666666666667,
+            "closing_speed": 22.936084747314453
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          99.89105987548828
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "2249ecec1c0906055cf8921fab60b30da38617938611606037ed57f8b18e1431"
+      },
+      "tuned": {
+        "end_tick": 19757,
+        "round_seconds": 329.28333333333336,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          3
+        ],
+        "deaths": [
+          {
+            "seat": 0,
+            "tick": 19757,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 248.36666666666667,
+            "closing_speed": 22.936084747314453
+          }
+        ],
+        "final_pilot_health": [
+          0.0,
+          99.56427001953125
+        ],
+        "ships_lost": [
+          1,
+          0
+        ],
+        "pod_ejections": [
+          1,
+          0
+        ],
+        "rebuilds": [
+          0,
+          0
+        ],
+        "completed_recoveries": [
+          0,
+          0
+        ],
+        "completed_recovery_ticks": [
+          [],
+          []
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "3fe85e63508233954bdf9848e14830bb2882309d1b81be8bda643e9483945fee"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 0,
+        "seed": 7248310457775985154,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 14096,
+        "round_seconds": 234.93333333333334,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 14096,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 145.55,
+            "closing_speed": 45.32483673095703
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          0,
+          1
+        ],
+        "completed_recoveries": [
+          0,
+          2
+        ],
+        "completed_recovery_ticks": [
+          [],
+          [
+            4641,
+            7661
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "4d9b6c9d62cd66a176f5858a88c1c52860eb55b7afc505fa813bb52e844d13df"
+      },
+      "tuned": {
+        "end_tick": 14096,
+        "round_seconds": 234.93333333333334,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "reason": "pilot_death",
+        "owned_planets": [
+          0,
+          1
+        ],
+        "deaths": [
+          {
+            "seat": 1,
+            "tick": 14096,
+            "cause": "impact",
+            "form": "on_foot",
+            "seconds_since_last_ejection": 145.55,
+            "closing_speed": 45.32483673095703
+          }
+        ],
+        "final_pilot_health": [
+          100.0,
+          0.0
+        ],
+        "ships_lost": [
+          1,
+          1
+        ],
+        "pod_ejections": [
+          1,
+          1
+        ],
+        "rebuilds": [
+          0,
+          1
+        ],
+        "completed_recoveries": [
+          0,
+          2
+        ],
+        "completed_recovery_ticks": [
+          [],
+          [
+            4641,
+            7661
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "6a0adc6dc03932842dd3df98cc9b443d905a9c1eca659e89e6ea04b8ec0b09f8"
+      }
+    },
+    {
+      "case": {
+        "asteroid_interval_seconds": 3,
+        "candidate_seat": 1,
+        "seed": 7248310457775985154,
+        "shape": "angular",
+        "slumping": true
+      },
+      "baseline": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          1,
+          2
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          98.82736206054688,
+          92.93354034423828
+        ],
+        "ships_lost": [
+          1,
+          2
+        ],
+        "pod_ejections": [
+          1,
+          2
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          2
+        ],
+        "completed_recovery_ticks": [
+          [
+            33967
+          ],
+          [
+            4641,
+            7661
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "8fab9e7b6277d1909010e2f4a04b3867e2b93f310af410f01ed5da424bb0bb60"
+      },
+      "tuned": {
+        "end_tick": 36000,
+        "round_seconds": 600.0,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "reason": "time_limit",
+        "owned_planets": [
+          1,
+          2
+        ],
+        "deaths": [],
+        "final_pilot_health": [
+          95.30941009521484,
+          92.50792694091797
+        ],
+        "ships_lost": [
+          1,
+          2
+        ],
+        "pod_ejections": [
+          1,
+          2
+        ],
+        "rebuilds": [
+          1,
+          1
+        ],
+        "completed_recoveries": [
+          1,
+          2
+        ],
+        "completed_recovery_ticks": [
+          [
+            33967
+          ],
+          [
+            4641,
+            7661
+          ]
+        ],
+        "terrain_issues": [],
+        "removed_cells": 0,
+        "source_summary_sha256": "c1edee72372f689855230e58b4a26e15488a9323b755f61d464140f3aacbb5ed"
+      }
+    }
+  ],
+  "compiler": "rustc 1.94.1 (e408947bf 2026-03-25), x86_64-unknown-linux-gnu"
+}

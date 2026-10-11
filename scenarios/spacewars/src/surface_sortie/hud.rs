@@ -103,6 +103,9 @@ impl SurfaceSortieState {
         };
         let note = if dead {
             "Pilot lost".into()
+        } else if !on_foot && ship.form == ShipForm::EscapePod && observation.pilot_vitals.is_some()
+        {
+            "Light protection".into()
         } else if ship.dead || ship.form == ShipForm::EscapePod {
             "Ship lost".into()
         } else if on_foot {
@@ -423,7 +426,7 @@ mod tests {
         let pod = state.player_hud(0);
         assert_eq!(pod.mode, "POD");
         assert_eq!(pod.health.label, "Pilot");
-        assert_eq!(pod.note, "Ship lost");
+        assert_eq!(pod.note, "Light protection");
         assert_eq!(pod.rounds_loaded, None);
     }
 }

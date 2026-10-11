@@ -1,6 +1,8 @@
 use super::*;
 use match_rules::{MatchOutcome, PILOT_HEALTH, PilotDamageCause};
 
+mod durability;
+
 #[test]
 fn time_limit_uses_current_ownership_and_freezes_living_pilots() {
     use match_rules::MatchEndReason;
@@ -282,11 +284,12 @@ fn simultaneous_deaths_draw_after_one_shared_step() {
 }
 
 #[test]
-fn solar_heat_has_the_same_falloff_for_pod_and_external_pilot() {
+fn pod_shields_pilot_from_half_the_on_foot_solar_damage() {
     for on_foot in [false, true] {
         let mut state = solar_round(&[0], on_foot);
         idle(&mut state, 60);
-        assert!((vitals(&state, 0).health - 90.0).abs() < 0.01);
+        let expected = if on_foot { 60.0 } else { 80.0 };
+        assert!((vitals(&state, 0).health - expected).abs() < 0.01);
     }
 }
 
@@ -389,7 +392,7 @@ fn physical_missile_hit_consumes_one_round_and_damages_pilot_once() {
         idle(&mut state, 30);
         assert_eq!(
             vitals(&state, 1).health,
-            60.0,
+            if on_foot { 0.0 } else { 50.0 },
             "{on_foot}: {:?}",
             vitals(&state, 1)
         );
@@ -452,7 +455,7 @@ fn supplied_missile_impact_leaves_a_physical_pod_braking_opportunity() {
         assert!(state.terrain_diagnostics().issues.is_empty());
     }
     assert_eq!(results[0].0, 0.0, "legacy counterfactual: {results:?}");
-    assert_eq!(results[1].0, 60.0, "supplied missile: {results:?}");
+    assert_eq!(results[1].0, 50.0, "supplied missile: {results:?}");
     assert!(
         results[1].1 > 20.0 && results[1].1 < results[0].1 * 0.7,
         "{results:?}"

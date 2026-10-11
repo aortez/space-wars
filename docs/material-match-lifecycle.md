@@ -1,5 +1,8 @@
 # Pilot health and finished material rounds
 
+The [durability balance](durability-balance.md) supersedes the initial damage
+values below. This page retains the original lifecycle investigation.
+
 The generated material arena now opts into a pilot-based round lifecycle.
 The confirmed rule is that a living pilot can survive loss of every ship and
 flag, reclaim a planet and rebuild. Pilot death ends that player's round even

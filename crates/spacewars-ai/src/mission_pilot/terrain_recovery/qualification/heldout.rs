@@ -28,7 +28,8 @@ fn run_match(profile: MissionRecoveryProfile, fresh_only: bool) {
     let spec = std::env::var_os("SPACEWARS_MISSION_CASE").expect("case JSON required");
     let case: HeldoutCase = serde_json::from_slice(&fs::read(spec).unwrap()).unwrap();
     assert!(!fresh_only || ![10101, 20202].contains(&case.mission.seed));
-    assert!([0, 8].contains(&case.asteroid_interval_seconds));
+    // Three-second arrivals also support the durability stress comparison.
+    assert!([0, 3, 8].contains(&case.asteroid_interval_seconds));
     let out = std::env::var_os("SPACEWARS_RECOVERY_OUT").expect("fresh output required");
     let out = Path::new(&out);
     fs::create_dir(out).expect("retain prior evidence");
