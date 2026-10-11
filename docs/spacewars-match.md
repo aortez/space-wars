@@ -47,6 +47,21 @@ persists through transfers and rebuilding; pilot death ends that player's
 round, even with owned planets. Simultaneous deaths draw. **Rematch** starts
 the same seed with fresh health, terrain, ownership and bot state.
 
+The full ship is the strongest form. Both its **Hull** and the separate
+**Pod hull** absorb damage without harming the pilot inside. A fresh pod has
+100 hull health, takes twice the raw laser damage of a full ship, and loses
+50 hull health to a direct missile. Destroying it releases the same pilot at
+the cockpit, preserving health, jetpack charge and physical motion.
+
+The on-foot **Pilot** meter is a persistent 100-point health pool. On foot,
+laser and solar damage are twice the pod-hull rate, a direct missile costs
+100 health, and hard landings hurt more. Boarding never repairs either health
+pool; rebuilding supplies a new ship without healing the pilot. Ship ejection
+grants three seconds of protection. Pod destruction and ordinary transfers do
+not renew that window, and a destroying hit never spills into the pilot's
+health. See the [durability measurements](durability-balance.md) for the rules
+and controlled comparisons.
+
 **Match length** defaults to ten minutes of gameplay time. Settings offers
 5, 10, or 15 minutes and Unlimited. The HUD shows the remaining time; pausing
 freezes it. At expiry, the player owning more planets wins, and equal ownership

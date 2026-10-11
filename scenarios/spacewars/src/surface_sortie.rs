@@ -868,6 +868,7 @@ impl Scenario for SurfaceSortieScenario {
             Some(prepared),
             Some(&mut state.asteroids),
         );
+        state.release_destroyed_pods();
         state.reconcile_recovery_vehicles();
         state.record_surface_damage(damage_before);
         state.advance_match_time(match_dt);

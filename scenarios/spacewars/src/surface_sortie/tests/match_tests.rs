@@ -1,5 +1,8 @@
 use super::*;
-use match_rules::{MatchOutcome, PILOT_HEALTH, PilotDamageCause};
+use match_rules::{MatchOutcome, PILOT_HEALTH, POD_HULL_HEALTH, PilotDamageCause};
+
+mod durability;
+mod pod_hull;
 
 #[test]
 fn time_limit_uses_current_ownership_and_freezes_living_pilots() {
@@ -66,7 +69,7 @@ fn unlimited_rounds_and_new_rounds_have_independent_clocks() {
 fn final_step_pilot_death_takes_precedence_over_time_limit_and_ownership() {
     use match_rules::MatchEndReason;
     for dead in [vec![0], vec![1], vec![0, 1]] {
-        let mut state = solar_round(&dead, false);
+        let mut state = solar_round(&dead, true);
         state.set_match_time_limit(Some(Duration::from_millis(1)));
         state.world.planets[0].owner_id = Some(dead[0]);
         for &seat in &dead {
@@ -214,6 +217,7 @@ fn solar_round(seats: &[usize], on_foot: bool) -> SurfaceSortieState {
         } else {
             let ship = &mut state.world.ships[seat];
             ship.change_to_escape_pod();
+            ship.life = POD_HULL_HEALTH;
             ship.position = position - POD_PIVOT;
             ship.velocity = Vec2::ZERO;
             ship.omega = 0.0;
@@ -225,68 +229,69 @@ fn solar_round(seats: &[usize], on_foot: bool) -> SurfaceSortieState {
 #[test]
 fn pilot_death_is_final_despite_owned_planets_and_freezes_actions() {
     for seat in 0..2 {
-        for on_foot in [false, true] {
-            let mut state = solar_round(&[seat], on_foot);
-            state.world.planets[0].owner_id = Some(seat);
-            state.pilots[seat].vitals.as_mut().unwrap().health = 0.1;
-            idle(&mut state, 1);
-            let expected = MatchOutcome::Winner(PlayerId::from_index(1 - seat).unwrap());
-            assert_eq!(state.match_outcome(), Some(expected));
-            assert_eq!(state.world.planets[0].owner_id, Some(seat));
-            assert!(state.world.players[seat].eliminated);
-            assert_eq!(
-                vitals(&state, seat).last_damage.unwrap().cause,
-                PilotDamageCause::SolarHeat
+        let mut state = solar_round(&[seat], true);
+        state.world.planets[0].owner_id = Some(seat);
+        state.pilots[seat].vitals.as_mut().unwrap().health = 0.1;
+        idle(&mut state, 1);
+        let expected = MatchOutcome::Winner(PlayerId::from_index(1 - seat).unwrap());
+        assert_eq!(state.match_outcome(), Some(expected));
+        assert_eq!(state.world.planets[0].owner_id, Some(seat));
+        assert!(state.world.players[seat].eliminated);
+        assert_eq!(
+            vitals(&state, seat).last_damage.unwrap().cause,
+            PilotDamageCause::SolarHeat
+        );
+        let before = SurfaceSortieScenario::observe(&state);
+        for _ in 0..120 {
+            tick(
+                &mut state,
+                SurfaceSortieAction {
+                    primary_held: true,
+                    interact_held: true,
+                    horizontal: 1.0,
+                    brake_held: true,
+                },
             );
-            let before = SurfaceSortieScenario::observe(&state);
-            for _ in 0..120 {
-                tick(
-                    &mut state,
-                    SurfaceSortieAction {
-                        primary_held: true,
-                        interact_held: true,
-                        horizontal: 1.0,
-                        brake_held: true,
-                    },
-                );
-            }
-            assert_eq!(
-                before.payload,
-                SurfaceSortieScenario::observe(&state).payload
-            );
-            assert_eq!(state.match_observation().unwrap().finished_tick, Some(1));
-            let fresh = SurfaceSortieScenario::init_material_match(42);
-            assert_eq!(fresh.match_outcome(), None);
-            assert_eq!(vitals(&fresh, seat).health, PILOT_HEALTH);
         }
+        assert_eq!(
+            before.payload,
+            SurfaceSortieScenario::observe(&state).payload
+        );
+        assert_eq!(state.match_observation().unwrap().finished_tick, Some(1));
+        let fresh = SurfaceSortieScenario::init_material_match(42);
+        assert_eq!(fresh.match_outcome(), None);
+        assert_eq!(vitals(&fresh, seat).health, PILOT_HEALTH);
     }
 }
 
 #[test]
 fn simultaneous_deaths_draw_after_one_shared_step() {
-    for on_foot in [false, true] {
-        let mut state = solar_round(&[0, 1], on_foot);
-        for pilot in &mut state.pilots {
-            pilot.vitals.as_mut().unwrap().health = 0.1;
-        }
-        idle(&mut state, 1);
-        assert_eq!(state.match_outcome(), Some(MatchOutcome::Draw));
-        assert_eq!(state.world.winner, None);
-        assert_eq!(state.world.tick, 1);
-        idle(&mut state, 5);
-        assert_eq!(
-            state.world.tick, 1,
-            "draw must freeze without a legacy winner"
-        );
+    let mut state = solar_round(&[0, 1], true);
+    for pilot in &mut state.pilots {
+        pilot.vitals.as_mut().unwrap().health = 0.1;
     }
+    idle(&mut state, 1);
+    assert_eq!(state.match_outcome(), Some(MatchOutcome::Draw));
+    assert_eq!(state.world.winner, None);
+    assert_eq!(state.world.tick, 1);
+    idle(&mut state, 5);
+    assert_eq!(
+        state.world.tick, 1,
+        "draw must freeze without a legacy winner"
+    );
 }
 
 #[test]
-fn solar_heat_has_the_same_falloff_for_pod_and_external_pilot() {
+fn pod_hull_absorbs_solar_damage_while_on_foot_pilot_is_exposed() {
     for on_foot in [false, true] {
         let mut state = solar_round(&[0], on_foot);
         idle(&mut state, 60);
-        assert!((vitals(&state, 0).health - 90.0).abs() < 0.01);
+        let expected = if on_foot { 60.0 } else { PILOT_HEALTH };
+        assert!((vitals(&state, 0).health - expected).abs() < 0.01);
+        if !on_foot {
+            assert!((state.world.ships[0].life - 80.0).abs() < 0.01);
+            assert!(vitals(&state, 0).last_damage.is_none());
+        }
     }
 }
 
@@ -295,9 +300,10 @@ fn ejection_protection_expires_and_labs_remain_invulnerable() {
     let mut state = solar_round(&[0], false);
     state.pilots[0].vitals.as_mut().unwrap().protect_ejection(0);
     idle(&mut state, 179);
-    assert_eq!(vitals(&state, 0).health, PILOT_HEALTH);
+    assert_eq!(state.world.ships[0].life, POD_HULL_HEALTH);
     idle(&mut state, 1);
-    assert!(vitals(&state, 0).health < PILOT_HEALTH);
+    assert!(state.world.ships[0].life < POD_HULL_HEALTH);
+    assert_eq!(vitals(&state, 0).health, PILOT_HEALTH);
     let mut lab = SurfaceSortieScenario::init_material_arena(42);
     weightless(&mut lab);
     let sun = lab.world.sun.unwrap();
@@ -327,6 +333,7 @@ fn target_round(on_foot: bool) -> SurfaceSortieState {
     } else {
         let target = &mut state.world.ships[1];
         target.change_to_escape_pod();
+        target.life = POD_HULL_HEALTH;
         target.position = position - POD_PIVOT;
         target.velocity = Vec2::ZERO;
         target.omega = 0.0;
@@ -356,15 +363,17 @@ fn shared_laser_rays_damage_both_survivor_forms_and_report_visible_targets() {
                 Duration::from_nanos(16_666_667),
             );
         }
-        assert!(
-            vitals(&state, 1).health < PILOT_HEALTH,
-            "{on_foot}: {:?}",
-            state.world.laser_hits
-        );
-        assert_eq!(
-            vitals(&state, 1).last_damage.unwrap().cause,
-            PilotDamageCause::Laser
-        );
+        if on_foot {
+            assert!(vitals(&state, 1).health < PILOT_HEALTH);
+            assert_eq!(
+                vitals(&state, 1).last_damage.unwrap().cause,
+                PilotDamageCause::Laser
+            );
+        } else {
+            assert!(state.world.ships[1].life < POD_HULL_HEALTH);
+            assert_eq!(vitals(&state, 1).health, PILOT_HEALTH);
+            assert!(vitals(&state, 1).last_damage.is_none());
+        }
         assert!(state.combat_telemetry(0).laser_hit_ticks > 0);
     }
 }
@@ -389,14 +398,19 @@ fn physical_missile_hit_consumes_one_round_and_damages_pilot_once() {
         idle(&mut state, 30);
         assert_eq!(
             vitals(&state, 1).health,
-            60.0,
+            if on_foot { 0.0 } else { PILOT_HEALTH },
             "{on_foot}: {:?}",
             vitals(&state, 1)
         );
-        assert_eq!(
-            vitals(&state, 1).last_damage.unwrap().cause,
-            PilotDamageCause::Missile
-        );
+        if on_foot {
+            assert_eq!(
+                vitals(&state, 1).last_damage.unwrap().cause,
+                PilotDamageCause::Missile
+            );
+        } else {
+            assert_eq!(state.world.ships[1].life, 50.0);
+            assert!(vitals(&state, 1).last_damage.is_none());
+        }
         assert!(
             !state
                 .world
@@ -444,15 +458,18 @@ fn supplied_missile_impact_leaves_a_physical_pod_braking_opportunity() {
             }
         }
         results.push((
-            vitals(&state, 1).health,
+            state.world.ships[1].life,
             peak_speed,
             state.impact_motion(1).unwrap().velocity.length(),
         ));
         assert_eq!(state.combat_telemetry(0).cannon_hits, 1);
         assert!(state.terrain_diagnostics().issues.is_empty());
+        if supplied {
+            assert_eq!(vitals(&state, 1).health, PILOT_HEALTH);
+        }
     }
     assert_eq!(results[0].0, 0.0, "legacy counterfactual: {results:?}");
-    assert_eq!(results[1].0, 60.0, "supplied missile: {results:?}");
+    assert_eq!(results[1].0, 50.0, "supplied missile: {results:?}");
     assert!(
         results[1].1 > 20.0 && results[1].1 < results[0].1 * 0.7,
         "{results:?}"
@@ -585,6 +602,7 @@ fn retained_planet_material_blocks_rays_to_both_survivor_forms() {
         } else {
             let target = &mut state.world.ships[1];
             target.change_to_escape_pod();
+            target.life = POD_HULL_HEALTH;
             target.position = target_position - POD_PIVOT;
             target.velocity = Vec2::ZERO;
             target.omega = 0.0;
