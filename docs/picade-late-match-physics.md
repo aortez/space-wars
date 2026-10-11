@@ -7,6 +7,8 @@ not live FPS measurements. The shipping candidate is now installed on
 `sw-picade.local` and passes a five-minute autoplay observation, including a
 completed round and automatic restart. Heavy-scene slowdowns remain. See the
 whole-step and live follow-ups at the end for method, limits and evidence.
+The subsequent terrain-clipping experiment saves 7.5% of lifecycle time in
+the first retained case; it is a separate, smaller improvement, not deployed.
 
 Reusing compound-shape thickness within each CCD pass reduces physics work by
 47.8% and 40.9% in two retained Picade stress cases. Two control/candidate pairs
@@ -553,3 +555,80 @@ output, screenshot, client binary and collector/report scripts are retained at
 `spacewars-handoffs/ccd-step-cache-live-20261011/`; working files are in
 `target/ccd-live-deploy.VVpDoDmU/`. The candidate remains installed and running
 autoplay for further observation. No commit or push was made in this step.
+
+## Terrain clipping scratch — October 11
+
+The CCD optimization and its evidence are committed as `6b9992a`. The next
+candidate changes only terrain surface-addition clipping and its tests.
+Packing already caches identical alternative tiles; this change reuses the
+temporary vertex buffers inside a preview and the piece lists between polygon
+subtractions. It still executes the same half-plane arithmetic, deduplication,
+area thresholds and ordered clipping/subtraction operations. It does not skip
+placement checks, reduce plan budgets, alter material or persist scratch in
+simulation state. Preview destruction releases the scratch storage.
+
+### Matched Pi result
+
+The first retained input case, ticks 9,061–9,180, runs twice per variant in
+control/candidate/candidate/control order on `sw-picade.local`. Both are Rust
+1.89 release/static ARM diagnostic builds with collection **disabled** during
+timing. The installed GPU client is paused and suspended with the same bounded
+timeout/resume guard. Both controls already include the whole-step CCD cache.
+
+| Cost | Control | Scratch candidate | Reduction |
+| --- | ---: | ---: | ---: |
+| Mean terrain/lifecycle, ms/tick | 2.851 | 2.637 | 7.5% |
+| Lifecycle p95, ms/tick | 9.531 | 8.432 | 11.5% |
+| Maximum sampled lifecycle tick, ms | 18.102 | 16.720 | 7.6% |
+| Mean complete scenario step, ms/tick | 21.728 | 21.415 | 1.4% |
+
+The controls average 2.849/2.853 ms lifecycle; the candidates 2.640/2.635 ms.
+P95 uses nearest rank over the pooled 240 measured ticks per variant. These
+are one retained case's timing results, not a live FPS gain, a speedup proven
+for every surface/workload, or a fix for the separate 39 ms live lifecycle
+spike. Physics and rendering are outside this optimization's scope. The second
+retained case is replayed on the workstation for correctness, not a second Pi
+speedup claim.
+
+A separate instrumented control/candidate pair attributes the saving to
+`packing_surface`: 0.849 to 0.642 ms per tick (about 24% less). Support-graph,
+clearance and collider-sync costs remain similar. Material-operation call
+counts and CCD work counts are identical. Those clocks include instrumentation
+overhead and are not used in the table's speedup calculation.
+
+The timing runs sample 58.9–64.8°C. Each control has a 1.1 GHz reading in the
+first 0.3 seconds, before the measured window; all other timing-run clock
+samples read 1.5 GHz. These are samples, not continuous throttling telemetry.
+
+### Checks and handoff
+
+The new clipping tests compare every f64 vertex bit and subtraction-piece order
+against the original allocating implementation across scales, offsets, empty
+and degenerate polygons, thin slivers and sequential inside/outside clips.
+Another test verifies reuse of the same two warmed vertex buffers. Existing
+surface-area, field-edge, alternative-edit and distance-only cache tests pass.
+
+The normal engine/scenario library suites pass 1,205 tests with five existing
+ignores. Diagnostic engine/Spacewars suites pass 742 with one existing ignore.
+Strict all-target Clippy for `engine-terrain`, formatting and diff checks pass.
+The four timing replays preserve all 612 original observation checks and 480
+measured native-state/observation hashes and CCD substep counts. Start/end
+snapshots, observations and conservation/finite-state/speed audit logs remain
+byte-identical. Both candidate workstation cases also match, covering 286
+original observation checks and 240 measured states; a workstation control
+replay separately verifies the retained baseline.
+
+Including the two attribution runs, six ARM replays cover 55,080 ticks, 918
+original observation checks and 720 measured states/substep counts, all
+matching the retained reference. The kiosk resumes unpaused autoplay on the
+same PID 416 with zero unexpected restarts and unchanged installed binaries
+and settings.
+
+The [scratch receipt](data/picade-terrain-clipping-scratch-v1.json) records the
+comparison and the separate instrumented attribution runs. Frozen binaries,
+source copies, scripts and raw evidence are retained at
+`spacewars-handoffs/terrain-clip-scratch-20261011/`, with working files in
+`target/terrain-clip-scratch.mEzCOWNP/`. At the end of this headless
+qualification, the clipping candidate is not installed in the kiosk. The
+existing CCD-optimized app and settings are preserved; neither Clock device
+is changed.
