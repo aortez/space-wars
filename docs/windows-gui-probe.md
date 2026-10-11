@@ -31,9 +31,10 @@ A fallback success does not hide a default failure: the workflow fails if either
 configuration fails, and retains both results. Blank captures, early exit, no
 visible window, help failure, or scenario-launch fallback fail the probe.
 Nonblank screenshots are observations, not semantic GUI approval. Inspect the
-PNGs to establish that they show the launcher and actual gameplay rather than
+PNGs to establish that they show the launcher and actual scenario output rather than
 another window or an error. The scenario is started through the existing CLI;
-this probe does not demonstrate navigating the launcher with mouse or keyboard.
+Falling opens at its title screen. This probe does not send Start, test gameplay
+input, or demonstrate navigating the launcher with mouse or keyboard.
 
 Download `windows-gui-<source SHA>-<run ID>-<attempt>` from the workflow run.
 Evidence is retained for two days, including on failure. `default/result.json`

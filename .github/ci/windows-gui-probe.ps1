@@ -86,9 +86,16 @@ function Invoke-WindowProbe([string]$Name, [string[]]$ExtraArguments) {
         }
         $phase.foreground_requested = [ProbeWindow]::SetForegroundWindow($handle)
         $phase.window_title = $process.MainWindowTitle
-        $phase.modules = @($process.Modules | ForEach-Object {
-            [ordered]@{ name = $_.ModuleName; path = $_.FileName; version = $_.FileVersionInfo.FileVersion }
-        })
+        try {
+            $phase.modules = @($process.Modules | ForEach-Object {
+                [ordered]@{ name = $_.ModuleName; path = $_.FileName; version = $_.FileVersionInfo.FileVersion }
+            })
+        }
+        catch {
+            $process.Refresh()
+            if ($process.HasExited) { throw "$Name exited while inspecting modules (exit $($process.ExitCode))." }
+            throw
+        }
         foreach ($frame in 1..2) {
             Start-Sleep -Seconds 3
             $process.Refresh()
