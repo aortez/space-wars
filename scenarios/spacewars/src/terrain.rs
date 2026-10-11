@@ -307,9 +307,17 @@ fn generate_field(radius: f32, seed: u64) -> Result<Terrain, TerrainError> {
 /// Complete every edit against its sampled field before any body is cropped or
 /// split. Weapon contacts from this tick never mutate the active solver world.
 pub(super) fn commit(state: &mut SpacewarsState) {
+    #[cfg(feature = "ccd-diagnostics")]
+    let _span = step_diagnostics::Scope::new("terrain.commit");
     let mut changed = BTreeMap::<PhysicsId, bool>::new();
     let pending = std::mem::take(&mut state.terrain.pending);
+    #[cfg(feature = "ccd-diagnostics")]
+    let releases_span = step_diagnostics::Scope::new("terrain.releases");
     let pending = loose::commit_releases(state, pending);
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(releases_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let edits_span = step_diagnostics::Scope::new("terrain.edits");
     for pending in pending {
         let watch = state
             .terrain
@@ -416,10 +424,30 @@ pub(super) fn commit(state: &mut SpacewarsState) {
             state.terrain.fragments.insert(id, fragment);
         }
     }
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(edits_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let slumping_span = step_diagnostics::Scope::new("terrain.slumping");
     loose::commit_slumping(state);
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(slumping_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let cohesion_span = step_diagnostics::Scope::new("terrain.cohesion");
     loose::commit_cohesion(state);
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(cohesion_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let impacts_span = step_diagnostics::Scope::new("terrain.impacts");
     loose::commit_impacts(state);
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(impacts_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let deposits_span = step_diagnostics::Scope::new("terrain.deposits");
     loose::commit_deposits(state);
+    #[cfg(feature = "ccd-diagnostics")]
+    drop(deposits_span);
+    #[cfg(feature = "ccd-diagnostics")]
+    let _support_span = step_diagnostics::Scope::new("terrain.support");
     reconcile_support(state);
 }
 

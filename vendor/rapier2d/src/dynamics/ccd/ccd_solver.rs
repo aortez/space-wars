@@ -1,5 +1,7 @@
 use super::TOIEntry;
 use crate::alloc_prelude::*;
+#[cfg(feature = "ccd-diagnostics")]
+use crate::counters::ccd_probe::{self, Phase, PhaseSpan};
 use crate::dynamics::{IntegrationParameters, IslandManager, RigidBodyHandle, RigidBodySet};
 use crate::geometry::{
     BroadPhaseBvh, Collider, ColliderHandle, ColliderParent, ColliderSet, CollisionEvent,
@@ -12,21 +14,29 @@ use crate::prelude::{ActiveEvents, CollisionEventFlags};
 use alloc::collections::BinaryHeap;
 use parry::utils::hashmap::HashMap;
 
-/// Shape geometry is immutable throughout one CCD pass. Compound thickness
-/// folds over every child shape, so reuse it across candidate pairs in that pass.
-/// Discarding this cache on return also covers shape edits and handle reuse
-/// before the next pass without persistent invalidation or snapshot state.
+/// Shape geometry is immutable throughout one `PhysicsPipeline::step`, even
+/// while collider poses change. Reuse compound thickness across candidate pairs,
+/// first-impact searches and motion-clamping passes within that step. This must
+/// remain step-local: discard it before callers can edit or replace colliders.
+/// It never enters persistent solver state or snapshots.
 #[derive(Default)]
-struct ThicknessCache(HashMap<ColliderHandle, Real>);
+pub(crate) struct ThicknessCache(HashMap<ColliderHandle, Real>);
 
 impl ThicknessCache {
     fn get(&mut self, handle: ColliderHandle, collider: &Collider) -> Real {
-        if collider.shape.as_compound().is_some() {
-            *self
-                .0
-                .entry(handle)
-                .or_insert_with(|| collider.shape.ccd_thickness())
+        if let Some(_compound) = collider.shape.as_compound() {
+            #[cfg(feature = "ccd-diagnostics")]
+            ccd_probe::compound_lookup();
+            *self.0.entry(handle).or_insert_with(|| {
+                #[cfg(feature = "ccd-diagnostics")]
+                ccd_probe::compound_miss(_compound.shapes().len());
+                #[cfg(feature = "ccd-diagnostics")]
+                let _span = PhaseSpan::new(Phase::CompoundThickness);
+                collider.shape.ccd_thickness()
+            })
         } else {
+            #[cfg(feature = "ccd-diagnostics")]
+            let _span = PhaseSpan::new(Phase::PrimitiveThickness);
             collider.shape.ccd_thickness()
         }
     }
@@ -165,7 +175,6 @@ impl CCDSolver {
     }
 
     /// Find the first time a CCD-enabled body has a non-sensor collider hitting another non-sensor collider.
-    #[profiling::function]
     pub fn find_first_impact(
         &mut self,
         dt: Real, // NOTE: this doesn’t necessarily match the `params.dt`.
@@ -177,6 +186,34 @@ impl CCDSolver {
         narrow_phase: &NarrowPhase,
         hooks: &dyn PhysicsHooks,
     ) -> Option<Real> {
+        self.find_first_impact_with_cache(
+            dt,
+            params,
+            islands,
+            bodies,
+            colliders,
+            broad_phase,
+            narrow_phase,
+            hooks,
+            &mut ThicknessCache::default(),
+        )
+    }
+
+    #[profiling::function]
+    pub(crate) fn find_first_impact_with_cache(
+        &mut self,
+        dt: Real,
+        params: &IntegrationParameters,
+        islands: &IslandManager,
+        bodies: &RigidBodySet,
+        colliders: &ColliderSet,
+        broad_phase: &mut BroadPhaseBvh,
+        narrow_phase: &NarrowPhase,
+        hooks: &dyn PhysicsHooks,
+        thicknesses: &mut ThicknessCache,
+    ) -> Option<Real> {
+        #[cfg(feature = "ccd-diagnostics")]
+        let setup_span = PhaseSpan::new(Phase::FirstSetup);
         // Update the query pipeline with the colliders’ predicted positions.
         for (handle, co) in colliders.iter_enabled() {
             if let Some(co_parent) = co.parent {
@@ -186,7 +223,13 @@ impl CCDSolver {
                         .pos
                         .integrate_forces_and_velocities(dt, &rb.forces, &rb.vels, &rb.mprops);
                     let next_position = predicted_pos * co_parent.pos_wrt_parent;
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let bounds_span = PhaseSpan::new(Phase::Bounds);
                     let swept_aabb = co.shape.compute_swept_aabb(&co.pos, &next_position);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    drop(bounds_span);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let _update_span = PhaseSpan::new(Phase::BvhUpdate);
                     broad_phase.set_aabb(params, handle, swept_aabb);
                 }
             }
@@ -201,8 +244,11 @@ impl CCDSolver {
 
         let mut pairs_seen = HashMap::default();
         let mut min_toi = dt;
-        let mut thicknesses = ThicknessCache::default();
 
+        #[cfg(feature = "ccd-diagnostics")]
+        drop(setup_span);
+        #[cfg(feature = "ccd-diagnostics")]
+        let _search_span = PhaseSpan::new(Phase::FirstSearch);
         for handle in islands.active_bodies() {
             let rb1 = &bodies[handle];
 
@@ -226,11 +272,20 @@ impl CCDSolver {
                     }
 
                     let predicted_collider_pos1 = predicted_body_pos1 * co1_parent.pos_wrt_parent;
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let bounds_span = PhaseSpan::new(Phase::Bounds);
                     let aabb1 = co1
                         .shape
                         .compute_swept_aabb(&co1.pos, &predicted_collider_pos1);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    drop(bounds_span);
 
-                    for (ch2, _) in query_pipeline.intersect_aabb_conservative(aabb1) {
+                    let candidates = query_pipeline.intersect_aabb_conservative(aabb1);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let candidates = ccd_probe::timed_candidates(candidates);
+                    for (ch2, _) in candidates {
+                        #[cfg(feature = "ccd-diagnostics")]
+                        ccd_probe::candidate(Phase::FirstSearch);
                         if *ch1 == ch2 {
                             // Ignore self-intersection.
                             continue;
@@ -265,11 +320,15 @@ impl CCDSolver {
                                 continue;
                             }
 
+                            #[cfg(feature = "ccd-diagnostics")]
+                            let contact_span = PhaseSpan::new(Phase::ContactLookup);
                             let smallest_dist = narrow_phase
                                 .contact_pair(*ch1, ch2)
                                 .and_then(|p| p.find_deepest_contact())
                                 .map(|c| c.1.dist)
                                 .unwrap_or(0.0);
+                            #[cfg(feature = "ccd-diagnostics")]
+                            drop(contact_span);
 
                             let rb2 = bh2.and_then(|h| bodies.get(h));
 
@@ -296,11 +355,14 @@ impl CCDSolver {
             }
         }
 
-        if min_toi < dt { Some(min_toi) } else { None }
+        if min_toi < dt {
+            Some(min_toi)
+        } else {
+            None
+        }
     }
 
     /// Outputs the set of bodies as well as their first time-of-impact event.
-    #[profiling::function]
     pub fn predict_impacts_at_next_positions(
         &mut self,
         params: &IntegrationParameters,
@@ -312,12 +374,39 @@ impl CCDSolver {
         hooks: &dyn PhysicsHooks,
         events: &dyn EventHandler,
     ) -> PredictedImpacts {
+        self.predict_impacts_at_next_positions_with_cache(
+            params,
+            islands,
+            bodies,
+            colliders,
+            broad_phase,
+            narrow_phase,
+            hooks,
+            events,
+            &mut ThicknessCache::default(),
+        )
+    }
+
+    #[profiling::function]
+    pub(crate) fn predict_impacts_at_next_positions_with_cache(
+        &mut self,
+        params: &IntegrationParameters,
+        islands: &IslandManager,
+        bodies: &RigidBodySet,
+        colliders: &ColliderSet,
+        broad_phase: &mut BroadPhaseBvh,
+        narrow_phase: &NarrowPhase,
+        hooks: &dyn PhysicsHooks,
+        events: &dyn EventHandler,
+        thicknesses: &mut ThicknessCache,
+    ) -> PredictedImpacts {
+        #[cfg(feature = "ccd-diagnostics")]
+        let setup_span = PhaseSpan::new(Phase::ClampSetup);
         let dt = params.dt;
         let mut frozen = HashMap::<_, Real>::default();
         let mut all_toi = BinaryHeap::new();
         let mut pairs_seen = HashMap::default();
         let mut min_overstep = dt;
-        let mut thicknesses = ThicknessCache::default();
 
         // Update the query pipeline with the colliders’ `next_position`.
         for (handle, co) in colliders.iter_enabled() {
@@ -326,7 +415,13 @@ impl CCDSolver {
                 if rb.is_ccd_active() {
                     let rb_next_pos = &bodies[co_parent.handle].pos.next_position;
                     let next_position = rb_next_pos * co_parent.pos_wrt_parent;
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let bounds_span = PhaseSpan::new(Phase::Bounds);
                     let swept_aabb = co.shape.compute_swept_aabb(&co.pos, &next_position);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    drop(bounds_span);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let _update_span = PhaseSpan::new(Phase::BvhUpdate);
                     broad_phase.set_aabb(params, handle, swept_aabb);
                 }
             }
@@ -344,6 +439,10 @@ impl CCDSolver {
          * First, collect all TOIs.
          *
          */
+        #[cfg(feature = "ccd-diagnostics")]
+        drop(setup_span);
+        #[cfg(feature = "ccd-diagnostics")]
+        let search_span = PhaseSpan::new(Phase::ClampSearch);
         // TODO: don't iterate through all the colliders.
         for handle in islands.active_bodies() {
             let rb1 = &bodies[handle];
@@ -364,11 +463,20 @@ impl CCDSolver {
                         .expect("Could not find the ColliderParent component.");
 
                     let predicted_collider_pos1 = predicted_body_pos1 * co_parent1.pos_wrt_parent;
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let bounds_span = PhaseSpan::new(Phase::Bounds);
                     let aabb1 = co1
                         .shape
                         .compute_swept_aabb(&co1.pos, &predicted_collider_pos1);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    drop(bounds_span);
 
-                    for (ch2, _) in query_pipeline.intersect_aabb_conservative(aabb1) {
+                    let candidates = query_pipeline.intersect_aabb_conservative(aabb1);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let candidates = ccd_probe::timed_candidates(candidates);
+                    for (ch2, _) in candidates {
+                        #[cfg(feature = "ccd-diagnostics")]
+                        ccd_probe::candidate(Phase::ClampSearch);
                         if *ch1 == ch2 {
                             // Ignore self-intersection.
                             continue;
@@ -400,11 +508,15 @@ impl CCDSolver {
                                 continue;
                             }
 
+                            #[cfg(feature = "ccd-diagnostics")]
+                            let contact_span = PhaseSpan::new(Phase::ContactLookup);
                             let smallest_dist = narrow_phase
                                 .contact_pair(*ch1, ch2)
                                 .and_then(|p| p.find_deepest_contact())
                                 .map(|c| c.1.dist)
                                 .unwrap_or(0.0);
+                            #[cfg(feature = "ccd-diagnostics")]
+                            drop(contact_span);
 
                             let rb1 = bh1.map(|h| &bodies[h]);
                             let rb2 = bh2.map(|h| &bodies[h]);
@@ -444,6 +556,8 @@ impl CCDSolver {
          * If the smallest TOI is outside of the time interval, return.
          *
          */
+        #[cfg(feature = "ccd-diagnostics")]
+        drop(search_span);
         if min_overstep == dt && all_toi.is_empty() {
             return PredictedImpacts::NoImpacts;
         } else if min_overstep > dt {
@@ -454,6 +568,8 @@ impl CCDSolver {
         // may avoid some resweeps.
         let mut pseudo_intersections_to_check = vec![];
 
+        #[cfg(feature = "ccd-diagnostics")]
+        let _resweep_span = PhaseSpan::new(Phase::Resweep);
         while let Some(toi) = all_toi.pop() {
             assert!(toi.toi <= dt);
 
@@ -505,9 +621,18 @@ impl CCDSolver {
                 let rb1 = &bodies[co1_parent.handle];
 
                 let co_next_pos1 = rb1.pos.next_position * co1_parent.pos_wrt_parent;
+                #[cfg(feature = "ccd-diagnostics")]
+                let bounds_span = PhaseSpan::new(Phase::Bounds);
                 let aabb = co1.shape.compute_swept_aabb(&co1.pos, &co_next_pos1);
+                #[cfg(feature = "ccd-diagnostics")]
+                drop(bounds_span);
 
-                for (ch2, _) in query_pipeline.intersect_aabb_conservative(aabb) {
+                let candidates = query_pipeline.intersect_aabb_conservative(aabb);
+                #[cfg(feature = "ccd-diagnostics")]
+                let candidates = ccd_probe::timed_candidates(candidates);
+                for (ch2, _) in candidates {
+                    #[cfg(feature = "ccd-diagnostics")]
+                    ccd_probe::candidate(Phase::Resweep);
                     let co2 = &colliders[ch2];
 
                     let bh1 = co1.parent.map(|p| p.handle);
@@ -537,11 +662,15 @@ impl CCDSolver {
                         continue;
                     }
 
+                    #[cfg(feature = "ccd-diagnostics")]
+                    let contact_span = PhaseSpan::new(Phase::ContactLookup);
                     let smallest_dist = narrow_phase
                         .contact_pair(*ch1, ch2)
                         .and_then(|p| p.find_deepest_contact())
                         .map(|c| c.1.dist)
                         .unwrap_or(0.0);
+                    #[cfg(feature = "ccd-diagnostics")]
+                    drop(contact_span);
 
                     if let Some(toi) = TOIEntry::try_from_colliders_with_thickness(
                         query_pipeline.dispatcher,

@@ -1,5 +1,13 @@
 # Picade late-match physics investigation
 
+The latest follow-up shares compound thickness across the complete physics
+step, saving a further 27.6% and 20.4% of physics time in the same two retained
+Pi cases. These are isolated headless comparisons against the per-pass cache,
+not live FPS measurements. The shipping candidate is now installed on
+`sw-picade.local` and passes a five-minute autoplay observation, including a
+completed round and automatic restart. Heavy-scene slowdowns remain. See the
+whole-step and live follow-ups at the end for method, limits and evidence.
+
 Reusing compound-shape thickness within each CCD pass reduces physics work by
 47.8% and 40.9% in two retained Picade stress cases. Two control/candidate pairs
 per case, run in both orders, preserve every measured native state and all
@@ -274,3 +282,274 @@ experimental recovery, Windows and AArch64 builds. Subsequent report-only
 commits do not change that tested runtime source. The performance change is
 ready for review separately from #178; the remaining slow live windows and
 incomplete recovery observation are limits, not solved problems.
+
+## GPU-default follow-up: residual physics costs — October 11
+
+This is a diagnosis on `ca9b229`, not another optimization or a demonstrated
+GPU regression. The installed client, CLI and saved settings remain unchanged.
+The additional counters are behind `ccd-diagnostics`; lifecycle clocks also
+require an explicit replay measurement. Normal client builds do not collect
+them. The fixed-input example now reports terrain subphases and the existing
+engine material profiler alongside CCD search, bounds and cache counters.
+
+### Live evidence
+
+Twenty-five read-only samples cover 140 seconds of automatic match
+`9286148569070392789`, ticks 24,124–30,084. Median sampled window means are
+14.024 ms of physics per tick, including 9.861 ms of CCD, and 3.082 ms of
+terrain/body lifecycle work. Rendering consumes 7.706 ms of CPU per display
+iteration. The host processes a median 4.975 updates per callback, close to its
+five-update catch-up limit. FPS ranges from 6.7 to 14.3; UPS from 33.7 to 56.3.
+Host and mission rolling windows cover different ticks, so these are not an
+additive decomposition of one frame. The renderer reports V3D and no error.
+
+The live interface cannot export a complete replay of this session. Instead,
+the existing two retained input streams are replayed with the new counters;
+they remain distinct cases, not exact recreations of this new live window.
+
+### CCD screening is still the expensive part
+
+| Per-tick mean | First retained case | Second retained case |
+| --- | ---: | ---: |
+| Time-of-impact candidate checks | 4,604.075 | 1,516.283 |
+| Rejected by relative motion/thickness | 4,594.000 | 1,498.408 |
+| Actual top-level shape sweeps | 10.075 | 17.875 |
+
+The final, more detailed first-case pass suspends the already-paused kiosk
+process during replay. With the display workload absent, instrumented CCD
+averages 18.249 ms per tick. Its nested thickness checks cost 8.748 ms:
+
+- 1,922.925 compound cache requests include 160.608 misses per tick.
+- Those misses visit 24,920.025 immediate child shapes and spend 6.735 ms
+  calculating compound thickness. The per-pass cache works, but discards its
+  results before the next first-impact/clamping pass, and before the next tick.
+- Uncached primitive thickness costs 0.589 ms. The rest of the thickness span
+  includes cache access, dispatch and instrumentation overhead.
+- Existing-contact lookups cost 1.785 ms and candidate traversal 1.713 ms.
+  Swept bounds cost 0.292 ms and BVH updates 0.168 ms.
+- Actual nonlinear shape sweeps total 1.146 ms. The compound/compound sweeps
+  account for 0.767 ms of that.
+
+These timers nest; do not add them to the outer CCD timer. Detailed collection
+has substantial overhead: in the earlier pair, with the paused kiosk still
+drawing, physics averages 36.325 ms with collection and 31.592 ms without it.
+Even collection-disabled runs retain the diagnostic build's conditional code.
+Do not treat instrumented component timings as shipping costs or compare the
+suspended final pass to that pair as an optimization result.
+
+### Terrain spikes are predominantly settling/packing
+
+In the isolated first case, lifecycle averages 2.889 ms. Checking and depositing
+loose dirt accounts for 2.728 ms, including 0.805 ms building the support graph
+and 1.370 ms evaluating packing plans. Added-surface assessment alone accounts
+for 0.844 ms. Successful collider synchronization averages only 0.077 ms;
+ordinary body reconciliation costs 0.109 ms.
+
+The earlier two instrumented windows contain lifecycle peaks of 23.769 and
+24.046 ms. Their worst ticks spend 17.108 and 20.958 ms, respectively, in packing
+plans. This distinguishes the sporadic planning/clearance cost from continuously
+rebuilding all terrain colliders. Packing, surface assessment, clearance and
+commit timers are nested, not independent totals.
+
+### Recommended next experiment
+
+1. Extend geometric-property reuse. Start with sharing compound thickness
+   across a complete physics step; consider geometry-lifetime caching with
+   explicit reshape/removal invalidation. Translation and rotation alone do
+   not change local shape thickness. Preserve exact arithmetic and query order.
+2. Investigate a cheap, conservative rejection before the existing-contact
+   lookup. Most candidates never reach a shape sweep; do not weaken CCD or
+   change collision thresholds to skip this work.
+3. Separately reduce packing's added-surface/clearance work and allocation.
+   Preserve placement checks, material conservation and the simulation schedule.
+
+The paused GPU client continued to consume roughly one CPU core, so future
+isolated physics benchmarks should suspend rendering as well as simulation.
+The bounded suspension used a 300-second remote timeout, a resume trap and a
+disabled service watchdog check. The same PID resumed autoplay with no restart.
+This is a separate idle-rendering follow-up, not a physics optimization.
+
+### Verification and retained evidence
+
+Across four ARM replays (35,520 ticks), all 592 original per-second observation
+checks pass. All 480 measured native-state/observation hashes and CCD substep
+counts match their retained references. Starting/ending solver snapshots,
+observations and audit logs are byte-identical. Terrain conservation, finite
+state and speed audits pass. The initial desktop diagnostic also matches all
+120 measured native states and 153 observation checks.
+
+The focused suites pass: 157 engine tests plus 583 scenario tests, including
+three new measurement-lifecycle tests; one pre-existing engine test is ignored.
+The normal, non-diagnostic configuration also compiles. Formatting and diff
+checks pass. No gameplay fix, commit, application deployment or PR is part of
+this follow-up.
+
+The [measurement receipt](data/picade-residual-physics-v1.json) retains means,
+counts, hashes and thermal samples. Full local evidence and replay scripts are
+in `target/physics-cost-investigation.wycn2MHN/`. ARM diagnostics use Rust 1.89
+with static glibc, not the shipping Yocto toolchain. The initial three replays
+leave the paused display rendering; the final pass suspends it and also adds
+cache-miss counters. These differences preclude direct speedup claims between
+those passes. No setting, installed binary or renderer default changed.
+
+## Whole-step thickness cache — October 11
+
+The pipeline now owns one temporary thickness cache after applying user shape
+changes, sharing it across first-impact searches, motion clamping and CCD
+substeps. Collider poses change in the loop; local geometry does not. Each
+step discards the cache, so edits, removals and handle reuse on the next step
+cannot read stale values. Primitive shapes still use direct property queries.
+No cache is serialized or retained in `CCDSolver`. The public solver methods
+keep their signatures and safe per-call caches for standalone callers.
+
+### Isolated Pi comparison
+
+Both variants use the same Rust 1.89 release/static ARM build settings and
+diagnostic feature, with detailed collection **disabled** for timing. The
+GPU kiosk is paused and its process suspended during each replay, with a
+300-second timeout and resume trap. Unlike the earlier GPU-default diagnosis,
+no display workload competes with either variant.
+
+Two runs per variant use control/candidate/candidate/control order for the
+first retained case and the reverse order for the second. Means per tick:
+
+| Retained case | Per-pass physics | Whole-step physics | Reduction | Per-pass CCD | Whole-step CCD |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| First, ticks 9,061–9,180 | 23.402 ms | 16.949 ms | 27.6% | 13.682 ms | 7.257 ms |
+| Second, ticks 7,861–7,980 | 9.600 ms | 7.640 ms | 20.4% | 5.657 ms | 3.718 ms |
+
+Physics includes CCD; do not add those columns. Cache construction/destruction
+now sits at the step boundary, so the outer physics wall timer is the principal
+comparison, not just the narrower CCD timer. Solver, contact narrow-phase and
+terrain-lifecycle means remain essentially unchanged in the paired runs.
+
+The first pair's frozen candidate predates moving the optional profiling
+attributes from the public wrappers to the internal implementation. The final
+source is separately rebuilt and rechecked on that case: 17.010 ms physics,
+7.330 ms CCD, with identical states. The second case and final counter runs
+use that final-source binary; all binary hashes are retained.
+
+Separate counter captures show what was eliminated in the first case:
+
+- Compound computations fall from 160.608 to 27.067 per tick; immediate child
+  visits from 24,920.025 to 4,218.175, roughly 83% less repeated traversal.
+- Compound requests remain 1,922.925 per tick. Candidate checks remain
+  4,604.075, of which 4,594 are rejected and 10.075 reach top-level shape casts.
+- The same candidate ordering, thickness arithmetic, rejection thresholds,
+  casts, CCD substep counts and collision response are retained.
+
+Those work counts explain the improvement; collection-enabled timer values
+are not used for the speedup calculation. Normal builds omit these diagnostic
+clocks entirely. The diagnostic compiler/static libc also differs from the
+installed Yocto client, so a live-client deployment check remains necessary.
+
+### Regression checks and remaining work
+
+The new work-count test fails with per-pass caching (five compound calculations
+instead of one) and passes with the whole-step cache. It covers disabled CCD,
+one/multiple substeps and reset between steps. Another regression exercises
+in-place edits, compound/primitive transitions, removal with collider arena
+slot reuse, continued collision response and byte-identical snapshot
+continuation. Existing moving-ground, compound-sweep and contact tests remain.
+
+The normal physics/scenario library suites pass 1,157 tests with five existing
+ignored tests. The diagnostic engine/Spacewars suites pass 742 tests with one
+existing ignore. Formatting and diff checks pass. Strict all-target Clippy is
+blocked by pre-existing lints in unchanged spaceling and Spacewars code; this
+change does not address those unrelated warnings.
+
+Eleven qualified ARM replays cover 94,980 ticks. All 1,583 original observation
+checks and 1,320 measured native-state/observation hashes and CCD substep counts
+match the retained references. Starting/ending solver snapshots, observations
+and audit logs are byte-identical; terrain conservation and finite-state/speed
+checks pass. A final-source desktop replay separately matches 153 observations
+and 120 measured states. The counter runs also retain identical shape-cast,
+tree-node and leaf-query counts.
+
+One additional second-case run completed but was excluded from timing because
+the kiosk changed from pause to gameplay at completion. The safety guard
+stopped the batch without overwriting that UI state. Its state checks still
+match; the complete second-case comparison was repeated after the user
+confirmed device availability. No service restart was required.
+
+Accepted-run temperature samples span 69.6–76.0°C. CPU samples read 1.5 GHz,
+apart from two 1.4 GHz readings in the first 0.3 seconds of their runs, before
+the measured windows. These are samples, not continuous throttling telemetry.
+The same installed kiosk PID 451 is active in unpaused autoplay with zero
+restarts afterward. Client, CLI and settings hashes are unchanged.
+
+The [whole-step receipt](data/picade-ccd-step-cache-v1.json) includes per-run
+means, latency distributions, exact compiler settings, source/binary hashes,
+work counts and verification results. Full evidence, frozen binaries, source
+copies and comparison scripts are retained outside build caches at
+`spacewars-handoffs/ccd-step-cache-20261011`; the working copy is
+`target/ccd-step-cache.JmZG0nN5/`. Original action streams remain in
+`spacewars-handoffs/ccd-cache-qualification-20261011/inputs`.
+
+Even after the saving, the heavier window still needs about 17 ms for physics
+alone, plus lifecycle and host/rendering work. This is not a claim of 60 FPS
+or a fix for loose-dirt packing spikes. The live-client check below qualifies
+deployment; further hot-path changes need separate, similarly measured tests.
+
+## Shipping-client observation — October 11
+
+Built the normal GPU kiosk recipe with Yocto Rust 1.94, release/fat LTO, and
+deployed with `./update.sh --fast --target sw-picade.local --yes`. The extra
+`ccd-diagnostics` feature is absent from Rapier, the adapter and the scenario.
+All ten candidate source hashes still match the tested headless source.
+Client SHA-256 is
+`70d1e1086e8656de7dec3810b060945ea1f0c7056e2b36d49ab361cac11b916d`.
+The CLI and saved settings hashes are unchanged; no image flash or reboot was
+needed. Neither Clock device was changed.
+
+Read-only sampling ran for 300.137 seconds at five-second intervals: 61 total
+samples, 57 during active gameplay, two in the launcher and two on the result
+screen. Seed `3706749222645332783` completed at tick 12,706; autoplay then
+started seed `3972511307554219699`, reaching tick 2,912 before sampling ended.
+PID 4381 stayed active with zero unexpected service restarts. GPU scene mode
+stayed `retained-culled`, with no scene or text errors. The journal contains
+no new failure, only the already-present gamepad default-mapping warning.
+A screenshot after sampling shows both split-screen views, ships, terrain,
+minimaps and HUD rendering normally with V3D direct geometry.
+
+For the 15 active samples at tick 9,000 or later in the first round:
+
+| Reported metric | Median | Sample range |
+| --- | ---: | ---: |
+| Physics, ms/update | 7.344 | 4.355–11.680 |
+| CCD, ms/update (included in physics) | 3.515 | 1.998–5.336 |
+| Terrain/lifecycle, ms/update | 4.258 | 2.851–5.873 |
+| Drawing CPU, ms/rendered loop | 10.866 | 6.175–14.703 |
+| Updates per host callback | 3.425 | 2.183–4.900 |
+| FPS | 16.8 | 8.4–27.9 |
+| UPS | 53.1 | 41.8–56.8 |
+
+These summarize rolling-window means, not the distribution of all ticks. The
+physics window spans 120 updates; rendering/host windows cover their own
+iterations. They are not aligned independent totals and must not be added
+together. Process CPU is approximately one saturated core in this portion.
+All mature-window clock samples read 1.5 GHz, with temperatures 71.6–73.5°C;
+these are samples, not continuous throttling telemetry.
+
+This is **not** a before/after performance comparison: the pre-deploy match had
+a different seed, tick and geometry. The matched headless replays remain the
+evidence for the 20–28% physics saving. The live run confirms successful
+deployment and ordinary gameplay progression, not exhaustive correctness or
+60 FPS. Exact-state replay checks supply the stronger regression evidence.
+
+The live run also exposes remaining work. At tick 6,400, physics averages
+18.992 ms with four CCD substeps: CCD 6.440 ms, contact narrow phase 4.348 ms
+and constraint solving 5.916 ms. Terrain/lifecycle is separately 4.788 ms.
+Across all active samples, the largest reported lifecycle tick is 38.883 ms.
+The earlier instrumented replays attribute similar spikes mainly to dirt
+settling/packing, but this shipping sample does not subdivide that timer.
+The next experiment should retain the fixed-input/state-equality checks while
+reducing that packing work; contact/solver cost and rendering remain distinct
+contributors, not effects this cache change claims to eliminate.
+
+The [live receipt](data/picade-ccd-step-cache-live-v1.json) records the build,
+scope and measurements. Raw statuses, process/thermal samples, logs, deployment
+output, screenshot, client binary and collector/report scripts are retained at
+`spacewars-handoffs/ccd-step-cache-live-20261011/`; working files are in
+`target/ccd-live-deploy.VVpDoDmU/`. The candidate remains installed and running
+autoplay for further observation. No commit or push was made in this step.
