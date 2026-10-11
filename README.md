@@ -666,6 +666,39 @@ return to the launcher. Keyboard equivalents for player 1 are arrows,
 `Z`/`Space` = A, `X` = B, `Tab` = Select, and `Enter` = Start; `Esc` opens the
 host pause menu.
 
+## Windows nightly downloads
+
+Open [Windows nightly in Actions](https://github.com/aortez/space-wars/actions/workflows/windows-nightly.yml)
+and select the latest **successful** run. Sign into GitHub to download its
+`windows-release-<commit>-<run>-<attempt>` artifact. Extract the downloaded
+artifact ZIP, then extract its `windows-client.zip` into a writable folder.
+Double-click `engine-client.exe` for the launcher, or `run-software.cmd` for
+software rendering when OpenGL is unavailable. To start Falling from a terminal:
+
+```bat
+run-software.cmd --scenario falling
+```
+
+Use Windows 10 version 1809 or newer (x64), or Windows 11, with current graphics
+drivers and Microsoft Visual C++ v14 Redistributable (x64) **14.44.35211 or newer**
+([Microsoft download](https://aka.ms/vs/17/release/vc_redist.x64.exe)). The bundled
+README.txt specifies the exact minimum for its MSVC toolset; use that version
+or newer if it exceeds this baseline. No Rust
+installation or source checkout is needed. The UI and Falling ROM are embedded;
+Windows supplies system fonts. Optional user NES ROMs are not included.
+The bundle includes run instructions, commit/target metadata and SHA256SUMS for
+all payload files. CLI and headless tools are excluded.
+
+Both the daily 08:23 UTC schedule and **Run workflow** build current `main`,
+even when manually invoked from another branch or when main has not changed.
+Artifacts expire after **two days**; additional manual runs consume storage.
+GitHub can delay scheduled runs and disables schedules in public repositories
+after 60 days of inactivity. If downloads have expired, trigger a manual run.
+The workflow summary reports measured ZIP bytes and the default renderer's
+separate outcome. Software launcher/Falling startup is required on the hosted
+Windows runner; default OpenGL can fail there. Captures require visual review
+and do not certify gameplay input, audio or clean-machine compatibility.
+
 ## Raspberry Pi / kiosk launch
 
 The shared Pi 4/5 image launches the scenario selector fullscreen. Per-device
