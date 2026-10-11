@@ -304,7 +304,7 @@ impl RecoverShipTask {
         self.hatch_supported_arrival = hatch_supported_arrival;
     }
     /// Select hatch landing behavior without resetting task clocks or memory.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_hatch_supported_arrival(&mut self, enabled: bool) {
         self.hatch_supported_arrival = enabled;
         if let Some(task) = &mut self.ground_task {
@@ -313,7 +313,7 @@ impl RecoverShipTask {
     }
     /// Require the measured foot position for coarse and refined rebuild sites.
     /// This changes approach precision only, not holding or native construction.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_rebuild_precise_arrival(&mut self, enabled: bool) {
         self.rebuild_precise_arrival = enabled;
     }
@@ -923,7 +923,7 @@ impl RecoverShipTask {
         let continuous_staging = self.continuous_staging
             && self.staging_destination(&o.flight.pilot) == Some(destination);
         let task = self.ground_task.as_mut().unwrap();
-        #[cfg(feature = "sensor-profile")]
+        #[cfg(feature = "terrain-recovery")]
         task.set_hatch_supported_arrival(self.hatch_supported_arrival);
         task.set_rejoin_target_directed(
             self.rebuild_rejoin_target_directed

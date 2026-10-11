@@ -7,7 +7,8 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-sensor-profile = ["scenario-spacewars/sensor-profile"]
+terrain-recovery = ["scenario-spacewars/terrain-recovery"]
+sensor-profile = ["terrain-recovery", "scenario-spacewars/sensor-profile"]
 
 [dependencies]
 engine-common = { workspace = true }

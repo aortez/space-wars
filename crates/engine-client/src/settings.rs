@@ -853,7 +853,7 @@ enabled = true
     #[test]
     fn legacy_player_selection_defaults_p1_to_human_and_new_bot_choices_roundtrip() {
         use engine_common::SpacewarsController::{
-            DestinationBot, Human, PlannerBot, RuleBot, ValueBot,
+            DestinationBot, Human, PlannerBot, RecoveryBot, RuleBot, ValueBot,
         };
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
@@ -866,8 +866,9 @@ enabled = true
         assert_eq!(PlannerBot.automatic_bot(), PlannerBot);
         assert_eq!(DestinationBot.automatic_bot(), DestinationBot);
         assert_eq!(ValueBot.automatic_bot(), ValueBot);
-        loaded.spacewars.player_1_controller = PlannerBot;
-        loaded.spacewars.player_2_controller = ValueBot;
+        assert_eq!(RecoveryBot.automatic_bot(), RecoveryBot);
+        loaded.spacewars.player_1_controller = ValueBot;
+        loaded.spacewars.player_2_controller = RecoveryBot;
         save_settings(&loaded, &path).unwrap();
         assert_eq!(
             load_settings(&path).unwrap().settings.spacewars,

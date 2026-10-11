@@ -68,7 +68,7 @@ def compare(control, trial):
             'different_ticks': {key: differences[key] for key in keys}, 'different_seat_inputs': seat_inputs}
 
 
-def audit_case(root, item, result):
+def audit_case(root, item, result, *, native_refinement=True):
     path = root/'cases'/item['name']/'output'
     assert result['exit_code'] == 0, result
     s = read(path/'summary.json')
@@ -82,7 +82,7 @@ def audit_case(root, item, result):
     for index, row in enumerate(rows(path/'actions.jsonl')):
         assert row['tick'] == index and len(row['actions']) == 6 and len(row['sites']) == 2
         for seat in (0, 1):
-            expected = item['case']['candidate_seat'] == seat and row['recovery_active'][seat]
+            expected = native_refinement and item['case']['candidate_seat'] == seat and row['recovery_active'][seat]
             assert row['native_refinement'][seat] == expected
             native_ticks[seat] += expected
     assert index+1 == s['end_tick']

@@ -59,7 +59,7 @@ impl RecoverShipTask {
         self.rebuild_rejoin_corridors = enabled;
     }
 
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn rebuild_rejoin_corridors_requested(&self, p: &PilotObservationV1) -> bool {
         self.rebuild_rejoin_corridors
             && self.rebuild_ground_rejoin_enabled

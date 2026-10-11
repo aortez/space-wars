@@ -1,0 +1,831 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "d9752f7a3d0ed8b75e0e4a0c34656386924e0f67",
+    "source_tree": "0b31a6c948e89559281dcaeed87277ff7329ba03",
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/spacewars-handoffs/recovery-ordinary-build-20261011",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791703148.471067,
+    "source_inputs_sha256": "cd6f17e9089b84d960a45d3b13969f9cc4f6825c0a82627c438b29a274fad4fb",
+    "exit_code": 0,
+    "seconds": 106.34567904472351,
+    "binary_sha256": "0df30c62135d3373401235d275cd3496d92c17a7ac9c208bb3bca5a2e741562b"
+  },
+  "retained": {
+    "matches": 10,
+    "planned": 10,
+    "audit_samples": 5252,
+    "ticks": 315063,
+    "unrun": 0
+  },
+  "source_verification": {
+    "source_files_verified": 2468,
+    "source_commit": "d9752f7a3d0ed8b75e0e4a0c34656386924e0f67",
+    "source_inputs_sha256": "cd6f17e9089b84d960a45d3b13969f9cc4f6825c0a82627c438b29a274fad4fb",
+    "binary_sha256": "0df30c62135d3373401235d275cd3496d92c17a7ac9c208bb3bca5a2e741562b"
+  },
+  "comparisons": [
+    {
+      "name": "10101-angular-collapse-0-p1-ordinary",
+      "control": {
+        "recoveries": 1,
+        "sorties": 4,
+        "blocked_ticks": 0,
+        "longest_block": 0,
+        "mission_blocked_ticks": 0,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 3,
+        "outcome_score": 1
+      },
+      "old_candidate": {
+        "recoveries": 1,
+        "sorties": 4,
+        "blocked_ticks": 0,
+        "longest_block": 0,
+        "mission_blocked_ticks": 0,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 3,
+        "outcome_score": 1
+      },
+      "candidate": {
+        "recoveries": 1,
+        "sorties": 4,
+        "blocked_ticks": 0,
+        "longest_block": 0,
+        "mission_blocked_ticks": 0,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 3,
+        "outcome_score": 1
+      },
+      "completed_ticks": [
+        11337
+      ],
+      "control_completed_ticks": [
+        11337
+      ],
+      "old_completed_ticks": [
+        11337
+      ],
+      "versus_control": {
+        "overlapping_ticks": 16611,
+        "lengths": [
+          16611,
+          16611
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 11235,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 102,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "versus_old": {
+        "overlapping_ticks": 16611,
+        "lengths": [
+          16611,
+          16611
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_control_match": true,
+      "control_flags": [],
+      "old_flags": []
+    },
+    {
+      "name": "20202-round-collapse-0-p2-ordinary",
+      "control": {
+        "recoveries": 1,
+        "sorties": 0,
+        "blocked_ticks": 14819,
+        "longest_block": 9772,
+        "mission_blocked_ticks": 14819,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": -1
+      },
+      "old_candidate": {
+        "recoveries": 2,
+        "sorties": 0,
+        "blocked_ticks": 5047,
+        "longest_block": 5047,
+        "mission_blocked_ticks": 5047,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 0,
+        "outcome_score": -1
+      },
+      "candidate": {
+        "recoveries": 2,
+        "sorties": 0,
+        "blocked_ticks": 5047,
+        "longest_block": 5047,
+        "mission_blocked_ticks": 5047,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 0,
+        "outcome_score": -1
+      },
+      "completed_ticks": [
+        7519,
+        24911
+      ],
+      "control_completed_ticks": [
+        7519
+      ],
+      "old_completed_ticks": [
+        7519,
+        24911
+      ],
+      "versus_control": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": 24828,
+          "sites": 24912,
+          "decision_fnv64": 6758,
+          "scenario_before_step_fnv64": 24830
+        },
+        "different_ticks": {
+          "actions": 11169,
+          "sites": 11088,
+          "decision_fnv64": 22274,
+          "scenario_before_step_fnv64": 11170
+        },
+        "different_seat_inputs": [
+          11070,
+          8664
+        ]
+      },
+      "versus_old": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 0,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_control_match": false,
+      "control_flags": [
+        "less_owned_planets"
+      ],
+      "old_flags": []
+    },
+    {
+      "name": "13656578344987333250-round-collapse-1-asteroids-8-p1-ordinary",
+      "control": {
+        "recoveries": 2,
+        "sorties": 2,
+        "blocked_ticks": 104,
+        "longest_block": 104,
+        "mission_blocked_ticks": 104,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": 1
+      },
+      "old_candidate": {
+        "recoveries": 2,
+        "sorties": 2,
+        "blocked_ticks": 0,
+        "longest_block": 0,
+        "mission_blocked_ticks": 0,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": 1
+      },
+      "candidate": {
+        "recoveries": 2,
+        "sorties": 2,
+        "blocked_ticks": 0,
+        "longest_block": 0,
+        "mission_blocked_ticks": 0,
+        "ships_lost": 2,
+        "rebuilds": 2,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": 1
+      },
+      "completed_ticks": [
+        10542,
+        24336
+      ],
+      "control_completed_ticks": [
+        10542,
+        25149
+      ],
+      "old_completed_ticks": [
+        10542,
+        24336
+      ],
+      "versus_control": {
+        "overlapping_ticks": 32037,
+        "lengths": [
+          32037,
+          34139
+        ],
+        "first_difference": {
+          "actions": 22866,
+          "sites": 24328,
+          "decision_fnv64": 9154,
+          "scenario_before_step_fnv64": 22867
+        },
+        "different_ticks": {
+          "actions": 8563,
+          "sites": 7691,
+          "decision_fnv64": 14189,
+          "scenario_before_step_fnv64": 9170
+        },
+        "different_seat_inputs": [
+          8111,
+          8046
+        ]
+      },
+      "versus_old": {
+        "overlapping_ticks": 34139,
+        "lengths": [
+          34139,
+          34139
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 22253,
+          "scenario_before_step_fnv64": 22253
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 130,
+          "scenario_before_step_fnv64": 130
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_control_match": false,
+      "control_flags": [],
+      "old_flags": []
+    },
+    {
+      "name": "13656578344987333250-angular-collapse-1-asteroids-0-p1-ordinary",
+      "control": {
+        "recoveries": 1,
+        "sorties": 3,
+        "blocked_ticks": 1743,
+        "longest_block": 1743,
+        "mission_blocked_ticks": 1743,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 2,
+        "outcome_score": 1
+      },
+      "old_candidate": {
+        "recoveries": 1,
+        "sorties": 3,
+        "blocked_ticks": 2058,
+        "longest_block": 2058,
+        "mission_blocked_ticks": 2058,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 2,
+        "outcome_score": 1
+      },
+      "candidate": {
+        "recoveries": 1,
+        "sorties": 3,
+        "blocked_ticks": 2058,
+        "longest_block": 2058,
+        "mission_blocked_ticks": 2058,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 2,
+        "outcome_score": 1
+      },
+      "completed_ticks": [
+        16297
+      ],
+      "control_completed_ticks": [
+        16297
+      ],
+      "old_completed_ticks": [
+        16297
+      ],
+      "versus_control": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": 32159,
+          "sites": 34414,
+          "decision_fnv64": 31401,
+          "scenario_before_step_fnv64": 32160
+        },
+        "different_ticks": {
+          "actions": 3194,
+          "sites": 321,
+          "decision_fnv64": 4599,
+          "scenario_before_step_fnv64": 3840
+        },
+        "different_seat_inputs": [
+          520,
+          3031
+        ]
+      },
+      "versus_old": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 32101,
+          "scenario_before_step_fnv64": 32101
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 1281,
+          "scenario_before_step_fnv64": 1281
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "same_control_match": false,
+      "control_flags": [
+        "more_blocked_ticks",
+        "more_longest_block",
+        "more_mission_blocked_ticks"
+      ],
+      "old_flags": []
+    },
+    {
+      "name": "13656578344987333250-angular-collapse-1-asteroids-0-p2-ordinary",
+      "control": {
+        "recoveries": 1,
+        "sorties": 1,
+        "blocked_ticks": 17796,
+        "longest_block": 17796,
+        "mission_blocked_ticks": 17796,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": -1
+      },
+      "old_candidate": {
+        "recoveries": 0,
+        "sorties": 0,
+        "blocked_ticks": 25287,
+        "longest_block": 16228,
+        "mission_blocked_ticks": 25287,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": 33563,
+        "owned_planets": 0,
+        "outcome_score": -1
+      },
+      "candidate": {
+        "recoveries": 1,
+        "sorties": 1,
+        "blocked_ticks": 17796,
+        "longest_block": 17796,
+        "mission_blocked_ticks": 17796,
+        "ships_lost": 1,
+        "rebuilds": 1,
+        "death_tick": null,
+        "owned_planets": 1,
+        "outcome_score": -1
+      },
+      "completed_ticks": [
+        25282
+      ],
+      "control_completed_ticks": [
+        25282
+      ],
+      "old_completed_ticks": [],
+      "versus_control": {
+        "overlapping_ticks": 36000,
+        "lengths": [
+          36000,
+          36000
+        ],
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 4910,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {
+          "actions": 0,
+          "sites": 0,
+          "decision_fnv64": 20372,
+          "scenario_before_step_fnv64": 0
+        },
+        "different_seat_inputs": [
+          0,
+          0
+        ]
+      },
+      "versus_old": {
+        "overlapping_ticks": 33563,
+        "lengths": [
+          33563,
+          36000
+        ],
+        "first_difference": {
+          "actions": 23659,
+          "sites": 23639,
+          "decision_fnv64": 7109,
+          "scenario_before_step_fnv64": 7109
+        },
+        "different_ticks": {
+          "actions": 9830,
+          "sites": 9924,
+          "decision_fnv64": 25948,
+          "scenario_before_step_fnv64": 25948
+        },
+        "different_seat_inputs": [
+          9665,
+          8131
+        ]
+      },
+      "same_control_match": true,
+      "control_flags": [],
+      "old_flags": [
+        "more_longest_block"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "tests",
+      "command": [
+        "/home/data/workspace/spacewars-handoffs/recovery-ordinary-offsets-20261011/ordinary-offsets"
+      ],
+      "exit_code": 0,
+      "seconds": 2.145770311355591
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "seconds": 11.392127275466919
+    },
+    {
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 5.742876768112183
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.3699140548706055
+    },
+    {
+      "name": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.004969358444213867
+    }
+  ],
+  "strict_ai_clippy": {
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "clippy",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--tests",
+      "--no-deps",
+      "--features",
+      "sensor-profile",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 9.76792049407959
+  },
+  "fresh": {
+    "status": "unrun",
+    "reason": "15-minute cap; remaining time reserved for retained comparisons, verification and recording",
+    "matrix": [
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "round",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": false,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 0,
+        "candidate_seat": 1
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": null
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 0
+      },
+      {
+        "seed": 3659225967059093636,
+        "shape": "angular",
+        "slumping": true,
+        "asteroid_interval_seconds": 8,
+        "candidate_seat": 1
+      }
+    ]
+  },
+  "artifacts": {
+    "count": 443,
+    "manifest_sha256": "69489eb5c06e096059323357eb6e6ac288b0ca8dcb6620751c9c29bed7827bcd"
+  },
+  "execution_freezes": [
+    {
+      "runner_sha256": "821e6eb172a4b46cdb77c3998793a3ae3e5dbb1f4915555a995fbc9e00394586",
+      "matrix_sha256": "3668f6e94b7497b711d2b1db058655164f21cc27789825db63599db42f4a8148",
+      "references_sha256": "fa70787d567479e276d2afe5425a02b01f3559597aeb48161105f5bd2685898d",
+      "runtime_sha256": "c112c2bede7677045126682b699b674f9b2c0e2a6cefdc5d10482bf0a469be94",
+      "auditors": {
+        "source/tools/audit-terrain-recovery-missions.py": "04163c21e7e6621b980daee755ac719caae570de7b9bf1b76061b220542c77cf",
+        "source/tools/audit-terrain-recovery-heldout.py": "cfa5fe2801f98c7df8415bcf8a7ac60d0ad1c88c763427123c30ef43bb56550d"
+      }
+    },
+    {
+      "runner_sha256": "37820452211a31333aadb27d02a5297dceb4affc09e700b87c98d8bbfe62428d",
+      "matrix_sha256": "3668f6e94b7497b711d2b1db058655164f21cc27789825db63599db42f4a8148",
+      "references_sha256": "fa70787d567479e276d2afe5425a02b01f3559597aeb48161105f5bd2685898d",
+      "runtime_sha256": "c112c2bede7677045126682b699b674f9b2c0e2a6cefdc5d10482bf0a469be94",
+      "auditors": {
+        "source/tools/audit-terrain-recovery-missions.py": "04163c21e7e6621b980daee755ac719caae570de7b9bf1b76061b220542c77cf",
+        "source/tools/audit-terrain-recovery-heldout.py": "cfa5fe2801f98c7df8415bcf8a7ac60d0ad1c88c763427123c30ef43bb56550d"
+      }
+    }
+  ]
+}

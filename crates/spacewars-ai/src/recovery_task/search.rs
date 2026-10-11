@@ -22,14 +22,14 @@ impl RebuildStagingTelemetry {
 
 impl RecoverShipTask {
     /// Independently opt in to faster staging interiors and measured-map reuse.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_staging_execution(&mut self, continuous_walk: bool, route_handoff: bool) {
         self.continuous_staging = continuous_walk;
         self.staging_route_handoff = route_handoff;
     }
 
     /// Opt-in search scheduling for controlled native experiments.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_rebuild_search(&mut self, enabled: bool) {
         self.rebuild_search_enabled = enabled;
         if !enabled {
@@ -38,7 +38,7 @@ impl RecoverShipTask {
         }
     }
 
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn rebuild_search_request(&self) -> Option<RebuildSearchProgress> {
         self.rebuild_search_enabled.then(|| {
             let mut request = self.telemetry.rebuild_search.clone().unwrap_or_default();
