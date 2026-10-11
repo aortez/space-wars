@@ -137,7 +137,7 @@ fn fps_counter_is_shared_by_scene_and_native_video_lifecycles() {
     });
 }
 
-fn wait_status(
+pub(super) fn wait_status(
     harness: &mut FunctionalHarness,
     ready: impl Fn(&BTreeMap<String, String>) -> bool,
 ) -> BTreeMap<String, String> {
@@ -160,7 +160,7 @@ fn wait_status(
         }
         assert!(
             Instant::now() < deadline,
-            "counter did not reach expected state: {status:?}"
+            "status did not reach expected state: {status:?}"
         );
         thread::sleep(POLL_INTERVAL);
     }

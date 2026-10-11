@@ -2,6 +2,7 @@
 use super::*;
 use crate::mission_evaluation::MissionEvaluator;
 use scenario_spacewars::surface_sortie::{SurfaceSortieState, mission::LandingSurveyCadence};
+use std::time::{Duration, Instant};
 
 impl MaterialMissionPilot {
     pub(crate) fn configure_terrain_recovery(&mut self, enabled: bool) {
@@ -10,7 +11,20 @@ impl MaterialMissionPilot {
             "configure before the first intent"
         );
         self.terrain_recovery = enabled;
+        self.native_rebuild_refinement = enabled;
         self.configure_recovery_task();
+    }
+
+    pub(crate) fn configure_native_rebuild_refinement(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        assert!(
+            !enabled || self.terrain_recovery,
+            "native refinement requires terrain recovery"
+        );
+        self.native_rebuild_refinement = enabled;
     }
 
     pub(super) fn configure_recovery_task(&mut self) {
@@ -36,6 +50,11 @@ impl MaterialMissionPilot {
         self.terrain_recovery && self.recovery.is_some()
     }
 
+    /// Physical-step selection; enhanced recovery observations remain independent.
+    pub fn native_rebuild_refinement_active(&self) -> bool {
+        self.native_rebuild_refinement && self.terrain_recovery_active()
+    }
+
     /// Host-only pairing: one cadenced observation, the unchanged mission intent
     /// entry point, then native option synchronization before the physical step.
     /// Returned observations also feed the host's usual post-intent planners.
@@ -44,6 +63,32 @@ impl MaterialMissionPilot {
         state: &mut SurfaceSortieState,
         cadence: LandingSurveyCadence,
         evaluation: &MissionEvaluator,
+    ) -> (MissionObservationV1, CombatIntent) {
+        self.decide_with_terrain_recovery_observed(state, cadence, evaluation, || {})
+    }
+
+    /// The same paired decision with separate sensor and policy wall timings.
+    pub fn decide_with_terrain_recovery_timed(
+        &mut self,
+        state: &mut SurfaceSortieState,
+        cadence: LandingSurveyCadence,
+        evaluation: &MissionEvaluator,
+    ) -> (MissionObservationV1, CombatIntent, Duration, Duration) {
+        let started = Instant::now();
+        let mut observed = started;
+        let (observation, intent) =
+            self.decide_with_terrain_recovery_observed(state, cadence, evaluation, || {
+                observed = Instant::now()
+            });
+        (observation, intent, observed - started, observed.elapsed())
+    }
+
+    fn decide_with_terrain_recovery_observed(
+        &mut self,
+        state: &mut SurfaceSortieState,
+        cadence: LandingSurveyCadence,
+        evaluation: &MissionEvaluator,
+        observed: impl FnOnce(),
     ) -> (MissionObservationV1, CombatIntent) {
         let seat = self.context.actor.index();
         let active = self.terrain_recovery_active();
@@ -69,13 +114,14 @@ impl MaterialMissionPilot {
                 state.add_ground_rejoin_corridors(seat, recovery);
             }
         }
+        observed();
         let intent = self.intent_with_evaluation(&observation, evaluation);
-        assert!(state.set_rebuild_refinement(seat, self.terrain_recovery_active()));
+        assert!(state.set_rebuild_refinement(seat, self.native_rebuild_refinement_active()));
         (observation, intent)
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sensor-profile"))]
 mod qualification;
 #[cfg(test)]
 mod tests;

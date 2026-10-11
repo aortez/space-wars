@@ -37,7 +37,7 @@ pub struct GroundPostureObservation {
 impl SurfaceSortieState {
     /// Opt-in host request during a bounded ground-rejoin attempt. The same
     /// capsule sweeps and surviving-floor checks remain movement prerequisites.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn add_ground_rejoin_corridors(
         &self,
         player: usize,
@@ -66,6 +66,7 @@ impl SurfaceSortieState {
         {
             return;
         }
+        #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("ground_rejoin_corridors");
         o.posture = self.ground_posture_with_corridors(player, p, true);
     }
@@ -203,7 +204,7 @@ mod tests {
     };
 
     #[test]
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     fn standing_corridors_are_fresh_supported_and_read_only() {
         let dt = Duration::from_nanos(16_666_667);
         let mut state = SurfaceSortieScenario::init_material(42, 1);

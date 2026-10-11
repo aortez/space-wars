@@ -49,7 +49,7 @@ impl SurfaceSortieState {
 
     /// Experimental caller-owned search progress. Repeated reads with the
     /// same request cannot consume candidates or mutate the native world.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn recovery_observation_with_rebuild_search(
         &self,
         player: usize,

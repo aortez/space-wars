@@ -17,6 +17,9 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
             ("value v13", "planner bot", "vector"),
             ("planner bot", "value v13", "raster"),
             ("value v13", "value v13", "raster"),
+            ("recovery v1", "human", "vector"),
+            ("value v13", "recovery v1", "raster"),
+            ("recovery v1", "recovery v1", "raster"),
             ("mission v12", "planner bot", "vector"),
             ("planner bot", "mission v12", "raster"),
             ("mission v12", "mission v12", "raster"),
@@ -87,6 +90,7 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 &format!("play-{p1}-{p2}-{renderer}.png"),
                 20_000,
             );
+            assert_recovery_profiles(harness, p1, p2);
             let first_instance = state.scenario_revision;
             harness.pause_guarded(&state);
             state = harness.wait_for(
@@ -112,6 +116,7 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 TRANSITION_TIMEOUT,
             );
             assert_ne!(state.scenario_revision, first_instance);
+            assert_recovery_profiles(harness, p1, p2);
             harness.pause_guarded(&state);
             state = harness.wait_for(
                 UiStatePredicate {
@@ -147,6 +152,23 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
             state = harness.activate_guarded("launcher.settings.back", &state);
         }
     });
+}
+
+fn assert_recovery_profiles(harness: &mut FunctionalHarness, p1: &str, p2: &str) {
+    // Gameplay becomes visible before the first runtime diagnostics sample.
+    let diagnostics = performance::wait_status(harness, |status| {
+        status.contains_key("mission_recovery_profile_p1")
+            && status.contains_key("mission_recovery_profile_p2")
+    });
+    for (seat, controller) in [p1, p2].iter().enumerate() {
+        let profile = if *controller == "recovery v1" {
+            "terrain_recovery_supported_hatch_ordinary_offsets_v1"
+        } else {
+            "standard"
+        };
+        let key = format!("mission_recovery_profile_p{}", seat + 1);
+        assert_eq!(diagnostics[&key], profile, "{diagnostics:?}");
+    }
 }
 
 #[test]
