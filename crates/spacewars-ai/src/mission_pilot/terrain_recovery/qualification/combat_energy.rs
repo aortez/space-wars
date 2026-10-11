@@ -29,7 +29,7 @@ fn initialize(case: &Case, direct_laser: bool) -> Run {
     run
 }
 
-fn continue_run(out: &Path, initial: &Run, recorded: &[Recorded], reserve_reload: bool) -> Run {
+fn continue_run(out: &Path, initial: &Run, recorded: &[Recorded], reserve_reload: bool) {
     fs::create_dir(out).unwrap();
     let mut run = initial.clone();
     assert_eq!(snapshot(&run), snapshot(initial));
@@ -117,7 +117,22 @@ fn continue_run(out: &Path, initial: &Run, recorded: &[Recorded], reserve_reload
             "reserve_reload":reserve_reload,"controller_reset":false,"physics_edited":false,
             "opponent_reactive":true,"audits_passed":true}),
     );
-    run
+}
+
+fn verify_final(out: &Path, reference: &Path) {
+    // Compare the serialization itself: parsing decimal floats back into Value
+    // can round a number differently even when both files are byte-identical.
+    for file in [
+        "final.json",
+        "final-controllers.txt",
+        "final-frame-p1.json",
+        "final-frame-p2.json",
+    ] {
+        assert!(
+            fs::read(out.join(file)).unwrap() == fs::read(reference.join(file)).unwrap(),
+            "retained {file} differs"
+        );
+    }
 }
 
 #[test]
@@ -141,15 +156,13 @@ fn retained_combat_reload_competition() {
     let candidate_rows = reference(candidate);
     assert_eq!(control_rows.len(), 12871);
     assert_eq!(candidate_rows.len(), 13403);
-    let baseline = continue_run(
+    continue_run(
         &out.join("original"),
         &initialize(&case, false),
         &control_rows,
         false,
     );
-    let original_final: Value =
-        serde_json::from_slice(&fs::read(control.join("final.json")).unwrap()).unwrap();
-    assert_eq!(snapshot(&baseline), original_final);
+    verify_final(&out.join("original"), control);
 
     let mut run = initialize(&case, true);
     for row in &candidate_rows[..FORK as usize] {
@@ -159,10 +172,8 @@ fn retained_combat_reload_competition() {
     }
     assert_eq!(run.state.tick(), FORK);
     save_state(out, "fork", &run);
-    let unchanged = continue_run(&out.join("candidate"), &run, &candidate_rows, false);
-    let candidate_final: Value =
-        serde_json::from_slice(&fs::read(candidate.join("final.json")).unwrap()).unwrap();
-    assert_eq!(snapshot(&unchanged), candidate_final);
+    continue_run(&out.join("candidate"), &run, &candidate_rows, false);
+    verify_final(&out.join("candidate"), candidate);
     continue_run(&out.join("reserve-reload"), &run, &candidate_rows, true);
     save(
         out.join("verification.json"),
