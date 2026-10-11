@@ -112,6 +112,35 @@ immediate settings screenshot had a displaced heading; it did not recur in
 the post-update transition checks. Keep that observation as a follow-up if it
 reappears, rather than claiming that screenshots prove every UI frame correct.
 
+### Current-main integration acceptance
+
+The rollout then merged `main` through `1cbc4ed` and repeated acceptance at
+`da72409`, rather than treating the earlier candidate's results as evidence for
+the newly integrated Clock and terrain changes. The full optimized desktop
+workspace/all-target run passed 2,940 tests (61 explicitly ignored). GPU tests
+passed 747 client, 32 CLI, four startup, 20 FemtoVG and three Slint renderer
+tests; the Rust 1.89.0 GPU check also passed. Yocto tooling passed 38 Node and
+44 Python tests, including shader-only rebuild coverage.
+
+The merged Pi release build completed all 4,185 requested tasks. Normal fast
+updates passed on both already GPU-capable devices. Each device then passed
+eight private-settings cases: Clock, Spacewars, Pizza, Falling, Scorched Earth,
+Terrain Grains, explicit software, and the generic `linuxkms` alias. Coverage
+includes all nine Clock events, a Spacewars zoom sweep, deliberate GPU opt-out
+followed by restart, launcher/settings/relaunch transitions, pool limits and
+44 dimension-checked screenshots per device. Representative captures were
+visually inspected. These remain finite presentation checks, not long-running
+terrain/gameplay tests or physical input validation.
+
+Both installed services recovered with zero automatic restarts; the private
+acceptance runs preserved installed binaries and settings byte-for-byte. The
+merged Pi 5 also passed the immediate-menu screenshot, write-error recovery
+and bounded concurrent-request checks. The new evidence bundle is
+`target/gpu-integration.MuJ7NIkE/`. The tested client
+SHA-256 is
+`eaf26583ca2b340dc5ce5a58ab0e172b98dbbe6aaa3c9e40d19c9225525210db`.
+See [rollout PR #188](https://github.com/aortez/space-wars/pull/188) for CI status.
+
 ## Historical investigation
 
 The chronological notes below retain the policy and defaults used for each
