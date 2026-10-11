@@ -26,6 +26,7 @@ mod connectivity;
 mod evidence;
 mod ground_rejoin;
 mod hatch_arrival;
+mod heldout;
 mod investigation;
 mod placement_cost;
 mod profile;
@@ -53,6 +54,20 @@ impl Case {
 
     fn initialize_with_profile(&self, profile: MissionRecoveryProfile) -> Run {
         assert!([10101, 20202].contains(&self.seed));
+        self.initialize_match(
+            profile,
+            MaterialAsteroidSettings {
+                interval_seconds: 8,
+                severity: MaterialAsteroidSeverity::Mixed,
+            },
+        )
+    }
+
+    fn initialize_match(
+        &self,
+        profile: MissionRecoveryProfile,
+        asteroids: MaterialAsteroidSettings,
+    ) -> Run {
         assert!(self.candidate_seat.is_none_or(|s| s < 2));
         let mode = match self.shape.as_str() {
             "round" => DirtMode::WeakRound,
@@ -66,10 +81,7 @@ impl Case {
             config.slumping = None;
         }
         state.enable_loose_terrain_with_config(config).unwrap();
-        state.set_asteroid_pressure(MaterialAsteroidSettings {
-            interval_seconds: 8,
-            severity: MaterialAsteroidSeverity::Mixed,
-        });
+        state.set_asteroid_pressure(asteroids);
         let brains = [0, 1].map(|seat| {
             MissionBot::new(
                 MissionPolicy::ValuePlanner,
