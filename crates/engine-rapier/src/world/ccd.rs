@@ -54,6 +54,8 @@ impl QueryDispatcher for CompoundCcdDispatcher {
         end_time: Real,
         stop_at_penetration: bool,
     ) -> Result<Option<ShapeCastHit>, Unsupported> {
+        #[cfg(feature = "ccd-diagnostics")]
+        let _scope = super::ccd_diagnostics::Scope::enter(shape1, shape2);
         if let Some(compound) = shape1.as_compound() {
             return Ok(cast_compound(
                 motion1,
@@ -123,9 +125,13 @@ fn cast_compound(
             end_time,
             |node, _| {
                 let aabb1 = node.aabb();
-                if let (Some(box1), Some(box2)) = (sweep1.bounds(aabb1), box2)
-                    && !box1.intersects(&box2)
-                {
+                let rejected = matches!(
+                    (sweep1.bounds(aabb1), box2),
+                    (Some(box1), Some(box2)) if !box1.intersects(&box2)
+                );
+                #[cfg(feature = "ccd-diagnostics")]
+                super::ccd_diagnostics::node(rejected);
+                if rejected {
                     return Real::MAX;
                 }
                 let center1 = aabb1.center();
@@ -147,6 +153,8 @@ fn cast_compound(
                 .unwrap_or(Real::MAX)
             },
             |part_id, _| {
+                #[cfg(feature = "ccd-diagnostics")]
+                super::ccd_diagnostics::leaf();
                 let (part_pos, part_shape) = &compound.shapes()[part_id as usize];
                 CompoundCcdDispatcher
                     .cast_shapes_nonlinear(

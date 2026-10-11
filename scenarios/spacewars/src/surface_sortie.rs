@@ -373,6 +373,16 @@ impl SurfaceSortieState {
         self.world.physics.world.pair_diagnostics()
     }
 
+    /// Exact native solver state for the opt-in fixed-input CCD experiment.
+    #[cfg(feature = "ccd-diagnostics")]
+    pub fn ccd_physics_snapshot(&self) -> Vec<u8> {
+        self.world
+            .physics
+            .world
+            .snapshot_bytes()
+            .expect("native CCD snapshot")
+    }
+
     pub fn player_count(&self) -> usize {
         self.pilots.len()
     }

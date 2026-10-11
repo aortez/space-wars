@@ -1,0 +1,548 @@
+{
+  "schema_version": 1,
+  "experiment": "picade-compound-ccd-cache-qualification",
+  "date_utc": "2026-10-11",
+  "pull_request": "https://github.com/aortez/space-wars/pull/187",
+  "base_pull_request": "https://github.com/aortez/space-wars/pull/178",
+  "artifact_directory": "/home/data/workspace/spacewars-handoffs/ccd-cache-qualification-20261011",
+  "control_revision": "f533fce",
+  "cache_revision": "7a2b2f33c21bbd13c99a6621a15f35ec0da9f7cd",
+  "shipping_build": {
+    "commit": "23b51e9af014d5acd4d255063ff0d7bcef2ab03a",
+    "source_clean": true,
+    "manifest": {
+      "format": 1,
+      "machine": "raspberrypi-spacewars",
+      "target_arch": "aarch64",
+      "compatibility": "bdd9999de3b8fb42cc0e3b0a2ae94bc4b6b676212493a7238e808898d21c92f9",
+      "binaries": {
+        "engine-client": {
+          "sha256": "f655b68c298b44f58dabdc9134b00b52547232a47a7b1bb8b43d591675b3f641",
+          "size": 20634616
+        },
+        "spacewars-cli": {
+          "sha256": "edf1c03d129d8444418726f8a42b22f8dd8b4f86bbac6c17af49937675703423",
+          "size": 1604744
+        }
+      }
+    },
+    "build_log_sha256": "4aaa4763f2126e1b46aa368669ade24aeb5ccc067802f6b9c87a76f6e73a80e4",
+    "build_warning": "Yocto has not validated host Ubuntu 26.04"
+  },
+  "runtime_changes_since_shipping_build": [],
+  "fixed_input_comparison": {
+    "count_queries": false,
+    "kiosk_paused": true,
+    "replayed_ticks": 68640,
+    "retained_observation_checks": 1144,
+    "retained_mismatches": 0,
+    "native_window_hashes_compared": 960,
+    "byte_identical_per_case": [
+      "start-physics.bin",
+      "start-observation.json",
+      "final-physics.bin",
+      "final-observation.json",
+      "audits.jsonl"
+    ],
+    "identical_per_tick": [
+      "physics_fnv64",
+      "scenario_fnv64",
+      "substeps"
+    ],
+    "thermal_sample_count": 169,
+    "cases": {
+      "first": {
+        "seed": 3057324812542282494,
+        "first": 9061,
+        "last": 9180,
+        "runs": 4,
+        "retained_checks_per_run": 153,
+        "native_window_hashes_per_run": 120,
+        "all_case_states_equal": true,
+        "timers": {
+          "physics_ms": {
+            "control_runs": [
+              47.11162290833333,
+              46.83941545
+            ],
+            "candidate_runs": [
+              24.574415666666667,
+              24.464004316666667
+            ],
+            "control_mean": 46.97551917916667,
+            "candidate_mean": 24.519209991666667,
+            "reduction_percent": 47.80428099549185
+          },
+          "ccd_ms": {
+            "control_runs": [
+              36.69476338333333,
+              36.37819136666667
+            ],
+            "candidate_runs": [
+              14.195640158333333,
+              14.166422708333334
+            ],
+            "control_mean": 36.536477375000004,
+            "candidate_mean": 14.181031433333334,
+            "reduction_percent": 61.18664837941748
+          },
+          "step_ms": {
+            "control_runs": [
+              52.22697676666667,
+              51.931144233333335
+            ],
+            "candidate_runs": [
+              29.6426595,
+              29.551380816666665
+            ],
+            "control_mean": 52.0790605,
+            "candidate_mean": 29.597020158333333,
+            "reduction_percent": 43.16905897652794
+          }
+        },
+        "temperature_c_range": [
+          72.062,
+          79.367
+        ],
+        "cpu_khz_values": [
+          1500000
+        ]
+      },
+      "second": {
+        "seed": 1978168328740471875,
+        "first": 7861,
+        "last": 7980,
+        "runs": 4,
+        "retained_checks_per_run": 133,
+        "native_window_hashes_per_run": 120,
+        "all_case_states_equal": true,
+        "timers": {
+          "physics_ms": {
+            "control_runs": [
+              17.229644166666667,
+              16.961342358333333
+            ],
+            "candidate_runs": [
+              10.066320091666666,
+              10.140135708333334
+            ],
+            "control_mean": 17.0954932625,
+            "candidate_mean": 10.1032279,
+            "reduction_percent": 40.901220310723396
+          },
+          "ccd_ms": {
+            "control_runs": [
+              13.013718,
+              12.77993665
+            ],
+            "candidate_runs": [
+              5.92918295,
+              5.961116991666667
+            ],
+            "control_mean": 12.896827325,
+            "candidate_mean": 5.9451499708333335,
+            "reduction_percent": 53.9022286565868
+          },
+          "step_ms": {
+            "control_runs": [
+              22.538943233333335,
+              22.268432633333333
+            ],
+            "candidate_runs": [
+              15.439770441666667,
+              15.508300841666667
+            ],
+            "control_mean": 22.403687933333334,
+            "candidate_mean": 15.474035641666667,
+            "reduction_percent": 30.93085527832399
+          }
+        },
+        "temperature_c_range": [
+          74.497,
+          78.88
+        ],
+        "cpu_khz_values": [
+          1500000
+        ]
+      }
+    },
+    "runs": [
+      {
+        "label": "01-first-candidate",
+        "variant": "candidate",
+        "binary_sha256": "afa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40",
+        "elapsed_seconds": 112.9394917019963,
+        "means_ms": {
+          "physics_ms": 24.574415666666667,
+          "ccd_ms": 14.195640158333333,
+          "step_ms": 29.6426595
+        }
+      },
+      {
+        "label": "02-first-control",
+        "variant": "control",
+        "binary_sha256": "b29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96",
+        "elapsed_seconds": 154.3471741050016,
+        "means_ms": {
+          "physics_ms": 47.11162290833333,
+          "ccd_ms": 36.69476338333333,
+          "step_ms": 52.22697676666667
+        }
+      },
+      {
+        "label": "03-second-control",
+        "variant": "control",
+        "binary_sha256": "b29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96",
+        "elapsed_seconds": 107.95499396900414,
+        "means_ms": {
+          "physics_ms": 17.229644166666667,
+          "ccd_ms": 13.013718,
+          "step_ms": 22.538943233333335
+        }
+      },
+      {
+        "label": "04-second-candidate",
+        "variant": "candidate",
+        "binary_sha256": "afa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40",
+        "elapsed_seconds": 79.68093572699581,
+        "means_ms": {
+          "physics_ms": 10.066320091666666,
+          "ccd_ms": 5.92918295,
+          "step_ms": 15.439770441666667
+        }
+      },
+      {
+        "label": "05-first-control",
+        "variant": "control",
+        "binary_sha256": "b29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96",
+        "elapsed_seconds": 151.8752370459988,
+        "means_ms": {
+          "physics_ms": 46.83941545,
+          "ccd_ms": 36.37819136666667,
+          "step_ms": 51.931144233333335
+        }
+      },
+      {
+        "label": "06-first-candidate",
+        "variant": "candidate",
+        "binary_sha256": "afa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40",
+        "elapsed_seconds": 112.83813584000018,
+        "means_ms": {
+          "physics_ms": 24.464004316666667,
+          "ccd_ms": 14.166422708333334,
+          "step_ms": 29.551380816666665
+        }
+      },
+      {
+        "label": "07-second-candidate",
+        "variant": "candidate",
+        "binary_sha256": "afa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40",
+        "elapsed_seconds": 79.80277887700504,
+        "means_ms": {
+          "physics_ms": 10.140135708333334,
+          "ccd_ms": 5.961116991666667,
+          "step_ms": 15.508300841666667
+        }
+      },
+      {
+        "label": "08-second-control",
+        "variant": "control",
+        "binary_sha256": "b29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96",
+        "elapsed_seconds": 107.76192713199998,
+        "means_ms": {
+          "physics_ms": 16.961342358333333,
+          "ccd_ms": 12.77993665,
+          "step_ms": 22.268432633333333
+        }
+      }
+    ],
+    "input_sha256": {
+      "retained-seed": {
+        "actions.jsonl": "8f0115cb68ec960709f6e192a2b2e57bd5633e0e4ee42528f890d76547ef91c5",
+        "samples.jsonl": "3ab68ab0aa159977d1007775c0445c69c42f59cd418878f97bc3112564fe8114",
+        "config.json": "3350b64b8cacf99a4fdaad198c88437ac1893be2af4e3c40671a2d3d9094cc03"
+      },
+      "current-seed": {
+        "actions.jsonl": "2057f8854d6ba1a20b77b99b40a2325eb96f64403b713cd7feb5fd38be5911e2",
+        "samples.jsonl": "5b955bb62a74d24d6fa2673b3b3ae1b5de21ff5933cb170fb19933a576634e30",
+        "config.json": "3754d8a0175292de9f361a7fe872435a0b812a18a6cdeb6dc49e79715cc942d9"
+      }
+    }
+  },
+  "live": {
+    "samples": 61,
+    "complete_profile_samples": 59,
+    "active_profile_samples": 57,
+    "elapsed_seconds": 644.3103546310012,
+    "raster_scale": "1.00",
+    "shipping_commit": "23b51e9af014d5acd4d255063ff0d7bcef2ab03a",
+    "preset": "Heavy one-second asteroids; plain Round; Legacy v9 / Planner v10; recovery candidate disabled",
+    "overall": {
+      "fps": {
+        "min": 4.4,
+        "median": 16.5,
+        "max": 58.9
+      },
+      "ups": {
+        "min": 22.2,
+        "median": 59.0,
+        "max": 60.7
+      },
+      "mission_world_physics_avg_ms": {
+        "min": 1.55,
+        "median": 6.759,
+        "max": 31.753
+      },
+      "mission_rapier_ccd_avg_ms": {
+        "min": 0.706,
+        "median": 3.805,
+        "max": 16.102
+      },
+      "mission_total_avg_ms": {
+        "min": 2.725,
+        "median": 10.873,
+        "max": 41.187
+      }
+    },
+    "after_tick_12000": {
+      "fps": {
+        "min": 4.4,
+        "median": 5.65,
+        "max": 6.9
+      },
+      "ups": {
+        "min": 22.2,
+        "median": 28.450000000000003,
+        "max": 34.7
+      },
+      "mission_world_physics_avg_ms": {
+        "min": 17.764,
+        "median": 21.514499999999998,
+        "max": 25.265
+      },
+      "mission_rapier_ccd_avg_ms": {
+        "min": 10.084,
+        "median": 12.209,
+        "max": 14.334
+      },
+      "mission_total_avg_ms": {
+        "min": 24.234,
+        "median": 28.21,
+        "max": 32.186
+      }
+    },
+    "peak_physics_sample": {
+      "sample": 20,
+      "elapsed_seconds": 217.5046771960042,
+      "temperature_c": 72.062,
+      "cpu_khz": 1500000,
+      "scenario": "spacewars",
+      "scenario_revision": "1",
+      "paused": "false",
+      "raster_scale": "1.00",
+      "renderer": "raster",
+      "fps": "4.4",
+      "ups": "22.2",
+      "match_seed": "4933744737834333975",
+      "match_tick": "11728",
+      "match_player_1": "material_mission_v9",
+      "match_player_2": "material_mission_v10",
+      "match_result": "in_progress",
+      "match_owned_planets": "2,0",
+      "mission_profile_version": "3",
+      "mission_profile_samples": "120",
+      "mission_rapier_ccd_samples": "120",
+      "mission_world_physics_avg_ms": "31.753",
+      "mission_rapier_ccd_avg_ms": "16.102",
+      "mission_rapier_ccd_first_impact_avg_ms": "8.022",
+      "mission_rapier_ccd_clamping_avg_ms": "7.971",
+      "mission_rapier_narrow_phase_avg_ms": "5.580",
+      "mission_rapier_solver_avg_ms": "6.284",
+      "mission_rapier_ccd_substeps_avg": "4.000",
+      "mission_rapier_active_bodies_latest": "326",
+      "mission_rapier_contact_pairs_latest": "322",
+      "mission_world_lifecycle_avg_ms": "3.754",
+      "mission_total_avg_ms": "41.187",
+      "mission_sensor_p1_avg_ms": "1.437",
+      "mission_sensor_p2_avg_ms": "1.319",
+      "mission_p1_form": "Ship",
+      "mission_p1_location": "Aboard(VehicleId(0))",
+      "mission_p1_task": "Planet 1: choosing sheltered ground",
+      "mission_p1_ground_nodes": "0",
+      "mission_p1_landing_sites": "0",
+      "mission_p1_recovery_sites": "0",
+      "mission_p2_form": "Ship",
+      "mission_p2_location": "OnFoot",
+      "mission_p2_task": "Planet 1: claiming planet",
+      "mission_p2_ground_nodes": "0",
+      "mission_p2_landing_sites": "1",
+      "mission_p2_recovery_sites": "1"
+    },
+    "cpu_khz_values": [
+      1500000
+    ],
+    "temperature_c_range": [
+      70.114,
+      73.523
+    ],
+    "limits": [
+      "Different live worlds from the earlier diagnostic client; no paired live FPS improvement claim.",
+      "Performance ranges exclude incomplete mission windows and game-over samples.",
+      "Host FPS/UPS and mission timers cover different windows.",
+      "Ten-second observations can miss short-lived bot states; transitions are observations, not exact event ticks.",
+      "This does not prove every destroyed-terrain recovery is feasible."
+    ]
+  },
+  "live_matches": [
+    {
+      "seed": "4933744737834333975",
+      "sample_count": 24,
+      "tick_range": [
+        662,
+        12687
+      ],
+      "last_result": "Player 1 wins / opposing pilot lost",
+      "observed_on_foot_to_aboard": {
+        "1": [
+          {
+            "sample": 7,
+            "tick": 4890,
+            "form": "Ship"
+          },
+          {
+            "sample": 13,
+            "tick": 8624,
+            "form": "Ship"
+          }
+        ],
+        "2": [
+          {
+            "sample": 8,
+            "tick": 5495,
+            "form": "Ship"
+          }
+        ]
+      },
+      "observed_escape_to_ship": {
+        "1": [],
+        "2": []
+      }
+    },
+    {
+      "seed": "8247063650597350487",
+      "sample_count": 17,
+      "tick_range": [
+        300,
+        10198
+      ],
+      "last_result": "Player 1 wins / opposing pilot lost",
+      "observed_on_foot_to_aboard": {
+        "1": [
+          {
+            "sample": 35,
+            "tick": 7146,
+            "form": "Ship"
+          }
+        ],
+        "2": [
+          {
+            "sample": 28,
+            "tick": 2850,
+            "form": "Ship"
+          }
+        ]
+      },
+      "observed_escape_to_ship": {
+        "1": [],
+        "2": []
+      }
+    },
+    {
+      "seed": "77295624247358486",
+      "sample_count": 4,
+      "tick_range": [
+        725,
+        2680
+      ],
+      "last_result": "in_progress",
+      "observed_on_foot_to_aboard": {
+        "1": [
+          {
+            "sample": 43,
+            "tick": 1398,
+            "form": "Ship"
+          }
+        ],
+        "2": []
+      },
+      "observed_escape_to_ship": {
+        "1": [],
+        "2": []
+      }
+    },
+    {
+      "seed": "3516911842465984138",
+      "sample_count": 14,
+      "tick_range": [
+        604,
+        8940
+      ],
+      "last_result": "in_progress",
+      "observed_on_foot_to_aboard": {
+        "1": [],
+        "2": []
+      },
+      "observed_escape_to_ship": {
+        "1": [],
+        "2": []
+      }
+    }
+  ],
+  "recovery_limit": {
+    "seed": "8247063650597350487",
+    "seat": 2,
+    "observed_stabilizing_ticks": [
+      8358,
+      8937
+    ],
+    "observed_landing_tick": 9577,
+    "pilot_death_match_sample_tick": 10198,
+    "complete_rebuild_observed": false,
+    "bot_policy": "Saved Planner v10; #178 supported-hatch candidate disabled"
+  },
+  "health": {
+    "pid": 4904,
+    "service_restarts": 0,
+    "current_pid_journal_lines": 16,
+    "error_lines": [],
+    "build_identity": "23b51e9af014",
+    "build_identity_found": true,
+    "dirty_identity_found": false,
+    "settings_sha256": "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef",
+    "startup_sampler_note": "The first sampler ran before automatic gameplay and had no raster_scale field. That attempt is retained in startup-probe and excluded from analysis; the successful sampler waited for gameplay."
+  },
+  "ci": {
+    "runtime_head": "23b51e9af014d5acd4d255063ff0d7bcef2ab03a",
+    "url": "https://github.com/aortez/space-wars/actions/runs/38108025801",
+    "conclusion": "success",
+    "jobs": {
+      "Spacewars experimental recovery": "success",
+      "Linux workspace": "success",
+      "NES core, golden tests, and benchmark": "success",
+      "Pi hardware profiles and update safety": "success",
+      "Windows client": "success",
+      "AArch64 core and scenario": "success",
+      "Spacewars AI deterministic baselines": "success"
+    }
+  },
+  "prior_qualification": {
+    "receipt": "picade-ccd-thickness-v1.json",
+    "relevant_tests_passed": 761,
+    "destruction_fixtures": [
+      "Weak/Round",
+      "Weak/Angular"
+    ],
+    "non_timing_outputs_identical": true,
+    "strict_clippy": "Existing unchanged lints remain; no new warning locations."
+  }
+}

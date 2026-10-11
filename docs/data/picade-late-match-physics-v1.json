@@ -1,0 +1,1583 @@
+{
+  "scope": "Read-only headless recreation on Picade from saved seed/config; no rendering. Original live inputs/solver snapshot unavailable. Both runs use ordinary Legacy/Planner bots, heavy asteroids every second and Round grains with strength/collapse Off. Runtime source is unchanged from ffee5ba. Timers are nested, not additive.",
+  "cases": {
+    "retained-seed": {
+      "config": {
+        "asteroid_interval_seconds": 1,
+        "asteroid_severity": "heavy",
+        "combat_break_seconds": [
+          15,
+          4
+        ],
+        "dirt_mode": "round",
+        "dt_nanos": 16666667,
+        "experimental_recovery": false,
+        "landing_survey_hz": 4,
+        "loose_dirt": true,
+        "match_seconds": 900,
+        "policies": [
+          "material_mission_v9",
+          "material_mission_v10"
+        ],
+        "requested_ticks": 14040,
+        "scope": "headless recreation from seed/config; original live inputs and solver snapshot were not captured",
+        "seed": 3057324812542282494,
+        "work": {
+          "graph": 4,
+          "physics_queries": 384
+        }
+      },
+      "ticks": 14040,
+      "audits": 234,
+      "first_600": {
+        "first_tick": 1,
+        "last_tick": 600,
+        "samples": 600,
+        "metrics": {
+          "active_bodies": {
+            "mean": 89.35,
+            "p95": 175,
+            "max": 179
+          },
+          "broad_phase_ms": {
+            "mean": 0.25152879166666664,
+            "p95": 0.368274,
+            "max": 0.813808
+          },
+          "candidate_pairs": {
+            "mean": 894.53,
+            "p95": 1284,
+            "max": 1303
+          },
+          "ccd_clamping_ms": {
+            "mean": 1.1681514866666667,
+            "p95": 2.464905,
+            "max": 4.3826480000000005
+          },
+          "ccd_first_impact_ms": {
+            "mean": 1.2263890966666666,
+            "p95": 2.505887,
+            "max": 4.573313
+          },
+          "ccd_ms": {
+            "mean": 2.4019906883333335,
+            "p95": 5.003310000000001,
+            "max": 8.980312000000001
+          },
+          "ccd_substeps": {
+            "mean": 1.015,
+            "p95": 1,
+            "max": 2
+          },
+          "collision_detection_ms": {
+            "mean": 0.7891265316666667,
+            "p95": 1.335693,
+            "max": 2.640663
+          },
+          "collision_ms": {
+            "mean": 0.24227429166666667,
+            "p95": 0.574421,
+            "max": 0.68605
+          },
+          "contact_pairs": {
+            "mean": 95.41166666666666,
+            "p95": 245,
+            "max": 248
+          },
+          "decisions_ms": {
+            "mean": 0.18262237833333334,
+            "p95": 0.454033,
+            "max": 0.651309
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.06182102833333333,
+            "p95": 0.093962,
+            "max": 0.165777
+          },
+          "gravity_ms": {
+            "mean": 0.06530677,
+            "p95": 0.125611,
+            "max": 0.168962
+          },
+          "island_constraints_ms": {
+            "mean": 0.05089491166666667,
+            "p95": 0.114258,
+            "max": 0.263554
+          },
+          "islands_ms": {
+            "mean": 0.00312976,
+            "p95": 0.0052959999999999995,
+            "max": 0.015759
+          },
+          "kinematic_ms": {
+            "mean": 0.003963925,
+            "p95": 0.009944,
+            "max": 0.029444
+          },
+          "lifecycle_ms": {
+            "mean": 1.0508521966666666,
+            "p95": 5.555231,
+            "max": 19.404356
+          },
+          "narrow_phase_ms": {
+            "mean": 0.47508106833333336,
+            "p95": 0.9013629999999999,
+            "max": 1.7480410000000002
+          },
+          "physics_ms": {
+            "mean": 3.8301225383333333,
+            "p95": 7.70251,
+            "max": 14.145566
+          },
+          "rapier_step_ms": {
+            "mean": 3.828164971666667,
+            "p95": 7.7002310000000005,
+            "max": 14.140937
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 127.44,
+            "p95": 315,
+            "max": 325
+          },
+          "solver_ms": {
+            "mean": 0.5057424383333333,
+            "p95": 1.19638,
+            "max": 2.391164
+          },
+          "step_ms": {
+            "mean": 5.596200271666667,
+            "p95": 13.610886,
+            "max": 28.751148
+          },
+          "update_ms": {
+            "mean": 0.03131317833333333,
+            "p95": 0.062186000000000005,
+            "max": 0.13298100000000002
+          },
+          "user_changes_ms": {
+            "mean": 0.03639856,
+            "p95": 0.055869999999999996,
+            "max": 0.101591
+          },
+          "workload_ms": {
+            "mean": 0.33310998833333333,
+            "p95": 0.623551,
+            "max": 0.8830659999999999
+          }
+        },
+        "ccd_fraction_of_physics": 0.6271315510909352
+      },
+      "last_600": {
+        "first_tick": 13441,
+        "last_tick": 14040,
+        "samples": 600,
+        "metrics": {
+          "active_bodies": {
+            "mean": 185.41666666666666,
+            "p95": 220,
+            "max": 223
+          },
+          "broad_phase_ms": {
+            "mean": 1.0684766433333333,
+            "p95": 1.299396,
+            "max": 1.455247
+          },
+          "candidate_pairs": {
+            "mean": 1087.075,
+            "p95": 1254,
+            "max": 1281
+          },
+          "ccd_clamping_ms": {
+            "mean": 8.758082061666666,
+            "p95": 11.011481999999999,
+            "max": 12.293915
+          },
+          "ccd_first_impact_ms": {
+            "mean": 10.258355488333333,
+            "p95": 13.161852999999999,
+            "max": 14.111994
+          },
+          "ccd_ms": {
+            "mean": 19.06616475,
+            "p95": 23.96504,
+            "max": 25.674617
+          },
+          "ccd_substeps": {
+            "mean": 3.098333333333333,
+            "p95": 4,
+            "max": 4
+          },
+          "collision_detection_ms": {
+            "mean": 3.678882165,
+            "p95": 4.406962,
+            "max": 4.970682
+          },
+          "collision_ms": {
+            "mean": 0.38155214833333334,
+            "p95": 0.5090509999999999,
+            "max": 0.590551
+          },
+          "contact_pairs": {
+            "mean": 133.89833333333334,
+            "p95": 194,
+            "max": 196
+          },
+          "decisions_ms": {
+            "mean": 2.0814717616666667,
+            "p95": 23.630802,
+            "max": 38.188254
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.12087609666666667,
+            "p95": 0.15212900000000001,
+            "max": 0.235442
+          },
+          "gravity_ms": {
+            "mean": 0.11044761333333333,
+            "p95": 0.155998,
+            "max": 0.230442
+          },
+          "island_constraints_ms": {
+            "mean": 0.26160548666666666,
+            "p95": 0.34822,
+            "max": 0.464606
+          },
+          "islands_ms": {
+            "mean": 0.017804786666666666,
+            "p95": 0.022295,
+            "max": 0.051684999999999995
+          },
+          "kinematic_ms": {
+            "mean": 0.036489731666666664,
+            "p95": 0.053815,
+            "max": 0.084759
+          },
+          "lifecycle_ms": {
+            "mean": 1.72154603,
+            "p95": 8.241338,
+            "max": 24.477850999999998
+          },
+          "narrow_phase_ms": {
+            "mean": 2.487059515,
+            "p95": 3.059586,
+            "max": 3.419803
+          },
+          "physics_ms": {
+            "mean": 26.09300533,
+            "p95": 32.521542000000004,
+            "max": 34.684635
+          },
+          "rapier_step_ms": {
+            "mean": 26.090626221666668,
+            "p95": 32.519153,
+            "max": 34.682209
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 216.91,
+            "p95": 281,
+            "max": 309
+          },
+          "solver_ms": {
+            "mean": 2.6547255783333332,
+            "p95": 3.405285,
+            "max": 3.824264
+          },
+          "step_ms": {
+            "mean": 29.219124378333333,
+            "p95": 37.517593000000005,
+            "max": 59.691629000000006
+          },
+          "update_ms": {
+            "mean": 0.28821702,
+            "p95": 0.377832,
+            "max": 0.474849
+          },
+          "user_changes_ms": {
+            "mean": 0.04666707666666667,
+            "p95": 0.068148,
+            "max": 0.120796
+          },
+          "workload_ms": {
+            "mean": 0.7702064116666667,
+            "p95": 0.953492,
+            "max": 1.108861
+          }
+        },
+        "ccd_fraction_of_physics": 0.7307002205713343
+      },
+      "checkpoints": [
+        {
+          "tick": 60,
+          "terrain": {
+            "occupied_cells": 113215,
+            "loose_cells": 0,
+            "fragments": 0,
+            "physics_bodies": 9,
+            "physics_colliders": 156,
+            "terrain_colliders": 146,
+            "terrain_polygons": 10016,
+            "rejected_releases": 0,
+            "max_speed": 142.28639221191406,
+            "motion_hash": "4f210b48a3cad8c1"
+          },
+          "pairs": {
+            "active_contact_pairs": 0,
+            "other_candidates": 157,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 462
+          }
+        },
+        {
+          "tick": 12960,
+          "terrain": {
+            "occupied_cells": 113087,
+            "loose_cells": 128,
+            "fragments": 4,
+            "physics_bodies": 253,
+            "physics_colliders": 400,
+            "terrain_colliders": 278,
+            "terrain_polygons": 11544,
+            "rejected_releases": 10,
+            "max_speed": 150.7558135986328,
+            "motion_hash": "082a738f782a7bd8"
+          },
+          "pairs": {
+            "active_contact_pairs": 244,
+            "other_candidates": 840,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 463
+          }
+        },
+        {
+          "tick": 14040,
+          "terrain": {
+            "occupied_cells": 113131,
+            "loose_cells": 84,
+            "fragments": 5,
+            "physics_bodies": 199,
+            "physics_colliders": 346,
+            "terrain_colliders": 235,
+            "terrain_polygons": 11472,
+            "rejected_releases": 10,
+            "max_speed": 146.2853546142578,
+            "motion_hash": "ba05f5180a30089b"
+          },
+          "pairs": {
+            "active_contact_pairs": 143,
+            "other_candidates": 650,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 463
+          }
+        }
+      ],
+      "end_match": {
+        "elapsed_seconds": 234.00000468,
+        "finished_tick": null,
+        "outcome": null,
+        "owned_planets": [
+          1,
+          2
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": null,
+        "remaining_seconds": 665.99999532,
+        "time_limit_seconds": 900.0,
+        "version": 2
+      },
+      "files": {
+        "actions.jsonl": "8f0115cb68ec960709f6e192a2b2e57bd5633e0e4ee42528f890d76547ef91c5",
+        "config.json": "3350b64b8cacf99a4fdaad198c88437ac1893be2af4e3c40671a2d3d9094cc03",
+        "costs.jsonl": "35588be3a9c3c526a2667199ba2a3cc0e15f94e46102b40b47398ee9b1cc036a",
+        "final-snapshot.json": "96646d1ea439e19501506d34ce9b5b45bf32ee63cae70ebdff8bfbc5f09143b9",
+        "initial-snapshot.json": "d80e4701e74ff15bfd522abf01b6d7b20a791501ed0659b912cfe04973e47acf",
+        "samples.jsonl": "3ab68ab0aa159977d1007775c0445c69c42f59cd418878f97bc3112564fe8114",
+        "summary.json": "a91dc5e526b456cec8bf997379ffe9527afe2e3b6a2f0c33d29be2a0f3179a5e"
+      },
+      "live_sample_window": {
+        "first_tick": 12852,
+        "last_tick": 12971,
+        "samples": 120,
+        "metrics": {
+          "active_bodies": {
+            "mean": 255.75,
+            "p95": 263,
+            "max": 265
+          },
+          "broad_phase_ms": {
+            "mean": 1.1301608833333334,
+            "p95": 1.2619529999999999,
+            "max": 1.317414
+          },
+          "candidate_pairs": {
+            "mean": 1313.7833333333333,
+            "p95": 1339,
+            "max": 1371
+          },
+          "ccd_clamping_ms": {
+            "mean": 11.502558491666667,
+            "p95": 12.793504,
+            "max": 12.94215
+          },
+          "ccd_first_impact_ms": {
+            "mean": 12.1654301,
+            "p95": 13.502109,
+            "max": 13.58883
+          },
+          "ccd_ms": {
+            "mean": 23.737563175,
+            "p95": 26.183689,
+            "max": 26.498315
+          },
+          "ccd_substeps": {
+            "mean": 2.9,
+            "p95": 3,
+            "max": 3
+          },
+          "collision_detection_ms": {
+            "mean": 4.405849916666667,
+            "p95": 4.907514,
+            "max": 5.227067
+          },
+          "collision_ms": {
+            "mean": 0.6144788916666667,
+            "p95": 0.719716,
+            "max": 0.736605
+          },
+          "contact_pairs": {
+            "mean": 232.55833333333334,
+            "p95": 246,
+            "max": 247
+          },
+          "decisions_ms": {
+            "mean": 1.5838375833333334,
+            "p95": 0.583791,
+            "max": 31.304089
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.13770130833333333,
+            "p95": 0.16948000000000002,
+            "max": 0.192109
+          },
+          "gravity_ms": {
+            "mean": 0.15895464166666667,
+            "p95": 0.20733200000000002,
+            "max": 0.264553
+          },
+          "island_constraints_ms": {
+            "mean": 0.362182575,
+            "p95": 0.447922,
+            "max": 0.50644
+          },
+          "islands_ms": {
+            "mean": 0.021912583333333333,
+            "p95": 0.024980000000000002,
+            "max": 0.058574
+          },
+          "kinematic_ms": {
+            "mean": 0.040758375,
+            "p95": 0.059240999999999995,
+            "max": 0.068797
+          },
+          "lifecycle_ms": {
+            "mean": 2.8130325583333335,
+            "p95": 10.589503,
+            "max": 18.393327
+          },
+          "narrow_phase_ms": {
+            "mean": 3.135516358333333,
+            "p95": 3.5645640000000003,
+            "max": 3.819968
+          },
+          "physics_ms": {
+            "mean": 32.88820008333333,
+            "p95": 36.175326,
+            "max": 36.483805000000004
+          },
+          "rapier_step_ms": {
+            "mean": 32.88573581666667,
+            "p95": 36.173196999999995,
+            "max": 36.481583
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 337.675,
+            "p95": 351,
+            "max": 355
+          },
+          "solver_ms": {
+            "mean": 3.888707975,
+            "p95": 4.3091859999999995,
+            "max": 4.387815
+          },
+          "step_ms": {
+            "mean": 37.752037425,
+            "p95": 46.853885,
+            "max": 55.87118
+          },
+          "update_ms": {
+            "mean": 0.33179084166666667,
+            "p95": 0.40208900000000003,
+            "max": 0.46284800000000004
+          },
+          "user_changes_ms": {
+            "mean": 0.057286891666666666,
+            "p95": 0.081498,
+            "max": 0.11227599999999999
+          },
+          "workload_ms": {
+            "mean": 1.1033363833333334,
+            "p95": 1.284101,
+            "max": 1.3675810000000002
+          }
+        },
+        "ccd_fraction_of_physics": 0.7217653479014627
+      },
+      "worst_120_at_second_boundaries": {
+        "first_tick": 9061,
+        "last_tick": 9180,
+        "samples": 120,
+        "metrics": {
+          "active_bodies": {
+            "mean": 287.23333333333335,
+            "p95": 318,
+            "max": 320
+          },
+          "broad_phase_ms": {
+            "mean": 1.3594494,
+            "p95": 1.55193,
+            "max": 1.630005
+          },
+          "candidate_pairs": {
+            "mean": 1563.3583333333333,
+            "p95": 1790,
+            "max": 1800
+          },
+          "ccd_clamping_ms": {
+            "mean": 17.326100225,
+            "p95": 19.114951,
+            "max": 19.689317000000003
+          },
+          "ccd_first_impact_ms": {
+            "mean": 18.471508041666667,
+            "p95": 20.391552,
+            "max": 20.917066000000002
+          },
+          "ccd_ms": {
+            "mean": 35.878798808333336,
+            "p95": 39.811519,
+            "max": 40.110905
+          },
+          "ccd_substeps": {
+            "mean": 3,
+            "p95": 3,
+            "max": 3
+          },
+          "collision_detection_ms": {
+            "mean": 5.218064808333334,
+            "p95": 5.958987,
+            "max": 6.242763
+          },
+          "collision_ms": {
+            "mean": 0.652732375,
+            "p95": 0.747197,
+            "max": 0.8249190000000001
+          },
+          "contact_pairs": {
+            "mean": 259.21666666666664,
+            "p95": 304,
+            "max": 309
+          },
+          "decisions_ms": {
+            "mean": 0.41793175,
+            "p95": 0.484645,
+            "max": 0.558569
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.150242575,
+            "p95": 0.190054,
+            "max": 0.205072
+          },
+          "gravity_ms": {
+            "mean": 0.166396425,
+            "p95": 0.231387,
+            "max": 0.268942
+          },
+          "island_constraints_ms": {
+            "mean": 0.4074524583333333,
+            "p95": 0.480774,
+            "max": 0.562958
+          },
+          "islands_ms": {
+            "mean": 0.02582845,
+            "p95": 0.029445,
+            "max": 0.045667
+          },
+          "kinematic_ms": {
+            "mean": 0.05544225,
+            "p95": 0.07133300000000001,
+            "max": 0.161442
+          },
+          "lifecycle_ms": {
+            "mean": 3.0342414,
+            "p95": 9.946250000000001,
+            "max": 18.039386
+          },
+          "narrow_phase_ms": {
+            "mean": 3.705801,
+            "p95": 4.231574999999999,
+            "max": 4.56061
+          },
+          "physics_ms": {
+            "mean": 46.236688941666664,
+            "p95": 51.712196,
+            "max": 52.178506999999996
+          },
+          "rapier_step_ms": {
+            "mean": 46.2341561,
+            "p95": 51.709567,
+            "max": 52.175915
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 346.39166666666665,
+            "p95": 408,
+            "max": 414
+          },
+          "solver_ms": {
+            "mean": 4.164661116666666,
+            "p95": 4.931904,
+            "max": 5.188752
+          },
+          "step_ms": {
+            "mean": 51.36043519166667,
+            "p95": 58.487824,
+            "max": 69.306808
+          },
+          "update_ms": {
+            "mean": 0.3838596166666667,
+            "p95": 0.46023800000000004,
+            "max": 0.525533
+          },
+          "user_changes_ms": {
+            "mean": 0.05683175,
+            "p95": 0.077574,
+            "max": 0.094684
+          },
+          "workload_ms": {
+            "mean": 1.1653549083333334,
+            "p95": 1.405414,
+            "max": 1.495154
+          }
+        },
+        "ccd_fraction_of_physics": 0.775981144618701
+      },
+      "ccd_substep_groups": {
+        "1": {
+          "samples": 4972,
+          "physics_mean_ms": 7.0618289601769915,
+          "ccd_mean_ms": 4.961840982300885
+        },
+        "2": {
+          "samples": 495,
+          "physics_mean_ms": 19.300870202020203,
+          "ccd_mean_ms": 13.826992753535354
+        },
+        "3": {
+          "samples": 8431,
+          "physics_mean_ms": 24.819481080654725,
+          "ccd_mean_ms": 17.98461446151109
+        },
+        "4": {
+          "samples": 142,
+          "physics_mean_ms": 28.835854507042253,
+          "ccd_mean_ms": 20.462339105633802
+        }
+      }
+    },
+    "current-seed": {
+      "config": {
+        "asteroid_interval_seconds": 1,
+        "asteroid_severity": "heavy",
+        "combat_break_seconds": [
+          15,
+          4
+        ],
+        "dirt_mode": "round",
+        "dt_nanos": 16666667,
+        "experimental_recovery": false,
+        "landing_survey_hz": 4,
+        "loose_dirt": true,
+        "match_seconds": 900,
+        "policies": [
+          "material_mission_v9",
+          "material_mission_v10"
+        ],
+        "requested_ticks": 12000,
+        "scope": "headless recreation from seed/config; original live inputs and solver snapshot were not captured",
+        "seed": 1978168328740471875,
+        "work": {
+          "graph": 4,
+          "physics_queries": 384
+        }
+      },
+      "ticks": 12000,
+      "audits": 200,
+      "first_600": {
+        "first_tick": 1,
+        "last_tick": 600,
+        "samples": 600,
+        "metrics": {
+          "active_bodies": {
+            "mean": 16.851666666666667,
+            "p95": 62,
+            "max": 108
+          },
+          "broad_phase_ms": {
+            "mean": 0.157830635,
+            "p95": 0.280294,
+            "max": 0.5977169999999999
+          },
+          "candidate_pairs": {
+            "mean": 651.0383333333333,
+            "p95": 798,
+            "max": 1048
+          },
+          "ccd_clamping_ms": {
+            "mean": 0.18037678166666665,
+            "p95": 0.878956,
+            "max": 2.0118169999999997
+          },
+          "ccd_first_impact_ms": {
+            "mean": 0.18539832,
+            "p95": 0.8924179999999999,
+            "max": 2.056576
+          },
+          "ccd_ms": {
+            "mean": 0.36753011166666666,
+            "p95": 1.792466,
+            "max": 4.076651
+          },
+          "ccd_substeps": {
+            "mean": 1,
+            "p95": 1,
+            "max": 1
+          },
+          "collision_detection_ms": {
+            "mean": 0.315659575,
+            "p95": 0.650254,
+            "max": 1.44423
+          },
+          "collision_ms": {
+            "mean": 0.033655358333333336,
+            "p95": 0.16244299999999998,
+            "max": 0.422441
+          },
+          "contact_pairs": {
+            "mean": 11.088333333333333,
+            "p95": 64,
+            "max": 153
+          },
+          "decisions_ms": {
+            "mean": 0.11969638333333334,
+            "p95": 0.43097799999999997,
+            "max": 0.76866
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.030079886666666666,
+            "p95": 0.058574,
+            "max": 0.15786899999999998
+          },
+          "gravity_ms": {
+            "mean": 0.014927029999999999,
+            "p95": 0.052092,
+            "max": 0.24951599999999996
+          },
+          "island_constraints_ms": {
+            "mean": 0.007665468333333333,
+            "p95": 0.032184000000000004,
+            "max": 0.120517
+          },
+          "islands_ms": {
+            "mean": 0.0009874966666666666,
+            "p95": 0.002722,
+            "max": 0.033204000000000004
+          },
+          "kinematic_ms": {
+            "mean": 0.00043827,
+            "p95": 0.001593,
+            "max": 0.004723000000000001
+          },
+          "lifecycle_ms": {
+            "mean": 0.11309849666666667,
+            "p95": 0.348459,
+            "max": 9.812974
+          },
+          "narrow_phase_ms": {
+            "mean": 0.12719956333333332,
+            "p95": 0.344275,
+            "max": 0.878677
+          },
+          "physics_ms": {
+            "mean": 0.7795221983333334,
+            "p95": 2.820846,
+            "max": 5.934839
+          },
+          "rapier_step_ms": {
+            "mean": 0.77853081,
+            "p95": 2.818995,
+            "max": 5.932858
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 13.506666666666666,
+            "p95": 77,
+            "max": 182
+          },
+          "solver_ms": {
+            "mean": 0.06234153666666667,
+            "p95": 0.341849,
+            "max": 0.7844939999999999
+          },
+          "step_ms": {
+            "mean": 1.090588115,
+            "p95": 3.8652640000000003,
+            "max": 15.734053000000001
+          },
+          "update_ms": {
+            "mean": 0.00750743,
+            "p95": 0.018463,
+            "max": 0.092833
+          },
+          "user_changes_ms": {
+            "mean": 0.01329714,
+            "p95": 0.02474,
+            "max": 0.099332
+          },
+          "workload_ms": {
+            "mean": 0.10400821333333334,
+            "p95": 0.25925600000000004,
+            "max": 0.478719
+          }
+        },
+        "ccd_fraction_of_physics": 0.47148126435971777
+      },
+      "last_600": {
+        "first_tick": 11401,
+        "last_tick": 12000,
+        "samples": 600,
+        "metrics": {
+          "active_bodies": {
+            "mean": 224.45666666666668,
+            "p95": 286,
+            "max": 292
+          },
+          "broad_phase_ms": {
+            "mean": 0.37274323833333334,
+            "p95": 0.478348,
+            "max": 0.856716
+          },
+          "candidate_pairs": {
+            "mean": 1177.99,
+            "p95": 1482,
+            "max": 1507
+          },
+          "ccd_clamping_ms": {
+            "mean": 3.607096706666667,
+            "p95": 4.931699,
+            "max": 8.286004
+          },
+          "ccd_first_impact_ms": {
+            "mean": 3.68776848,
+            "p95": 5.024773,
+            "max": 8.759483
+          },
+          "ccd_ms": {
+            "mean": 7.313612395,
+            "p95": 10.015471,
+            "max": 17.08706
+          },
+          "ccd_substeps": {
+            "mean": 1.0183333333333333,
+            "p95": 1,
+            "max": 2
+          },
+          "collision_detection_ms": {
+            "mean": 1.5072183166666666,
+            "p95": 1.9816310000000001,
+            "max": 3.144195
+          },
+          "collision_ms": {
+            "mean": 0.44947951333333336,
+            "p95": 0.6971609999999999,
+            "max": 0.788382
+          },
+          "contact_pairs": {
+            "mean": 172.16,
+            "p95": 281,
+            "max": 303
+          },
+          "decisions_ms": {
+            "mean": 0.9133933683333333,
+            "p95": 7.186902,
+            "max": 7.872341
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.13545144833333334,
+            "p95": 0.170943,
+            "max": 0.283627
+          },
+          "gravity_ms": {
+            "mean": 0.12621319833333333,
+            "p95": 0.19199899999999998,
+            "max": 0.287646
+          },
+          "island_constraints_ms": {
+            "mean": 0.10074988833333333,
+            "p95": 0.163314,
+            "max": 0.288368
+          },
+          "islands_ms": {
+            "mean": 0.007192658333333333,
+            "p95": 0.009222000000000001,
+            "max": 0.039851000000000004
+          },
+          "kinematic_ms": {
+            "mean": 0.01318267,
+            "p95": 0.025925999999999998,
+            "max": 0.049277
+          },
+          "lifecycle_ms": {
+            "mean": 2.09750008,
+            "p95": 9.971379,
+            "max": 21.006343
+          },
+          "narrow_phase_ms": {
+            "mean": 0.99809346,
+            "p95": 1.373451,
+            "max": 2.3465920000000002
+          },
+          "physics_ms": {
+            "mean": 10.076951508333334,
+            "p95": 13.737607,
+            "max": 22.983974
+          },
+          "rapier_step_ms": {
+            "mean": 10.074595683333333,
+            "p95": 13.735626,
+            "max": 22.981122
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 233.42,
+            "p95": 373,
+            "max": 404
+          },
+          "solver_ms": {
+            "mean": 0.9692241283333334,
+            "p95": 1.508228,
+            "max": 2.496849
+          },
+          "step_ms": {
+            "mean": 13.562759113333334,
+            "p95": 22.516885000000002,
+            "max": 36.540675
+          },
+          "update_ms": {
+            "mean": 0.10584913,
+            "p95": 0.166757,
+            "max": 0.252441
+          },
+          "user_changes_ms": {
+            "mean": 0.05136137833333333,
+            "p95": 0.07538800000000001,
+            "max": 0.114091
+          },
+          "workload_ms": {
+            "mean": 0.66890176,
+            "p95": 0.911418,
+            "max": 1.156268
+          }
+        },
+        "ccd_fraction_of_physics": 0.7257762815422764
+      },
+      "checkpoints": [
+        {
+          "tick": 60,
+          "terrain": {
+            "occupied_cells": 112567,
+            "loose_cells": 0,
+            "fragments": 0,
+            "physics_bodies": 8,
+            "physics_colliders": 153,
+            "terrain_colliders": 144,
+            "terrain_polygons": 10144,
+            "rejected_releases": 0,
+            "max_speed": 136.75975036621094,
+            "motion_hash": "d7a27d6f9a64bbc3"
+          },
+          "pairs": {
+            "active_contact_pairs": 0,
+            "other_candidates": 157,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 459
+          }
+        },
+        {
+          "tick": 10740,
+          "terrain": {
+            "occupied_cells": 112426,
+            "loose_cells": 141,
+            "fragments": 2,
+            "physics_bodies": 260,
+            "physics_colliders": 406,
+            "terrain_colliders": 288,
+            "terrain_polygons": 11684,
+            "rejected_releases": 23,
+            "max_speed": 143.194091796875,
+            "motion_hash": "d007b253a0069beb"
+          },
+          "pairs": {
+            "active_contact_pairs": 206,
+            "other_candidates": 840,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 461
+          }
+        },
+        {
+          "tick": 12000,
+          "terrain": {
+            "occupied_cells": 112437,
+            "loose_cells": 130,
+            "fragments": 3,
+            "physics_bodies": 252,
+            "physics_colliders": 398,
+            "terrain_colliders": 278,
+            "terrain_polygons": 11804,
+            "rejected_releases": 23,
+            "max_speed": 156.10467529296875,
+            "motion_hash": "9228fdcd3c054af5"
+          },
+          "pairs": {
+            "active_contact_pairs": 201,
+            "other_candidates": 813,
+            "removed_collider_candidates": 0,
+            "same_body_candidates": 461
+          }
+        }
+      ],
+      "end_match": {
+        "elapsed_seconds": 200.000004,
+        "finished_tick": null,
+        "outcome": null,
+        "owned_planets": [
+          0,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": null,
+        "remaining_seconds": 699.999996,
+        "time_limit_seconds": 900.0,
+        "version": 2
+      },
+      "files": {
+        "actions.jsonl": "2057f8854d6ba1a20b77b99b40a2325eb96f64403b713cd7feb5fd38be5911e2",
+        "config.json": "3754d8a0175292de9f361a7fe872435a0b812a18a6cdeb6dc49e79715cc942d9",
+        "costs.jsonl": "cafaa1506138d716d7847ec485a5b4ce798135bc24148d434f3e53b52a5ce1c8",
+        "final-snapshot.json": "8d3a6fb1d6e95e6ead91ac04af4bcb743d4f6e4cb015d13cb119df291c812d80",
+        "initial-snapshot.json": "586169f450490485a8098e8195a729f7cd2f6eed0e6e322808e2c04264d68500",
+        "samples.jsonl": "5b955bb62a74d24d6fa2673b3b3ae1b5de21ff5933cb170fb19933a576634e30",
+        "summary.json": "a1c32b5627afb316ceaae6d0053a4316a3641805fe728229736f7e6ebf4169ca"
+      },
+      "live_sample_window": {
+        "first_tick": 10617,
+        "last_tick": 10736,
+        "samples": 120,
+        "metrics": {
+          "active_bodies": {
+            "mean": 240.96666666666667,
+            "p95": 270,
+            "max": 273
+          },
+          "broad_phase_ms": {
+            "mean": 0.420842125,
+            "p95": 0.751974,
+            "max": 1.159397
+          },
+          "candidate_pairs": {
+            "mean": 1210.075,
+            "p95": 1364,
+            "max": 1376
+          },
+          "ccd_clamping_ms": {
+            "mean": 4.5931608,
+            "p95": 6.30854,
+            "max": 10.312783000000001
+          },
+          "ccd_first_impact_ms": {
+            "mean": 5.113292808333333,
+            "p95": 7.955711000000001,
+            "max": 14.073956
+          },
+          "ccd_ms": {
+            "mean": 9.7287793,
+            "p95": 15.019374000000001,
+            "max": 23.505710999999998
+          },
+          "ccd_substeps": {
+            "mean": 1.15,
+            "p95": 2,
+            "max": 3
+          },
+          "collision_detection_ms": {
+            "mean": 1.7441428583333334,
+            "p95": 2.7824210000000003,
+            "max": 4.797145
+          },
+          "collision_ms": {
+            "mean": 0.455035075,
+            "p95": 0.6138279999999999,
+            "max": 0.638624
+          },
+          "contact_pairs": {
+            "mean": 169.00833333333333,
+            "p95": 215,
+            "max": 245
+          },
+          "decisions_ms": {
+            "mean": 0.9277367000000001,
+            "p95": 7.944822,
+            "max": 8.372763
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.14221970833333333,
+            "p95": 0.18448,
+            "max": 0.214536
+          },
+          "gravity_ms": {
+            "mean": 0.142989875,
+            "p95": 0.21723900000000002,
+            "max": 0.23609
+          },
+          "island_constraints_ms": {
+            "mean": 0.11330508333333333,
+            "p95": 0.21175799999999997,
+            "max": 0.32747899999999996
+          },
+          "islands_ms": {
+            "mean": 0.008214766666666666,
+            "p95": 0.014259,
+            "max": 0.023426
+          },
+          "kinematic_ms": {
+            "mean": 0.016848333333333333,
+            "p95": 0.031999,
+            "max": 0.049943
+          },
+          "lifecycle_ms": {
+            "mean": 2.37550495,
+            "p95": 10.462597,
+            "max": 12.66595
+          },
+          "narrow_phase_ms": {
+            "mean": 1.1800526083333334,
+            "p95": 2.0000389999999997,
+            "max": 3.499194
+          },
+          "physics_ms": {
+            "mean": 12.904227316666667,
+            "p95": 19.91424,
+            "max": 32.453765000000004
+          },
+          "rapier_step_ms": {
+            "mean": 12.901522716666667,
+            "p95": 19.911185,
+            "max": 32.451617
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 236.2,
+            "p95": 306,
+            "max": 329
+          },
+          "solver_ms": {
+            "mean": 1.1036714083333334,
+            "p95": 2.204037,
+            "max": 3.2859529999999997
+          },
+          "step_ms": {
+            "mean": 16.714528766666668,
+            "p95": 28.461983999999998,
+            "max": 35.161575
+          },
+          "update_ms": {
+            "mean": 0.12492759166666667,
+            "p95": 0.204017,
+            "max": 0.344756
+          },
+          "user_changes_ms": {
+            "mean": 0.05319641666666667,
+            "p95": 0.079332,
+            "max": 0.09587
+          },
+          "workload_ms": {
+            "mean": 0.7091665166666666,
+            "p95": 0.915639,
+            "max": 0.97316
+          }
+        },
+        "ccd_fraction_of_physics": 0.7539218785641381
+      },
+      "worst_120_at_second_boundaries": {
+        "first_tick": 7861,
+        "last_tick": 7980,
+        "samples": 120,
+        "metrics": {
+          "active_bodies": {
+            "mean": 291.0083333333333,
+            "p95": 309,
+            "max": 309
+          },
+          "broad_phase_ms": {
+            "mean": 0.48526006666666666,
+            "p95": 0.9086399999999999,
+            "max": 1.182916
+          },
+          "candidate_pairs": {
+            "mean": 1444.8333333333333,
+            "p95": 1503,
+            "max": 1541
+          },
+          "ccd_clamping_ms": {
+            "mean": 6.201311208333333,
+            "p95": 9.950768,
+            "max": 15.353167
+          },
+          "ccd_first_impact_ms": {
+            "mean": 6.452577691666667,
+            "p95": 11.367312,
+            "max": 18.49877
+          },
+          "ccd_ms": {
+            "mean": 12.683832541666666,
+            "p95": 21.768133,
+            "max": 33.968104
+          },
+          "ccd_substeps": {
+            "mean": 1.1083333333333334,
+            "p95": 2,
+            "max": 3
+          },
+          "collision_detection_ms": {
+            "mean": 2.142981,
+            "p95": 3.695969,
+            "max": 5.262326000000001
+          },
+          "collision_ms": {
+            "mean": 0.6801353916666667,
+            "p95": 0.76992,
+            "max": 0.861104
+          },
+          "contact_pairs": {
+            "mean": 267.0416666666667,
+            "p95": 293,
+            "max": 295
+          },
+          "decisions_ms": {
+            "mean": 1.0309242583333333,
+            "p95": 8.345301,
+            "max": 8.641113
+          },
+          "final_broad_phase_ms": {
+            "mean": 0.148231625,
+            "p95": 0.181368,
+            "max": 0.228646
+          },
+          "gravity_ms": {
+            "mean": 0.17247290833333334,
+            "p95": 0.239776,
+            "max": 0.26236899999999996
+          },
+          "island_constraints_ms": {
+            "mean": 0.15392710833333334,
+            "p95": 0.28747799999999996,
+            "max": 0.46469900000000003
+          },
+          "islands_ms": {
+            "mean": 0.009794908333333333,
+            "p95": 0.017405999999999998,
+            "max": 0.028592
+          },
+          "kinematic_ms": {
+            "mean": 0.02038259166666667,
+            "p95": 0.035296,
+            "max": 0.066777
+          },
+          "lifecycle_ms": {
+            "mean": 3.374775458333333,
+            "p95": 12.075139,
+            "max": 18.43805
+          },
+          "narrow_phase_ms": {
+            "mean": 1.5084514833333333,
+            "p95": 2.651422,
+            "max": 3.9345229999999995
+          },
+          "physics_ms": {
+            "mean": 16.819094225,
+            "p95": 29.30368,
+            "max": 44.963049
+          },
+          "rapier_step_ms": {
+            "mean": 16.816617416666666,
+            "p95": 29.30118,
+            "max": 44.961012000000004
+          },
+          "sleeping_bodies": {
+            "mean": 0,
+            "p95": 0,
+            "max": 0
+          },
+          "solver_contacts": {
+            "mean": 355.1,
+            "p95": 389,
+            "max": 394
+          },
+          "solver_ms": {
+            "mean": 1.5996431916666667,
+            "p95": 2.9573270000000003,
+            "max": 4.6957759999999995
+          },
+          "step_ms": {
+            "mean": 22.087304316666668,
+            "p95": 35.491980999999996,
+            "max": 50.295634
+          },
+          "update_ms": {
+            "mean": 0.14057268333333334,
+            "p95": 0.252425,
+            "max": 0.374311
+          },
+          "user_changes_ms": {
+            "mean": 0.05751669166666667,
+            "p95": 0.077519,
+            "max": 0.12460999999999998
+          },
+          "workload_ms": {
+            "mean": 0.8853543416666667,
+            "p95": 1.1049339999999999,
+            "max": 1.22149
+          }
+        },
+        "ccd_fraction_of_physics": 0.7541329141740193
+      },
+      "ccd_substep_groups": {
+        "1": {
+          "samples": 11707,
+          "physics_mean_ms": 9.165354419236355,
+          "ccd_mean_ms": 6.708483159050141
+        },
+        "2": {
+          "samples": 271,
+          "physics_mean_ms": 19.327238752767528,
+          "ccd_mean_ms": 14.065043265682657
+        },
+        "3": {
+          "samples": 19,
+          "physics_mean_ms": 29.31269189473684,
+          "ccd_mean_ms": 21.30913505263158
+        },
+        "4": {
+          "samples": 3,
+          "physics_mean_ms": 27.91292,
+          "ccd_mean_ms": 19.36411
+        }
+      }
+    }
+  },
+  "binary": {
+    "sha256": "a624b71f43cc7f62b4384541c567e927aa89f371eea5612c4490ebdf2c3490d4",
+    "bytes": 4317832,
+    "source_base": "e82b2a4f61b585672dfbe9474043c411e8d15952",
+    "runtime_base": "ffee5ba5d8215142106e1b05cf2223930dfbb408",
+    "rustc": "rustc 1.89.0 (29483883e 2025-08-04)",
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "build",
+      "--locked",
+      "--release",
+      "--target",
+      "aarch64-unknown-linux-gnu",
+      "-p",
+      "spacewars-ai",
+      "--example",
+      "picade_physics_probe"
+    ],
+    "features": "default",
+    "runtime_changes": [],
+    "addition": "crates/spacewars-ai/examples/picade_physics_probe.rs",
+    "rustflags": "-C target-feature=+crt-static",
+    "linking": "static glibc; no runtime library dependency on the Pi"
+  },
+  "validation": {
+    "build": {
+      "release_aarch64": true,
+      "dynamic_launch": {
+        "exit_code": 127,
+        "reason": "Host linker required GLIBC_2.43 from device libm; no probe tick executed."
+      },
+      "static_launch": "both cases complete; exit 0"
+    },
+    "lint": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "--release",
+        "--target",
+        "aarch64-unknown-linux-gnu",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "picade_physics_probe",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    "format": {
+      "command": [
+        "rustfmt",
+        "+1.89.0",
+        "--edition",
+        "2024",
+        "crates/spacewars-ai/examples/picade_physics_probe.rs"
+      ],
+      "exit_code": 0
+    },
+    "host_flow_review": {
+      "initialization": "Same init_material_match seed, 900s limit, Round grains, heavy asteroids each second",
+      "controllers": "Saved Human becomes Legacy on automatic launch; saved Planner stays Planner. No value bot, so the host flag planner is absent.",
+      "decision_order": "P1 then P2; cadenced observation, intent, destination-cover observation, evaluator observation; shared surveys/evaluation work; native fixed step",
+      "dt_nanos": 16666667,
+      "work_physics_queries": 384,
+      "checks": [
+        "No experimental sensor-profile feature",
+        "No changes to existing runtime files",
+        "Camera/render work is excluded and does not mutate the native state"
+      ]
+    },
+    "limitations": [
+      "Diagnostic Rust 1.89.0 with static host glibc; shipping client uses Yocto Rust 1.94.0.",
+      "Original live inputs and solver state were not captured, so these are seed/config recreations, not byte-proven replays of the old live match.",
+      "No optimization or before/after speed claim is made."
+    ]
+  },
+  "live_comparison": {
+    "original_seed": {
+      "live_tick": 12971,
+      "live_physics_avg_ms": 19.057,
+      "live_p2_task": "rebuilding ship",
+      "headless_nearest_tick": 12960,
+      "headless_p2_goal": "transfer",
+      "headless_p2_completed_recoveries": 0
+    },
+    "current_seed": {
+      "live_tick": 10736,
+      "live_physics_avg_ms": 43.893,
+      "headless_same_window_physics_avg_ms": 12.904227316666667
+    },
+    "conclusion": "These are new retained stress cases, not exact replays of either earlier live physical state. Compiler/library and host differences have not been isolated. CCD dominance is measured on these headless cases; the precise 43.893 ms live sample remains unpartitioned."
+  },
+  "device": {
+    "host": "sw-picade.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.4",
+    "headless": true,
+    "kiosk_paused_during_runs": true,
+    "restored": true,
+    "scale": 1.0,
+    "settings_sha256_before_and_after": "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef",
+    "system_samples": {
+      "current-seed-system-after": [
+        "73036",
+        "2.25 2.11 1.73 2/178 2980",
+        "1500000"
+      ],
+      "current-seed-system-before": [
+        "71575",
+        "2.36 2.03 1.63 2/178 2956",
+        "1500000"
+      ],
+      "retained-seed-system-after": [
+        "72062",
+        "2.39 2.03 1.62 2/177 2941",
+        "1500000"
+      ],
+      "retained-seed-system-before": [
+        "67679",
+        "1.42 1.38 1.31 2/180 2883",
+        "1500000"
+      ]
+    },
+    "service_after": "MainPID=2429\nNRestarts=0\nActiveState=active\n"
+  }
+}

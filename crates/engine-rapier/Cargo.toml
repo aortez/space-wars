@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [features]
 query-diagnostics = []
+ccd-diagnostics = ["rapier2d/ccd-diagnostics"]
 
 [dependencies]
 bincode = { workspace = true }

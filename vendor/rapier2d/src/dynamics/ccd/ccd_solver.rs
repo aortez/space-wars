@@ -12,6 +12,26 @@ use crate::prelude::{ActiveEvents, CollisionEventFlags};
 use alloc::collections::BinaryHeap;
 use parry::utils::hashmap::HashMap;
 
+/// Shape geometry is immutable throughout one CCD pass. Compound thickness
+/// folds over every child shape, so reuse it across candidate pairs in that pass.
+/// Discarding this cache on return also covers shape edits and handle reuse
+/// before the next pass without persistent invalidation or snapshot state.
+#[derive(Default)]
+struct ThicknessCache(HashMap<ColliderHandle, Real>);
+
+impl ThicknessCache {
+    fn get(&mut self, handle: ColliderHandle, collider: &Collider) -> Real {
+        if collider.shape.as_compound().is_some() {
+            *self
+                .0
+                .entry(handle)
+                .or_insert_with(|| collider.shape.ccd_thickness())
+        } else {
+            collider.shape.ccd_thickness()
+        }
+    }
+}
+
 /// Returns `true` if the user's `filter_contact_pair` hook rejected this
 /// pair. Mirrors the narrow-phase filter call in `NarrowPhase::compute_contacts`
 /// so CCD respects the same user-level contact filtering (see issue #754).
@@ -181,6 +201,7 @@ impl CCDSolver {
 
         let mut pairs_seen = HashMap::default();
         let mut min_toi = dt;
+        let mut thicknesses = ThicknessCache::default();
 
         for handle in islands.active_bodies() {
             let rb1 = &bodies[handle];
@@ -252,7 +273,7 @@ impl CCDSolver {
 
                             let rb2 = bh2.and_then(|h| bodies.get(h));
 
-                            if let Some(toi) = TOIEntry::try_from_colliders(
+                            if let Some(toi) = TOIEntry::try_from_colliders_with_thickness(
                                 narrow_phase.query_dispatcher(),
                                 *ch1,
                                 ch2,
@@ -265,6 +286,7 @@ impl CCDSolver {
                                 0.0,
                                 min_toi,
                                 smallest_dist,
+                                || thicknesses.get(*ch1, co1) + thicknesses.get(ch2, co2),
                             ) {
                                 min_toi = min_toi.min(toi.toi);
                             }
@@ -295,6 +317,7 @@ impl CCDSolver {
         let mut all_toi = BinaryHeap::new();
         let mut pairs_seen = HashMap::default();
         let mut min_overstep = dt;
+        let mut thicknesses = ThicknessCache::default();
 
         // Update the query pipeline with the colliders’ `next_position`.
         for (handle, co) in colliders.iter_enabled() {
@@ -386,7 +409,7 @@ impl CCDSolver {
                             let rb1 = bh1.map(|h| &bodies[h]);
                             let rb2 = bh2.map(|h| &bodies[h]);
 
-                            if let Some(toi) = TOIEntry::try_from_colliders(
+                            if let Some(toi) = TOIEntry::try_from_colliders_with_thickness(
                                 query_pipeline.dispatcher,
                                 *ch1,
                                 ch2,
@@ -401,6 +424,7 @@ impl CCDSolver {
                                 // there is at least one TOI before dt.
                                 min_overstep,
                                 smallest_dist,
+                                || thicknesses.get(*ch1, co1) + thicknesses.get(ch2, co2),
                             ) {
                                 if toi.toi > dt {
                                     min_overstep = min_overstep.min(toi.toi);
@@ -519,7 +543,7 @@ impl CCDSolver {
                         .map(|c| c.1.dist)
                         .unwrap_or(0.0);
 
-                    if let Some(toi) = TOIEntry::try_from_colliders(
+                    if let Some(toi) = TOIEntry::try_from_colliders_with_thickness(
                         query_pipeline.dispatcher,
                         *ch1,
                         ch2,
@@ -532,6 +556,7 @@ impl CCDSolver {
                         start_time,
                         dt,
                         smallest_dist,
+                        || thicknesses.get(*ch1, co1) + thicknesses.get(ch2, co2),
                     ) {
                         all_toi.push(toi);
                     }

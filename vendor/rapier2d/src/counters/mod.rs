@@ -240,3 +240,5 @@ impl Default for Counters {
         Self::new(false)
     }
 }
+#[cfg(feature = "ccd-diagnostics")]
+pub mod ccd_probe;

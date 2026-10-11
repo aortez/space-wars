@@ -43,9 +43,24 @@ described in `docs/compound-ccd-pruning.md`:
   restarted on every substep. These counters are diagnostics, never simulation
   inputs. No CCD activation, stepping, solver or motion-clamping logic changes.
 
-The pruning algorithm is in the engine adapter, not this vendor copy. The four
-Rust files named above are the complete set of source differences from the
-published crate.
+The pruning algorithm is in the engine adapter. The late-match CCD experiment
+also changes `src/dynamics/ccd/ccd_solver.rs` and `toi_entry.rs` to reuse compound
+shape thickness within one first-impact or clamping pass. Collider geometry is
+immutably borrowed throughout each pass; the local cache is discarded before
+any subsequent pass or shape edit. Primitive shapes retain direct property
+queries. The original public `TOIEntry::try_from_colliders` API remains available
+and computes its own thickness. The same thickness sum, comparison, cast order
+and response are retained; no cache enters snapshots or persistent solver state.
+
+The opt-in `ccd-diagnostics` Cargo feature enables `src/counters/ccd_probe.rs`
+through `src/counters/mod.rs`, with counters around the existing TOI prefilter.
+The engine adapter separately counts shape casts and compound tree visits.
+These clocks and counters are absent from normal builds. Instrumented timings
+include their overhead; comparison timings disable collection.
+
+These eight Rust files and the diagnostic feature in `Cargo.toml` are the
+complete source/configuration differences from the published crate. See
+`docs/picade-late-match-physics.md` for the retained inputs and qualification.
 
 Upstream metadata identifies commit
 `a1ef31035613154dfb97a9e1d480c6a5eb9d0010`, with a dirty publishing tree; the
