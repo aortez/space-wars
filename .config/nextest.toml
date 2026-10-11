@@ -5,6 +5,13 @@ retries = 0
 [profile.ci.junit]
 path = "junit.xml"
 
+# Keep opt-in diagnostic results separate from the normal workspace report.
+[profile.physics-diagnostics]
+inherits = "ci"
+
+[profile.physics-diagnostics.junit]
+path = "junit.xml"
+
 # Complete suite for nightly/manual runs and local investigations.
 # These tests share an X display. Keep them serial until display/focus isolation
 # is explicit; a virtual display does not make real-time scenarios run faster.

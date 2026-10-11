@@ -21,19 +21,19 @@ class ReportTests(unittest.TestCase):
         phases = set()
         for workflow in workflows.glob("*.yml"):
             phases.update(re.findall(r"--phase ([a-z][a-z-]*)", workflow.read_text()))
-        self.assertTrue({"lyon", "gpu-check", "gpu-text"}.issubset(phases))
+        self.assertTrue({"lyon", "gpu-check", "gpu-text", "physics-diagnostics"}.issubset(phases))
         self.assertEqual(phases - PHASES.keys(), set())
 
-    def test_renderer_phases_are_accepted_by_cli(self):
+    def test_focused_regression_phases_are_accepted_by_cli(self):
         with TemporaryDirectory() as directory:
             command = [sys.executable, str(Path(__file__).with_name("test_report.py")),
                        "--timings-dir", directory]
-            for phase in ("lyon", "gpu-check", "gpu-text"):
+            for phase in ("lyon", "gpu-check", "gpu-text", "physics-diagnostics"):
                 command.extend(["--phase", phase])
             command.append(str(Path(directory) / "missing.xml"))
             result = subprocess.run(command, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.count("Not recorded"), 3)
+            self.assertEqual(result.stdout.count("Not recorded"), 4)
 
     def test_wall_time_is_separate_from_overlapping_test_durations(self):
         with TemporaryDirectory() as directory:

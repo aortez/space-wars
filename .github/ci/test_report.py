@@ -16,6 +16,7 @@ PHASES = {
     "lyon": "Build and test exact round-join tessellator",
     "gpu-check": "Check GPU kiosk client",
     "gpu-text": "Test GPU text and rotation helpers",
+    "physics-diagnostics": "Build and test focused physics diagnostics",
 }
 
 
