@@ -8,7 +8,9 @@ not live FPS measurements. The shipping candidate is now installed on
 completed round and automatic restart. Heavy-scene slowdowns remain. See the
 whole-step and live follow-ups at the end for method, limits and evidence.
 The subsequent terrain-clipping experiment saves 7.5% of lifecycle time in
-the first retained case; it is a separate, smaller improvement, not deployed.
+the first retained case; it is a separate, smaller improvement. The combined
+build is now deployed and qualified below under "Combined shipping deployment".
+Entries below retain their original experimental baselines and device states.
 
 Reusing compound-shape thickness within each CCD pass reduces physics work by
 47.8% and 40.9% in two retained Picade stress cases. Two control/candidate pairs
@@ -17,8 +19,9 @@ per case, run in both orders, preserve every measured native state and all
 at 1×. The worst retained window still averages 24.519 ms of physics, above the
 16.7 ms budget for 60 updates per second.
 
-This investigation is separate from #178, which is ready for review with its
-candidate still opt-in. The initial headless investigation used runtime source
+The initial investigation was separate from #178 and its opt-in recovery
+candidate. The final deployment also includes main's #200 selector without
+changing saved bot choices. The initial headless investigation used runtime source
 unchanged from `ffee5ba`; `e82b2a4` adds the final publication notes. The initial
 Rust addition was the read-only `picade_physics_probe` example. Live diagnostic
 fields now expose the existing backend counters as described below.
@@ -632,3 +635,41 @@ source copies, scripts and raw evidence are retained at
 qualification, the clipping candidate is not installed in the kiosk. The
 existing CCD-optimized app and settings are preserved; neither Clock device
 is changed.
+
+## Combined shipping deployment — October 11
+
+The clipping optimization is committed as `d53f62a`; merge `df0b642` brings in
+current main at `a483fa4`. That exact runtime is built with the shipping Yocto
+Rust 1.94 release/GPU configuration and deployed using
+`./update.sh --fast --target sw-picade.local --yes`. Extra CCD diagnostic
+instrumentation is disabled. Both installed executable hashes match the fast
+bundle. The saved settings file is byte-identical before/after deployment and
+observation; neither `sw-picade-2` nor `spacewars.local` is touched.
+
+A bounded five-minute read-only observation records 61 samples, including 57
+active-gameplay samples and two samples of the same result screen. The first
+round completes at tick 10,013; the next round starts automatically and reaches
+tick 6,720 by the last sample. PID 1636 remains active with zero unexpected
+service restarts. Every active sample uses 1×, retained/culled GPU geometry,
+and reports no scene or text-cache error. The bounded journal read finds no
+new error for that PID, only the existing gamepad default-mapping warning.
+
+This confirms deployment and ordinary round progression, **not an FPS A/B
+comparison**. Only three active samples are beyond tick 9,000 in this short
+run. Busy periods still slow down; the exact-input headless comparisons above
+remain the performance evidence, and the thermal readings are periodic
+samples rather than continuous throttling telemetry.
+
+After merging main, the nine engine/scenario library suites pass 1,205 tests
+(five existing ignores), the diagnostic engine/Spacewars suites pass 742
+(one existing ignore), and client unit tests pass 687 (three existing ignores).
+Strict all-target Clippy for `engine-terrain`, formatting and whitespace
+checks pass. No workspace-wide Clippy-clean claim is made.
+
+The [combined deployment receipt](data/picade-terrain-clipping-live-v1.json)
+records the runtime revision, hashes, tests and observation. Raw statuses,
+journal reads, release bundle manifest/binary and bounded collector/check
+scripts are retained at `spacewars-handoffs/terrain-clip-live-20261011/`
+(working copy `target/terrain-clip-live.JOhhD7pY/`). The optimized app remains
+in unpaused autoplay for observation. No further runtime change is included
+in this publication step.
