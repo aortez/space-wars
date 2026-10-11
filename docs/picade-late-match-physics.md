@@ -1,15 +1,20 @@
 # Picade late-match physics investigation
 
-The first retained headless slow case spends most of its native physics time
-in continuous collision detection (CCD). Its worst measured 120-tick window
-averages 46.237 ms of physics work, including 35.879 ms of CCD. This identifies
-a focused performance target without changing recovery policy or physics.
+Reusing compound-shape thickness within each CCD pass reduces the retained
+Picade slow window from 46.256 to 24.287 ms of physics work, a 47.5% reduction
+in one paired headless run. The 120 measured native-state hashes, starting and
+ending solver snapshots, and all 153 retained state checks match the control.
+The candidate is committed locally; the deployed client contains only the new
+diagnostic fields. Rendered performance with the optimization is not measured.
 
 This investigation is separate from #178, which is ready for review with its
 candidate still opt-in. The headless measurements below use runtime source
 unchanged from `ffee5ba`; `e82b2a4` adds the final publication notes. The initial
 Rust addition was the read-only `picade_physics_probe` example. Live diagnostic
 fields now expose the existing backend counters as described below.
+
+The [CCD qualification receipt](data/picade-ccd-thickness-v1.json) records the
+live capture, fixed inputs, candidate source, binary hashes and comparisons.
 
 ## Live settings and scope
 
@@ -108,11 +113,78 @@ CCD substeps, active/sleeping bodies and contact/candidate populations report
 means, maxima and latest values. Contact populations do not count CCD sweeps.
 The host FPS/UPS window covers callbacks and can span more simulation ticks.
 
-The next bounded experiment should reconstruct the first case through tick
-9,060, retain its native physical state, and inspect the fixed inputs for ticks
-9,061–9,180. Count the expensive CCD shape pairs and compound-tree queries before
-choosing a pruning or reuse change. Compare it against an unchanged control on
-the same physical state and require matching motion/contact outcomes, material
-audits and later gameplay checks. Existing moving-ground and compound-sweep
-regressions remain required. Additional live backend timers are needed to
-confirm the same breakdown directly in a slow shipping-client match.
+## Live confirmation and fixed-input diagnosis — October 11
+
+The diagnostic client at `4d383cf` was built with the shipping Yocto toolchain
+and deployed at 1×. Twenty samples cover two automatic matches with the saved
+heavy/Round settings. All samples have 120 complete CCD measurements. The
+slowest sampled physics window, seed `16293239525808771919` at tick 12,056,
+averages 15.451 ms of physics and 11.616 ms of CCD (75.2%). Its first-impact
+and clamping means are 5.831 and 5.761 ms. The host reports 7.5 FPS / 37.3 UPS,
+over its different callback window. This is direct live confirmation of CCD's
+large physics share, not a reproduction of the historical 43.893 ms sample.
+
+The fixed-input runner reconstructs seed `3057324812542282494` through tick
+9,060, writes the complete native solver snapshot, then examines ticks
+9,061–9,180. It uses the original recorded controls, without rerunning bot
+decisions. Both ARM and desktop replays match all 153 original per-second
+observation hashes; the two hosts also match the 120 native-state hashes in
+the measured window. Terrain conservation, finite-state and speed audits pass.
+
+Query instrumentation changes the diagnosis: actual shape casts total only
+about 1.16 ms per tick on the Pi, despite roughly 36 ms of CCD. The desktop
+prefilter trace records 552,489 candidate-pair thickness checks across the
+120 ticks, with 551,280 rejected before a shape cast. Thickness calculation
+accounts for 1.421 of 2.539 ms of instrumented desktop CCD time. A compound's
+thickness folds over all child shapes each time it is requested.
+
+The candidate caches that exact property for compound colliders within one
+first-impact or clamping call. Both calls immutably borrow collider geometry.
+Each local cache is discarded on return, so subsequent shape edits, removals,
+handle reuse and CCD substeps require no persistent invalidation. Primitive
+shapes still use direct property calls. Threshold arithmetic, filtering,
+candidate order, casts, substeps and collision response remain unchanged.
+
+## Focused candidate qualification
+
+The Picade comparison uses the same static ARM toolchain and fixed controls,
+with query counting disabled in both diagnostic executables. Gameplay remains
+paused during the pair. Means for ticks 9,061–9,180:
+
+| Timer | Control | Cached thickness | Reduction |
+| --- | ---: | ---: | ---: |
+| Native physics | 46.256 ms | 24.287 ms | 47.5% |
+| CCD | 35.947 ms | 14.064 ms | 60.9% |
+| Whole native scenario step | 51.322 ms | 29.386 ms | 42.7% |
+
+Starting/ending solver snapshots and observations, plus the entire audit log,
+are byte-identical. Every measured tick has matching native-state and scenario
+hashes and the same CCD substep count. The instrumented desktop comparison
+also preserves all prefilter counts and reduces thickness time from 1.421 to
+0.322 ms. Instrumented times include measurement overhead.
+
+Two additional 30-second Weak quarry fixtures, Round and Angular, exercise
+release, fracture and deposition with replay. Each shape's complete non-timing
+output, observation hash and motion hash matches its control. The 157 engine,
+576 Spacewars and 19 Scorched tests pass, including moving-ground and compound
+sweep regressions. Nine client diagnostic tests and formatting pass. Existing
+ignored long tests remain ignored. Strict Clippy is blocked by existing lints
+in unchanged code; it reports no new warning locations in this change.
+
+The initial candidate quarry build reused the control artifact from the shared
+Cargo target. It was discarded. Vendor source timestamps were refreshed, the
+candidate's Rapier compilation was verified in the log, and distinct executable
+hashes were checked before the fixture comparisons.
+
+This is one paired Pi timing result on one retained Round-heavy case, with
+limited additional destruction fixtures. The candidate still exceeds the
+16.7 ms physics budget in this window. It needs repeated timings, another
+retained match, and a shipping-client check before deployment or a general
+frame-rate claim. Captured CPU samples read 1.5 GHz; temperatures range from
+71.6°C to 76.0°C during the pair, without exhaustive throttle monitoring.
+
+The Picade resumed automatic play at 1×, PID 3198 with zero service restarts.
+Saved settings remain byte-identical. #178 and bot defaults are unchanged.
+Full evidence is in `spacewars-handoffs/picade-live-ccd-20261011` and
+`spacewars-handoffs/ccd-fixed-input-20261011`; their source worktrees are excluded
+from the portable evidence archives.
