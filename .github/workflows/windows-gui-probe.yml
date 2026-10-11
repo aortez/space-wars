@@ -1,0 +1,103 @@
+name: Windows GUI feasibility
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/windows-gui-probe.yml
+      - .github/ci/windows-gui-probe.ps1
+      - docs/windows-gui-probe.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-gui-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-gui:
+    name: Capture packaged Windows client
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_TERM_COLOR: never
+      PROBE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Set probe output directory
+        run: '"PROBE_ROOT=$env:RUNNER_TEMP/windows-gui-probe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PROBE_SOURCE_SHA }}
+          persist-credentials: false
+      - name: Inspect hosted desktop before building
+        run: ./.github/ci/windows-gui-probe.ps1 -OutputDirectory "$env:PROBE_ROOT/desktop" -DesktopOnly
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          shared-key: windows-gui-probe
+          cache-on-failure: true
+      - name: Build locked feasibility candidate
+        run: |
+          $env:SPACEWARS_BUILD_REVISION = $env:PROBE_SOURCE_SHA
+          cargo build --locked --profile ci -p engine-client --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package and extract outside the checkout
+        run: |
+          $stage = New-Item -ItemType Directory -Path "$env:PROBE_ROOT/stage"
+          Copy-Item target/x86_64-pc-windows-msvc/ci/engine-client.exe $stage
+          $manifest = [ordered]@{
+            source_commit = $env:PROBE_SOURCE_SHA
+            target = 'x86_64-pc-windows-msvc'
+            profile = 'ci'
+            purpose = 'GUI feasibility only; not the nightly release package'
+            executable_sha256 = (Get-FileHash "$stage/engine-client.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+            rustc = (rustc -Vv | Out-String).Trim()
+            run_id = $env:GITHUB_RUN_ID
+            run_attempt = $env:GITHUB_RUN_ATTEMPT
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content "$stage/probe-manifest.json" -Encoding utf8
+          Compress-Archive -Path "$stage/*" -DestinationPath "$env:PROBE_ROOT/candidate.zip"
+          Expand-Archive "$env:PROBE_ROOT/candidate.zip" "$env:PROBE_ROOT/extracted"
+          Get-FileHash "$env:PROBE_ROOT/candidate.zip" -Algorithm SHA256 | Format-List | Out-File "$env:PROBE_ROOT/archive-sha256.txt"
+      - name: Capture default renderer
+        id: default_probe
+        continue-on-error: true
+        run: ./.github/ci/windows-gui-probe.ps1 -Executable "$env:PROBE_ROOT/extracted/engine-client.exe" -OutputDirectory "$env:PROBE_ROOT/default" -Backend default
+      - name: Capture explicit software and raster configuration
+        id: software_probe
+        continue-on-error: true
+        run: ./.github/ci/windows-gui-probe.ps1 -Executable "$env:PROBE_ROOT/extracted/engine-client.exe" -OutputDirectory "$env:PROBE_ROOT/software" -Backend software
+      - name: Report probe outcomes
+        if: ${{ !cancelled() && steps.default_probe.outcome != '' }}
+        env:
+          DEFAULT_OUTCOME: ${{ steps.default_probe.outcome }}
+          SOFTWARE_OUTCOME: ${{ steps.software_probe.outcome }}
+        run: |
+          @"
+          ## Windows GUI feasibility
+          - Source: $env:PROBE_SOURCE_SHA
+          - Default renderer: $env:DEFAULT_OUTCOME
+          - Explicit software/raster: $env:SOFTWARE_OUTCOME
+          - These results require visual inspection of the PNGs. A captured window is not by itself proof of correct GUI rendering.
+          - The candidate uses the ci profile. Release packaging and clean-Windows runtime prerequisites remain part of #167.
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
+          if ($env:DEFAULT_OUTCOME -ne 'success' -or $env:SOFTWARE_OUTCOME -ne 'success') {
+            throw 'At least one probe configuration failed; inspect the retained evidence.'
+          }
+      - name: Retain evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-gui-${{ env.PROBE_SOURCE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.PROBE_ROOT }}
+            !${{ env.PROBE_ROOT }}/stage
+            !${{ env.PROBE_ROOT }}/extracted
+          if-no-files-found: error
+          retention-days: 2
