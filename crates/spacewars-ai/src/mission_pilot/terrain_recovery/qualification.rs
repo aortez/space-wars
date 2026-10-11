@@ -23,6 +23,7 @@ use std::{
 };
 
 mod angular_diagnosis;
+mod arrival_diagnosis;
 mod connectivity;
 mod evidence;
 mod ground_rejoin;
