@@ -1,14 +1,14 @@
 # Picade late-match physics investigation
 
-Reusing compound-shape thickness within each CCD pass reduces the retained
-Picade slow window from 46.256 to 24.287 ms of physics work, a 47.5% reduction
-in one paired headless run. The 120 measured native-state hashes, starting and
-ending solver snapshots, and all 153 retained state checks match the control.
-The candidate is committed locally; the deployed client contains only the new
-diagnostic fields. Rendered performance with the optimization is not measured.
+Reusing compound-shape thickness within each CCD pass reduces physics work by
+47.8% and 40.9% in two retained Picade stress cases. Two control/candidate pairs
+per case, run in both orders, preserve every measured native state and all
+1,144 retained observation checks. The optimized shipping client is deployed
+at 1×. The worst retained window still averages 24.519 ms of physics, above the
+16.7 ms budget for 60 updates per second.
 
 This investigation is separate from #178, which is ready for review with its
-candidate still opt-in. The headless measurements below use runtime source
+candidate still opt-in. The initial headless investigation used runtime source
 unchanged from `ffee5ba`; `e82b2a4` adds the final publication notes. The initial
 Rust addition was the read-only `picade_physics_probe` example. Live diagnostic
 fields now expose the existing backend counters as described below.
@@ -75,7 +75,7 @@ successful static binary, failed invocation and all source hashes are retained.
 The kiosk resumed automatic play afterward, with PID 2429, zero restarts,
 unchanged settings bytes and 1× scale. A later read confirms ticks advancing.
 
-## Reproduction and next gate
+## Initial probe reproduction
 
 The [compact receipt](data/picade-late-match-physics-v1.json) records timings,
 populations, checksums, exact configuration and compiler limitations. Full input
@@ -176,15 +176,101 @@ Cargo target. It was discarded. Vendor source timestamps were refreshed, the
 candidate's Rapier compilation was verified in the log, and distinct executable
 hashes were checked before the fixture comparisons.
 
-This is one paired Pi timing result on one retained Round-heavy case, with
-limited additional destruction fixtures. The candidate still exceeds the
-16.7 ms physics budget in this window. It needs repeated timings, another
-retained match, and a shipping-client check before deployment or a general
-frame-rate claim. Captured CPU samples read 1.5 GHz; temperatures range from
-71.6°C to 76.0°C during the pair, without exhaustive throttle monitoring.
+This initial result covered one paired Pi run on one retained Round-heavy
+case, with limited additional destruction fixtures. It motivated the repeated
+comparison and shipping-client check below. Captured CPU samples read 1.5 GHz;
+temperatures range from 71.6°C to 76.0°C during the initial pair, without
+exhaustive throttle monitoring.
 
-The Picade resumed automatic play at 1×, PID 3198 with zero service restarts.
+After that initial qualification, the Picade resumed automatic play at 1×,
+PID 3198 with zero service restarts.
 Saved settings remain byte-identical. #178 and bot defaults are unchanged.
 Full evidence is in `spacewars-handoffs/picade-live-ccd-20261011` and
 `spacewars-handoffs/ccd-fixed-input-20261011`; their source worktrees are excluded
 from the portable evidence archives.
+
+## Repeated comparisons on both retained matches
+
+Eight fresh runs use the same verified static control and candidate binaries,
+with counting disabled. Each case has two pairs with opposite control/candidate
+order. The kiosk is paused for these measurements. Table values are the mean
+of the two 120-tick window means for each variant:
+
+| Case / window | Control physics | Candidate physics | Reduction | Control CCD | Candidate CCD |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| First seed, 9,061–9,180 | 46.976 ms | 24.519 ms | 47.8% | 36.536 ms | 14.181 ms |
+| Second seed, 7,861–7,980 | 17.095 ms | 10.103 ms | 40.9% | 12.897 ms | 5.945 ms |
+
+The first case's control means range from 46.839 to 47.112 ms and candidate
+means from 24.464 to 24.574 ms. The second case ranges from 16.961 to 17.230 ms
+for control and 10.066 to 10.140 ms for candidate. CCD decreases by 61.2% and
+53.9%, respectively. These are two repetitions per variant, not a broad
+statistical estimate across maps or devices.
+
+Each arm reconstructs the physical world from tick zero using frozen actions.
+Across 68,640 replayed ticks, all 1,144 original per-second observation checks
+match and all material audits pass. Each case's four runs have byte-identical
+starting/ending native snapshots, starting/ending observations and audit logs.
+All 120 per-tick native hashes, observation hashes and CCD substep counts in
+each measured window match across every arm. Five-second temperature/frequency
+samples range from 72.1°C to 79.4°C; all 169 captured CPU clocks read 1.5 GHz.
+
+The [repeated qualification receipt](data/picade-ccd-qualification-v1.json)
+records individual runs and shipping evidence. Full inputs, binaries, outputs,
+scripts and build artifacts are retained in
+`spacewars-handoffs/ccd-cache-qualification-20261011`. Reproduction instructions
+require fresh output directories and separate Cargo target directories per
+source variant. The performance PR is stacked on #178 so recovery-policy work
+remains separately reviewable.
+
+## Optimized shipping client at 1×
+
+The clean `23b51e9af014` source was built with the Yocto Rust 1.94 toolchain,
+without `ccd-diagnostics`, and installed with the compatible fast-update helper.
+The client hash is recorded in the receipt. The saved heavy/Round preset and
+Legacy/Planner defaults remain byte-identical, including 1× raster scale at
+1024×768. The helper verified the new client/CLI pair and retained the previous
+binaries for rollback.
+
+Sixty-one read-only samples span 644.3 seconds and four automatic matches.
+Fifty-nine samples contain complete 120-tick mission/CCD windows; 57 of these
+are from matches still in progress. The performance ranges below exclude
+incomplete windows and game-over samples:
+
+| Live metric | Minimum | Median | Maximum |
+| --- | ---: | ---: | ---: |
+| Host FPS | 4.4 | 16.5 | 58.9 |
+| Host UPS | 22.2 | 59.0 | 60.7 |
+| Physics window mean | 1.550 ms | 6.759 ms | 31.753 ms |
+| CCD window mean | 0.706 ms | 3.805 ms | 16.102 ms |
+
+These are different worlds from the earlier diagnostic deployment, not a
+paired live benchmark. Host and mission windows also differ. The ranges do
+not establish a live frame-rate improvement. The worst sampled physics window
+occurs at tick 11,728 of seed `4933744737834333975`: CCD costs 16.102 ms,
+the contact narrow phase 5.580 ms and the solver 6.284 ms. Its mean CCD substep
+count is four. Caching removes repeated work but does not eliminate expensive
+CCD, contact or solver processing in damaged worlds.
+
+Both bots perform on-foot capture and reboarding, and automatic match turnover
+continues. Planner enters escape-pod recovery in seed `8247063650597350487`,
+progressing from stabilization to landing. The pilot dies before rebuilding;
+the match ends with `PilotDeath` at the sampled tick 10,198. No complete
+escape-pod-to-ship rebuild was observed in the sampled interval. This bounded
+check exercises recovery attempts without establishing universal recoverability
+or changing #178's opt-in recovery policy. Ten-second samples can miss brief
+states; their ticks are observation times, not exact event timestamps.
+
+The client remains active as PID 4904 with zero service restarts, and the
+retained journal contains no error or panic entry for that process. CPU samples
+read 1.5 GHz at 70.1–73.5°C. Early and final screenshots were inspected at
+1024×768. The first sampling attempt happened before automatic gameplay started
+and had no scenario fields; it is retained separately and excluded from these
+results. The successful collector explicitly waits for gameplay.
+
+All seven [CI checks on the runtime source](https://github.com/aortez/space-wars/actions/runs/38108025801)
+pass, including the Linux workspace/UI checks, deterministic AI baselines,
+experimental recovery, Windows and AArch64 builds. Subsequent report-only
+commits do not change that tested runtime source. The performance change is
+ready for review separately from #178; the remaining slow live windows and
+incomplete recovery observation are limits, not solved problems.
