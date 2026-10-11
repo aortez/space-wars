@@ -666,7 +666,7 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert!(!window.get_launcher_clock_marquee_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 9);
     click(&window, 728.0, 376.0);
-    assert_eq!(window.get_launcher_clock_marquee_preset(), "Clock spin");
+    assert_eq!(window.get_launcher_clock_marquee_preset(), "Clock chase");
     assert_eq!(window.get_launcher_settings_focus_index(), 10);
     click(&window, 100.0, 428.0);
     assert!(!window.get_launcher_settings_visible());

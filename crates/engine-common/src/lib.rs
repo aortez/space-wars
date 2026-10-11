@@ -488,13 +488,14 @@ pub struct ClockRainState {
 #[repr(u8)]
 pub enum ClockMarqueePreset {
     ClockChase = 0,
-    #[default]
     ClockWave = 1,
     ClockSpin = 2,
     DigitSpin = 3,
     TextScroll = 4,
     TextRibbon = 5,
     TextSpin = 6,
+    #[default]
+    Random = 7,
 }
 
 impl ClockMarqueePreset {
@@ -507,10 +508,11 @@ impl ClockMarqueePreset {
             Self::TextScroll => "text-scroll",
             Self::TextRibbon => "text-ribbon",
             Self::TextSpin => "text-spin",
+            Self::Random => "random",
         }
     }
 
-    pub const ALL: [Self; 7] = [
+    pub const CONCRETE: [Self; 7] = [
         Self::ClockChase,
         Self::ClockWave,
         Self::ClockSpin,
@@ -518,6 +520,17 @@ impl ClockMarqueePreset {
         Self::TextScroll,
         Self::TextRibbon,
         Self::TextSpin,
+    ];
+
+    pub const ALL: [Self; 8] = [
+        Self::ClockChase,
+        Self::ClockWave,
+        Self::ClockSpin,
+        Self::DigitSpin,
+        Self::TextScroll,
+        Self::TextRibbon,
+        Self::TextSpin,
+        Self::Random,
     ];
 
     pub const fn label(self) -> &'static str {
@@ -529,6 +542,7 @@ impl ClockMarqueePreset {
             Self::TextScroll => "Text scroll",
             Self::TextRibbon => "Text ribbon",
             Self::TextSpin => "Text spin",
+            Self::Random => "Random",
         }
     }
 }

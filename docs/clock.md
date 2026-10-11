@@ -1747,11 +1747,12 @@ the shared scheduling or cleanup rules.
 ### Composed Marquee effects
 
 Choose **Recipe** in the launcher or live Clock Controls, select **Marquee** as
-the Preview Event, then **Preview & Resume**. The default is **Clock wave**.
+the Preview Event, then **Preview & Resume**. The default is **Random**.
 Explicit previews work even with the Marquee switch or profile Off.
 
 | Recipe | Content | Motion | Lighting |
 | --- | --- | --- | --- |
+| Random | Clock or saved message | One seeded concrete recipe per event | Chosen recipe |
 | Clock chase | Live time | Anchored | Clockwise digit-outline chase, separate middle-bar pass |
 | Clock wave | Live time | Whole digits bob along a wave | Color cycle |
 | Clock spin | Live time | Entire face rotates around its center | Color cycle |
@@ -1780,6 +1781,12 @@ boundaries and stores at most 32 bytes inline. Text cells are built once when an
 event starts, not each frame, and never create physics objects.
 
 #### Custom text
+
+**Random** is the default marquee option. Each admission chooses one of the seven
+concrete recipes from the event seed, independently of scheduler randomness.
+Consecutive repeats are allowed. Settings retain Random while active diagnostics
+report the concrete recipe, which stays latched until the animation ends.
+Existing saved explicit recipes retain their behavior.
 
 Select one of the three **Text** recipes. To change its saved message in a running
 client, pause Clock (with the controller, touch controls, or `host pause`), then:

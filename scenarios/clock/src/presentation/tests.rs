@@ -322,7 +322,7 @@ fn rectangular_clip_handles_rotated_partial_and_fully_hidden_cells() {
 #[test]
 fn all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face() {
     for aspect in [0.25, 0.75, 800.0 / 480.0, 4.0] {
-        for preset in ClockMarqueePreset::ALL {
+        for preset in ClockMarqueePreset::CONCRETE {
             let mut state = clock(preset, aspect);
             let original = ClockScenario::render_frame(&state);
             let segments = state.segments().to_vec();
@@ -489,4 +489,89 @@ fn combined_recipe_samples_all_three_independent_effects() {
         .lighting
         .sample(cell, event.content.bounds, 2.5, 0.5);
     assert_ne!(sample, later);
+}
+
+#[test]
+fn random_marquee_latches_through_pause_settings_changes_and_cleanup() {
+    let mut state = clock(ClockMarqueePreset::Random, 1.5);
+    let mut choices = Vec::new();
+    for _ in 0..16 {
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Marquee)],
+            Duration::ZERO,
+        );
+        let preset = state.marquee_state().unwrap().preset;
+        assert!(ClockMarqueePreset::CONCRETE.contains(&preset));
+        assert_eq!(state.settings().marquee_preset, ClockMarqueePreset::Random);
+        choices.push(preset);
+        step(&mut state, 150);
+        let paused = state.marquee_state();
+        let mut settings = state.settings();
+        settings.marquee_preset = ClockMarqueePreset::ClockChase;
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::configure(settings)],
+            Duration::ZERO,
+        );
+        for _ in 0..10 {
+            ClockScenario::step(&mut state, &[], Duration::ZERO);
+        }
+        assert_eq!(state.marquee_state(), paused);
+        settings.marquee_preset = ClockMarqueePreset::Random;
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::configure(settings)],
+            Duration::ZERO,
+        );
+        step(&mut state, MARQUEE_TICKS - 150);
+        assert!(state.marquee_state().is_none());
+        assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
+    }
+    assert!(choices.iter().any(|choice| *choice != choices[0]));
+}
+
+#[test]
+fn marquee_numeric_actions_preserve_existing_values_and_append_random() {
+    for (index, preset) in ClockMarqueePreset::ALL.into_iter().enumerate() {
+        assert_eq!(preset as usize, index);
+        let mut settings = clock(preset, 1.5).settings();
+        settings.marquee_preset = preset;
+        assert_eq!(
+            ClockAction::decode(&ClockAction::configure(settings)),
+            Some(ClockAction::Configure(settings))
+        );
+    }
+    assert_eq!(ClockMarqueePreset::default(), ClockMarqueePreset::Random);
+}
+
+#[test]
+fn random_recipe_does_not_change_scheduler_cadence_or_future_choices() {
+    let mut random = clock(ClockMarqueePreset::Random, 1.5);
+    let mut explicit = clock(ClockMarqueePreset::ClockWave, 1.5);
+    for state in [&mut random, &mut explicit] {
+        let mut settings = state.settings();
+        settings.event_profile = ClockEventProfile::Calm;
+        ClockScenario::step(state, &[ClockAction::configure(settings)], Duration::ZERO);
+    }
+    for _ in 0..16 {
+        for state in [&mut random, &mut explicit] {
+            ClockScenario::step(
+                state,
+                &[ClockAction::preview_event(ClockEventKind::Marquee)],
+                Duration::ZERO,
+            );
+            step(state, MARQUEE_TICKS);
+        }
+        assert_eq!(random.next_event_tick(), explicit.next_event_tick());
+        for state in [&mut random, &mut explicit] {
+            for _ in 0..5000 {
+                state.schedule.advance_tick();
+            }
+        }
+        assert_eq!(
+            random.schedule.due_event(true),
+            explicit.schedule.due_event(true)
+        );
+    }
 }

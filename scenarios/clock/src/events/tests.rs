@@ -176,3 +176,26 @@ fn a_replacing_slide_preview_restarts_the_periodic_schedule_and_respects_reconfi
     schedule.configure(ClockEventProfile::Demo, ClockEvents::default());
     assert!(schedule.next_event_tick.is_some());
 }
+
+#[test]
+fn random_marquee_is_seeded_concrete_and_preserves_explicit_recipes() {
+    use engine_common::ClockMarqueePreset;
+    let choices: Vec<_> = (0..128)
+        .map(|seed| {
+            let choice = resolve_marquee_preset(ClockMarqueePreset::Random, seed);
+            assert_eq!(
+                choice,
+                resolve_marquee_preset(ClockMarqueePreset::Random, seed)
+            );
+            assert!(ClockMarqueePreset::CONCRETE.contains(&choice));
+            for preset in ClockMarqueePreset::CONCRETE {
+                assert_eq!(resolve_marquee_preset(preset, seed), preset);
+            }
+            choice
+        })
+        .collect();
+    for preset in ClockMarqueePreset::CONCRETE {
+        assert!(choices.contains(&preset));
+    }
+    assert!(choices.windows(2).any(|pair| pair[0] == pair[1]));
+}
