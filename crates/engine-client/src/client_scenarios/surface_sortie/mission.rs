@@ -25,9 +25,9 @@ pub(crate) const MATCH_REGISTRATION: ScenarioRegistration = ScenarioRegistration
         "P2: num4/6 move, 8 thrust/jump, 5 brake, 2 transfer;\n",
         "PageDown cruise/size, End laser/mine, Home missile.\n",
         "Land on both feet, exit, stand 3s to claim; owned ground 8s rebuild.\n",
-        "Hull protects the pilot. Pods are weaker; on foot is most fragile.\n",
-        "Pilot health persists: boarding and rebuilding never heal it.\n",
-        "Ejection grants 3s protection. Pilot death ends the round."
+        "Ship and pod hulls fully protect the pilot. On foot is most fragile.\n",
+        "A broken pod releases the pilot. Boarding never repairs hull or health.\n",
+        "Ship ejection grants 3s protection. Pilot death ends the round."
     ),
     create: create_match,
     ..ARENA_REGISTRATION
@@ -52,7 +52,7 @@ pub(crate) const ARENA_REGISTRATION: ScenarioRegistration = ScenarioRegistration
         game_over: true,
         ..TRAVEL_REGISTRATION.capabilities
     },
-    controls_help: "Generated three-planet arena: P1 human, P2 mission bot. The launch seed reproduces planet sizes, spacing and motion. Land, exit and raise a flag where you stand; destroying its footing returns ownership to neutral. The bot chooses destinations, captures on foot, boards and travels onward. A/Space thrusts or jumps; left/right turns or walks; Down/S brakes; B/X exits or boards. Hold RB/J for swept cruise. RT/LB or E fires the laser aboard and mines on foot; gamepad X or K launches a missile. On foot, right stick aims, Y/T changes cut size, and holding A in the air uses the jetpack. Stand still on owned ground to rebuild after losing your ship. Hold A+B+Down for three seconds to scuttle a stranded full ship. Settings adjust asteroid arrivals and strength across all three planets. Start/Esc pauses; R restarts the same seed. Hull protects the pilot; a pod has light protection and an on-foot pilot is most fragile. Pilot health persists through boarding, ejection and rebuilding without healing. Ship loss ejects you with 3 seconds of protection; later laser, missile, hard-impact and solar heat damage can kill the pilot. Pilot death ends the round even with owned planets; simultaneous deaths draw. Losing your ship and flags alone does not eliminate you. Use Play again to restart the same seed. Select spacewars-terrain-arena-duel to watch two mission bots.",
+    controls_help: "Generated three-planet arena: P1 human, P2 mission bot. The launch seed reproduces planet sizes, spacing and motion. Land, exit and raise a flag where you stand; destroying its footing returns ownership to neutral. The bot chooses destinations, captures on foot, boards and travels onward. A/Space thrusts or jumps; left/right turns or walks; Down/S brakes; B/X exits or boards. Hold RB/J for swept cruise. RT/LB or E fires the laser aboard and mines on foot; gamepad X or K launches a missile. On foot, right stick aims, Y/T changes cut size, and holding A in the air uses the jetpack. Stand still on owned ground to rebuild after losing your ship. Hold A+B+Down for three seconds to scuttle a stranded full ship. Settings adjust asteroid arrivals and strength across all three planets. Start/Esc pauses; R restarts the same seed. Ship and pod hulls absorb damage without harming the occupant. The pod is weaker than a full ship; losing it releases the pilot with their existing health and motion. Pilot health persists through boarding, ejection and rebuilding without healing, and boarding never repairs a pod. Ship loss ejects you with 3 seconds of protection; pod loss does not renew it. On foot, laser, missile, hard-impact and solar heat damage can kill the fragile pilot. Pilot death ends the round even with owned planets; simultaneous deaths draw. Losing your ship and flags alone does not eliminate you. Use Play again to restart the same seed. Select spacewars-terrain-arena-duel to watch two mission bots.",
     create: create_arena_human,
     ..TRAVEL_REGISTRATION
 };

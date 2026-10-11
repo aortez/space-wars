@@ -75,10 +75,18 @@ impl SurfaceSortieState {
         let on_foot = observation.location == PilotLocation::OnFoot;
         let dead = observation.pilot_vitals.is_some_and(|v| !v.alive());
         let supply = (!on_foot && !dead).then(|| ship.weapon_supply()).flatten();
-        let health = if on_foot || dead || ship.form == ShipForm::EscapePod {
+        let health = if on_foot
+            || dead
+            || ship.form == ShipForm::EscapePod && observation.pilot_vitals.is_none()
+        {
             HudMeter {
                 label: "Pilot",
                 fraction: observation.pilot_vitals.map_or(1.0, |v| v.health / 100.0),
+            }
+        } else if ship.form == ShipForm::EscapePod {
+            HudMeter {
+                label: "Pod hull",
+                fraction: ship.life / match_rules::POD_HULL_HEALTH,
             }
         } else {
             HudMeter {
@@ -105,7 +113,10 @@ impl SurfaceSortieState {
             "Pilot lost".into()
         } else if !on_foot && ship.form == ShipForm::EscapePod && observation.pilot_vitals.is_some()
         {
-            "Light protection".into()
+            format!(
+                "Pilot {:.0}% · protected",
+                observation.pilot_vitals.unwrap().health
+            )
         } else if ship.dead || ship.form == ShipForm::EscapePod {
             "Ship lost".into()
         } else if on_foot {
@@ -423,10 +434,13 @@ mod tests {
 
         let mut state = SurfaceSortieScenario::init_material_match(42);
         state.world.ships[0].change_to_escape_pod();
+        state.world.ships[0].life = 45.0;
+        state.pilots[0].vitals.as_mut().unwrap().health = 73.0;
         let pod = state.player_hud(0);
         assert_eq!(pod.mode, "POD");
-        assert_eq!(pod.health.label, "Pilot");
-        assert_eq!(pod.note, "Light protection");
+        assert_eq!(pod.health.label, "Pod hull");
+        assert_eq!(pod.health.fraction, 0.45);
+        assert_eq!(pod.note, "Pilot 73% · protected");
         assert_eq!(pod.rounds_loaded, None);
     }
 }

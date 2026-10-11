@@ -57,6 +57,7 @@ pub struct SurfaceRecoveryObservation {
     pub scuttle_required_seconds: f32,
     pub ships_lost: u64,
     pub pod_ejections: u64,
+    pub pods_lost: u64,
     pub rebuilds: u64,
     pub rebuild_interruptions: u64,
     pub blocked_attempts: u64,
@@ -72,6 +73,7 @@ pub(super) struct SurfaceRecovery {
     scuttle: Duration,
     ships_lost: u64,
     pod_ejections: u64,
+    pods_lost: u64,
     rebuilds: u64,
     rebuild_interruptions: u64,
     blocked_attempts: u64,
@@ -93,6 +95,7 @@ impl SurfaceRecovery {
             scuttle_required_seconds: SCUTTLE_TIME.as_secs_f32(),
             ships_lost: self.ships_lost,
             pod_ejections: self.pod_ejections,
+            pods_lost: self.pods_lost,
             rebuilds: self.rebuilds,
             rebuild_interruptions: self.rebuild_interruptions,
             blocked_attempts: self.blocked_attempts,
@@ -130,6 +133,7 @@ impl SurfacePilot {
             let spin = physics::physical_angular_velocity(ship);
             ship.change_to_escape_pod();
             if let Some(vitals) = &mut self.vitals {
+                ship.life = match_rules::POD_HULL_HEALTH;
                 vitals.protect_ejection(tick);
             }
             // Combat uses Rapier's resolved velocity: the contact impulse has
@@ -159,6 +163,64 @@ impl SurfacePilot {
 }
 
 impl SurfaceSortieState {
+    /// A match pod's hull protects its occupant through the entire damage step.
+    /// Losing it leaves the same pilot at the cockpit with the resolved motion;
+    /// it neither heals the pilot nor grants another protection window.
+    pub(super) fn release_destroyed_pods(&mut self) {
+        for pilot in &mut self.pilots {
+            let ship = &mut self.world.ships[pilot.vehicle.0];
+            if pilot.vitals.is_none()
+                || ship.form != ShipForm::EscapePod
+                || ship.dead
+                || ship.life > 0.0
+            {
+                continue;
+            }
+            if pilot.body.is_none() {
+                let id = self.world.physics.ship_body(pilot.vehicle.0);
+                let position = ship.position + POD_PIVOT;
+                let motion = self.world.physics.world.motion(id).expect("live pod");
+                let velocity = self
+                    .world
+                    .physics
+                    .world
+                    .velocity_at_point(id, position)
+                    .expect("live pod velocity");
+                let mut body = SpacelingAssembly::insert(
+                    &mut self.world.physics.world,
+                    pilot_physics_id(pilot.owner),
+                    position,
+                    motion.angle,
+                    Self::spec(),
+                )
+                .expect("pod occupant has no external body");
+                if let Some(charge) = pilot.jetpack_charge {
+                    assert!(body.equip_jetpack(charge));
+                }
+                self.world.physics.world.set_velocity(
+                    body.body(),
+                    velocity,
+                    motion.angular_velocity,
+                    true,
+                );
+                pilot.body = Some(body);
+                pilot.controls_armed = false;
+                pilot.control = SpacelingControl::default();
+                self.world.last_step_metrics.added += 1;
+            }
+            ship.dead = true;
+            ship.life = 0.0;
+            ship.exhaust_trails.clear();
+            ship.thrusters = None;
+            pilot.landing = LandingTelemetry::default();
+            pilot.landing_gear = landing_gear::LandingGear::default();
+            let recovery = pilot.recovery.as_mut().expect("match recovery");
+            recovery.pods_lost += 1;
+            recovery.reset_rebuild();
+            recovery.status = SurfaceRecoveryStatus::NeedSupport;
+        }
+    }
+
     pub(super) fn enable_recovery(&mut self) {
         self.world.physics.enable_surface_recovery();
         for pilot in &mut self.pilots {

@@ -2,34 +2,45 @@
 
 Issue [#154](https://github.com/aortez/space-wars/issues/154) makes the full ship
 the strongest form, the escape pod appreciably weaker, and the on-foot pilot
-fragile. The change uses **per-form damage**, retaining one persistent
-100-point pilot-health pool. There is no additional pod armor meter to refill
-by boarding, exiting or rebuilding.
+fragile. **Both vehicles fully shield their occupant.** Ship hull, pod hull and
+persistent pilot health are separate: damage never reaches an occupied pilot.
 
 ## Rules
 
 The full ship retains its existing hull health, weapons, collision damage and
-heat rules. Its **Hull** meter shields the occupant. Ship destruction ejects a
-living occupant and starts the existing 180-tick protection window. The killing
-shot cannot also damage the new pod. Protection never heals the pilot, and
-boarding or exiting does not extend it.
+heat rules. Ship destruction ejects a living occupant into a fresh 100-point
+pod hull and starts the existing 180-tick protection window. The killing shot
+cannot also damage the new pod. A destroyed unoccupied ship creates no pod.
 
-The pod and on-foot **Pilot** meter shows the same remaining health. Compared
-with a full ship's raw laser hit, pod damage is doubled and on-foot damage is
-quadrupled. A direct missile removes 50 pilot health in a pod or 100 on foot.
-Above the unchanged safe closing speed of 12 units/s, a fresh impact removes
-two health per excess unit/s in a pod or four on foot, capped at 100. Resting
-contacts and ordinary walking remain harmless. Zero-damage wreckage retains
-its physical shove without direct pilot damage.
+A match pod's hull takes twice the full ship's raw laser damage and loses 50
+health to a direct missile. Above the unchanged safe closing speed of 12 units/s,
+a fresh impact removes two hull health per excess unit/s, capped at 100.
+The pilot inside takes **zero** damage from lasers, missiles, impacts and heat,
+including the hit that destroys the pod. After all damage in the shared step,
+a broken pod releases the same spaceling at the cockpit, preserving pilot
+health, jetpack charge, velocity and spin. It does not add another protection
+window. Subsequent on-foot hits can hurt the pilot.
+
+The on-foot pilot retains a persistent 100-point health pool and takes four
+times the full ship's raw laser damage. A direct missile removes 100 health;
+impacts above 12 units/s remove four health per excess unit/s, capped at 100.
+Resting contacts and ordinary walking remain harmless. Zero-damage wreckage
+retains its physical shove without direct health damage.
 
 The solar corona retains its 24-unit width and linear falloff. At maximum
-exposure, it removes 20% hull/s from a full ship, 40 pilot health/s in a pod,
-and 80 on foot. All exposed damage respects ejection protection.
+exposure, it removes 20% hull/s from a full ship, 40 hull health/s from a pod,
+and 80 pilot health/s on foot. Pod-hull and on-foot damage respect the existing
+ejection protection deadline.
 
-The HUD continues to distinguish **Hull** from **Pilot**, labels pod protection
-as light, and shows the remaining ejection protection. Match help explains the
-durability hierarchy and persistent health. Historical labs without match
-rules retain invulnerable survivor forms.
+Boarding and exiting repair neither pool and never extend protection. Empty
+pods remain destructible. Rebuilding replaces the vehicle with a full ship;
+it does not heal the pilot. A later full-ship loss supplies a new pod, but
+boarding or exiting cannot refresh the current pod's hull.
+
+The HUD shows **Hull**, **Pod hull**, or **Pilot** for the active form. In a pod
+it also shows the occupant's preserved health. Combat sensors report pod hull
+health instead of the occupant's health; no controller policy is changed.
+Historical labs without match rules retain invulnerable survivor forms.
 
 ## Controlled measurements
 
@@ -37,7 +48,10 @@ Baseline: `a483fa41cf85e351436b2d10314b715a2077c60a`. Both versions use seed 42,
 100 hull health, 100 pilot health, a 60 Hz step, stationary gravity sources
 with zero mass, and real laser rays and Rapier contacts. The table below starts
 without ejection protection. Ship loss means losing the hull and ejecting;
-pod/on-foot loss means pilot death. These are not interchangeable round endings.
+in the baseline, pod/on-foot loss means pilot death. In this version, pod loss
+means destruction of its hull with a living pilot released; only on-foot loss
+means pilot death. These are not interchangeable round endings. Every tuned
+ship and pod exposure below leaves the pilot at 100 health.
 
 | Exposure | Ship before → after | Pod before → after | On foot before → after |
 | --- | --- | --- | --- |
@@ -55,10 +69,10 @@ exposure, not shooter accuracy or reload decisions. Times start at the first
 launch, including travel to contact. The ship takes three contacts in both
 builds; its impulse-based damage varies as it moves and rotates. The old pod
 dies in a world-boundary collision after two missile hits; the old on-foot
-pilot dies in a boundary collision after one. The tuned pod dies from its
-second missile and the tuned on-foot pilot from the first. The raw records
-retain the final cause: a knockback death is not counted as direct missile
-damage.
+pilot dies in a boundary collision after one. The tuned pod hull breaks on its
+second missile without hurting its occupant; the on-foot pilot dies from the
+first. Pilot damage records retain the final cause: a knockback death is not
+counted as direct missile damage.
 
 For planet impacts, the fixture maintains the incident speed until first
 contact, then records actual closing speed. Native flight drag makes the
@@ -68,10 +82,12 @@ ship/pod close at 39.5 units/s versus 40 on foot. At incident speeds 10, 20 and
 landing cushion while making it less durable than a full hull.
 
 Protected laser and heat cases are recorded separately. They first lose
-health at tick 180; the same persistent pool then drains at its form's rate.
-The native supplied-missile braking test also confirms that a fresh pod keeps
-50 health and can brake below 2 units/s after the hit. Existing physical
-transfer and rebuilding tests preserve wounded pilot health throughout.
+hull or pilot health at tick 180. The native supplied-missile braking test also
+confirms that a fresh pod retains 50 hull health and 100 pilot health, and can
+brake below 2 units/s after the hit. Physical transfer tests preserve both a
+wounded pod hull and its wounded pilot; rebuilding preserves pilot health.
+Native lethal laser and missile tests verify that pod destruction releases one
+pilot without damage spillover, healing, or another protection period.
 
 ## Paired bot matches
 
@@ -91,34 +107,39 @@ finite motion and physical speed checks pass in every run.
 | Match group (8 runs per build) | Before | After |
 | --- | --- | --- |
 | Ordinary: deaths / ship losses / physical rebuilds / completed recovery tasks | 6 / 10 / 4 / 4 | 6 / 10 / 4 / 4 |
-| Heavy: deaths / ship losses / physical rebuilds / completed recovery tasks | 4 / 13 / 6 / 8 | 4 / 13 / 6 / 8 |
-| Ordinary: median round duration | 207.09s | 206.77s |
-| Heavy: median round duration | 439.19s | 438.56s |
+| Heavy: deaths / ship losses / physical rebuilds / completed recovery tasks | 4 / 13 / 6 / 8 | 6 / 15 / 6 / 8 |
+| Ordinary: median round duration | 207.09s | 211.08s |
+| Heavy: median round duration | 439.19s | 258.23s |
 | Ordinary: P1 wins / P2 wins | 4 / 4 | 4 / 4 |
 | Heavy: P1 wins / P2 wins | 6 / 2 | 6 / 2 |
 
-Every pair retains its winner and recovery counts. Six runs in each build
-reach the time limit; round duration includes those timeouts and is distinct
-from the controlled time-to-kill measurements above. Recovery-task completions
-are reported separately from physical rebuilds.
+Every pair retains its winner, physical rebuild counts and completed recovery
+counts. The revised version records four pod losses in ordinary matches and
+five in heavy matches. All twelve pilot deaths occur on foot after physical
+impacts; no pilot dies aboard a ship or pod.
 
-Four defeats become missile kills: two ordinary cases finish 0.65s earlier,
-and two heavy cases finish 1.27s earlier. Previously those same pilots died
-from a later impact or laser hit. Total lethal causes change from eight
-impacts and two lasers to six impacts and four missiles.
+Two heavy Angular cases that previously timed out now end in an on-foot impact
+death at 235.30s, with the same winner. Across the matrix, timeout endings fall
+from six to four. Round durations include timeouts and are distinct from the
+controlled hull-loss and pilot-death measurements above. Recovery-task
+completions are reported separately from physical rebuilds.
 
-The existing violent-impact deaths 3.12s and 3.82s after ejection remain. A
-three-second grace period is an opportunity to recover, not a guarantee that
-every trajectory is survivable. The tested recovery completions are retained;
-the small, paired matrix does not establish overall win-rate balance or solve
+The former Angular impact deaths 3.12s after ship ejection now occur 27.13s
+after ejection; those pilots survive the pod-breaking collision and die from a
+later on-foot impact. The Round case still ends soon after protection expires:
+pod destruction is followed by a lethal on-foot impact two ticks later. Full
+shielding does not guarantee that a high-speed trajectory becomes survivable
+once the hull is gone.
+
+This small paired matrix does not establish overall win-rate balance or solve
 the known blocked-route cases. Aggression and pursuit changes remain under
 [#155](https://github.com/aortez/space-wars/issues/155).
 
 ## Evidence and reproduction
 
-[Machine-readable results](data/durability-154-v1.json) include every case,
-health/protection settings, loss/death ticks, causes, physical rebuilds,
-recovery completions, outcomes and executable hashes. Full commands, action
+[Machine-readable results](data/durability-154-v2.json) include every case,
+health/protection settings, separate hull-loss/death meanings, pod losses,
+causes, physical rebuilds, recovery completions, outcomes and executable hashes. Full commands, action
 traces, snapshots and the retained baseline/tuned executables are under
 `target/durability-154/`. These desktop measurements use Rust 1.94.1 on the
 same machine; they are not Pi performance measurements. No device deployment
@@ -132,10 +153,12 @@ RUST_MIN_STACK=16777216 SPACEWARS_DURABILITY_OUT=/tmp/durability-new.json \
   measure_native_durability -- --ignored --nocapture
 ```
 
-For the baseline, use a detached checkout of `a483fa4`, copy only the
-`tests/match_tests/durability.rs` probe and its `mod durability;` declaration,
-and run the ignored measurement. Its non-ignored tier assertions deliberately
-describe the new contract and are not baseline assertions.
+For the baseline, use a detached checkout of `a483fa4`. Copy the exposure probe
+from commit `69a745e` (`tests/match_tests/durability.rs`) and add its
+`mod durability;` declaration, then run only the ignored measurement. That
+retained probe reads pilot health for the old pod model; the current probe
+reads pod hull health. The non-ignored tier assertions describe tuned behavior
+and are not baseline assertions.
 
 Build and retain an AI test executable for each version before editing damage
 rules; Cargo prints its path with `--no-run`:
@@ -152,8 +175,9 @@ arrivals in `qualification/heldout.rs`. The runner rejects an existing output
 directory and records its binary, matrix and runner hashes. All 16 cases are
 retained, including failures; no outcome determines seed selection.
 
-Focused tests cover native tier ordering, direct missiles, safe and lethal
-impacts, persistent wounded health, harmless surface movement, bounded ejection
-protection, one killing shot per form transition, material occlusion, braking,
-rebuilding and finished rounds. Scenario and AI suites, the 45 ground-navigation
+Focused tests cover native tier ordering, full occupant shielding, lethal pod
+hits without spillover, one surviving spaceling with preserved motion and
+jetpack charge, destructible empty pods, wounded hull/health persistence across
+physical transfers, safe and lethal impacts, bounded protection, rebuilding
+and finished rounds. The 609 scenario tests, 456 AI tests, 45 ground-navigation
 and 51 surface-recovery integration tests, and all 687 client tests pass.

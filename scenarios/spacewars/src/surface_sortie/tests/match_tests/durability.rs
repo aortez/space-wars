@@ -13,9 +13,14 @@ enum Form {
 
 impl Form {
     fn health(self, state: &SurfaceSortieState) -> f32 {
-        if self == Self::Ship {
+        if self != Self::OnFoot {
             let ship = &state.world.ships[1];
-            if ship.form == ShipForm::Ship && !ship.dead {
+            let expected = if self == Self::Ship {
+                ShipForm::Ship
+            } else {
+                ShipForm::EscapePod
+            };
+            if ship.form == expected && !ship.dead {
                 ship.life
             } else {
                 0.0
@@ -42,6 +47,7 @@ impl Form {
         } else {
             if self == Self::Pod {
                 ship.change_to_escape_pod();
+                ship.life = POD_HULL_HEALTH;
             }
             ship.position = position
                 - if self == Self::Pod {
@@ -117,6 +123,13 @@ fn continuous(form: Form, heat: bool, protected: bool) -> Value {
         }
     }
     assert_eq!(form.health(&state), 0.0, "{form:?}, heat={heat}");
+    if form != Form::OnFoot {
+        assert_eq!(
+            vitals(&state, 1).health,
+            PILOT_HEALTH,
+            "hull must fully protect occupant"
+        );
+    }
     json!({"form":format!("{form:?}"),"exposure":if heat {"half_corona"} else {"laser_40_units"},
         "initial_health":100,"protection_ticks":if protected {180} else {0},
         "first_damage_tick":first_damage_tick,"first_damage":first_damage,"damaging_ticks":hit_ticks,
@@ -183,6 +196,13 @@ fn missile_series(form: Form) -> Value {
         }
     }
     assert_eq!(form.health(&state), 0.0, "{form:?}");
+    if form != Form::OnFoot {
+        assert_eq!(
+            vitals(&state, 1).health,
+            PILOT_HEALTH,
+            "hull must fully protect occupant"
+        );
+    }
     json!({"form":format!("{form:?}"),"exposure":"incoming_missiles_every_2_seconds",
         "initial_health":100,"protection_ticks":0,"missile_mass":weapons::ROUND_MASS,
         "relative_launch_speed":300,"launched":launched,
