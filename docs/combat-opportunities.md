@@ -337,3 +337,38 @@ python3 tools/analyze-combat-opportunities.py target/combat-155/confirmation-con
 The compressed report adds strata, mission-review notes and review receipts to
 that analyzer output. Both matrix manifests bind source, executable and traces;
 the committed `f8bbcda` plan preserves the criteria as they stood before the run.
+
+## Lost-win diagnosis: shared energy and missile reload
+
+The first confirmation lost win (seed `16775363816852070040`, Round, eight-second
+asteroids, evaluated P2) is selected for a controlled diagnosis. Initial trace
+inspection shows extra laser use draining the shared energy pool. Energy is paid
+when an automatic missile reload **starts**, not when an already-loaded round
+fires: each reload costs 25, regeneration is 10/second, and the laser draws
+12/second. At 8,231 both bots fire a loaded missile, but only the original has
+enough energy to start the next reload. At 8,351 that replacement can fire in the
+original; the candidate is empty with no reload in progress. The first ship-motion
+difference follows at 8,352. This suggests reload competition, without yet
+establishing its role in the final loss.
+
+Before running the diagnostic, fix its scope:
+
+- Replay the complete original and candidate games, verifying every native input,
+  controller-decision hash, physical-state hash and final snapshot against the
+  retained references. Their published outcomes must remain unchanged.
+- Fork the candidate at **8,230**, immediately before the current reload finishes.
+  Preserve the whole physical world, both controllers, planning memory and clocks.
+- Compare its unchanged continuation with one input-only intervention: suppress
+  an otherwise requested laser when the cannon has zero loaded rounds, no reload
+  in progress and less than the native 25-energy reload cost. Preserve every
+  cannon request, flight control, opponent action and all native supply rules.
+  Stop suppressing once the automatic loader starts; apply no energy injection,
+  controller reset, terrain edit or recovery override.
+- Continue both arms to the native match ending. Record reload starts, actual
+  shots, damage, recovery and outcome; check physical/material and work bounds.
+  This is one explanatory continuation, not another qualification set or a
+  production policy. Do not adjust the fork or rule to recover this win.
+
+The direct-laser candidate and the current defaults remain unchanged. The draft
+PR's eight CI checks pass on `85003d1`; the new diagnostic requires its own build
+and verification.

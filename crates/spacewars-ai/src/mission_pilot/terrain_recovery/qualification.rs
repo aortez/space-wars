@@ -25,6 +25,7 @@ use std::{
 mod angular_diagnosis;
 mod arrival_diagnosis;
 mod combat_diagnosis;
+mod combat_energy;
 mod connectivity;
 mod evidence;
 mod ground_rejoin;
