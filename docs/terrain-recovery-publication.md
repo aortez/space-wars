@@ -1,7 +1,7 @@
 # Terrain publication and recovery integration
 
 Terrain [#174](https://github.com/aortez/space-wars/pull/174) is merged as
-`1cbc4ede1bdf306e49e4f35532ad246a5d5e0c5e`. Draft
+`1cbc4ede1bdf306e49e4f35532ad246a5d5e0c5e`.
 [#178](https://github.com/aortez/space-wars/pull/178) now targets main and
 includes that merge at `4842b274202397776dc5a5ed29b4ad3044856668`.
 The original working checkouts and historical replay inputs are preserved.
@@ -150,16 +150,48 @@ controller blocks. The two Round and later Angular controls also remain
 unchanged. The [placement-cost receipt](data/terrain-recovery-placement-cost-v1.json)
 records the complete four-case comparison and validation commands.
 
-The Picade was subsequently set to native 1× raster scale (1024×768), preserving
-all other saved preferences. The earlier device measurements below remain
-historical 2× results; changing this setting does not alter the headless replay
-comparisons. Device frame time remains a separate qualification limit.
+Hosted [placement-change CI](https://github.com/aortez/space-wars/actions/runs/38101201761)
+at `ffee5ba5d8215142106e1b05cf2223930dfbb408` passes all seven jobs. Uploaded
+JUnit reports confirm 2,753 workspace tests and all 49 UI workflows, with zero
+failures. The experimental recovery job also passes.
+
+The same source is deployed to the Picade at native 1× raster scale (1024×768).
+Automatic play advances, pause/resume works, and the attached Settings workflow
+passes. Device Info reports `ffee5ba5d821`; other saved preferences are preserved
+and the kiosk has zero restarts. Six early samples show 13.3–20.1 FPS and
+55.1–60.5 UPS. This is a functional check, not a controlled frame-rate comparison.
+The earlier device measurements below remain historical 2× results; changing
+this setting does not alter the headless replay comparisons.
+
+At tick 12,971 of the same match (seed `3057324812542282494`), a later sample
+falls to 5.9 FPS / 29.4 UPS. World physics averages 19.057 ms per tick and
+lifecycle work 1.645 ms. The kiosk uses ordinary Legacy v9 / Planner v10 bots;
+the experimental candidate is disabled. Overall device frame time remains a
+separate investigation and a limit on default/frontier promotion.
+
+## Final integration review
+
+The final review at `ffee5ba` finds no blocking issue in the shared arrival and
+native-placement changes, named-profile selection and cleanup, bounded recovery
+search, or placement-cost shortcut. Native landing, support, clearance and
+boarding checks remain authoritative. The shortcut retains node-based rejection
+precedence and leaves full graph filtering available to other callers. The
+retained comparisons above verify that native retries and later construction
+and boarding opportunities survive it.
+
+The remaining hosted-check and 1× device functional gates are complete. #178
+is ready for review and a merge decision with the candidate still opt-in; this
+does not approve default/frontier promotion. This follow-up changes only this
+publication record, so the runtime and recorded replay expectations remain
+those of `ffee5ba`. Historical failed runs and unresolved cases remain retained.
 
 ## Remaining work
 
-1. Retain #178 as a draft through the placement change's hosted checks and
-   its device check at 1×. Default/frontier promotion remains a separate decision.
-2. Investigate the later Round opponent route stall separately from the sealed
+1. Complete the #178 merge decision with launcher/default bot selection unchanged.
+2. Reproduce the late-match 1× slowdown from the retained seed and configuration,
+   then separate native physics costs before proposing a change. The live sample
+   alone does not identify a backend defect or attribute cost to the candidate.
+3. Investigate the later Round opponent route stall separately from the sealed
    Angular pocket and collapse-on replacement-distance gate. Prior failed resets
    do not prove those physical states are unrecoverable or justify wider gates.
 
