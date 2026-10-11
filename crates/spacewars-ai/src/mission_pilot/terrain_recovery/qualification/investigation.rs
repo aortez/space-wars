@@ -14,7 +14,7 @@ struct Investigation {
 
 #[derive(Deserialize)]
 pub(super) struct Recorded {
-    tick: u64,
+    pub(super) tick: u64,
     pub(super) actions: Vec<Action>,
     decision_fnv64: String,
     pub(super) scenario_before_step_fnv64: String,

@@ -482,15 +482,19 @@ impl SurfaceSortieState {
                     )
                     .ok_or(RebuildRejection::NoHatchFooting)?
                     .point;
-                let avoiding = map.avoiding(self.pilots[player].gravity.length(), |position| {
-                    let world = world_point(position);
-                    let axis = rotation_for_direction(position.rotate_radians(frame.angle));
-                    // Check the resting and raised spawn poses. The route is a
-                    // forecast; actual landing and transfer gates still apply.
-                    preview_clear(world, axis, settled, angle)
-                        && preview_clear(world, axis, center, angle)
-                });
-                let route = avoiding.route_to_hatch(local(actual_standing), local(hatch));
+                let route = map.route_to_hatch_avoiding(
+                    local(actual_standing),
+                    local(hatch),
+                    self.pilots[player].gravity.length(),
+                    |position| {
+                        let world = world_point(position);
+                        let axis = rotation_for_direction(position.rotate_radians(frame.angle));
+                        // Check the resting and raised spawn poses. The route is a
+                        // forecast; actual landing and transfer gates still apply.
+                        preview_clear(world, axis, settled, angle)
+                            && preview_clear(world, axis, center, angle)
+                    },
+                );
                 Ok((
                     RebuildPose { center, normal },
                     Some(local(hatch)),

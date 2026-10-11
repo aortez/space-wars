@@ -105,15 +105,61 @@ The earlier published #178 Actions run also failed the terrain-grain screenshot
 assertion despite passing locally. The retained main-integration screenshot
 establishes the late-capture problem and the test-only correction described above.
 
+## Native placement cost follow-up
+
+The grain correction's hosted run at `b00bb7c` passes all seven jobs, including
+2,751 workspace tests and 49 UI workflows. The next change skips hull-edge
+filtering only when a rebuild hatch query has no starting foothold. It first
+filters the nodes and uses the existing strict three-unit attachment rule, so
+nearest-node distances, destination counts and rejection precedence remain
+unchanged. The partially filtered graph stays inside this one query. Other
+callers still receive complete filtered graphs; native retries remain enabled.
+
+Four alternating old/new executable pairs reconstruct the retained Angular/off
+fork at tick 8,327 and each replay the same 600 recorded-input ticks. Every
+physical fingerprint, scenario observation, native recovery receipt and final
+snapshot matches, including selected offsets and complete route diagnostics.
+Each arm still makes 20 native attempts, 520 offset checks and 260 node-filtered
+queries. Hull-edge samples fall from 453,042 to zero in this blocked window;
+base ground surveys and node filtering remain unchanged.
+
+| Instrumented desktop measurement | Before | After |
+| --- | ---: | ---: |
+| Mean native rebuild attempt | 6.912 ms | 1.207 ms |
+| Mean native simulation step over the 600-tick window | 0.318 ms | 0.130 ms |
+
+These are means across four repetitions on the same retained physical state.
+The roughly 83% reduction applies to the blocked native attempt, not whole-game
+frame time. Prefix reconstruction, receipt serialization and rendering are
+excluded. The source and executable hashes, commands, full receipts and timing
+profiles are retained under `spacewars-handoffs/native-placement-cost-20261011`.
+
+Both complete named-profile matches reproduce all 52,611 retained decisions,
+initial controller records and initial/final snapshot bytes after the change.
+The Round completion at 24,911 and Angular completion at 11,337 remain unchanged.
+All 599 native simulation tests and 614 AI library/integration tests pass, as do
+strict AI Clippy, default-feature compilation and formatting. New regressions
+cover missing or hull-removed footing, the three-unit boundary, failure
+precedence, empty maps and actual walk/jump obstructions when a start exists.
+
+The heavy-Angular continuation still exhausts four relocations at 12,255,
+constructs the ship at 21,621 and boards at 21,849. Its complete control and
+candidate artifacts match the pre-optimization executable byte-for-byte. This
+retains the later native opportunity instead of suppressing retries after the
+controller blocks. The two Round and later Angular controls also remain
+unchanged. The [placement-cost receipt](data/terrain-recovery-placement-cost-v1.json)
+records the complete four-case comparison and validation commands.
+
+The Picade was subsequently set to native 1× raster scale (1024×768), preserving
+all other saved preferences. The earlier device measurements below remain
+historical 2× results; changing this setting does not alter the headless replay
+comparisons. Device frame time remains a separate qualification limit.
+
 ## Remaining work
 
-1. Pass the correction's fresh GitHub checks and retain #178 as a draft while
-   reviewing the combined device evidence.
-2. Bound repeated native-placement work without disabling later native retries.
-   The retained Angular cost case constructs hull-filtered edges before rejecting
-   missing start footing. A focused optimization must preserve node filtering,
-   rejection order, route diagnostics and the later heavy-Angular rebuild.
-3. Investigate the later Round opponent route stall separately from the sealed
+1. Retain #178 as a draft through the placement change's hosted checks and
+   its device check at 1×. Default/frontier promotion remains a separate decision.
+2. Investigate the later Round opponent route stall separately from the sealed
    Angular pocket and collapse-on replacement-distance gate. Prior failed resets
    do not prove those physical states are unrecoverable or justify wider gates.
 

@@ -27,6 +27,7 @@ mod evidence;
 mod ground_rejoin;
 mod hatch_arrival;
 mod investigation;
+mod placement_cost;
 mod profile;
 mod round_entry;
 use evidence::*;

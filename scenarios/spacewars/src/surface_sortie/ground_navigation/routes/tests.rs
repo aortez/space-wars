@@ -34,6 +34,91 @@ fn edge(from: u16, to: u16, length: f32, kind: GroundEdgeKind) -> GroundEdge {
 }
 
 #[test]
+fn hull_route_without_start_keeps_filtered_node_diagnostics_and_skips_edges() {
+    use std::cell::Cell;
+    let map = map(
+        vec![node(0, 0.0, 60.0), node(1, 8.0, 60.0), node(2, 16.0, 60.0)],
+        vec![
+            edge(0, 1, 8.0, GroundEdgeKind::Walk),
+            edge(1, 2, 8.0, GroundEdgeKind::Jump),
+        ],
+    );
+    let hatch = map.nodes[2].position
+        + map.nodes[2].position.normalized() * SurfaceSortieState::spec().half_height();
+    for (start, remove_start) in [
+        (Vec2::new(0.0, 50.0), false),
+        (Vec2::new(0.0, 57.0), false), // Exactly three units is not footing.
+        (map.nodes[0].position, true), // The hull removes otherwise valid footing.
+    ] {
+        for target in [hatch, Vec2::new(0.0, 100.0)] {
+            let clear = |p: Vec2| !remove_start || p.x > 4.0;
+            let old_calls = Cell::new(0);
+            let full = map.avoiding(10.0, |p| {
+                old_calls.set(old_calls.get() + 1);
+                clear(p)
+            });
+            let new_calls = Cell::new(0);
+            let route = map.route_to_hatch_avoiding(start, target, 10.0, |p| {
+                new_calls.set(new_calls.get() + 1);
+                clear(p)
+            });
+            assert_eq!(route, full.route_to_hatch(start, target));
+            assert_eq!(
+                route.diagnostics.failure,
+                Some(GroundRouteFailure::NoStartFooting)
+            );
+            assert_eq!(route.diagnostics.start_node, Some(u16::from(remove_start)));
+            assert_eq!(route.diagnostics.destination_nodes > 0, target == hatch);
+            assert_eq!(new_calls.get(), map.nodes.len());
+            assert!(old_calls.get() > new_calls.get());
+        }
+    }
+}
+
+#[test]
+fn hull_route_with_start_still_checks_walk_and_jump_clearance() {
+    let map = map(
+        vec![node(0, 0.0, 60.0), node(1, 8.0, 60.0), node(2, 16.0, 60.0)],
+        vec![
+            edge(0, 1, 8.0, GroundEdgeKind::Walk),
+            edge(1, 2, 8.0, GroundEdgeKind::Jump),
+        ],
+    );
+    let hatch = map.nodes[2].position
+        + map.nodes[2].position.normalized() * SurfaceSortieState::spec().half_height();
+    for start in [map.nodes[0].position, Vec2::new(0.0, 57.01)] {
+        for obstruction in [None, Some((3.0, 5.0)), Some((11.0, 14.0))] {
+            let clear = |p: Vec2| obstruction.is_none_or(|(a, b)| p.x < a || p.x > b);
+            let route = map.route_to_hatch_avoiding(start, hatch, 10.0, clear);
+            assert_eq!(
+                route,
+                map.avoiding(10.0, clear).route_to_hatch(start, hatch)
+            );
+            if obstruction.is_none() {
+                assert_eq!(route.path, [0, 1, 2]);
+                assert_eq!(route.diagnostics.jumps, 1);
+            } else {
+                assert_eq!(
+                    route.diagnostics.failure,
+                    Some(GroundRouteFailure::Disconnected)
+                );
+            }
+        }
+    }
+    for clear in [true, false] {
+        let empty = self::map(vec![], vec![]);
+        for graph in [&map, &empty] {
+            assert_eq!(
+                graph.route_to_hatch_avoiding(Vec2::ZERO, hatch, 10.0, |_| clear),
+                graph
+                    .avoiding(10.0, |_| clear)
+                    .route_to_hatch(Vec2::ZERO, hatch),
+            );
+        }
+    }
+}
+
+#[test]
 fn ties_keep_node_id_and_original_directed_edge_order() {
     use GroundEdgeKind::{Jump, Walk};
     // Storage order differs from node IDs. Parallel edges tie in cost but
