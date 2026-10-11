@@ -1,5 +1,10 @@
 # Combat firing opportunities (#155)
 
+**Current decision: retain the existing defaults.** The independent four-world
+confirmation below fails the predeclared outcome/survival screen. The opt-in
+firing experiment remains in [draft PR #206](https://github.com/aortez/space-wars/pull/206)
+for investigation; no device qualification or default rollout follows this result.
+
 The integration baseline is merged main `44623ecc98d5a689d2ca94cfa402fc7be34c8255`:
 the #204 durability rules and #201 physics work together. The local client builds
 and all 456 existing AI unit tests pass. This investigation uses the production
@@ -83,7 +88,7 @@ hosts. All full matches run native controllers with no resets or input overrides
 the optional five-step probes are isolated diagnostics, explicitly marked in
 their own file. No device is changed by this runner.
 
-## Completed comparison
+## Completed initial comparison
 
 All **32 games / 16 pairs** passed native physics/material and shared planning-work
 audits. The candidate passes the predeclared screen and advances to review.
@@ -163,7 +168,8 @@ integration tests**, four analysis tests, formatting, required Clippy and the
 client build. Standard constructors leave the option disabled; both mission and
 combat resets preserve an explicitly selected profile.
 Merged main's [eight CI checks](https://github.com/aortez/space-wars/actions/runs/38169193384)
-also pass. Validation of this candidate branch is local.
+also pass. The candidate's draft PR has its own CI run, separate from those
+merged-main checks.
 
 The frozen comparison binary SHA-256 is
 `d930f61b9520fb9a80e3dd477428076159f16c80c2181f5064f7a82fd329a89d`.
@@ -225,3 +231,109 @@ Before running further matches, freeze one confirmation batch:
 The firing change is staged separately from the unresolved attack/avoidance
 investigation in #155. This confirmation adds four independent worlds; the
 conditions within each world remain correlated.
+
+## Independent confirmation result: retain defaults
+
+All **64 games / 32 pairs** completed and passed the native physical/material and
+planning-work audits. The same frozen executable was used for both arms, with
+the plan committed as `f8bbcda` before any confirmation match. No candidate code,
+seed or acceptance criterion was changed after seeing the results.
+
+| Evaluated Recovery v1 seat | Control | Direct laser window |
+| --- | ---: | ---: |
+| Wins | 16 | 14 |
+| Ship losses | 16 | 17 |
+| Pilot deaths | 10 | 12 |
+| Completed capture departures | 81 | 79 |
+| Completed recoveries | 15 | 15 |
+| Native laser-hit ticks | 8,722 | 10,631 |
+| Eligible direct-aim windows taken / available | 13,825 / 16,022 | 16,180 / 16,180 |
+
+The candidate removes the measured declined-shot pattern, but fails all three
+outcome/survival conditions. There are **three lost wins and one gained win**.
+Twenty-three pairs change inputs; their first changed input is only the evaluated
+laser request, with identical preceding physical-state hashes. The other nine
+pairs have identical complete native input and physical-state streams.
+
+| World seed | Control wins | Candidate wins |
+| --- | ---: | ---: |
+| 16775363816852070040 | 4 | 2 |
+| 2178709192992772276 | 4 | 4 |
+| 8780702509180422506 | 4 | 4 |
+| 14910522168241314925 | 4 | 4 |
+
+Each terrain shape scores 8→7, and the ordinary and asteroid strata each score
+8→7. Evaluated P1 scores 7→6; P2 scores 9→8. These overlapping groups remain four
+independent worlds. Pooling the earlier favorable batch to override this failed
+confirmation would change the frozen decision rule.
+
+Exposure still differs: total evaluated ticks are 687,687→718,231, recorded
+debris-contact ticks 470→466, laser-recharge ticks 2,861→3,056, and the mean of the
+32 per-game energy means is 94.93%→95.37%. More aggregate hits do not establish
+better accuracy or explain the later deaths. Desktop timings are not device
+qualification.
+
+### Lost wins and mission review
+
+The [confirmation report](data/combat-opportunities-confirmation-v1.json.gz)
+retains every evaluated seat's mission events, arrived-then-replanned trips,
+unfinished arrivals, final capture/recovery state and terminal pilot damage in
+both arms. The longest event list uses 57 of 128 retained slots; none is truncated.
+An interrupted trip is not automatically an implementation defect, and final
+controller telemetry precedes the native terminal physics step.
+
+| Lost win | First added laser | Control ending | Candidate ending |
+| --- | ---: | --- | --- |
+| First world, Round, asteroids, P2 | 7,680 | Recovers at 11,539; wins at 12,871 on opponent impact death | Pod lands at 12,407; pilot exits at 12,409 and dies to a missile at 13,403 during claim |
+| First world, Angular, asteroids, P1 | 7,924 | Seven departures; wins at 34,397 on opponent impact death | Three departures, later capture timeouts and a recovery blocked for no measured route at 34,500; pilot dies from world impact at 34,696 |
+| Second world, Round, no asteroids, P2 | 3,779 | Wins at 6,036 on opponent missile death | Later completes more trips and recovery, then dies to a missile at 20,455 while walking during capture |
+
+The first differing request establishes the intervention, not a causal account
+of a death thousands of ticks later. The original batch's lost win remains
+retained above.
+
+Four other pairs have fewer capture or recovery completions:
+
+- **Second world, Round/asteroids/P1:** both win. Candidate ends at 19,520 with
+  four departures and no ship losses. Control's fifth departure is at 30,723,
+  and it loses two ships by 36,000. Later opportunities are censored; zero
+  candidate recoveries does not indicate failed recovery without a ship loss.
+  Its approach-frame replan at 19,334 is still retained.
+- **Second world, Round/asteroids/P2:** candidate gains a win but fails recovery.
+  Both lose their first ship at 4,202. Control recovers at 14,076; candidate
+  blocks at 13,005 after exceeding the ground-traversal deadline and stays
+  blocked until the opponent's impact death at 19,361. The later control recovery
+  at 35,085 is censored, but early victory does not explain the earlier failure.
+- **Fourth world, Round/asteroids/P1:** both win at the same 36,000-tick limit.
+  Four departures match; control completes a fifth at 35,036. Candidate is still
+  walking during capture, with progress last recorded at 35,995. It reports no
+  task failure, but the completion deficit has no earlier-victory explanation.
+- **Fourth world, Angular/asteroids/P1:** both win. Candidate ends at 9,150,
+  before control's third departure at 10,476. The first two departures match;
+  the later completion is unavailable after the candidate's earlier victory.
+
+### Retained clearance cycle and next boundary
+
+The new batch contains a direct short climb→engage→climb sequence in the second
+world, Angular/asteroids/P2. Control climbs through 14,682, engages at
+14,683–14,800, and climbs again at 14,801–15,402. Candidate's first engagement
+ends at 14,767 and a second short engagement occurs at 15,403–15,514. This is one
+world with an actionable transition window, not a diagnosis of all avoidance
+behavior. Clearance policy remains unchanged.
+
+The rollout decision is **retain default**, so no device settings, build or
+automatic Clock mode were changed. Keep #206 as a draft and retain the failed
+candidate without tuning this confirmation set. Further work should explain a
+retained regression or the clearance cycle before selecting another intervention.
+
+To recompute the paired metrics from the retained raw evidence:
+
+```sh
+python3 tools/analyze-combat-opportunities.py target/combat-155/confirmation-control-v1 \
+  --candidate target/combat-155/confirmation-candidate-v1 \
+  --out /tmp/combat-confirmation.json
+```
+
+The compressed report adds strata, mission-review notes and review receipts to
+that analyzer output. Both matrix manifests bind source, executable and traces;
+the committed `f8bbcda` plan preserves the criteria as they stood before the run.
