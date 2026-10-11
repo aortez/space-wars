@@ -1,0 +1,1287 @@
+{
+  "schema": 1,
+  "runtime_commit": "4842b274202397776dc5a5ed29b4ad3044856668",
+  "terrain_merge": "1cbc4ede1bdf306e49e4f35532ad246a5d5e0c5e",
+  "pr": 178,
+  "base": "main",
+  "draft": true,
+  "integration_runtime_preserved": true,
+  "diagnostic_binary": {
+    "source_commit": "4842b274202397776dc5a5ed29b4ad3044856668",
+    "target": "aarch64-unknown-linux-gnu",
+    "rust": "1.89.0",
+    "static": true,
+    "features": [
+      "sensor-profile"
+    ],
+    "binary_and_inputs": {
+      "cases/10101-angular-collapse-0-candidate-p1.json": "670e9e301aa2b930972575a68060af852d78a0e01d17ab6070fa69528c537740",
+      "cases/10101-angular-collapse-0-control.json": "7d51c669f44f44fb5f2ab710f5424fb29f570790759730532f973323d3e321eb",
+      "cases/20202-round-collapse-0-candidate-p2.json": "ffac0c2a3b9f85f24bf8d0db48dcf649ba2bf26dde9b0bc43d88085b973720d5",
+      "cases/20202-round-collapse-0-control.json": "d563022c4f6a195c9a3f00e951f9c77d4ae2b523dba74b0e4fe6cb4bb5c6aec6",
+      "cases.json": "a312c26e9ceb7ab5c5af43facd8cf912efc6d6a94f390519ec7f10e0b67bd71c",
+      "references/10101-angular-collapse-0-candidate-p1/actions.jsonl": "4de925a673c3829aee95a4aed2645e464607c8ab85623529fde2c25a41c1c9ce",
+      "references/10101-angular-collapse-0-candidate-p1/final.json": "c37e9751cf13c7860d8bc10c127159254d3dbfe0a403a0c9177dce9afdbecc1a",
+      "references/10101-angular-collapse-0-candidate-p1/initial-controllers.txt": "38ebdb511920380a9c26288c7df19681efea6d64821706fbdb721b2001e179ae",
+      "references/10101-angular-collapse-0-candidate-p1/initial.json": "652c2149705f7b7c84cbb6905a6095da3dddd5ae7c67aa413ef85d44eee2243d",
+      "references/10101-angular-collapse-0-candidate-p1/summary.json": "8e5e39768ed89e696d045fc372fa17da64215c79dc613b9cd5fe0b5c68a8fee3",
+      "references/20202-round-collapse-0-candidate-p2/actions.jsonl": "e7c6235be0422a10b458bbb7c61d8d83ecc3e5161697c0456f7087b65490f4d4",
+      "references/20202-round-collapse-0-candidate-p2/final.json": "f95bd4137ba5fa37e10cd6588a98a3aba78a469c14af6b7d03ee20fe37607547",
+      "references/20202-round-collapse-0-candidate-p2/initial-controllers.txt": "d702605e4bcf0fefbdaf29b9847f324514eec45e0a77cec68d87e12398dacdd6",
+      "references/20202-round-collapse-0-candidate-p2/initial.json": "289a55f293352e3521cb2bda9debf42d2adfbb5b499241b4d4d1bdab747cf8c9",
+      "references/20202-round-collapse-0-candidate-p2/summary.json": "25e2abcd24a422963cb882c068948cab13f6704519a718922c2b14f3e7fffa88",
+      "references/provenance.json": "f6abf8175849ef6a192dcfb66dbc4b4f13a43ff7c3b3b511bfec424b99b305a0",
+      "spacewars-ai-tests": "85cc5e0c4c78c9e0861717f5d3492f65c68e85b022cb8d0e82e7eb4c00e29446"
+    }
+  },
+  "device": {
+    "host": "sw-picade.local",
+    "model": "Raspberry Pi 4 Model B Rev 1.4",
+    "cpu_khz": 1500000,
+    "kiosk_paused_during_headless_runs": true
+  },
+  "qualification": {
+    "source_commit": "4842b274202397776dc5a5ed29b4ad3044856668",
+    "binary_sha256": "85cc5e0c4c78c9e0861717f5d3492f65c68e85b022cb8d0e82e7eb4c00e29446",
+    "rust": "1.89.0",
+    "target": "aarch64-unknown-linux-gnu",
+    "static": true,
+    "cases": [
+      {
+        "name": "20202-round-collapse-0-candidate-p2",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": 1
+        },
+        "profile": "terrain_recovery_supported_hatch_v1",
+        "end_tick": 36000,
+        "material_samples": 600,
+        "reference_decisions_verified": 36000,
+        "artifacts_verified": 46,
+        "elapsed_seconds": 323.4756587209995,
+        "completed": [
+          [
+            12301
+          ],
+          [
+            7519,
+            24911
+          ]
+        ],
+        "blocked_ticks": [
+          4653,
+          5047
+        ],
+        "block_reasons": [
+          {
+            "spaceling stopped making progress on ground route": 4653
+          },
+          {
+            "spaceling stopped making progress on ground route": 5047
+          }
+        ],
+        "match": {
+          "elapsed_seconds": 600.0,
+          "finished_tick": 36000,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            2,
+            0
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 14.718953132629395,
+              "last_damage": {
+                "amount": 0.05327330529689789,
+                "cause": "laser",
+                "contact": null,
+                "tick": 10631
+              },
+              "protected_until_tick": 26593
+            },
+            {
+              "death_tick": null,
+              "health": 97.48228454589844,
+              "last_damage": {
+                "amount": 0.052302200347185135,
+                "cause": "laser",
+                "contact": null,
+                "tick": 24235
+              },
+              "protected_until_tick": 13322
+            }
+          ],
+          "reason": "time_limit",
+          "remaining_seconds": 0.0,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        },
+        "timing": {
+          "decision_ms": [
+            {
+              "count": 36000,
+              "mean_ms": 0.6172491130833333,
+              "p50_ms": 0.174943,
+              "p95_ms": 0.396089,
+              "p99_ms": 24.89204,
+              "max_ms": 46.437607,
+              "ticks_above_16_667_ms": 567
+            },
+            {
+              "count": 36000,
+              "mean_ms": 0.7205751920555555,
+              "p50_ms": 0.161887,
+              "p95_ms": 0.329183,
+              "p99_ms": 25.023631,
+              "max_ms": 45.405913999999996,
+              "ticks_above_16_667_ms": 852
+            }
+          ],
+          "planning": {
+            "count": 36000,
+            "mean_ms": 0.06940567019444445,
+            "p50_ms": 0.059611,
+            "p95_ms": 0.124037,
+            "p99_ms": 0.29846,
+            "max_ms": 1.5416,
+            "ticks_above_16_667_ms": 0
+          },
+          "step": {
+            "count": 36000,
+            "mean_ms": 5.590314042194444,
+            "p50_ms": 4.700999,
+            "p95_ms": 11.478389,
+            "p99_ms": 21.925248,
+            "max_ms": 39.600719,
+            "ticks_above_16_667_ms": 1010
+          },
+          "combined": {
+            "count": 36000,
+            "mean_ms": 6.997544017527778,
+            "p50_ms": 5.192144,
+            "p95_ms": 21.239513,
+            "p99_ms": 32.763385,
+            "max_ms": 73.464534,
+            "ticks_above_16_667_ms": 2368
+          }
+        }
+      },
+      {
+        "name": "10101-angular-collapse-0-candidate-p1",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": 0
+        },
+        "profile": "terrain_recovery_supported_hatch_v1",
+        "end_tick": 16611,
+        "material_samples": 277,
+        "reference_decisions_verified": 16611,
+        "artifacts_verified": 20,
+        "elapsed_seconds": 213.37296167100067,
+        "completed": [
+          [
+            11337
+          ],
+          []
+        ],
+        "blocked_ticks": [
+          0,
+          0
+        ],
+        "block_reasons": [
+          {},
+          {}
+        ],
+        "match": {
+          "elapsed_seconds": 276.850005537,
+          "finished_tick": 16611,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            3,
+            0
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 9765
+            },
+            {
+              "death_tick": 16611,
+              "health": 0.0,
+              "last_damage": {
+                "amount": 7.338127136230469,
+                "cause": "impact",
+                "contact": {
+                  "actor_motion": {
+                    "angle": -2.3854658603668213,
+                    "position": {
+                      "x": 185.37960815429688,
+                      "y": 528.4017944335938
+                    },
+                    "spin": 193.0229949951172,
+                    "velocity": {
+                      "x": -148.88453674316406,
+                      "y": -27.505229949951172
+                    }
+                  },
+                  "closing_speed": 345.9649658203125,
+                  "impulse": 28.490388870239258,
+                  "normal": {
+                    "x": -0.8404535055160522,
+                    "y": -0.5418835878372192
+                  },
+                  "on_foot": true,
+                  "other_id": null,
+                  "other_kind": "world",
+                  "other_motion": null,
+                  "point": {
+                    "x": 183.1954345703125,
+                    "y": 528.262939453125
+                  }
+                },
+                "tick": 16611
+              },
+              "protected_until_tick": 12606
+            }
+          ],
+          "reason": "pilot_death",
+          "remaining_seconds": 323.149994463,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        },
+        "timing": {
+          "decision_ms": [
+            {
+              "count": 16611,
+              "mean_ms": 0.40341163000421404,
+              "p50_ms": 0.171462,
+              "p95_ms": 0.406571,
+              "p99_ms": 0.695828,
+              "max_ms": 43.582732,
+              "ticks_above_16_667_ms": 125
+            },
+            {
+              "count": 16611,
+              "mean_ms": 0.4044107932093191,
+              "p50_ms": 0.049388,
+              "p95_ms": 0.324905,
+              "p99_ms": 21.370842,
+              "max_ms": 44.695735,
+              "ticks_above_16_667_ms": 188
+            }
+          ],
+          "planning": {
+            "count": 16611,
+            "mean_ms": 0.06608028445006321,
+            "p50_ms": 0.057351000000000006,
+            "p95_ms": 0.111592,
+            "p99_ms": 0.303442,
+            "max_ms": 1.065214,
+            "ticks_above_16_667_ms": 0
+          },
+          "step": {
+            "count": 16611,
+            "mean_ms": 10.191903026127264,
+            "p50_ms": 10.306943,
+            "p95_ms": 20.427312,
+            "p99_ms": 27.716017,
+            "max_ms": 51.055395000000004,
+            "ticks_above_16_667_ms": 1853
+          },
+          "combined": {
+            "count": 16611,
+            "mean_ms": 11.065805733790862,
+            "p50_ms": 10.805201,
+            "p95_ms": 23.179405,
+            "p99_ms": 36.987483000000005,
+            "max_ms": 55.185416000000004,
+            "ticks_above_16_667_ms": 2285
+          }
+        }
+      },
+      {
+        "name": "20202-round-collapse-0-control",
+        "case": {
+          "seed": 20202,
+          "shape": "round",
+          "slumping": false,
+          "candidate_seat": null
+        },
+        "profile": "standard",
+        "end_tick": 36000,
+        "material_samples": 600,
+        "reference_decisions_verified": null,
+        "artifacts_verified": 33,
+        "elapsed_seconds": 302.6125536510008,
+        "completed": [
+          [
+            12301
+          ],
+          [
+            7519
+          ]
+        ],
+        "blocked_ticks": [
+          0,
+          14819
+        ],
+        "block_reasons": [
+          {},
+          {
+            "spaceling stopped making progress on ground route": 14819
+          }
+        ],
+        "match": {
+          "elapsed_seconds": 600.0,
+          "finished_tick": 36000,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            2,
+            1
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 14.718953132629395,
+              "last_damage": {
+                "amount": 0.05327330529689789,
+                "cause": "laser",
+                "contact": null,
+                "tick": 10631
+              },
+              "protected_until_tick": 9364
+            },
+            {
+              "death_tick": null,
+              "health": 44.30573272705078,
+              "last_damage": {
+                "amount": 41.514732360839844,
+                "cause": "impact",
+                "contact": {
+                  "actor_motion": {
+                    "angle": -0.4542199373245239,
+                    "position": {
+                      "x": 1216.7471923828125,
+                      "y": 727.729736328125
+                    },
+                    "spin": -23.21086311340332,
+                    "velocity": {
+                      "x": -3.5995519161224365,
+                      "y": -4.514544486999512
+                    }
+                  },
+                  "closing_speed": 22.37868309020996,
+                  "impulse": 2.346527576446533,
+                  "normal": {
+                    "x": 0.9982873797416687,
+                    "y": -0.05850258469581604
+                  },
+                  "on_foot": true,
+                  "other_id": 1125899906844018,
+                  "other_kind": "terrain_fragment",
+                  "other_motion": {
+                    "angle": 2.717080593109131,
+                    "position": {
+                      "x": 1217.3734130859375,
+                      "y": 727.9703369140625
+                    },
+                    "spin": -7.763683795928955,
+                    "velocity": {
+                      "x": -19.56450843811035,
+                      "y": -4.242563247680664
+                    }
+                  },
+                  "point": {
+                    "x": 1216.951416015625,
+                    "y": 727.9950561523438
+                  }
+                },
+                "tick": 30011
+              },
+              "protected_until_tick": 13322
+            }
+          ],
+          "reason": "time_limit",
+          "remaining_seconds": 0.0,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        },
+        "timing": {
+          "decision_ms": [
+            {
+              "count": 36000,
+              "mean_ms": 0.6013903128888889,
+              "p50_ms": 0.08737,
+              "p95_ms": 0.380923,
+              "p99_ms": 24.316957,
+              "max_ms": 46.495504,
+              "ticks_above_16_667_ms": 463
+            },
+            {
+              "count": 36000,
+              "mean_ms": 0.7790384474166667,
+              "p50_ms": 0.09911,
+              "p95_ms": 0.28208999999999995,
+              "p99_ms": 26.091274000000002,
+              "max_ms": 45.414107,
+              "ticks_above_16_667_ms": 937
+            }
+          ],
+          "planning": {
+            "count": 36000,
+            "mean_ms": 0.06336720097222222,
+            "p50_ms": 0.054019,
+            "p95_ms": 0.11472099999999999,
+            "p99_ms": 0.283592,
+            "max_ms": 1.827431,
+            "ticks_above_16_667_ms": 0
+          },
+          "step": {
+            "count": 36000,
+            "mean_ms": 5.598921944972222,
+            "p50_ms": 4.69563,
+            "p95_ms": 11.522835,
+            "p99_ms": 21.785642,
+            "max_ms": 39.991890000000005,
+            "ticks_above_16_667_ms": 1015
+          },
+          "combined": {
+            "count": 36000,
+            "mean_ms": 7.04271790625,
+            "p50_ms": 5.091273999999999,
+            "p95_ms": 21.307868,
+            "p99_ms": 36.305043999999995,
+            "max_ms": 74.591591,
+            "ticks_above_16_667_ms": 2371
+          }
+        }
+      },
+      {
+        "name": "10101-angular-collapse-0-control",
+        "case": {
+          "seed": 10101,
+          "shape": "angular",
+          "slumping": false,
+          "candidate_seat": null
+        },
+        "profile": "standard",
+        "end_tick": 16611,
+        "material_samples": 277,
+        "reference_decisions_verified": null,
+        "artifacts_verified": 20,
+        "elapsed_seconds": 204.29196677000073,
+        "completed": [
+          [
+            11337
+          ],
+          []
+        ],
+        "blocked_ticks": [
+          0,
+          0
+        ],
+        "block_reasons": [
+          {},
+          {}
+        ],
+        "match": {
+          "elapsed_seconds": 276.850005537,
+          "finished_tick": 16611,
+          "outcome": {
+            "winner": "player_1"
+          },
+          "owned_planets": [
+            3,
+            0
+          ],
+          "pilots": [
+            {
+              "death_tick": null,
+              "health": 100.0,
+              "last_damage": null,
+              "protected_until_tick": 9765
+            },
+            {
+              "death_tick": 16611,
+              "health": 0.0,
+              "last_damage": {
+                "amount": 7.338127136230469,
+                "cause": "impact",
+                "contact": {
+                  "actor_motion": {
+                    "angle": -2.3854658603668213,
+                    "position": {
+                      "x": 185.37960815429688,
+                      "y": 528.4017944335938
+                    },
+                    "spin": 193.0229949951172,
+                    "velocity": {
+                      "x": -148.88453674316406,
+                      "y": -27.505229949951172
+                    }
+                  },
+                  "closing_speed": 345.9649658203125,
+                  "impulse": 28.490388870239258,
+                  "normal": {
+                    "x": -0.8404535055160522,
+                    "y": -0.5418835878372192
+                  },
+                  "on_foot": true,
+                  "other_id": null,
+                  "other_kind": "world",
+                  "other_motion": null,
+                  "point": {
+                    "x": 183.1954345703125,
+                    "y": 528.262939453125
+                  }
+                },
+                "tick": 16611
+              },
+              "protected_until_tick": 12606
+            }
+          ],
+          "reason": "pilot_death",
+          "remaining_seconds": 323.149994463,
+          "time_limit_seconds": 600.0,
+          "version": 2
+        },
+        "timing": {
+          "decision_ms": [
+            {
+              "count": 16611,
+              "mean_ms": 0.3971231895129734,
+              "p50_ms": 0.170813,
+              "p95_ms": 0.408794,
+              "p99_ms": 0.6794760000000001,
+              "max_ms": 43.119427,
+              "ticks_above_16_667_ms": 125
+            },
+            {
+              "count": 16611,
+              "mean_ms": 0.39811412931190177,
+              "p50_ms": 0.047555,
+              "p95_ms": 0.324239,
+              "p99_ms": 20.866671999999998,
+              "max_ms": 45.484545000000004,
+              "ticks_above_16_667_ms": 188
+            }
+          ],
+          "planning": {
+            "count": 16611,
+            "mean_ms": 0.06573214111131179,
+            "p50_ms": 0.057203000000000004,
+            "p95_ms": 0.11218499999999999,
+            "p99_ms": 0.287775,
+            "max_ms": 1.853449,
+            "ticks_above_16_667_ms": 0
+          },
+          "step": {
+            "count": 16611,
+            "mean_ms": 10.203523892300282,
+            "p50_ms": 10.363772,
+            "p95_ms": 20.395046,
+            "p99_ms": 27.603918,
+            "max_ms": 49.416986,
+            "ticks_above_16_667_ms": 1861
+          },
+          "combined": {
+            "count": 16611,
+            "mean_ms": 11.06449335223647,
+            "p50_ms": 10.866843999999999,
+            "p95_ms": 22.986858,
+            "p99_ms": 36.300998,
+            "max_ms": 54.47584499999999,
+            "ticks_above_16_667_ms": 2305
+          }
+        }
+      }
+    ],
+    "pairs": [
+      {
+        "candidate": "20202-round-collapse-0-candidate-p2",
+        "baseline": "20202-round-collapse-0-control",
+        "initial_snapshots_identical": true,
+        "first_input_difference": 24828,
+        "first_world_observation_difference": 24830,
+        "identical_world_and_input_prefix_ticks": 24828,
+        "prefix_timing": {
+          "candidate": {
+            "decision_ms": [
+              {
+                "count": 24828,
+                "mean_ms": 0.328924440994039,
+                "p50_ms": 0.086184,
+                "p95_ms": 0.394349,
+                "p99_ms": 0.7764570000000001,
+                "max_ms": 44.865787,
+                "ticks_above_16_667_ms": 154
+              },
+              {
+                "count": 24828,
+                "mean_ms": 0.6872519806267119,
+                "p50_ms": 0.15251699999999999,
+                "p95_ms": 0.305794,
+                "p99_ms": 24.991206,
+                "max_ms": 45.405913999999996,
+                "ticks_above_16_667_ms": 565
+              }
+            ],
+            "planning": {
+              "count": 24828,
+              "mean_ms": 0.06943763444498147,
+              "p50_ms": 0.057259,
+              "p95_ms": 0.128944,
+              "p99_ms": 0.336979,
+              "max_ms": 1.5416,
+              "ticks_above_16_667_ms": 0
+            },
+            "step": {
+              "count": 24828,
+              "mean_ms": 5.58842008059449,
+              "p50_ms": 4.798869,
+              "p95_ms": 11.848312,
+              "p99_ms": 21.563493,
+              "max_ms": 39.600719,
+              "ticks_above_16_667_ms": 649
+            },
+            "combined": {
+              "count": 24828,
+              "mean_ms": 6.6740341366602225,
+              "p50_ms": 5.234440000000001,
+              "p95_ms": 19.276455999999996,
+              "p99_ms": 31.876022,
+              "max_ms": 51.71204899999999,
+              "ticks_above_16_667_ms": 1388
+            }
+          },
+          "baseline": {
+            "decision_ms": [
+              {
+                "count": 24828,
+                "mean_ms": 0.3281885766070566,
+                "p50_ms": 0.08661100000000001,
+                "p95_ms": 0.394034,
+                "p99_ms": 0.7946230000000001,
+                "max_ms": 46.495504,
+                "ticks_above_16_667_ms": 154
+              },
+              {
+                "count": 24828,
+                "mean_ms": 0.677727714072821,
+                "p50_ms": 0.14699900000000002,
+                "p95_ms": 0.29590500000000003,
+                "p99_ms": 24.660639000000003,
+                "max_ms": 45.414107,
+                "ticks_above_16_667_ms": 565
+              }
+            ],
+            "planning": {
+              "count": 24828,
+              "mean_ms": 0.06816631259062349,
+              "p50_ms": 0.056204000000000004,
+              "p95_ms": 0.127741,
+              "p99_ms": 0.327517,
+              "max_ms": 1.827431,
+              "ticks_above_16_667_ms": 0
+            },
+            "step": {
+              "count": 24828,
+              "mean_ms": 5.579082370831319,
+              "p50_ms": 4.791574,
+              "p95_ms": 11.832146999999999,
+              "p99_ms": 21.419332,
+              "max_ms": 39.991890000000005,
+              "ticks_above_16_667_ms": 636
+            },
+            "combined": {
+              "count": 24828,
+              "mean_ms": 6.653164974101821,
+              "p50_ms": 5.208293,
+              "p95_ms": 19.039074,
+              "p99_ms": 31.373309000000003,
+              "max_ms": 51.697595,
+              "ticks_above_16_667_ms": 1391
+            }
+          }
+        }
+      },
+      {
+        "candidate": "10101-angular-collapse-0-candidate-p1",
+        "baseline": "10101-angular-collapse-0-control",
+        "initial_snapshots_identical": true,
+        "first_input_difference": null,
+        "first_world_observation_difference": null,
+        "identical_world_and_input_prefix_ticks": 16611,
+        "prefix_timing": {
+          "candidate": {
+            "decision_ms": [
+              {
+                "count": 16611,
+                "mean_ms": 0.40341163000421404,
+                "p50_ms": 0.171462,
+                "p95_ms": 0.406571,
+                "p99_ms": 0.695828,
+                "max_ms": 43.582732,
+                "ticks_above_16_667_ms": 125
+              },
+              {
+                "count": 16611,
+                "mean_ms": 0.4044107932093191,
+                "p50_ms": 0.049388,
+                "p95_ms": 0.324905,
+                "p99_ms": 21.370842,
+                "max_ms": 44.695735,
+                "ticks_above_16_667_ms": 188
+              }
+            ],
+            "planning": {
+              "count": 16611,
+              "mean_ms": 0.06608028445006321,
+              "p50_ms": 0.057351000000000006,
+              "p95_ms": 0.111592,
+              "p99_ms": 0.303442,
+              "max_ms": 1.065214,
+              "ticks_above_16_667_ms": 0
+            },
+            "step": {
+              "count": 16611,
+              "mean_ms": 10.191903026127264,
+              "p50_ms": 10.306943,
+              "p95_ms": 20.427312,
+              "p99_ms": 27.716017,
+              "max_ms": 51.055395000000004,
+              "ticks_above_16_667_ms": 1853
+            },
+            "combined": {
+              "count": 16611,
+              "mean_ms": 11.065805733790862,
+              "p50_ms": 10.805201,
+              "p95_ms": 23.179405,
+              "p99_ms": 36.987483000000005,
+              "max_ms": 55.185416000000004,
+              "ticks_above_16_667_ms": 2285
+            }
+          },
+          "baseline": {
+            "decision_ms": [
+              {
+                "count": 16611,
+                "mean_ms": 0.3971231895129734,
+                "p50_ms": 0.170813,
+                "p95_ms": 0.408794,
+                "p99_ms": 0.6794760000000001,
+                "max_ms": 43.119427,
+                "ticks_above_16_667_ms": 125
+              },
+              {
+                "count": 16611,
+                "mean_ms": 0.39811412931190177,
+                "p50_ms": 0.047555,
+                "p95_ms": 0.324239,
+                "p99_ms": 20.866671999999998,
+                "max_ms": 45.484545000000004,
+                "ticks_above_16_667_ms": 188
+              }
+            ],
+            "planning": {
+              "count": 16611,
+              "mean_ms": 0.06573214111131179,
+              "p50_ms": 0.057203000000000004,
+              "p95_ms": 0.11218499999999999,
+              "p99_ms": 0.287775,
+              "max_ms": 1.853449,
+              "ticks_above_16_667_ms": 0
+            },
+            "step": {
+              "count": 16611,
+              "mean_ms": 10.203523892300282,
+              "p50_ms": 10.363772,
+              "p95_ms": 20.395046,
+              "p99_ms": 27.603918,
+              "max_ms": 49.416986,
+              "ticks_above_16_667_ms": 1861
+            },
+            "combined": {
+              "count": 16611,
+              "mean_ms": 11.06449335223647,
+              "p50_ms": 10.866843999999999,
+              "p95_ms": 22.986858,
+              "p99_ms": 36.300998,
+              "max_ms": 54.47584499999999,
+              "ticks_above_16_667_ms": 2305
+            }
+          }
+        }
+      }
+    ],
+    "limits": [
+      "One sequential headless run per arm; instrumented Rust 1.89 static binary.",
+      "Timings exclude rendering, audits, trace serialization and replay verification.",
+      "Reactive worlds can diverge; whole-match cost differences are not isolated policy overhead.",
+      "Two retained shape cases with collapse disabled do not qualify all terrain settings."
+    ],
+    "passed": true
+  },
+  "application_build": {
+    "source_commit": "4842b274202397776dc5a5ed29b4ad3044856668",
+    "clean_source": true,
+    "rust": "1.94.0",
+    "pn_spacewars_source_override": "/home/data/workspace/spacewars-handoffs/terrain-main-integration-20261010/combined-source.conf",
+    "manifest": {
+      "format": 1,
+      "machine": "raspberrypi-spacewars",
+      "target_arch": "aarch64",
+      "compatibility": "bdd9999de3b8fb42cc0e3b0a2ae94bc4b6b676212493a7238e808898d21c92f9",
+      "binaries": {
+        "engine-client": {
+          "sha256": "85a9a3bf1dc5c653ee74d88012ecc59b13902b64db36fdf6ac91b17defcaf113",
+          "size": 20626936
+        },
+        "spacewars-cli": {
+          "sha256": "53e778dbee5c97f1f03d1ebbe6881731aa121f2de44cf31d35925739551864ac",
+          "size": 1604744
+        }
+      }
+    },
+    "runtime_source_inputs_sha256": "e8a3b67eb19fe801032eaa2f0d7915702811f81ed8ac166a6f1313a0430b1bbe",
+    "build_log_sha256": "f9265b5049f0cbe0344cdf8834016f68264fd5d72d1aae650c488abf72ba516a",
+    "source_files_hashed": 1095
+  },
+  "smoke": {
+    "passed": true,
+    "source_commit": "4842b274202397776dc5a5ed29b4ad3044856668",
+    "candidate_profile_selected": false,
+    "automatic_session_preserved": true,
+    "settings_sha256_before_and_after": "2c20229e476dd9f7a2a3e21688d3591636ab248dac3c1b28baf59abf42302783",
+    "same_scenario_revision": 1,
+    "start_tick": "121",
+    "end_tick": "6405",
+    "pause_freezes_match": true,
+    "resume_advances_match": true,
+    "settings_workflow": {
+      "app_version": "0.1.0 \u00b7 4842b2742023 \u00b7 release",
+      "artifacts": "/data/spacewars/terrain-main-integration-20261010/settings-smoke",
+      "autostart_session_unchanged": true,
+      "cleanup": {
+        "error": null,
+        "final_state": {
+          "actions": [],
+          "active_scenario": "spacewars",
+          "benchmark_active": false,
+          "controls": [],
+          "error": null,
+          "paused": false,
+          "revision": 16,
+          "scenario_revision": 1,
+          "schema_version": 1,
+          "screen": "gameplay",
+          "selected_control": null,
+          "selected_scenario": "spacewars"
+        },
+        "success": true
+      },
+      "cleanup_timeout_ms": 10000,
+      "device_hostname": "sw-picade",
+      "duration_ms": 4463,
+      "error": null,
+      "initial_state": {
+        "actions": [],
+        "active_scenario": "spacewars",
+        "benchmark_active": false,
+        "controls": [],
+        "error": null,
+        "paused": false,
+        "revision": 2,
+        "scenario_revision": 1,
+        "schema_version": 1,
+        "screen": "gameplay",
+        "selected_control": null,
+        "selected_scenario": "spacewars"
+      },
+      "kiosk_logs": {
+        "path": "kiosk.log",
+        "status": "captured"
+      },
+      "runner_version": "0.1.0",
+      "schema_version": 1,
+      "service_recovery": "not-attempted",
+      "settings_error": null,
+      "settings_file": "/var/lib/spacewars/settings.toml",
+      "settings_unchanged": true,
+      "socket": "/tmp/spacewars-control.sock",
+      "success": true,
+      "workflow": "settings",
+      "workflow_timeout_ms": 60000
+    },
+    "timing_samples": [
+      {
+        "match_tick": "731",
+        "fps": "26.0",
+        "ups": "60.7",
+        "mission_total_avg_ms": "7.640",
+        "mission_total_p95_ms": "14.272",
+        "host_step_avg_ms": "12.959",
+        "host_callback_avg_ms": "21.976"
+      },
+      {
+        "match_tick": "1344",
+        "fps": "15.5",
+        "ups": "59.9",
+        "mission_total_avg_ms": "8.391",
+        "mission_total_p95_ms": "15.654",
+        "host_step_avg_ms": "12.068",
+        "host_callback_avg_ms": "26.705"
+      },
+      {
+        "match_tick": "1945",
+        "fps": "11.3",
+        "ups": "55.6",
+        "mission_total_avg_ms": "9.627",
+        "mission_total_p95_ms": "16.699",
+        "host_step_avg_ms": "43.591",
+        "host_callback_avg_ms": "58.098"
+      },
+      {
+        "match_tick": "2512",
+        "fps": "10.7",
+        "ups": "53.3",
+        "mission_total_avg_ms": "13.360",
+        "mission_total_p95_ms": "19.360",
+        "host_step_avg_ms": "50.518",
+        "host_callback_avg_ms": "67.142"
+      },
+      {
+        "match_tick": "3038",
+        "fps": "10.9",
+        "ups": "53.4",
+        "mission_total_avg_ms": "13.936",
+        "mission_total_p95_ms": "22.506",
+        "host_step_avg_ms": "73.398",
+        "host_callback_avg_ms": "87.265"
+      },
+      {
+        "match_tick": "3534",
+        "fps": "9.9",
+        "ups": "49.3",
+        "mission_total_avg_ms": "13.306",
+        "mission_total_p95_ms": "20.331",
+        "host_step_avg_ms": "73.294",
+        "host_callback_avg_ms": "88.345"
+      }
+    ],
+    "retained_observer_failure": "v1 incorrectly asserted the resume acknowledgement was already the completed transition; corrected to wait for gameplay and a newer UI revision, then repeated only pause/resume in the same match."
+  },
+  "ci": {
+    "integration_run": 38096400027,
+    "workspace_passed": 2751,
+    "ui_passed": 48,
+    "ui_failed": 1,
+    "complete_successful_jobs": 6,
+    "correction_runs": [
+      {
+        "repeat": 1,
+        "command": [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24",
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "engine-client",
+          "--test",
+          "ui_control_functional",
+          "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 36.91143936300068,
+        "log": "grain-ui-corrected-1.log"
+      },
+      {
+        "repeat": 2,
+        "command": [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24",
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "engine-client",
+          "--test",
+          "ui_control_functional",
+          "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 4.521136677998584,
+        "log": "grain-ui-corrected-2.log"
+      },
+      {
+        "repeat": 3,
+        "command": [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24",
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "engine-client",
+          "--test",
+          "ui_control_functional",
+          "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 4.505239443999017,
+        "log": "grain-ui-corrected-3.log"
+      },
+      {
+        "repeat": 4,
+        "command": [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24",
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "engine-client",
+          "--test",
+          "ui_control_functional",
+          "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 4.495937693998712,
+        "log": "grain-ui-corrected-4.log"
+      },
+      {
+        "repeat": 5,
+        "command": [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24",
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "engine-client",
+          "--test",
+          "ui_control_functional",
+          "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 4.490075551002519,
+        "log": "grain-ui-corrected-5.log"
+      }
+    ],
+    "correction_pixels": [
+      {
+        "repeat": 1,
+        "renderer": "vector",
+        "grain_pixels": 8707,
+        "sha256": "d661455cdc68a9814c26e69f736fe70f1441cb8fff209ee44450e851faa719fd",
+        "file": "grain-ui-corrected-artifacts/repeat-1/terrain-grains-vector-grains.png"
+      },
+      {
+        "repeat": 1,
+        "renderer": "raster",
+        "grain_pixels": 11759,
+        "sha256": "61c9978d61e77c88e5eef41a81a41f37afd1dc259e0bf27675be885aefd28eed",
+        "file": "grain-ui-corrected-artifacts/repeat-1/terrain-grains-raster-grains.png"
+      },
+      {
+        "repeat": 2,
+        "renderer": "vector",
+        "grain_pixels": 8669,
+        "sha256": "205a7b3e8ffcb19ce1992bfa4f5b087422454b02ffbfc18f8daed3a18da2dd81",
+        "file": "grain-ui-corrected-artifacts/repeat-2/terrain-grains-vector-grains.png"
+      },
+      {
+        "repeat": 2,
+        "renderer": "raster",
+        "grain_pixels": 11816,
+        "sha256": "d0ed9f5ed6f354acad10b56525439c6a8b64873b7de084c8a661b05ea926547d",
+        "file": "grain-ui-corrected-artifacts/repeat-2/terrain-grains-raster-grains.png"
+      },
+      {
+        "repeat": 3,
+        "renderer": "vector",
+        "grain_pixels": 8707,
+        "sha256": "d661455cdc68a9814c26e69f736fe70f1441cb8fff209ee44450e851faa719fd",
+        "file": "grain-ui-corrected-artifacts/repeat-3/terrain-grains-vector-grains.png"
+      },
+      {
+        "repeat": 3,
+        "renderer": "raster",
+        "grain_pixels": 11816,
+        "sha256": "47f3922e299c3c791ca88465b02baecc8e64be24233e1f9135033842e6bfabd7",
+        "file": "grain-ui-corrected-artifacts/repeat-3/terrain-grains-raster-grains.png"
+      },
+      {
+        "repeat": 4,
+        "renderer": "vector",
+        "grain_pixels": 8707,
+        "sha256": "d661455cdc68a9814c26e69f736fe70f1441cb8fff209ee44450e851faa719fd",
+        "file": "grain-ui-corrected-artifacts/repeat-4/terrain-grains-vector-grains.png"
+      },
+      {
+        "repeat": 4,
+        "renderer": "raster",
+        "grain_pixels": 11816,
+        "sha256": "47f3922e299c3c791ca88465b02baecc8e64be24233e1f9135033842e6bfabd7",
+        "file": "grain-ui-corrected-artifacts/repeat-4/terrain-grains-raster-grains.png"
+      },
+      {
+        "repeat": 5,
+        "renderer": "vector",
+        "grain_pixels": 8707,
+        "sha256": "d661455cdc68a9814c26e69f736fe70f1441cb8fff209ee44450e851faa719fd",
+        "file": "grain-ui-corrected-artifacts/repeat-5/terrain-grains-vector-grains.png"
+      },
+      {
+        "repeat": 5,
+        "renderer": "raster",
+        "grain_pixels": 11816,
+        "sha256": "47f3922e299c3c791ca88465b02baecc8e64be24233e1f9135033842e6bfabd7",
+        "file": "grain-ui-corrected-artifacts/repeat-5/terrain-grains-raster-grains.png"
+      }
+    ],
+    "diagnosis": {
+      "run": 38096400027,
+      "head": "4842b274202397776dc5a5ed29b4ad3044856668",
+      "workspace": {
+        "passed": 2751
+      },
+      "ui": {
+        "passed": 48,
+        "failed": 1,
+        "test": "terrain_lab::terrain_grains_launch_pause_restart_and_both_renderers",
+        "assertion": "blasted grains are absent from vector: 0 pixels"
+      },
+      "screenshot": "ci-38096400027-artifacts/ui-functional-test-artifacts/terrain-grains-dwV8Ub/terrain-grains-vector-box-and-grains.png",
+      "screenshot_sha256": "20fbb4683cf87c7bfaedd9c4e65c5b600602ae86eda14620b62aeaf814c2665d",
+      "visible_hud": {
+        "loose": 0,
+        "resting": 60,
+        "settled": 74,
+        "time_seconds": 4.37,
+        "box_present": true
+      },
+      "cause": "Screenshot taken after 2000 ms fire hold followed by 2000 ms box hold; fire is edge-triggered and all live grain bodies can pack or settle before capture.",
+      "change": "Inspect unchanged grain-color threshold after the default 120 ms fire press; then perform a separate box press and capture.",
+      "production_changes": false
+    },
+    "current_checks": "https://github.com/aortez/space-wars/pull/178/checks"
+  },
+  "remaining": [
+    {
+      "item": "Repeated native placement cost",
+      "decision": "Keep as the next bounded optimization; retain native retries after controller block.",
+      "evidence": "docs/terrain-recovery-mission-investigation-results.md: four paired 600-tick runs retain identical physics while refinement increases hull-filtered edge samples.",
+      "code_review": "GroundMap::avoiding filters all edges before route_to_hatch rejects missing start footing. Route failure diagnostics use retained node positions, so a start-aware internal query can potentially skip only edge filtering after preserving node filtering and existing rejection order.",
+      "acceptance": [
+        "Exact selected offsets, rejection reasons, and route diagnostics remain unchanged.",
+        "Alternate old/new cost order on the same frozen physical state.",
+        "Retain the heavy Angular later native rebuild; do not disable retries or refinement after task block.",
+        "Recheck both named profile matches and native placement/ground-route tests."
+      ]
+    },
+    {
+      "item": "Later Round opponent rebuild-route stall",
+      "decision": "Separate movement-execution follow-up, using the retained first block at tick 31347.",
+      "evidence": "Candidate P2 completes a second recovery; the later stalled controller is P1 using Standard. Reactive terrain differs, so this is not established as a shared-code regression.",
+      "acceptance": [
+        "Preserve the physical fork, route and opponent.",
+        "Compare unchanged execution with one bounded controller change.",
+        "Require native construction and boarding; do not relax arrival or boarding gates."
+      ]
+    },
+    {
+      "item": "Sealed Angular pocket and replacement-distance gate",
+      "decision": "Retain as unresolved recoverability limits; no broad reset or gate-widening policy.",
+      "evidence": "Prior reset and posture experiments failed to complete recovery; failures alone do not prove escape impossible.",
+      "acceptance": [
+        "Demonstrate a physical route before proposing recovery-policy changes.",
+        "Keep missing footing separate from the 24-unit replacement condition."
+      ]
+    }
+  ],
+  "artifacts": {
+    "directory": "/home/data/workspace/spacewars-handoffs/terrain-main-integration-20261010",
+    "portable_package": "terrain-main-integration-20261010.tar.gz",
+    "files": {
+      "integration-main-merge-verified.json": "2d18bd8dc2f59f58b4a71cdc9c346bf59dc8ba5b6eed9190f63c07c62e22660e",
+      "terrain-final-review.json": "22ee870ca55aadbff70df3c9d5990bb3abcfd6bf87671a03b06ade0aadcefbad",
+      "runtime-source-inputs.json": "e8a3b67eb19fe801032eaa2f0d7915702811f81ed8ac166a6f1313a0430b1bbe",
+      "picade-comparison-audit.json": "799b4ccf9053864d621aca761fe3b2c0dd369e22eef7ee795d5f920e9db030fd",
+      "picade-input-manifest.json": "5e6ed4e2770468a74a77741034971afd4813a8a7ef05a9f0cf9d1364b5437e7a",
+      "picade-fast-update.log": "fe0eb07da3e6fe0d581a42eaeecdedaa15f95d64bc75b5d98650cad280d4f281",
+      "picade-device-identity.txt": "076688ece5bf1c419120d8e0960b4f157ad5db70715e72daffd49e10dfeb70b2",
+      "picade-telemetry.jsonl": "aec94c71f72337141dd6536b93702726120d7f179a6d8b308879a29cb26aceaf",
+      "picade-smoke/summary.json": "168de8720b4ea21f0f31a0935676dda0080e15208e191f891a61770f54e395a2",
+      "picade-smoke/combined-gameplay.png": "f6f77daa4eea777f8552fc411df9bc2cf3349be9f95f08c0f0d8b3fe07bfe544",
+      "grain-ui-ci-diagnosis.json": "2d1420996396aa4a9401fbac532b7c75e983d076738edb42b526808467b6c4c1",
+      "grain-ui-corrected-runs.json": "5808adb691932df4481be6f4584a3c965f4142a6f4f3795cdcf6c9e3d2c72bb8",
+      "grain-ui-corrected-pixels.json": "86b84c29bda887d4be12ca985efab13cd6718d379925a5dc07037e11bf78ad01",
+      "run-picade-comparisons.py": "13772b368f1e7428a21837787c413e58f2d17d48a4fec04da5c24c68a10a5eed",
+      "audit-picade-comparisons.py": "baf478385268ad6acd1c09d6f7011eab928382dbbfc57fe1fdf52c55347aced5",
+      "run-picade-smoke.py": "25d300401a34f2e36934f8df6fd5749339876e9da86aed9e4b610dd18ec5cc29",
+      "run-picade-smoke-v1.py": "6b8d84b9cc930e6892c3b3d4e873bc316080f13bf510c21ebba30d8c6d398cef",
+      "picade-comparison-audit.log": "5068d02e925892d52827b8da94ae31b06664a179da321d7fdf70309c3178e6ab",
+      "picade-comparison-audit-complete.log": "a5281a4d99347c788a341e55295a6b3eac3a0b1f96a6a1ab2bf3f4581f6e7367"
+    }
+  }
+}
