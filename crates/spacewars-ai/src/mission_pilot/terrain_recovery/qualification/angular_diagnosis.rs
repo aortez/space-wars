@@ -72,7 +72,7 @@ fn continuation(out: &Path, initial: &Run, case: &Case, rows: &[Recorded], arm: 
         blocked += u64::from(r.is_some_and(|r| r.status == TaskStatus::Blocked));
         if b.completed_recoveries > completed {
             assert!(p.ship_available && p.ship_form == ShipForm::Ship);
-            assert_eq!(p.location, PilotLocation::Aboard(1));
+            assert_eq!(p.location, PilotLocation::Aboard(p.vehicle));
             assert!(r.is_none());
             assert_eq!(run.state.rebuild_refinement_enabled(1), Some(false));
             completions.push(tick);
