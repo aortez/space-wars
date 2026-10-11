@@ -372,3 +372,83 @@ Before running the diagnostic, fix its scope:
 The direct-laser candidate and the current defaults remain unchanged. The draft
 PR's eight CI checks pass on `85003d1`; the new diagnostic requires its own build
 and verification.
+
+### Completed reload diagnosis
+
+The diagnostic reproduces **all 26,274 reference ticks** across the original and
+candidate games, including their inputs, decision hashes and physical-state
+hashes. Both final snapshots, controller dumps and player-frame files match the
+retained references byte for byte. The unchanged candidate and intervention also
+start with identical fork snapshots, controllers and player frames.
+
+This confirms a specific weapon-resource interaction:
+
+1. At **8,231**, both versions launch the same loaded missile. The original
+   starts its next reload with 57.57 energy available on the preceding tick; the
+   direct-laser candidate has 14.57 and cannot pay the 25-energy reload cost.
+2. At **8,351**, the original's next missile is loaded and launches. The candidate
+   has no loaded round or active reload, despite having the same ship positions
+   and a valid missile aim. It does not begin another reload until **8,567**.
+3. The original's launch recoil first changes P2 motion at **8,352**; P1 motion
+   first differs at **8,365**. Thus the first movement divergence follows a
+   changed weapon action; steering and recovery policy were not edited.
+
+The fixed input intervention suppresses **106** otherwise requested laser ticks,
+in intervals **8,246–8,293** and **8,415–8,472**. Every changed action is verified
+to be only P2's laser changing from on to off, under the stated empty-ammunition,
+unpaid-reload and energy conditions. The first reload starts at **8,294**, 273
+ticks earlier than the unchanged candidate, and a native missile launches at
+**8,414**. Its recoil first changes P2 motion at **8,415**, and P1 motion first
+differs at **8,427**. No energy, ammunition, cooldown or controller state is
+injected.
+
+| P2 result | Original | Direct laser | Direct laser + diagnostic reservation |
+| --- | ---: | ---: | ---: |
+| Next reload after 8,231 | Already started at 8,231 | 8,567 | 8,294 |
+| Next missile launch after 8,231 | 8,351 | None before ship loss | 8,414 |
+| First ship loss | 8,799 | 8,807 | 8,797 |
+| Completed recoveries | 1 | 0 | 0 |
+| Native ending | Wins at 12,871 | Loses at 13,403 | Loses at 11,669 |
+
+The reservation restores a missile launch but **does not restore the win**.
+The unchanged candidate dies from a missile during on-foot recovery. In the
+reservation continuation its pod is destroyed, releasing the pilot at 9,287;
+the pilot later dies from a native planet impact at 11,669. The original wins
+after rebuilding and boarding while its opponent dies from a planet impact.
+This single fork establishes reload competition and a movement-divergence
+mechanism; it does not establish an effective resource policy or fully attribute
+the eventual winner to one missed missile.
+
+The next weapon-policy design needs to consider reload timing before ammunition
+is exhausted and the laser's need for a sustained beam. The tested empty-cannon
+reservation is retained as a failed continuation, with no production option,
+default change, extra seeds or revised thresholds. Recovery remains outside this
+firing change.
+
+The [machine-readable diagnosis](data/combat-reload-diagnosis-v1.json.gz) retains
+all three summaries, timing checkpoints, exact overrides, native death evidence,
+source/binary identity and SHA-256 receipts. Raw evidence is under
+`target/combat-155/reload-competition-v2`. The first attempt is retained as `v1`:
+it stopped before any intervention when parsed floating-point JSON values
+compared differently despite identical serialized bytes. The corrected diagnostic
+compares final files byte for byte; its fork and intervention are unchanged.
+
+Validation on diagnostic source `b5127e9`: **461 AI tests**, the explicit native
+replay/intervention, strict Clippy and formatting pass. The physical/material
+audits and shared planning-work assertions pass in every arm. This is diagnostic
+validation; the prior failed rollout decision still stands.
+
+Reproduce from the repository root with the retained executable (or rebuild the
+AI tests with `sensor-profile` and use the executable path Cargo prints):
+
+```sh
+RUST_MIN_STACK=16777216 \
+SPACEWARS_COMBAT_CONTROL="$PWD/target/combat-155/confirmation-control-v1/03-round-8s-p2/output" \
+SPACEWARS_COMBAT_CANDIDATE="$PWD/target/combat-155/confirmation-candidate-v1/03-round-8s-p2/output" \
+SPACEWARS_COMBAT_ENERGY_OUT=/tmp/spacewars-combat-reload-replay \
+target/combat-155/reload-competition-v2/ai-tests \
+  mission_pilot::terrain_recovery::qualification::combat_energy::retained_combat_reload_competition \
+  --ignored --exact --nocapture
+```
+
+Choose a fresh output directory; the diagnostic refuses to overwrite evidence.
