@@ -6,9 +6,10 @@ averages 46.237 ms of physics work, including 35.879 ms of CCD. This identifies
 a focused performance target without changing recovery policy or physics.
 
 This investigation is separate from #178, which is ready for review with its
-candidate still opt-in. Runtime source here is unchanged from `ffee5ba`;
-`e82b2a4` adds the final publication notes. The only Rust addition is the
-read-only `picade_physics_probe` example.
+candidate still opt-in. The headless measurements below use runtime source
+unchanged from `ffee5ba`; `e82b2a4` adds the final publication notes. The initial
+Rust addition was the read-only `picade_physics_probe` example. Live diagnostic
+fields now expose the existing backend counters as described below.
 
 ## Live settings and scope
 
@@ -84,8 +85,28 @@ Use a fresh output directory with the frozen static binary on the Picade:
 Build the diagnostic with locked dependencies, Rust 1.89, the release profile,
 default features and target `aarch64-unknown-linux-gnu`; its target Rust flags
 are `-C target-feature=+crt-static`. Strict example Clippy and formatting pass.
-No gameplay source, bot defaults, solver limits or historical recovery fixtures
-change in this branch.
+No bot defaults, solver limits or historical recovery fixtures change in this
+branch.
+
+## Live diagnostic fields
+
+Mission profile version 3 reports Rapier timings and populations in the same
+bounded 120-tick window as `mission_world_physics_avg_ms`. It reads the metrics
+already copied into each mission sample; it adds no simulation clocks, queries,
+or world scans. Reading diagnostics remains observational.
+
+`mission_rapier_ccd_{avg,p95,max}_ms` measures all CCD work. First-impact search
+and motion clamping have their own `mission_rapier_ccd_first_impact_*` and
+`mission_rapier_ccd_clamping_*` fields. These are nested timings, not additive
+to the outer physics timer. `mission_rapier_ccd_samples` explicitly counts
+complete CCD measurements. Missing backend timers are excluded from all three
+CCD aggregates; no timing fields are emitted when that count is zero. Compare
+CCD and physics means directly only when the sample counts match.
+
+Existing broad/narrow-phase, island, solver and update timers are also exposed.
+CCD substeps, active/sleeping bodies and contact/candidate populations report
+means, maxima and latest values. Contact populations do not count CCD sweeps.
+The host FPS/UPS window covers callbacks and can span more simulation ticks.
 
 The next bounded experiment should reconstruct the first case through tick
 9,060, retain its native physical state, and inspect the fixed inputs for ticks
