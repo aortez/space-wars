@@ -418,7 +418,7 @@ impl SurfaceSortieState {
     }
 
     /// Experimental recovery preserves mission cadence, context and objectives.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn mission_observation_with_rebuild_search(
         &self,
         player: usize,

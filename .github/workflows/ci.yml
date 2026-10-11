@@ -211,7 +211,8 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      # The normal workspace build does not enable the experimental host/profile.
+      # The workspace tests the live terrain-recovery host without profiling.
+      # This job also covers historical profiles and diagnostic instrumentation.
       # Retained full-match diagnostics remain ignored and require their packages.
       - name: Test recovery profiles and native ground/boarding behavior
         run: cargo test --locked --profile ci -p spacewars-ai --features sensor-profile --lib --test ground_navigation --test surface_recovery

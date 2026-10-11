@@ -7,8 +7,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
+terrain-recovery = []
 # Opt-in read-only mission sensor profiling for diagnostic runners.
-sensor-profile = ["engine-rapier/query-diagnostics"]
+sensor-profile = ["terrain-recovery", "engine-rapier/query-diagnostics"]
 ccd-diagnostics = ["engine-rapier/ccd-diagnostics"]
 # Optional presentation metadata for retained-renderer experiments.
 render-hints = []

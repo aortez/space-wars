@@ -230,7 +230,7 @@ impl SurfaceSortieState {
     }
 
     /// Reuse the same local sensor composition with one enhanced recovery read.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub(super) fn tactical_sortie_with_rebuild_search(
         &self,
         player: usize,
@@ -238,6 +238,7 @@ impl SurfaceSortieState {
         planning: landing_objective::ObjectivePlanning,
         search: &rebuild_placement::RebuildSearchProgress,
     ) -> TacticalSortieObservationV1 {
+        #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
         let combat = self.combat_observation_with_rebuild_search(player, query, search);
         self.tactical_sortie_from_combat(player, combat, planning, true)
@@ -331,7 +332,7 @@ impl SurfaceSortieState {
     }
 
     /// Explicit experimental recovery sensing without a second ordinary survey.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn combat_observation_with_rebuild_search(
         &self,
         player: usize,

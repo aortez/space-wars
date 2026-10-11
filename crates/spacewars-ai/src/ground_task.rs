@@ -273,7 +273,7 @@ impl GroundNavigationTask {
     }
     /// Proximity to a hatch while airborne does not identify landing ground.
     /// Keep following the measured route until actual support allows settling.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_hatch_supported_arrival(&mut self, enabled: bool) {
         self.telemetry.hatch_supported_arrival = enabled;
     }

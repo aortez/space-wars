@@ -2,7 +2,7 @@ use super::*;
 use engine_core::planning::Work;
 use scenario_spacewars::surface_sortie::live_planning::{FlagSurveyPlanner, LiveObjectivePlanner};
 use spacewars_ai::mission_evaluation::{DEFAULT_WORK, FlagValueShadow, MissionEvaluator};
-use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
+use spacewars_ai::mission_policy::{MissionBot, MissionPolicy, MissionRecoveryProfile};
 use std::time::Instant;
 
 const OBSERVATION_WORK: Work = Work {
@@ -11,6 +11,8 @@ const OBSERVATION_WORK: Work = Work {
 };
 
 mod profiling;
+#[cfg(test)]
+mod recovery_tests;
 
 pub(crate) const MATCH_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars",
@@ -61,6 +63,7 @@ pub(crate) const ARENA_DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistr
 struct MaterialMissionClientScenario {
     sortie: SurfaceSortieClientScenario,
     pilots: [MissionBot; 2],
+    recovery_profiles: [MissionRecoveryProfile; 2],
     bots: [bool; 2],
     registration: &'static ScenarioRegistration,
     seed: u64,
@@ -71,13 +74,21 @@ struct MaterialMissionClientScenario {
     flag_value_shadow: FlagValueShadow,
 }
 impl MaterialMissionClientScenario {
+    fn controller_name(&self, seat: usize) -> &'static str {
+        if !self.bots[seat] {
+            "Human"
+        } else if self.recovery_profiles[seat]
+            == MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
+        {
+            "Recovery bot v1"
+        } else {
+            self.pilots[seat].policy().display_name()
+        }
+    }
+
     fn append_controller_hud(&self, frames: &mut [RenderFrame], viewport: Viewport) {
         for seat in 0..2 {
-            let identity = if self.bots[seat] {
-                self.pilots[seat].policy().display_name()
-            } else {
-                "Human"
-            };
+            let identity = self.controller_name(seat);
             super::hud::append_controller_identity(frames, viewport, seat, identity);
             if self.bots[seat] {
                 pilot_hud_for(frames, seat, &self.pilots[seat].label());
@@ -115,34 +126,51 @@ fn create_with_seats(
     if settings.material_combat.loose_dirt {
         state.enable_dirt_mode(settings.material_combat.dirt_mode);
     }
+    let controllers = [
+        settings.spacewars.player_1_controller,
+        settings.spacewars.player_2_controller,
+    ];
+    let recovery_profiles = controllers.map(|controller| {
+        if registration.id == MATCH_REGISTRATION.id
+            && controller == engine_common::SpacewarsController::RecoveryBot
+        {
+            MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
+        } else {
+            MissionRecoveryProfile::Standard
+        }
+    });
     Box::new(MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario::new(state),
         bots,
+        recovery_profiles,
         registration,
         seed,
         profile: profiling::Profile::default(),
         evaluation: MissionEvaluator::new(2),
         flag_value_shadow: FlagValueShadow::new(2),
         surveys: LiveObjectivePlanner::new(2, OBSERVATION_WORK),
-        flag_surveys: [
-            settings.spacewars.player_1_controller,
-            settings.spacewars.player_2_controller,
-        ]
-        .contains(&engine_common::SpacewarsController::ValueBot)
-        .then(|| FlagSurveyPlanner::new(2)),
+        flag_surveys: controllers
+            .iter()
+            .any(|controller| {
+                matches!(
+                    controller,
+                    engine_common::SpacewarsController::ValueBot
+                        | engine_common::SpacewarsController::RecoveryBot
+                )
+            })
+            .then(|| FlagSurveyPlanner::new(2)),
         pilots: std::array::from_fn(|seat| {
             MissionBot::new(
                 if registration.id == MATCH_REGISTRATION.id {
-                    match [
-                        settings.spacewars.player_1_controller,
-                        settings.spacewars.player_2_controller,
-                    ][seat]
-                    {
+                    match controllers[seat] {
                         engine_common::SpacewarsController::PlannerBot => MissionPolicy::Planner,
                         engine_common::SpacewarsController::DestinationBot => {
                             MissionPolicy::DestinationPlanner
                         }
-                        engine_common::SpacewarsController::ValueBot => MissionPolicy::ValuePlanner,
+                        engine_common::SpacewarsController::ValueBot
+                        | engine_common::SpacewarsController::RecoveryBot => {
+                            MissionPolicy::ValuePlanner
+                        }
                         _ => MissionPolicy::Legacy,
                     }
                 } else {
@@ -154,6 +182,7 @@ fn create_with_seats(
                 },
                 settings.combat_breaks,
             )
+            .with_recovery_profile(recovery_profiles[seat])
         }),
     })
 }
@@ -230,19 +259,30 @@ impl ClientScenario for MaterialMissionClientScenario {
         for seat in (0..2).filter(|&seat| self.bots[seat]) {
             let site = self.pilots[seat].site_request();
             let clock = Instant::now();
-            let mut o = self.sortie.state.mission_observation_with_cadence(
-                seat,
-                self.pilots[seat].sensor_request(),
-                Default::default(),
-            );
-            sample.sensors[seat] = clock.elapsed();
-            let clock = Instant::now();
-            actions.extend(
-                self.pilots[seat]
-                    .intent_with_evaluation(&o, &self.evaluation)
-                    .encode(PlayerId::from_index(seat).unwrap()),
-            );
-            sample.policies[seat] = clock.elapsed();
+            let (mut o, intent) =
+                if self.recovery_profiles[seat] != MissionRecoveryProfile::Standard {
+                    let (o, intent, sensors, policy) = self.pilots[seat]
+                        .decide_with_terrain_recovery_timed(
+                            &mut self.sortie.state,
+                            Default::default(),
+                            &self.evaluation,
+                        );
+                    sample.sensors[seat] = sensors;
+                    sample.policies[seat] = policy;
+                    (o, intent)
+                } else {
+                    let o = self.sortie.state.mission_observation_with_cadence(
+                        seat,
+                        self.pilots[seat].sensor_request(),
+                        Default::default(),
+                    );
+                    sample.sensors[seat] = clock.elapsed();
+                    let clock = Instant::now();
+                    let intent = self.pilots[seat].intent_with_evaluation(&o, &self.evaluation);
+                    sample.policies[seat] = clock.elapsed();
+                    (o, intent)
+                };
+            actions.extend(intent.encode(PlayerId::from_index(seat).unwrap()));
             sample.seats[seat] = Some(profiling::Seat::read(&o, site));
             let clock = Instant::now();
             let request = self
@@ -345,14 +385,7 @@ impl ClientScenario for MaterialMissionClientScenario {
             outcome: round.outcome?,
             elapsed: Duration::from_secs_f64(round.elapsed_seconds),
             planets: round.owned_planets,
-            controllers: std::array::from_fn(|seat| {
-                if !self.bots[seat] {
-                    "Human"
-                } else {
-                    self.pilots[seat].policy().display_name()
-                }
-                .into()
-            }),
+            controllers: std::array::from_fn(|seat| self.controller_name(seat).into()),
         })
     }
     fn runtime_diagnostics(&self) -> String {
@@ -384,8 +417,10 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
+                "{}\nmission_recovery_profile_p1={}\nmission_recovery_profile_p2={}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
                 self.profile.diagnostics(&self.pilots),
+                self.recovery_profiles[0].id(),
+                self.recovery_profiles[1].id(),
                 serde_json::to_string(&self.pilots.each_ref().map(|p| {
                     spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
                 }))
@@ -427,7 +462,7 @@ mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
     use engine_common::SpacewarsController::{
-        DestinationBot, Human, PlannerBot, RuleBot, ValueBot,
+        DestinationBot, Human, PlannerBot, RecoveryBot, RuleBot, ValueBot,
     };
     use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
@@ -579,6 +614,11 @@ mod tests {
             [ValueBot, Human],
             [Human, ValueBot],
             [ValueBot, ValueBot],
+            [RecoveryBot, Human],
+            [Human, RecoveryBot],
+            [RecoveryBot, ValueBot],
+            [ValueBot, RecoveryBot],
+            [RecoveryBot, RecoveryBot],
             [ValueBot, DestinationBot],
             [DestinationBot, ValueBot],
             [DestinationBot, Human],
@@ -619,10 +659,29 @@ mod tests {
                 let policy = match controller {
                     PlannerBot => MissionPolicy::Planner,
                     DestinationBot => MissionPolicy::DestinationPlanner,
-                    ValueBot => MissionPolicy::ValuePlanner,
+                    ValueBot | RecoveryBot => MissionPolicy::ValuePlanner,
                     _ => MissionPolicy::Legacy,
                 };
                 assert_eq!(client.pilots[seat].telemetry().policy, policy.id());
+                let recovery = if *controller == RecoveryBot {
+                    MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1
+                } else {
+                    MissionRecoveryProfile::Standard
+                };
+                assert_eq!(client.recovery_profiles[seat], recovery);
+                let expected = MissionBot::new(
+                    policy,
+                    BrainReset {
+                        actor: PlayerId::from_index(seat).unwrap(),
+                        episode_seed: 42,
+                    },
+                    settings.combat_breaks,
+                )
+                .with_recovery_profile(recovery);
+                assert_eq!(
+                    format!("{:?}", client.pilots[seat]),
+                    format!("{expected:?}")
+                );
                 assert_eq!(
                     client.pilots[seat].sensor_request().objective_planning,
                     policy.objective_planning()
@@ -812,6 +871,7 @@ mod tests {
             (PlannerBot, "Planner bot v10"),
             (DestinationBot, "Destination bot v12"),
             (ValueBot, "Value bot v13"),
+            (RecoveryBot, "Recovery bot v1"),
         ];
         for (p1, label1) in choices {
             for (p2, label2) in choices {

@@ -1641,6 +1641,7 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
                 "planner bot",
                 "mission v12",
                 "value v13",
+                "recovery v1",
             ],
             delta,
         ))),
@@ -1652,6 +1653,7 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
                 "planner bot",
                 "mission v12",
                 "value v13",
+                "recovery v1",
             ],
             delta,
         ))),
@@ -2525,6 +2527,7 @@ fn spacewars_controller_label(controller: SpacewarsController) -> &'static str {
         SpacewarsController::PlannerBot => "planner bot",
         SpacewarsController::DestinationBot => "mission v12",
         SpacewarsController::ValueBot => "value v13",
+        SpacewarsController::RecoveryBot => "recovery v1",
     }
 }
 
@@ -2535,6 +2538,7 @@ fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, S
         "planner bot" => Ok(SpacewarsController::PlannerBot),
         "mission v12" | "destination bot v12" => Ok(SpacewarsController::DestinationBot),
         "value v13" => Ok(SpacewarsController::ValueBot),
+        "recovery v1" => Ok(SpacewarsController::RecoveryBot),
         other => Err(format!("Unknown Spacewars controller {other:?}.")),
     }
 }

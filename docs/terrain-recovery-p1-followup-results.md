@@ -71,3 +71,57 @@ The [machine-readable receipt](terrain-recovery-p1-followup-results-v1.json) lin
 The prior time cap was explicitly removed by the user. This run completes the declared matrix; the one-seed screen is limited qualification evidence and does not establish frontier strength or warrant a default change.
 
 The retained-delay question and the declared fresh screen are complete. The next step is review of the existing opt-in ordinary-offset profile and its integration path. Keep the named candidate stable during that review; broader evaluation is still needed before changing the default bot.
+
+## Live candidate integration
+
+The launcher now offers **recovery v1** for either or both players. Its HUD and
+scoreboard identity is **Recovery bot v1**. This is the qualified Value v13
+policy plus `terrain_recovery_supported_hatch_ordinary_offsets_v1`, selected
+before the first decision. Existing controller settings and automatic-fill
+defaults retain their meanings.
+
+The client calls the same paired observation/decision driver as the retained
+qualification. Enhanced sensing is enabled only for an active recovery task;
+ordinary physical rebuild offsets are restored before the simulation steps.
+The usual shared planning budgets and flag surveys still run after decisions.
+Sensor and policy timing remain separate. Diagnostics expose
+`mission_recovery_profile_p1` and `mission_recovery_profile_p2` alongside the
+base mission policy identity.
+
+A `terrain-recovery` build feature exposes this production path without the
+`sensor-profile` instrumentation or query diagnostics. `sensor-profile`
+includes the new feature, preserving the historical experiment entry points.
+
+Local verification on Rust 1.89:
+
+- 440 AI unit tests pass with only `terrain-recovery` enabled.
+- 456 AI unit tests, 45 ground-navigation tests and 51 surface-recovery tests
+  pass with `sensor-profile` enabled. Strict AI Clippy passes with either feature.
+- 687 client unit tests pass, including controller ownership, pause/reset,
+  persisted settings and all 36 human/bot scoreboard pairings.
+- The production client reproduces the fresh Round/collapse-off/quiet/P1 and
+  Angular/collapse-on/Mixed8/P2 cases: all 72,000 retained world checksums,
+  final world snapshots, mission telemetry and native match results match.
+  Each candidate completes recovery; physical refinement is false after every
+  decision. Recorded controls are never applied to the live host.
+- The first replay checks reached the correct final worlds but compared an
+  in-memory JSON float against a parsed artifact. Applying the same JSON
+  serialization/readback to both sides fixes that test-only mismatch; both
+  full replays then pass without controller or physics changes.
+- The launcher functional test now covers the candidate in either and both
+  seats, verifies the exact profile through runtime diagnostics, and repeats
+  that check after restart. Its execution belongs to the display-backed CI gate.
+
+Reproduce either full host comparison using the corresponding `output`
+directory from the frozen fresh-screen package:
+
+```sh
+RUST_MIN_STACK=16777216 SPACEWARS_LIVE_RECOVERY_REFERENCE=/path/to/case/output \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client \
+  live_recovery_matches_retained_qualification -- --ignored --nocapture
+```
+
+Local logs are under `target/live-recovery-candidate/`. The local Pi GPU check
+requires the missing host `libseat` development package; CI and the Yocto target
+build provide the kiosk dependencies. Live integration is a candidate rollout,
+not evidence for changing the default bot or a general playing-strength claim.

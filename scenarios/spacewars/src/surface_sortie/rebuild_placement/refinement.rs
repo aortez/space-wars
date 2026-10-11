@@ -79,7 +79,7 @@ pub(super) fn neighbors<'a>(
 }
 
 impl SurfaceSortieState {
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn rebuild_refinement_enabled(&self, player: usize) -> Option<bool> {
         self.pilots
             .get(player)
@@ -88,7 +88,7 @@ impl SurfaceSortieState {
 
     /// Experimental search density only. Native placement/landing guards and
     /// recovery timers remain authoritative, including for actual builds.
-    #[cfg(feature = "sensor-profile")]
+    #[cfg(feature = "terrain-recovery")]
     pub fn set_rebuild_refinement(&mut self, player: usize, enabled: bool) -> bool {
         let Some(pilot) = self.pilots.get_mut(player) else {
             return false;

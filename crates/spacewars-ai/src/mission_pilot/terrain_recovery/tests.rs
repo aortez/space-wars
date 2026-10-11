@@ -1,7 +1,9 @@
 use super::*;
 use crate::mission_policy::{MissionBot, MissionPolicy, MissionRecoveryProfile};
 use engine_common::Scenario;
-use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, sensor_profile};
+use scenario_spacewars::surface_sortie::SurfaceSortieScenario;
+#[cfg(feature = "sensor-profile")]
+use scenario_spacewars::surface_sortie::sensor_profile;
 use std::time::Duration;
 
 const DT: Duration = Duration::from_nanos(16_666_667);
@@ -90,6 +92,7 @@ fn mission_losses_create_configured_tasks_without_renewing_an_existing_task() {
 }
 
 #[test]
+#[cfg(feature = "sensor-profile")]
 fn completion_clears_native_refinement_before_step_without_touching_the_other_seat() {
     let mut state = SurfaceSortieScenario::init_material_combat(42);
     SurfaceSortieScenario::step(&mut state, &[], DT);
@@ -116,6 +119,7 @@ fn completion_clears_native_refinement_before_step_without_touching_the_other_se
 }
 
 #[test]
+#[cfg(feature = "sensor-profile")]
 fn enhanced_sensor_keeps_mission_context_and_defers_the_same_landing_survey() {
     let mut state = SurfaceSortieScenario::init_material_match(42);
     for _ in 0..17 {
