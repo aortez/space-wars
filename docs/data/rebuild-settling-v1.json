@@ -1,0 +1,1557 @@
+{
+  "schema": 1,
+  "profile": "native_rebuild_settling_v1",
+  "complete": true,
+  "decision": "not_qualified",
+  "runtime_source_commit": "8c9e3338f340adadf53d63176c3fcd15af8aefde",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/surface_mission_soak",
+    "sha256": "4fcbce64542e78be52cf03610cbfa7a3233b7cdb4e0216303e7db153cd37318b"
+  },
+  "lab_binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/surface_flag_soak",
+    "sha256": "373ec4fbbbd11f6546532c84a4f94dbcd5a0030a4cc6e16a2a9df1b562aac903"
+  },
+  "frozen_inputs": 950,
+  "fresh_games": 0,
+  "main_replays": 4,
+  "candidate_lab_trials": 20,
+  "baseline_lab_trials": 20,
+  "game_retries": 0,
+  "audit_resumes": 0,
+  "default_promotion": false,
+  "screen": {
+    "decision": "not_qualified",
+    "complete_recovery": false,
+    "controls_retained": true,
+    "survival_retained": true,
+    "established_trials_retained": false,
+    "native_receipt_ticks": {
+      "claim": null,
+      "rebuild": null,
+      "boarding": null
+    },
+    "default_promotion": false
+  },
+  "runs": {
+    "new-world1-p2-asteroids3-integrated": {
+      "elapsed_ticks": 13337,
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "completed_recoveries": [
+        1,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        1
+      ],
+      "ships_lost": [
+        1,
+        1
+      ],
+      "pilot_health": [
+        100.0,
+        0.0
+      ],
+      "retained_physics": true,
+      "retained_actions": true,
+      "retained_non_timing_report": true,
+      "comparison": {
+        "common_rows": 26674,
+        "before_rows": 26674,
+        "after_rows": 26674,
+        "first_observation": {
+          "tick": 6395,
+          "seat": 0
+        },
+        "first_action": null,
+        "first_native": null,
+        "actions_retained": true
+      },
+      "observer_rows": 26674,
+      "observer_overrides": 0,
+      "placement_reports": 1,
+      "misaligned_attempts": 0,
+      "builds": [
+        {
+          "tick": 6395,
+          "seat": 0,
+          "count": 1,
+          "selected_offset": -8.0,
+          "settling_angle_degrees": 2.991924524307251
+        }
+      ],
+      "high_flights": 0
+    },
+    "new-world3-p1-asteroids3-integrated": {
+      "elapsed_ticks": 21833,
+      "outcomes": [
+        "win",
+        "loss"
+      ],
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "pilot_deaths": [
+        0,
+        1
+      ],
+      "ships_lost": [
+        0,
+        1
+      ],
+      "pilot_health": [
+        100.0,
+        0.0
+      ],
+      "retained_physics": true,
+      "retained_actions": true,
+      "retained_non_timing_report": true,
+      "comparison": {
+        "common_rows": 43666,
+        "before_rows": 43666,
+        "after_rows": 43666,
+        "first_observation": null,
+        "first_action": null,
+        "first_native": null,
+        "actions_retained": true
+      },
+      "observer_rows": 43666,
+      "observer_overrides": 0,
+      "placement_reports": 0,
+      "misaligned_attempts": 0,
+      "builds": [],
+      "high_flights": 0
+    },
+    "new-world3-p1-asteroids3-no-stop": {
+      "elapsed_ticks": 11509,
+      "outcomes": [
+        "loss",
+        "win"
+      ],
+      "completed_recoveries": [
+        0,
+        0
+      ],
+      "pilot_deaths": [
+        1,
+        0
+      ],
+      "ships_lost": [
+        1,
+        0
+      ],
+      "pilot_health": [
+        0.0,
+        100.0
+      ],
+      "retained_physics": true,
+      "retained_actions": true,
+      "retained_non_timing_report": true,
+      "comparison": {
+        "common_rows": 23018,
+        "before_rows": 23018,
+        "after_rows": 23018,
+        "first_observation": null,
+        "first_action": null,
+        "first_native": null,
+        "actions_retained": true
+      },
+      "observer_rows": 23018,
+      "observer_overrides": 0,
+      "placement_reports": 0,
+      "misaligned_attempts": 0,
+      "builds": [],
+      "high_flights": 0
+    },
+    "new-world1-p2-asteroids3-no-stop": {
+      "elapsed_ticks": 18215,
+      "outcomes": [
+        "loss",
+        "win"
+      ],
+      "completed_recoveries": [
+        1,
+        1
+      ],
+      "pilot_deaths": [
+        1,
+        0
+      ],
+      "ships_lost": [
+        2,
+        1
+      ],
+      "pilot_health": [
+        0.0,
+        66.72103881835938
+      ],
+      "retained_physics": false,
+      "retained_actions": false,
+      "retained_non_timing_report": false,
+      "comparison": {
+        "common_rows": 36430,
+        "before_rows": 72000,
+        "after_rows": 36430,
+        "first_observation": {
+          "tick": 6395,
+          "seat": 0
+        },
+        "first_action": {
+          "tick": 12422,
+          "seat": 0
+        },
+        "first_native": {
+          "tick": 12423,
+          "seat": 0
+        },
+        "actions_retained": false
+      },
+      "observer_rows": 36430,
+      "observer_overrides": 0,
+      "placement_reports": 1254,
+      "misaligned_attempts": 323,
+      "builds": [
+        {
+          "tick": 6395,
+          "seat": 0,
+          "count": 1,
+          "selected_offset": -8.0,
+          "settling_angle_degrees": 2.991924524307251
+        },
+        {
+          "tick": 17169,
+          "seat": 1,
+          "count": 1,
+          "selected_offset": -8.0,
+          "settling_angle_degrees": 0.0
+        }
+      ],
+      "high_flights": 0
+    }
+  },
+  "native_receipts": {
+    "rebuild_tick": 17169,
+    "settled_tick": 17244,
+    "boarding_tick": 17245,
+    "completed_recovery_tick": 17246,
+    "departure_tick": 17252,
+    "settled_landing": {
+      "altitude": -0.0023938119411468506,
+      "angle_degrees": 0.01978234015405178,
+      "assist_strength": 1.0,
+      "corner_support": false,
+      "descent_speed": -0.026729261502623558,
+      "foot_clearances": [
+        -0.0023938119411468506,
+        0.0002238452434539795
+      ],
+      "lateral_speed": -0.004301814362406731,
+      "phase": "landed",
+      "planet": 1,
+      "relative_spin": 0.0006933175027370453,
+      "settled_seconds": 0.25,
+      "supported_feet": 2
+    },
+    "native_recovery": {
+      "blocked_attempts": 0,
+      "placement": {
+        "attempts": [
+          {
+            "center": {
+              "x": 38.42196273803711,
+              "y": 142.77978515625
+            },
+            "hatch": {
+              "x": 44.282196044921875,
+              "y": 133.77137756347656
+            },
+            "offset": -8.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 0.4581957459449768,
+              "destination_nodes": 3,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.4581957459449768,
+              "partial": false,
+              "reachable_nodes": 1,
+              "start_distance": 0.08794716745615005,
+              "start_node": 486
+            },
+            "settling_angle_degrees": 0.0
+          },
+          {
+            "center": {
+              "x": 32.28771209716797,
+              "y": 144.2908172607422
+            },
+            "hatch": {
+              "x": 38.52743911743164,
+              "y": 135.54067993164062
+            },
+            "offset": -14.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 2.521533250808716,
+              "destination_nodes": 4,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 3.4584801197052,
+              "nearest_destination_distance": 0.8738659620285034,
+              "partial": false,
+              "reachable_nodes": 5,
+              "start_distance": 0.08794716745615005,
+              "start_node": 486
+            },
+            "settling_angle_degrees": 0.0
+          },
+          {
+            "center": {
+              "x": 54.36476135253906,
+              "y": 137.5023956298828
+            },
+            "hatch": {
+              "x": 59.16497802734375,
+              "y": 127.88756561279297
+            },
+            "offset": 8.0,
+            "rejection": "no_hatch_route",
+            "route": {
+              "closest_reachable_distance": 12.663288116455078,
+              "destination_nodes": 3,
+              "failure": "disconnected",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.6993789076805115,
+              "partial": false,
+              "reachable_nodes": 20,
+              "start_distance": 0.08794716745615005,
+              "start_node": 486
+            },
+            "settling_angle_degrees": 0.01978234015405178
+          },
+          {
+            "center": {
+              "x": 60.18582534790039,
+              "y": 135.05551147460938
+            },
+            "hatch": {
+              "x": 64.5721664428711,
+              "y": 125.2437744140625
+            },
+            "offset": 14.0,
+            "rejection": "no_hatch_route",
+            "route": {
+              "closest_reachable_distance": 11.765816688537598,
+              "destination_nodes": 3,
+              "failure": "disconnected",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.5789913535118103,
+              "partial": false,
+              "reachable_nodes": 24,
+              "start_distance": 0.08794716745615005,
+              "start_node": 486
+            },
+            "settling_angle_degrees": 0.0
+          }
+        ],
+        "planet": 1,
+        "revision": 29,
+        "selected_offset": -8.0,
+        "standing": {
+          "x": 44.282684326171875,
+          "y": 133.76571655273438
+        },
+        "tick": 17169
+      },
+      "planet": null,
+      "pod_ejections": 1,
+      "rebuild_interruptions": 0,
+      "rebuild_progress": 0.0,
+      "rebuild_required_seconds": 8.0,
+      "rebuilds": 1,
+      "scuttle_progress": 0.0,
+      "scuttle_required_seconds": 3.0,
+      "ships_lost": 1,
+      "status": "ship_available"
+    },
+    "high_ledge_chain_exercised": false,
+    "earlier_preview_tick": 12405,
+    "earlier_rejected_angle": 26.744617462158203,
+    "first_changed_action": {
+      "tick": 12422,
+      "seat": 0
+    },
+    "first_changed_native": {
+      "tick": 12423,
+      "seat": 0
+    },
+    "original_chain_required": "High crossing, new claim, rebuild and boarding on planet zero after the retained ledge; not reached in this match."
+  },
+  "lab_comparison": {
+    "candidate_accepted": 19,
+    "baseline_accepted": 19,
+    "same_physical_samples": 20,
+    "same_physical_events": 20,
+    "same_final_audit": 20,
+    "same_non_timing_report": 16,
+    "recorded_samples_per_case": 180,
+    "failed_case": "seed42-seat1-capture-none",
+    "failed_case_report_equal": true
+  },
+  "validation": {
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-settling/v1/validation-logs/native.log",
+      "log_sha256": "9a9a3e555d9064d0c9fb7ba27c7a4be6c7b96cf4d1e778107fd6e37aacd51a8f"
+    },
+    "bot_ground_recovery": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-settling/v1/validation-logs/bot_ground_recovery.log",
+      "log_sha256": "f4dca3eb6110426e1dfeeee913c90ee47bf4a1cf9b118aadf249e6fef42af14a"
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-settling/v1/validation-logs/python.log",
+      "log_sha256": "7c897324403a75f03cd7d7421a44c0c6b67623ef18facb29670b328c5f9d7d52"
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-settling/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "8fb84876f02160d840037bd9c1ca1fd5b924f3f69a1bb2f9fd3d4991e19f8834"
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--example",
+        "surface_flag_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-settling/v1/validation-logs/release.log",
+      "log_sha256": "39331a15d429729e8f7c3c94b070a7d98fc2fd0ed8f211cad85a798a8be8d0f6"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0
+    }
+  },
+  "archives": {
+    "new-world1-p2-asteroids3-integrated": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/new-world1-p2-asteroids3-integrated.tar.gz",
+      "sha256": "f226d6e2b56f396dbb6329ee8758dfce71598db5fa6732e0246d00dfb4febf33",
+      "bytes": 65519076,
+      "raw_bytes": 540487716,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "518ff79bfcacaf5f101b592e7e388b14ed253862f69f56321dad9da496ddd441",
+          "bytes": 56256
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "ceca7f434e99e38ae4de60a83430b57aa1bc07326ddfda43bbbd72847dc8b123",
+          "bytes": 146639524
+        },
+        "clearance-audit.json": {
+          "sha256": "d306a5a7b8a1d089d3a91faa8ab2bd349f6dff7573d496169ef19fe153ff587e",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "e9ca8bdb1e79eb5c6bed5d36946b54307cd3184764c4facac74cf4567da8342f",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "69d6dcf6decc7d786e0c27beacef30a02df9f397b478dff1d88012e0407f7faf",
+          "bytes": 10530945
+        },
+        "destination-cover.jsonl": {
+          "sha256": "cdb70ec20124af37ebb0a9b93b9fed93ceac7ddd1e760faee2ebca2ab717f5ba",
+          "bytes": 1607419
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "8edfcf829a25c38b94ce10f0b042406457d3c12c790fbc994b34fd96184b23dd",
+          "bytes": 3184519
+        },
+        "flag-survey.jsonl": {
+          "sha256": "476c2216033d03c46c6260a9a00918291645e746c74cf4c167774c54d76f270d",
+          "bytes": 14462
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "440f23171aead35c4b74e5dc56457a29135157f341843a45eba4c3fa3705a85d",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "d180b8128bf29adcf3bc6a2ad5b46a4e5938f670a2c2c9a1a89fecdf0f0735e1",
+          "bytes": 52539963
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "dd44dbda0c9b25558ffebb20942e42f18375379d1baf141d803caeedfdd4d7db",
+          "bytes": 348921
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "5c7d3ee0a1dd643864d6953b55385b80774bf27f48d83303bec5f4c404a4184f",
+          "bytes": 2189307
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "03733081ca2b8878cd2e5288e100830ad971c89a4fd4cbcc4720a1155fbd3d9d",
+          "bytes": 8512915
+        },
+        "native-recovery-audit.json": {
+          "sha256": "26b66f06e355f767265290b2bcd32ce1caa531ef59b2e7da4957429edf24773c",
+          "bytes": 61
+        },
+        "new-world1-p2-asteroids3-integrated-audit.json": {
+          "sha256": "38ea8ad6e1ba141848c49229efa06ef531fafc6966e8434dda78fb56ba4e8455",
+          "bytes": 392081
+        },
+        "rebuild-placement-audit.json": {
+          "sha256": "bf9cf21fd1cf7117e47e4a7e0bf2f0d89f42a44bd8cc97b73224a248d68f7864",
+          "bytes": 229948
+        },
+        "report.json": {
+          "sha256": "a8a30876fac4f552d6985d689ac698a0be1467a9091232c305a9245b35d0ee27",
+          "bytes": 7114678
+        },
+        "sensors.jsonl": {
+          "sha256": "326f28300fd61d0d2b2ad1349f3df6bf9f50d757e5002ddc5582b71ada32c787",
+          "bytes": 32017204
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "093a5fd8eec597b7ab789e0c297aade206a18a343443188c7050ee3cbc1b7f93",
+          "bytes": 9620847
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "6a509dda8b7468fc8ffcc8211c4128fdf61d09b65fba6465b2a0221ca2ea3563",
+          "bytes": 335978
+        },
+        "trace.jsonl": {
+          "sha256": "97661c4f6c5124b00bce7adb6a20ac46bd33e35121fa3eb43ec0abdf6077ac68",
+          "bytes": 265152194
+        }
+      }
+    },
+    "new-world3-p1-asteroids3-integrated": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/new-world3-p1-asteroids3-integrated.tar.gz",
+      "sha256": "9fea81388dce81c6c4f432b9f127e18af6a7eeb096d4a38acdf580093650e629",
+      "bytes": 120725123,
+      "raw_bytes": 959866792,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "52431f5dce1523b2910805883b417781b99aba6f2cdd16bcdc080f57387407ae",
+          "bytes": 179
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "668cb82766522857db04974b3952c49f9c926fc12d890addb780a173616dcdeb",
+          "bytes": 262278370
+        },
+        "clearance-audit.json": {
+          "sha256": "cfb0169d2c0121676edb323e19bebf115ec6538b1d092fe0f8a4a2e62231d744",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "8d1e06d9c60ef360451b0762b27bf321aa8f886aa539c78eebf6cef76345f9d5",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "844b4f67d20d402456e5ee4f80f81216d6f4aad8d5cf901b102c0a9162340206",
+          "bytes": 17290785
+        },
+        "destination-cover.jsonl": {
+          "sha256": "860d3ea316a13796ac35ddc0324e21e74b6765091d31943b2ed42685fdcc936c",
+          "bytes": 1239609
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "c5d43dc0e2c4173997119a71c3023ad9d641adca199e26a29e56f3210ec1f312",
+          "bytes": 5190298
+        },
+        "flag-survey.jsonl": {
+          "sha256": "d9ffca46a891e0f9b6635d43d9290f8463a2fe9aa0f62a1529732ea73ee3b2de",
+          "bytes": 8775
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "4fc3b301c0f686cbe7bd797085e4850c67a41dab8db792cf75737f12284ad18e",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "7ee4b3e38b428ef650222251a5771278ead7983f0f17981fee7623419de0e73b",
+          "bytes": 85984913
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "7a855fb152be72b92b7c1d5a6de7fbac0149d99da0dd5fa93535fcfad103fe4a",
+          "bytes": 1115194
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "90519bce483730173b3c113b41e9f6c84ad9f3bb35aaec9a805e1d1a1a5016df",
+          "bytes": 3590687
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "ca8537ec1d41f534af27c711b874cc769fe405861a2e2d0813d4eb4db3a19ad4",
+          "bytes": 7187314
+        },
+        "native-recovery-audit.json": {
+          "sha256": "41adabf8cc0ad2478938e31384aaa546e5026b267b8292f3d3c045c064f62fd5",
+          "bytes": 61
+        },
+        "new-world3-p1-asteroids3-integrated-audit.json": {
+          "sha256": "0a38ab9cd0cb970528c8b83b6cbcec01ea6d73ec04d313d33f59a2f701d1fcd9",
+          "bytes": 577273
+        },
+        "rebuild-placement-audit.json": {
+          "sha256": "1b7492ee560faf61bcb1149a76de25c06416ffe78efc6f335174776836381ddd",
+          "bytes": 18813
+        },
+        "report.json": {
+          "sha256": "32a54397fb0b8b2c77b0a43ba2e5177bb3d06ca2d471be1ce581db39a50cb26f",
+          "bytes": 19859909
+        },
+        "sensors.jsonl": {
+          "sha256": "2d4ed32bd97f7c05f5d2e1e67f6c3a56742b7757a8da016cb0d0874dd9a37717",
+          "bytes": 51532522
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "236d9628a6e8853a029c69fcf764c3bc3e67d8f30a995aa88c2cee92d921e0ed",
+          "bytes": 10441500
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "69f38fc8bd64345e5a889eedf107c02fa228b7d4831affb930265ba4d2c50c94",
+          "bytes": 308868
+        },
+        "trace.jsonl": {
+          "sha256": "b4739ea1ef53bb0dc4a5e3a0088dabf86b73429534ef4533b6e43ac79436b7b9",
+          "bytes": 493241228
+        }
+      }
+    },
+    "new-world3-p1-asteroids3-no-stop": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/new-world3-p1-asteroids3-no-stop.tar.gz",
+      "sha256": "8dcedec50265f516e7a405792eb11dbd6c2d3fca84e22814c2bcb2bc6abfc817",
+      "bytes": 64505513,
+      "raw_bytes": 511165414,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "51d66403de423dd447c53e53cc2e39a6062de5bf2c91ace3b4463e3374263a06",
+          "bytes": 179
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "1f071e2cf80e976e0809e8d0217d1956b53bb45e0c21c0749813551bac601c18",
+          "bytes": 146451291
+        },
+        "clearance-audit.json": {
+          "sha256": "34c47e52d960912c964b283bdfdc4e32daf461bc3b7e2f62ac610161a6c315d4",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "0fd6ef65ddccedaf6674a74a3b573423ce09c9744e7d24d58e940947277c3bad",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "68c80377200a4810df1c61f195d7781e8448efb3e1be0ef0a122783a4c28a625",
+          "bytes": 9128528
+        },
+        "destination-cover.jsonl": {
+          "sha256": "860d3ea316a13796ac35ddc0324e21e74b6765091d31943b2ed42685fdcc936c",
+          "bytes": 1239609
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "1ae9823e57bfa866018e461f8dde1476135f9c1a01c560a473ced1e9b7c73f35",
+          "bytes": 2440794
+        },
+        "flag-survey.jsonl": {
+          "sha256": "ef5ecee758b101730e39ca09f79b4466e1b09fd436dd84e6403d155da525c8b9",
+          "bytes": 4492
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "2b02083de0f1502daffd6c9679b55d91eafdf6208d81ff24efd87eee4f7a32c8",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "93115b85f1d6decfaefd069d030f6ca48254ef8acca65fecfcbc73f0a6fbbc86",
+          "bytes": 44045529
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "ca7f728ac5619ce9b86368e7b3d6dfbaec2d18e3f059fc8e9f5ace2d919c4c66",
+          "bytes": 512074
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "400bd20e7c619972eae4b77c0ce551757fe08934b2c7f6f05ee359b5de761f58",
+          "bytes": 1887578
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "c62dd8caa77508a933bf1bc6b3748962782c2209a8089c91dbd603c01313157a",
+          "bytes": 6240719
+        },
+        "native-recovery-audit.json": {
+          "sha256": "57582f47232004142161ed8eed208ffe25aee7d24a9b4c56759a760f38492770",
+          "bytes": 61
+        },
+        "new-world3-p1-asteroids3-no-stop-audit.json": {
+          "sha256": "4114b43d5e3f53c618ce0ad23121c830b38c61583d63d352f02cb3b873c67c9d",
+          "bytes": 535205
+        },
+        "rebuild-placement-audit.json": {
+          "sha256": "58b646d1b433aa14b861a825bed2f223f7729c28ab8a2f604819328dc0d5cb6d",
+          "bytes": 82
+        },
+        "report.json": {
+          "sha256": "8e404a54864db2e8bc30083c58f0a20c4704affb273233ca0ba86082f97ff223",
+          "bytes": 9126269
+        },
+        "sensors.jsonl": {
+          "sha256": "773a2fda559235dd93fa303146ef1f776961b169a4a33b117db0d2d6b90a1487",
+          "bytes": 28467715
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "b598704eb88235150bf706c9b4dc34b89e4caeccc5832821132a02cfaa2915fe",
+          "bytes": 5502186
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "f8fd07cdb8d94ae378357e7b2ef2b44517a7d7a49898dbc4ac71cfc9aad2564b",
+          "bytes": 245689
+        },
+        "trace.jsonl": {
+          "sha256": "f90b223108f42d876aedb79a1474a6827d16c1419563f5bcf36fdbd4751282dc",
+          "bytes": 255336920
+        }
+      }
+    },
+    "new-world1-p2-asteroids3-no-stop": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/new-world1-p2-asteroids3-no-stop.tar.gz",
+      "sha256": "6779b8aa942a26037129e5058f0a043abe3dfa243f4115340aabfd2ed8200894",
+      "bytes": 103403630,
+      "raw_bytes": 791257455,
+      "files": {
+        "baseline-comparison.json": {
+          "sha256": "63a5d265229ab91b1f088deba7a1914b613c7b5a8cc3a14c8afe7ccf9437439b",
+          "bytes": 145382
+        },
+        "capture-evidence.jsonl": {
+          "sha256": "5d2841479aa4fc9bcd6500b7d8379b7c65edc8dfc6c4137af0239828e17d58c0",
+          "bytes": 197920656
+        },
+        "clearance-audit.json": {
+          "sha256": "dd045cb9ace0221462dc127fef693f2d041f87715149f01b4ae46ca477c33d41",
+          "bytes": 149
+        },
+        "defense-audit.json": {
+          "sha256": "d4d1cace8058685f73afd58e3d5ab383b61e0d3baf5275c20091458ec79dfc35",
+          "bytes": 239
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "18c32883b91bc882bb26def76c8bda29df63cfdb7df98ae5b27e465a22b6e24c",
+          "bytes": 14355221
+        },
+        "destination-cover.jsonl": {
+          "sha256": "639fc89cc9f718882bfa882f3e188207f6716ca26d5a9b59ac55a90deccf9afd",
+          "bytes": 1623054
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "b5c728cf8565f15fa97fc55a6094792d23f39c5e7d0eeece2dd7d64f63689241",
+          "bytes": 4411032
+        },
+        "flag-survey.jsonl": {
+          "sha256": "c767131245bbc947738611c34c5432fa6dfff878dc2ad4e97af4a5b443b8a27b",
+          "bytes": 21540
+        },
+        "ground-arrival-audit.json": {
+          "sha256": "0bbe5ae5c04b26b9d8322b3ab81f6827a9b7bf1d1d74f89556b2d7dd42b0eb69",
+          "bytes": 106
+        },
+        "impact.jsonl": {
+          "sha256": "eea8556a4581cd2cc823231ef54d57bae3e960f23112ce00deec7931f29ba399",
+          "bytes": 77786980
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-planning.csv": {
+          "sha256": "ccdaa7f34f46ee0e1c02b610d05f86a8d860bd5648567b924ef90b0b444ee8a7",
+          "bytes": 390313
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "d8aac5d8f79687487eba649d7d536df2b1ad2d1d3ce24a629b539b5f022c7861",
+          "bytes": 2994164
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "0db5eef4ed02249565e812e6959969e5ac40e7f2201db21af42fece53cdaef37",
+          "bytes": 11309568
+        },
+        "native-recovery-audit.json": {
+          "sha256": "7b57e45c9d77a380dba0f7552063709c0d0fc19e11783c9d970e3ef292eea38e",
+          "bytes": 61
+        },
+        "new-world1-p2-asteroids3-no-stop-audit.json": {
+          "sha256": "12024556e44e9ec52ad4f8678e56d93729756ce8d8d74b03056cf6d972f71273",
+          "bytes": 362100
+        },
+        "rebuild-placement-audit.json": {
+          "sha256": "54379c5c980894cccc8bdfeb2fae8f3700b92a857c9deea36938053a2444160e",
+          "bytes": 2065454
+        },
+        "report.json": {
+          "sha256": "d903e340fa805ba317457212a9ca239972f65322c7fcddac96d4ecc12f072170",
+          "bytes": 11686731
+        },
+        "sensors.jsonl": {
+          "sha256": "94194932045d551c05f3bdcef8024565e0443b7f672f31daa1aa535036b53b32",
+          "bytes": 43205131
+        },
+        "sequence-diagnostics.json": {
+          "sha256": "04333e62385e394817d47647d73bee122985e82e98c1ab68c25b2806b9f67444",
+          "bytes": 14991159
+        },
+        "terrain-flight-audit.json": {
+          "sha256": "99658e19d0ccba2dec5bae0c37a7cbc2de95f264f6fa3568ca24207bc7f99122",
+          "bytes": 312536
+        },
+        "trace.jsonl": {
+          "sha256": "4d70136b65bc63bd4878ed7d8b9ad0763f40ebd744c66c56e89f7f5ccdd48394",
+          "bytes": 407675879
+        }
+      }
+    },
+    "candidate-seed42-seat0-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-capture-none.tar.gz",
+      "sha256": "75caef72103818a27168e4ecef4416aa533eced32d162d64c3248276ce952a1c",
+      "bytes": 734356,
+      "raw_bytes": 4787697,
+      "files": {
+        "report.json": {
+          "sha256": "ed7e74c77f6de6e68cb9f4ab1112edb2b22cc6f216b990b5e9ab6de3596efcb8",
+          "bytes": 4783913
+        },
+        "runner.log": {
+          "sha256": "b75bc5479699b4fc0c328293987df2efcfa914a167b06e3c3c3f94997766267a",
+          "bytes": 3784
+        }
+      }
+    },
+    "candidate-seed42-seat1-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-capture-none.tar.gz",
+      "sha256": "c99ea4352b4d7868740a9cc61ec1f0d2fe9af9209dccf126156f978f271def57",
+      "bytes": 467129,
+      "raw_bytes": 3793712,
+      "files": {
+        "report.json": {
+          "sha256": "7168072d5326580dd984a0f76d1aa9f075c00de62c618a43ad3b571b0c7c6b54",
+          "bytes": 3791069
+        },
+        "runner.log": {
+          "sha256": "8b4f968d9f1056d99bfed90809d8ba4271952e85a1a29e3762fa20532add9345",
+          "bytes": 2643
+        }
+      }
+    },
+    "candidate-seed42-seat0-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-recovery-none.tar.gz",
+      "sha256": "2dc80f53b6578f0eec8a08cf5ce38c85a12f57b3a1a670350d2c911c253d588e",
+      "bytes": 256563,
+      "raw_bytes": 2507894,
+      "files": {
+        "report.json": {
+          "sha256": "8067b26a82b14f90792e4d6fc2ac378f87a6ca9c24479cec8c947c75e557d73b",
+          "bytes": 2505376
+        },
+        "runner.log": {
+          "sha256": "1a93b3bfe1283b51c80f9338938fd2f61fbdca5fc06f3057c1f0ae0dc4612936",
+          "bytes": 2518
+        }
+      }
+    },
+    "candidate-seed42-seat1-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-recovery-none.tar.gz",
+      "sha256": "00567caf4237aec9b7dd25116cead0bc2ae6c1a112cf3524628203e5b1943c86",
+      "bytes": 256219,
+      "raw_bytes": 2505612,
+      "files": {
+        "report.json": {
+          "sha256": "7b0281c5f2eb6b9f6e9974ce048294f85eb55efdc8030ae200116093f77907ee",
+          "bytes": 2503190
+        },
+        "runner.log": {
+          "sha256": "6fe2d355bfba9584b6b3ae936b63114d287cedc086d17b720b50afe9ee4e979c",
+          "bytes": 2422
+        }
+      }
+    },
+    "candidate-seed42-seat0-navigation-crater": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-navigation-crater.tar.gz",
+      "sha256": "69c39bf4d60d95b63bd0ef6e2b98bcc820a01e80c309692845e05f83398ce405",
+      "bytes": 297839,
+      "raw_bytes": 2421433,
+      "files": {
+        "report.json": {
+          "sha256": "fcc981376b844cf1132635f33f005f25111da9364843ebb6b1c667b8996f304e",
+          "bytes": 2418524
+        },
+        "runner.log": {
+          "sha256": "0ebef30c12c6ab95d5b571d5c88391e115bbb22a1501b583fb584bdee462c0ba",
+          "bytes": 2909
+        }
+      }
+    },
+    "candidate-seed42-seat1-navigation-crater": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-navigation-crater.tar.gz",
+      "sha256": "62c111e3fd83975557ef656ef1713546cc14f4799699b16f4c2823e486f8d664",
+      "bytes": 284445,
+      "raw_bytes": 2312844,
+      "files": {
+        "report.json": {
+          "sha256": "96417bdb9df456626c4481d8571d8c5c24931cf4cbd9086bf726440618626bd3",
+          "bytes": 2310336
+        },
+        "runner.log": {
+          "sha256": "4bd94b534c8903b83765a75a6d68e62bf4be07c80c316b59bcdce90aa3ab36c8",
+          "bytes": 2508
+        }
+      }
+    },
+    "candidate-seed42-seat0-navigation-flag": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-navigation-flag.tar.gz",
+      "sha256": "2fa3219f32bbdb6123e86ddf9cf936d583c6d93fe692b0f3c0b630f31565d5e2",
+      "bytes": 224299,
+      "raw_bytes": 1848099,
+      "files": {
+        "report.json": {
+          "sha256": "7ad86fefdd180b18e04a368a6ae154f4c22451e5c1b978dd7b523588d8986437",
+          "bytes": 1847178
+        },
+        "runner.log": {
+          "sha256": "9a82d0ec44f34413627f3e89c7cca7f151fff60d149122a3308f1affc15bda59",
+          "bytes": 921
+        }
+      }
+    },
+    "candidate-seed42-seat1-navigation-flag": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-navigation-flag.tar.gz",
+      "sha256": "680b8a6460e3d0d9b51a2da2d208d34f271227d28df24516226f4465b83d6cbe",
+      "bytes": 225330,
+      "raw_bytes": 1850137,
+      "files": {
+        "report.json": {
+          "sha256": "534c74d7d7f338286d35d6ae8a6631ba0f694dac23099c7eaaef7280a6fa64da",
+          "bytes": 1849217
+        },
+        "runner.log": {
+          "sha256": "b16c2f5e1db4bad12b4f6c214aa3779c1d1f4e9d9e7ebd67db96684e40d4682c",
+          "bytes": 920
+        }
+      }
+    },
+    "candidate-seed42-seat0-navigation-blocked": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-navigation-blocked.tar.gz",
+      "sha256": "a39adf709ba04b662829c2450e9ab28a3b56ccaef62ecb0be1421517859036d4",
+      "bytes": 271431,
+      "raw_bytes": 2271498,
+      "files": {
+        "report.json": {
+          "sha256": "27c99a6d6bd2bb6c8964ce50a886b0f923f46017a5b4b2b4a53e4213a6fe609a",
+          "bytes": 2270450
+        },
+        "runner.log": {
+          "sha256": "ab83f9e7b8006f2d9039c7d95094562b6e86383ff68b0bba4b1a94b0079bff2c",
+          "bytes": 1048
+        }
+      }
+    },
+    "candidate-seed42-seat1-navigation-blocked": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-navigation-blocked.tar.gz",
+      "sha256": "0130e6f90561a554fdc1900480ee688eb26475d9b47d48a57efb266661b3419c",
+      "bytes": 259744,
+      "raw_bytes": 2233038,
+      "files": {
+        "report.json": {
+          "sha256": "e0cc883db450cf4f250efb6ff57d2bb02266522f7f234f5ebedd0a7aa5cbdd26",
+          "bytes": 2231988
+        },
+        "runner.log": {
+          "sha256": "aeffab7ea664b663af03c1301f4e958791a9a56034e0aa7646ae297b80667842",
+          "bytes": 1050
+        }
+      }
+    },
+    "candidate-seed42-seat0-pod-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-pod-none.tar.gz",
+      "sha256": "4ef55cad470992b124bb4bb4e6677d7ff14f9b659848d5b4a760a93066031429",
+      "bytes": 200812,
+      "raw_bytes": 1896899,
+      "files": {
+        "report.json": {
+          "sha256": "780ef84888669b682dbeeb1b0b81bd3fdbeaea225d7312d5d80ef8fa9fe8029f",
+          "bytes": 1895375
+        },
+        "runner.log": {
+          "sha256": "44f84ebd32bbf263ababf23ea9912d367c23e831fed7e86913677d7e39c91169",
+          "bytes": 1524
+        }
+      }
+    },
+    "candidate-seed42-seat1-pod-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-pod-none.tar.gz",
+      "sha256": "89f3dcd91e5f509b712dd397c7889d9fafa94d66b2e8dd864ffdbdd3b0a52ec6",
+      "bytes": 257069,
+      "raw_bytes": 2325752,
+      "files": {
+        "report.json": {
+          "sha256": "67b4575c32b4200d51188c55d946b64fab64166e758fc73bb67d7ed3c8631728",
+          "bytes": 2323370
+        },
+        "runner.log": {
+          "sha256": "c98c26aa77bc6bdee195e8ba7f8930f012f8bad312eb240b8ccdd3800eea05f2",
+          "bytes": 2382
+        }
+      }
+    },
+    "candidate-seed42-seat0-recovery-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-recovery-rebuild.tar.gz",
+      "sha256": "e0ee7ab243a10c96e9988096ca38f51ee95300b56b1a1232f443d37a5186376a",
+      "bytes": 280132,
+      "raw_bytes": 2758704,
+      "files": {
+        "report.json": {
+          "sha256": "497ea6142539d9b75685385fa5d1da70996d7400ece5c423bf9cb7abdba4261e",
+          "bytes": 2755693
+        },
+        "runner.log": {
+          "sha256": "cf5cc54cd624e8562948b3c64ee5c93e8853fd256b729e25f6730b9f2eea7f41",
+          "bytes": 3011
+        }
+      }
+    },
+    "candidate-seed42-seat1-recovery-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-recovery-rebuild.tar.gz",
+      "sha256": "f6f1ab87859b67666a969cd38fd3b1bd8b8a5810bf7c90c185b90b699bb6eb15",
+      "bytes": 282603,
+      "raw_bytes": 2779894,
+      "files": {
+        "report.json": {
+          "sha256": "37aef8b58b04995bb810bb161f0c2f131e2ecae444b3018c96cc4557a9b3d059",
+          "bytes": 2776984
+        },
+        "runner.log": {
+          "sha256": "0aed2b4cad59dfaac196a0d4fc25b194e87a1f9f571f99b16f7537dcb90c2ddc",
+          "bytes": 2910
+        }
+      }
+    },
+    "candidate-seed42-seat0-pod-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat0-pod-rebuild.tar.gz",
+      "sha256": "45895894361f053c42674b40fb2745c86d3034ea887183c4bec399f7197c21ad",
+      "bytes": 226156,
+      "raw_bytes": 2027429,
+      "files": {
+        "report.json": {
+          "sha256": "42429c7b82bc4c78f17481b25d972c3a292dfc939799144d5cdeca721568124d",
+          "bytes": 2025654
+        },
+        "runner.log": {
+          "sha256": "7352911eba1884c320de235abd6e1e26e32f6b68675e68852c175018ffb40fcd",
+          "bytes": 1775
+        }
+      }
+    },
+    "candidate-seed42-seat1-pod-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed42-seat1-pod-rebuild.tar.gz",
+      "sha256": "edfcfa6c7b38b4dbb8fc70c1f8fe8dcc8ba4c947dd70a3870217226e4eafe757",
+      "bytes": 281344,
+      "raw_bytes": 2455608,
+      "files": {
+        "report.json": {
+          "sha256": "a95de1f78add5d8063a31578923855ddcd40205a7c632efe0555f0872856112a",
+          "bytes": 2452968
+        },
+        "runner.log": {
+          "sha256": "5080ce53bbe557d47f7ef3616c55806c9e5e725a1f7bdec752a8cf3bfb6b5bc7",
+          "bytes": 2640
+        }
+      }
+    },
+    "candidate-seed7-seat0-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed7-seat0-capture-none.tar.gz",
+      "sha256": "4e60e34315143c037b2bc27c6911338e5c5e26f0ed631a5db3af97ca6e4ffb6b",
+      "bytes": 777952,
+      "raw_bytes": 5030905,
+      "files": {
+        "report.json": {
+          "sha256": "6faca5e1c54a5a76c94f95198304114b55ce14f6332f89fbc1098ac098c2b97e",
+          "bytes": 5026881
+        },
+        "runner.log": {
+          "sha256": "e59f99b2347ab4b527a3bf1f885ad0959c314b297cc6a920954a069c996c21f8",
+          "bytes": 4024
+        }
+      }
+    },
+    "candidate-seed7-seat1-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed7-seat1-capture-none.tar.gz",
+      "sha256": "904e4818ba3b0b620296f060d3d01947fb7fe1aac0eb1c605913333ede8b5495",
+      "bytes": 720986,
+      "raw_bytes": 4706366,
+      "files": {
+        "report.json": {
+          "sha256": "9e0a930db78d49d01e310c3fa6b3c8883b0a3c8e409c79cc6a8c77405ecf1bb8",
+          "bytes": 4702721
+        },
+        "runner.log": {
+          "sha256": "3743b4c2a9e66a4a48fc3423e31888dcbf1dfa068ca780622cf0f164fb702c43",
+          "bytes": 3645
+        }
+      }
+    },
+    "candidate-seed7-seat0-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed7-seat0-recovery-none.tar.gz",
+      "sha256": "a65ecd2d523115d6124211c15965fa2c118a1f24bda94338a723f3c96d6c0956",
+      "bytes": 254168,
+      "raw_bytes": 2508046,
+      "files": {
+        "report.json": {
+          "sha256": "0aece41987051c906d64d954778fddcaf06bc4a2af1a023431b27a83a51537a2",
+          "bytes": 2505528
+        },
+        "runner.log": {
+          "sha256": "983637251a3cfbe95aa4d7f547a790ad3bd36485ef75f390e24c32a05d9c2836",
+          "bytes": 2518
+        }
+      }
+    },
+    "candidate-seed7-seat1-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/seed7-seat1-recovery-none.tar.gz",
+      "sha256": "0253bf43e439be8eb412668dbbea82e8d1222a661ba050426970413c573d5fcb",
+      "bytes": 255307,
+      "raw_bytes": 2507036,
+      "files": {
+        "report.json": {
+          "sha256": "1360c443ad5b7233e51c2ed90fc28a0b72cb88f682feac8b079c1e261663d382",
+          "bytes": 2504614
+        },
+        "runner.log": {
+          "sha256": "665bbace22d681f4a832065f236b74e9cacdf26aa9940145f3cf2d8191a7789d",
+          "bytes": 2422
+        }
+      }
+    },
+    "baseline-seed42-seat0-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-capture-none.tar.gz",
+      "sha256": "f6311361d4e93e436145892ee36dda7d27180df202615372a271a9f890f3d75c",
+      "bytes": 734367,
+      "raw_bytes": 4787689,
+      "files": {
+        "report.json": {
+          "sha256": "6a352092ffeef21d2694f717ab75b2b0df2eb2319a59461c1c2cfd1fef4cd323",
+          "bytes": 4783905
+        },
+        "runner.log": {
+          "sha256": "b75bc5479699b4fc0c328293987df2efcfa914a167b06e3c3c3f94997766267a",
+          "bytes": 3784
+        }
+      }
+    },
+    "baseline-seed42-seat1-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-capture-none.tar.gz",
+      "sha256": "2a511d18e88205a973e547298a5dc8fec74805ddbe8eb36f0d543dd6ad498bc9",
+      "bytes": 467131,
+      "raw_bytes": 3793705,
+      "files": {
+        "report.json": {
+          "sha256": "e72c1f0cd01115fe462a3ba5fa42e74683097c6e4bef5b40fe1e72c29e11f6b4",
+          "bytes": 3791062
+        },
+        "runner.log": {
+          "sha256": "8b4f968d9f1056d99bfed90809d8ba4271952e85a1a29e3762fa20532add9345",
+          "bytes": 2643
+        }
+      }
+    },
+    "baseline-seed42-seat0-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-recovery-none.tar.gz",
+      "sha256": "dae15f30bea4aa03d244fc181d6380597937a27cf921492c0a3207adb7ad00d8",
+      "bytes": 256564,
+      "raw_bytes": 2507880,
+      "files": {
+        "report.json": {
+          "sha256": "980ec50b122adfcb43d6f78042bdf9150ae6402b9726fdeb6d176a39575f4a3c",
+          "bytes": 2505362
+        },
+        "runner.log": {
+          "sha256": "1a93b3bfe1283b51c80f9338938fd2f61fbdca5fc06f3057c1f0ae0dc4612936",
+          "bytes": 2518
+        }
+      }
+    },
+    "baseline-seed42-seat1-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-recovery-none.tar.gz",
+      "sha256": "1f9742bd23d3f503f39bf04b51c921d0f1ed49508cf0426422953716194582e9",
+      "bytes": 256609,
+      "raw_bytes": 2505622,
+      "files": {
+        "report.json": {
+          "sha256": "a1078276099ac6848da85b2996a1e8c46f1703d68ceeb5279e46a373d03199a5",
+          "bytes": 2503200
+        },
+        "runner.log": {
+          "sha256": "6fe2d355bfba9584b6b3ae936b63114d287cedc086d17b720b50afe9ee4e979c",
+          "bytes": 2422
+        }
+      }
+    },
+    "baseline-seed42-seat0-navigation-crater": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-navigation-crater.tar.gz",
+      "sha256": "bd4db6087359561424636a22afd0b747807f43f64d811bc0f10ce2a81ea08094",
+      "bytes": 297849,
+      "raw_bytes": 2421422,
+      "files": {
+        "report.json": {
+          "sha256": "74ffeb5c7aac08a26c8bbf0844b142bf850443eef82bca45cbb6e29d8de070a2",
+          "bytes": 2418513
+        },
+        "runner.log": {
+          "sha256": "0ebef30c12c6ab95d5b571d5c88391e115bbb22a1501b583fb584bdee462c0ba",
+          "bytes": 2909
+        }
+      }
+    },
+    "baseline-seed42-seat1-navigation-crater": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-navigation-crater.tar.gz",
+      "sha256": "20dbe4833e51037663e13216072a140bc2d7dd87b8422bf6056192593e9f608d",
+      "bytes": 284454,
+      "raw_bytes": 2312854,
+      "files": {
+        "report.json": {
+          "sha256": "22e669f4a168d45a1369d9beab41285bfda0fddb854d1b6681f861a8cdef9a89",
+          "bytes": 2310346
+        },
+        "runner.log": {
+          "sha256": "4bd94b534c8903b83765a75a6d68e62bf4be07c80c316b59bcdce90aa3ab36c8",
+          "bytes": 2508
+        }
+      }
+    },
+    "baseline-seed42-seat0-navigation-flag": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-navigation-flag.tar.gz",
+      "sha256": "9035ccaea77594bc1f59e52cd5f60c52a24b9cf11de359a18b60b8a0d0f9f330",
+      "bytes": 224298,
+      "raw_bytes": 1848122,
+      "files": {
+        "report.json": {
+          "sha256": "3e9ff351b09e6b33f41b62315d9e6f78cc576d68bf0544d587f6846103f05a84",
+          "bytes": 1847201
+        },
+        "runner.log": {
+          "sha256": "9a82d0ec44f34413627f3e89c7cca7f151fff60d149122a3308f1affc15bda59",
+          "bytes": 921
+        }
+      }
+    },
+    "baseline-seed42-seat1-navigation-flag": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-navigation-flag.tar.gz",
+      "sha256": "259117fcbdd3c893358b4f8a84378d0bc19191ca2810dd53fa023fd3a5e1bcf8",
+      "bytes": 225338,
+      "raw_bytes": 1850148,
+      "files": {
+        "report.json": {
+          "sha256": "f0811f6b6d299a5fec999143762914335c5df6418c1aef4bd74f08059c1124e6",
+          "bytes": 1849228
+        },
+        "runner.log": {
+          "sha256": "b16c2f5e1db4bad12b4f6c214aa3779c1d1f4e9d9e7ebd67db96684e40d4682c",
+          "bytes": 920
+        }
+      }
+    },
+    "baseline-seed42-seat0-navigation-blocked": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-navigation-blocked.tar.gz",
+      "sha256": "ec74f6c7480e500d4893c570b1202162267d392892f154b30e51c8ef397dd8c7",
+      "bytes": 271432,
+      "raw_bytes": 2271470,
+      "files": {
+        "report.json": {
+          "sha256": "1ef04ca00f2b8feb572f4294ef560f7303f072061e77ec25a157dfb795ce7d7e",
+          "bytes": 2270422
+        },
+        "runner.log": {
+          "sha256": "ab83f9e7b8006f2d9039c7d95094562b6e86383ff68b0bba4b1a94b0079bff2c",
+          "bytes": 1048
+        }
+      }
+    },
+    "baseline-seed42-seat1-navigation-blocked": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-navigation-blocked.tar.gz",
+      "sha256": "318d3264a4390989e52914f168a005a6e010f807bc293ce7e8e693d19f92a1fc",
+      "bytes": 259749,
+      "raw_bytes": 2233038,
+      "files": {
+        "report.json": {
+          "sha256": "7bce217927197bad76c9df347e2f1bc95757af16b1b27cad414581b791d2d547",
+          "bytes": 2231988
+        },
+        "runner.log": {
+          "sha256": "aeffab7ea664b663af03c1301f4e958791a9a56034e0aa7646ae297b80667842",
+          "bytes": 1050
+        }
+      }
+    },
+    "baseline-seed42-seat0-pod-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-pod-none.tar.gz",
+      "sha256": "09dc2cfbf474152207973bb99bfb6fa54d9881ee05753bbb1b582a33c66560cd",
+      "bytes": 200820,
+      "raw_bytes": 1896877,
+      "files": {
+        "report.json": {
+          "sha256": "e9636c405c8152d629f7ff276415a6b328f49685ddff8442d78f67529c8f65c9",
+          "bytes": 1895353
+        },
+        "runner.log": {
+          "sha256": "44f84ebd32bbf263ababf23ea9912d367c23e831fed7e86913677d7e39c91169",
+          "bytes": 1524
+        }
+      }
+    },
+    "baseline-seed42-seat1-pod-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-pod-none.tar.gz",
+      "sha256": "b3017fa15dcde287d0e38f3f3cd61e04d16e0ca357b490f0c64e1d922b960123",
+      "bytes": 257090,
+      "raw_bytes": 2325776,
+      "files": {
+        "report.json": {
+          "sha256": "632779c6337799f719dcd56d699d73327bbe6c54002be5c15d49e02f4e11dd4b",
+          "bytes": 2323394
+        },
+        "runner.log": {
+          "sha256": "c98c26aa77bc6bdee195e8ba7f8930f012f8bad312eb240b8ccdd3800eea05f2",
+          "bytes": 2382
+        }
+      }
+    },
+    "baseline-seed42-seat0-recovery-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-recovery-rebuild.tar.gz",
+      "sha256": "2cbe688d2fda5f0500c27cd4552a85660e37017ff8694b33e1f4a8f74d6287a8",
+      "bytes": 277959,
+      "raw_bytes": 2757481,
+      "files": {
+        "report.json": {
+          "sha256": "1dfc0c12abeeb0f688f51bf723fefc30475d748f12195479ca2fd5866421aff2",
+          "bytes": 2754470
+        },
+        "runner.log": {
+          "sha256": "cf5cc54cd624e8562948b3c64ee5c93e8853fd256b729e25f6730b9f2eea7f41",
+          "bytes": 3011
+        }
+      }
+    },
+    "baseline-seed42-seat1-recovery-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-recovery-rebuild.tar.gz",
+      "sha256": "e0a0cc3fd5a498533d03252cf500054e051c427540414d04e0f44c625e684881",
+      "bytes": 282411,
+      "raw_bytes": 2778723,
+      "files": {
+        "report.json": {
+          "sha256": "e88a394d51e1ff9ba46057d1bff335ad6fd5e197d756a1d0a219f324aa973209",
+          "bytes": 2775813
+        },
+        "runner.log": {
+          "sha256": "0aed2b4cad59dfaac196a0d4fc25b194e87a1f9f571f99b16f7537dcb90c2ddc",
+          "bytes": 2910
+        }
+      }
+    },
+    "baseline-seed42-seat0-pod-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat0-pod-rebuild.tar.gz",
+      "sha256": "562be75eb44cff4922fee8cf0307dcd15aed9a4077b60afbe45c9f75d9bfa151",
+      "bytes": 226056,
+      "raw_bytes": 2027263,
+      "files": {
+        "report.json": {
+          "sha256": "3ffdba10ab4a4beaa6585bac533c36904353272da662de6b531d92aa7839346b",
+          "bytes": 2025488
+        },
+        "runner.log": {
+          "sha256": "7352911eba1884c320de235abd6e1e26e32f6b68675e68852c175018ffb40fcd",
+          "bytes": 1775
+        }
+      }
+    },
+    "baseline-seed42-seat1-pod-rebuild": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed42-seat1-pod-rebuild.tar.gz",
+      "sha256": "4814b21a672a27e59ca6d1f1a98886a7f0b7d6255ad06ba988c80e1119399434",
+      "bytes": 282190,
+      "raw_bytes": 2455398,
+      "files": {
+        "report.json": {
+          "sha256": "63fd003a9529af6377a62ade62e8c240a104f549e6277afca53c3b9d2ec898c6",
+          "bytes": 2452758
+        },
+        "runner.log": {
+          "sha256": "5080ce53bbe557d47f7ef3616c55806c9e5e725a1f7bdec752a8cf3bfb6b5bc7",
+          "bytes": 2640
+        }
+      }
+    },
+    "baseline-seed7-seat0-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed7-seat0-capture-none.tar.gz",
+      "sha256": "45e630de46551593426884bb14c85769226c29cd1ca6ba5c07a0e9504a97e5ca",
+      "bytes": 777963,
+      "raw_bytes": 5030906,
+      "files": {
+        "report.json": {
+          "sha256": "86f2de7022d57d8251a5d16f9880dde8ac5e9ecc0bc9486f0e4a62311e4132d7",
+          "bytes": 5026882
+        },
+        "runner.log": {
+          "sha256": "e59f99b2347ab4b527a3bf1f885ad0959c314b297cc6a920954a069c996c21f8",
+          "bytes": 4024
+        }
+      }
+    },
+    "baseline-seed7-seat1-capture-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed7-seat1-capture-none.tar.gz",
+      "sha256": "c1c5399c35ae2e83403e4a866520321f821d52d0145c5a5d2a1d1851585372b7",
+      "bytes": 721030,
+      "raw_bytes": 4706389,
+      "files": {
+        "report.json": {
+          "sha256": "c0b44195e0b476b33722fb05d1e9ec33044bacfcdb92d6961a2dbf7e5c853667",
+          "bytes": 4702744
+        },
+        "runner.log": {
+          "sha256": "3743b4c2a9e66a4a48fc3423e31888dcbf1dfa068ca780622cf0f164fb702c43",
+          "bytes": 3645
+        }
+      }
+    },
+    "baseline-seed7-seat0-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed7-seat0-recovery-none.tar.gz",
+      "sha256": "72d0a2e55006bfe846a234607f2c79fe1abbdcee0275d4aa5af5b2c00aa98527",
+      "bytes": 254185,
+      "raw_bytes": 2508034,
+      "files": {
+        "report.json": {
+          "sha256": "719c5d4ba9c448dc700976ed06646ef9e457eaa229af90cff1ecd36d74ccb6ef",
+          "bytes": 2505516
+        },
+        "runner.log": {
+          "sha256": "983637251a3cfbe95aa4d7f547a790ad3bd36485ef75f390e24c32a05d9c2836",
+          "bytes": 2518
+        }
+      }
+    },
+    "baseline-seed7-seat1-recovery-none": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-settling/v1/archives/baseline-seed7-seat1-recovery-none.tar.gz",
+      "sha256": "0621aca92a251bcdc530a44fda8cb77cfc7263a502afeae4b52ea54fc7c9f475",
+      "bytes": 255337,
+      "raw_bytes": 2507077,
+      "files": {
+        "report.json": {
+          "sha256": "03f4fd7277b8512d48a5b036d64b9d1bd83d6eb72d6e16f828b05d5f3daa2563",
+          "bytes": 2504655
+        },
+        "runner.log": {
+          "sha256": "665bbace22d681f4a832065f236b74e9cacdf26aa9940145f3cf2d8191a7789d",
+          "bytes": 2422
+        }
+      }
+    }
+  },
+  "archive_count": 44,
+  "compressed_bytes": 367780058,
+  "raw_bytes": 2913831854,
+  "review_bundle": {
+    "path": "docs/data/rebuild-settling-v1.json.gz",
+    "sha256": "e59c7a4f0e3fe5cd7d10a86772c2a4d5183d6648746c6d51a28549957af730f3",
+    "bytes": 12034248
+  },
+  "plan_sha256": "af0d4869e5ebe6b6cca745644e0b20312fb208d142e5cd3391b01bd883541509",
+  "summary_sha256": "9c88b419096f2b81cb7de7e1dd051c9600c52ab58be8491c75ed0ea6bba22ccb",
+  "baseline_plan_sha256": "82ae05e2e2bda798f38e55ae47fab2364ff24cff0c01ca68fc193de39b60c88c",
+  "baseline_result_sha256": "22d3b5ed07607799319c87d640de6e79109ff269f7f2d9b8d964778c857ba7ba"
+}

@@ -1,0 +1,453 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "b00bb7c78858d1f2eafd5d2e36811320b1d05434",
+  "evidence_directory": "/home/data/workspace/spacewars-handoffs/native-placement-cost-20261011",
+  "comparison": {
+    "matching_fixed_input_ticks": 2400,
+    "repetitions": 4,
+    "prefix_decisions_verified_per_run": 8327,
+    "native_attempts_per_run": 20,
+    "offset_checks_per_run": 520,
+    "hull_filtered_node_queries_per_run": 260,
+    "hull_edge_samples_before_after": [
+      453042,
+      0
+    ],
+    "unchanged": [
+      "physics fingerprints",
+      "scenario observations",
+      "complete native recovery and placement receipts",
+      "fork and final snapshots",
+      "native retry cadence"
+    ],
+    "cost_comparison_sha256": "add833170e193261f8327b1a8d2c059e498c0c609bf497a4675ed6574a008883"
+  },
+  "binaries": {
+    "baseline-v2": {
+      "sha256": "5c0ee5306886a749d367433b76aa88c873e8f2ee3f14b173ae3395a706d6f86b",
+      "bytes": 10076042
+    },
+    "optimized": {
+      "sha256": "215d1bf8123e72b0aec040b1bc43793777db4a10a512145721bf7b49bafea9d8",
+      "bytes": 10076284
+    }
+  },
+  "timing": {
+    "scope": "instrumented desktop, native simulation only; excludes reconstruction, evidence I/O and rendering",
+    "before_after_mean_step_ms": [
+      0.31821278791666663,
+      0.12960061666666667
+    ],
+    "before_after_mean_native_attempt_ms": [
+      6.91168565,
+      1.206677425
+    ]
+  },
+  "profile_replays": [
+    {
+      "case": {
+        "candidate_seat": 0,
+        "seed": 10101,
+        "shape": "angular",
+        "slumping": false
+      },
+      "decisions": 16611,
+      "completed": [
+        [
+          11337
+        ],
+        []
+      ],
+      "summary_sha256": "a4ab719bf52bfeb48ca1f5655a25daee8d0ce4d8566177899ab3a422c311966b",
+      "actions_sha256": "4de925a673c3829aee95a4aed2645e464607c8ab85623529fde2c25a41c1c9ce",
+      "initial_sha256": "652c2149705f7b7c84cbb6905a6095da3dddd5ae7c67aa413ef85d44eee2243d",
+      "final_sha256": "c37e9751cf13c7860d8bc10c127159254d3dbfe0a403a0c9177dce9afdbecc1a"
+    },
+    {
+      "case": {
+        "candidate_seat": 1,
+        "seed": 20202,
+        "shape": "round",
+        "slumping": false
+      },
+      "decisions": 36000,
+      "completed": [
+        [
+          12301
+        ],
+        [
+          7519,
+          24911
+        ]
+      ],
+      "summary_sha256": "2380bf3a72718b645e910bf812b3276bfb0082f0a61160e4bec285ef52023011",
+      "actions_sha256": "e7c6235be0422a10b458bbb7c61d8d83ecc3e5161697c0456f7087b65490f4d4",
+      "initial_sha256": "289a55f293352e3521cb2bda9debf42d2adfbb5b499241b4d4d1bdab747cf8c9",
+      "final_sha256": "f95bd4137ba5fa37e10cd6588a98a3aba78a469c14af6b7d03ee20fe37607547"
+    }
+  ],
+  "checks": {
+    "native-tests": {
+      "args": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib"
+      ],
+      "env": {
+        "RUST_MIN_STACK": "16777216",
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+      },
+      "started": 1791680515.688017,
+      "exit_code": 0,
+      "elapsed_seconds": 37.19280293599877,
+      "log_sha256": "d55518843d846ae05e488ed3c37858135ed05988184e11595d2e5481e620c89e",
+      "passed": 599,
+      "ignored": 0
+    },
+    "ai-tests": {
+      "args": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "--tests"
+      ],
+      "env": {
+        "RUST_MIN_STACK": "16777216",
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+      },
+      "started": 1791680552.8810217,
+      "exit_code": 0,
+      "elapsed_seconds": 104.2821160070016,
+      "log_sha256": "6e74a5ae180c5fbcd55df7f5eb0acc90dea3516d2b634542b1ca902383ef9e82",
+      "passed": 614,
+      "ignored": 18
+    },
+    "ai-clippy": {
+      "args": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "--tests",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "env": {
+        "RUST_MIN_STACK": "16777216",
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+      },
+      "started": 1791680657.1633728,
+      "exit_code": 0,
+      "elapsed_seconds": 9.676165318996937,
+      "log_sha256": "c2d8abd5d27226408369f7509964ce19f421dcc7bb9f3c1a192c6800d707686b"
+    },
+    "default-check": {
+      "args": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "env": {
+        "RUST_MIN_STACK": "16777216",
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+      },
+      "started": 1791680666.8398106,
+      "exit_code": 0,
+      "elapsed_seconds": 5.058099320005567,
+      "log_sha256": "5bb9bf0cea15ec457e5929a048b8f0a814eacacd252c85c4363075703970dbc7"
+    },
+    "fmt": {
+      "args": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "env": {
+        "RUST_MIN_STACK": "16777216",
+        "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target"
+      },
+      "started": 1791680671.8981555,
+      "exit_code": 0,
+      "elapsed_seconds": 1.8828281599999173,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "limits": [
+    "No claim about full-match speed, bot strength or universal recovery.",
+    "The later Round opponent stall, sealed Angular pocket, and replacement-distance gate remain separate.",
+    "Picade uses 1x; historical 2x device observations are unchanged."
+  ],
+  "heavy_recovery_comparison": {
+    "identical_artifacts": 120,
+    "comparison_sha256": "11f606331b5d8ae88ff9e36136d8b9d565856c3303c9c49ed8052c9f91fdcaa8",
+    "cases": {
+      "angular-pod-immediate": {
+        "automatic": {
+          "first_block": [
+            null,
+            [
+              12255,
+              "no accessible rebuild after four measured relocations"
+            ]
+          ],
+          "first_completion": [
+            null,
+            21849
+          ],
+          "first_new_loss": [
+            null,
+            23824
+          ],
+          "initial_losses": [
+            0,
+            1
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "case": "angular-pod-immediate",
+        "control": {
+          "first_block": [
+            null,
+            [
+              8064,
+              "recovery exceeded two-minute task budget"
+            ]
+          ],
+          "first_completion": [
+            null,
+            null
+          ],
+          "first_new_loss": [
+            null,
+            863
+          ],
+          "initial_losses": [
+            0,
+            0
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "controller_reset": false,
+        "end_tick": 26065,
+        "first_action_difference": 8065,
+        "fork_tick": 8065,
+        "from_tick_zero_prefix_verified": true,
+        "subject_seat": 1
+      },
+      "angular-pod-later": {
+        "automatic": {
+          "first_block": [
+            null,
+            [
+              14400,
+              "recovery exceeded two-minute task budget"
+            ]
+          ],
+          "first_completion": [
+            null,
+            null
+          ],
+          "first_new_loss": [
+            null,
+            null
+          ],
+          "initial_losses": [
+            0,
+            1
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "case": "angular-pod-later",
+        "control": {
+          "first_block": [
+            null,
+            [
+              8064,
+              "recovery exceeded two-minute task budget"
+            ]
+          ],
+          "first_completion": [
+            null,
+            null
+          ],
+          "first_new_loss": [
+            null,
+            863
+          ],
+          "initial_losses": [
+            0,
+            0
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "controller_reset": false,
+        "end_tick": 32400,
+        "first_action_difference": null,
+        "fork_tick": 14400,
+        "from_tick_zero_prefix_verified": false,
+        "subject_seat": 1
+      },
+      "round-claim-immediate": {
+        "automatic": {
+          "first_block": [
+            [
+              3072,
+              "no supported claim progress"
+            ],
+            null
+          ],
+          "first_completion": [
+            null,
+            14123
+          ],
+          "first_new_loss": [
+            null,
+            11744
+          ],
+          "initial_losses": [
+            1,
+            0
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "case": "round-claim-immediate",
+        "control": {
+          "first_block": [
+            [
+              3071,
+              "no supported claim progress"
+            ],
+            null
+          ],
+          "first_completion": [
+            null,
+            14123
+          ],
+          "first_new_loss": [
+            705,
+            11744
+          ],
+          "initial_losses": [
+            0,
+            0
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "controller_reset": false,
+        "end_tick": 21072,
+        "first_action_difference": null,
+        "fork_tick": 3072,
+        "from_tick_zero_prefix_verified": false,
+        "subject_seat": 0
+      },
+      "round-claim-later": {
+        "automatic": {
+          "first_block": [
+            [
+              14400,
+              "no supported claim progress"
+            ],
+            null
+          ],
+          "first_completion": [
+            null,
+            null
+          ],
+          "first_new_loss": [
+            null,
+            null
+          ],
+          "initial_losses": [
+            1,
+            1
+          ],
+          "initial_recoveries": [
+            0,
+            1
+          ]
+        },
+        "case": "round-claim-later",
+        "control": {
+          "first_block": [
+            [
+              3071,
+              "no supported claim progress"
+            ],
+            null
+          ],
+          "first_completion": [
+            null,
+            14123
+          ],
+          "first_new_loss": [
+            705,
+            11744
+          ],
+          "initial_losses": [
+            0,
+            0
+          ],
+          "initial_recoveries": [
+            0,
+            0
+          ]
+        },
+        "controller_reset": false,
+        "end_tick": 32400,
+        "first_action_difference": null,
+        "fork_tick": 14400,
+        "from_tick_zero_prefix_verified": false,
+        "subject_seat": 0
+      }
+    }
+  }
+}

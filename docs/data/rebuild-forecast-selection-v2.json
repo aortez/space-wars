@@ -1,0 +1,1317 @@
+{
+  "schema": 1,
+  "profile": "native_rebuild_forecast_selection_v2",
+  "complete": true,
+  "screen": {
+    "controls_retained": true,
+    "live_chains": {
+      "selection_handoff": true,
+      "selection_coarse": false
+    },
+    "recorded_positive_retained": true,
+    "decision": "not_qualified",
+    "default_promotion": false,
+    "scored_match": false
+  },
+  "runtime_source_commit": "8d9f322ef4d84e41d537db3fe6a0da4d24111956",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v2/surface_mission_soak",
+    "sha256": "22df3c00a2eed247c2586bfcbeb9bef4c2cf72d84e62e188d83a08c1e2398e6e"
+  },
+  "frozen_inputs": 1019,
+  "changed_inputs": [
+    "crates/spacewars-ai/examples/support/rebuild_replay.rs",
+    "crates/spacewars-ai/tests/surface_recovery.rs",
+    "docs/rebuild-forecast-selection-plan.md",
+    "scenarios/spacewars/src/physics.rs",
+    "scenarios/spacewars/src/surface_sortie.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/footprint.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/local_forecast.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/native_forecast.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/selection.rs",
+    "scenarios/spacewars/src/surface_sortie/recovery.rs",
+    "tools/tests/test_rebuild_forecast_selection.py",
+    "tools/validate-rebuild-forecast-selection.py"
+  ],
+  "prefixes": 4,
+  "continuations": 8,
+  "diagnostic_restarts": 1,
+  "within_batch_simulation_retries": 0,
+  "aborted_batch": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v1/failed-batch.json",
+    "sha256": "773ab0655c1b77775ee7f0ed35880f0c86719be1043c39f5436edea728d40c5d",
+    "source_commit": "e9aa35e8c8d2caf26d2b1f4f12bcac0550a088b1",
+    "changed_inputs": [
+      "crates/spacewars-ai/tests/surface_recovery.rs",
+      "docs/rebuild-forecast-selection-plan.md",
+      "scenarios/spacewars/src/surface_sortie/rebuild_placement.rs",
+      "scenarios/spacewars/src/surface_sortie/rebuild_placement/footprint.rs",
+      "scenarios/spacewars/src/surface_sortie/rebuild_placement/selection.rs",
+      "tools/validate-rebuild-forecast-selection.py"
+    ],
+    "diagnostic_restarts": 1,
+    "selection_runtime_unchanged": true
+  },
+  "audit_resumes": 0,
+  "diagnosis": {
+    "outcomes": {
+      "control_handoff": {
+        "live": {
+          "last_tick": 27233,
+          "reason": "recovery_complete",
+          "task_reason": null,
+          "health": 60.66692352294922,
+          "ships_lost": 1,
+          "relocations": 3,
+          "builds": [
+            27114
+          ],
+          "settled_ticks": [
+            27188
+          ]
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1,
+          "builds": [
+            27459
+          ],
+          "settled_ticks": [
+            27557
+          ]
+        }
+      },
+      "control_coarse": {
+        "live": {
+          "last_tick": 27349,
+          "reason": "recovery_blocked",
+          "task_reason": "no reachable standing site with hatch access",
+          "health": 100.0,
+          "ships_lost": 2,
+          "relocations": 1,
+          "builds": [
+            25373
+          ],
+          "settled_ticks": [
+            null
+          ]
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1,
+          "builds": [],
+          "settled_ticks": []
+        }
+      },
+      "selection_handoff": {
+        "live": {
+          "last_tick": 27261,
+          "reason": "recovery_complete",
+          "task_reason": null,
+          "health": 60.66692352294922,
+          "ships_lost": 1,
+          "relocations": 3,
+          "selection": {
+            "searches": 1,
+            "candidate_queries": 0,
+            "maximum_update_ms": 2.946022,
+            "cancellations": 0,
+            "invalidations": 0,
+            "exhausted": 0,
+            "pending": 0,
+            "measurements": [
+              {
+                "capture_tick": 27114,
+                "launch_tick": 27154,
+                "decision_tick": 27154,
+                "offset": -10.0,
+                "accepted": true,
+                "prediction": true,
+                "warmup_steps": 40,
+                "steps": 120,
+                "stop": "horizon",
+                "forecast_events": {
+                  "first_contact": 27213,
+                  "first_two_supported": 27214,
+                  "first_settled": 27228
+                },
+                "timing": {
+                  "diagnostics_ms": 0.592738,
+                  "physics_steps_ms": 1.52391,
+                  "setup_ms": 0.04231
+                },
+                "maximum_chunk_ms": 0.088397,
+                "actual": {
+                  "common_rows": 108,
+                  "first_differences": {
+                    "ship": 27154,
+                    "landing": 27155,
+                    "contacts": 27213
+                  },
+                  "max_position_error": 0.0024687192890816266,
+                  "events": {
+                    "first_contact": 27213,
+                    "first_two_supported": 27214,
+                    "first_settled": 27228
+                  }
+                },
+                "terrain_revision_changes": [],
+                "matches_observed_settling": true
+              }
+            ],
+            "physics_work": 160,
+            "sha256": "7e2621a2423ad5b5426b8437feb33ea58061d36cdb4517f939fd2c05f74f708d"
+          },
+          "builds": [
+            27154
+          ],
+          "boardings": [
+            27260
+          ]
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1,
+          "selection": {
+            "searches": 1,
+            "candidate_queries": 0,
+            "maximum_update_ms": 3.491002,
+            "cancellations": 0,
+            "invalidations": 0,
+            "exhausted": 0,
+            "pending": 0,
+            "measurements": [
+              {
+                "capture_tick": 27459,
+                "launch_tick": 27499,
+                "decision_tick": 27499,
+                "offset": -12.0,
+                "accepted": true,
+                "prediction": true,
+                "warmup_steps": 40,
+                "steps": 120,
+                "stop": "horizon",
+                "forecast_events": {
+                  "first_contact": 27551,
+                  "first_two_supported": 27580,
+                  "first_settled": 27594
+                },
+                "timing": {
+                  "diagnostics_ms": 0.622111,
+                  "physics_steps_ms": 1.777242,
+                  "setup_ms": 0.03174
+                },
+                "maximum_chunk_ms": 0.10498800000000001,
+                "actual": {
+                  "common_rows": 121,
+                  "first_differences": {
+                    "ship": 27499,
+                    "landing": 27500,
+                    "contacts": 27551
+                  },
+                  "max_position_error": 0.0002729575167846423,
+                  "events": {
+                    "first_contact": 27551,
+                    "first_two_supported": 27580,
+                    "first_settled": 27594
+                  }
+                },
+                "terrain_revision_changes": [],
+                "matches_observed_settling": true
+              }
+            ],
+            "physics_work": 160,
+            "sha256": "6f0f68e01bfedac2b00a5bccd3b8074dab102f4748782b39d2ffe2621ad60480"
+          },
+          "builds": [
+            27499
+          ],
+          "boardings": []
+        }
+      },
+      "selection_coarse": {
+        "live": {
+          "last_tick": 25739,
+          "reason": "recovery_blocked",
+          "task_reason": "no reachable standing site with hatch access",
+          "health": 100.0,
+          "ships_lost": 1,
+          "relocations": 1,
+          "selection": {
+            "searches": 1,
+            "candidate_queries": 25,
+            "maximum_update_ms": 1.232356,
+            "cancellations": 0,
+            "invalidations": 0,
+            "exhausted": 1,
+            "pending": 0,
+            "measurements": [
+              {
+                "capture_tick": 25373,
+                "launch_tick": 25413,
+                "decision_tick": 25413,
+                "offset": -8.0,
+                "accepted": false,
+                "prediction": false,
+                "warmup_steps": 40,
+                "steps": 120,
+                "stop": "horizon",
+                "forecast_events": {
+                  "first_contact": 25461,
+                  "first_two_supported": null,
+                  "first_settled": null
+                },
+                "timing": {
+                  "diagnostics_ms": 0.627113,
+                  "physics_steps_ms": 2.4346799999999997,
+                  "setup_ms": 0.047139
+                },
+                "maximum_chunk_ms": 0.129525
+              }
+            ],
+            "physics_work": 160,
+            "sha256": "6af5c364ad9b1eb28cdd4cc126c55888547a8336269205501e40b0affa5c2ae8"
+          },
+          "builds": [],
+          "boardings": []
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1,
+          "selection": {
+            "searches": 0,
+            "candidate_queries": 0,
+            "maximum_update_ms": 0.770224,
+            "cancellations": 0,
+            "invalidations": 0,
+            "exhausted": 0,
+            "pending": 0,
+            "measurements": [],
+            "physics_work": 0,
+            "sha256": "9d40b53f52b0a50d63cbe94cfddaa4439ce0fd2c1576eaab91ccd519e7efb906"
+          },
+          "builds": [],
+          "boardings": []
+        }
+      }
+    },
+    "counts": {
+      "warmup_steps": 120,
+      "ship_steps": 360,
+      "completed_forecasts": 3,
+      "accepted": 2,
+      "all_physics_work": 480
+    },
+    "decision": "not_qualified",
+    "scope": "Default-off native selector on retained counterfactual recoveries. Future launch, bounded forecasts, fresh anchored placement validation. Privileged geometry; no fresh games, opponent reaction, hazard prediction or default promotion."
+  },
+  "provenance": {
+    "prior_bundle": {
+      "path": "docs/data/rebuild-local-forecast-v1.json.gz",
+      "bytes": 1548599,
+      "sha256": "21218b41a1f4a6d90046faf7be491852fb90f0a2d12893b17ee30706b8b2dcd4"
+    },
+    "prior_plan": {
+      "path": "target/rebuild-local-forecast/v1/plan.json",
+      "bytes": 135992,
+      "sha256": "adce0ca2d5103d618d6cd869a87f5f82fc6d79ae661b6db27d3f99937642102d"
+    },
+    "prior_summary": {
+      "path": "target/rebuild-local-forecast/v1/summary.json",
+      "bytes": 242944,
+      "sha256": "eb20e2faeff57a1e8a205641afacb234a729ff99295436f707aacf23f75b33b4"
+    }
+  },
+  "archives": {
+    "control_handoff": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v2/archives/control_handoff.tar.gz",
+      "sha256": "f5f5be7910e3cc1249a27d5a6f7caa94ec5fb05e74a2eb41a08f48332263888d",
+      "bytes": 48808547,
+      "raw_bytes": 315905510,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "591133622a43669a8d8536dfafbfdbf95a6251295ca3eb5dce0f3611ec726e59",
+          "bytes": 641559
+        },
+        "live-contact-audit.json": {
+          "sha256": "a789257249955ef0969723317135d3fd596912ed9cbf5e97cb2565c190be6c49",
+          "bytes": 53336
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-orientation-audit.json": {
+          "sha256": "e7d2f8884143429e6116f12711109b9af0168dba83ecdff7ccfe463ec1f1b5c4",
+          "bytes": 288073
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "e2b758b4332bf5f18af963a8bf68ea74bb6ce5ca2bd512664c16e59b8097281e",
+          "bytes": 163484
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-staging-audit.json": {
+          "sha256": "be71326770d969cfe5ea7ffb5607317356b04db68f78fd5ec207c7be09d2545e",
+          "bytes": 956161
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "47cf0c38f181a85eedc719cf5f9831ef6641dab4643839e6372fa34084329e10",
+          "bytes": 179323
+        },
+        "live-support-audit.json": {
+          "sha256": "e1682f8cc136b6ce7b417ce47daf653c4537756d91f693bf2e7eeba0614c3a2e",
+          "bytes": 288097
+        },
+        "local-forecast-audit.json": {
+          "sha256": "9c276adf66051dfda89ebe722a58ea457cdd535a670aa7d5b17a28b121357eeb",
+          "bytes": 840357
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "native-forecast-audit.json": {
+          "sha256": "e19d5b1757cf2597df5a51ad679648742fff5d89f2002ddc2c85a6d12fdcf115",
+          "bytes": 3641612
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "a58567dac3c47c02f39a77a6a3e4f37e627ea4355d2648a14bfb0f492c4f6c80",
+          "bytes": 1878406
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "c95f1175826e5e0d584f81fc658592ab89f777dca4923a6c4106181c553301e1",
+          "bytes": 62032915
+        },
+        "rebuild-local-forecast-live-27114.json": {
+          "sha256": "00ed2dd3db35e44c7fd0630603a5172627c5693db94c17ef6ff4822fa8c740e6",
+          "bytes": 315933
+        },
+        "rebuild-local-forecast-recorded-27459.json": {
+          "sha256": "a79c01bd800fa4b53508a0ea9c542a3aca1579005f2e04d31089e22db9ec2908",
+          "bytes": 306865
+        },
+        "rebuild-native-forecast-live-27114.json": {
+          "sha256": "512186ab8c72928c2705fa96ae238e90f9b96c41c34940af21ac6688422ba323",
+          "bytes": 829272
+        },
+        "rebuild-native-forecast-recorded-27459.json": {
+          "sha256": "4875444631c3c509351f275f3dd69771042eba818f48d2dfe2c24e3fd5f1e87b",
+          "bytes": 750015
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "e1722e3cf00b6100c1c37a948ca969b27e3c48ce0512da995566b323b0589f04",
+          "bytes": 3458175
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "564603f5bc63352f294a3005b26c8543c4b558b7d3150f43e4801307786ea857",
+          "bytes": 107337986
+        },
+        "rebuild-replay.json": {
+          "sha256": "f26a8a505b61317db051d47c4caeb37ae839c2b6f2cd761c81a4aea6d9f4c845",
+          "bytes": 80062
+        },
+        "rebuild-round-foot-live-27114.json": {
+          "sha256": "61992fdf8ee710e0ccb8a92816369bf231d75ce522457b53262bc93b5c096d17",
+          "bytes": 22309
+        },
+        "rebuild-round-foot-recorded-27459.json": {
+          "sha256": "5aeb8607941c8ee223fdb5218b7274a3c14c16ffb1059637fe187e1faaf5ebd0",
+          "bytes": 19568
+        },
+        "recorded-audit.json": {
+          "sha256": "d86f53c346abe878da2ceeedb9d17fc7d46625390ccc942f7304dd6e8c65c33e",
+          "bytes": 498544
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "859520192e8b041b2f65cc102c5064b16a747c355bb007d507ee20e1cd5ac058",
+          "bytes": 380870
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-orientation-audit.json": {
+          "sha256": "c806d5f5259a72e00f4900bb94e700cd81547ad17eaf36b8e3e127ca86dd4144",
+          "bytes": 929325
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "fe00bfa4cb2a73360a66bf3f518eb402f2804a231959e4f148e92b2e610ba81f",
+          "bytes": 1336226
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "recorded-support-audit.json": {
+          "sha256": "6db4da75039cb2d4957ec7cde9e589e135dc4a99eee59b97833a4ce5df9e742b",
+          "bytes": 929349
+        },
+        "round-foot-audit.json": {
+          "sha256": "238dd0145d01f0c271e12b7717776f2a077bd17f2c43c367edf822eac3964643",
+          "bytes": 638441
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "control_coarse": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v2/archives/control_coarse.tar.gz",
+      "sha256": "1e334923e9b9cb42e0a247a5c76165a4025291fd634427bb234fd9b8d1af8fca",
+      "bytes": 49543883,
+      "raw_bytes": 322290370,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "7bf627fdbf56d926b59a82c72529ed6e70b2887e9e1ff2b7df8451e97c0574b9",
+          "bytes": 424220
+        },
+        "live-contact-audit.json": {
+          "sha256": "ddbb7d18a96f0a761367da002fd382191e314058b1fef2cc24a73b7e4b803b0d",
+          "bytes": 93813
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-orientation-audit.json": {
+          "sha256": "facf97cb1fe4e23a2df5c6b9edff015d0c3bda10d483eef23cc77960d037adad",
+          "bytes": 243178
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "5d49a2847f6b7fb29efd59102ac45ab2d00126826890cab95134c453875864fc",
+          "bytes": 505038
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-staging-audit.json": {
+          "sha256": "21dc6505314798b911cf336a5c194d95b6526419ebfaa4986b75dfeade36b19e",
+          "bytes": 394546
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "live-support-audit.json": {
+          "sha256": "9bedee6cd90512b3172baf98915c0be3a48d44c72de90cf9831a68248d24ce58",
+          "bytes": 243185
+        },
+        "local-forecast-audit.json": {
+          "sha256": "669fd719276b691073871ec471c64f5de7b9da9da4461ee95de25824029673ed",
+          "bytes": 424473
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "native-forecast-audit.json": {
+          "sha256": "aab93f25824dd4c58b39fd3d60dda4c6210b8c0782b4fc7256c7facbf340e506",
+          "bytes": 2129180
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "d87724d5a81d5ac4de4af92acea20493caf8fc8466cae36f3050ad7fa80cc487",
+          "bytes": 2275705
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "ac1dfaa65d9c3edd880b4ee02b9a7028fb92913ab7fef43d7927f923d174559f",
+          "bytes": 59500421
+        },
+        "rebuild-local-forecast-live-25373.json": {
+          "sha256": "6adce82682ef01415b427441e03ec5f8801aabdc2ef5e0d8cb64ea8f34f5a97e",
+          "bytes": 312935
+        },
+        "rebuild-native-forecast-live-25373.json": {
+          "sha256": "c8f1b3799798f665c0fee37443478f4022b264aac7c5a241821333e3efcf8f93",
+          "bytes": 832583
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "3d3aec72024689c46f64360f4a501f7fa6bfd5fe7047269ba2d2a000504e12e1",
+          "bytes": 3458244
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "a33bbd6f0cc4c74affed641323317cb6a193234e2e3d7ba540ae500dcc9df41b",
+          "bytes": 119383484
+        },
+        "rebuild-replay.json": {
+          "sha256": "e6a3c9b2022417e0241b8c63db95c423ee4af27b3342d83111c4847a0ee3c32d",
+          "bytes": 90002
+        },
+        "rebuild-round-foot-live-25373.json": {
+          "sha256": "3fa5fa766634f54b1af00c653f7bf3c3ece076fb64f3e81262eb64a75286a9bc",
+          "bytes": 16015
+        },
+        "recorded-audit.json": {
+          "sha256": "7d5207682e7ad07404ffdfc064199d8903b4783d86acc42f3c21d2006185f0af",
+          "bytes": 346144
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "4d3f133e7b1abdf73fc8b3fc116bcdea834b34c40755a62da4e108516832404f",
+          "bytes": 665445
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-orientation-audit.json": {
+          "sha256": "cecf9b7cb24f805be0cbb77beae3634349a40e5754d4c5cc93b4a378fe4d07bf",
+          "bytes": 1009917
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "095707c9bcecf52bfd439d4c5dd81bda8da61cc2bae4023f38d8cfad74fde3fc",
+          "bytes": 1494603
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "recorded-support-audit.json": {
+          "sha256": "54ffe87b633c9f13f6aa7d2a529a11a220c952840975422970dc15963afce4c9",
+          "bytes": 1009924
+        },
+        "round-foot-audit.json": {
+          "sha256": "8817d665c6c283146f2aa281e0e282aabe775a03056e56eb35c2b4242e16ec37",
+          "bytes": 327941
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "selection_handoff": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v2/archives/selection_handoff.tar.gz",
+      "sha256": "0c8e6e5defd2fddb77d7ad435f1fa63bcd829da90948e1aa3bdc31326c1c6562",
+      "bytes": 48223843,
+      "raw_bytes": 310030829,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "c6beb50d5a76e427cf74d798955189f9e7ddea781486aec2d6099162ae890cd6",
+          "bytes": 615190
+        },
+        "live-contact-audit.json": {
+          "sha256": "ef95b7fe512b62230bb65ad1ed5b55ef10a9c95db2875f2f5edf2f3276734c86",
+          "bytes": 46044
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "168a1ab7286bf517d18e4b3f559b4cbc4b55410fd7b8f5847738e2ca932b6c17",
+          "bytes": 137070
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-selection-audit.json": {
+          "sha256": "7e2621a2423ad5b5426b8437feb33ea58061d36cdb4517f939fd2c05f74f708d",
+          "bytes": 1202198
+        },
+        "live-selection-orientation-audit.json": {
+          "sha256": "7daaa2a8979ecb336d8bde83e4d7751139e78d0a7b1d7790e77355b8253920ae",
+          "bytes": 31774
+        },
+        "live-staging-audit.json": {
+          "sha256": "eede7837ba0c874fbb998a98e684425ba5a9086ab2f85057c29a3074299dce9e",
+          "bytes": 949376
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "47cf0c38f181a85eedc719cf5f9831ef6641dab4643839e6372fa34084329e10",
+          "bytes": 179323
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "81836ed48b16fdb6c4ad11579aaa8a0bbe119af30eaad4430498fb472060e06c",
+          "bytes": 1897730
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "eed1993c1fa6c79e6e92f6b2d1eadd88566a7cf381c309c59513bfe15bcfec97",
+          "bytes": 62531536
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "f96995b06b3c379c29d4153ad2c58f1a2d9a0205fb1d4145d4f59f250f879386",
+          "bytes": 3458242
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "e4c2a03231fe7f257ea60c1170ff070e2da65ef98a0f2976028dc0262afd2fdc",
+          "bytes": 107652296
+        },
+        "rebuild-replay.json": {
+          "sha256": "b36c7e1d3b7616438d73742e04dd104d3ff50c814e4aa19d5c9048c6d4334f03",
+          "bytes": 80029
+        },
+        "rebuild-round-foot-live-27154.json": {
+          "sha256": "e4064a60fc808681ac75a881bb1103c19fb2015f25b9604818c9e4380a816cc4",
+          "bytes": 15532
+        },
+        "rebuild-round-foot-recorded-27499.json": {
+          "sha256": "76ce9e1ea432841ff05a2b827e9b788c8178579032ef3fbf2a0b8f72e01ef67e",
+          "bytes": 15552
+        },
+        "rebuild-selection-live.jsonl": {
+          "sha256": "12de322a3bf8bf68605ad9bf46f57011d4d679a29b0d9450a371ba992437dd66",
+          "bytes": 196721
+        },
+        "rebuild-selection-recorded.jsonl": {
+          "sha256": "f00ded82c9b29fa703693921ef7b65493d1c3936ba0668bd680c2c3f419217a9",
+          "bytes": 192481
+        },
+        "recorded-audit.json": {
+          "sha256": "b52702466ea3eded1098e94be3b0996a2388773c46b0259d20f811db176f6780",
+          "bytes": 482807
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "8b26f00e4e5cb4fbd5666f4f5737661a482d734dcd5b2915b2b6a5bd62a1e084",
+          "bytes": 376536
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-selection-audit.json": {
+          "sha256": "6f0f68e01bfedac2b00a5bccd3b8074dab102f4748782b39d2ffe2621ad60480",
+          "bytes": 1228390
+        },
+        "recorded-selection-orientation-audit.json": {
+          "sha256": "5e8e26c87f6d23d7940f4fc7f8deca249cd203f1ddd1a4f0024d69c7e8ee28d4",
+          "bytes": 300531
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "cf300f3c86cae16017a2b8e1f1fdeabb18a2a5a24579bf96a3102395a217b1f6",
+          "bytes": 1332224
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "selection_coarse": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-forecast-selection/v2/archives/selection_coarse.tar.gz",
+      "sha256": "02174f11112915072ba029431d92e868de220de31ae4f4b13eb4df24fb328e95",
+      "bytes": 45040736,
+      "raw_bytes": 292235508,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "9c49be29cb84dd0fd80bb39b3cdb4ab57490354275fff3986e3f3b11c2449160",
+          "bytes": 218663
+        },
+        "live-contact-audit.json": {
+          "sha256": "260553024e717b805fec0e6a406a3572e3cb8d98abfad465d865773c5ef3e131",
+          "bytes": 86166
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "7242bdc6806ab7330c2bcec961e544fd010ac59a856dcf5418d8920cf36285a0",
+          "bytes": 539911
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-selection-audit.json": {
+          "sha256": "6af5c364ad9b1eb28cdd4cc126c55888547a8336269205501e40b0affa5c2ae8",
+          "bytes": 421710
+        },
+        "live-selection-orientation-audit.json": {
+          "sha256": "b9936867e67ee56c6b05b235affff994ef822e8593a819e27504ccebd36f6d5e",
+          "bytes": 60903
+        },
+        "live-staging-audit.json": {
+          "sha256": "93fb3fe495de7182f1d0729d691eef344c514dcf9ebb89a7657babc6ffb6b75a",
+          "bytes": 382902
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "e72294756315a0ad15a3106f2efcd8e91b67ef446d56c35c3f05ad4f87d69a09",
+          "bytes": 1203676
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "e0882d6025bf5f7edab45ad768bcfec3edf4432f9e5c6f4d03e6c5bc4dcb07d2",
+          "bytes": 36066061
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "3d3aec72024689c46f64360f4a501f7fa6bfd5fe7047269ba2d2a000504e12e1",
+          "bytes": 3458244
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "a33bbd6f0cc4c74affed641323317cb6a193234e2e3d7ba540ae500dcc9df41b",
+          "bytes": 119383484
+        },
+        "rebuild-replay.json": {
+          "sha256": "55641975e7a7f33dc9ef2cfa7acd6646f434787a477cab5e229fb5b313c204f8",
+          "bytes": 92687
+        },
+        "rebuild-selection-live.jsonl": {
+          "sha256": "da48c01b1c8da9489cdea4ddd2ffab373067bbdf48fe7d05e79c82fae68b7fcf",
+          "bytes": 206078
+        },
+        "rebuild-selection-recorded.jsonl": {
+          "sha256": "337e92af03fbee3dced915cda49a1b9f0e3f757cb5712c65b728e5bac423e429",
+          "bytes": 8232
+        },
+        "recorded-audit.json": {
+          "sha256": "7d5207682e7ad07404ffdfc064199d8903b4783d86acc42f3c21d2006185f0af",
+          "bytes": 346144
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "4d3f133e7b1abdf73fc8b3fc116bcdea834b34c40755a62da4e108516832404f",
+          "bytes": 665445
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-selection-audit.json": {
+          "sha256": "9d40b53f52b0a50d63cbe94cfddaa4439ce0fd2c1576eaab91ccd519e7efb906",
+          "bytes": 13449
+        },
+        "recorded-selection-orientation-audit.json": {
+          "sha256": "19a0a2d1d972fb37185b4e110f5cc1784645e9181d5556a83d60d00c40ce45ca",
+          "bytes": 477776
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "095707c9bcecf52bfd439d4c5dd81bda8da61cc2bae4023f38d8cfad74fde3fc",
+          "bytes": 1494603
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    }
+  },
+  "retained_files": {
+    "control_handoff": 47,
+    "control_coarse": 44
+  },
+  "validation": {
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "rebuild"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/native.log",
+      "log_sha256": "8d9998744c91e285d70ace3eb067c279ebb37ff9431a8c21772d5ab5faf5c45a"
+    },
+    "bot": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/bot.log",
+      "log_sha256": "275835d4a456399755ea87d07941ecd588d55e021aad94227c2adf24d30bf5a2"
+    },
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/harness.log",
+      "log_sha256": "1a3daa191f4f65af0232b747e5b5ba2e02a2dc8081d21ca957acc0d67002ed40"
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/python.log",
+      "log_sha256": "bf31e655b87a400dbbe8426aaacdde0ff92da23d1ced1a764b54320e412a4919"
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/bot_clippy.log",
+      "log_sha256": "3a4ff713fc1ea7bbb53953247df61b255317ee0deac73f2b94e9a95aa0a71cd6"
+    },
+    "native_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/native_clippy.log",
+      "log_sha256": "08ec261af8ed56af5fdea6562d9c3b1ee7ce4faf55d1ded3ea1830f11d6d2d90",
+      "diagnostic_identities": [
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "items after a test module",
+          "file": "scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/pilot.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/render.rs"
+        },
+        {
+          "message": "this boolean expression can be simplified",
+          "file": "scenarios/spacewars/src/terrain/loose.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "file": "scenarios/spacewars/src/lib.rs"
+        }
+      ],
+      "same_diagnostic_identities": true,
+      "baseline_log": {
+        "path": "target/rebuild-local-forecast/v1/validation-logs/native_clippy.log",
+        "sha256": "7d216c4bf1e747a8e8be0737065f9ae6d04d50cfe13512d2cfee6e67312d4472",
+        "log": "    Checking engine-common v0.1.0 (/home/data/workspace/space-wars3/crates/engine-common)\n    Checking engine-core v0.1.0 (/home/data/workspace/space-wars3/crates/engine-core)\n    Checking engine-terrain v0.1.0 (/home/data/workspace/space-wars3/crates/engine-terrain)\n    Checking engine-water v0.1.0 (/home/data/workspace/space-wars3/crates/engine-water)\n    Checking engine-gravity v0.1.0 (/home/data/workspace/space-wars3/crates/engine-gravity)\n    Checking engine-rapier v0.1.0 (/home/data/workspace/space-wars3/crates/engine-rapier)\n    Checking scenario-spacewars v0.1.0 (/home/data/workspace/space-wars3/scenarios/spacewars)\nerror: this `if` statement can be collapsed\n   --> scenarios/spacewars/src/surface_sortie/pilot.rs:417:13\n    |\n417 | /             if let Some((previous, clear)) = last_clearance.get() {\n418 | |                 if query == previous {\n419 | |                     return clear;\n420 | |                 }\n421 | |             }\n    | |_____________^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\n    = note: `-D clippy::collapsible-if` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`\nhelp: collapse nested if block\n    |\n417 ~             if let Some((previous, clear)) = last_clearance.get()\n418 ~                 && query == previous {\n419 |                     return clear;\n420 ~                 }\n    |\n\nerror: this `if` statement can be collapsed\n   --> scenarios/spacewars/src/surface_sortie/render.rs:121:5\n    |\n121 | /     if let Some(mining) = &observation.mining {\n122 | |         if let Some((start, end)) = mining.beam {\n123 | |             line(\n124 | |                 &mut frame,\n...   |\n132 | |     }\n    | |_____^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n    |\n121 ~     if let Some(mining) = &observation.mining\n122 ~         && let Some((start, end)) = mining.beam {\n123 |             line(\n...\n130 |             );\n131 ~         }\n    |\n\nerror: this `if` statement can be collapsed\n   --> scenarios/spacewars/src/surface_sortie.rs:450:9\n    |\n450 | /         if self\n451 | |             .world\n452 | |             .terrain\n453 | |             .planets\n...   |\n459 | |         }\n    | |_________^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n    |\n454 ~             .contains_key(&self.pilots[player].planet)\n455 ~             && let Some(hit) = self.material_access(player) {\n456 |                 return hit.normal;\n457 ~             }\n    |\n\nerror: this boolean expression can be simplified\n   --> scenarios/spacewars/src/terrain/loose.rs:259:8\n    |\n259 |       if !state\n    |  ________^\n260 | |         .terrain\n261 | |         .loose\n262 | |         .as_ref()\n263 | |         .is_some_and(|pool| pool.config().slumping.is_some())\n    | |_____________________________________________________________^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool\n    = note: `-D clippy::nonminimal-bool` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::nonminimal_bool)]`\nhelp: try\n    |\n259 ~     if state\n260 +         .terrain\n261 +         .loose\n262 +         .as_ref().is_none_or(|pool| pool.config().slumping.is_none())\n    |\n\nerror: field assignment outside of initializer for an instance created with Default::default()\n    --> scenarios/spacewars/src/lib.rs:1606:9\n     |\n1606 |         config.asteroid_probability_per_sec = 100.0;\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\nnote: consider initializing the variable with `engine_core::SpacewarsConfig { asteroid_probability_per_sec: 100.0, ..Default::default() }` and removing relevant reassignments\n    --> scenarios/spacewars/src/lib.rs:1605:9\n     |\n1605 |         let mut config = SpacewarsConfig::default();\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default\n     = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`\n     = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`\n\nerror: this function has too many arguments (8/7)\n    --> scenarios/spacewars/src/lib.rs:2313:1\n     |\n2313 | / fn spawn_impact_particles(\n2314 | |     state: &mut SpacewarsState,\n2315 | |     flack_dir: Vec2,\n2316 | |     entity_center: Vec2,\n...    |\n2321 | |     salt: u64,\n2322 | | ) {\n     | |_^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments\n     = note: `-D clippy::too-many-arguments` implied by `-D warnings`\n     = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`\n\nerror: this `if` statement can be collapsed\n    --> scenarios/spacewars/src/lib.rs:6516:5\n     |\n6516 | /     if let Some(capturing_player) = planet.capturing_player_id {\n6517 | |         if planet.owner_id != Some(capturing_player) {\n6518 | |             let progress = capture_progress(planet);\n6519 | |             if progress > 0.0 {\n...    |\n6524 | |     }\n     | |_____^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n     |\n6516 ~     if let Some(capturing_player) = planet.capturing_player_id\n6517 ~         && planet.owner_id != Some(capturing_player) {\n6518 |             let progress = capture_progress(planet);\n ...\n6522 |             }\n6523 ~         }\n     |\n\nerror: this `if` statement can be collapsed\n    --> scenarios/spacewars/src/lib.rs:6581:5\n     |\n6581 | /     if let SpaceportStatus::Active(ship_index) = spaceport_status(state, planet_index) {\n6582 | |         if let Some(ship) = state.ships.get(ship_index) {\n6583 | |             let player_color = render_color(state.players[ship.owner_id].color);\n6584 | |             if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {\n...    |\n6604 | |     }\n     | |_____^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n     |\n6581 ~     if let SpaceportStatus::Active(ship_index) = spaceport_status(state, planet_index)\n6582 ~         && let Some(ship) = state.ships.get(ship_index) {\n6583 |             let player_color = render_color(state.players[ship.owner_id].color);\n ...\n6602 |             }\n6603 ~         }\n     |\n\nerror: could not compile `scenario-spacewars` (lib) due to 8 previous errors\nwarning: build failed, waiting for other jobs to finish...\nerror: items after a test module\n   --> scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs:338:1\n    |\n338 |   mod sparse_tests {\n    |   ^^^^^^^^^^^^^^^^\n...\n410 |   fn empty_diagnostics() -> GroundRouteDiagnostics {\n    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n...\n425 | / fn measure_node(\n426 | |     d: &mut GroundRouteDiagnostics,\n427 | |     node: GroundNode,\n428 | |     start: Vec2,\n429 | |     distance: f32,\n430 | |     range: f32,\n431 | | ) {\n    | |_^\n...\n446 |   impl PlanningJob for GroundRoundTripJob<'_> {\n    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n...\n689 |   impl GroundRoutes<'_> {\n    |   ^^^^^^^^^^^^^^^^^^^^^\n...\n713 |   fn edge_at(map: &GroundMap, extra: &[Option<GroundEdge>; 2], i: usize) -> Option<GroundEdge> {\n    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n...\n720 |   impl GroundRoutes<'_> {\n    |   ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module\n    = note: `-D clippy::items-after-test-module` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`\n    = help: move the items to before the test module was defined\n\nerror: this `if` statement can be collapsed\n    --> scenarios/spacewars/src/lib.rs:7302:17\n     |\n7302 | /                 if let Some(fill) = circle.fill {\n7303 | |                     if distance <= radius {\n7304 | |                         blend_pixel(image, x, y, fill.color);\n7305 | |                     }\n7306 | |                 }\n     | |_________________^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n     |\n7302 ~                 if let Some(fill) = circle.fill\n7303 ~                     && distance <= radius {\n7304 |                         blend_pixel(image, x, y, fill.color);\n7305 ~                     }\n     |\n\nerror: this `if` statement can be collapsed\n    --> scenarios/spacewars/src/lib.rs:7308:17\n     |\n7308 | /                 if let Some(stroke) = circle.stroke {\n7309 | |                     if (distance - radius).abs() <= stroke_width * 0.5 {\n7310 | |                         blend_pixel(image, x, y, stroke.color);\n7311 | |                     }\n7312 | |                 }\n     | |_________________^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if\nhelp: collapse nested if block\n     |\n7308 ~                 if let Some(stroke) = circle.stroke\n7309 ~                     && (distance - radius).abs() <= stroke_width * 0.5 {\n7310 |                         blend_pixel(image, x, y, stroke.color);\n7311 ~                     }\n     |\n\nerror: `assert!(true)` will be optimized out by the compiler\n     --> scenarios/spacewars/src/lib.rs:10070:9\n      |\n10070 |         assert!(EXHAUST_LAYER < SHIP_LAYER);\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      |\n      = help: remove it\n      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants\n      = note: `-D clippy::assertions-on-constants` implied by `-D warnings`\n      = help: to override `-D warnings` add `#[allow(clippy::assertions_on_constants)]`\n\nerror: `assert!(true)` will be optimized out by the compiler\n     --> scenarios/spacewars/src/lib.rs:10167:9\n      |\n10167 |         assert!(DEBRIS_LAYER > SHIP_LAYER);\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      |\n      = help: remove it\n      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants\n\nerror: `assert!(true)` will be optimized out by the compiler\n     --> scenarios/spacewars/src/lib.rs:10168:9\n      |\n10168 |         assert!(DEBRIS_LAYER < LASER_LAYER);\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      |\n      = help: remove it\n      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants\n\nerror: `assert!(true)` will be optimized out by the compiler\n     --> scenarios/spacewars/src/lib.rs:10169:9\n      |\n10169 |         assert!(PARTICLE_LAYER > SHIP_LAYER);\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      |\n      = help: remove it\n      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants\n\nerror: field assignment outside of initializer for an instance created with Default::default()\n     --> scenarios/spacewars/src/lib.rs:11026:9\n      |\n11026 |         config.player_view_heights = [240.0, 640.0];\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      |\nnote: consider initializing the variable with `engine_core::SpacewarsConfig { player_view_heights: [240.0, 640.0], ..Default::default() }` and removing relevant reassignments\n     --> scenarios/spacewars/src/lib.rs:11025:9\n      |\n11025 |         let mut config = SpacewarsConfig::default();\n      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default\n\nerror: could not compile `scenario-spacewars` (lib test) due to 16 previous errors\n"
+      }
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/release.log",
+      "log_sha256": "c8b396fbd7c11d441d27637cf67022eb4eec166d8f44974d01484b0acb1213d9"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/default_check.log",
+      "log_sha256": "9fc4ae4e47a4452d6915fe0bed93dc7f51619d935b612f535868a0029178126f"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-forecast-selection/v2/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "plan_sha256": "9a67e58f83e93b92b778b8435ac61e9301b29569ba2a051182cf94d0fb254657",
+  "summary_sha256": "7e36b26f6f9803b01af43266ced02e3860544569a56c8f6548244b15e4ddd800",
+  "review_bundle": {
+    "path": "docs/data/rebuild-forecast-selection-v2.json.gz",
+    "bytes": 2387130,
+    "sha256": "82935fa50d53bd5506cec6a14f8811eed68a6e440f9df974ad3cd00cf9ef79ca"
+  }
+}

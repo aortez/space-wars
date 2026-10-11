@@ -1,0 +1,346 @@
+{
+  "schema": 1,
+  "source_commit": "e46f5a587308ef39d2c5ea599c62d6e733d2d1d3",
+  "source_archive": {
+    "path": "/home/data/workspace/space-wars3/target/terrain-flight-forecast/v1/archives/new-world1-p2-asteroids3-no-stop.tar.gz",
+    "sha256": "cc7e9943cfd530bdafae2fc776f29e5119874b4b0094ea90dfe67b2d618274b2",
+    "bytes": 250446289,
+    "raw_bytes": 1775025125,
+    "files": {
+      "baseline-comparison.json": {
+        "sha256": "6241b3f6fd63d90f1121498a89dbbf853154891aef7af26dce9e546ff80200f4",
+        "bytes": 1714623
+      },
+      "capture-evidence.jsonl": {
+        "sha256": "0f08dedbc5f73aaf19a47897b534eb817ff9ddc389b503b0c9d5927d8fc7a8aa",
+        "bytes": 371661778
+      },
+      "clearance-audit.json": {
+        "sha256": "a615c227fcae8c0045924db9d6b20818da0c0b98f073ed21f3a12c838674b109",
+        "bytes": 149
+      },
+      "defense-audit.json": {
+        "sha256": "dae8d8c74948cfb6496559b620e8d4df20379b97438403b496cd5ed4c1131601",
+        "bytes": 239
+      },
+      "destination-behavior.jsonl": {
+        "sha256": "e70481f11de6e3dc0849c41201bfe6cb044f168a6d7db05ec35d658bb8ded003",
+        "bytes": 28144332
+      },
+      "destination-cover.jsonl": {
+        "sha256": "5cdb128715ad4fa286a6f23b61da533dd02abfba5f77d635919dc149fae6bfcd",
+        "bytes": 1612734
+      },
+      "flag-survey-work.jsonl": {
+        "sha256": "b5bf807980e7e3922578509541062e9f3e368f82bd35dfe2ec2816e667ce56fe",
+        "bytes": 8085127
+      },
+      "flag-survey.jsonl": {
+        "sha256": "a6449dd63233e756b5fa638beec86a606084f6d019e9ea4835cb27d1e8a257fe",
+        "bytes": 12024
+      },
+      "ground-arrival-audit.json": {
+        "sha256": "be2a264b4262c44d954f6f20273a3f5553bd2d30ef00fbad2198b98e87eb7ee4",
+        "bytes": 3601460
+      },
+      "impact.jsonl": {
+        "sha256": "503e370bf259d0fb492aa6ad226b36f429d7998505b09b375b606517976fb157",
+        "bytes": 218660635
+      },
+      "landing-handoffs.jsonl": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "live-planning.csv": {
+        "sha256": "ad86802f85c3d6961234ee482ebcf3230d2ee085799146a3f005c34c6b535e00",
+        "bytes": 404915
+      },
+      "mission-evaluation-work.jsonl": {
+        "sha256": "49b01fb1beb026431fb790c454ead5dc6575b41217c149e923fcebd714c8d5cc",
+        "bytes": 5928677
+      },
+      "mission-evaluations.jsonl": {
+        "sha256": "bffcf38f12ebc4fbda2cb1c04283e60ff311cfa4c869a2d7b38ac3f55fc8c000",
+        "bytes": 18824931
+      },
+      "native-recovery-audit.json": {
+        "sha256": "8c1c3282158b63d79599ba89874232f0088368123e270fc9ce258c9db0a67520",
+        "bytes": 61
+      },
+      "new-world1-p2-asteroids3-no-stop-audit.json": {
+        "sha256": "f547f1dd651645abb3dda3d9781bbb6c60d0fc8afabad61e3993d79ae2571cf9",
+        "bytes": 362328
+      },
+      "report.json": {
+        "sha256": "b283b5a1cb18a111f9960a107dda0045821bf464c91849680aed0af64e0702ba",
+        "bytes": 21492526
+      },
+      "sensors.jsonl": {
+        "sha256": "9275ded8062eb3847aaa5d01ed7bb4d4e26a366ed3320825ce8bf1f5a8213456",
+        "bytes": 85709375
+      },
+      "sequence-diagnostics.json": {
+        "sha256": "85dc971664031d6b2c97a0c52d54420f5b7c1c25e8ce5878c04786d1c832c469",
+        "bytes": 32674765
+      },
+      "terrain-flight-audit.json": {
+        "sha256": "e15cfda1d42e5e6e32945af5acb89c216cd8c0142a10e76e9fb192e59340aa0c",
+        "bytes": 1037090
+      },
+      "trace.jsonl": {
+        "sha256": "8c313a24591f712433c7c01bee514e77ca7f46c808b2aee632bae0fa6e4cbdf1",
+        "bytes": 975097356
+      }
+    }
+  },
+  "source_witnesses": {
+    "path": "target/terrain-flight-forecast/v1/recovery-handoff-witnesses.json",
+    "sha256": "7a9c53139c27a979a3f87e068f3560bb65d05b86046cd2e55d835dea9fd8d5c2"
+  },
+  "samples": [
+    {
+      "tick": 25498,
+      "seat": 1,
+      "ship": {
+        "angle": -2.2885165214538574,
+        "position": {
+          "x": 1016.8563842773438,
+          "y": 982.7413940429688
+        },
+        "spin": 0.0005748867406509817,
+        "velocity": {
+          "x": -13.846339225769043,
+          "y": 15.000598907470703
+        }
+      },
+      "frame": {
+        "angle": 0.24421504139900208,
+        "position": {
+          "x": 978.1334838867188,
+          "y": 994.2493896484375
+        },
+        "spin": 0.0005748867406509817,
+        "velocity": {
+          "x": -13.852954864501953,
+          "y": 14.978337287902832
+        }
+      },
+      "standing_support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1001), part: 0 }",
+        "local_surface": {
+          "normal": {
+            "x": 0.7071067690849304,
+            "y": -0.7071067690849304
+          },
+          "position": {
+            "x": 23.79796028137207,
+            "y": -18.981260299682617
+          }
+        },
+        "normal": {
+          "x": 0.8570948839187622,
+          "y": -0.5151586532592773
+        },
+        "position": {
+          "x": 1006.0449829101562,
+          "y": 981.3360595703125
+        },
+        "separation": -0.001508857123553753,
+        "spin": 0.0005748867406509817,
+        "velocity": {
+          "x": -13.84553050994873,
+          "y": 14.994382858276367
+        }
+      },
+      "placement": {
+        "attempts": [
+          {
+            "center": {
+              "x": 34.79132080078125,
+              "y": -20.529518127441406
+            },
+            "hatch": {
+              "x": 24.39434051513672,
+              "y": -18.541051864624023
+            },
+            "offset": -8.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 0.8100926876068115,
+              "destination_nodes": 8,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.4441869854927063,
+              "partial": false,
+              "reachable_nodes": 1,
+              "start_distance": 0.3229312598705292,
+              "start_node": 329
+            }
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -14.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 8.0,
+            "rejection": "hull_obstructed",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 14.0,
+            "rejection": "no_ground",
+            "route": null
+          }
+        ],
+        "planet": 0,
+        "revision": 21,
+        "selected_offset": -8.0,
+        "standing": {
+          "x": 23.960918426513672,
+          "y": -19.279010772705078
+        },
+        "tick": 25498
+      }
+    },
+    {
+      "tick": 27060,
+      "seat": 1,
+      "ship": {
+        "angle": -2.264646053314209,
+        "position": {
+          "x": 1096.756591796875,
+          "y": 1435.4515380859375
+        },
+        "spin": 0.0005739926709793508,
+        "velocity": {
+          "x": 18.141761779785156,
+          "y": 9.375531196594238
+        }
+      },
+      "frame": {
+        "angle": 0.25916698575019836,
+        "position": {
+          "x": 1057.9547119140625,
+          "y": 1446.4561767578125
+        },
+        "spin": 0.0005739926709793508,
+        "velocity": {
+          "x": 18.13544464111328,
+          "y": 9.353259086608887
+        }
+      },
+      "standing_support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1001), part: 0 }",
+        "local_surface": {
+          "normal": {
+            "x": 0.7071067690849304,
+            "y": -0.7071067690849304
+          },
+          "position": {
+            "x": 23.811599731445312,
+            "y": -18.967620849609375
+          }
+        },
+        "normal": {
+          "x": 0.8647013902664185,
+          "y": -0.5022863149642944
+        },
+        "position": {
+          "x": 1085.5267333984375,
+          "y": 1434.06982421875
+        },
+        "separation": -0.006766140460968018,
+        "spin": 0.0005739926709793508,
+        "velocity": {
+          "x": 18.142555236816406,
+          "y": 9.369085311889648
+        }
+      },
+      "placement": {
+        "attempts": [
+          {
+            "center": {
+              "x": 34.685829162597656,
+              "y": -20.58109474182129
+            },
+            "hatch": {
+              "x": 24.219951629638672,
+              "y": -18.646347045898438
+            },
+            "offset": -8.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 0.6640158891677856,
+              "destination_nodes": 9,
+              "failure": null,
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.42396247386932373,
+              "partial": false,
+              "reachable_nodes": 1,
+              "start_distance": 0.2899426817893982,
+              "start_node": 329
+            }
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -14.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": {
+              "x": 26.062217712402344,
+              "y": -34.27177429199219
+            },
+            "hatch": {
+              "x": 15.007972717285156,
+              "y": -32.9486083984375
+            },
+            "offset": 8.0,
+            "rejection": "no_hatch_route",
+            "route": {
+              "closest_reachable_distance": 14.438027381896973,
+              "destination_nodes": 13,
+              "failure": "disconnected",
+              "flights": 0,
+              "jumps": 0,
+              "length": 0.0,
+              "nearest_destination_distance": 0.4553426206111908,
+              "partial": false,
+              "reachable_nodes": 25,
+              "start_distance": 0.2899426817893982,
+              "start_node": 329
+            }
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 14.0,
+            "rejection": "no_ground",
+            "route": null
+          }
+        ],
+        "planet": 0,
+        "revision": 22,
+        "selected_offset": -8.0,
+        "standing": {
+          "x": 23.47690200805664,
+          "y": -19.038726806640625
+        },
+        "tick": 27060
+      }
+    }
+  ]
+}

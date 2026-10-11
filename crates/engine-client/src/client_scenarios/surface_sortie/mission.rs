@@ -785,6 +785,11 @@ mod tests {
                 );
                 let diagnostics = measured.runtime_diagnostics();
                 assert_eq!(diagnostics, measured.runtime_diagnostics());
+                assert!(diagnostics.contains("mission_profile_version=3\n"));
+                assert!(diagnostics.lines().any(|line| {
+                    line == format!("mission_rapier_ccd_samples={}", tick.min(120))
+                }));
+                assert!(diagnostics.contains("\nmission_rapier_ccd_avg_ms="));
                 assert_eq!(
                     state,
                     SurfaceSortieScenario::observe(&measured.sortie.state).payload

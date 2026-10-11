@@ -217,20 +217,19 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 );
             }
             if scenario == "terrain-grains" {
-                for button in [
+                // Fire is edge-triggered. Two long button holds can let every
+                // grain pack or deposit before the screenshot. Inspect the
+                // fresh blast after a short press, then exercise the box.
+                let request = spacewars_control::InputPressRequest::new(
+                    &state,
                     spacewars_control::InputButton::South,
-                    spacewars_control::InputButton::West,
-                ] {
-                    let mut request = spacewars_control::InputPressRequest::new(&state, button);
-                    request.hold_ms = 2000;
-                    state = harness
-                        .client
-                        .input_press_before(&request, Instant::now() + Duration::from_secs(5))
-                        .unwrap()
-                        .state;
-                }
-                let path = harness
-                    .capture_screenshot(&format!("{scenario}-{renderer}-box-and-grains.png"));
+                );
+                state = harness
+                    .client
+                    .input_press_before(&request, Instant::now() + Duration::from_secs(5))
+                    .unwrap()
+                    .state;
+                let path = harness.capture_screenshot(&format!("{scenario}-{renderer}-grains.png"));
                 let mut reader = png::Decoder::new(File::open(path).unwrap())
                     .read_info()
                     .unwrap();
@@ -248,6 +247,16 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                     grains > 100,
                     "blasted grains are absent from {renderer}: {grains} pixels"
                 );
+                let request = spacewars_control::InputPressRequest::new(
+                    &state,
+                    spacewars_control::InputButton::West,
+                );
+                state = harness
+                    .client
+                    .input_press_before(&request, Instant::now() + Duration::from_secs(5))
+                    .unwrap()
+                    .state;
+                harness.capture_screenshot(&format!("{scenario}-{renderer}-box-and-grains.png"));
             }
             let first_instance = state.scenario_revision;
             let pause = harness.pause_guarded(&state);

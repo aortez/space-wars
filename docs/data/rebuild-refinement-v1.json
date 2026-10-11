@@ -1,0 +1,1553 @@
+{
+  "schema": 1,
+  "profile": "retained_rebuild_refinement_v1",
+  "complete": true,
+  "screen": {
+    "control_retained": true,
+    "isolated_recovery_complete": false,
+    "decision": "not_qualified",
+    "scored_match": false,
+    "default_promotion": false
+  },
+  "runtime_source_commit": "576e34e9d7e6f3e3faa2f6675accf853469f5584",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-refinement/v1/surface_mission_soak",
+    "sha256": "5694d9746b87983babd32f2118e4e4563af79f9e33765371753eb47d729a7ec2"
+  },
+  "frozen_inputs": 962,
+  "prefixes": 2,
+  "continuations": 4,
+  "fresh_games": 0,
+  "simulation_retries": 0,
+  "audit_resumes": 0,
+  "retained_control_files": 20,
+  "prefix": {
+    "verified": true,
+    "rows": 23768,
+    "task_steps": 6948,
+    "audit_samples": 396,
+    "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90"
+  },
+  "bounds": {
+    "coarse_candidates": 8,
+    "refined_candidates": 8,
+    "offset_checks": 240,
+    "extra_offsets": 22,
+    "neighborhood_radius": 2,
+    "max_route_length": 24,
+    "precise_route_range": 0.01,
+    "precise_arrival_range": 0.12
+  },
+  "diagnosis": {
+    "comparisons": {
+      "live": {
+        "rows": 782,
+        "first_differences": {
+          "observation": 24247,
+          "pilots": 24247
+        },
+        "changed_rows": {
+          "observation": 302,
+          "pilots": 302
+        },
+        "actions_identical": true,
+        "normalized_rows_identical": true,
+        "trace_sha256": {
+          "control": "e2d44e709282206eba4d9299704b5beae524feeb857a3e51b33d166b89b424b4",
+          "refined": "5476e341a74c7a0c75df11b9ce0c80dcc81cbcb86e730cd8f229e60a8a578f76"
+        },
+        "excluded_paths": [
+          "pilots[*].recovery.placement",
+          "observation.flight.pilot.recovery.placement",
+          "observation.rebuild.attempts",
+          "observation.rebuild.checked",
+          "observation.rebuild.refinement"
+        ]
+      },
+      "recorded": {
+        "rows": 5655,
+        "first_differences": {
+          "observation": 24247,
+          "pilots": 24247,
+          "pilots_excluding_placement": 25498,
+          "task": 25560,
+          "generated_actions": 25578,
+          "landing_diagnostics": 27819,
+          "audit": 27840
+        },
+        "changed_rows": {
+          "observation": 3028,
+          "pilots": 3028,
+          "task": 3862,
+          "generated_actions": 1229,
+          "landing_diagnostics": 1603,
+          "audit": 28
+        },
+        "actions_identical": true,
+        "normalized_rows_identical": false,
+        "trace_sha256": {
+          "control": "f96709a9d37e9099ef0f97ab051d073507ce8b2188b12e0ef2ff49430fafb139",
+          "refined": "cfd58ce4cfd3cbb6e93fa7ae6461f754c590a4035c070d646f4f9e230c305af5"
+        }
+      }
+    },
+    "search": {
+      "surveys": [
+        {
+          "tick": 24270,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": []
+        },
+        {
+          "tick": 24300,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 240,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            301,
+            291,
+            306,
+            286,
+            311,
+            316,
+            321,
+            324
+          ],
+          "refined": [
+            311,
+            324,
+            310,
+            325,
+            312,
+            326,
+            313,
+            329
+          ]
+        },
+        {
+          "tick": 24330,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 220,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            276,
+            330,
+            269,
+            262,
+            336,
+            255,
+            341,
+            248
+          ],
+          "refined": [
+            330,
+            341,
+            329,
+            340,
+            331,
+            342,
+            332,
+            339
+          ]
+        },
+        {
+          "tick": 24360,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": []
+        },
+        {
+          "tick": 24390,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 240,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            291,
+            301,
+            286,
+            306,
+            311,
+            316,
+            321,
+            324
+          ],
+          "refined": [
+            311,
+            324,
+            310,
+            325,
+            312,
+            326,
+            313,
+            329
+          ]
+        },
+        {
+          "tick": 24420,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 220,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            276,
+            330,
+            269,
+            262,
+            336,
+            255,
+            341,
+            248
+          ],
+          "refined": [
+            330,
+            341,
+            329,
+            340,
+            331,
+            342,
+            332,
+            339
+          ]
+        },
+        {
+          "tick": 24450,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": []
+        },
+        {
+          "tick": 24480,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 240,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            291,
+            301,
+            286,
+            306,
+            311,
+            316,
+            321,
+            324
+          ],
+          "refined": [
+            311,
+            324,
+            310,
+            325,
+            312,
+            326,
+            309,
+            329
+          ]
+        },
+        {
+          "tick": 24510,
+          "work": {
+            "coarse_candidates": 8,
+            "offset_checks": 220,
+            "refined_candidates": 8
+          },
+          "coarse": [
+            276,
+            330,
+            269,
+            262,
+            336,
+            255,
+            341,
+            248
+          ],
+          "refined": [
+            330,
+            341,
+            329,
+            340,
+            331,
+            342,
+            332,
+            339
+          ]
+        },
+        {
+          "tick": 24540,
+          "work": {
+            "coarse_candidates": 3,
+            "offset_checks": 0,
+            "refined_candidates": 0
+          },
+          "coarse": [
+            346,
+            242,
+            351
+          ],
+          "refined": []
+        }
+      ],
+      "known_preview_bearing": 343,
+      "known_preview_sampled": false,
+      "max_offset_checks": 240,
+      "unique_refined_bearings": [
+        309,
+        310,
+        311,
+        312,
+        313,
+        324,
+        325,
+        326,
+        329,
+        330,
+        331,
+        332,
+        339,
+        340,
+        341,
+        342
+      ],
+      "conclusion": "Repeated bounded neighborhoods do not progress to the known preview footing before the original search deadline."
+    },
+    "landing": {
+      "build_tick": 27819,
+      "placement": {
+        "attempts": [
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -8.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -14.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 8.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 14.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -8.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -9.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -9.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -10.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -10.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -11.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -11.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": {
+              "x": 40.610103607177734,
+              "y": -13.171870231628418
+            },
+            "hatch": {
+              "x": 28.90376091003418,
+              "y": -16.073715209960938
+            },
+            "offset": -12.0,
+            "rejection": null,
+            "route": {
+              "closest_reachable_distance": 2.693899393081665,
+              "destination_nodes": 14,
+              "failure": null,
+              "flights": 0,
+              "jumps": 1,
+              "length": 3.5808053016662598,
+              "nearest_destination_distance": 0.43014970421791077,
+              "partial": false,
+              "reachable_nodes": 10,
+              "start_distance": 0.374058336019516,
+              "start_node": 329
+            },
+            "settling_angle_degrees": 5.5041680335998535
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -12.5,
+            "rejection": "no_hatch_footing",
+            "route": null,
+            "settling_angle_degrees": 2.0537607669830322
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -13.0,
+            "rejection": "no_hatch_footing",
+            "route": null,
+            "settling_angle_degrees": 0.3071048855781555
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": -13.5,
+            "rejection": "no_hatch_footing",
+            "route": null,
+            "settling_angle_degrees": 0.0
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 8.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 9.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 9.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 10.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 10.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 11.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 11.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 12.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 12.5,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 13.0,
+            "rejection": "no_ground",
+            "route": null
+          },
+          {
+            "center": null,
+            "hatch": null,
+            "offset": 13.5,
+            "rejection": "no_ground",
+            "route": null
+          }
+        ],
+        "planet": 0,
+        "revision": 22,
+        "selected_offset": -12.0,
+        "standing": {
+          "x": 23.625762939453125,
+          "y": -18.674659729003906
+        },
+        "tick": 27819
+      },
+      "selected_attempt": {
+        "center": {
+          "x": 40.610103607177734,
+          "y": -13.171870231628418
+        },
+        "hatch": {
+          "x": 28.90376091003418,
+          "y": -16.073715209960938
+        },
+        "offset": -12.0,
+        "rejection": null,
+        "route": {
+          "closest_reachable_distance": 2.693899393081665,
+          "destination_nodes": 14,
+          "failure": null,
+          "flights": 0,
+          "jumps": 1,
+          "length": 3.5808053016662598,
+          "nearest_destination_distance": 0.43014970421791077,
+          "partial": false,
+          "reachable_nodes": 10,
+          "start_distance": 0.374058336019516,
+          "start_node": 329
+        },
+        "settling_angle_degrees": 5.5041680335998535
+      },
+      "first_settled_tick": 28227,
+      "first_settled_landing": {
+        "altitude": 0.0020590126514434814,
+        "angle_degrees": 5.970282554626465,
+        "assist_strength": 1.0,
+        "corner_support": false,
+        "descent_speed": 0.006939046550542116,
+        "foot_clearances": [
+          0.0020590126514434814,
+          1.1352453231811523
+        ],
+        "lateral_speed": 0.008878441527485847,
+        "phase": "landed",
+        "planet": 0,
+        "relative_spin": -0.00038558547385036945,
+        "settled_seconds": 0.25,
+        "supported_feet": 2
+      },
+      "settled_intervals": [
+        [
+          28227,
+          28598
+        ]
+      ],
+      "settled_rows": 372,
+      "post_build_rows": 1603,
+      "support_counts": {
+        "0": 72,
+        "1": 1145,
+        "2": 386
+      },
+      "final_tick": 29421,
+      "final_landing": {
+        "altitude": 0.0021490752696990967,
+        "angle_degrees": 10.213438987731934,
+        "assist_strength": 1.0,
+        "corner_support": false,
+        "descent_speed": -0.0013183471746742725,
+        "foot_clearances": [
+          0.0021490752696990967,
+          1.3177754878997803
+        ],
+        "lateral_speed": 0.0011356358882039785,
+        "phase": "settling",
+        "planet": 0,
+        "relative_spin": -0.00028670887695625424,
+        "settled_seconds": 0.0,
+        "supported_feet": 1
+      },
+      "final_health": 91.26747131347656,
+      "final_ships_lost": 1,
+      "final_rebuilds": 1,
+      "final_task_reason": "spaceling stopped making progress on ground route",
+      "native_boardings": 0,
+      "autonomous_recovery_complete": false,
+      "control_source": "Original recorded P2 controls; generated task controls are diagnostic only.",
+      "scope": "A later native build at revision 22; not arrival at the original revision-21 preview footing."
+    },
+    "route": {
+      "scope": "Pure native route queries on the saved measured graph; no world construction or physics steps.",
+      "tick": 24330,
+      "baseline_routes_exact": 99,
+      "graph_roundtrip_exact": true,
+      "known_preview": {
+        "bearing": 343,
+        "ordinary": {
+          "diagnostics": {
+            "closest_reachable_distance": 0.43047213554382324,
+            "destination_nodes": 3,
+            "failure": null,
+            "flights": 1,
+            "jumps": 3,
+            "length": 23.6519775390625,
+            "nearest_destination_distance": 0.0,
+            "partial": false,
+            "reachable_nodes": 56,
+            "start_distance": 0.011331000365316868,
+            "start_node": 296
+          },
+          "path": [
+            296,
+            297,
+            298,
+            299,
+            300,
+            301,
+            302,
+            303,
+            304,
+            305,
+            306,
+            307,
+            308,
+            309,
+            310,
+            311,
+            312,
+            313,
+            314,
+            315,
+            316,
+            317,
+            318,
+            319,
+            320,
+            325,
+            326,
+            332,
+            333,
+            334,
+            339,
+            340,
+            341,
+            342
+          ]
+        },
+        "precise": {
+          "diagnostics": {
+            "closest_reachable_distance": 0.0,
+            "destination_nodes": 1,
+            "failure": null,
+            "flights": 1,
+            "jumps": 3,
+            "length": 24.082448959350586,
+            "nearest_destination_distance": 0.0,
+            "partial": false,
+            "reachable_nodes": 57,
+            "start_distance": 0.011331000365316868,
+            "start_node": 296
+          },
+          "path": [
+            296,
+            297,
+            298,
+            299,
+            300,
+            301,
+            302,
+            303,
+            304,
+            305,
+            306,
+            307,
+            308,
+            309,
+            310,
+            311,
+            312,
+            313,
+            314,
+            315,
+            316,
+            317,
+            318,
+            319,
+            320,
+            325,
+            326,
+            332,
+            333,
+            334,
+            339,
+            340,
+            341,
+            342,
+            343
+          ]
+        },
+        "selected_offset": -11.0
+      },
+      "route_limit": 24,
+      "admitted_precise_routes_with_valid_preview": 0,
+      "limitation": "Placement coverage is limited to the prior frozen local probe and its 26 offsets; no claim about other times, positions, or offsets.",
+      "input": {
+        "path": "target/rebuild-coverage/v1/review-extracts/rebuild-coverage.json",
+        "sha256": "2e2eb6113bf477a224c2cca334fd5b6441e30957b3a1999490a9b2d1627f037a",
+        "bytes": 651663
+      },
+      "output": {
+        "path": "target/rebuild-refinement/v1/route-inspection.json",
+        "sha256": "e2cba9dffd06b71058d1f58a57a57d47b5e326964835302e27a725e12f4be174",
+        "bytes": 138486
+      },
+      "sources": {
+        "src/main.rs": {
+          "path": "target/rebuild-refinement/v1/route-inspection/src/main.rs",
+          "sha256": "4fe1c1b1d2276b36a182a74fd01a2f19b87aa7d6c00f32736b1ae1b5d2f3e1bf",
+          "bytes": 2838
+        },
+        "Cargo.toml": {
+          "path": "target/rebuild-refinement/v1/route-inspection/Cargo.toml",
+          "sha256": "22d1a6755c3bc3424a0704b3888bdb606057f56a205e559394b654e988da695a",
+          "bytes": 291
+        },
+        "Cargo.lock": {
+          "path": "target/rebuild-refinement/v1/route-inspection/Cargo.lock",
+          "sha256": "e008a250bac93201e088f14a5f7f41f5f90077f558bad518dd82d9cbc705b41c",
+          "bytes": 19908
+        }
+      },
+      "binary": {
+        "path": "target/rebuild-route-inspection-build/release/rebuild-route-inspection",
+        "sha256": "b486e4c5791868bb6aa6e32fa0e47ca6fc1f4e1f7533c21a8d1c72207db0d21c",
+        "bytes": 711799
+      },
+      "log": {
+        "path": "target/rebuild-refinement/v1/route-inspection.log",
+        "sha256": "07ea8ab525762d3b0c20baa86dab7b7f86959196e967eaafd7dc36b2c5a386a0",
+        "bytes": 2904
+      },
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "run",
+        "--offline",
+        "--release",
+        "--manifest-path",
+        "target/rebuild-refinement/v1/route-inspection/Cargo.toml",
+        "--target-dir",
+        "target/rebuild-route-inspection-build",
+        "--",
+        "target/rebuild-coverage/v1/review-extracts/rebuild-coverage.json"
+      ],
+      "exit_code": 0,
+      "physics_steps": 0
+    },
+    "recommendation": "Investigate persistent bounded search progress and a short staged reposition within the original recovery deadline; exact arrival and autonomous boarding remain unqualified."
+  },
+  "runs": {
+    "control": {
+      "forks": {
+        "recorded": {
+          "rows": 5655,
+          "builds": [],
+          "boardings": [],
+          "reason": "fixed_end",
+          "last_tick": 29421,
+          "first_native_difference": 25498,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347,
+          "sha256": "1e5a6fdae1e86ad57121b118a3efede01a15fdef03cde986a8e3e9578d49d1b5"
+        },
+        "live": {
+          "rows": 782,
+          "builds": [],
+          "boardings": [],
+          "reason": "recovery_blocked",
+          "last_tick": 24548,
+          "first_native_difference": 24348,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347,
+          "sha256": "7680a254caddda8cdda147ae9e191b4289333bd86a3cb1ae36271fbd009ca106"
+        }
+      },
+      "refinement": {
+        "recorded": {
+          "surveys": 101,
+          "relocation_ticks": [],
+          "precise_arrival_ticks": [],
+          "max_offset_checks": 0,
+          "native_reports": 103,
+          "sha256": "88eb4a119aec31514f6c87235d168888fbec25d145ab65bb52e8252ef1c49b94"
+        },
+        "live": {
+          "surveys": 10,
+          "relocation_ticks": [],
+          "precise_arrival_ticks": [],
+          "max_offset_checks": 0,
+          "native_reports": 11,
+          "sha256": "c55a86fdd12ea14a4a53a1ad2afe5077555f6d015c375a9500a115e1fb0f6968"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-refinement/v1/archives/control.tar.gz",
+        "sha256": "13ca6170df898ae5c249dce0c4f5e9389d65045231bde84f7f944f28cc7dc744",
+        "bytes": 38719432,
+        "raw_bytes": 249622777,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "7680a254caddda8cdda147ae9e191b4289333bd86a3cb1ae36271fbd009ca106",
+            "bytes": 83870
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-refinement-audit.json": {
+            "sha256": "c55a86fdd12ea14a4a53a1ad2afe5077555f6d015c375a9500a115e1fb0f6968",
+            "bytes": 91751
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "e2d44e709282206eba4d9299704b5beae524feeb857a3e51b33d166b89b424b4",
+            "bytes": 13679940
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "f96709a9d37e9099ef0f97ab051d073507ce8b2188b12e0ef2ff49430fafb139",
+            "bytes": 106919791
+          },
+          "rebuild-replay.json": {
+            "sha256": "8a697ca313dc5468027e16211549ec3c5dbb49629f8803aedb75cc8d4fc802b5",
+            "bytes": 81779
+          },
+          "recorded-audit.json": {
+            "sha256": "1e5a6fdae1e86ad57121b118a3efede01a15fdef03cde986a8e3e9578d49d1b5",
+            "bytes": 281857
+          },
+          "recorded-refinement-audit.json": {
+            "sha256": "88eb4a119aec31514f6c87235d168888fbec25d145ab65bb52e8252ef1c49b94",
+            "bytes": 1375128
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      }
+    },
+    "refined": {
+      "forks": {
+        "recorded": {
+          "rows": 5655,
+          "builds": [
+            27819
+          ],
+          "boardings": [],
+          "reason": "fixed_end",
+          "last_tick": 29421,
+          "first_native_difference": 25498,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347,
+          "sha256": "b540aaf3efc6782420cd95604818eb1dbf53cc58cb7e94706d14021df12d249a"
+        },
+        "live": {
+          "rows": 782,
+          "builds": [],
+          "boardings": [],
+          "reason": "recovery_blocked",
+          "last_tick": 24548,
+          "first_native_difference": 24348,
+          "first_task_difference": 24330,
+          "first_action_difference": 24347,
+          "sha256": "a614309b6e9a5d21c2d689c631ff8b43e2dfe7d2bf46f086621cc3dfe08b1231"
+        }
+      },
+      "refinement": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "precise_arrival_ticks": [],
+          "max_offset_checks": 240,
+          "native_reports": 50,
+          "sha256": "b798d4493795a9e9dedbe1f999efee768bac1acf815fb123b37db333deb5fa7c"
+        },
+        "live": {
+          "surveys": 10,
+          "relocation_ticks": [],
+          "precise_arrival_ticks": [],
+          "max_offset_checks": 240,
+          "native_reports": 11,
+          "sha256": "eb1c69082481586604c05664c762a3b815505a4a9804f8ab70fcad26fef4c7f2"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-refinement/v1/archives/refined.tar.gz",
+        "sha256": "cc6abb697f3e46a1e88993960e1a3ccceead8175d5dad8fcab9b20fac27f8360",
+        "bytes": 38487638,
+        "raw_bytes": 254524512,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "a614309b6e9a5d21c2d689c631ff8b43e2dfe7d2bf46f086621cc3dfe08b1231",
+            "bytes": 103338
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-refinement-audit.json": {
+            "sha256": "eb1c69082481586604c05664c762a3b815505a4a9804f8ab70fcad26fef4c7f2",
+            "bytes": 599109
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "5476e341a74c7a0c75df11b9ce0c80dcc81cbcb86e730cd8f229e60a8a578f76",
+            "bytes": 14947217
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "cfd58ce4cfd3cbb6e93fa7ae6461f754c590a4035c070d646f4f9e230c305af5",
+            "bytes": 109404186
+          },
+          "rebuild-replay.json": {
+            "sha256": "d81b42dc23d2b3f4e212b4eb051eb2ebbd1527e3da5565f8fa9d86121625442f",
+            "bytes": 84235
+          },
+          "recorded-audit.json": {
+            "sha256": "b540aaf3efc6782420cd95604818eb1dbf53cc58cb7e94706d14021df12d249a",
+            "bytes": 442172
+          },
+          "recorded-refinement-audit.json": {
+            "sha256": "b798d4493795a9e9dedbe1f999efee768bac1acf815fb123b37db333deb5fa7c",
+            "bytes": 1835594
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      }
+    }
+  },
+  "validation": {
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "rebuild_placement"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/native.log",
+      "log_sha256": "a06c070c907c3667c44f757975b846019fab73a99c372ed429ba6a456649fc6d",
+      "tests": 4
+    },
+    "bot": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "ground_navigation",
+        "--test",
+        "surface_recovery",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/bot.log",
+      "log_sha256": "3d0ef89f2e1c6b92b5260ae1d5569e023dd691ef23fdf52fa4d5c20ce9f62044",
+      "tests": 75
+    },
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/harness.log",
+      "log_sha256": "d26e81060f6b19ecb49f8f8e47088bf7c57035d4fdd07088e2788d96b939c2a7",
+      "tests": 63
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/python.log",
+      "log_sha256": "f511ffb117e5025f8bbee7cee4675c25e7567639c7d213ed929ba040344e2101",
+      "tests": 954
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "340c2f64d10f20a37595dcbcc0404ce5478afacce3fff3281a46a0870b3577a0"
+    },
+    "native_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/native_clippy.log",
+      "log_sha256": "8c3635902601648af42af0ff877ba9ef778c56fd98b9eb38d9e9e9f6bbfe1e80",
+      "diagnostics": 16,
+      "same_diagnostic_identities": true,
+      "diagnostic_identities": [
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/pilot.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/render.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie.rs"
+        },
+        {
+          "message": "this boolean expression can be simplified",
+          "file": "scenarios/spacewars/src/terrain/loose.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "items after a test module",
+          "file": "scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        }
+      ],
+      "baseline_log": {
+        "path": "target/rebuild-coverage/v1/validation-logs/native_clippy.log",
+        "sha256": "2deae04ba7dffd0d88de4c01972071ed41c5273011c3a9c232a13fc589cf1c07"
+      },
+      "explanation": "Broad native Clippy still fails with the same 16 message/file diagnostics as the preceding coverage baseline. No diagnostic points to the refinement or coverage modules. This is not a passing check."
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/release.log",
+      "log_sha256": "e4b4bd92017de1526adb4084de6f7634040c981d81824235c37084d079088509"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/default_check.log",
+      "log_sha256": "d506e00b7ec0c0e070e54caf6c30851f27acb163b247c501181fab7b867c2492"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-refinement/v1/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "provenance": {
+    "coverage_bundle": {
+      "path": "docs/data/rebuild-coverage-v1.json.gz",
+      "sha256": "08f78092082f0fa085a0aad33f257e6e1ae7b20f47e0b8c61e4a84a0810677b2",
+      "bytes": 133459
+    },
+    "replay_bundle": {
+      "path": "docs/data/rebuild-replay-v2.json.gz",
+      "sha256": "9d0d972b1810d281ddec0523f2b0ca92a6e8481afd5206717f65030a02708116",
+      "bytes": 2611333
+    },
+    "prior_replay_archive": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-replay/v2/archives/candidate.tar.gz",
+      "sha256": "56aaf8d3c1331e3745bf4374ec6a8f69277540a7be74a029e084d29de69fe56a",
+      "bytes": 38596128,
+      "raw_bytes": 248155898,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "7680a254caddda8cdda147ae9e191b4289333bd86a3cb1ae36271fbd009ca106",
+          "bytes": 83870
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "e2d44e709282206eba4d9299704b5beae524feeb857a3e51b33d166b89b424b4",
+          "bytes": 13679940
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "f96709a9d37e9099ef0f97ab051d073507ce8b2188b12e0ef2ff49430fafb139",
+          "bytes": 106919791
+        },
+        "rebuild-replay.json": {
+          "sha256": "8a697ca313dc5468027e16211549ec3c5dbb49629f8803aedb75cc8d4fc802b5",
+          "bytes": 81779
+        },
+        "recorded-audit.json": {
+          "sha256": "1e5a6fdae1e86ad57121b118a3efede01a15fdef03cde986a8e3e9578d49d1b5",
+          "bytes": 281857
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "coverage_archive": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-coverage/v1/archives/replay.tar.gz",
+      "sha256": "d873072bb49d1e374d476d75e9a33a8a2a26ae8d36a3270ec34e8735a0ae8151",
+      "bytes": 38657658,
+      "raw_bytes": 248810263,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "coverage-audit.json": {
+          "sha256": "68856b6350b09c5ee2df25f23ab32a6551fe7f75cb8487e217839a959d3c89d9",
+          "bytes": 2702
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "7680a254caddda8cdda147ae9e191b4289333bd86a3cb1ae36271fbd009ca106",
+          "bytes": 83870
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-coverage.json": {
+          "sha256": "2e2eb6113bf477a224c2cca334fd5b6441e30957b3a1999490a9b2d1627f037a",
+          "bytes": 651663
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "e2d44e709282206eba4d9299704b5beae524feeb857a3e51b33d166b89b424b4",
+          "bytes": 13679940
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "f96709a9d37e9099ef0f97ab051d073507ce8b2188b12e0ef2ff49430fafb139",
+          "bytes": 106919791
+        },
+        "rebuild-replay.json": {
+          "sha256": "8a697ca313dc5468027e16211549ec3c5dbb49629f8803aedb75cc8d4fc802b5",
+          "bytes": 81779
+        },
+        "recorded-audit.json": {
+          "sha256": "1e5a6fdae1e86ad57121b118a3efede01a15fdef03cde986a8e3e9578d49d1b5",
+          "bytes": 281857
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "tape": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-replay/v2/inputs/tape.jsonl",
+      "sha256": "c48c29b50b3c9b953305b0ac5fe9a2581040f654c5f2b9a5e84300d77b60d168",
+      "rows": 29422
+    }
+  },
+  "plan_sha256": "3320aeb2feff838ca2136eb12e793b59d430a9de1aa7329f55842441d477e133",
+  "summary_sha256": "b0bbc6134cfbf16a3355ceebb9f0cc3f658c9cc24ab46b90570bd5ce45021b97",
+  "review_bundle": {
+    "path": "docs/data/rebuild-refinement-v1.json.gz",
+    "sha256": "97620c14654e6ecd796a6f9ef36ed4d91acf13c2f889ed04ceb749db39a51c36",
+    "bytes": 679118
+  }
+}

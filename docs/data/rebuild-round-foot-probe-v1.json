@@ -1,0 +1,1137 @@
+{
+  "schema": 1,
+  "profile": "retained_rebuild_round_foot_probe_v1",
+  "complete": true,
+  "screen": {
+    "all_paths_retained": true,
+    "read_only": true,
+    "default_promotion": false,
+    "scored_match": false
+  },
+  "runtime_source_commit": "e7379119f784e50cacc4272bce904c081cd9724d",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-round-foot-probe/v1/surface_mission_soak",
+    "sha256": "2c17c7bac1f464ca0c642b97c1c8834a4e40e54aec59c6198cee0aeffe97072d"
+  },
+  "frozen_inputs": 1006,
+  "changed_inputs": [
+    "crates/engine-rapier/src/world.rs",
+    "crates/engine-rapier/src/world/ball_cast.rs",
+    "crates/spacewars-ai/examples/support/rebuild_replay.rs",
+    "docs/rebuild-round-foot-probe-plan.md",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/footprint.rs",
+    "scenarios/spacewars/src/surface_sortie/rebuild_placement/round_foot.rs",
+    "tools/probe-rebuild-round-foot.py",
+    "tools/tests/test_rebuild_round_foot.py"
+  ],
+  "prefixes": 2,
+  "continuations": 4,
+  "simulation_retries": 0,
+  "audit_resumes": 0,
+  "diagnosis": {
+    "outcomes": {
+      "control_handoff": {
+        "live": {
+          "last_tick": 27233,
+          "reason": "recovery_complete",
+          "task_reason": null,
+          "builds": [
+            27114
+          ],
+          "boardings": [
+            27232
+          ],
+          "health": 60.66692352294922,
+          "ships_lost": 1,
+          "relocations": 3
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "builds": [
+            27459
+          ],
+          "boardings": [],
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1
+        }
+      },
+      "control_coarse": {
+        "live": {
+          "last_tick": 27349,
+          "reason": "recovery_blocked",
+          "task_reason": "no reachable standing site with hatch access",
+          "builds": [
+            25373
+          ],
+          "boardings": [],
+          "health": 100.0,
+          "ships_lost": 2,
+          "relocations": 1
+        },
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "builds": [],
+          "boardings": [],
+          "health": 91.26747131347656,
+          "ships_lost": 1,
+          "relocations": 1
+        }
+      }
+    },
+    "cases": {
+      "control_handoff_live_27114": {
+        "tick": 27114,
+        "predictions": {
+          "normal": {
+            "prediction": true,
+            "alignments": [
+              0.9973348379135132,
+              0.9955514669418335
+            ],
+            "distance_gap": 0.0007069110870361328,
+            "matches_observed_settling": true
+          },
+          "radial": {
+            "prediction": true,
+            "alignments": [
+              0.9973360896110535,
+              0.9955577254295349
+            ],
+            "distance_gap": 0.0007387399673461914,
+            "matches_observed_settling": true
+          }
+        },
+        "first_settled_tick": 27188,
+        "first_contact_tick": 27173,
+        "first_two_supported_tick": 27174,
+        "first_contact": {
+          "tick": 27173,
+          "center": {
+            "x": 40.980613468318246,
+            "y": -6.785473792119772
+          },
+          "angle": -1.7370197176933289,
+          "angle_degrees": 0.1251145452260971,
+          "cross_track": {
+            "normal": -0.22839545885414747,
+            "radial": -0.22817083328152551
+          },
+          "revision": 22,
+          "supported_feet": 1,
+          "settled_seconds": 0.0,
+          "contacts": [
+            [],
+            [
+              {
+                "point": {
+                  "x": 35.11469650268555,
+                  "y": -8.812409400939941
+                },
+                "alignment": 0.9973483085632324,
+                "separation": 0.0006465315818786621,
+                "normal_speed": 0.13785572350025177
+              }
+            ]
+          ]
+        },
+        "reference_contact": {
+          "tick": 27188,
+          "center": {
+            "x": 40.977202831415184,
+            "y": -6.759249269697841
+          },
+          "angle": -1.734548956155777,
+          "angle_degrees": 0.02797645516693592,
+          "cross_track": {
+            "normal": -0.2536693351294438,
+            "radial": -0.25344356045744454
+          },
+          "revision": 22,
+          "supported_feet": 2,
+          "settled_seconds": 0.25,
+          "contacts": [
+            [
+              {
+                "point": {
+                  "x": 36.08138656616211,
+                  "y": -3.000000238418579
+                },
+                "alignment": 0.9805063605308533,
+                "separation": 0.002015739679336548,
+                "normal_speed": 0.006760848220437765
+              },
+              {
+                "point": {
+                  "x": 36.08460998535156,
+                  "y": -2.953449249267578
+                },
+                "alignment": 0.9955515265464783,
+                "separation": -0.0003992021083831787,
+                "normal_speed": 0.006892192643135786
+              }
+            ],
+            [
+              {
+                "point": {
+                  "x": 35.11800003051758,
+                  "y": -8.798730850219727
+                },
+                "alignment": 0.9973036646842957,
+                "separation": -0.00036513805389404297,
+                "normal_speed": 0.002341111656278372
+              }
+            ]
+          ]
+        },
+        "foot_hit_points": {
+          "normal": [
+            {
+              "x": 36.06525421142578,
+              "y": -3.1658663749694824
+            },
+            {
+              "x": 35.06734085083008,
+              "y": -9.007466316223145
+            }
+          ],
+          "radial": [
+            {
+              "x": 36.065284729003906,
+              "y": -3.1657485961914062
+            },
+            {
+              "x": 35.067718505859375,
+              "y": -9.006051063537598
+            }
+          ]
+        }
+      },
+      "control_handoff_recorded_27459": {
+        "tick": 27459,
+        "predictions": {
+          "normal": {
+            "prediction": false,
+            "alignments": [
+              0.994796097278595,
+              0.6278550028800964
+            ],
+            "distance_gap": 0.1845008134841919,
+            "matches_observed_settling": false
+          },
+          "radial": {
+            "prediction": false,
+            "alignments": [
+              0.9944639205932617,
+              0.630104660987854
+            ],
+            "distance_gap": 0.015169262886047363,
+            "matches_observed_settling": false
+          }
+        },
+        "first_settled_tick": 27557,
+        "first_contact_tick": 27510,
+        "first_two_supported_tick": 27543,
+        "first_contact": {
+          "tick": 27510,
+          "center": {
+            "x": 39.47819564796775,
+            "y": -12.594381684988534
+          },
+          "angle": -1.976438730955124,
+          "angle_degrees": 5.547824859619141,
+          "cross_track": {
+            "normal": -0.09561178848408663,
+            "radial": -0.21328334033107338
+          },
+          "revision": 22,
+          "supported_feet": 1,
+          "settled_seconds": 0.0,
+          "contacts": [
+            [],
+            [
+              {
+                "point": {
+                  "x": 33.45464324951172,
+                  "y": -13.0
+                },
+                "alignment": 0.7883797883987427,
+                "separation": 0.013881772756576538,
+                "normal_speed": 0.1265382021665573
+              },
+              {
+                "point": {
+                  "x": 33.45464324951172,
+                  "y": -13.0
+                },
+                "alignment": 0.7883797883987427,
+                "separation": 0.013881772756576538,
+                "normal_speed": 0.1265382021665573
+              }
+            ]
+          ]
+        },
+        "reference_contact": {
+          "tick": 27557,
+          "center": {
+            "x": 39.43793836092834,
+            "y": -12.33256285891679
+          },
+          "angle": -1.9316405653953552,
+          "angle_degrees": 3.3100287914276123,
+          "cross_track": {
+            "normal": -0.3200584954754633,
+            "radial": -0.44987118403135573
+          },
+          "revision": 22,
+          "supported_feet": 2,
+          "settled_seconds": 0.25,
+          "contacts": [
+            [
+              {
+                "point": {
+                  "x": 35.38125228881836,
+                  "y": -7.6675896644592285
+                },
+                "alignment": 0.9955503940582275,
+                "separation": -0.0023058652877807617,
+                "normal_speed": -2.971224603243172e-05
+              }
+            ],
+            [
+              {
+                "point": {
+                  "x": 33.45464324951172,
+                  "y": -13.0
+                },
+                "alignment": 0.7742942571640015,
+                "separation": -0.0022909045219421387,
+                "normal_speed": 0.006737887393683195
+              },
+              {
+                "point": {
+                  "x": 33.45464324951172,
+                  "y": -13.0
+                },
+                "alignment": 0.7742942571640015,
+                "separation": -0.0022909045219421387,
+                "normal_speed": 0.006737887393683195
+              }
+            ]
+          ]
+        },
+        "foot_hit_points": {
+          "normal": [
+            {
+              "x": 35.364013671875,
+              "y": -7.74945068359375
+            },
+            {
+              "x": 33.43333435058594,
+              "y": -13.008308410644531
+            }
+          ],
+          "radial": [
+            {
+              "x": 35.33373260498047,
+              "y": -7.891986846923828
+            },
+            {
+              "x": 33.249149322509766,
+              "y": -13.079197883605957
+            }
+          ]
+        }
+      },
+      "control_coarse_live_25373": {
+        "tick": 25373,
+        "predictions": {
+          "normal": {
+            "prediction": false,
+            "alignments": [
+              0.3354759216308594,
+              0.9995909929275513
+            ],
+            "distance_gap": 0.2517733573913574,
+            "matches_observed_settling": true
+          },
+          "radial": {
+            "prediction": false,
+            "alignments": [
+              0.6439867615699768,
+              0.9998368620872498
+            ],
+            "distance_gap": 0.3679438829421997,
+            "matches_observed_settling": true
+          }
+        },
+        "first_settled_tick": null,
+        "first_contact_tick": 25421,
+        "first_two_supported_tick": null,
+        "first_contact": {
+          "tick": 25421,
+          "center": {
+            "x": 33.80429159867812,
+            "y": -19.211429036844976
+          },
+          "angle": -2.3626217246055603,
+          "angle_degrees": 15.75811767578125,
+          "cross_track": {
+            "normal": 0.0010062848700866933,
+            "radial": -0.32680345557600254
+          },
+          "revision": 21,
+          "supported_feet": 0,
+          "settled_seconds": 0.0,
+          "contacts": [
+            [
+              {
+                "point": {
+                  "x": 32.50795364379883,
+                  "y": -13.088464736938477
+                },
+                "alignment": 0.33565548062324524,
+                "separation": 0.014763802289962769,
+                "normal_speed": -1.1992446184158325
+              }
+            ],
+            []
+          ]
+        },
+        "reference_contact": {
+          "tick": 25535,
+          "center": {
+            "x": 33.5338930554634,
+            "y": -19.1642720118456
+          },
+          "angle": -2.368994250893593,
+          "angle_degrees": 15.985857963562012,
+          "cross_track": {
+            "normal": 0.16029993993277314,
+            "radial": -0.23203086397901806
+          },
+          "revision": 21,
+          "supported_feet": 1,
+          "settled_seconds": 0.0,
+          "contacts": [
+            [
+              {
+                "point": {
+                  "x": 32.270416259765625,
+                  "y": -13.046590805053711
+                },
+                "alignment": 0.337904155254364,
+                "separation": 7.94529914855957e-05,
+                "normal_speed": 0.0010220016120001674
+              }
+            ],
+            [
+              {
+                "point": {
+                  "x": 27.477214813232422,
+                  "y": -17.5
+                },
+                "alignment": 0.9931244254112244,
+                "separation": 0.004652112722396851,
+                "normal_speed": 0.003615879686549306
+              },
+              {
+                "point": {
+                  "x": 27.51036834716797,
+                  "y": -17.445110321044922
+                },
+                "alignment": 0.9997076988220215,
+                "separation": 0.00010716915130615234,
+                "normal_speed": 0.003883921541273594
+              }
+            ]
+          ]
+        },
+        "foot_hit_points": {
+          "normal": [
+            {
+              "x": 32.48766326904297,
+              "y": -13.084878921508789
+            },
+            {
+              "x": 27.57880401611328,
+              "y": -17.331783294677734
+            }
+          ],
+          "radial": [
+            {
+              "x": 31.630189895629883,
+              "y": -13.06408977508545
+            },
+            {
+              "x": 27.371875762939453,
+              "y": -17.674381256103516
+            }
+          ]
+        }
+      }
+    },
+    "decision": "first_contact_gate_not_qualified",
+    "assessment": "Both straight-sweep variants falsely reject the valid recorded landing. Its first native contact already has valid corner support, after pre-contact drift away from both assumed descent lines. Rotation then brings the other foot into contact. A hard gate needs a bounded native settling forecast or another validated model of that motion."
+  },
+  "retained_files": {
+    "control_handoff": 38,
+    "control_coarse": 38
+  },
+  "archives": {
+    "control_handoff": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-round-foot-probe/v1/archives/control_handoff.tar.gz",
+      "sha256": "a54e74c5b44f67f0b4608ad78fffb038af8b5b16220b765a1abdd86a0b4cde0f",
+      "bytes": 47938060,
+      "raw_bytes": 309221456,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "591133622a43669a8d8536dfafbfdbf95a6251295ca3eb5dce0f3611ec726e59",
+          "bytes": 641559
+        },
+        "live-contact-audit.json": {
+          "sha256": "a789257249955ef0969723317135d3fd596912ed9cbf5e97cb2565c190be6c49",
+          "bytes": 53336
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-orientation-audit.json": {
+          "sha256": "e7d2f8884143429e6116f12711109b9af0168dba83ecdff7ccfe463ec1f1b5c4",
+          "bytes": 288073
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "e2b758b4332bf5f18af963a8bf68ea74bb6ce5ca2bd512664c16e59b8097281e",
+          "bytes": 163484
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-staging-audit.json": {
+          "sha256": "be71326770d969cfe5ea7ffb5607317356b04db68f78fd5ec207c7be09d2545e",
+          "bytes": 956161
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "47cf0c38f181a85eedc719cf5f9831ef6641dab4643839e6372fa34084329e10",
+          "bytes": 179323
+        },
+        "live-support-audit.json": {
+          "sha256": "e1682f8cc136b6ce7b417ce47daf653c4537756d91f693bf2e7eeba0614c3a2e",
+          "bytes": 288097
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "a58567dac3c47c02f39a77a6a3e4f37e627ea4355d2648a14bfb0f492c4f6c80",
+          "bytes": 1878406
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "c95f1175826e5e0d584f81fc658592ab89f777dca4923a6c4106181c553301e1",
+          "bytes": 62032915
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "e1722e3cf00b6100c1c37a948ca969b27e3c48ce0512da995566b323b0589f04",
+          "bytes": 3458175
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "564603f5bc63352f294a3005b26c8543c4b558b7d3150f43e4801307786ea857",
+          "bytes": 107337986
+        },
+        "rebuild-replay.json": {
+          "sha256": "f26a8a505b61317db051d47c4caeb37ae839c2b6f2cd761c81a4aea6d9f4c845",
+          "bytes": 80062
+        },
+        "rebuild-round-foot-live-27114.json": {
+          "sha256": "61992fdf8ee710e0ccb8a92816369bf231d75ce522457b53262bc93b5c096d17",
+          "bytes": 22309
+        },
+        "rebuild-round-foot-recorded-27459.json": {
+          "sha256": "5aeb8607941c8ee223fdb5218b7274a3c14c16ffb1059637fe187e1faaf5ebd0",
+          "bytes": 19568
+        },
+        "recorded-audit.json": {
+          "sha256": "d86f53c346abe878da2ceeedb9d17fc7d46625390ccc942f7304dd6e8c65c33e",
+          "bytes": 498544
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "859520192e8b041b2f65cc102c5064b16a747c355bb007d507ee20e1cd5ac058",
+          "bytes": 380870
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-orientation-audit.json": {
+          "sha256": "c806d5f5259a72e00f4900bb94e700cd81547ad17eaf36b8e3e127ca86dd4144",
+          "bytes": 929325
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "fe00bfa4cb2a73360a66bf3f518eb402f2804a231959e4f148e92b2e610ba81f",
+          "bytes": 1336226
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "recorded-support-audit.json": {
+          "sha256": "6db4da75039cb2d4957ec7cde9e589e135dc4a99eee59b97833a4ce5df9e742b",
+          "bytes": 929349
+        },
+        "round-foot-audit.json": {
+          "sha256": "238dd0145d01f0c271e12b7717776f2a077bd17f2c43c367edf822eac3964643",
+          "bytes": 638441
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "control_coarse": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-round-foot-probe/v1/archives/control_coarse.tar.gz",
+      "sha256": "d6b662a72135c12230317568e0d480314c6a103bc06ee5b0739901440d34672f",
+      "bytes": 49005751,
+      "raw_bytes": 318591199,
+      "files": {
+        "capture-evidence.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-behavior.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "destination-cover.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "flag-survey.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "impact.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "landing-handoffs.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "live-audit.json": {
+          "sha256": "7bf627fdbf56d926b59a82c72529ed6e70b2887e9e1ff2b7df8451e97c0574b9",
+          "bytes": 424220
+        },
+        "live-contact-audit.json": {
+          "sha256": "ddbb7d18a96f0a761367da002fd382191e314058b1fef2cc24a73b7e4b803b0d",
+          "bytes": 93813
+        },
+        "live-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "live-orientation-audit.json": {
+          "sha256": "facf97cb1fe4e23a2df5c6b9edff015d0c3bda10d483eef23cc77960d037adad",
+          "bytes": 243178
+        },
+        "live-planning.csv": {
+          "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+          "bytes": 126
+        },
+        "live-precise-arrival-audit.json": {
+          "sha256": "5d49a2847f6b7fb29efd59102ac45ab2d00126826890cab95134c453875864fc",
+          "bytes": 505038
+        },
+        "live-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "live-staging-audit.json": {
+          "sha256": "21dc6505314798b911cf336a5c194d95b6526419ebfaa4986b75dfeade36b19e",
+          "bytes": 394546
+        },
+        "live-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "live-support-audit.json": {
+          "sha256": "9bedee6cd90512b3172baf98915c0be3a48d44c72de90cf9831a68248d24ce58",
+          "bytes": 243185
+        },
+        "mission-evaluation-work.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "mission-evaluations.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "prefix-audit.json": {
+          "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+          "bytes": 64791
+        },
+        "rebuild-live-contacts.jsonl": {
+          "sha256": "d87724d5a81d5ac4de4af92acea20493caf8fc8466cae36f3050ad7fa80cc487",
+          "bytes": 2275705
+        },
+        "rebuild-live.jsonl": {
+          "sha256": "ac1dfaa65d9c3edd880b4ee02b9a7028fb92913ab7fef43d7927f923d174559f",
+          "bytes": 59500421
+        },
+        "rebuild-prefix.json": {
+          "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+          "bytes": 11338
+        },
+        "rebuild-prefix.jsonl": {
+          "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+          "bytes": 127032406
+        },
+        "rebuild-recorded-contacts.jsonl": {
+          "sha256": "3d3aec72024689c46f64360f4a501f7fa6bfd5fe7047269ba2d2a000504e12e1",
+          "bytes": 3458244
+        },
+        "rebuild-recorded.jsonl": {
+          "sha256": "a33bbd6f0cc4c74affed641323317cb6a193234e2e3d7ba540ae500dcc9df41b",
+          "bytes": 119383484
+        },
+        "rebuild-replay.json": {
+          "sha256": "e6a3c9b2022417e0241b8c63db95c423ee4af27b3342d83111c4847a0ee3c32d",
+          "bytes": 90002
+        },
+        "rebuild-round-foot-live-25373.json": {
+          "sha256": "3fa5fa766634f54b1af00c653f7bf3c3ece076fb64f3e81262eb64a75286a9bc",
+          "bytes": 16015
+        },
+        "recorded-audit.json": {
+          "sha256": "7d5207682e7ad07404ffdfc064199d8903b4783d86acc42f3c21d2006185f0af",
+          "bytes": 346144
+        },
+        "recorded-contact-audit.json": {
+          "sha256": "4d3f133e7b1abdf73fc8b3fc116bcdea834b34c40755a62da4e108516832404f",
+          "bytes": 665445
+        },
+        "recorded-footing-audit.json": {
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+          "bytes": 77
+        },
+        "recorded-orientation-audit.json": {
+          "sha256": "cecf9b7cb24f805be0cbb77beae3634349a40e5754d4c5cc93b4a378fe4d07bf",
+          "bytes": 1009917
+        },
+        "recorded-precise-arrival-audit.json": {
+          "sha256": "1afac230c2e443d4b817aedbe18ceb2569da24795f068995f164ce62c0caa91d",
+          "bytes": 65
+        },
+        "recorded-recheck-audit.json": {
+          "sha256": "1ad1ed52995877eba59e60035d7c7c7a8334fa0a65c19b4b6dcf573bb84caf76",
+          "bytes": 120
+        },
+        "recorded-staging-audit.json": {
+          "sha256": "095707c9bcecf52bfd439d4c5dd81bda8da61cc2bae4023f38d8cfad74fde3fc",
+          "bytes": 1494603
+        },
+        "recorded-staging-walk-audit.json": {
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+          "bytes": 127
+        },
+        "recorded-support-audit.json": {
+          "sha256": "54ffe87b633c9f13f6aa7d2a529a11a220c952840975422970dc15963afce4c9",
+          "bytes": 1009924
+        },
+        "round-foot-audit.json": {
+          "sha256": "8817d665c6c283146f2aa281e0e282aabe775a03056e56eb35c2b4242e16ec37",
+          "bytes": 327941
+        },
+        "sensors.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "trace.jsonl": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    }
+  },
+  "validation": {
+    "engine": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "engine-rapier",
+        "--lib",
+        "world::ball_cast"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/engine.log",
+      "log_sha256": "1f4a6fe4d782a56f880d940864b6a55190636b43d8d30a6f93320d2d41e3dea5"
+    },
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "rebuild"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/native.log",
+      "log_sha256": "c6687ef80d94e4ac9380888574508ac6846b6772dddd9a161655b432bb46ce73"
+    },
+    "bot": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/bot.log",
+      "log_sha256": "e1bd451d3a7a81e720f18e5f539b351ebc0eff23ccb5cf5cf7c49dd77d5e58a6"
+    },
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/harness.log",
+      "log_sha256": "b6382562baf0af126dcdd582becc226124a4fc1087796b72ac2100d7d05502d4"
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/python.log",
+      "log_sha256": "78cda69972083258c23cbef168a8f5bb44107bf87e353baccd31cbfb8bf7214c"
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "37b4e12ca843d6eee966ac06ca7b80023436bcbf15b422d1c40c523ba0352570"
+    },
+    "native_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/native_clippy.log",
+      "log_sha256": "89015a153e2838a1f92c4bdab5e680f9c5c8bbc2158bba89c91c1d0b06849bef",
+      "diagnostic_identities": [
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "items after a test module",
+          "file": "scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/pilot.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/render.rs"
+        },
+        {
+          "message": "this boolean expression can be simplified",
+          "file": "scenarios/spacewars/src/terrain/loose.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "file": "scenarios/spacewars/src/lib.rs"
+        }
+      ],
+      "same_diagnostic_identities": true,
+      "baseline_log": {
+        "path": "target/rebuild-support-alignment/v1/validation-logs/native_clippy.log",
+        "sha256": "89015a153e2838a1f92c4bdab5e680f9c5c8bbc2158bba89c91c1d0b06849bef"
+      }
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/release.log",
+      "log_sha256": "f0ddce09f5b63ba77b7193a7c896f5016fc86b146958d96b008b1ee4fbd9d24d"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/default_check.log",
+      "log_sha256": "18ab161fc00dbacdc197ac0907ce055cb1f65773b2da8ecd55028dbc7ad709ed"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "engine_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "engine-rapier",
+        "--lib",
+        "--tests",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-round-foot-probe/v1/validation-logs/engine_clippy.log",
+      "log_sha256": "558b5c23b7b657cba0113eef0913a50ca320242e91d53f5930280d25cb8a9d36",
+      "diagnostic_identities": [
+        {
+          "message": "this `else { if .. }` block can be collapsed",
+          "file": "crates/engine-rapier/src/spaceling.rs"
+        }
+      ],
+      "baseline_commit": "a12e58b223ec3d7821c4db40f4b73a8016342e78",
+      "same_diagnostic_identities": true,
+      "baseline_log": {
+        "path": "target/rebuild-round-foot-probe/v1/validation-logs/engine_clippy_baseline.log",
+        "sha256": "5e6c9d0f2912790131d07d639c80ed60a156e5f157df541477c70e95871fc048"
+      }
+    }
+  },
+  "plan_sha256": "1c291bfe365c1e6c69500e2fdc48053749617e8106a1332c2e40f20dee8658c3",
+  "summary_sha256": "78c21608fe12316655c42a229e2501ff768ac16655ce8674fc55b8a5d80454d3",
+  "provenance": {
+    "prior_bundle": {
+      "path": "docs/data/rebuild-support-alignment-v1.json.gz",
+      "bytes": 8372869,
+      "sha256": "150ce0ea75d657ef27ca2270818251136249fa7ac56af8f46940cfeffd31900d"
+    },
+    "prior_plan": {
+      "path": "target/rebuild-support-alignment/v1/plan.json",
+      "bytes": 142173,
+      "sha256": "6ce74893e2ef5f579b6cf5326cee9a2b8a25e61328a56bfebeac7518b45f1935"
+    },
+    "prior_summary": {
+      "path": "target/rebuild-support-alignment/v1/summary.json",
+      "bytes": 655842,
+      "sha256": "fcc84013223cca12aa45f120c2beaa3573280cd56ec017956568678821393d6e"
+    }
+  },
+  "review_bundle": {
+    "path": "docs/data/rebuild-round-foot-probe-v1.json.gz",
+    "bytes": 1646940,
+    "sha256": "ede09db1c334d2361dd19ff0b05d8027cb208d3c525ff2353f88871c620f92f5"
+  }
+}

@@ -6,6 +6,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+query-diagnostics = []
+ccd-diagnostics = ["rapier2d/ccd-diagnostics"]
+
 [dependencies]
 bincode = { workspace = true }
 engine-core = { workspace = true }

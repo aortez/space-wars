@@ -151,11 +151,7 @@ impl<'a> GroundRoutes<'a> {
                 .min_by(f32::total_cmp)
                 .unwrap_or(f32::INFINITY)
         };
-        let nearest = self.map.nodes.iter().min_by(|a, b| {
-            a.position
-                .distance_to(start)
-                .total_cmp(&b.position.distance_to(start))
-        });
+        let nearest = self.map.nearest_node(start);
         let mut result = GroundRoute {
             path: Vec::new(),
             diagnostics: GroundRouteDiagnostics {
@@ -182,7 +178,7 @@ impl<'a> GroundRoutes<'a> {
                 flights: 0,
             },
         };
-        let Some(initial) = nearest.filter(|n| n.position.distance_to(start) < 3.0) else {
+        let Some(initial) = nearest.filter(|n| n.supports_route_start(start)) else {
             result.diagnostics.failure = Some(GroundRouteFailure::NoStartFooting);
             return result;
         };

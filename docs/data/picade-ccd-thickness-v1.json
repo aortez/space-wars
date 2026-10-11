@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "candidate_commit": "7a2b2f33c21bbd13c99a6621a15f35ec0da9f7cd",
+  "diagnostic_base_commit": "f533fce",
+  "deployed_client_commit": "4d383cffc70de8de7afba14d8178c6fc866729cf",
+  "scope": "separate local performance branch; PR 178 and all bot defaults unchanged; thickness cache is not deployed",
+  "live": {
+    "samples": 20,
+    "complete_ccd_windows": 20,
+    "seeds": [
+      "16293239525808771919",
+      "289503039845440984"
+    ],
+    "peak_physics_sample": {
+      "sample": 19,
+      "elapsed_seconds": 387.64396249700076,
+      "match_seed": "16293239525808771919",
+      "match_tick": "12056",
+      "scenario_revision": "2",
+      "paused": "false",
+      "raster_scale": "1.00",
+      "fps": "7.5",
+      "ups": "37.3",
+      "mission_profile_version": "3",
+      "mission_profile_samples": "120",
+      "mission_rapier_ccd_samples": "120",
+      "mission_world_physics_avg_ms": "15.451",
+      "mission_rapier_ccd_avg_ms": "11.616",
+      "mission_rapier_ccd_first_impact_avg_ms": "5.831",
+      "mission_rapier_ccd_clamping_avg_ms": "5.761",
+      "mission_rapier_narrow_phase_avg_ms": "1.389",
+      "mission_rapier_solver_avg_ms": "1.565",
+      "mission_rapier_ccd_substeps_avg": "1.050",
+      "mission_rapier_active_bodies_latest": "229",
+      "mission_rapier_contact_pairs_latest": "290"
+    },
+    "peak_ccd_share": 0.7517960002588828,
+    "one_x_throughout": true,
+    "interpretation": "fresh live samples, not replays of the historical 43.893 ms sample; host FPS/UPS and mission windows differ"
+  },
+  "picade_pair": {
+    "seed": "3057324812542282494",
+    "reconstructed_ticks_per_arm": 9180,
+    "measured_window": [
+      9061,
+      9180
+    ],
+    "measured_ticks": 120,
+    "physics_and_observation_hash_matches": 120,
+    "byte_exact_artifacts": {
+      "start-physics.bin": true,
+      "start-observation.json": true,
+      "final-physics.bin": true,
+      "final-observation.json": true,
+      "audits.jsonl": true
+    },
+    "audit_checks_per_arm": 153,
+    "retained_state_mismatches": 0,
+    "substeps_identical": true,
+    "query_counting_disabled": true,
+    "means": {
+      "physics_ms": [
+        46.25576124166667,
+        24.28728975
+      ],
+      "ccd_ms": [
+        35.947097383333336,
+        14.063665741666666
+      ],
+      "step_ms": [
+        51.3218118,
+        29.385552783333335
+      ]
+    },
+    "limitations": [
+      "one paired run on one retained Round-heavy case",
+      "headless diagnostic executables with counting disabled, Rust 1.89 static; shipping client uses Yocto Rust 1.94",
+      "no rendered FPS improvement measured; optimizer is not deployed"
+    ],
+    "physics_reduction_fraction": 0.47493481680888905,
+    "ccd_reduction_fraction": 0.6087676957142247
+  },
+  "picade_runs": [
+    {
+      "label": "baseline-unprofiled",
+      "command": "/data/spacewars/ccd-fixed-input-20261011/control-final-aarch64 --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-fixed-input-20261011/baseline-unprofiled",
+      "exit_code": 0,
+      "elapsed_seconds": 148.09565238699724,
+      "device_before": "71575\n1500000\nb29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96  /data/spacewars/ccd-fixed-input-20261011/control-final-aarch64\n",
+      "device_after": "75471\n1500000\n"
+    },
+    {
+      "label": "candidate-unprofiled",
+      "command": "/data/spacewars/ccd-fixed-input-20261011/candidate-aarch64 --seed 3057324812542282494 --first 9061 --last 9180 --actions /data/spacewars/picade-physics-20261011/static-probe/retained-seed/actions.jsonl --samples /data/spacewars/picade-physics-20261011/static-probe/retained-seed/samples.jsonl --out /data/spacewars/ccd-fixed-input-20261011/candidate-unprofiled",
+      "exit_code": 0,
+      "elapsed_seconds": 110.37446631800412,
+      "device_before": "74984\n1500000\nafa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40  /data/spacewars/ccd-fixed-input-20261011/candidate-aarch64\n",
+      "device_after": "75958\n1500000\n"
+    }
+  ],
+  "desktop_instrumented": {
+    "physics_hash_matches": 120,
+    "ticks": 120,
+    "candidate_retained_audits": {
+      "checked": 153,
+      "completed": true,
+      "count_queries": true,
+      "first": 9061,
+      "last": 9180,
+      "mismatches": 0,
+      "seed": 3057324812542282494,
+      "timing_scope": "opt-in diagnostic binary; query clocks and counters active only with --counts"
+    },
+    "means": {
+      "physics_ms": [
+        3.550859358333333,
+        2.384806975
+      ],
+      "ccd_ms": [
+        2.5391494166666666,
+        1.3617603666666667
+      ]
+    },
+    "prefilter_means_ms": {
+      "thickness_ns": [
+        1.4208729166666667,
+        0.3223595416666667
+      ],
+      "toi_ns": [
+        1.7708726916666666,
+        0.6693189666666667
+      ]
+    },
+    "same_prefilter_decisions": true
+  },
+  "query_breakdown": {
+    "summary": {
+      "checked": 153,
+      "completed": true,
+      "first": 9061,
+      "last": 9180,
+      "mismatches": 0,
+      "seed": 3057324812542282494,
+      "timing_scope": "instrumented query counts; timings include instrumentation overhead"
+    },
+    "pairs": {
+      "Compound/Compound": {
+        "elapsed_ns": 93451042,
+        "leaves": 6330,
+        "max_parts": 196,
+        "nodes": 31118,
+        "primitive_queries": 5594,
+        "queries": 322,
+        "rejected_nodes": 8979
+      },
+      "Compound/Polyline": {
+        "elapsed_ns": 39514093,
+        "leaves": 2344,
+        "max_parts": 4,
+        "nodes": 3516,
+        "primitive_queries": 2344,
+        "queries": 586,
+        "rejected_nodes": 0
+      },
+      "Ball/Polyline": {
+        "elapsed_ns": 5708914,
+        "leaves": 0,
+        "max_parts": 0,
+        "nodes": 0,
+        "primitive_queries": 301,
+        "queries": 301,
+        "rejected_nodes": 0
+      }
+    },
+    "means": {
+      "physics_ms": 46.44516683333333,
+      "ccd_ms": 36.017517391666665,
+      "substeps": 3
+    }
+  },
+  "prefilter_breakdown": {
+    "summary": {
+      "checked": 153,
+      "completed": true,
+      "first": 9061,
+      "last": 9180,
+      "mismatches": 0,
+      "seed": 3057324812542282494,
+      "timing_scope": "instrumented query counts; timings include instrumentation overhead"
+    },
+    "prefilter": {
+      "thickness_calls": 552489,
+      "thickness_ns": 170504750,
+      "thickness_rejected": 551280,
+      "toi_calls": 552489,
+      "toi_ns": 212504723
+    },
+    "means": {
+      "physics_ms": 3.550859358333333,
+      "ccd_ms": 2.5391494166666666,
+      "substeps": 3
+    },
+    "prefilter_mean_ms": {
+      "thickness_ns": 1.4208729166666667,
+      "toi_ns": 1.7708726916666666
+    }
+  },
+  "destruction_fixtures": [
+    {
+      "shape": "round",
+      "all_non_timing_output_identical": true,
+      "ticks_per_arm": 1800,
+      "replay_checked": true,
+      "observation_hash": "8c736b9c355e3bc9",
+      "motion_hash": "7e2d3ac260951ec5",
+      "mean_ms": [
+        0.3855939350000001,
+        0.3030869555555554
+      ],
+      "p95_ms": [
+        0.615935,
+        0.536715
+      ],
+      "max_ms": [
+        3.061807,
+        2.802147
+      ]
+    },
+    {
+      "shape": "angular",
+      "all_non_timing_output_identical": true,
+      "ticks_per_arm": 1800,
+      "replay_checked": true,
+      "observation_hash": "463f560f9b226a7c",
+      "motion_hash": "7caf79d3b163d41e",
+      "mean_ms": [
+        0.4674816877777775,
+        0.362424810555556
+      ],
+      "p95_ms": [
+        0.784102,
+        0.672651
+      ],
+      "max_ms": [
+        2.993959,
+        2.736563
+      ]
+    }
+  ],
+  "validation": {
+    "engine_rapier_tests": 157,
+    "spacewars_tests": 576,
+    "scorched_tests": 19,
+    "client_tests": 9,
+    "ignored": {
+      "engine_rapier": 1,
+      "client": 1
+    },
+    "fmt": "pass",
+    "clippy": "strict mode blocked by existing lints; no diagnostics target added lines",
+    "strict_engine_rapier_existing_lint": "crates/engine-rapier/src/spaceling.rs:395 collapsible_else_if",
+    "build_cache_note": "First candidate destruction build reused control binary in shared Cargo target and was discarded. Touched vendor source mtimes, verified recompilation from candidate path and distinct hashes before comparison."
+  },
+  "saved_settings_sha256": "12d09ccd0645a28235f1b65a1777299b986f8f39de51e9998bfd990d26426cef",
+  "final_device": {
+    "pid": 3198,
+    "service_restarts": 0,
+    "active": true,
+    "paused": false,
+    "raster_scale": 1,
+    "automatic": true,
+    "tick": 15422
+  },
+  "binary_sha256": {
+    "ccd-fixed-input-aarch64": "25a7df89d4f3df5745a58167e364a343d444ea06520b7f1e5e9330f6b0871a95",
+    "control-final-aarch64": "b29c4162ea5db6e3eaab039262b783bbd5c77879d69c3b7398a82d92ca9cab96",
+    "candidate-aarch64": "afa09efead8866ff723e7042089853c9b06ca66cbf73b45dab1361d422262b40",
+    "prefilter-control-native": "bacef9b6d32263cd370a6f4dcbed5102e37afca4f3c269d9f357486136775cf2",
+    "candidate-native": "ff5ae7e8e198f3cf13a828111e857ba8bfb12cfa66f19dcf335cae86df14e3e5",
+    "destruction-control-native": "919e26e8b9df06234880b63329d179726a9fd12cfd2ec9f7026e0450689b88e0",
+    "destruction-candidate-native": "953994567b7ff870b1b0c11b101120e0d231f0f4c71b44a49d368ea09c2c4471"
+  },
+  "input_sha256": {
+    "config.json": "3350b64b8cacf99a4fdaad198c88437ac1893be2af4e3c40671a2d3d9094cc03",
+    "samples.jsonl": "3ab68ab0aa159977d1007775c0445c69c42f59cd418878f97bc3112564fe8114",
+    "actions.jsonl": "8f0115cb68ec960709f6e192a2b2e57bd5633e0e4ee42528f890d76547ef91c5"
+  },
+  "runtime_source_sha256": {
+    "vendor/rapier2d/src/dynamics/ccd/ccd_solver.rs": "847cd51e750b0d099e564a4f55db125d975ae11d94a72b45ca55aeaa217cdde1",
+    "vendor/rapier2d/src/dynamics/ccd/toi_entry.rs": "029ffdd54952fc1d11590fa529853b80c3d38782108c2641d9e7df7592e64ad8"
+  },
+  "evidence_directories": [
+    "/home/data/workspace/spacewars-handoffs/picade-live-ccd-20261011",
+    "/home/data/workspace/spacewars-handoffs/ccd-fixed-input-20261011"
+  ]
+}

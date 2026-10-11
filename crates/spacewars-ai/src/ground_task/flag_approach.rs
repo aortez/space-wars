@@ -66,6 +66,7 @@ impl GroundNavigationTask {
             return None;
         }
         if self.powered_flag
+            && !self.telemetry.live_claim_stopping_disabled
             && p.balanced
             && p.supported_planet == Some(p.planet.index)
             && p.planet.claim.as_ref().is_some_and(|claim| {

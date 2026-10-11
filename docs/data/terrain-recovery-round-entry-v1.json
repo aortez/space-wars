@@ -1,0 +1,2628 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "4731bdb92348d7ad503c1a411ccc9f409f8ba3d1",
+    "source_inputs_sha256": "9acf43a85d75a0274d03481af91204a57295923c3a845089a3b54127510cb06d",
+    "source_input_count": 2424,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791659430.8266852,
+    "exit_code": 0,
+    "seconds": 61.93914842605591,
+    "binary_sha256": "61ee9558455944f8b2e99d7444c201ac685d8d5d875b47c5f1c3c075268b7bee"
+  },
+  "run": {
+    "source_commit": "4731bdb92348d7ad503c1a411ccc9f409f8ba3d1",
+    "binary_sha256": "61ee9558455944f8b2e99d7444c201ac685d8d5d875b47c5f1c3c075268b7bee",
+    "reference_sha256": "0ca618e8c28f0cffa96d6d6cac5a5cc5a94a3ca1367c48e52f08941648102d15",
+    "command": [
+      "/home/data/workspace/spacewars-handoffs/round-entry-20261010/round-entry-diagnostic",
+      "mission_pilot::terrain_recovery::qualification::round_entry::retained_round_hatch_entry",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "env": {
+      "RUST_MIN_STACK": "16777216",
+      "SPACEWARS_MISSION_REFERENCE": "/home/data/workspace/spacewars-handoffs/round-entry-20261010/references",
+      "SPACEWARS_RECOVERY_OUT": "/home/data/workspace/spacewars-handoffs/round-entry-20261010/output"
+    },
+    "started_unix": 1791659521.2475584,
+    "exit_code": 0,
+    "seconds": 164.90847730636597
+  },
+  "references": {
+    "mission_source_commit": "e36ee55",
+    "investigation_source_commit": "8e7b014b79080370492833057475783fec3ff0bc",
+    "files": {
+      "inspection-24743.json": "9e67d5a4009a0cf205d87b38a20a4e9c0b27c06d4f40dc952867da599651e3fb",
+      "inspection-26229.json": "6b378a13736535d8164069373ec87f19667fa976a78a78a0da6cf037fd7f3971",
+      "actions.jsonl": "0ca618e8c28f0cffa96d6d6cac5a5cc5a94a3ca1367c48e52f08941648102d15"
+    }
+  },
+  "audit": {
+    "schema": 1,
+    "passed": true,
+    "source_inputs_checked": 2424,
+    "artifacts_checked": 382,
+    "control_decisions_verified": 26829,
+    "cases": [
+      {
+        "fork": 24743,
+        "initial_controls_armed": false,
+        "geometry": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 5403,
+            "component_bounds": [
+              [
+                -6.050000090152025,
+                6.050000090152025
+              ],
+              [
+                -0.6500000096857548,
+                6.050000090152025
+              ]
+            ],
+            "barrier_witnesses": 238,
+            "minimum_extra_margin": 0.0010337823802088197,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 490
+            },
+            "nearest_standing_center": 2.382750979395405
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 21119,
+            "component_bounds": [
+              [
+                -6.025000089779496,
+                6.025000089779496
+              ],
+              [
+                -0.6250000093132257,
+                6.025000089779496
+              ]
+            ],
+            "barrier_witnesses": 481,
+            "minimum_extra_margin": 3.3188892805638415e-05,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 490
+            },
+            "nearest_standing_center": 2.382750979395405
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 83500,
+            "component_bounds": [
+              [
+                -6.012500089593232,
+                6.012500089593232
+              ],
+              [
+                -0.6125000091269612,
+                6.012500089593232
+              ]
+            ],
+            "barrier_witnesses": 962,
+            "minimum_extra_margin": 0.00010571096826646198,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 490
+            },
+            "nearest_standing_center": 2.382750979395405
+          }
+        ],
+        "control": {
+          "ticks": 600,
+          "jump_presses": 8,
+          "native_jumps": 5,
+          "native_getups": 3,
+          "supported_entry": null,
+          "supported_destination": null,
+          "native_ready": null,
+          "first_waypoint_advance": null,
+          "minimum_start_distance": 1.214811015546921,
+          "minimum_hatch_distance": 2.256848627811607,
+          "transfer_counts": {
+            "ship_not_settled": 77,
+            "too_far": 334,
+            "must_be_supported": 189
+          },
+          "ground_goals": {
+            "survey": 60,
+            "walk": 240,
+            "jump": 132,
+            "settle": 165,
+            "get_up": 2
+          },
+          "initial_revision": 182,
+          "first_revision_change": 25042,
+          "native_ready_revision": null,
+          "supported_entry_revision": null
+        },
+        "trials": [
+          {
+            "name": "h0-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 9,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.214811015546921,
+            "minimum_hatch_distance": 2.256848627811607,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 334,
+              "must_be_supported": 189
+            },
+            "ground_goals": {
+              "survey": 47,
+              "walk": 240,
+              "jump": 132,
+              "settle": 165,
+              "get_up": 2
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 79,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 85,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 67,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 73,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 7,
+            "native_jumps": 4,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2176707904444881,
+            "minimum_hatch_distance": 2.250338174652026,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 369,
+              "must_be_supported": 154
+            },
+            "ground_goals": {
+              "survey": 98,
+              "walk": 156,
+              "jump": 92,
+              "settle": 134,
+              "get_up": 49,
+              "crawl": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 9,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.214811015546921,
+            "minimum_hatch_distance": 2.256848627811607,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 334,
+              "must_be_supported": 189
+            },
+            "ground_goals": {
+              "survey": 47,
+              "walk": 240,
+              "jump": 132,
+              "settle": 165,
+              "get_up": 2
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 79,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 85,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 67,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 73,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 7,
+            "native_jumps": 4,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2176707904444881,
+            "minimum_hatch_distance": 2.250338174652026,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 369,
+              "must_be_supported": 154
+            },
+            "ground_goals": {
+              "survey": 98,
+              "walk": 156,
+              "jump": 92,
+              "settle": 134,
+              "get_up": 49,
+              "crawl": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2174350969103966,
+            "minimum_hatch_distance": 2.1793829865852175,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 394,
+              "must_be_supported": 129
+            },
+            "ground_goals": {
+              "survey": 60,
+              "wait_for_ship": 31,
+              "jump": 124,
+              "walk": 213,
+              "settle": 108,
+              "get_up": 63
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2174350969103966,
+            "minimum_hatch_distance": 2.1793829865852175,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 394,
+              "must_be_supported": 129
+            },
+            "ground_goals": {
+              "survey": 60,
+              "wait_for_ship": 31,
+              "jump": 124,
+              "walk": 213,
+              "settle": 108,
+              "get_up": 63
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 5,
+            "native_jumps": 4,
+            "native_getups": 1,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2148251929355458,
+            "minimum_hatch_distance": 2.2352412885311184,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 398,
+              "must_be_supported": 125
+            },
+            "ground_goals": {
+              "survey": 115,
+              "wait_for_ship": 31,
+              "walk": 205,
+              "jump": 73,
+              "settle": 111,
+              "get_up": 50,
+              "crawl": 14
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25041,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 5,
+            "native_jumps": 4,
+            "native_getups": 1,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2148251929355458,
+            "minimum_hatch_distance": 2.2352412885311184,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 398,
+              "must_be_supported": 125
+            },
+            "ground_goals": {
+              "survey": 115,
+              "wait_for_ship": 31,
+              "walk": 205,
+              "jump": 73,
+              "settle": 111,
+              "get_up": 50,
+              "crawl": 14
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25041,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2098700059768155,
+            "minimum_hatch_distance": 2.264795250059181,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 387,
+              "must_be_supported": 136
+            },
+            "ground_goals": {
+              "survey": 82,
+              "walk": 238,
+              "jump": 121,
+              "wait_for_ship": 31,
+              "settle": 118,
+              "get_up": 9
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2098700059768155,
+            "minimum_hatch_distance": 2.264795250059181,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 387,
+              "must_be_supported": 136
+            },
+            "ground_goals": {
+              "survey": 82,
+              "walk": 238,
+              "jump": 121,
+              "wait_for_ship": 31,
+              "settle": 118,
+              "get_up": 9
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 9,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.214811015546921,
+            "minimum_hatch_distance": 2.256848627811607,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 334,
+              "must_be_supported": 189
+            },
+            "ground_goals": {
+              "survey": 47,
+              "walk": 240,
+              "jump": 132,
+              "settle": 165,
+              "get_up": 2
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 79,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 85,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 67,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 73,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 7,
+            "native_jumps": 4,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2176707904444881,
+            "minimum_hatch_distance": 2.250338174652026,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 369,
+              "must_be_supported": 154
+            },
+            "ground_goals": {
+              "survey": 98,
+              "walk": 156,
+              "jump": 92,
+              "settle": 134,
+              "get_up": 49,
+              "crawl": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 9,
+            "native_jumps": 5,
+            "native_getups": 3,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.214811015546921,
+            "minimum_hatch_distance": 2.256848627811607,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 334,
+              "must_be_supported": 189
+            },
+            "ground_goals": {
+              "survey": 47,
+              "walk": 240,
+              "jump": 132,
+              "settle": 165,
+              "get_up": 2
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24744,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 79,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 85,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24756,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 67,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 8,
+            "native_jumps": 5,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2164009487355028,
+            "minimum_hatch_distance": 2.2575570064245603,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 342,
+              "must_be_supported": 181
+            },
+            "ground_goals": {
+              "survey": 73,
+              "walk": 195,
+              "jump": 127,
+              "settle": 152,
+              "get_up": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 24768,
+            "script_jump_accepted": false,
+            "neutral_rearm_missing": true,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 7,
+            "native_jumps": 4,
+            "native_getups": 2,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.2176707904444881,
+            "minimum_hatch_distance": 2.250338174652026,
+            "transfer_counts": {
+              "ship_not_settled": 77,
+              "too_far": 369,
+              "must_be_supported": 154
+            },
+            "ground_goals": {
+              "survey": 98,
+              "walk": 156,
+              "jump": 92,
+              "settle": 134,
+              "get_up": 49,
+              "crawl": 15
+            },
+            "initial_revision": 182,
+            "first_revision_change": 25042,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          }
+        ]
+      },
+      {
+        "fork": 26229,
+        "initial_controls_armed": true,
+        "geometry": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 6119,
+            "component_bounds": [
+              [
+                -6.050000090152025,
+                6.050000090152025
+              ],
+              [
+                -1.2500000186264515,
+                6.050000090152025
+              ]
+            ],
+            "barrier_witnesses": 242,
+            "minimum_extra_margin": 2.8790568678105366e-05,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 489
+            },
+            "nearest_standing_center": 1.85049770416642
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 23975,
+            "component_bounds": [
+              [
+                -6.025000089779496,
+                6.025000089779496
+              ],
+              [
+                -1.2250000182539225,
+                6.025000089779496
+              ]
+            ],
+            "barrier_witnesses": 485,
+            "minimum_extra_margin": 4.283239214732115e-05,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 489
+            },
+            "nearest_standing_center": 1.85049770416642
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": false,
+            "source_blocked": false,
+            "reaches_boundary": true,
+            "reachable_cells": 94896,
+            "component_bounds": [
+              [
+                -6.012500089593232,
+                6.012500089593232
+              ],
+              [
+                -1.187500017695129,
+                6.012500089593232
+              ]
+            ],
+            "barrier_witnesses": 968,
+            "minimum_extra_margin": 9.379725057087618e-06,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 6,
+              "other_cell": 0,
+              "outside_grid": 489
+            },
+            "nearest_standing_center": 1.85049770416642
+          }
+        ],
+        "control": {
+          "ticks": 600,
+          "jump_presses": 0,
+          "native_jumps": 0,
+          "native_getups": 0,
+          "supported_entry": null,
+          "supported_destination": null,
+          "native_ready": null,
+          "first_waypoint_advance": null,
+          "minimum_start_distance": 1.6817468743690438,
+          "minimum_hatch_distance": 3.2706610005025003,
+          "transfer_counts": {
+            "too_far": 600
+          },
+          "ground_goals": {
+            "blocked": 600
+          },
+          "initial_revision": 189,
+          "first_revision_change": 26303,
+          "native_ready_revision": null,
+          "supported_entry_revision": null
+        },
+        "trials": [
+          {
+            "name": "h0-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.41225702243154,
+            "transfer_counts": {
+              "too_far": 580,
+              "must_be_supported": 20
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.41225702243154,
+            "transfer_counts": {
+              "too_far": 579,
+              "must_be_supported": 21
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26242,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.602270989272638,
+            "transfer_counts": {
+              "too_far": 582,
+              "must_be_supported": 18
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26242,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.602270989272638,
+            "transfer_counts": {
+              "too_far": 582,
+              "must_be_supported": 18
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26268,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.481766110656237,
+            "transfer_counts": {
+              "too_far": 566,
+              "must_be_supported": 34
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h0-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26268,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.481766110656237,
+            "transfer_counts": {
+              "too_far": 563,
+              "must_be_supported": 37
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.4184463965930942,
+            "transfer_counts": {
+              "too_far": 578,
+              "must_be_supported": 22
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.4184463965930942,
+            "transfer_counts": {
+              "too_far": 578,
+              "must_be_supported": 22
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26242,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.548729569440698,
+            "transfer_counts": {
+              "too_far": 577,
+              "must_be_supported": 23
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26242,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.548729569440698,
+            "transfer_counts": {
+              "too_far": 578,
+              "must_be_supported": 22
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.5582516041063514,
+            "transfer_counts": {
+              "too_far": 575,
+              "must_be_supported": 25
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h1-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": -0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.5582516041063514,
+            "transfer_counts": {
+              "too_far": 575,
+              "must_be_supported": 25
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.4447932555124234,
+            "minimum_hatch_distance": 2.3788126408742873,
+            "transfer_counts": {
+              "too_far": 566,
+              "must_be_supported": 34
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26235,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.4447932555124234,
+            "minimum_hatch_distance": 2.3788126408742873,
+            "transfer_counts": {
+              "too_far": 566,
+              "must_be_supported": 34
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26244,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6263652855931965,
+            "minimum_hatch_distance": 2.5075374999147013,
+            "transfer_counts": {
+              "too_far": 571,
+              "must_be_supported": 29
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26244,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6263652855931965,
+            "minimum_hatch_distance": 2.5075374999147013,
+            "transfer_counts": {
+              "too_far": 571,
+              "must_be_supported": 29
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.5178754969747263,
+            "transfer_counts": {
+              "too_far": 577,
+              "must_be_supported": 23
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h2-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6817468743690438,
+            "minimum_hatch_distance": 2.5178754969747263,
+            "transfer_counts": {
+              "too_far": 577,
+              "must_be_supported": 23
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26236,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.4339430969505327,
+            "minimum_hatch_distance": 2.4571425620429164,
+            "transfer_counts": {
+              "too_far": 568,
+              "must_be_supported": 32
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": 26268,
+            "launch_requested": 26236,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": {
+              "tick": 26267,
+              "hatch_distance": 2.986322556385065,
+              "relative_speed": 1.6855977222141791,
+              "revision": 189,
+              "support_collider": {
+                "entity": 101,
+                "part": 0,
+                "role": 1004
+              },
+              "supported_planet": 1,
+              "balanced": true,
+              "landing_phase": "landed"
+            },
+            "ticks": 39,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": 26264,
+            "supported_destination": null,
+            "native_ready": 26267,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 0.5946320628508467,
+            "minimum_hatch_distance": 2.5913037317495267,
+            "transfer_counts": {
+              "too_far": 15,
+              "must_be_supported": 23,
+              "ready": 1
+            },
+            "ground_goals": {
+              "blocked": 39
+            },
+            "initial_revision": 189,
+            "first_revision_change": null,
+            "native_ready_revision": 189,
+            "supported_entry_revision": 189
+          },
+          {
+            "name": "h3-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26245,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.170991896096428,
+            "minimum_hatch_distance": 2.533668028348152,
+            "transfer_counts": {
+              "too_far": 565,
+              "must_be_supported": 35
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": 26273,
+            "launch_requested": 26245,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": {
+              "tick": 26272,
+              "hatch_distance": 2.738864689597116,
+              "relative_speed": 1.4011871283745465,
+              "revision": 189,
+              "support_collider": {
+                "entity": 101,
+                "part": 0,
+                "role": 1004
+              },
+              "supported_planet": 1,
+              "balanced": true,
+              "landing_phase": "landed"
+            },
+            "ticks": 44,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": 26272,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 0.9273620311973763,
+            "minimum_hatch_distance": 2.653740252586069,
+            "transfer_counts": {
+              "too_far": 26,
+              "must_be_supported": 17,
+              "ready": 1
+            },
+            "ground_goals": {
+              "blocked": 44
+            },
+            "initial_revision": 189,
+            "first_revision_change": null,
+            "native_ready_revision": 189,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.5,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.211433632989337,
+            "minimum_hatch_distance": 2.5790763862418147,
+            "transfer_counts": {
+              "too_far": 569,
+              "must_be_supported": 31
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h3-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 0.5,
+              "steer_ticks": 30
+            },
+            "boarded_tick": 26286,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": {
+              "tick": 26285,
+              "hatch_distance": 2.78251971504308,
+              "relative_speed": 1.5060106183670885,
+              "revision": 189,
+              "support_collider": {
+                "entity": 101,
+                "part": 0,
+                "role": 1004
+              },
+              "supported_planet": 1,
+              "balanced": true,
+              "landing_phase": "landed"
+            },
+            "ticks": 57,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": 26281,
+            "supported_destination": null,
+            "native_ready": 26285,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 0.7343138293844907,
+            "minimum_hatch_distance": 2.6900448089407503,
+            "transfer_counts": {
+              "too_far": 34,
+              "must_be_supported": 22,
+              "ready": 1
+            },
+            "ground_goals": {
+              "blocked": 57
+            },
+            "initial_revision": 189,
+            "first_revision_change": null,
+            "native_ready_revision": 189,
+            "supported_entry_revision": 189
+          },
+          {
+            "name": "h4-delay0-air12",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26236,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.4339430969505327,
+            "minimum_hatch_distance": 2.4571425620429164,
+            "transfer_counts": {
+              "too_far": 568,
+              "must_be_supported": 32
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay0-air30",
+            "recipe": {
+              "delay": 0,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26236,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": 26264,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 0.34984222260864256,
+            "minimum_hatch_distance": 2.5913037317495267,
+            "transfer_counts": {
+              "too_far": 577,
+              "must_be_supported": 23
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": 189
+          },
+          {
+            "name": "h4-delay12-air12",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26245,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.170991896096428,
+            "minimum_hatch_distance": 2.533668028348152,
+            "transfer_counts": {
+              "too_far": 565,
+              "must_be_supported": 35
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay12-air30",
+            "recipe": {
+              "delay": 12,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": 26273,
+            "launch_requested": 26245,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": {
+              "tick": 26272,
+              "hatch_distance": 2.7512100440230225,
+              "relative_speed": 1.9904037023672099,
+              "revision": 189,
+              "support_collider": {
+                "entity": 101,
+                "part": 0,
+                "role": 1004
+              },
+              "supported_planet": 1,
+              "balanced": true,
+              "landing_phase": "landed"
+            },
+            "ticks": 44,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": 26272,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 0.8517820552077993,
+            "minimum_hatch_distance": 2.6556294473685798,
+            "transfer_counts": {
+              "too_far": 26,
+              "must_be_supported": 17,
+              "ready": 1
+            },
+            "ground_goals": {
+              "blocked": 44
+            },
+            "initial_revision": 189,
+            "first_revision_change": null,
+            "native_ready_revision": 189,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay24-air12",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 1.0,
+              "steer_ticks": 12
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6250328797645939,
+            "minimum_hatch_distance": 3.2298021332172304,
+            "transfer_counts": {
+              "too_far": 600
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          },
+          {
+            "name": "h4-delay24-air30",
+            "recipe": {
+              "delay": 24,
+              "horizontal": 1.0,
+              "steer_ticks": 30
+            },
+            "boarded_tick": null,
+            "launch_requested": 26254,
+            "script_jump_accepted": true,
+            "neutral_rearm_missing": false,
+            "boarding_gate": null,
+            "ticks": 600,
+            "jump_presses": 1,
+            "native_jumps": 1,
+            "native_getups": 0,
+            "supported_entry": null,
+            "supported_destination": null,
+            "native_ready": null,
+            "first_waypoint_advance": null,
+            "minimum_start_distance": 1.6250328797645939,
+            "minimum_hatch_distance": 3.2298021332172304,
+            "transfer_counts": {
+              "too_far": 600
+            },
+            "ground_goals": {
+              "blocked": 600
+            },
+            "initial_revision": 189,
+            "first_revision_change": 26303,
+            "native_ready_revision": null,
+            "supported_entry_revision": null
+          }
+        ]
+      }
+    ],
+    "trial_ticks": 33784,
+    "scripted_native_jumps": 36,
+    "neutral_rearm_missing": 24,
+    "native_boardings": 4
+  },
+  "validation": {
+    "note": "Consolidated after execution from retained logs and observed successful tool exits. Structured command receipts were not captured for these four checks; the frozen binary build and diagnostic run have their own exact command receipts.",
+    "ai_library": {
+      "passed": 451,
+      "failed": 0,
+      "ignored": 15,
+      "frozen_binary": true,
+      "log": "validation-frozen-library.log",
+      "log_sha256": "2668c777690ca6f155568f96f08e9de73eb62e640498463ca405cff3fda0c6fa"
+    },
+    "ai_clippy_strict": {
+      "passed": true,
+      "log": "validation-clippy-final.log",
+      "log_sha256": "89ecf67a9c9bd3010f41cf83c4c804f1f203e2c438f88a03407fa1f7a2a3a430"
+    },
+    "default_feature_check": {
+      "passed": true,
+      "log": "validation-default.log",
+      "log_sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+    },
+    "format": {
+      "passed": true,
+      "log": "validation-format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime_changes": "Ignored diagnostic harness only; native physics and production controller code unchanged."
+  },
+  "execution_analysis": {
+    "control_start": 24743,
+    "control_blocked_tick": 26228,
+    "controller_jump_requests": 22,
+    "native_jumps": 17,
+    "native_getups": 5,
+    "airborne_settle_ticks": 486,
+    "first_native_jump_tick": 24820,
+    "first_midair_settle": {
+      "tick": 24828,
+      "foot": {
+        "x": -5.473579406738281,
+        "y": -135.75894165039062
+      },
+      "supported_planet": null,
+      "transfer": "must_be_supported",
+      "revision": 182
+    },
+    "first_midair_settle_hatch_distance": 2.7934976250416668,
+    "all_observed_waypoints_zero": true,
+    "interpretation": "Hatch proximity triggers quiet settling while airborne. Successful input witnesses continue steering to actual retained support. This identifies a candidate arrival-gate change but does not isolate or validate that production change."
+  },
+  "plot": {
+    "source_files": {
+      "output/control-decisions.jsonl": "d1a9d16d46c8ed9a9d422ce78b95a943a1b4b45d5b2554b6c189789e630ea2aa",
+      "output/trials-26229/h3-delay0-air12/decisions.jsonl": "18f9006ce3261fecae07880b3d2cd4a2c96283c6da7c8ccbff2f9ca909bbfc94",
+      "output/trials-26229/h3-delay0-air30/decisions.jsonl": "6d5d58d747823902df8bc5936df8ccdfa930ffeb08bd0384f7745d1adaf95aed"
+    },
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.3",
+    "output": {
+      "entry.png": "167e2c3d81bd1bcf3b5edb1a238b3c0419b12223faef30af74209719af568054",
+      "entry.pdf": "0b0792759dc099b3965a030a117019fa17eaaf02919c83ce8f9bb8dd6f3c8a27"
+    },
+    "scope": "Recorded ordinary inputs and physical observations, aligned by each jump request. Original first jump and later blocked-fork probes begin from different states. Foot traces estimate center minus up times half height; they do not depict collider bottoms or terrain. This comparison motivates a controlled policy test and does not isolate a single policy edit."
+  },
+  "interpretation": {
+    "case": "seed20202/round/collapse-off/candidate-P2",
+    "late_blocked_state_has_native_boarding_witness": true,
+    "earliest_boarding_ticks_from_fork": 39,
+    "boardings_before_local_terrain_revision_change": 4,
+    "early_trials_missing_neutral_rearm": 24,
+    "new_production_policy": false,
+    "controller_reset": false,
+    "physics_edited": false,
+    "scope": "Four ordinary-input boarding witnesses from one retained blocked state. Not independent matches, a win-rate estimate, or a validated policy. Early negative trials are limited by the frozen harness input-arming mistake. Final published-terrain integration and device qualification remain pending."
+  },
+  "post_freeze_changes": [
+    "Auditor now checks initial physical observations, fresh boarding input, native range and speed, final transfer counter, and the early missing-neutral limitation.",
+    "Analysis, figures, result documents and packaging added. Frozen runtime, source manifest and all 60 original trials unchanged."
+  ]
+}

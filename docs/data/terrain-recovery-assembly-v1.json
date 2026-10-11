@@ -1,0 +1,476 @@
+{
+  "schema": "terrain-recovery-assembly-v1",
+  "scope": "Local source separation, exact assembly rehearsal and focused CI wiring; no recovery-policy changes",
+  "source": {
+    "bot_base": "cada1eb12a2d8a394f285e0dbc47666c4f8bffca",
+    "terrain_snapshot": "f5c368bff32d1604a2bc0c3c5c30d438b5562741",
+    "combined_base": "6083226304e31d74ef141b7eb8e421bc181e755f",
+    "qualified_tip": "eb419415c43245bf4e9bebab4c152fc27b51f20e",
+    "main": "6611a0b0eef4a13d5f5c061541a95d79cb82165e",
+    "bot_delta_paths": [
+      "crates/engine-rapier/Cargo.toml",
+      "crates/engine-rapier/src/world.rs",
+      "crates/engine-rapier/src/world/connectivity.rs",
+      "crates/engine-rapier/src/world/connectivity/tests.rs",
+      "crates/spacewars-ai/src/combat_pilot.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate/ablation.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate/reconsideration.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate/round_footing.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate/round_footing/geometry.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/candidate/round_footing/opening.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic/fresh_matches.rs",
+      "crates/spacewars-ai/src/combat_pilot/terrain_recovery.rs",
+      "crates/spacewars-ai/src/ground_task.rs",
+      "crates/spacewars-ai/src/ground_task/rejoin.rs",
+      "crates/spacewars-ai/src/mission_pilot.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/connectivity.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/evidence.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/ground_rejoin.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/hatch_arrival.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/investigation.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/profile.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/qualification/round_entry.rs",
+      "crates/spacewars-ai/src/mission_pilot/terrain_recovery/tests.rs",
+      "crates/spacewars-ai/src/mission_policy.rs",
+      "crates/spacewars-ai/src/mission_policy/recovery_profile.rs",
+      "crates/spacewars-ai/src/recovery_task.rs",
+      "crates/spacewars-ai/src/recovery_task/ground_rejoin.rs",
+      "crates/spacewars-ai/src/recovery_task/ground_rejoin/tests.rs",
+      "crates/spacewars-ai/src/recovery_task/pod_reconsideration.rs",
+      "crates/spacewars-ai/src/recovery_task/pod_reconsideration/tests.rs",
+      "crates/spacewars-ai/tests/ground_navigation.rs",
+      "crates/spacewars-ai/tests/surface_recovery.rs",
+      "docs/data/terrain-recovery-components-v1.json",
+      "docs/data/terrain-recovery-corridor-sensing-v1.json",
+      "docs/data/terrain-recovery-fresh-matches-v1.json",
+      "docs/data/terrain-recovery-hatch-arrival-v1.json",
+      "docs/data/terrain-recovery-hatch-arrival.png",
+      "docs/data/terrain-recovery-integration-v1.json",
+      "docs/data/terrain-recovery-mission-investigation-v1.json",
+      "docs/data/terrain-recovery-missions-v1.json",
+      "docs/data/terrain-recovery-pocket-connectivity-v1.json",
+      "docs/data/terrain-recovery-pocket-connectivity.png",
+      "docs/data/terrain-recovery-profile-v1.json",
+      "docs/data/terrain-recovery-reconsideration-v1.json",
+      "docs/data/terrain-recovery-round-entry-v1.json",
+      "docs/data/terrain-recovery-round-entry.png",
+      "docs/data/terrain-recovery-round-footing-v1.json",
+      "docs/data/terrain-recovery-round-geometry-v1.json",
+      "docs/data/terrain-recovery-round-opening-v1.json",
+      "docs/data/terrain-recovery-standing-rejoin-v1.json",
+      "docs/data/terrain-recovery-target-direction-trajectories.png",
+      "docs/data/terrain-recovery-target-direction-v1.json",
+      "docs/terrain-recovery-components-plan.md",
+      "docs/terrain-recovery-corridor-sensing-plan.md",
+      "docs/terrain-recovery-corridor-sensing-results.md",
+      "docs/terrain-recovery-fresh-matches-plan.md",
+      "docs/terrain-recovery-fresh-matches-results.md",
+      "docs/terrain-recovery-hatch-arrival-plan.md",
+      "docs/terrain-recovery-hatch-arrival-results.md",
+      "docs/terrain-recovery-integration-plan.md",
+      "docs/terrain-recovery-integration-results.md",
+      "docs/terrain-recovery-mission-investigation-plan.md",
+      "docs/terrain-recovery-mission-investigation-results.md",
+      "docs/terrain-recovery-mission-plan.md",
+      "docs/terrain-recovery-mission-results.md",
+      "docs/terrain-recovery-pocket-connectivity-plan.md",
+      "docs/terrain-recovery-pocket-connectivity-results.md",
+      "docs/terrain-recovery-profile-plan.md",
+      "docs/terrain-recovery-profile-results.md",
+      "docs/terrain-recovery-reconsideration-plan.md",
+      "docs/terrain-recovery-reconsideration-results.md",
+      "docs/terrain-recovery-round-entry-plan.md",
+      "docs/terrain-recovery-round-entry-results.md",
+      "docs/terrain-recovery-round-footing-plan.md",
+      "docs/terrain-recovery-round-footing-results.md",
+      "docs/terrain-recovery-round-geometry-plan.md",
+      "docs/terrain-recovery-round-opening-plan.md",
+      "docs/terrain-recovery-round-opening-results.md",
+      "docs/terrain-recovery-standing-rejoin-plan.md",
+      "docs/terrain-recovery-standing-rejoin-results.md",
+      "docs/terrain-recovery-target-direction-plan.md",
+      "docs/terrain-recovery-target-direction-results.md",
+      "scenarios/spacewars/Cargo.toml",
+      "scenarios/spacewars/src/surface_sortie/combat.rs",
+      "scenarios/spacewars/src/surface_sortie/ground_posture.rs",
+      "scenarios/spacewars/src/surface_sortie/ground_posture/diagnostics.rs",
+      "scenarios/spacewars/src/surface_sortie/mission.rs",
+      "scenarios/spacewars/src/surface_sortie/rebuild_placement.rs",
+      "scenarios/spacewars/src/surface_sortie/rebuild_placement/refinement.rs",
+      "scenarios/spacewars/src/surface_sortie/recovery.rs",
+      "scenarios/spacewars/src/surface_sortie/recovery/diagnostics.rs",
+      "scenarios/spacewars/src/surface_sortie/recovery/diagnostics/connectivity.rs",
+      "tools/audit-terrain-recovery-components.py",
+      "tools/audit-terrain-recovery-corridor-sensing.py",
+      "tools/audit-terrain-recovery-fresh-matches.py",
+      "tools/audit-terrain-recovery-hatch-arrival.py",
+      "tools/audit-terrain-recovery-integration.py",
+      "tools/audit-terrain-recovery-mission-investigation.py",
+      "tools/audit-terrain-recovery-missions.py",
+      "tools/audit-terrain-recovery-pocket-connectivity.py",
+      "tools/audit-terrain-recovery-profile.py",
+      "tools/audit-terrain-recovery-reconsideration.py",
+      "tools/audit-terrain-recovery-round-entry.py",
+      "tools/audit-terrain-recovery-round-footing.py",
+      "tools/audit-terrain-recovery-round-geometry.py",
+      "tools/audit-terrain-recovery-round-opening.py",
+      "tools/audit-terrain-recovery-standing-rejoin.py",
+      "tools/audit-terrain-recovery-target-direction.py"
+    ],
+    "diagnostic_foundation_paths": [
+      "crates/spacewars-ai/src/combat_pilot.rs",
+      "crates/spacewars-ai/src/combat_pilot/recovery_diagnostic.rs"
+    ],
+    "formatting_only_paths": [
+      "scenarios/spacewars/src/physics.rs",
+      "scenarios/spacewars/src/terrain/tests/loose.rs"
+    ]
+  },
+  "audit": {
+    "passed": true,
+    "bot_delta_paths": 112,
+    "exact_qualified_file_matches": 111,
+    "world_module_change": "Only four query-diagnostics declaration/export lines",
+    "bot_branch_contains_terrain_snapshot": false,
+    "qualified_source_files": 2439,
+    "reassembled_tree_equals_qualified_tree": true,
+    "current_main_and_ci_only_differences": [
+      ".github/workflows/ci.yml",
+      "README.md"
+    ],
+    "snapshots": {
+      "e3303d8": {
+        "commit": "e3303d825bcd9be46b1bf37604b8dda480a8dbaf",
+        "tree": "f6e94170c11dbe3e4e0d78fe7ad2729eb9a13b7e"
+      },
+      "f427c8e": {
+        "commit": "f427c8e8eb6359c4ab93e0e57715dfca08132941",
+        "tree": "88d07131ba8fde1a99a57dc87f624db349fd257a"
+      },
+      "08ab58f": {
+        "commit": "08ab58fe83429b32450e9206448e5486e98ffdfb",
+        "tree": "cb7ef6e951047f0310435be99957f7defc57d8ac"
+      },
+      "731d69a": {
+        "commit": "731d69aefb117c74a1718c2ea03dca3775cd95db",
+        "tree": "f4d1291db979109bcb3388c89fc2abfb16f43bd6"
+      },
+      "1727849": {
+        "commit": "17278491a6c59f05ef5dc73777148422c7ce6d28",
+        "tree": "4e223dd33df6ecdc70a6764a76b32e17b836855d"
+      },
+      "8097da7": {
+        "commit": "8097da70a1a2efa948dc274987b899ad921a90e2",
+        "tree": "10340cff588fc7275d69a3600f4c4d1930eced40"
+      }
+    },
+    "source_plan_sha256": "76994849b1718bb8242f4c529cc2fb3420944e991cf768fe169f3d2f9f476b7a"
+  },
+  "validation": {
+    "test_results": [
+      {
+        "passed": 454,
+        "failed": 0,
+        "ignored": 17,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 45,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 51,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 594
+      }
+    ],
+    "total_passing_tests": 553,
+    "ignored_diagnostics": 17,
+    "ci_job_checks": [
+      {
+        "name": "Test recovery profiles and native ground/boarding behavior",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "spacewars-ai",
+          "--features",
+          "sensor-profile",
+          "--lib",
+          "--test",
+          "ground_navigation",
+          "--test",
+          "surface_recovery"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/assembled",
+        "exit_code": 0,
+        "elapsed_seconds": 25.968525171279907,
+        "log": "ci-job-0.log"
+      },
+      {
+        "name": "Test experimental supported-corridor observations",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "test",
+          "--locked",
+          "--profile",
+          "ci",
+          "-p",
+          "scenario-spacewars",
+          "--features",
+          "sensor-profile",
+          "--lib",
+          "surface_sortie::ground_posture::tests"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/assembled",
+        "exit_code": 0,
+        "elapsed_seconds": 19.180532693862915,
+        "log": "ci-job-1.log"
+      },
+      {
+        "name": "Lint recovery code and diagnostics",
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "clippy",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--features",
+          "sensor-profile",
+          "--lib",
+          "--tests",
+          "--no-deps",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/assembled",
+        "exit_code": 0,
+        "elapsed_seconds": 8.392053127288818,
+        "log": "ci-job-2.log"
+      }
+    ],
+    "assembled_checks": [
+      {
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/assembled",
+        "exit_code": 0,
+        "elapsed_seconds": 1.8553545475006104,
+        "log": "assembled-0.log"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "check",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib",
+          "--tests",
+          "--features",
+          "sensor-profile"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/assembled",
+        "exit_code": 0,
+        "elapsed_seconds": 7.297591209411621,
+        "log": "assembled-1.log"
+      }
+    ],
+    "standalone_checks": [
+      {
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "check",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/bot-only",
+        "exit_code": 0,
+        "elapsed_seconds": 6.25316596031189,
+        "log": "standalone-0.log"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.89.0",
+          "check",
+          "--locked",
+          "-p",
+          "spacewars-ai",
+          "--lib",
+          "--tests",
+          "--features",
+          "sensor-profile"
+        ],
+        "cwd": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010/bot-only",
+        "exit_code": 101,
+        "elapsed_seconds": 5.342653512954712,
+        "log": "standalone-1.log"
+      }
+    ],
+    "standalone_dependency": [
+      "engine_common::DirtMode",
+      "surface_sortie::dirt_config",
+      "SurfaceSortieState::enable_dirt_mode"
+    ],
+    "github_actions_run": false,
+    "full_match_replays_rerun": false
+  },
+  "terrain_evidence_whitespace": {
+    "preserved": true,
+    "kind": "Supplied log has blank line at EOF",
+    "paths": [
+      "docs/data/dirt-collapse-cost-local-live-20261008.txt",
+      "docs/data/dirt-collapse-cost-picade-live-20261008.txt",
+      "docs/data/dirt-overhang-local-live-20261008.txt"
+    ]
+  },
+  "publication": {
+    "checked_at_utc": "2026-10-10T20:34:07.122498+00:00",
+    "pull_requests": [
+      {
+        "headRefName": "feat/shared-dirt-packing",
+        "headRefOid": "52f9e18e8de7f9e8b5d746160e52f5e4de0d5aca",
+        "isDraft": false,
+        "mergedAt": null,
+        "number": 174,
+        "state": "OPEN",
+        "url": "https://github.com/aortez/space-wars/pull/174"
+      },
+      {
+        "headRefName": "bot-rebuild-preview-normal",
+        "headRefOid": "cada1eb12a2d8a394f285e0dbc47666c4f8bffca",
+        "isDraft": true,
+        "mergedAt": null,
+        "number": 178,
+        "state": "OPEN",
+        "url": "https://github.com/aortez/space-wars/pull/178"
+      }
+    ],
+    "main": "6611a0b0eef4a13d5f5c061541a95d79cb82165e"
+  },
+  "raw_directory": "/home/data/workspace/spacewars-handoffs/recovery-integration-prep-20261010",
+  "raw_artifacts": {
+    "assembled-0.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "assembled-1.log": {
+      "bytes": 1341,
+      "sha256": "46c85e05fc1e248ec38b907ca601700c630003f6e28129248409d4a3ba4496c4"
+    },
+    "assembled-checks.json": {
+      "bytes": 712,
+      "sha256": "6dc8f480297e48f61c2131baeeb4dcc80dd555746a3680a1e4fa67cbd98f7b99"
+    },
+    "assembly-audit.json": {
+      "bytes": 1356,
+      "sha256": "1f6ed63b784d692e2efb384ac8540b1210fad8fc403dc3200832e012a4346e85"
+    },
+    "bot-delta-apply.log": {
+      "bytes": 4956,
+      "sha256": "696d83a043e65e68de67f9f7b71db88b94623eed074196a33bb36afd80cab7bd"
+    },
+    "bot-delta.patch": {
+      "bytes": 4539735,
+      "sha256": "e3db4eb376560c4821cb766b46b691c271cb2a2933ca48bdac5c7c3a158559e9"
+    },
+    "ci-job-0.log": {
+      "bytes": 65261,
+      "sha256": "fbdb5692df7e927b82021c4f13633025240f26320262125cd9103719713d3a68"
+    },
+    "ci-job-1.log": {
+      "bytes": 1043,
+      "sha256": "5357d168a345886b467a2c11136e22753b5d7a429dce61030f8e908e78936dd0"
+    },
+    "ci-job-2.log": {
+      "bytes": 1208,
+      "sha256": "85cfa2155bb145d2f550715f11315eacbb3ec5da5d9b0b02c9d7034c872669a2"
+    },
+    "ci-job-checks.json": {
+      "bytes": 1602,
+      "sha256": "782a7b3021da9f15560f6838fbf9d891eaf2bdc21079c3dedfc409238219da98"
+    },
+    "diagnostic-foundation.patch": {
+      "bytes": 17963,
+      "sha256": "5ce924c943534d4d9f3d15c36358047a101699246b78f306884652a41056e50e"
+    },
+    "formatting-after-terrain.patch": {
+      "bytes": 1639,
+      "sha256": "3096febe568d172d327c1d8ff523291c35349c123d02d588036e342a17b03020"
+    },
+    "publication-status.json": {
+      "bytes": 697,
+      "sha256": "d4ad93582e012250fc9d068d4a392e587bc09a3898ebe8499ac15ffe5f0fc3fc"
+    },
+    "run-checks.py": {
+      "bytes": 1323,
+      "sha256": "1713710834f2aea35e618414c86660d3cebc5d06d97c7171d0cf06c0f8a38253"
+    },
+    "run-ci-job.py": {
+      "bytes": 1235,
+      "sha256": "a9d2adda2ab9fd7bf263dca5dd3b1eaaf2d66f7f8db5a2c190a3d4fa68101d19"
+    },
+    "source-plan.json": {
+      "bytes": 7375,
+      "sha256": "76994849b1718bb8242f4c529cc2fb3420944e991cf768fe169f3d2f9f476b7a"
+    },
+    "standalone-0.log": {
+      "bytes": 1332,
+      "sha256": "5f0e3091e2ca1a8a825735f003d0dfd81195b06dd74f997738b157264ecc18a1"
+    },
+    "standalone-1.log": {
+      "bytes": 2504,
+      "sha256": "66fca11bb149b72a13bafeca03f354a7609d32ebf880ba84d80b6ad18fd60063"
+    },
+    "standalone-checks.json": {
+      "bytes": 737,
+      "sha256": "7280a837ab6c65bab861074fc2ec62d8144f0e88c2398a5dd26e43d91e15914c"
+    },
+    "verify-preparation.py": {
+      "bytes": 3775,
+      "sha256": "8da4efced0245250728efa116d00f527da2d78edcbf047e458fb7e5155d14773"
+    }
+  },
+  "pending": [
+    "Verify the final published #174 runtime source",
+    "Assemble #178 with published terrain, retaining recovery ownership",
+    "Run combined workspace/platform CI and device timing/playtests"
+  ],
+  "defaults_changed": false,
+  "github_writes": false
+}
