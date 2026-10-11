@@ -257,3 +257,35 @@ jobs:
       - run: cargo check --locked -p engine-nes -p scenario-falling -p scenario-nes --target aarch64-unknown-linux-gnu
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+  windows-release:
+    name: Windows release validation
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      RELEASE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify selected head
+        shell: pwsh
+        run: |
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -cne $env:RELEASE_SHA) { throw 'Wrong checkout' }
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      - name: Build and validate extracted release
+        shell: pwsh
+        run: .github/ci/windows-release.ps1 -SourceCommit $env:RELEASE_SHA -OutputDirectory "$env:RUNNER_TEMP/windows-release-evidence"
+      - name: Upload release and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-${{ env.RELEASE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-release-evidence/
+          retention-days: 2
+          if-no-files-found: error
