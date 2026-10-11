@@ -350,11 +350,13 @@ mod tests {
     #[cfg(unix)]
     use std::io::{Read, Write};
     #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+    #[cfg(unix)]
     use std::os::unix::net::UnixListener;
     #[cfg(unix)]
-    use std::thread;
+    use std::sync::atomic::{AtomicU64, Ordering};
     #[cfg(unix)]
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::thread;
 
     fn state(screen: UiScreen, revision: u64) -> UiState {
         UiState {
@@ -427,6 +429,11 @@ mod tests {
     #[test]
     fn wait_polls_until_a_later_state_matches() {
         let socket = TestSocket::new("wait-success");
+        assert_polling(&socket);
+    }
+
+    #[cfg(unix)]
+    fn assert_polling(socket: &TestSocket) {
         let listener = UnixListener::bind(&socket.0).unwrap();
         let first = state(UiScreen::LauncherMain, 1);
         let second = state(UiScreen::LauncherSettings, 2);
@@ -477,19 +484,80 @@ mod tests {
     }
 
     #[cfg(unix)]
-    struct TestSocket(PathBuf);
+    #[test]
+    fn long_root_sockets_poll_and_clean_up_only_owned_resources() {
+        let owner = TestSocket::new("root-owner");
+        let caller_root = owner.1.join("é".repeat(80));
+        std::fs::create_dir(&caller_root).unwrap();
+        let sentinel = caller_root.join("sentinel");
+        std::fs::write(&sentinel, b"caller-owned").unwrap();
+        assert!(caller_root.as_os_str().as_bytes().len() > TestSocket::MAX_PATH_BYTES);
+
+        let first = TestSocket::with_root(&caller_root);
+        let second = TestSocket::with_root(&caller_root);
+        assert_ne!(first.0, second.0);
+        assert_ne!(first.1, second.1);
+        for socket in [&first, &second] {
+            assert!(socket.0.as_os_str().as_bytes().len() <= TestSocket::MAX_PATH_BYTES);
+            assert!(!socket.0.starts_with(&caller_root));
+        }
+        assert_polling(&first);
+        let first_path = first.0.clone();
+        let first_directory = first.1.clone();
+        // Keep another bound socket live while the first fixture is removed.
+        let listener = UnixListener::bind(&second.0).unwrap();
+        drop(first);
+        assert!(!first_path.exists());
+        assert!(!first_directory.exists());
+        assert!(second.0.exists());
+        assert!(second.1.is_dir());
+        assert_eq!(std::fs::read(&sentinel).unwrap(), b"caller-owned");
+        drop(listener);
+        std::fs::remove_file(&second.0).unwrap();
+        assert_polling(&second);
+        let second_path = second.0.clone();
+        let second_directory = second.1.clone();
+        drop(second);
+        assert!(!second_path.exists());
+        assert!(!second_directory.exists());
+        assert!(caller_root.is_dir());
+        assert_eq!(std::fs::read(&sentinel).unwrap(), b"caller-owned");
+        std::fs::remove_file(sentinel).unwrap();
+        std::fs::remove_dir(caller_root).unwrap();
+    }
+
+    #[cfg(unix)]
+    struct TestSocket(PathBuf, PathBuf);
 
     #[cfg(unix)]
     impl TestSocket {
-        fn new(label: &str) -> Self {
-            let nonce = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
-            Self(std::env::temp_dir().join(format!(
-                "spacewars-control-{}-{nonce}-{label}.sock",
-                std::process::id()
-            )))
+        // Leave room for the terminating NUL in Unix platforms with 104-byte sun_path.
+        const MAX_PATH_BYTES: usize = 103;
+
+        fn new(_label: &str) -> Self {
+            Self::with_root(&std::env::temp_dir())
+        }
+
+        fn with_root(root: &std::path::Path) -> Self {
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+            for _ in 0..1024 {
+                let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+                let name = format!("sw-{:08x}-{id:016x}", std::process::id());
+                let mut directory = root.join(&name);
+                let mut path = directory.join("s");
+                if path.as_os_str().as_bytes().len() > Self::MAX_PATH_BYTES {
+                    directory = PathBuf::from("/tmp").join(&name);
+                    path = directory.join("s");
+                }
+                assert!(path.as_os_str().as_bytes().len() <= Self::MAX_PATH_BYTES);
+                // Only a successful atomic create grants this fixture cleanup ownership.
+                match std::fs::create_dir(&directory) {
+                    Ok(()) => return Self(path, directory),
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => panic!("create test socket directory {directory:?}: {error}"),
+                }
+            }
+            panic!("test socket directory collision retry limit exceeded");
         }
     }
 
@@ -497,6 +565,8 @@ mod tests {
     impl Drop for TestSocket {
         fn drop(&mut self) {
             let _ = std::fs::remove_file(&self.0);
+            // Do not recursively delete unexpected files, or remove caller-owned roots.
+            let _ = std::fs::remove_dir(&self.1);
         }
     }
 }
