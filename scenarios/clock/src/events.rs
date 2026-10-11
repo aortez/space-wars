@@ -211,6 +211,20 @@ pub(super) enum ActiveEvent {
     Explosion(ExplosionEvent),
 }
 
+// Use the admission seed locally so recipe selection cannot advance the scheduler RNG.
+fn resolve_marquee_preset(
+    preset: engine_common::ClockMarqueePreset,
+    seed: u64,
+) -> engine_common::ClockMarqueePreset {
+    use engine_common::ClockMarqueePreset;
+    if preset == ClockMarqueePreset::Random {
+        let mut rng = StdRng::seed_from_u64(seed);
+        ClockMarqueePreset::CONCRETE[rng.random_range(0..ClockMarqueePreset::CONCRETE.len())]
+    } else {
+        preset
+    }
+}
+
 impl ActiveEvent {
     pub fn new(
         kind: ClockEventKind,
@@ -231,7 +245,7 @@ impl ActiveEvent {
             ClockEventKind::Duck => unreachable!("a duck admission creates an independent visit"),
             ClockEventKind::Crow => unreachable!("a crow admission creates an independent visit"),
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
-                config.marquee_preset,
+                resolve_marquee_preset(config.marquee_preset, seed),
                 config.marquee_message,
                 context.display,
             ))),

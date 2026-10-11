@@ -17,7 +17,7 @@ fn stats(label: &str, values: &mut [f64]) {
 
 fn main() {
     for (width, height) in [(800, 480), (480, 800), (1280, 720)] {
-        for preset in ClockMarqueePreset::ALL {
+        for preset in ClockMarqueePreset::CONCRETE {
             let mut steps = Vec::with_capacity(MARQUEE_TICKS as usize * 12);
             let mut frames = Vec::with_capacity(steps.capacity());
             let mut peak = 0;

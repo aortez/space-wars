@@ -35,6 +35,7 @@ impl MarqueeEvent {
                 | ClockMarqueePreset::DigitSpin
         );
         let recipe = match preset {
+            ClockMarqueePreset::Random => unreachable!("Random is resolved at admission"),
             ClockMarqueePreset::ClockChase => Recipe {
                 lighting: Lighting::Chase,
                 ..Recipe::default()

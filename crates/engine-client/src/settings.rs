@@ -602,9 +602,22 @@ enabled = true
         assert!(!settings.clock.events.falling);
         assert_eq!(
             settings.clock.marquee_preset,
-            engine_common::ClockMarqueePreset::ClockWave
+            engine_common::ClockMarqueePreset::Random
         );
-        for preset in engine_common::ClockMarqueePreset::ALL {
+        for (preset, serialized) in engine_common::ClockMarqueePreset::ALL.into_iter().zip([
+            "clock-chase",
+            "clock-wave",
+            "clock-spin",
+            "digit-spin",
+            "text-scroll",
+            "text-ribbon",
+            "text-spin",
+            "random",
+        ]) {
+            let saved: Settings =
+                toml::from_str(&format!("[clock]\nmarquee_preset = '{serialized}'\n")).unwrap();
+            assert_eq!(saved.clock.marquee_preset, preset);
+            assert_eq!(preset.as_str(), serialized);
             settings.clock.marquee_preset = preset;
             let decoded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
             assert_eq!(decoded.clock, settings.clock);

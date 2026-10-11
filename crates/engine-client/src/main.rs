@@ -309,13 +309,13 @@ impl Args {
 }
 
 fn parse_clock_benchmark_recipe(value: &str) -> Result<engine_common::ClockMarqueePreset, String> {
-    engine_common::ClockMarqueePreset::ALL
+    engine_common::ClockMarqueePreset::CONCRETE
         .into_iter()
         .find(|preset| preset.as_str() == value)
         .ok_or_else(|| {
             format!(
                 "Unknown Clock recipe {value:?}; choose {}",
-                engine_common::ClockMarqueePreset::ALL
+                engine_common::ClockMarqueePreset::CONCRETE
                     .map(|p| p.as_str())
                     .join(", ")
             )

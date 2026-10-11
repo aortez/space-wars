@@ -300,7 +300,21 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         let mut state = harness.activate_guarded("launcher.settings", &state);
         state = harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
         state = harness.activate_guarded("launcher.settings.clock.marquee.next", &state);
-        for _ in 0..4 {
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.marquee-preset.next"),
+            Some("Random")
+        );
+        harness.capture_screenshot("clock-marquee-random-launcher.png");
+        // Launcher changes apply immediately; keep each returned revision for
+        // the next guarded activation instead of waiting for live controls.
+        for _ in 0..ClockMarqueePreset::ALL.len() {
+            assert_eq!(state.screen, UiScreen::LauncherSettings);
+            assert_eq!(state.error, None);
+            if control_value(&state, "launcher.settings.clock.marquee-preset.next")
+                == Some("Text ribbon")
+            {
+                break;
+            }
             state = harness.activate_guarded("launcher.settings.clock.marquee-preset.next", &state);
         }
         assert_eq!(
@@ -392,6 +406,50 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!(idle.next_event_tick, None);
         assert_eq!((idle.body_count, idle.collider_count), (0, 0));
         harness.capture_screenshot("clock-marquee-recovered.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        // Text spin immediately precedes Random; the live helper advances once
+        // and waits for the settings acknowledgement before returning.
+        let page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Random", &page);
+        assert_eq!(
+            harness.clock_state().settings.marquee_preset,
+            ClockMarqueePreset::Random
+        );
+        harness.capture_screenshot("clock-marquee-random-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let preview = harness.clock_wait(&idle, "presenting", idle.event_id + 1, 90);
+        assert_eq!(preview.event_kind, Some(ClockEventKind::Marquee));
+        assert_eq!(preview.settings.marquee_preset, ClockMarqueePreset::Random);
+        let preview_preset = preview.marquee.as_ref().unwrap().preset;
+        assert!(ClockMarqueePreset::CONCRETE.contains(&preview_preset));
+        assert_eq!((preview.body_count, preview.collider_count), (0, 0));
+        harness.capture_screenshot("clock-marquee-random-preview.png");
+        // Preview & Resume admits an event itself. Finish it before issuing
+        // another trigger with the idle event id and scenario revision.
+        let mut baseline = harness.clock_wait(&preview, "idle", preview.event_id, 0);
+        assert!(baseline.marquee.is_none());
+        assert_eq!(baseline.next_event_tick, None);
+        assert_eq!((baseline.body_count, baseline.collider_count), (0, 0));
+        let mut choices = vec![preview_preset];
+        for _ in 0..8 {
+            assert!(baseline.can_trigger);
+            assert!(!baseline.trigger_pending && !baseline.settings_pending);
+            assert_eq!(baseline.settings.marquee_preset, ClockMarqueePreset::Random);
+            harness.clock_trigger_event(&baseline, ClockEventKind::Marquee);
+            let running = harness.clock_wait(&baseline, "presenting", baseline.event_id + 1, 90);
+            assert_eq!(running.settings.marquee_preset, ClockMarqueePreset::Random);
+            let preset = running.marquee.as_ref().unwrap().preset;
+            assert!(ClockMarqueePreset::CONCRETE.contains(&preset));
+            choices.push(preset);
+            baseline = harness.clock_wait(&baseline, "idle", running.event_id, 0);
+            assert!(baseline.marquee.is_none());
+            assert_eq!(baseline.next_event_tick, None);
+            assert_eq!((baseline.body_count, baseline.collider_count), (0, 0));
+        }
+        assert!(choices.iter().any(|preset| *preset != choices[0]));
+        let configured = harness.clock_state();
+
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.restart", &menu);

@@ -611,7 +611,7 @@ mod tests {
             Viewport::new(480.0, 800.0),
             Viewport::new(1280.0, 720.0),
         ] {
-            for preset in engine_common::ClockMarqueePreset::ALL {
+            for preset in engine_common::ClockMarqueePreset::CONCRETE {
                 let mut state = ClockScenario::init(
                     ClockConfig {
                         aspect_ratio: viewport.aspect_ratio(),
