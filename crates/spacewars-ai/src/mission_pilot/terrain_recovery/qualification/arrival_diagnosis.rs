@@ -116,7 +116,7 @@ fn continuation(
                 "first_scenario_difference":first_difference[1]},
             "controller_reset":false,"input_override":false,"physics_edited":false,
             "initial_cells":cells,"metrics":trace.metrics,"brains":run.brains.each_ref().map(|b|b.telemetry()),
-            "native_recovery":[0,1].map(|s|run.state.pilot_observation(s,None).recovery),
+            "native_recovery":([0,1].map(|s|run.state.pilot_observation(s,None).recovery)),
             "match":run.state.match_observation()}),
     );
 }
