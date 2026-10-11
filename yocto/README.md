@@ -30,7 +30,7 @@ npm run build
 The expected bootable image artifact is:
 
 ```text
-/home/data/workspace/.space-wars-yocto-build-raspberrypi-spacewars/tmp/deploy/images/raspberrypi-spacewars/spacewars-image-raspberrypi-spacewars.rootfs.wic.gz
+/home/data/workspace/.space-wars-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/spacewars-image-raspberrypi-spacewars.rootfs.wic.gz
 ```
 
 The build wrapper sets `KAS_BUILD_DIR` outside the Rust workspace by default so
@@ -38,6 +38,18 @@ Yocto's own Rust bootstrap does not accidentally discover Space-Wars'
 `Cargo.toml`. Its name includes the checkout and machine to avoid clobbering
 other builds. Override `KAS_BUILD_DIR` if you need a different build location;
 use the same override when flashing or updating. Downloads/sstate remain shared.
+
+Normal build/flash/update commands use the GPU image and the existing directory
+ending in `-gpu`. It includes Mesa/EGL/GBM and starts GPU scene/UI rendering by
+default. `--gpu` remains a build alias. Software recovery is always available
+with `SLINT_BACKEND=linuxkms-software` on this image.
+
+`npm run build -- --software` produces a software-only image in the separate
+unsuffixed build directory. Use `SPACEWARS_GPU=0` consistently for build, flash
+and update commands when selecting that reference image. Do not mix their
+`KAS_BUILD_DIR` overrides. Older devices require one full image update; never
+bypass the fast updater's compatibility check to replace missing GPU libraries
+or outdated service files. See the [GPU milestone](../docs/gpu-renderer-prototype.md#gpu-default-milestone).
 
 Builds first run [bounded local Cargo cache maintenance](../docs/build-cache-maintenance.md).
 If free space is below 40 GiB or this checkout's debug profile exceeds 60 GiB,

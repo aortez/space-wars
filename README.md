@@ -673,7 +673,7 @@ profiles support HDMI, the existing HyperPixel kiosk, and a Pi 4 Picade X HAT
 cabinet. See [Picade bring-up and hardware profiles](docs/picade.md).
 
 ```sh
-engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 1.0
 ```
 
 The launcher and host menus accept direct touchscreen taps. Open **Controls →
@@ -685,6 +685,13 @@ requesting fullscreen presentation. The image selects Slint's LinuxKMS backend
 with `SLINT_BACKEND`; `--kiosk` remains available when booting directly into the
 saved scenario is preferred. The same settings directory can also be selected
 with `SPACEWARS_CONFIG_DIR`.
+
+The normal Pi image uses GPU output and direct, cached geometry at 1×. The
+`raster` setting remains the compatible scene entry point; it no longer implies
+CPU rasterization when the GPU path is active. NES/Falling retain native-video
+presentation. `SLINT_BACKEND=linuxkms-software` provides explicit software
+recovery. See the [GPU milestone](docs/gpu-renderer-prototype.md#gpu-default-milestone)
+for the supported profile and validation.
 
 Settings use declared defaults for missing fields and recover invalid fields
 without resetting unrelated preferences. Unknown keys survive saves; rejected

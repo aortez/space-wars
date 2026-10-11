@@ -15,6 +15,8 @@ use slint::{Image, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
 use crate::render::{self, FrameLayout, Viewport};
 
 mod blend;
+pub(crate) mod publication;
+pub(crate) mod texture_upload;
 
 pub const DEFAULT_OVERVIEW_CACHE_PERIOD: u64 = 6;
 
@@ -94,6 +96,8 @@ pub struct RasterTimings {
     pub overview_live: Duration,
     pub other_frames: Duration,
     pub image: Duration,
+    // Nested in image; wall time and actual CPU buffer allocation/copy counts.
+    pub publication: publication::Timings,
 }
 
 impl RasterTimings {
@@ -151,6 +155,7 @@ impl std::ops::AddAssign for RasterTimings {
         self.overview_live += rhs.overview_live;
         self.other_frames += rhs.other_frames;
         self.image += rhs.image;
+        self.publication += rhs.publication;
     }
 }
 
@@ -165,6 +170,7 @@ pub struct RasterRenderer {
     // Primitive alpha is resolved while drawing. Keeping the completed frame RGB lets Slint's
     // software renderer copy pixels directly instead of blending an already-opaque texture.
     buffers: Vec<SharedPixelBuffer<Rgb8Pixel>>,
+    publisher: publication::Publisher,
     width: u32,
     height: u32,
     active_buffer: usize,
@@ -178,6 +184,7 @@ impl RasterRenderer {
         Self {
             last_timings: RasterTimings::default(),
             buffers: Vec::new(),
+            publisher: publication::Publisher::default(),
             width: 0,
             height: 0,
             active_buffer: 0,
@@ -316,8 +323,13 @@ impl RasterRenderer {
 
         self.frame_index = self.frame_index.wrapping_add(1);
         let started = Instant::now();
-        let image = Image::from_rgb8(self.buffers[buffer_index].clone());
+        let (image, publication) = self.publisher.publish(
+            &self.buffers[buffer_index],
+            buffer_index,
+            publication::requested_format(),
+        );
         timings.image += started.elapsed();
+        timings.publication = publication;
         self.last_timings = timings;
         RasterRenderResult { image, timings }
     }
@@ -330,6 +342,7 @@ impl RasterRenderer {
         self.width = width;
         self.height = height;
         self.active_buffer = 0;
+        self.publisher = publication::Publisher::default();
         self.buffers = (0..BUFFER_COUNT)
             .map(|_| SharedPixelBuffer::new(width, height))
             .collect();

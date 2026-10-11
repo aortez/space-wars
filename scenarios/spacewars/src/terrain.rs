@@ -54,6 +54,7 @@ struct PendingEdit {
 
 #[derive(Debug, Clone)]
 pub(super) struct TerrainState {
+    pub render_art: std::cell::RefCell<crate::terrain_art::Cache>,
     pub surface: TerrainSurface,
     pub colliders: engine_rapier::terrain::TerrainColliders,
     pub planets: BTreeMap<usize, PlanetTerrain>,
@@ -78,6 +79,7 @@ pub(super) struct TerrainState {
 impl Default for TerrainState {
     fn default() -> Self {
         Self {
+            render_art: Default::default(),
             surface: TerrainSurface::Blocks,
             colliders: engine_rapier::terrain::TerrainColliders::default(),
             planets: BTreeMap::new(),
@@ -729,6 +731,32 @@ pub(super) fn render_body_in_view(
     angle: f32,
     view: Option<engine_common::RenderRect>,
 ) {
+    render_body_with_hints(frame, field, geometry, position, angle, view, None);
+}
+
+pub(super) fn render_body_with_hints(
+    frame: &mut RenderFrame,
+    field: &Terrain,
+    geometry: &TerrainGeometry,
+    position: Vec2,
+    angle: f32,
+    view: Option<engine_common::RenderRect>,
+    art: Option<&mut crate::terrain_art::Cache>,
+) {
+    render_body_with_storage(frame, field, geometry, position, angle, view, art, None);
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn render_body_with_storage(
+    frame: &mut RenderFrame,
+    field: &Terrain,
+    geometry: &TerrainGeometry,
+    position: Vec2,
+    angle: f32,
+    view: Option<engine_common::RenderRect>,
+    mut art: Option<&mut crate::terrain_art::Cache>,
+    mut pool: Option<&mut engine_common::RenderPointPool>,
+) {
     // An AABB around the inverse-transformed camera is conservative for rotated
     // bodies. Only these four points are transformed before rejecting chunks.
     let local_view = view.map(|view| {
@@ -759,49 +787,35 @@ pub(super) fn render_body_in_view(
                 continue;
             }
         }
-        for rect in &chunk.rectangles {
-            let color = if rect.material == ORE {
-                RenderColor::rgb(0.53, 0.49, 0.25)
-            } else {
-                RenderColor::rgb(0.22, 0.36, 0.45)
-            };
-            let center = rect.local_center(field);
-            let half = rect.half_extents(field);
-            let points = [
-                (-half.x, -half.y),
-                (half.x, -half.y),
-                (half.x, half.y),
-                (-half.x, half.y),
-            ]
-            .map(|(x, y)| render_point(position + (center + Vec2::new(x, y)).rotate_radians(angle)))
-            .to_vec();
-            frame.push_primitive(
-                PLANET_LAYER,
-                RenderPrimitive::Polygon(RenderPolygon {
-                    points,
-                    fill: Some(Fill::new(color)),
-                    stroke: Some(Stroke::new(color, 0.75)),
-                }),
-            );
+        let first = frame
+            .layers
+            .iter()
+            .find(|l| l.z == PLANET_LAYER)
+            .map_or(0, |l| l.primitives.len());
+        for polygon in crate::terrain_art::polygons_with_pool(
+            field,
+            chunk,
+            position,
+            angle,
+            pool.as_deref_mut(),
+        ) {
+            frame.push_primitive(PLANET_LAYER, RenderPrimitive::Polygon(polygon));
         }
-        for polygon in &chunk.polygons {
-            let color = if polygon.material == ORE {
-                RenderColor::rgb(0.53, 0.49, 0.25)
-            } else {
-                RenderColor::rgb(0.22, 0.36, 0.45)
-            };
-            frame.push_primitive(
-                PLANET_LAYER,
-                RenderPrimitive::Polygon(RenderPolygon {
-                    points: polygon
-                        .vertices
-                        .iter()
-                        .map(|&p| render_point(position + p.rotate_radians(angle)))
-                        .collect(),
-                    fill: Some(Fill::new(color)),
-                    stroke: Some(Stroke::new(color, 0.75)),
-                }),
-            );
+        if let Some(geometry) = art.as_mut().and_then(|cache| cache.get(field, chunk)) {
+            let layer = frame
+                .layers
+                .iter()
+                .position(|l| l.z == PLANET_LAYER)
+                .unwrap();
+            frame
+                .geometry_hints
+                .push(engine_common::PolygonGeometryHint {
+                    layer,
+                    first,
+                    geometry,
+                    position: render_point(position),
+                    angle,
+                });
         }
     }
 }

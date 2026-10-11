@@ -23,6 +23,9 @@ mod display;
 #[cfg(target_os = "linux")]
 pub mod profiling;
 
+#[cfg(all(target_os = "linux", feature = "renderer-femtovg"))]
+pub mod frame_capture;
+
 #[cfg(target_os = "linux")]
 mod renderer {
     use i_slint_core::platform::PlatformError;

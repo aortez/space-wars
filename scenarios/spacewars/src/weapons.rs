@@ -165,7 +165,7 @@ pub(super) fn mount_position(ship: &ShipState, mount: usize) -> Vec2 {
 }
 
 pub(super) fn render_round(
-    frame: &mut RenderFrame,
+    frame: &mut impl ShipArtSink,
     layer: i32,
     transform: Transform2,
     brightness: f32,
@@ -190,7 +190,7 @@ pub(super) fn render_round(
 }
 
 fn hardware_polygon(
-    frame: &mut RenderFrame,
+    frame: &mut impl ShipArtSink,
     layer: i32,
     transform: Transform2,
     points: &[Vec2],
@@ -210,7 +210,7 @@ fn hardware_polygon(
     );
 }
 
-pub(super) fn render_mounts(frame: &mut RenderFrame, ship: &ShipState) {
+pub(super) fn render_mounts(frame: &mut impl ShipArtSink, ship: &ShipState) {
     let Some(armament) = &ship.armament else {
         return;
     };

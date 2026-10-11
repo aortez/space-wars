@@ -166,7 +166,7 @@ pub(super) fn run(
     ui.set_launcher_scenario("spacewars".into());
     ui.set_raster_visible(true);
     ui.set_raster_frame(image);
-    crate::host::update_raster_text_overlay(&ui, rows);
+    crate::host::update_scene_primitives(&ui, rows);
     ui.show()?;
     ui.window().set_size(PhysicalSize::new(width, height));
     let windows = windows.borrow();

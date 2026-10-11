@@ -1,0 +1,11 @@
+# Explicit software-only recovery/reference image. Keep artifacts separate
+# from the normal GPU build; both images share downloads and sstate caches.
+header:
+  version: 14
+  includes:
+    - kas-spacewars.yml
+
+local_conf_header:
+  software: |
+    SPACEWARS_GPU = "0"
+    DISTRO_FEATURES:remove = "opengl"

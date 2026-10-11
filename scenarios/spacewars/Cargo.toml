@@ -10,6 +10,8 @@ rust-version.workspace = true
 # Opt-in read-only mission sensor profiling for diagnostic runners.
 sensor-profile = ["engine-rapier/query-diagnostics"]
 ccd-diagnostics = ["engine-rapier/ccd-diagnostics"]
+# Optional presentation metadata for retained-renderer experiments.
+render-hints = []
 
 [[example]]
 name = "ccd_fixed_input"

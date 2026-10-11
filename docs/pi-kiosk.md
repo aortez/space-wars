@@ -13,7 +13,7 @@ device has been identified and explicitly confirmed.
 - Persistent settings directory: `/var/lib/spacewars`
 - Persistent settings file: `/var/lib/spacewars/settings.toml`
 - Persistent user ROM library: `/var/lib/spacewars/roms`
-- Renderer: `raster` (fixed in the `pi-kiosk` display build)
+- Renderer: GPU geometry and UI by default (`pi-kiosk-gpu`); explicit software recovery
 - Raster scale: saved `launch.raster_scale` preference (default `1.0`)
 
 The settings directory must be writable by the user that runs `engine-client`.
@@ -53,16 +53,17 @@ npm run build
 Expected image artifact:
 
 ```text
-/home/data/workspace/.space-wars-yocto-build-raspberrypi-spacewars/tmp/deploy/images/raspberrypi-spacewars/spacewars-image-raspberrypi-spacewars.rootfs.wic.gz
+/home/data/workspace/.space-wars-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/spacewars-image-raspberrypi-spacewars.rootfs.wic.gz
 ```
 
 The build wrapper sets `KAS_BUILD_DIR` outside the Rust workspace by default so
 Yocto's own Rust bootstrap does not accidentally discover Space-Wars'
 `Cargo.toml`. Override `KAS_BUILD_DIR` if a different build location is needed.
 
-The image recipe builds `engine-client` with the `engine-client/pi-kiosk`
-feature, which selects Slint `linuxkms` plus the software renderer instead of
-the full desktop backend set. Gamepads are read directly from
+The normal image builds `engine-client` with `engine-client/pi-kiosk-gpu`,
+including Mesa/EGL/GBM, direct geometry rendering and GPU UI/output. It keeps
+the software renderer available without the full desktop backend set.
+Gamepads are read directly from
 `/dev/input/event*` through gilrs/libudev and do not depend on the Slint display
 backend. Slint's LinuxKMS backend reads touchscreens through libinput on the
 same seatd session used for DRM access and presents touches to `TouchArea`
@@ -70,6 +71,15 @@ components as pointer input. The feature still includes Slint's Winit
 physical-key adapter for the desktop keyboard fallback; Pi validation must
 separately confirm whether keyboard events are available on the selected
 display backend.
+
+Upgrading from a software-only image requires one full image update, not a
+binary-only update. `SLINT_BACKEND=linuxkms` chooses GPU when built in;
+`linuxkms-software` explicitly selects software recovery. The helper
+`sudo /usr/sbin/spacewars-renderer software` makes a temporary, health-checked
+switch; set the backend in `/boot/spacewars-kiosk.env` to persist it.
+`SPACEWARS_GPU=0` selects the separate software-only build/update artifacts.
+See the [GPU milestone](gpu-renderer-prototype.md#gpu-default-milestone) for
+the supported profile and validation boundary.
 
 ### Bluetooth pairing storage
 
@@ -116,7 +126,7 @@ With the `hyperpixel` profile selected, the Yocto hardware service supplies:
 
 ```sh
 ALSA_CARD=Audio
-SLINT_BACKEND=linuxkms-software
+SLINT_BACKEND=linuxkms
 SLINT_DRM_OUTPUT=DPI-1
 SLINT_KMS_ROTATION=90
 ```
@@ -173,7 +183,7 @@ To start directly in the diagnostic while adjusting a new image or display,
 run:
 
 ```sh
-SLINT_BACKEND=linuxkms-software \
+SLINT_BACKEND=linuxkms \
 SLINT_DRM_OUTPUT=DPI-1 \
 SLINT_KMS_ROTATION=90 \
 engine-client --fullscreen --touch-test --config-dir /var/lib/spacewars
@@ -302,9 +312,17 @@ new revision resets its frame/update counters; measured FPS/UPS refresh once per
 second. FPS counts frames submitted to Slint (`fps_source=submitted-frames`),
 not host timer callbacks or physical scanout. UPS counts simulation steps, or
 emulated NES frames for native-video scenarios. Duplicate native-video polls
-do not increase FPS. **App Settings → FPS Counter** toggles the shared floating
-overlay and persists `video.show_fps`; it defaults off. Status also includes
-`performance_overlay_enabled` and `performance_overlay_text`.
+do not increase FPS. **App Settings → Performance Overlay** toggles the shared
+floating overlay and persists the existing `video.show_fps`; it defaults off.
+Alongside FPS/UPS it shows Linux process CPU usage (100% = one core, including
+worker threads), scene preparation wall time, KMS draw CPU time, and the scene
+adapter/presentation path. Values refresh about once per second. Preparation
+and draw timings use bounded rolling windows; do not add them to CPU usage.
+GPU execution time is not measured: `GPU n/a` is deliberate, not zero. Missing
+metrics show `--`, including draw timing on desktop backends and scene
+preparation for native video. Pausing/ending a round hides stale timing details.
+Status includes `performance_overlay_enabled`, `performance_overlay_text`,
+and single-line `performance_overlay_details`.
 
 The App Settings panel extends the former Sound panel. Existing automation IDs
 (`launcher.sound`, `pause.sound`, `sound.back`, and `sound.retry`) remain stable;
@@ -481,11 +499,11 @@ Installing the helper and its sudo rule requires **one normal rootfs update**;
 fingerprint, so an older device is rejected before installing an incompatible
 app-only bundle. No kernel/boot changes are needed for this feature.
 
-The Pi's Slint software backend does not draw vector `Path` items. The kiosk
-now migrates a saved vector preference to raster and fixes the Renderer row to
-raster. Direct and automatic launches also enforce the restriction and log
-any fallback. Desktop vector rendering and CPU-only headless vector benchmarks
-are unchanged.
+The Pi's explicit software backend does not draw vector `Path` items. In that
+mode the kiosk migrates a saved vector preference to raster and fixes the
+Renderer row to raster. GPU mode supports either adapter; the `raster` choice
+at 1× uses direct geometry by default, while native-video scenarios retain
+their own path. Desktop and CPU-only headless benchmarks are unchanged.
 
 ### Fast application updates
 

@@ -567,8 +567,6 @@ dependencies = [
 [[package]]
 name = "femtovg"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deda049f5a6dc3152b23263f72c575847f6aa0ace0045299d151f36af7aca136"
 dependencies = [
  "bitflags 2.9.4",
  "bytemuck",
@@ -879,6 +877,7 @@ dependencies = [
  "bytemuck",
  "calloop",
  "drm",
+ "femtovg",
  "gbm",
  "glutin",
  "i-slint-common",
@@ -1004,8 +1003,6 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-femtovg"
 version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4ce7ca8b5316585f3db1ce902318c93980b09ab14aafc30846cad36da67acd"
 dependencies = [
  "cfg-if",
  "const-field-offset",

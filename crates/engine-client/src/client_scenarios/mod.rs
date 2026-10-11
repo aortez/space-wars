@@ -260,6 +260,16 @@ pub trait ClientScenario {
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult;
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action>;
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame>;
+    /// Opt-in allocation reuse, with exactly the ordinary owned frame contents.
+    /// None leaves this adapter on its existing producer and avoids recycling.
+    fn render_frames_pooled(
+        &self,
+        _renderer: RenderBackend,
+        _viewport: Viewport,
+        _points: &mut engine_common::RenderPointPool,
+    ) -> Option<Vec<RenderFrame>> {
+        None
+    }
     /// Optional uncropped reference for paired scene-construction/pixel checks.
     fn render_frames_reference(&self, _viewport: Viewport) -> Option<Vec<RenderFrame>> {
         None
