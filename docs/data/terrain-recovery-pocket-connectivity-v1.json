@@ -1,0 +1,559 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "7f09b728ad4133aee426894f6255313a02e74973",
+    "source_inputs_sha256": "d13486fc3b3e06002abc6185ea7806618084bb5b02fc7b6def12cef703a366d7",
+    "source_input_count": 2418,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791651908.1780505,
+    "exit_code": 0,
+    "seconds": 0.1347789764404297,
+    "binary_sha256": "74959ee89e02e33297a413201593ca971369dd15a300172f0580db19128e9676"
+  },
+  "audit": {
+    "schema": 1,
+    "source_inputs_checked": 2418,
+    "case_artifacts_checked": 34,
+    "verified_decision_ticks": 17314,
+    "material_audit_samples": 287,
+    "native_queries": 1216332,
+    "checkpoints": [
+      {
+        "fork": 8025,
+        "tick": 8025,
+        "revision": 16,
+        "physics": "55d78454d4e9dfe8",
+        "grids": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 195,
+            "component_bounds": [
+              [
+                -0.850000012665987,
+                0.5500000081956387
+              ],
+              [
+                -0.6500000096857548,
+                1.4500000216066837
+              ]
+            ],
+            "barrier_witnesses": 74,
+            "minimum_extra_margin": 0.0005086032704013227,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 34,
+              "outside_grid": 469
+            },
+            "nearest_standing_center": 4.118170881367484
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 711,
+            "component_bounds": [
+              [
+                -0.875000013038516,
+                0.5250000078231096
+              ],
+              [
+                -0.5750000085681677,
+                1.3750000204890966
+              ]
+            ],
+            "barrier_witnesses": 138,
+            "minimum_extra_margin": 0.000678882417923285,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 34,
+              "outside_grid": 469
+            },
+            "nearest_standing_center": 4.118170881367484
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 2704,
+            "component_bounds": [
+              [
+                -0.8375000124797225,
+                0.5375000080093741
+              ],
+              [
+                -0.5625000083819032,
+                1.3625000203028321
+              ]
+            ],
+            "barrier_witnesses": 268,
+            "minimum_extra_margin": 0.00019341311239483294,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 34,
+              "outside_grid": 469
+            },
+            "nearest_standing_center": 4.118170881367484
+          }
+        ]
+      },
+      {
+        "fork": 8025,
+        "tick": 8506,
+        "revision": 16,
+        "physics": "cb435d5a64d910f8",
+        "grids": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 199,
+            "component_bounds": [
+              [
+                -1.0500000156462193,
+                0.45000000670552254
+              ],
+              [
+                -0.7500000111758709,
+                1.3500000201165676
+              ]
+            ],
+            "barrier_witnesses": 76,
+            "minimum_extra_margin": 0.00273181156066353,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.0724549100872505
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 711,
+            "component_bounds": [
+              [
+                -0.9750000145286322,
+                0.37500000558793545
+              ],
+              [
+                -0.6750000100582838,
+                1.3250000197440386
+              ]
+            ],
+            "barrier_witnesses": 138,
+            "minimum_extra_margin": 9.664353885292798e-05,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.0724549100872505
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 2700,
+            "component_bounds": [
+              [
+                -0.9875000147148967,
+                0.36250000540167093
+              ],
+              [
+                -0.6625000098720193,
+                1.287500019185245
+              ]
+            ],
+            "barrier_witnesses": 268,
+            "minimum_extra_margin": 0.0002455511219796591,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.0724549100872505
+          }
+        ]
+      },
+      {
+        "fork": 8325,
+        "tick": 8325,
+        "revision": 16,
+        "physics": "7bb1eee2885d3995",
+        "grids": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 199,
+            "component_bounds": [
+              [
+                -1.0500000156462193,
+                0.45000000670552254
+              ],
+              [
+                -0.7500000111758709,
+                1.3500000201165676
+              ]
+            ],
+            "barrier_witnesses": 76,
+            "minimum_extra_margin": 0.00015578695432622025,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.062998588850592
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 712,
+            "component_bounds": [
+              [
+                -1.0250000152736902,
+                0.37500000558793545
+              ],
+              [
+                -0.6750000100582838,
+                1.3250000197440386
+              ]
+            ],
+            "barrier_witnesses": 140,
+            "minimum_extra_margin": 0.0007682870818657983,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.062998588850592
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 2702,
+            "component_bounds": [
+              [
+                -0.9875000147148967,
+                0.36250000540167093
+              ],
+              [
+                -0.6625000098720193,
+                1.287500019185245
+              ]
+            ],
+            "barrier_witnesses": 268,
+            "minimum_extra_margin": 8.025099314447337e-05,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.062998588850592
+          }
+        ]
+      },
+      {
+        "fork": 8325,
+        "tick": 8806,
+        "revision": 16,
+        "physics": "995ff57e777af579",
+        "grids": [
+          {
+            "spacing": 0.10000000149011612,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 199,
+            "component_bounds": [
+              [
+                -1.0500000156462193,
+                0.45000000670552254
+              ],
+              [
+                -0.7500000111758709,
+                1.3500000201165676
+              ]
+            ],
+            "barrier_witnesses": 76,
+            "minimum_extra_margin": 0.0011954332284077607,
+            "native_queries": 14641,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.072463225183425
+          },
+          {
+            "spacing": 0.05000000074505806,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 710,
+            "component_bounds": [
+              [
+                -1.0250000152736902,
+                0.37500000558793545
+              ],
+              [
+                -0.6750000100582838,
+                1.3250000197440386
+              ]
+            ],
+            "barrier_witnesses": 140,
+            "minimum_extra_margin": 0.0002907966153154612,
+            "native_queries": 58081,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.072463225183425
+          },
+          {
+            "spacing": 0.02500000037252903,
+            "enclosed": true,
+            "source_blocked": false,
+            "reaches_boundary": false,
+            "reachable_cells": 2699,
+            "component_bounds": [
+              [
+                -0.9875000147148967,
+                0.36250000540167093
+              ],
+              [
+                -0.6625000098720193,
+                1.287500019185245
+              ]
+            ],
+            "barrier_witnesses": 268,
+            "minimum_extra_margin": 5.853197075091077e-05,
+            "native_queries": 231361,
+            "standing_targets": {
+              "source_component": 0,
+              "other_cell": 33,
+              "outside_grid": 470
+            },
+            "nearest_standing_center": 4.072463225183425
+          }
+        ]
+      }
+    ],
+    "passed": true
+  },
+  "validation": [
+    {
+      "name": "engine",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "engine-rapier",
+        "--features",
+        "query-diagnostics",
+        "--lib"
+      ],
+      "started_unix": 1791651671.5659385,
+      "exit_code": 0,
+      "seconds": 1.1289558410644531
+    },
+    {
+      "name": "ai",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--lib"
+      ],
+      "started_unix": 1791651672.6950638,
+      "exit_code": 0,
+      "seconds": 82.41604709625244
+    },
+    {
+      "name": "native-posture",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::ground_posture::tests"
+      ],
+      "started_unix": 1791651755.1113482,
+      "exit_code": 0,
+      "seconds": 77.11941957473755
+    },
+    {
+      "name": "engine-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "engine-rapier",
+        "--lib",
+        "--tests",
+        "--features",
+        "query-diagnostics",
+        "--no-deps"
+      ],
+      "started_unix": 1791651875.033894,
+      "exit_code": 0,
+      "seconds": 2.0221335887908936
+    },
+    {
+      "name": "ai-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_unix": 1791651877.0561945,
+      "exit_code": 0,
+      "seconds": 7.660405874252319
+    },
+    {
+      "name": "native-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-deps"
+      ],
+      "started_unix": 1791651884.7168012,
+      "exit_code": 0,
+      "seconds": 3.608327627182007
+    },
+    {
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "started_unix": 1791651888.325324,
+      "exit_code": 0,
+      "seconds": 1.6690876483917236
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_unix": 1791651889.9946086,
+      "exit_code": 0,
+      "seconds": 1.8890936374664307
+    }
+  ],
+  "plot": {
+    "source_files": {
+      "cases/8025/output/connectivity-8025.json": "5cfadfcce56a6e42ef7a5b21c29475597ac11c7ad5ce0be8f960fbb2493d695d",
+      "cases/8025/output/connectivity-8506.json": "1ace4a153152648d26d9f34bc57b76f04c46d4f7970f7433c5731f1c561b28e7",
+      "cases/8325/output/connectivity-8325.json": "766a56bec0089e34deb7facf77bc5354bfcfb5d3d5385d1349aac2206344b632",
+      "cases/8325/output/connectivity-8806.json": "776dfa349e17f7c0e730b22e0eb32338174514264e256cba9648447a819689fa"
+    },
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.3",
+    "spacing": 0.025,
+    "output": {
+      "connectivity.png": "886e51a6d1ff742f4394a0d8dff62498050b4616e138c41389eb7738f6118d6c",
+      "connectivity.pdf": "39e448be076272c394e54ccfe71a2bb8c0040b7321149cc39f2ce212c65f2395"
+    },
+    "scope": "Native whole-cell exclusion evidence, not rendered terrain. Pilot-center configuration space for any capsule orientation. All uncertified cells and diagonal passages treated as open. The radial grid moves with each checkpoint. Native queries are already recorded; this script performs no simulation or physics query."
+  },
+  "interpretation": {
+    "expected_blocked_case": "seed20202/angular/collapse-off/candidate-P2",
+    "enclosed_checkpoints": 4,
+    "certificates": 12,
+    "standing_centers_in_component": 0,
+    "policy_changed": false,
+    "physics_changed": false,
+    "source_reset": false,
+    "scope": "Frozen native geometry, every capsule orientation with 0.025 penetration allowance and numerical margin. No supported continuous center path to outer standing nodes in these states. Later destruction, solver tunneling, and rebuilding/boarding elsewhere remain outside the certificate."
+  },
+  "post_freeze_changes": [
+    "Auditor scalar comparisons accept f32 values expanded through serde_json::Value; no runtime change.",
+    "Auditor also compares both complete saved endpoints with the preceding experiment."
+  ]
+}

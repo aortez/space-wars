@@ -1,0 +1,420 @@
+{
+  "source_bundle": "docs/data/live-claim-sequences-v1.json.gz",
+  "source_sha256": "1111ee8c584491c55539648fc23cf4a6411e86d4d753380112310bdc8ee0fcf8",
+  "source_run": "new-world1-p2-asteroids3-no-stop",
+  "seat": 1,
+  "samples": [
+    {
+      "tick": 18562,
+      "expected_arrival": true,
+      "pilot": {
+        "owner": "player_2",
+        "location": "on_foot",
+        "controls_armed": true,
+        "queries_ready": true,
+        "actor": {
+          "angle": 0.707128643989563,
+          "position": {
+            "x": 1413.23876953125,
+            "y": 1072.67529296875
+          },
+          "spin": -3.688436269760132,
+          "velocity": {
+            "x": -10.479843139648438,
+            "y": -18.595773696899414
+          }
+        },
+        "actor_up": {
+          "x": -0.69813072681427,
+          "y": 0.7159702777862549
+        },
+        "supported_planet": 0,
+        "balanced": true,
+        "relative_speed": -2.381812810897827,
+        "planet": {
+          "claim": {
+            "captures": 2,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": 0.6791807413101196,
+                "y": -0.7339709997177124
+              },
+              "player": "player_1",
+              "position": {
+                "x": 1467.332275390625,
+                "y": 1024.3787841796875
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 1,
+            "owner": "player_1",
+            "phase": "idle",
+            "planet": 0,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "need_settle"
+          },
+          "index": 0,
+          "motion": {
+            "angle": 0.177758127450943,
+            "position": {
+              "x": 1442.7060546875,
+              "y": 1050.9122314453125
+            },
+            "spin": 0.0005739926709793508,
+            "velocity": {
+              "x": -9.828279495239258,
+              "y": -17.878246307373047
+            }
+          },
+          "radius": 36.57160949707031,
+          "revision": 18
+        }
+      },
+      "plan": {
+        "anchor": {
+          "GroundGap": {
+            "from": 55,
+            "to": 62
+          }
+        },
+        "cruise_radius": 41.204193115234375,
+        "destination": {
+          "x": -24.964296340942383,
+          "y": 26.220748901367188
+        },
+        "direction": "Left",
+        "planet": 0,
+        "revision": 18,
+        "start": {
+          "x": -22.620311737060547,
+          "y": 28.263275146484375
+        }
+      },
+      "jetpack": {
+        "charge": 0.566665530204773,
+        "reference_velocity": {
+          "x": -4.319999694824219,
+          "y": -19.959041595458984
+        },
+        "burning": false,
+        "burn_seconds": 1.299999475479126,
+        "gravity": {
+          "x": 11.968299865722656,
+          "y": -12.274129867553711
+        }
+      }
+    },
+    {
+      "tick": 19180,
+      "expected_arrival": true,
+      "pilot": {
+        "owner": "player_2",
+        "location": "on_foot",
+        "controls_armed": true,
+        "queries_ready": true,
+        "actor": {
+          "angle": 0.9255738854408264,
+          "position": {
+            "x": 1254.3834228515625,
+            "y": 927.0377197265625
+          },
+          "spin": 0.9156630635261536,
+          "velocity": {
+            "x": -19.217071533203125,
+            "y": -7.6178669929504395
+          }
+        },
+        "actor_up": {
+          "x": -0.8541629314422607,
+          "y": 0.5200055241584778
+        },
+        "supported_planet": 0,
+        "balanced": true,
+        "relative_speed": -0.16659829020500183,
+        "planet": {
+          "claim": {
+            "captures": 2,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": 0.6835149526596069,
+                "y": -0.7299365401268005
+              },
+              "player": "player_1",
+              "position": {
+                "x": 1310.7579345703125,
+                "y": 891.593505859375
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 1,
+            "owner": "player_1",
+            "phase": "idle",
+            "planet": 0,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "approach_flag"
+          },
+          "index": 0,
+          "motion": {
+            "angle": 0.1836794763803482,
+            "position": {
+              "x": 1285.97509765625,
+              "y": 917.980712890625
+            },
+            "spin": 0.0005748867406509817,
+            "velocity": {
+              "x": -19.23250961303711,
+              "y": -6.7966718673706055
+            }
+          },
+          "radius": 36.57160949707031,
+          "revision": 19
+        }
+      },
+      "plan": {
+        "anchor": {
+          "GroundGap": {
+            "from": 85,
+            "to": 90
+          }
+        },
+        "cruise_radius": 39.2026481628418,
+        "destination": {
+          "x": -29.081382751464844,
+          "y": 14.638310432434082
+        },
+        "direction": "Left",
+        "planet": 0,
+        "revision": 19,
+        "start": {
+          "x": -31.278120040893555,
+          "y": 18.229400634765625
+        }
+      },
+      "jetpack": {
+        "charge": 0.6902769207954407,
+        "reference_velocity": {
+          "x": -19.23038673400879,
+          "y": -6.840042591094971
+        },
+        "burning": false,
+        "burn_seconds": 2.26666522026062,
+        "gravity": {
+          "x": 13.123937606811523,
+          "y": -7.989717483520508
+        }
+      }
+    },
+    {
+      "tick": 19762,
+      "expected_arrival": true,
+      "pilot": {
+        "owner": "player_2",
+        "location": "on_foot",
+        "controls_armed": true,
+        "queries_ready": true,
+        "actor": {
+          "angle": 1.0490072965621948,
+          "position": {
+            "x": 1055.4847412109375,
+            "y": 915.568603515625
+          },
+          "spin": 1.4584834575653076,
+          "velocity": {
+            "x": -19.40875244140625,
+            "y": 6.1042022705078125
+          }
+        },
+        "actor_up": {
+          "x": -0.9503916501998901,
+          "y": 0.3110560178756714
+        },
+        "supported_planet": 0,
+        "balanced": true,
+        "relative_speed": 0.13649645447731018,
+        "planet": {
+          "claim": {
+            "captures": 2,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": 0.6875746846199036,
+                "y": -0.7261135578155518
+              },
+              "player": "player_1",
+              "position": {
+                "x": 1116.87646484375,
+                "y": 892.4742431640625
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 1,
+            "owner": "player_1",
+            "phase": "idle",
+            "planet": 0,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "approach_flag"
+          },
+          "index": 0,
+          "motion": {
+            "angle": 0.18925586342811584,
+            "position": {
+              "x": 1091.9468994140625,
+              "y": 918.7228393554688
+            },
+            "spin": 0.0005757808103226125,
+            "velocity": {
+              "x": -19.188629150390625,
+              "y": 6.925314903259277
+            }
+          },
+          "radius": 36.57160949707031,
+          "revision": 20
+        }
+      },
+      "plan": {
+        "anchor": {
+          "GroundGap": {
+            "from": 116,
+            "to": 120
+          }
+        },
+        "cruise_radius": 39.20244598388672,
+        "destination": {
+          "x": -36.02811813354492,
+          "y": 3.54849910736084
+        },
+        "direction": "Left",
+        "planet": 0,
+        "revision": 20,
+        "start": {
+          "x": -32.89909362792969,
+          "y": 4.880171775817871
+        }
+      },
+      "jetpack": {
+        "charge": 0.566665530204773,
+        "reference_velocity": {
+          "x": -19.19403076171875,
+          "y": 6.879121780395508
+        },
+        "burning": false,
+        "burn_seconds": 3.566663980484009,
+        "gravity": {
+          "x": 16.675125122070312,
+          "y": -5.457643032073975
+        }
+      }
+    },
+    {
+      "tick": 19963,
+      "expected_arrival": false,
+      "pilot": {
+        "owner": "player_2",
+        "location": "on_foot",
+        "controls_armed": true,
+        "queries_ready": true,
+        "actor": {
+          "angle": 0.7488389611244202,
+          "position": {
+            "x": 994.655029296875,
+            "y": 945.7101440429688
+          },
+          "spin": -0.2883550524711609,
+          "velocity": {
+            "x": -16.96068572998047,
+            "y": 10.64110279083252
+          }
+        },
+        "actor_up": {
+          "x": -0.9606009721755981,
+          "y": 0.2779313027858734
+        },
+        "supported_planet": 0,
+        "balanced": true,
+        "relative_speed": -0.72718745470047,
+        "planet": {
+          "claim": {
+            "captures": 2,
+            "claimant": null,
+            "flag": {
+              "normal": {
+                "x": 0.6889718174934387,
+                "y": -0.7247881293296814
+              },
+              "player": "player_1",
+              "position": {
+                "x": 1055.992919921875,
+                "y": 923.1154174804688
+              },
+              "raised_fraction": 1.0
+            },
+            "flag_interaction_range": 3.0,
+            "neutralizations": 1,
+            "owner": "player_1",
+            "phase": "idle",
+            "planet": 0,
+            "progress": 0.0,
+            "stage_required_seconds": 3.0,
+            "status": "approach_flag"
+          },
+          "index": 0,
+          "motion": {
+            "angle": 0.1911817342042923,
+            "position": {
+              "x": 1031.0128173828125,
+              "y": 949.3159790039062
+            },
+            "spin": 0.0005757808103226125,
+            "velocity": {
+              "x": -17.02798843383789,
+              "y": 11.231956481933594
+            }
+          },
+          "radius": 36.57160949707031,
+          "revision": 20
+        }
+      },
+      "plan": {
+        "anchor": {
+          "GroundGap": {
+            "from": 121,
+            "to": 124
+          }
+        },
+        "cruise_radius": 39.204559326171875,
+        "destination": {
+          "x": -33.00216293334961,
+          "y": 1.6212773323059082
+        },
+        "direction": "Left",
+        "planet": 0,
+        "revision": 20,
+        "start": {
+          "x": -36.0710563659668,
+          "y": 3.106269598007202
+        }
+      },
+      "jetpack": {
+        "charge": 0.8972204327583313,
+        "reference_velocity": {
+          "x": -17.040386199951172,
+          "y": 11.196762084960938
+        },
+        "burning": false,
+        "burn_seconds": 3.849997043609619,
+        "gravity": {
+          "x": 17.314266204833984,
+          "y": -5.009547710418701
+        }
+      }
+    }
+  ]
+}

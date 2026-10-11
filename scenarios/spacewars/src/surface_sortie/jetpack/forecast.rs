@@ -17,6 +17,7 @@ use continuation::ContinuationLimits;
 pub use continuation::{VehicleFlightContinuation, VehicleFlightRequest};
 mod environment;
 pub(crate) use environment::FlightEnvironment;
+pub mod terrain;
 type Preview = Arc<dyn Fn(Vec2, f32, Vec2, f32) -> bool + Send + Sync>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -238,6 +239,8 @@ pub(crate) struct FlightForecastJob {
     frame_angle: f32,
     capsules: [CapsuleQuery; 2],
     previews: [Preview; 2],
+    terrain: bool,
+    launch_window: u64,
     vehicle: Vec2,
     angle: f32,
     position: Vec2,
@@ -272,6 +275,7 @@ pub(crate) struct FlightScene {
     frame_angle: f32,
     capsules: [CapsuleQuery; 2],
     previews: [Preview; 2],
+    terrain: bool,
     pub hull: Arc<Vec<Vec2>>,
     pub vehicle: usize,
 }
@@ -320,6 +324,7 @@ impl FlightScene {
                 )
             }),
             previews,
+            terrain: false,
             hull: Arc::new(physics::ship_collision_hull(&ship)),
             vehicle: state.pilots[player].vehicle.0,
         })
@@ -343,15 +348,15 @@ impl FlightForecastJob {
             frame_angle,
             capsules,
             previews,
+            terrain,
             ..
         } = scene.clone();
-        let CrossingAnchor::Vehicle {
-            position: center,
-            angle,
-            ..
-        } = proposal.plan.anchor
-        else {
-            unreachable!()
+        let (center, angle) = match proposal.plan.anchor {
+            CrossingAnchor::Vehicle {
+                position, angle, ..
+            } if !terrain => (position, angle),
+            CrossingAnchor::GroundGap { .. } if terrain => (Vec2::ZERO, 0.0),
+            _ => unreachable!(),
         };
         let samples = if environment.time_dependent() { 3 } else { 1 };
         let mut job = Self {
@@ -366,6 +371,12 @@ impl FlightForecastJob {
             frame_angle,
             capsules,
             previews,
+            terrain,
+            launch_window: if terrain {
+                30
+            } else {
+                environment::LAUNCH_WINDOW_TICKS
+            },
             vehicle: frame_position + center.rotate_radians(frame_angle),
             angle: angle + frame_angle,
             position: Vec2::ZERO,
@@ -462,7 +473,7 @@ impl FlightForecastJob {
                     self.result = Some(VehicleCrossingForecast {
                         version: 2,
                         measured_tick: self.environment.tick,
-                        launch_until_tick: self.environment.tick + environment::LAUNCH_WINDOW_TICKS,
+                        launch_until_tick: self.environment.tick + self.launch_window,
                         plan: self.proposal.plan,
                         nodes: self.proposal.nodes,
                         flights: [self.estimates[0], self.estimates[1]],
@@ -562,7 +573,7 @@ impl FlightForecastJob {
         if self.samples == 1 {
             0
         } else {
-            self.sample as u64 * environment::LAUNCH_WINDOW_TICKS / (self.samples - 1) as u64
+            self.sample as u64 * self.launch_window / (self.samples - 1) as u64
         }
     }
     fn launch_delay(&self) -> f32 {
@@ -627,7 +638,13 @@ impl PlanningJob for FlightForecastJob {
                     self.frame_position + self.query.rotate_radians(self.frame_angle),
                     rotation_for_direction(self.query) + self.frame_angle,
                 ) {
-                    self.phase = Phase::HullQuery;
+                    // Terrain flights retain the real vehicle in the snapshot.
+                    // Only prospective vehicle flights query a replacement hull.
+                    self.phase = if self.terrain {
+                        Phase::Integrate
+                    } else {
+                        Phase::HullQuery
+                    };
                 } else {
                     self.reject("world_clearance");
                 }

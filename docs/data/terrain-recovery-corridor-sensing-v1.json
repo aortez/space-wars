@@ -1,0 +1,1089 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "7644bfc35c74faebe8db09aa5f718f4fc51d383e",
+    "source_inputs_sha256": "3acd0682cd50aa8f05de6215026921309ec9b7c9be78c64d52afd89e5c33a7a4",
+    "source_input_count": 2405,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791647679.8529353,
+    "exit_code": 0,
+    "seconds": 63.93169379234314,
+    "binary_sha256": "0346b806916afb9705d0e8f1119d39a8428f65e85852f032012154dc833ccfdd"
+  },
+  "raw_directory": "corridor-sensing-20261010",
+  "audit_sha256": "9a6833bd3505a18b6e75576d157c0822e6867a93e0c55288607953b14f05be2b",
+  "source_files_verified": 2405,
+  "case_artifacts_verified": 138,
+  "cases": [
+    {
+      "fork_tick": 8025,
+      "comparison": {
+        "overlap_ticks": 27975,
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": null,
+          "scenario_before_step_fnv64": null
+        },
+        "different_ticks": {}
+      },
+      "arms": {
+        "control": {
+          "start_tick": 8025,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 27975,
+          "rejoin": {
+            "deadline_tick": 8505,
+            "finished_tick": 8506,
+            "origin": {
+              "x": 20.18758201599121,
+              "y": 4.724009037017822
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8025,
+            "target": {
+              "x": 23.333330154418945,
+              "y": 6.149932861328125
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 312,
+          "max_rejoin_displacement": 0.5686405045585857,
+          "native_recovery": {
+            "blocked_attempts": 863,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 27,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 467,
+          "features": {
+            "survey": 859
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "direction_reversals": 24,
+          "last_movement": [
+            8505,
+            1.0
+          ],
+          "standing_clear_supported_stable_ticks": 0,
+          "standing_clear_with_corridors": 0,
+          "first_standing_clear_supported_stable_tick": null,
+          "route_start_distance_range": [
+            3.8534061908721924,
+            4.11052131652832
+          ],
+          "last_attempt_route": {
+            "closest_reachable_distance": null,
+            "destination_nodes": 5,
+            "failure": "no_start_footing",
+            "flights": 0,
+            "jumps": 0,
+            "length": 0.0,
+            "nearest_destination_distance": 0.00012212990259286016,
+            "partial": false,
+            "reachable_nodes": 0,
+            "start_distance": 4.088482856750488,
+            "start_node": 405
+          },
+          "final_attempt_posture": {
+            "balance": "balanced",
+            "crawl": [
+              null,
+              {
+                "direction": 1.0,
+                "position": {
+                  "x": 20.30330467224121,
+                  "y": 4.616903781890869
+                }
+              }
+            ],
+            "crawl_clearance": [
+              0.06781859695911407,
+              0.64000004529953
+            ],
+            "crawl_floor": [
+              null,
+              true
+            ],
+            "get_up_attempts": 0,
+            "get_up_result": "not_requested",
+            "owner": "player_2",
+            "planet": 0,
+            "revision": 16,
+            "stable": true,
+            "standing_clear": false,
+            "tick": 8506,
+            "version": 1
+          },
+          "corridor_sensor_ticks": 0,
+          "first_corridor_sensor_tick": null,
+          "last_corridor_sensor_tick": null,
+          "terrain_revisions": [
+            16
+          ],
+          "endpoint_diagnostics_sha256": "34d753556df2ff418d614dd08c8c7d676c032e1b45f2f80098bd8722197cf9c6"
+        },
+        "candidate": {
+          "start_tick": 8025,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 0,
+          "rejoin": {
+            "deadline_tick": 8505,
+            "finished_tick": 8506,
+            "origin": {
+              "x": 20.18758201599121,
+              "y": 4.724009037017822
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8025,
+            "target": {
+              "x": 23.333330154418945,
+              "y": 6.149932861328125
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 312,
+          "max_rejoin_displacement": 0.5686405045585857,
+          "native_recovery": {
+            "blocked_attempts": 863,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 27,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 467,
+          "features": {
+            "survey": 859
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "direction_reversals": 24,
+          "last_movement": [
+            8505,
+            1.0
+          ],
+          "standing_clear_supported_stable_ticks": 0,
+          "standing_clear_with_corridors": 0,
+          "first_standing_clear_supported_stable_tick": null,
+          "route_start_distance_range": [
+            3.8534061908721924,
+            4.11052131652832
+          ],
+          "last_attempt_route": {
+            "closest_reachable_distance": null,
+            "destination_nodes": 5,
+            "failure": "no_start_footing",
+            "flights": 0,
+            "jumps": 0,
+            "length": 0.0,
+            "nearest_destination_distance": 0.00012212990259286016,
+            "partial": false,
+            "reachable_nodes": 0,
+            "start_distance": 4.088482856750488,
+            "start_node": 405
+          },
+          "final_attempt_posture": {
+            "balance": "balanced",
+            "crawl": [
+              null,
+              {
+                "direction": 1.0,
+                "position": {
+                  "x": 20.30330467224121,
+                  "y": 4.616903781890869
+                }
+              }
+            ],
+            "crawl_clearance": [
+              0.06781859695911407,
+              0.64000004529953
+            ],
+            "crawl_floor": [
+              null,
+              true
+            ],
+            "get_up_attempts": 0,
+            "get_up_result": "not_requested",
+            "owner": "player_2",
+            "planet": 0,
+            "revision": 16,
+            "stable": true,
+            "standing_clear": false,
+            "tick": 8506,
+            "version": 1
+          },
+          "corridor_sensor_ticks": 0,
+          "first_corridor_sensor_tick": null,
+          "last_corridor_sensor_tick": null,
+          "terrain_revisions": [
+            16
+          ],
+          "endpoint_diagnostics_sha256": "34d753556df2ff418d614dd08c8c7d676c032e1b45f2f80098bd8722197cf9c6"
+        }
+      }
+    },
+    {
+      "fork_tick": 8325,
+      "comparison": {
+        "overlap_ticks": 27675,
+        "first_difference": {
+          "actions": 8554,
+          "sites": null,
+          "decision_fnv64": 8530,
+          "scenario_before_step_fnv64": 8555
+        },
+        "different_ticks": {
+          "decision_fnv64": 27451,
+          "actions": 179,
+          "scenario_before_step_fnv64": 27445
+        }
+      },
+      "arms": {
+        "control": {
+          "start_tick": 8325,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 27675,
+          "rejoin": {
+            "deadline_tick": 8805,
+            "finished_tick": 8806,
+            "origin": {
+              "x": 20.301828384399414,
+              "y": 4.60287618637085
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8325,
+            "target": {
+              "x": 23.333393096923828,
+              "y": 6.150030136108398
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 131,
+          "max_rejoin_displacement": 0.8173789243375544,
+          "native_recovery": {
+            "blocked_attempts": 858,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 16,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 462,
+          "features": {
+            "survey": 845
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "direction_reversals": 9,
+          "last_movement": [
+            8560,
+            1.0
+          ],
+          "standing_clear_supported_stable_ticks": 255,
+          "standing_clear_with_corridors": 0,
+          "first_standing_clear_supported_stable_tick": 8530,
+          "route_start_distance_range": [
+            3.8316707611083984,
+            4.112857818603516
+          ],
+          "last_attempt_route": {
+            "closest_reachable_distance": null,
+            "destination_nodes": 5,
+            "failure": "no_start_footing",
+            "flights": 0,
+            "jumps": 0,
+            "length": 0.0,
+            "nearest_destination_distance": 6.218841735972092e-05,
+            "partial": false,
+            "reachable_nodes": 0,
+            "start_distance": 3.8338863849639893,
+            "start_node": 405
+          },
+          "final_attempt_posture": {
+            "balance": "balanced",
+            "crawl": [
+              null,
+              null
+            ],
+            "crawl_clearance": [
+              null,
+              null
+            ],
+            "crawl_floor": [
+              null,
+              null
+            ],
+            "get_up_attempts": 0,
+            "get_up_result": "not_requested",
+            "owner": "player_2",
+            "planet": 0,
+            "revision": 16,
+            "stable": true,
+            "standing_clear": true,
+            "tick": 8806,
+            "version": 1
+          },
+          "corridor_sensor_ticks": 0,
+          "first_corridor_sensor_tick": null,
+          "last_corridor_sensor_tick": null,
+          "terrain_revisions": [
+            16
+          ],
+          "endpoint_diagnostics_sha256": "e5e5a226759dd93ce1b0e5ebfd9d820feb608043f7cedafdb0019ba444807f2c"
+        },
+        "candidate": {
+          "start_tick": 8325,
+          "end_tick": 36000,
+          "match": {
+            "elapsed_seconds": 600.0,
+            "finished_tick": 36000,
+            "outcome": {
+              "winner": "player_1"
+            },
+            "owned_planets": [
+              2,
+              1
+            ],
+            "pilots": [
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              },
+              {
+                "death_tick": null,
+                "health": 100.0,
+                "last_damage": null,
+                "protected_until_tick": 0
+              }
+            ],
+            "reason": "time_limit",
+            "remaining_seconds": 0.0,
+            "time_limit_seconds": 600.0,
+            "version": 2
+          },
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "reference_ticks_verified": 0,
+          "rejoin": {
+            "deadline_tick": 8805,
+            "finished_tick": 8806,
+            "origin": {
+              "x": 20.301828384399414,
+              "y": 4.60287618637085
+            },
+            "planet": 0,
+            "reason": "rebuild ground rejoin exceeded eight seconds or six units",
+            "rejoined_tick": null,
+            "search_since": 8025,
+            "started_tick": 8325,
+            "target": {
+              "x": 23.333393096923828,
+              "y": 6.150030136108398
+            }
+          },
+          "rejoin_trace_ticks": 482,
+          "movement_ticks": 304,
+          "max_rejoin_displacement": 0.8173789243375544,
+          "native_recovery": {
+            "blocked_attempts": 850,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 31,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "audit_samples": 462,
+          "features": {
+            "survey": 837
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          },
+          "direction_reversals": 24,
+          "last_movement": [
+            8804,
+            -1.0
+          ],
+          "standing_clear_supported_stable_ticks": 124,
+          "standing_clear_with_corridors": 121,
+          "first_standing_clear_supported_stable_tick": 8530,
+          "route_start_distance_range": [
+            3.8487823009490967,
+            4.112857818603516
+          ],
+          "last_attempt_route": {
+            "closest_reachable_distance": null,
+            "destination_nodes": 5,
+            "failure": "no_start_footing",
+            "flights": 0,
+            "jumps": 0,
+            "length": 0.0,
+            "nearest_destination_distance": 6.218841735972092e-05,
+            "partial": false,
+            "reachable_nodes": 0,
+            "start_distance": 3.9957327842712402,
+            "start_node": 405
+          },
+          "final_attempt_posture": {
+            "balance": "balanced",
+            "crawl": [
+              null,
+              null
+            ],
+            "crawl_clearance": [
+              null,
+              null
+            ],
+            "crawl_floor": [
+              null,
+              null
+            ],
+            "get_up_attempts": 0,
+            "get_up_result": "not_requested",
+            "owner": "player_2",
+            "planet": 0,
+            "revision": 16,
+            "stable": false,
+            "standing_clear": true,
+            "tick": 8806,
+            "version": 1
+          },
+          "corridor_sensor_ticks": 124,
+          "first_corridor_sensor_tick": 8530,
+          "last_corridor_sensor_tick": 8804,
+          "terrain_revisions": [
+            16
+          ],
+          "endpoint_diagnostics_sha256": "4e3d7cb2bd50689ba3c24683a79b147b5636191cbb9b8ae8e444834045d655cc"
+        }
+      }
+    }
+  ],
+  "validation": [
+    {
+      "name": "library",
+      "command": [
+        "/home/data/workspace/spacewars-handoffs/corridor-sensing-20261010/corridor-sensing-comparison"
+      ],
+      "started_unix": 1791647748.9478142,
+      "exit_code": 0,
+      "seconds": 1.8996574878692627,
+      "tests_passed": 447,
+      "log_sha256": "bba0c65bcc4e8935fbc324ec4ba139fd07eb26268838702d1b4bb473754605f6"
+    },
+    {
+      "name": "native-posture",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::ground_posture::tests"
+      ],
+      "started_unix": 1791647750.847601,
+      "exit_code": 0,
+      "seconds": 0.22570085525512695,
+      "tests_passed": 3,
+      "log_sha256": "3207bec569d1796e0bb1f55b0744369cabd9adb259ef8832953ad2074df2e45d"
+    },
+    {
+      "name": "native-mission",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::mission"
+      ],
+      "started_unix": 1791647751.0734897,
+      "exit_code": 0,
+      "seconds": 0.2898590564727783,
+      "tests_passed": 8,
+      "log_sha256": "a5f5dbea33c80e2d4d34782332006ca95b20162554371de2dc78d34dcf27f7bf"
+    },
+    {
+      "name": "native-combat-observations",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::combat"
+      ],
+      "started_unix": 1791647751.363517,
+      "exit_code": 0,
+      "seconds": 0.23482799530029297,
+      "tests_passed": 7,
+      "log_sha256": "00f9d24373bcc0a3e214d104b36131eb15896062087979941f93c3095074375d"
+    },
+    {
+      "name": "recovery-gameplay",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "spacewars-ai",
+        "--features",
+        "sensor-profile",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--test",
+        "ground_jetpack",
+        "--test",
+        "ground_walk",
+        "--test",
+        "recovery_route_stall",
+        "--test",
+        "surface_combat",
+        "--test",
+        "surface_mission"
+      ],
+      "started_unix": 1791647751.5985308,
+      "exit_code": 0,
+      "seconds": 59.02046513557434,
+      "tests_passed": 117,
+      "log_sha256": "f04209527abef254286fcc84d6483a661ae86d48288568b3cea4b465e4e245f7"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_unix": 1791647810.6191585,
+      "exit_code": 0,
+      "seconds": 5.940890550613403,
+      "tests_passed": 0,
+      "log_sha256": "cb04681f28d2298acbebebe5fdaff3875c56c36cfef0a406a06a94f1aa396946"
+    },
+    {
+      "name": "native-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-deps"
+      ],
+      "started_unix": 1791647816.5602076,
+      "exit_code": 0,
+      "seconds": 3.688765048980713,
+      "tests_passed": 0,
+      "log_sha256": "2c1c41212e86b8346624153cdc7b398c58c8838fe753b7c84be8fdbb316c9c42"
+    },
+    {
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "started_unix": 1791647820.24912,
+      "exit_code": 0,
+      "seconds": 1.442272663116455,
+      "tests_passed": 0,
+      "log_sha256": "f0405c5349b84a3ec8c72c888f44cf7d65fe0f5fd6a618e9af9d2ac6020fc6f5"
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_unix": 1791647821.6915832,
+      "exit_code": 0,
+      "seconds": 1.8701374530792236,
+      "tests_passed": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "tests_passed": 582,
+  "reference_provenance": {
+    "source_commit": "8f4f554ddb040bbf5170d98adc2c5e1b9b8f466f",
+    "results_commit": "eddda3721b9aa33510cd0f6bc8e8627394354e21",
+    "files": {
+      "8325/actions.jsonl": "51d06e0f35c70277bc55074008ba3345c3786c9c4ff4edbf1ef5a8b537b95d12",
+      "angular-footing/actions.jsonl": "7f9ad5d9eb2f000f30bb7101485c6c3b2400508ce4c74f76d121ed3b233350d4",
+      "8025/actions.jsonl": "5e4635d5dda5f74dcd96ef75e598a6286b24ffa5b0166e3e320459042c2db3bb"
+    }
+  },
+  "validation_sha256": "f0f7c46c053e8477bdb58d637e789b0b67ceb3aab4f82ceadd7cd6e058b09ba8",
+  "reference_ticks_verified": 72000,
+  "continuation_action_ticks": 111300,
+  "material_audit_samples": 1858,
+  "direction_analysis_sha256": "71b5951d47b5a26d77c7ce148b139d768e2b46a8d223c73204dcc8f0e42201c9",
+  "direction_analysis": {
+    "cases": [
+      {
+        "fork_tick": 8025,
+        "arms": {
+          "control": {
+            "trace_sha256": "ab476b02429b92e2f07da0c29b1e532414f09ad0f0455645d86e26890bca9224",
+            "both_directions_open_ticks": 151,
+            "selected_farther_endpoint_ticks": 67,
+            "first_farther_endpoint": [
+              {
+                "tick": 8037,
+                "selected": -1.0,
+                "target": {
+                  "x": 23.333330154418945,
+                  "y": 6.149932861328125
+                },
+                "corridors": [
+                  {
+                    "direction": -1.0,
+                    "endpoint": {
+                      "x": 19.850635528564453,
+                      "y": 5.059162139892578
+                    },
+                    "distance_to_target": 3.6495126556427757
+                  },
+                  {
+                    "direction": 1.0,
+                    "endpoint": {
+                      "x": 20.321054458618164,
+                      "y": 4.588921546936035
+                    },
+                    "distance_to_target": 3.3927217969017445
+                  }
+                ]
+              }
+            ],
+            "movement_without_matching_fresh_corridor_ticks": [
+              8043,
+              8349,
+              8425,
+              8469
+            ],
+            "fresh_floor_false_in_selected_direction_ticks": [
+              8043,
+              8349
+            ]
+          },
+          "candidate": {
+            "trace_sha256": "ab476b02429b92e2f07da0c29b1e532414f09ad0f0455645d86e26890bca9224",
+            "both_directions_open_ticks": 151,
+            "selected_farther_endpoint_ticks": 67,
+            "first_farther_endpoint": [
+              {
+                "tick": 8037,
+                "selected": -1.0,
+                "target": {
+                  "x": 23.333330154418945,
+                  "y": 6.149932861328125
+                },
+                "corridors": [
+                  {
+                    "direction": -1.0,
+                    "endpoint": {
+                      "x": 19.850635528564453,
+                      "y": 5.059162139892578
+                    },
+                    "distance_to_target": 3.6495126556427757
+                  },
+                  {
+                    "direction": 1.0,
+                    "endpoint": {
+                      "x": 20.321054458618164,
+                      "y": 4.588921546936035
+                    },
+                    "distance_to_target": 3.3927217969017445
+                  }
+                ]
+              }
+            ],
+            "movement_without_matching_fresh_corridor_ticks": [
+              8043,
+              8349,
+              8425,
+              8469
+            ],
+            "fresh_floor_false_in_selected_direction_ticks": [
+              8043,
+              8349
+            ]
+          }
+        }
+      },
+      {
+        "fork_tick": 8325,
+        "arms": {
+          "control": {
+            "trace_sha256": "f98804d7890e2174895bc9c682b1342d5a9607dc349d1f8dfcbc6a5844bc5192",
+            "both_directions_open_ticks": 54,
+            "selected_farther_endpoint_ticks": 21,
+            "first_farther_endpoint": [
+              {
+                "tick": 8329,
+                "selected": -1.0,
+                "target": {
+                  "x": 23.333393096923828,
+                  "y": 6.150030136108398
+                },
+                "corridors": [
+                  {
+                    "direction": -1.0,
+                    "endpoint": {
+                      "x": 19.85310173034668,
+                      "y": 5.051573276519775
+                    },
+                    "distance_to_target": 3.649525375805563
+                  },
+                  {
+                    "direction": 1.0,
+                    "endpoint": {
+                      "x": 20.323495864868164,
+                      "y": 4.5813188552856445
+                    },
+                    "distance_to_target": 3.394162110170478
+                  }
+                ]
+              }
+            ],
+            "movement_without_matching_fresh_corridor_ticks": [
+              8415,
+              8530,
+              8534,
+              8549,
+              8551,
+              8552,
+              8554,
+              8555,
+              8557,
+              8559,
+              8560
+            ],
+            "fresh_floor_false_in_selected_direction_ticks": []
+          },
+          "candidate": {
+            "trace_sha256": "0fa7098cbc7b3b4caed1f70359eb0341d1cc62c35e916a2a30c731bc1ff01a5e",
+            "both_directions_open_ticks": 156,
+            "selected_farther_endpoint_ticks": 73,
+            "first_farther_endpoint": [
+              {
+                "tick": 8329,
+                "selected": -1.0,
+                "target": {
+                  "x": 23.333393096923828,
+                  "y": 6.150030136108398
+                },
+                "corridors": [
+                  {
+                    "direction": -1.0,
+                    "endpoint": {
+                      "x": 19.85310173034668,
+                      "y": 5.051573276519775
+                    },
+                    "distance_to_target": 3.649525375805563
+                  },
+                  {
+                    "direction": 1.0,
+                    "endpoint": {
+                      "x": 20.323495864868164,
+                      "y": 4.5813188552856445
+                    },
+                    "distance_to_target": 3.394162110170478
+                  }
+                ]
+              }
+            ],
+            "movement_without_matching_fresh_corridor_ticks": [
+              8415,
+              8530,
+              8577,
+              8724
+            ],
+            "fresh_floor_false_in_selected_direction_ticks": [
+              8530,
+              8577,
+              8724
+            ]
+          }
+        }
+      }
+    ],
+    "scope": "Read-only trace inspection. Endpoint distance is not route reachability or native recovery. A fresh longer corridor can fail a floor probe while a shorter previously retained step remains eligible; this count alone does not establish an unsafe control.",
+    "source_rule": "GroundRejoin first prefers the previous direction among fresh corridors, then the closest endpoint, then a retained step with a less-than-15-tick, same-revision spatial bound."
+  },
+  "followup_validation": [
+    {
+      "source_commit": "60c59614e64e404243d7fb697b3c241ae8ecf7ae",
+      "name": "native-posture",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--release",
+        "-p",
+        "scenario-spacewars",
+        "--features",
+        "sensor-profile",
+        "--lib",
+        "surface_sortie::ground_posture::tests"
+      ],
+      "started_unix": 1791647899.8779025,
+      "exit_code": 0,
+      "seconds": 65.65254950523376
+    },
+    {
+      "source_commit": "60c59614e64e404243d7fb697b3c241ae8ecf7ae",
+      "name": "native-clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "--no-deps"
+      ],
+      "started_unix": 1791647965.5306273,
+      "exit_code": 0,
+      "seconds": 2.241175889968872
+    },
+    {
+      "source_commit": "60c59614e64e404243d7fb697b3c241ae8ecf7ae",
+      "name": "default-check",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "started_unix": 1791647967.771945,
+      "exit_code": 0,
+      "seconds": 1.0036044120788574
+    },
+    {
+      "source_commit": "60c59614e64e404243d7fb697b3c241ae8ecf7ae",
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_unix": 1791647968.7756937,
+      "exit_code": 0,
+      "seconds": 1.8521063327789307
+    }
+  ],
+  "followup_validation_sha256": "375c50dc46cf8079b73f80e8ff2670d479b206a46f47846656fae5e0174e19c0",
+  "post_freeze_change": "60c59614e64e404243d7fb697b3c241ae8ecf7ae replaces !Option::is_some_and(revision == current) with equivalent Option::is_none_or(revision != current), resolving one new native Clippy warning. No simulation replay is repeated; native posture tests, native Clippy, default-feature check and formatting are rechecked. Frozen runtime and all original receipts are retained.",
+  "inspection_sha256": "70740f597c8d153ac1e20ee5152c6d76f8546f7cf74304463ac386d2317f379d"
+}

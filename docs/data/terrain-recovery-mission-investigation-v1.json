@@ -1,0 +1,953 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "8e7b014b79080370492833057475783fec3ff0bc",
+    "source_inputs_sha256": "d6f1d47a9d836513cfdf6e5378a2810e5244fbcfdf7d31afbbe6d95b78fec2f5",
+    "source_input_count": 2393,
+    "command": [
+      "cargo",
+      "+1.89.0",
+      "test",
+      "--locked",
+      "--release",
+      "-p",
+      "spacewars-ai",
+      "--lib",
+      "--features",
+      "sensor-profile",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "env": {
+      "CARGO_TARGET_DIR": "/home/data/workspace/space-wars3/target",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791620612.069237,
+    "exit_code": 0,
+    "seconds": 75.46859169006348,
+    "binary_sha256": "b4d0aa608f6bd94992237ced5f0e62d9f528518cd02490b6bb5a83c2bea4c37a"
+  },
+  "audit_sha256": "1d082a936f2e5b39003bc8a9aa8d0408cf2e2c8de514e3b036c5607124ff113f",
+  "source_files_verified": 2393,
+  "case_artifacts_verified": 181,
+  "control_prefix_ticks": 62476,
+  "control_continuation_ticks": 45524,
+  "continuation_action_ticks": 91048,
+  "material_audit_samples": 1520,
+  "validation_sha256": "12b54754dc7e6f6f8830451a44ba48badd6a9463dc19a65382c9d6bb5df88edc",
+  "limitations": [
+    "No fresh arm completed another recovery; this does not prove physical impossibility.",
+    "Unscheduled diagnostic maps never enter controller observations.",
+    "Cost pairs use fixed recorded inputs, not reactive gameplay; all repetitions are retained.",
+    "Cost is instrumented desktop native stepping, excluding rendering; no Pi qualification.",
+    "Production policy, defaults, deployment and GitHub remain unchanged.",
+    "Final published terrain source and previous heavy-Angular late rebuild remain integration gates."
+  ],
+  "inspection_sha256": "629470bd945f1a758f9c45fa2e56831f83cce627cd0526dc9a06ef5e3ff06e9a",
+  "raw_directory": "mission-recovery-investigation-20261010",
+  "tests_passed": 570,
+  "validation": [
+    {
+      "name": "library",
+      "exit_code": 0,
+      "tests_passed": 438,
+      "log_sha256": "d19a4976f8b5b4457df04bb557b982d132655db955df987f7e623d55e2a794c6"
+    },
+    {
+      "name": "native-mission",
+      "exit_code": 0,
+      "tests_passed": 8,
+      "log_sha256": "9682b4d426e5f5403238ff632a6a1eddfe913c705be93fbeab4ae943cbfa8de1"
+    },
+    {
+      "name": "native-combat-observations",
+      "exit_code": 0,
+      "tests_passed": 7,
+      "log_sha256": "cb4b96951b23af1607a65c427ac0813eec51873f184f2ed7e8266f7b85bda7e8"
+    },
+    {
+      "name": "recovery-gameplay",
+      "exit_code": 0,
+      "tests_passed": 117,
+      "log_sha256": "eafa3a4ca7054739d8ba8c3ef766268c1217ec24818734033cb53c307db9163e"
+    },
+    {
+      "name": "clippy",
+      "exit_code": 0,
+      "tests_passed": 0,
+      "log_sha256": "24d001e640583efd5565e8850fe7552c0063ffcbad45d57751e94d6038504dc5"
+    },
+    {
+      "name": "native-clippy",
+      "exit_code": 0,
+      "tests_passed": 0,
+      "log_sha256": "8ecd26ef6cb044ef8f40b9bc1a404466224285ed2e666fe27a562d67547ec6e3"
+    },
+    {
+      "name": "default-check",
+      "exit_code": 0,
+      "tests_passed": 0,
+      "log_sha256": "661522c297cc4c206fcc39f0f9f9b57d1631449a137d192cac9e7c1bef9c9991"
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "tests_passed": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "cases": [
+    {
+      "name": "round-hatch",
+      "fork_tick": 26229,
+      "comparison": {
+        "lengths": [
+          9771,
+          9771
+        ],
+        "different_ticks": {
+          "decision_fnv64": 9771,
+          "actions": 6922,
+          "scenario_before_step_fnv64": 9763,
+          "sites": 5497
+        },
+        "first_difference": {
+          "actions": 26235,
+          "sites": 30501,
+          "decision_fnv64": 26229,
+          "scenario_before_step_fnv64": 26237
+        }
+      },
+      "arms": {
+        "control": {
+          "end_tick": 36000,
+          "remaining_seconds": 162.85,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 26229,
+          "subject_final_reason": "spaceling stopped making progress on ground route",
+          "subject_native": {
+            "blocked_attempts": 0,
+            "planet": null,
+            "pod_ejections": 2,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 2,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 2,
+            "status": "ship_available"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        },
+        "fresh": {
+          "end_tick": 36000,
+          "remaining_seconds": 162.85,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 27528,
+          "subject_final_reason": "spaceling stopped making progress on ground route",
+          "subject_native": {
+            "blocked_attempts": 0,
+            "planet": null,
+            "pod_ejections": 2,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 2,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 2,
+            "status": "ship_available"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "angular-footing",
+      "fork_tick": 8327,
+      "comparison": {
+        "lengths": [
+          27673,
+          27673
+        ],
+        "different_ticks": {
+          "decision_fnv64": 27673
+        },
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 8327,
+          "scenario_before_step_fnv64": null
+        }
+      },
+      "arms": {
+        "control": {
+          "end_tick": 36000,
+          "remaining_seconds": 461.21666666666664,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 8327,
+          "subject_final_reason": "no reachable standing site with hatch access",
+          "subject_native": {
+            "blocked_attempts": 882,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 5,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        },
+        "fresh": {
+          "end_tick": 36000,
+          "remaining_seconds": 461.21666666666664,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 8628,
+          "subject_final_reason": "no reachable standing site with hatch access",
+          "subject_native": {
+            "blocked_attempts": 882,
+            "planet": 0,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 5,
+            "rebuild_progress": 1.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 1,
+            "status": "hatch_blocked"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "angular-replacement",
+      "fork_tick": 27920,
+      "comparison": {
+        "lengths": [
+          8080,
+          8080
+        ],
+        "different_ticks": {
+          "decision_fnv64": 8080
+        },
+        "first_difference": {
+          "actions": null,
+          "sites": null,
+          "decision_fnv64": 27920,
+          "scenario_before_step_fnv64": null
+        }
+      },
+      "arms": {
+        "control": {
+          "end_tick": 36000,
+          "remaining_seconds": 134.66666666666666,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 27920,
+          "subject_final_reason": "unreachable ship replacement could not start or finish",
+          "subject_native": {
+            "blocked_attempts": 0,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        },
+        "fresh": {
+          "end_tick": 36000,
+          "remaining_seconds": 134.66666666666666,
+          "new_completed_recoveries": [
+            0,
+            0
+          ],
+          "subject_first_block": 29722,
+          "subject_final_reason": "unreachable ship replacement could not start or finish",
+          "subject_native": {
+            "blocked_attempts": 0,
+            "planet": null,
+            "pod_ejections": 0,
+            "rebuild_interruptions": 0,
+            "rebuild_progress": 0.0,
+            "rebuild_required_seconds": 8.0,
+            "rebuilds": 0,
+            "scuttle_progress": 0.0,
+            "scuttle_required_seconds": 3.0,
+            "ships_lost": 0,
+            "status": "ship_available"
+          },
+          "max_host_work": {
+            "graph": 4,
+            "physics_queries": 0
+          }
+        }
+      }
+    }
+  ],
+  "paired_native_cost": [
+    {
+      "refinement": false,
+      "ticks": 2400,
+      "replicates": [
+        {
+          "repeat": 0,
+          "refinement": false,
+          "inclusive": {
+            "native_recovery_update": 35.930388999999934,
+            "find_rebuild_placement": 20.257582,
+            "ground_avoiding": 19.674034,
+            "ground_avoiding_edges": 18.567166,
+            "ground_avoiding_nodes": 1.079991,
+            "ground_edges": 13.749068000000001,
+            "ground_nodes": 1.7249819999999998,
+            "ground_route": 0.103208,
+            "ground_route_index": 0.04062700000000001,
+            "native_rebuild_attempt": 35.780513000000006,
+            "survey_ground_with_gravity": 15.494406999999999
+          },
+          "exclusive": {
+            "native_recovery_update": 0.14987600000000018,
+            "find_rebuild_placement": 0.43971299999999996,
+            "ground_avoiding": 0.026877,
+            "ground_avoiding_edges": 18.567166,
+            "ground_avoiding_nodes": 1.079991,
+            "ground_edges": 13.749068000000001,
+            "ground_nodes": 1.7249819999999998,
+            "ground_route": 0.103208,
+            "ground_route_index": 0.04062700000000001,
+            "native_rebuild_attempt": 0.028524,
+            "survey_ground_with_gravity": 0.020357000000000004
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 20,
+            "ground_avoiding": 40,
+            "ground_avoiding_edges": 40,
+            "ground_avoiding_nodes": 40,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 40,
+            "ground_route_index": 40,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 71514,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 15892,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 80
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.14930350166666664,
+            "p50_ms": 0.079952,
+            "p95_ms": 0.198426,
+            "p99_ms": 1.794882,
+            "max_ms": 3.570497
+          }
+        },
+        {
+          "repeat": 1,
+          "refinement": false,
+          "inclusive": {
+            "native_recovery_update": 34.12842700000014,
+            "find_rebuild_placement": 19.704105000000002,
+            "ground_avoiding": 19.279707000000005,
+            "ground_avoiding_edges": 18.20944,
+            "ground_avoiding_nodes": 1.0552380000000001,
+            "ground_edges": 12.673720000000001,
+            "ground_nodes": 1.6197119999999998,
+            "ground_route": 0.09765600000000003,
+            "ground_route_index": 0.027712000000000004,
+            "native_rebuild_attempt": 34.01868600000001,
+            "survey_ground_with_gravity": 14.301235
+          },
+          "exclusive": {
+            "native_recovery_update": 0.10974099999999998,
+            "find_rebuild_placement": 0.29903,
+            "ground_avoiding": 0.015028999999999999,
+            "ground_avoiding_edges": 18.20944,
+            "ground_avoiding_nodes": 1.0552380000000001,
+            "ground_edges": 12.673720000000001,
+            "ground_nodes": 1.6197119999999998,
+            "ground_route": 0.09765600000000003,
+            "ground_route_index": 0.027712000000000004,
+            "native_rebuild_attempt": 0.013346,
+            "survey_ground_with_gravity": 0.007803
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 20,
+            "ground_avoiding": 40,
+            "ground_avoiding_edges": 40,
+            "ground_avoiding_nodes": 40,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 40,
+            "ground_route_index": 40,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 71514,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 15892,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 80
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.13192678333333333,
+            "p50_ms": 0.071615,
+            "p95_ms": 0.102494,
+            "p99_ms": 1.809169,
+            "max_ms": 1.902426
+          }
+        },
+        {
+          "repeat": 2,
+          "refinement": false,
+          "inclusive": {
+            "native_recovery_update": 34.27614099999994,
+            "find_rebuild_placement": 19.693696,
+            "ground_avoiding": 19.089235000000002,
+            "ground_avoiding_edges": 18.000484,
+            "ground_avoiding_nodes": 1.0602209999999999,
+            "ground_edges": 12.615610000000002,
+            "ground_nodes": 1.7461109999999997,
+            "ground_route": 0.102234,
+            "ground_route_index": 0.040967,
+            "native_rebuild_attempt": 34.105025999999995,
+            "survey_ground_with_gravity": 14.381136
+          },
+          "exclusive": {
+            "native_recovery_update": 0.1711149999999999,
+            "find_rebuild_placement": 0.46126,
+            "ground_avoiding": 0.028530000000000003,
+            "ground_avoiding_edges": 18.000484,
+            "ground_avoiding_nodes": 1.0602209999999999,
+            "ground_edges": 12.615610000000002,
+            "ground_nodes": 1.7461109999999997,
+            "ground_route": 0.102234,
+            "ground_route_index": 0.040967,
+            "native_rebuild_attempt": 0.03019400000000001,
+            "survey_ground_with_gravity": 0.019415
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 20,
+            "ground_avoiding": 40,
+            "ground_avoiding_edges": 40,
+            "ground_avoiding_nodes": 40,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 40,
+            "ground_route_index": 40,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 71514,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 15892,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 80
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.14977600666666668,
+            "p50_ms": 0.086023,
+            "p95_ms": 0.14832199999999998,
+            "p99_ms": 1.8014839999999999,
+            "max_ms": 1.826181
+          }
+        },
+        {
+          "repeat": 3,
+          "refinement": false,
+          "inclusive": {
+            "native_recovery_update": 33.88402700000012,
+            "find_rebuild_placement": 19.592250999999997,
+            "ground_avoiding": 19.154498,
+            "ground_avoiding_edges": 18.093769000000005,
+            "ground_avoiding_nodes": 1.044549,
+            "ground_edges": 12.533251999999997,
+            "ground_nodes": 1.6305000000000003,
+            "ground_route": 0.097845,
+            "ground_route_index": 0.030377000000000005,
+            "native_rebuild_attempt": 33.777025,
+            "survey_ground_with_gravity": 14.172243000000002
+          },
+          "exclusive": {
+            "native_recovery_update": 0.10700199999999965,
+            "find_rebuild_placement": 0.309531,
+            "ground_avoiding": 0.01618,
+            "ground_avoiding_edges": 18.093769000000005,
+            "ground_avoiding_nodes": 1.044549,
+            "ground_edges": 12.533251999999997,
+            "ground_nodes": 1.6305000000000003,
+            "ground_route": 0.097845,
+            "ground_route_index": 0.030377000000000005,
+            "native_rebuild_attempt": 0.012531,
+            "survey_ground_with_gravity": 0.008491
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 20,
+            "ground_avoiding": 40,
+            "ground_avoiding_edges": 40,
+            "ground_avoiding_nodes": 40,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 40,
+            "ground_route_index": 40,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 71514,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 15892,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 80
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.13421825166666668,
+            "p50_ms": 0.07375999999999999,
+            "p95_ms": 0.11076,
+            "p99_ms": 1.810481,
+            "max_ms": 1.907635
+          }
+        }
+      ],
+      "mean_step_ms": 0.14130613583333335,
+      "calls": {
+        "native_recovery_update": 2400,
+        "find_rebuild_placement": 80,
+        "ground_avoiding": 160,
+        "ground_avoiding_edges": 160,
+        "ground_avoiding_nodes": 160,
+        "ground_edges": 80,
+        "ground_nodes": 80,
+        "ground_route": 160,
+        "ground_route_index": 160,
+        "native_rebuild_attempt": 80,
+        "survey_ground_with_gravity": 80
+      },
+      "counters": {
+        "ground_avoiding_edge_samples": 286056,
+        "ground_edge_candidate_pairs": 18720,
+        "ground_edge_capsule_samples": 168480,
+        "ground_edge_floor_samples": 48960,
+        "ground_edge_jump_paths": 2400,
+        "ground_edge_walk_paths": 16320,
+        "ground_route_index_scanned_edges": 63568,
+        "ground_route_scanned_edges": 0,
+        "ground_route_visited_nodes": 0,
+        "rebuild_placement_offset_checks": 320
+      },
+      "inclusive_ms": {
+        "native_recovery_update": 138.21898400000012,
+        "find_rebuild_placement": 79.247634,
+        "ground_avoiding": 77.19747400000001,
+        "ground_avoiding_edges": 72.87085900000001,
+        "ground_avoiding_nodes": 4.239998999999999,
+        "ground_edges": 51.571650000000005,
+        "ground_nodes": 6.721305,
+        "ground_route": 0.40094300000000005,
+        "ground_route_index": 0.13968300000000003,
+        "native_rebuild_attempt": 137.68125,
+        "survey_ground_with_gravity": 58.349021
+      },
+      "exclusive_ms": {
+        "native_recovery_update": 0.5377339999999997,
+        "find_rebuild_placement": 1.509534,
+        "ground_avoiding": 0.086616,
+        "ground_avoiding_edges": 72.87085900000001,
+        "ground_avoiding_nodes": 4.239998999999999,
+        "ground_edges": 51.571650000000005,
+        "ground_nodes": 6.721305,
+        "ground_route": 0.40094300000000005,
+        "ground_route_index": 0.13968300000000003,
+        "native_rebuild_attempt": 0.08459500000000002,
+        "survey_ground_with_gravity": 0.056066000000000005
+      },
+      "placement_ms_per_attempt": 0.9905954250000001
+    },
+    {
+      "refinement": true,
+      "ticks": 2400,
+      "replicates": [
+        {
+          "repeat": 0,
+          "refinement": true,
+          "inclusive": {
+            "native_recovery_update": 141.52987299999998,
+            "find_rebuild_placement": 126.77572999999998,
+            "ground_avoiding": 124.275638,
+            "ground_avoiding_edges": 117.475276,
+            "ground_avoiding_nodes": 6.733395000000001,
+            "ground_edges": 12.985141000000002,
+            "ground_nodes": 1.6283949999999998,
+            "ground_route": 0.614956,
+            "ground_route_index": 0.161171,
+            "native_rebuild_attempt": 141.419161,
+            "survey_ground_with_gravity": 14.621151000000001
+          },
+          "exclusive": {
+            "native_recovery_update": 0.1107119999999996,
+            "find_rebuild_placement": 1.7239650000000002,
+            "ground_avoiding": 0.066967,
+            "ground_avoiding_edges": 117.475276,
+            "ground_avoiding_nodes": 6.733395000000001,
+            "ground_edges": 12.985141000000002,
+            "ground_nodes": 1.6283949999999998,
+            "ground_route": 0.614956,
+            "ground_route_index": 0.161171,
+            "native_rebuild_attempt": 0.022279999999999998,
+            "survey_ground_with_gravity": 0.0076149999999999985
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 40,
+            "ground_avoiding": 260,
+            "ground_avoiding_edges": 260,
+            "ground_avoiding_nodes": 260,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 260,
+            "ground_route_index": 260,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 453042,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 100676,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 520
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.31388435000000003,
+            "p50_ms": 0.070794,
+            "p95_ms": 0.162658,
+            "p99_ms": 6.952928,
+            "max_ms": 10.546989
+          }
+        },
+        {
+          "repeat": 1,
+          "refinement": true,
+          "inclusive": {
+            "native_recovery_update": 138.99028200000018,
+            "find_rebuild_placement": 124.335421,
+            "ground_avoiding": 121.776589,
+            "ground_avoiding_edges": 115.05693799999999,
+            "ground_avoiding_nodes": 6.643383,
+            "ground_edges": 12.704709,
+            "ground_nodes": 1.7531429999999997,
+            "ground_route": 0.6156090000000001,
+            "ground_route_index": 0.162535,
+            "native_rebuild_attempt": 138.850978,
+            "survey_ground_with_gravity": 14.47842
+          },
+          "exclusive": {
+            "native_recovery_update": 0.13930400000000007,
+            "find_rebuild_placement": 1.780688,
+            "ground_avoiding": 0.07626799999999999,
+            "ground_avoiding_edges": 115.05693799999999,
+            "ground_avoiding_nodes": 6.643383,
+            "ground_edges": 12.704709,
+            "ground_nodes": 1.7531429999999997,
+            "ground_route": 0.6156090000000001,
+            "ground_route_index": 0.162535,
+            "native_rebuild_attempt": 0.037136999999999996,
+            "survey_ground_with_gravity": 0.020568
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 40,
+            "ground_avoiding": 260,
+            "ground_avoiding_edges": 260,
+            "ground_avoiding_nodes": 260,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 260,
+            "ground_route_index": 260,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 453042,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 100676,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 520
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.31685950166666665,
+            "p50_ms": 0.08169499999999999,
+            "p95_ms": 0.129305,
+            "p99_ms": 7.0549610000000005,
+            "max_ms": 7.352194
+          }
+        },
+        {
+          "repeat": 2,
+          "refinement": true,
+          "inclusive": {
+            "native_recovery_update": 139.0612159999999,
+            "find_rebuild_placement": 124.683568,
+            "ground_avoiding": 122.208251,
+            "ground_avoiding_edges": 115.45031,
+            "ground_avoiding_nodes": 6.689209000000001,
+            "ground_edges": 12.643597999999999,
+            "ground_nodes": 1.6001770000000004,
+            "ground_route": 0.612167,
+            "ground_route_index": 0.161752,
+            "native_rebuild_attempt": 138.955013,
+            "survey_ground_with_gravity": 14.251497
+          },
+          "exclusive": {
+            "native_recovery_update": 0.10620299999999959,
+            "find_rebuild_placement": 1.7013980000000002,
+            "ground_avoiding": 0.068732,
+            "ground_avoiding_edges": 115.45031,
+            "ground_avoiding_nodes": 6.689209000000001,
+            "ground_edges": 12.643597999999999,
+            "ground_nodes": 1.6001770000000004,
+            "ground_route": 0.612167,
+            "ground_route_index": 0.161752,
+            "native_rebuild_attempt": 0.019948,
+            "survey_ground_with_gravity": 0.0077220000000000006
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 40,
+            "ground_avoiding": 260,
+            "ground_avoiding_edges": 260,
+            "ground_avoiding_nodes": 260,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 260,
+            "ground_route_index": 260,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 453042,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 100676,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 520
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.3092195566666667,
+            "p50_ms": 0.076545,
+            "p95_ms": 0.115289,
+            "p99_ms": 7.014414,
+            "max_ms": 7.475708
+          }
+        },
+        {
+          "repeat": 3,
+          "refinement": true,
+          "inclusive": {
+            "native_recovery_update": 140.1665550000002,
+            "find_rebuild_placement": 125.586472,
+            "ground_avoiding": 122.916156,
+            "ground_avoiding_edges": 116.14921200000002,
+            "ground_avoiding_nodes": 6.683713999999999,
+            "ground_edges": 12.614393000000003,
+            "ground_nodes": 1.7488539999999997,
+            "ground_route": 0.621103,
+            "ground_route_index": 0.175653,
+            "native_rebuild_attempt": 140.012103,
+            "survey_ground_with_gravity": 14.385444999999999
+          },
+          "exclusive": {
+            "native_recovery_update": 0.15445200000000003,
+            "find_rebuild_placement": 1.8735600000000001,
+            "ground_avoiding": 0.08323,
+            "ground_avoiding_edges": 116.14921200000002,
+            "ground_avoiding_nodes": 6.683713999999999,
+            "ground_edges": 12.614393000000003,
+            "ground_nodes": 1.7488539999999997,
+            "ground_route": 0.621103,
+            "ground_route_index": 0.175653,
+            "native_rebuild_attempt": 0.04018599999999999,
+            "survey_ground_with_gravity": 0.022197999999999996
+          },
+          "calls": {
+            "native_recovery_update": 600,
+            "find_rebuild_placement": 40,
+            "ground_avoiding": 260,
+            "ground_avoiding_edges": 260,
+            "ground_avoiding_nodes": 260,
+            "ground_edges": 20,
+            "ground_nodes": 20,
+            "ground_route": 260,
+            "ground_route_index": 260,
+            "native_rebuild_attempt": 20,
+            "survey_ground_with_gravity": 20
+          },
+          "counters": {
+            "ground_avoiding_edge_samples": 453042,
+            "ground_edge_candidate_pairs": 4680,
+            "ground_edge_capsule_samples": 42120,
+            "ground_edge_floor_samples": 12240,
+            "ground_edge_jump_paths": 600,
+            "ground_edge_walk_paths": 4080,
+            "ground_route_index_scanned_edges": 100676,
+            "ground_route_scanned_edges": 0,
+            "ground_route_visited_nodes": 0,
+            "rebuild_placement_offset_checks": 520
+          },
+          "timing": {
+            "count": 600,
+            "mean_ms": 0.32465452333333333,
+            "p50_ms": 0.085212,
+            "p95_ms": 0.146718,
+            "p99_ms": 7.157465,
+            "max_ms": 7.764956
+          }
+        }
+      ],
+      "mean_step_ms": 0.3161544829166667,
+      "calls": {
+        "native_recovery_update": 2400,
+        "find_rebuild_placement": 160,
+        "ground_avoiding": 1040,
+        "ground_avoiding_edges": 1040,
+        "ground_avoiding_nodes": 1040,
+        "ground_edges": 80,
+        "ground_nodes": 80,
+        "ground_route": 1040,
+        "ground_route_index": 1040,
+        "native_rebuild_attempt": 80,
+        "survey_ground_with_gravity": 80
+      },
+      "counters": {
+        "ground_avoiding_edge_samples": 1812168,
+        "ground_edge_candidate_pairs": 18720,
+        "ground_edge_capsule_samples": 168480,
+        "ground_edge_floor_samples": 48960,
+        "ground_edge_jump_paths": 2400,
+        "ground_edge_walk_paths": 16320,
+        "ground_route_index_scanned_edges": 402704,
+        "ground_route_scanned_edges": 0,
+        "ground_route_visited_nodes": 0,
+        "rebuild_placement_offset_checks": 2080
+      },
+      "inclusive_ms": {
+        "native_recovery_update": 559.7479260000002,
+        "find_rebuild_placement": 501.381191,
+        "ground_avoiding": 491.17663400000004,
+        "ground_avoiding_edges": 464.13173600000005,
+        "ground_avoiding_nodes": 26.749701,
+        "ground_edges": 50.947841,
+        "ground_nodes": 6.730568999999999,
+        "ground_route": 2.4638349999999996,
+        "ground_route_index": 0.661111,
+        "native_rebuild_attempt": 559.237255,
+        "survey_ground_with_gravity": 57.736512999999995
+      },
+      "exclusive_ms": {
+        "native_recovery_update": 0.5106709999999993,
+        "find_rebuild_placement": 7.079611000000001,
+        "ground_avoiding": 0.29519700000000004,
+        "ground_avoiding_edges": 464.13173600000005,
+        "ground_avoiding_nodes": 26.749701,
+        "ground_edges": 50.947841,
+        "ground_nodes": 6.730568999999999,
+        "ground_route": 2.4638349999999996,
+        "ground_route_index": 0.661111,
+        "native_rebuild_attempt": 0.11955099999999999,
+        "survey_ground_with_gravity": 0.058102999999999995
+      },
+      "placement_ms_per_attempt": 6.2672648875
+    }
+  ]
+}

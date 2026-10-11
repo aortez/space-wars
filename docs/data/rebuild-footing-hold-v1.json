@@ -1,0 +1,1925 @@
+{
+  "schema": 1,
+  "profile": "retained_rebuild_footing_hold_v1",
+  "complete": true,
+  "screen": {
+    "control_retained": true,
+    "isolated_recovery_complete": {
+      "hold_walk": false,
+      "hold_handoff": false
+    },
+    "decision": "not_qualified",
+    "scored_match": false,
+    "default_promotion": false
+  },
+  "runtime_source_commit": "ee2285000fe950f62245a37d228d40b3a3eb517b",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/rebuild-footing-hold/v1/surface_mission_soak",
+    "sha256": "2e15fc40a53528bd9ae4b943fb3b4b3b70bfb030c93ab815d32efd6b7bb1864f"
+  },
+  "frozen_inputs": 975,
+  "prefixes": 4,
+  "continuations": 8,
+  "fresh_games": 0,
+  "simulation_retries": 0,
+  "audit_resumes": 0,
+  "retained_control_files": {
+    "control_walk": 24,
+    "control_handoff": 24
+  },
+  "prefix": {
+    "verified": true,
+    "rows": 23768,
+    "task_steps": 6948,
+    "audit_samples": 396,
+    "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90"
+  },
+  "bounds": {
+    "coarse_candidates": 8,
+    "refined_candidates": 8,
+    "offset_checks": 240,
+    "extra_offsets": 22,
+    "neighborhood_radius": 2,
+    "max_route_length": 24,
+    "precise_route_range": 0.01,
+    "precise_arrival_range": 0.12,
+    "staging_moves": 1,
+    "staging_walk_min": 2,
+    "staging_walk_max": 4,
+    "combined_route_max": 28,
+    "remaining_route_max": 24,
+    "staging_route_checks": 16,
+    "missing_site_ticks": 300,
+    "search_history_ticks": 300,
+    "search_origin_range": 0.5,
+    "staging_arrival_radius": 0.12,
+    "staging_handoff_route_queries": 1,
+    "footing_hold_ticks": 1200,
+    "footing_hold_displacement": 2.0
+  },
+  "diagnosis": {
+    "comparisons": {
+      "live": {
+        "walk": {
+          "common_rows": 2090,
+          "extra_rows": {
+            "control_walk": 1444
+          },
+          "first_extra_ticks": {
+            "control_walk": 25857
+          },
+          "first_differences": {
+            "task": 25420,
+            "actions": 25421,
+            "generated_actions": 25421,
+            "observation": 25422,
+            "pilots": 25422,
+            "audit": 25440,
+            "applied": 25856,
+            "stop": 25856
+          },
+          "changed_rows": {
+            "task": 437,
+            "actions": 172,
+            "generated_actions": 172,
+            "observation": 435,
+            "pilots": 435,
+            "audit": 8,
+            "applied": 1,
+            "stop": 1
+          },
+          "trace_sha256": {
+            "control_walk": "549941ba8217ccaf69733cf5ae8f02535e927361b0c737f9439daff28f08e378",
+            "hold_walk": "d6f6fcc1cbb059bf3e05799258ecb434d4f0e45e911d52e924f19cf4ccbb7b32"
+          },
+          "native_pilots_applied_controls_landing_and_world_audits_identical": false
+        },
+        "handoff": {
+          "common_rows": 2803,
+          "extra_rows": {
+            "control_handoff": 1035
+          },
+          "first_extra_ticks": {
+            "control_handoff": 26570
+          },
+          "first_differences": {
+            "task": 25421,
+            "actions": 25422,
+            "generated_actions": 25422,
+            "observation": 25423,
+            "pilots": 25423,
+            "audit": 25440,
+            "landing_diagnostics": 25586,
+            "applied": 26569,
+            "stop": 26569
+          },
+          "changed_rows": {
+            "task": 1149,
+            "actions": 812,
+            "generated_actions": 812,
+            "observation": 1147,
+            "pilots": 1147,
+            "audit": 20,
+            "landing_diagnostics": 984,
+            "applied": 1,
+            "stop": 1
+          },
+          "trace_sha256": {
+            "control_handoff": "2787df9535f9cdd821db97e76ea075ea988391d441e20298bddba16b2bcfb568",
+            "hold_handoff": "d992121095bf2e7a9e5be0e91e58f065435f8c1568fd14bdcb5688878b5ed653"
+          },
+          "native_pilots_applied_controls_landing_and_world_audits_identical": false
+        }
+      },
+      "recorded": {
+        "walk": {
+          "common_rows": 5655,
+          "extra_rows": {},
+          "first_extra_ticks": {},
+          "first_differences": {},
+          "changed_rows": {},
+          "trace_sha256": {
+            "control_walk": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0",
+            "hold_walk": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0"
+          },
+          "native_pilots_applied_controls_landing_and_world_audits_identical": true
+        },
+        "handoff": {
+          "common_rows": 5655,
+          "extra_rows": {},
+          "first_extra_ticks": {},
+          "first_differences": {},
+          "changed_rows": {},
+          "trace_sha256": {
+            "control_handoff": "b6a0b13863425f5d3a9aff1c6660bd718b52573031cc17044e0991711095d482",
+            "hold_handoff": "b6a0b13863425f5d3a9aff1c6660bd718b52573031cc17044e0991711095d482"
+          },
+          "native_pilots_applied_controls_landing_and_world_audits_identical": true
+        }
+      }
+    },
+    "outcomes": {
+      "control_walk": {
+        "reason": "recovery_blocked",
+        "last_tick": 27300,
+        "task_reason": "no accessible rebuild after four measured relocations",
+        "build_ticks": [],
+        "boarding_ticks": [],
+        "completed_tick": null,
+        "first_settled_tick": null,
+        "last_settled_tick": null,
+        "settled_rows": 0,
+        "settled_contiguous": false,
+        "relocations": 4,
+        "relocation_ticks": [
+          24420,
+          24540,
+          25860,
+          26700
+        ],
+        "health": 100.0,
+        "ships_lost": 1,
+        "last_damage": null,
+        "holds": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        },
+        "maximum_active_hold_distance": null
+      },
+      "control_handoff": {
+        "reason": "recovery_complete",
+        "last_tick": 27604,
+        "task_reason": null,
+        "build_ticks": [
+          27114
+        ],
+        "boarding_ticks": [
+          27603
+        ],
+        "completed_tick": 27604,
+        "first_settled_tick": 27188,
+        "last_settled_tick": 27604,
+        "settled_rows": 417,
+        "settled_contiguous": true,
+        "relocations": 3,
+        "relocation_ticks": [
+          24420,
+          24540,
+          26370
+        ],
+        "health": 60.66692352294922,
+        "ships_lost": 1,
+        "last_damage": {
+          "amount": 39.33307647705078,
+          "cause": "impact",
+          "contact": {
+            "actor_motion": {
+              "angle": -1.0635414123535156,
+              "position": {
+                "x": 983.0978393554688,
+                "y": 1007.9747924804688
+              },
+              "spin": 25.58066749572754,
+              "velocity": {
+                "x": -20.940288543701172,
+                "y": 2.265263319015503
+              }
+            },
+            "closing_speed": 21.833269119262695,
+            "impulse": 4.4055986404418945,
+            "normal": {
+              "x": -0.2936631441116333,
+              "y": -0.955909013748169
+            },
+            "on_foot": true,
+            "other_id": 0,
+            "other_kind": "planet",
+            "other_motion": {
+              "angle": 0.2453073114156723,
+              "position": {
+                "x": 953.8182983398438,
+                "y": 1024.3983154296875
+              },
+              "spin": 0.0005757808103226125,
+              "velocity": {
+                "x": -11.722411155700684,
+                "y": 16.69189453125
+              }
+            },
+            "point": {
+              "x": 982.79150390625,
+              "y": 1007.6854248046875
+            }
+          },
+          "tick": 25613
+        },
+        "holds": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        },
+        "maximum_active_hold_distance": null
+      },
+      "hold_walk": {
+        "reason": "recovery_blocked",
+        "last_tick": 25856,
+        "task_reason": "no accessible rebuild after four measured relocations",
+        "build_ticks": [],
+        "boarding_ticks": [],
+        "completed_tick": null,
+        "first_settled_tick": null,
+        "last_settled_tick": null,
+        "settled_rows": 0,
+        "settled_contiguous": false,
+        "relocations": 4,
+        "relocation_ticks": [
+          24420,
+          24540,
+          25590,
+          25830
+        ],
+        "health": 100.0,
+        "ships_lost": 1,
+        "last_damage": null,
+        "holds": {
+          "hold_ticks": [
+            25420,
+            25638,
+            25855
+          ],
+          "releases": [
+            {
+              "tick": 25537,
+              "reason": "terrain changed"
+            },
+            {
+              "tick": 25829,
+              "reason": "native placement rejected"
+            },
+            {
+              "tick": 25856,
+              "reason": "native placement rejected"
+            }
+          ],
+          "correction_rows": 130,
+          "first_correction_tick": 25421,
+          "sha256": "fa36b0bbcc2b9de3cc3f4f4adda9fc7b2cc99985438441ece4b46a0b4855350c"
+        },
+        "maximum_active_hold_distance": {
+          "tick": 25729,
+          "distance": 0.12215865234366302
+        }
+      },
+      "hold_handoff": {
+        "reason": "recovery_blocked",
+        "last_tick": 26569,
+        "task_reason": "no accessible rebuild after four measured relocations",
+        "build_ticks": [],
+        "boarding_ticks": [],
+        "completed_tick": null,
+        "first_settled_tick": null,
+        "last_settled_tick": null,
+        "settled_rows": 0,
+        "settled_contiguous": false,
+        "relocations": 4,
+        "relocation_ticks": [
+          24420,
+          24540,
+          25590,
+          26520
+        ],
+        "health": 68.85386657714844,
+        "ships_lost": 1,
+        "last_damage": {
+          "amount": 31.146133422851562,
+          "cause": "impact",
+          "contact": {
+            "actor_motion": {
+              "angle": -0.4119347929954529,
+              "position": {
+                "x": 983.5072021484375,
+                "y": 1007.1428833007812
+              },
+              "spin": 15.557291984558105,
+              "velocity": {
+                "x": -23.705135345458984,
+                "y": -0.7085676789283752
+              }
+            },
+            "closing_speed": 19.78653335571289,
+            "impulse": 5.17476749420166,
+            "normal": {
+              "x": -0.704820990562439,
+              "y": -0.7093852758407593
+            },
+            "on_foot": true,
+            "other_id": 0,
+            "other_kind": "planet",
+            "other_motion": {
+              "angle": 0.24525941908359528,
+              "position": {
+                "x": 954.7984008789062,
+                "y": 1023.0092163085938
+              },
+              "spin": 0.0005739926709793508,
+              "velocity": {
+                "x": -11.817625999450684,
+                "y": 16.629638671875
+              }
+            },
+            "point": {
+              "x": 983.1978759765625,
+              "y": 1006.7485961914062
+            }
+          },
+          "tick": 25608
+        },
+        "holds": {
+          "hold_ticks": [
+            25421,
+            26053,
+            26568
+          ],
+          "releases": [
+            {
+              "tick": 25536,
+              "reason": "terrain changed"
+            },
+            {
+              "tick": 26464,
+              "reason": "native placement rejected"
+            },
+            {
+              "tick": 26569,
+              "reason": "native placement rejected"
+            }
+          ],
+          "correction_rows": 219,
+          "first_correction_tick": 25422,
+          "sha256": "05c1bade3cbcea78e6fccc82d6486163074369216338484117fb5c228ead57ed"
+        },
+        "maximum_active_hold_distance": {
+          "tick": 26083,
+          "distance": 0.12201715653090264
+        }
+      }
+    },
+    "drift": {
+      "control_walk": {
+        "first_selection": 24540,
+        "first_arrival": 25420,
+        "initial_site": {
+          "flight_length": 5.742915630340576,
+          "hatch_walk_length": 3.4902749061584473,
+          "jetpack_flights": 1,
+          "planet": 0,
+          "position": {
+            "x": 29.005271911621097,
+            "y": -15.96430492401123
+          },
+          "precise": true,
+          "revision": 21,
+          "walk_length": 16.089881896972656
+        },
+        "until_next_selection": 25860,
+        "arrival_distance": 0.11961817786366029,
+        "events": {
+          "revision_change": {
+            "tick": 25537,
+            "distance": 0.29598402408659463
+          },
+          "drift_over_half": {
+            "tick": 25672,
+            "distance": 0.5009493510438394
+          },
+          "unsupported": null,
+          "unbalanced": null
+        },
+        "maximum": {
+          "tick": 25860,
+          "distance": 0.7726070167875749
+        }
+      },
+      "control_handoff": {
+        "first_selection": 24540,
+        "first_arrival": 25421,
+        "initial_site": {
+          "flight_length": 5.742915630340576,
+          "hatch_walk_length": 3.4902749061584473,
+          "jetpack_flights": 1,
+          "planet": 0,
+          "position": {
+            "x": 29.005271911621097,
+            "y": -15.96430492401123
+          },
+          "precise": true,
+          "revision": 21,
+          "walk_length": 16.089881896972656
+        },
+        "until_next_selection": 26370,
+        "arrival_distance": 0.11873958524141191,
+        "events": {
+          "revision_change": {
+            "tick": 25536,
+            "distance": 0.29457209404859885
+          },
+          "drift_over_half": {
+            "tick": 25585,
+            "distance": 0.7209039409790922
+          },
+          "unsupported": {
+            "tick": 25585,
+            "distance": 0.7209039409790922
+          },
+          "unbalanced": {
+            "tick": 25586,
+            "distance": 0.9740824959051428
+          }
+        },
+        "maximum": {
+          "tick": 25612,
+          "distance": 8.315307600778839
+        }
+      },
+      "hold_walk": {
+        "first_selection": 24540,
+        "first_arrival": 25420,
+        "initial_site": {
+          "flight_length": 5.742915630340576,
+          "hatch_walk_length": 3.4902749061584473,
+          "jetpack_flights": 1,
+          "planet": 0,
+          "position": {
+            "x": 29.005271911621097,
+            "y": -15.96430492401123
+          },
+          "precise": true,
+          "revision": 21,
+          "walk_length": 16.089881896972656
+        },
+        "until_next_selection": 25590,
+        "arrival_distance": 0.11961817786366029,
+        "events": {
+          "revision_change": {
+            "tick": 25537,
+            "distance": 0.11827852619904208
+          },
+          "drift_over_half": null,
+          "unsupported": null,
+          "unbalanced": null
+        },
+        "maximum": {
+          "tick": 25590,
+          "distance": 0.200275786026548
+        }
+      },
+      "hold_handoff": {
+        "first_selection": 24540,
+        "first_arrival": 25421,
+        "initial_site": {
+          "flight_length": 5.742915630340576,
+          "hatch_walk_length": 3.4902749061584473,
+          "jetpack_flights": 1,
+          "planet": 0,
+          "position": {
+            "x": 29.005271911621097,
+            "y": -15.96430492401123
+          },
+          "precise": true,
+          "revision": 21,
+          "walk_length": 16.089881896972656
+        },
+        "until_next_selection": 25590,
+        "arrival_distance": 0.11873958524141191,
+        "events": {
+          "revision_change": {
+            "tick": 25536,
+            "distance": 0.11958481166738609
+          },
+          "drift_over_half": {
+            "tick": 25585,
+            "distance": 0.550833448867474
+          },
+          "unsupported": {
+            "tick": 25585,
+            "distance": 0.550833448867474
+          },
+          "unbalanced": {
+            "tick": 25586,
+            "distance": 0.8410372125957762
+          }
+        },
+        "maximum": {
+          "tick": 25590,
+          "distance": 2.202360205945267
+        }
+      }
+    },
+    "reconstruction": "Foot distances recomputed in f64 from recorded pose, up vector, shared half-height 0.45 and planet frame. Runtime arrival remains the strict f32 <0.12 check.",
+    "placement_mismatch": {
+      "control_walk": {
+        "native_attempts": [],
+        "stale_releases": []
+      },
+      "control_handoff": {
+        "native_attempts": [],
+        "stale_releases": []
+      },
+      "hold_walk": {
+        "native_attempts": [
+          {
+            "tick": 25829,
+            "foot_distance": 0.12017127760720231,
+            "native_standing_distance": 0.404466189776729
+          }
+        ],
+        "stale_releases": [
+          {
+            "tick": 25856,
+            "hold_started": 25855,
+            "placement_tick": 25829
+          }
+        ]
+      },
+      "hold_handoff": {
+        "native_attempts": [
+          {
+            "tick": 26464,
+            "foot_distance": 0.12073278136400474,
+            "native_standing_distance": 0.41420805043826986
+          },
+          {
+            "tick": 26494,
+            "foot_distance": 0.162119263105491,
+            "native_standing_distance": 0.45522056261432187
+          },
+          {
+            "tick": 26524,
+            "foot_distance": 0.2074208877852244,
+            "native_standing_distance": 0.2440416571324357
+          },
+          {
+            "tick": 26554,
+            "foot_distance": 0.15592115130982998,
+            "native_standing_distance": 0.18768458328983575
+          }
+        ],
+        "stale_releases": [
+          {
+            "tick": 26569,
+            "hold_started": 26568,
+            "placement_tick": 26554
+          }
+        ]
+      }
+    }
+  },
+  "runs": {
+    "control_walk": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3"
+        },
+        "live": {
+          "surveys": 12,
+          "relocation_ticks": [
+            24420,
+            24540,
+            25860,
+            26700
+          ],
+          "staging_ticks": [
+            24420
+          ],
+          "arrival_ticks": [
+            24539
+          ],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 2,
+          "sha256": "6c758f88d6a00849420b6b6660aee5d9f2f91142e7dc08e70171f80fd71ce0dc"
+        }
+      },
+      "execution": {
+        "recorded": {
+          "staging_ticks": [],
+          "seed_ticks": [],
+          "continuous_rows": 0,
+          "first_staging_path_tick": null,
+          "sha256": "d8ea2dfa601d21d48919f9fa7413d2b7b67f546db4a1949bfc1e71d0214dc5a6"
+        },
+        "live": {
+          "staging_ticks": [
+            24420
+          ],
+          "seed_ticks": [],
+          "continuous_rows": 120,
+          "first_staging_path_tick": 24435,
+          "sha256": "8c7ad62a4d850db4ee3ba380feec0dd8df6c58c4c4fcf8787afda6645ffd64f4"
+        }
+      },
+      "footing": {
+        "recorded": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        },
+        "live": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-footing-hold/v1/archives/control_walk.tar.gz",
+        "sha256": "81ca440cbdf1ee9414b0544cabdb917af35180a1700725474c9174a2baf85c25",
+        "bytes": 47161745,
+        "raw_bytes": 305650989,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "97ddfd67457f4911d251370a7b80b9694d77c59879d6ed000af6d09c6347d5f2",
+            "bytes": 682003
+          },
+          "live-footing-audit.json": {
+            "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+            "bytes": 77
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "6c758f88d6a00849420b6b6660aee5d9f2f91142e7dc08e70171f80fd71ce0dc",
+            "bytes": 1047242
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "8c7ad62a4d850db4ee3ba380feec0dd8df6c58c4c4fcf8787afda6645ffd64f4",
+            "bytes": 1460
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "549941ba8217ccaf69733cf5ae8f02535e927361b0c737f9439daff28f08e378",
+            "bytes": 64108467
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0",
+            "bytes": 110311862
+          },
+          "rebuild-replay.json": {
+            "sha256": "a78985ed648545bcd221c5785896ea35e977e658f543ea0f594c31fd3289f397",
+            "bytes": 92214
+          },
+          "recorded-audit.json": {
+            "sha256": "a8e0bac693adb79c35a9f2698a55aa353fd0bb86f950708be171322ffa7e721a",
+            "bytes": 446753
+          },
+          "recorded-footing-audit.json": {
+            "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+            "bytes": 77
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3",
+            "bytes": 1852049
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "d8ea2dfa601d21d48919f9fa7413d2b7b67f546db4a1949bfc1e71d0214dc5a6",
+            "bytes": 124
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": []
+        },
+        "live": {
+          "last_tick": 27300,
+          "reason": "recovery_blocked",
+          "task_reason": "no accessible rebuild after four measured relocations",
+          "build_ticks": [],
+          "boarding_ticks": []
+        }
+      }
+    },
+    "control_handoff": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "4ecda8773fe6cbbbd76e6274385ed36eb12935b18eb92fb132fb4d3a08983542"
+        },
+        "live": {
+          "surveys": 8,
+          "relocation_ticks": [
+            24420,
+            24540,
+            26370
+          ],
+          "staging_ticks": [
+            24420
+          ],
+          "arrival_ticks": [
+            24521
+          ],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 2,
+          "sha256": "61ae2dd3cd73bfe1df28ef6fdaa87631f51a20a232c6d9d6a7ab4d445e91c767"
+        }
+      },
+      "execution": {
+        "recorded": {
+          "staging_ticks": [],
+          "seed_ticks": [],
+          "continuous_rows": 0,
+          "first_staging_path_tick": null,
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4"
+        },
+        "live": {
+          "staging_ticks": [
+            24420
+          ],
+          "seed_ticks": [
+            24420
+          ],
+          "continuous_rows": 121,
+          "first_staging_path_tick": 24420,
+          "sha256": "e35bf23afc2ebc7d4e7d58e3f68762053acf298056e00115b4f4ac3a9b842e0b"
+        }
+      },
+      "footing": {
+        "recorded": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        },
+        "live": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-footing-hold/v1/archives/control_handoff.tar.gz",
+        "sha256": "a47328931d425524f03b4d69229b0a6476ae2cb483516a9352ad7596019ffe3c",
+        "bytes": 48001682,
+        "raw_bytes": 310176367,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "654d0863c7802db00f986b4c1a4a44ada29bc16ebee50f564c3accb24ce87163",
+            "bytes": 644091
+          },
+          "live-footing-audit.json": {
+            "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+            "bytes": 77
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "61ae2dd3cd73bfe1df28ef6fdaa87631f51a20a232c6d9d6a7ab4d445e91c767",
+            "bytes": 956116
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "e35bf23afc2ebc7d4e7d58e3f68762053acf298056e00115b4f4ac3a9b842e0b",
+            "bytes": 179321
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "2787df9535f9cdd821db97e76ea075ea988391d441e20298bddba16b2bcfb568",
+            "bytes": 68454348
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "b6a0b13863425f5d3a9aff1c6660bd718b52573031cc17044e0991711095d482",
+            "bytes": 110452262
+          },
+          "rebuild-replay.json": {
+            "sha256": "756fea91f0b0eed4990910f7f9a297fca1d79c412f9c902e2f8f4def3f167ad5",
+            "bytes": 80063
+          },
+          "recorded-audit.json": {
+            "sha256": "2e9b6ef779ae26eb2a64ca94d53fbb842c7c20d38241ce58dd427284db0c7b5c",
+            "bytes": 447223
+          },
+          "recorded-footing-audit.json": {
+            "sha256": "fbf90bd707727df5dc8cba3373c2595036b48da66d7148ee55d3332277d153ae",
+            "bytes": 77
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "4ecda8773fe6cbbbd76e6274385ed36eb12935b18eb92fb132fb4d3a08983542",
+            "bytes": 1854001
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+            "bytes": 127
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": []
+        },
+        "live": {
+          "last_tick": 27604,
+          "reason": "recovery_complete",
+          "task_reason": null,
+          "build_ticks": [
+            27114
+          ],
+          "boarding_ticks": [
+            27603
+          ]
+        }
+      }
+    },
+    "hold_walk": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3"
+        },
+        "live": {
+          "surveys": 10,
+          "relocation_ticks": [
+            24420,
+            24540,
+            25590,
+            25830
+          ],
+          "staging_ticks": [
+            24420
+          ],
+          "arrival_ticks": [
+            24539
+          ],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 2,
+          "sha256": "1282f9d1c3f79495884d090e77c6c330175c51516ba7cd21c721763d3fd63d8b"
+        }
+      },
+      "execution": {
+        "recorded": {
+          "staging_ticks": [],
+          "seed_ticks": [],
+          "continuous_rows": 0,
+          "first_staging_path_tick": null,
+          "sha256": "d8ea2dfa601d21d48919f9fa7413d2b7b67f546db4a1949bfc1e71d0214dc5a6"
+        },
+        "live": {
+          "staging_ticks": [
+            24420
+          ],
+          "seed_ticks": [],
+          "continuous_rows": 120,
+          "first_staging_path_tick": 24435,
+          "sha256": "8c7ad62a4d850db4ee3ba380feec0dd8df6c58c4c4fcf8787afda6645ffd64f4"
+        }
+      },
+      "footing": {
+        "recorded": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "7e440de68c83aaa2caf0ff36457a9d5edfdf4704283eae5b9b84790df740c911"
+        },
+        "live": {
+          "hold_ticks": [
+            25420,
+            25638,
+            25855
+          ],
+          "releases": [
+            {
+              "tick": 25537,
+              "reason": "terrain changed"
+            },
+            {
+              "tick": 25829,
+              "reason": "native placement rejected"
+            },
+            {
+              "tick": 25856,
+              "reason": "native placement rejected"
+            }
+          ],
+          "correction_rows": 130,
+          "first_correction_tick": 25421,
+          "sha256": "fa36b0bbcc2b9de3cc3f4f4adda9fc7b2cc99985438441ece4b46a0b4855350c"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-footing-hold/v1/archives/hold_walk.tar.gz",
+        "sha256": "662cf6c009453534fcb399670ca63276a4bcf495d57b96fe27f215fa99256be5",
+        "bytes": 42795228,
+        "raw_bytes": 279678149,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "86add24206ce0a4c45774cb52d08b843bf08788782ecd133a52fa32592d0294b",
+            "bytes": 531590
+          },
+          "live-footing-audit.json": {
+            "sha256": "fa36b0bbcc2b9de3cc3f4f4adda9fc7b2cc99985438441ece4b46a0b4855350c",
+            "bytes": 250971
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "1282f9d1c3f79495884d090e77c6c330175c51516ba7cd21c721763d3fd63d8b",
+            "bytes": 894369
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "8c7ad62a4d850db4ee3ba380feec0dd8df6c58c4c4fcf8787afda6645ffd64f4",
+            "bytes": 1460
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "d6f6fcc1cbb059bf3e05799258ecb434d4f0e45e911d52e924f19cf4ccbb7b32",
+            "bytes": 38189042
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0",
+            "bytes": 110311862
+          },
+          "rebuild-replay.json": {
+            "sha256": "ea2406b97617b3d7b496501f21d13454354f000178300b8bae67362a5c32012a",
+            "bytes": 91192
+          },
+          "recorded-audit.json": {
+            "sha256": "a8e0bac693adb79c35a9f2698a55aa353fd0bb86f950708be171322ffa7e721a",
+            "bytes": 446753
+          },
+          "recorded-footing-audit.json": {
+            "sha256": "7e440de68c83aaa2caf0ff36457a9d5edfdf4704283eae5b9b84790df740c911",
+            "bytes": 76
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3",
+            "bytes": 1852049
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "d8ea2dfa601d21d48919f9fa7413d2b7b67f546db4a1949bfc1e71d0214dc5a6",
+            "bytes": 124
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": []
+        },
+        "live": {
+          "last_tick": 25856,
+          "reason": "recovery_blocked",
+          "task_reason": "no accessible rebuild after four measured relocations",
+          "build_ticks": [],
+          "boarding_ticks": []
+        }
+      }
+    },
+    "hold_handoff": {
+      "search": {
+        "recorded": {
+          "surveys": 48,
+          "relocation_ticks": [
+            25560
+          ],
+          "staging_ticks": [],
+          "arrival_ticks": [],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 0,
+          "sha256": "4ecda8773fe6cbbbd76e6274385ed36eb12935b18eb92fb132fb4d3a08983542"
+        },
+        "live": {
+          "surveys": 12,
+          "relocation_ticks": [
+            24420,
+            24540,
+            25590,
+            26520
+          ],
+          "staging_ticks": [
+            24420
+          ],
+          "arrival_ticks": [
+            24521
+          ],
+          "max_offset_checks": 240,
+          "max_staging_route_checks": 2,
+          "sha256": "b9ab00330cb0dcba17ec421338ba9f4954ca8d0a52f3efd61f07387a9f585b5b"
+        }
+      },
+      "execution": {
+        "recorded": {
+          "staging_ticks": [],
+          "seed_ticks": [],
+          "continuous_rows": 0,
+          "first_staging_path_tick": null,
+          "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4"
+        },
+        "live": {
+          "staging_ticks": [
+            24420
+          ],
+          "seed_ticks": [
+            24420
+          ],
+          "continuous_rows": 121,
+          "first_staging_path_tick": 24420,
+          "sha256": "e35bf23afc2ebc7d4e7d58e3f68762053acf298056e00115b4f4ac3a9b842e0b"
+        }
+      },
+      "footing": {
+        "recorded": {
+          "hold_ticks": [],
+          "releases": [],
+          "correction_rows": 0,
+          "first_correction_tick": null,
+          "sha256": "7e440de68c83aaa2caf0ff36457a9d5edfdf4704283eae5b9b84790df740c911"
+        },
+        "live": {
+          "hold_ticks": [
+            25421,
+            26053,
+            26568
+          ],
+          "releases": [
+            {
+              "tick": 25536,
+              "reason": "terrain changed"
+            },
+            {
+              "tick": 26464,
+              "reason": "native placement rejected"
+            },
+            {
+              "tick": 26569,
+              "reason": "native placement rejected"
+            }
+          ],
+          "correction_rows": 219,
+          "first_correction_tick": 25422,
+          "sha256": "05c1bade3cbcea78e6fccc82d6486163074369216338484117fb5c228ead57ed"
+        }
+      },
+      "archive": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-footing-hold/v1/archives/hold_handoff.tar.gz",
+        "sha256": "40ed000f87b9fb96898d896eaf67cb90e8a59cc6fb96afaf7e9546f0518dff42",
+        "bytes": 45164152,
+        "raw_bytes": 294083311,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "08f45049137cf7abb0050c76e2f504696deeb97f0993940d069f969d97b42992",
+            "bytes": 597110
+          },
+          "live-footing-audit.json": {
+            "sha256": "05c1bade3cbcea78e6fccc82d6486163074369216338484117fb5c228ead57ed",
+            "bytes": 263079
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "b9ab00330cb0dcba17ec421338ba9f4954ca8d0a52f3efd61f07387a9f585b5b",
+            "bytes": 1255517
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "e35bf23afc2ebc7d4e7d58e3f68762053acf298056e00115b4f4ac3a9b842e0b",
+            "bytes": 179321
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "d992121095bf2e7a9e5be0e91e58f065435f8c1568fd14bdcb5688878b5ed653",
+            "bytes": 51833062
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "b6a0b13863425f5d3a9aff1c6660bd718b52573031cc17044e0991711095d482",
+            "bytes": 110452262
+          },
+          "rebuild-replay.json": {
+            "sha256": "0df2ce7f336c062a450eb5bf07b6fab739ec0a9e5f06e303b8f571d5951da714",
+            "bytes": 92872
+          },
+          "recorded-audit.json": {
+            "sha256": "2e9b6ef779ae26eb2a64ca94d53fbb842c7c20d38241ce58dd427284db0c7b5c",
+            "bytes": 447223
+          },
+          "recorded-footing-audit.json": {
+            "sha256": "7e440de68c83aaa2caf0ff36457a9d5edfdf4704283eae5b9b84790df740c911",
+            "bytes": 76
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "4ecda8773fe6cbbbd76e6274385ed36eb12935b18eb92fb132fb4d3a08983542",
+            "bytes": 1854001
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+            "bytes": 127
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "forks": {
+        "recorded": {
+          "last_tick": 29421,
+          "reason": "fixed_end",
+          "task_reason": "spaceling stopped making progress on ground route",
+          "build_ticks": [
+            27819
+          ],
+          "boarding_ticks": []
+        },
+        "live": {
+          "last_tick": 26569,
+          "reason": "recovery_blocked",
+          "task_reason": "no accessible rebuild after four measured relocations",
+          "build_ticks": [],
+          "boarding_ticks": []
+        }
+      }
+    }
+  },
+  "validation": {
+    "native": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--features",
+        "sensor-profile",
+        "rebuild_placement"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/native.log",
+      "log_sha256": "83162d5aa08c7e6d98e1f22d6988a3ade57ae03ad7be60cb98ab4f0b8f7ba0b2",
+      "tests": 6
+    },
+    "bot": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--test",
+        "surface_recovery",
+        "--test",
+        "ground_navigation",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/bot.log",
+      "log_sha256": "58d739a350cfdc2168e6b1b50fb02ebcf64ad8ca66e6fc7bffb41d57834a395e",
+      "tests": 88
+    },
+    "harness": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/harness.log",
+      "log_sha256": "6eca39ed33dea3dd4fc154744503a3662c1f255adc49af79ee99d71d27b327e8",
+      "tests": 63
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/python.log",
+      "log_sha256": "3f9c16e36a583438457b2eb2f741af8a803b8d9987122053583066615c2b85a2",
+      "tests": 961
+    },
+    "bot_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/bot_clippy.log",
+      "log_sha256": "e9490bc7d7d88711f23de923291e7844fce1bbee9947150df5ea04cee58b3eec"
+    },
+    "native_clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "--tests",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "passed": false,
+      "exit_code": 101,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/native_clippy.log",
+      "log_sha256": "8630c0f6f3706255beb9890247f9737b73a1b7140719fc18a3eb6a78a434a008",
+      "diagnostics": 16,
+      "same_diagnostic_identities": true,
+      "diagnostic_identities": [
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "`assert!(true)` will be optimized out by the compiler",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "field assignment outside of initializer for an instance created with Default::default()",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "items after a test module",
+          "file": "scenarios/spacewars/src/surface_sortie/ground_navigation/routes/round_trip.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/pilot.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "file": "scenarios/spacewars/src/surface_sortie/render.rs"
+        },
+        {
+          "message": "this boolean expression can be simplified",
+          "file": "scenarios/spacewars/src/terrain/loose.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "file": "scenarios/spacewars/src/lib.rs"
+        }
+      ],
+      "baseline_log": {
+        "path": "target/rebuild-staging-walk/v1/validation-logs/native_clippy.log",
+        "sha256": "6ea5d3e5981aa02c748754f95af3a39e47d55a4b590c776b5a92d3386f4d6d4b"
+      },
+      "explanation": "Broad native Clippy remains a failed check with the same 16 message/file diagnostic identities as the preceding staging-walk baseline."
+    },
+    "release": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/release.log",
+      "log_sha256": "daf29199e30fc40c7dc496bc27fe2ef088220de0d7849a3e42f059c64b4ec96b"
+    },
+    "default_check": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "check",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--lib"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/default_check.log",
+      "log_sha256": "a797b4828b2b962f7266b03c53b5717f16dd1c131b92994b1110c48a7b3bf58c"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "log_path": "target/rebuild-footing-hold/v1/validation-logs/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "provenance": {
+    "previous_bundle": {
+      "path": "docs/data/rebuild-staging-walk-v1.json.gz",
+      "sha256": "e84bca90cae0e129d82fbcef127a9e21ca697c3989b840a01938b7255cd71d7c",
+      "bytes": 3247872
+    },
+    "previous_archives": {
+      "walk": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-staging-walk/v1/archives/walk.tar.gz",
+        "sha256": "d700ffb95686d5b868cbef955f5bcad549ed4843227fdc7d9b8e964e1e881a7c",
+        "bytes": 47160847,
+        "raw_bytes": 305650835,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "97ddfd67457f4911d251370a7b80b9694d77c59879d6ed000af6d09c6347d5f2",
+            "bytes": 682003
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "6c758f88d6a00849420b6b6660aee5d9f2f91142e7dc08e70171f80fd71ce0dc",
+            "bytes": 1047242
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "8c7ad62a4d850db4ee3ba380feec0dd8df6c58c4c4fcf8787afda6645ffd64f4",
+            "bytes": 1460
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "549941ba8217ccaf69733cf5ae8f02535e927361b0c737f9439daff28f08e378",
+            "bytes": 64108467
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "993d8bf27b362acc0c594893273d530f937c987b853f2bb50d80b70de4fdb6c0",
+            "bytes": 110311862
+          },
+          "rebuild-replay.json": {
+            "sha256": "a78985ed648545bcd221c5785896ea35e977e658f543ea0f594c31fd3289f397",
+            "bytes": 92214
+          },
+          "recorded-audit.json": {
+            "sha256": "a8e0bac693adb79c35a9f2698a55aa353fd0bb86f950708be171322ffa7e721a",
+            "bytes": 446753
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "600029142ce3451140d1f4a0b68b39162f3bc53b240019e1a6d08da2919129e3",
+            "bytes": 1852049
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "d8ea2dfa601d21d48919f9fa7413d2b7b67f546db4a1949bfc1e71d0214dc5a6",
+            "bytes": 124
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      },
+      "handoff": {
+        "path": "/home/data/workspace/space-wars3/target/rebuild-staging-walk/v1/archives/handoff.tar.gz",
+        "sha256": "ea84f0bc762dc6c2910fbccf7e0529d9f29815ccd4be984cfb3db3b59fc4073d",
+        "bytes": 48001540,
+        "raw_bytes": 310176213,
+        "files": {
+          "capture-evidence.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-behavior.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "destination-cover.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "flag-survey.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "impact.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "landing-handoffs.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "live-audit.json": {
+            "sha256": "654d0863c7802db00f986b4c1a4a44ada29bc16ebee50f564c3accb24ce87163",
+            "bytes": 644091
+          },
+          "live-planning.csv": {
+            "sha256": "fe319695a77923f657e839c141fd3a12e9c73f21bd843eccf89d278ca98072f8",
+            "bytes": 126
+          },
+          "live-staging-audit.json": {
+            "sha256": "61ae2dd3cd73bfe1df28ef6fdaa87631f51a20a232c6d9d6a7ab4d445e91c767",
+            "bytes": 956116
+          },
+          "live-staging-walk-audit.json": {
+            "sha256": "e35bf23afc2ebc7d4e7d58e3f68762053acf298056e00115b4f4ac3a9b842e0b",
+            "bytes": 179321
+          },
+          "mission-evaluation-work.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "mission-evaluations.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "prefix-audit.json": {
+            "sha256": "d15af00c830d6d9a2f916e726fe706e780970594b1d574ea748061a467527c90",
+            "bytes": 64791
+          },
+          "rebuild-live.jsonl": {
+            "sha256": "2787df9535f9cdd821db97e76ea075ea988391d441e20298bddba16b2bcfb568",
+            "bytes": 68454348
+          },
+          "rebuild-prefix.json": {
+            "sha256": "35c94ccbf2f03ab268e08e00b01399600df7fdb6360df424aaf8904dad18244a",
+            "bytes": 11338
+          },
+          "rebuild-prefix.jsonl": {
+            "sha256": "f4b98d2a232ebaef9da9d9de3ca2fda8cce96515ba11b78784c05a5c31975c92",
+            "bytes": 127032406
+          },
+          "rebuild-recorded.jsonl": {
+            "sha256": "b6a0b13863425f5d3a9aff1c6660bd718b52573031cc17044e0991711095d482",
+            "bytes": 110452262
+          },
+          "rebuild-replay.json": {
+            "sha256": "756fea91f0b0eed4990910f7f9a297fca1d79c412f9c902e2f8f4def3f167ad5",
+            "bytes": 80063
+          },
+          "recorded-audit.json": {
+            "sha256": "2e9b6ef779ae26eb2a64ca94d53fbb842c7c20d38241ce58dd427284db0c7b5c",
+            "bytes": 447223
+          },
+          "recorded-staging-audit.json": {
+            "sha256": "4ecda8773fe6cbbbd76e6274385ed36eb12935b18eb92fb132fb4d3a08983542",
+            "bytes": 1854001
+          },
+          "recorded-staging-walk-audit.json": {
+            "sha256": "de67711cdfb7899ef7ce44f4e9a1cdac809d10d36a220a7b382cce00d0ba9de4",
+            "bytes": 127
+          },
+          "sensors.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          "trace.jsonl": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          }
+        }
+      }
+    },
+    "tape": {
+      "path": "/home/data/workspace/space-wars3/target/rebuild-replay/v2/inputs/tape.jsonl",
+      "sha256": "c48c29b50b3c9b953305b0ac5fe9a2581040f654c5f2b9a5e84300d77b60d168",
+      "rows": 29422
+    }
+  },
+  "plan_sha256": "043d873c95ba9e14f7804bb037d2a5bea1a65f2fabab52abd646b99bffd52091",
+  "summary_sha256": "ed21fd685d823edd2bbf374cefaafde2a7ef20fe94ab6fd3405fcc3a6c6c3af1",
+  "review_bundle": {
+    "path": "docs/data/rebuild-footing-hold-v1.json.gz",
+    "sha256": "2e0e6297f0519d7fa2e6f4b8865a14e75a096a5c59a5f1438218f3b08eac8fab",
+    "bytes": 7598624
+  }
+}

@@ -1,7 +1,8 @@
 //! A reusable task: recover the assigned full ship and board it. The caller
 //! selects the objective and decides what to do after success or a bounded
 //! failure. A newly observed native rebuild can release a blocked task once,
-//! for a bounded boarding attempt. Other retries require caller reset. No world writes.
+//! for a bounded boarding attempt. An opt-in pod timeout review can grant one
+//! bounded approach to a freshly measured alternative. No world writes.
 use crate::{
     BrainReset,
     flight_pilot::FlightIntent,
@@ -18,11 +19,19 @@ use scenario_spacewars::{
         LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
         TransferResult, VehicleId,
         pilot::{LandingSiteId, PilotLandingSite, PilotObservationV1},
-        rebuild_placement::RebuildStandingSite,
+        rebuild_placement::{RebuildSearchProgress, RebuildStandingSite},
         recovery_sensors::RecoveryTaskObservationV1,
     },
 };
 use serde::Serialize;
+mod search;
+pub use search::RebuildStagingTelemetry;
+mod footing;
+pub use footing::RebuildFootingTelemetry;
+mod pod_reconsideration;
+pub use pod_reconsideration::PodReconsiderationTelemetry;
+mod ground_rejoin;
+pub use ground_rejoin::RebuildGroundRejoinTelemetry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -96,6 +105,16 @@ pub struct RecoveryTelemetry {
     /// the original recovery clock, relocation count, or replacement history.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rebuild_boarding: Option<RebuildBoardingTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_search: Option<RebuildSearchProgress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_staging: Option<RebuildStagingTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_footing: Option<RebuildFootingTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pod_reconsideration: Option<PodReconsiderationTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rebuild_ground_rejoin: Option<RebuildGroundRejoinTelemetry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -119,6 +138,7 @@ pub struct PodLandingRejection {
 
 const POD_SITE_WAIT_TICKS: u64 = 15 * 60;
 const GROUND_BUDGET_TICKS: u64 = 90 * 60;
+const FLIGHT_BUDGET_REASON: &str = "recovery exceeded two-minute task budget";
 impl RecoveryTelemetry {
     pub fn label(&self) -> &'static str {
         if let Some(reason) = self.reason {
@@ -172,6 +192,19 @@ pub struct RecoverShipTask {
     return_route_checked: Option<(usize, u64, u64, bool)>,
     seen_rebuilds: Option<(VehicleId, u64)>,
     invalid_observation: bool,
+    rebuild_search_enabled: bool,
+    continuous_staging: bool,
+    staging_route_handoff: bool,
+    rebuild_footing_hold: bool,
+    rebuild_footing_recheck: bool,
+    rebuild_precise_arrival: bool,
+    footing_recheck: Option<(usize, u16)>,
+    selected_footing_bearing: Option<u16>,
+    pod_reconsideration_enabled: bool,
+    rebuild_ground_rejoin_enabled: bool,
+    rebuild_rejoin_corridors: bool,
+    rebuild_rejoin_target_directed: bool,
+    hatch_supported_arrival: bool,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
@@ -205,6 +238,11 @@ impl RecoverShipTask {
                 scuttled_tick: None,
                 scuttle_attempts: 0,
                 rebuild_boarding: None,
+                rebuild_search: None,
+                rebuild_staging: None,
+                rebuild_footing: None,
+                pod_reconsideration: None,
+                rebuild_ground_rejoin: None,
             },
             site: None,
             stabilized: false,
@@ -225,12 +263,64 @@ impl RecoverShipTask {
             return_route_checked: None,
             seen_rebuilds: None,
             invalid_observation: false,
+            rebuild_search_enabled: false,
+            continuous_staging: false,
+            staging_route_handoff: false,
+            rebuild_footing_hold: false,
+            rebuild_footing_recheck: false,
+            rebuild_precise_arrival: false,
+            footing_recheck: None,
+            selected_footing_bearing: None,
+            pod_reconsideration_enabled: false,
+            rebuild_ground_rejoin_enabled: false,
+            rebuild_rejoin_corridors: false,
+            rebuild_rejoin_target_directed: false,
+            hatch_supported_arrival: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let rebuild_search_enabled = self.rebuild_search_enabled;
+        let continuous_staging = self.continuous_staging;
+        let staging_route_handoff = self.staging_route_handoff;
+        let rebuild_footing_hold = self.rebuild_footing_hold;
+        let rebuild_footing_recheck = self.rebuild_footing_recheck;
+        let rebuild_precise_arrival = self.rebuild_precise_arrival;
+        let pod_reconsideration_enabled = self.pod_reconsideration_enabled;
+        let rebuild_ground_rejoin_enabled = self.rebuild_ground_rejoin_enabled;
+        let rebuild_rejoin_corridors = self.rebuild_rejoin_corridors;
+        let rebuild_rejoin_target_directed = self.rebuild_rejoin_target_directed;
+        let hatch_supported_arrival = self.hatch_supported_arrival;
         *self = Self::new(context);
+        self.rebuild_search_enabled = rebuild_search_enabled;
+        self.continuous_staging = continuous_staging;
+        self.staging_route_handoff = staging_route_handoff;
+        self.rebuild_footing_hold = rebuild_footing_hold;
+        self.rebuild_footing_recheck = rebuild_footing_recheck;
+        self.rebuild_precise_arrival = rebuild_precise_arrival;
+        self.pod_reconsideration_enabled = pod_reconsideration_enabled;
+        self.rebuild_ground_rejoin_enabled = rebuild_ground_rejoin_enabled;
+        self.rebuild_rejoin_corridors = rebuild_rejoin_corridors;
+        self.rebuild_rejoin_target_directed = rebuild_rejoin_target_directed;
+        self.hatch_supported_arrival = hatch_supported_arrival;
+    }
+    /// Select hatch landing behavior without resetting task clocks or memory.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_hatch_supported_arrival(&mut self, enabled: bool) {
+        self.hatch_supported_arrival = enabled;
+        if let Some(task) = &mut self.ground_task {
+            task.set_hatch_supported_arrival(enabled);
+        }
+    }
+    /// Require the measured foot position for coarse and refined rebuild sites.
+    /// This changes approach precision only, not holding or native construction.
+    #[cfg(feature = "sensor-profile")]
+    pub fn set_rebuild_precise_arrival(&mut self, enabled: bool) {
+        self.rebuild_precise_arrival = enabled;
     }
     pub fn site_request(&self) -> Option<LandingSiteId> {
+        if self.pod_review_due(self.previous_tick.unwrap_or(0).saturating_add(1)) {
+            return None;
+        }
         self.site.map(|s| s.id)
     }
     pub fn telemetry(&self) -> &RecoveryTelemetry {
@@ -251,6 +341,7 @@ impl RecoverShipTask {
         self.telemetry.reason = None;
     }
     fn block(&mut self, reason: &'static str, tick: u64) {
+        self.finish_rebuild_ground_rejoin(tick, reason);
         self.goal(RecoveryGoal::Blocked, tick);
         self.telemetry.status = TaskStatus::Blocked;
         self.telemetry.reason = Some(reason);
@@ -309,6 +400,10 @@ impl RecoverShipTask {
         }
         self.telemetry.started_tick.get_or_insert(p.tick);
         self.observe_rebuild(p);
+        self.check_rebuild_ground_rejoin_limits(p);
+        self.reconsider_pod(o);
+        self.check_footing_deadline(p.tick);
+        self.check_pod_reconsideration_deadline(p);
         if self.telemetry.status != TaskStatus::Succeeded
             && let Some(boarding) = &self.telemetry.rebuild_boarding
         {
@@ -340,12 +435,13 @@ impl RecoverShipTask {
         } else if self.telemetry.rebuild_boarding.is_none() && self.task_budget_exceeded(p.tick) {
             self.block(
                 if self.telemetry.ground_budget_ticks == 0 {
-                    "recovery exceeded two-minute task budget"
+                    FLIGHT_BUDGET_REASON
                 } else {
                     "recovery exceeded combined flight and ground budget"
                 },
                 p.tick,
             );
+            self.arm_pod_review();
             SurfaceSortieAction::default()
         } else {
             self.choose(o)
@@ -361,6 +457,14 @@ impl RecoverShipTask {
     }
 
     fn task_budget_exceeded(&self, tick: u64) -> bool {
+        if let Some(deadline) = self
+            .telemetry
+            .pod_reconsideration
+            .as_ref()
+            .and_then(|r| r.deadline_tick)
+        {
+            return tick > deadline;
+        }
         self.telemetry.started_tick.is_some_and(|start| {
             tick.saturating_sub(start) > 120 * 60 + self.telemetry.ground_budget_ticks
         })
@@ -370,6 +474,20 @@ impl RecoverShipTask {
         let Some(recovery) = &p.recovery else {
             return;
         };
+        if p.ship_available && p.ship_form == ShipForm::Ship {
+            if self.finish_rebuild_ground_rejoin(p.tick, "ship available") {
+                self.telemetry.ground = None;
+            }
+            self.invalidate_staging(p.tick);
+            self.release_rebuild_footing("ship available", p.tick);
+            self.footing_recheck = None;
+        }
+        if self
+            .footing_recheck
+            .is_some_and(|(planet, _)| planet != p.planet.index)
+        {
+            self.footing_recheck = None;
+        }
         let previous = self.seen_rebuilds;
         self.seen_rebuilds = Some((
             p.vehicle,
@@ -418,6 +536,13 @@ impl RecoverShipTask {
             if !p.queries_ready {
                 return action;
             }
+            if self.staging_deadline_exceeded(p.tick) {
+                self.block(
+                    "rebuild staging exceeded the original search deadline",
+                    p.tick,
+                );
+                return action;
+            }
             if self.return_fallback_since.is_some() {
                 return self.replace_unreachable_ship(o);
             }
@@ -439,6 +564,21 @@ impl RecoverShipTask {
                     GroundDestination::Rebuild {
                         planet: site.planet,
                         position: site.position,
+                    }
+                } else if let Some(destination) = self.staging_destination(p) {
+                    destination
+                } else if let Some(held) = &self.telemetry.rebuild_footing
+                    && held.active()
+                    && held.site.planet == p.planet.index
+                    && held.site.revision == p.planet.revision
+                    && p.planet
+                        .claim
+                        .as_ref()
+                        .is_some_and(|c| c.owner == Some(p.owner))
+                {
+                    GroundDestination::Rebuild {
+                        planet: held.site.planet,
+                        position: held.site.position,
                     }
                 } else {
                     GroundDestination::Flag
@@ -468,6 +608,11 @@ impl RecoverShipTask {
             }
             let claim = p.planet.claim.as_ref();
             if claim.is_none_or(|c| c.owner != Some(p.owner)) {
+                if self.finish_rebuild_ground_rejoin(p.tick, "ownership changed") {
+                    self.telemetry.ground = None;
+                }
+                self.release_rebuild_footing("ownership changed", p.tick);
+                self.footing_recheck = None;
                 self.goal(RecoveryGoal::Claim, p.tick);
                 if claim.is_some_and(|c| {
                     c.owner.is_some()
@@ -498,6 +643,15 @@ impl RecoverShipTask {
                 return action;
             }
             let recovery = p.recovery.as_ref().unwrap();
+            if let Some(action) = self.advance_rebuild_ground_rejoin(o) {
+                return action;
+            }
+            if let Some(action) = self.hold_rebuild_footing(o) {
+                return action;
+            }
+            if let Some(action) = self.traverse_staging(o) {
+                return action;
+            }
             if let Some(site) = self.telemetry.relocation_site {
                 if site.planet != p.planet.index || site.revision != p.planet.revision {
                     self.telemetry.relocation_site = None;
@@ -519,7 +673,9 @@ impl RecoverShipTask {
                         .is_some_and(|g| g.goal == GroundGoal::Arrived)
                     {
                         self.telemetry.relocation_site = None;
-                        self.ground_task = None;
+                        if !self.retain_rebuild_footing(site, o) {
+                            self.ground_task = None;
+                        }
                         self.telemetry.last_progress_tick = p.tick;
                     }
                     return action;
@@ -528,7 +684,9 @@ impl RecoverShipTask {
             if matches!(
                 recovery.status,
                 SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
-            ) {
+            ) || self.staged_search_pending()
+                || self.footing_recheck.is_some()
+            {
                 self.goal(RecoveryGoal::FindBuildSpace, p.tick);
                 let since = *self.relocation_missing_since.get_or_insert(p.tick);
                 if self.telemetry.relocations >= 4 {
@@ -544,6 +702,9 @@ impl RecoverShipTask {
                         return action;
                     }
                     self.telemetry.relocation_surveys += 1;
+                    if !self.remember_rebuild_search(survey, p) {
+                        return action;
+                    }
                     if let Some(site) = survey.site {
                         if site.planet != p.planet.index
                             || site.revision != p.planet.revision
@@ -555,9 +716,16 @@ impl RecoverShipTask {
                         }
                         self.telemetry.relocations += 1;
                         self.telemetry.relocation_site = Some(site);
+                        self.remember_footing_bearing(survey, site);
                         self.relocation_missing_since = None;
+                        self.footing_recheck = None;
                         self.ground_task = None;
+                    } else if self.rebuild_search_enabled {
+                        self.accept_staging(survey, o, since);
                     }
+                }
+                if self.start_rebuild_ground_rejoin(o, since) {
+                    return self.advance_rebuild_ground_rejoin(o).unwrap();
                 }
                 if self.telemetry.relocation_site.is_none() && p.tick.saturating_sub(since) > 5 * 60
                 {
@@ -752,7 +920,35 @@ impl RecoverShipTask {
                 self.ground_task = Some(GroundNavigationTask::new(self.context, destination));
             }
         }
+        let continuous_staging = self.continuous_staging
+            && self.staging_destination(&o.flight.pilot) == Some(destination);
         let task = self.ground_task.as_mut().unwrap();
+        #[cfg(feature = "sensor-profile")]
+        task.set_hatch_supported_arrival(self.hatch_supported_arrival);
+        task.set_rejoin_target_directed(
+            self.rebuild_rejoin_target_directed
+                && self
+                    .telemetry
+                    .rebuild_ground_rejoin
+                    .as_ref()
+                    .is_some_and(|r| r.finished_tick.is_none()),
+        );
+        task.set_continuous_walk(continuous_staging);
+        task.set_precise_rebuild(
+            self.telemetry
+                .relocation_site
+                .is_some_and(|site| site.precise || self.rebuild_precise_arrival)
+                || self
+                    .telemetry
+                    .rebuild_staging
+                    .as_ref()
+                    .is_some_and(|s| s.active())
+                || self
+                    .telemetry
+                    .rebuild_footing
+                    .as_ref()
+                    .is_some_and(|f| f.active()),
+        );
         let action = task.step(o);
         self.telemetry.ground = Some(task.telemetry().clone());
         self.telemetry.last_progress_tick = self

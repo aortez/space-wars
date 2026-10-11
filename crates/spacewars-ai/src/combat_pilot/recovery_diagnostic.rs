@@ -1,6 +1,6 @@
 //! Developer-only handoff for terrain/recovery integration. This module cannot
-//! enter an application build. The sole intervention replaces one recovery task;
-//! it does not reset RulePilotV4, the opponent, or any scenario state.
+//! enter an application build. Retained reset diagnostics and opt-in ordinary
+//! controller comparisons preserve the surrounding combat and physical state.
 use super::*;
 use engine_common::{DirtMode, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario};
 use scenario_spacewars::surface_sortie::{
@@ -17,6 +17,11 @@ use std::{
 const STEP: Duration = Duration::from_nanos(16_666_667);
 const SEED: u64 = 42;
 const CONTINUATION_TICKS: u64 = 300 * 60;
+
+#[cfg(feature = "sensor-profile")]
+mod candidate;
+#[cfg(feature = "sensor-profile")]
+mod fresh_matches;
 
 #[derive(Clone, Copy)]
 struct Case {

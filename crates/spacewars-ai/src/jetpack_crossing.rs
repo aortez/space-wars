@@ -1,13 +1,15 @@
 //! One measured out-and-back ship crossing using ordinary shared pilot actions.
 use crate::BrainReset;
 use engine_core::Vec2;
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::surface_sortie::jetpack::flight::{
     FlightPhase, FlightSample, LAUNCH_CHARGE, flight_command,
 };
 use scenario_spacewars::surface_sortie::{
     PilotLocation, SurfaceSortieAction, TransferResult,
     jetpack::{
-        CROSSING_ARRIVAL_RANGE, CrossingDirection, CrossingPlan, JetpackCrossingObservation,
+        CROSSING_ARRIVAL_RANGE, CrossingAnchor, CrossingDirection, CrossingPlan,
+        JetpackCrossingObservation,
     },
 };
 use serde::Serialize;
@@ -302,6 +304,13 @@ impl JetpackCrossingPilot {
             && p.balanced
             && relative.length() < 1.0
             && error.abs() < CROSSING_ARRIVAL_RANGE
+            // Tilted footing can align the sideways error at the takeoff
+            // ledge. A terrain route only completes at its destination feet.
+            && (!matches!(plan.anchor, CrossingAnchor::GroundGap { .. })
+                || (actor.position - p.actor_up * HALF_HEIGHT - p.planet.motion.position)
+                    .rotate_radians(-p.planet.motion.angle)
+                    .distance_to(plan.destination)
+                    < CROSSING_ARRIVAL_RANGE)
         {
             self.telemetry.crossings += 1;
             if self.traversal {
@@ -342,3 +351,7 @@ impl JetpackCrossingPilot {
         a
     }
 }
+
+#[cfg(test)]
+#[path = "jetpack_crossing_tests.rs"]
+mod tests;

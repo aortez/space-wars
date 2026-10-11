@@ -21,6 +21,11 @@ pub struct GroundNode {
     pub position: Vec2,
     pub normal: Vec2,
 }
+impl GroundNode {
+    fn supports_route_start(&self, start: Vec2) -> bool {
+        self.position.distance_to(start) < 3.0
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GroundEdgeKind {
@@ -97,6 +102,14 @@ pub(super) fn standing_height() -> f32 {
 }
 
 impl GroundMap {
+    fn nearest_node(&self, point: Vec2) -> Option<&GroundNode> {
+        self.nodes.iter().min_by(|a, b| {
+            a.position
+                .distance_to(point)
+                .total_cmp(&b.position.distance_to(point))
+        })
+    }
+
     pub(super) fn take_contents(&mut self) -> Self {
         Self {
             version: self.version,
@@ -165,6 +178,28 @@ impl GroundMap {
 
     /// Filter a measured route against the proposed ship's real hull and feet.
     pub(super) fn avoiding(&self, gravity: f32, clear: impl Fn(Vec2) -> bool) -> Self {
+        self.avoiding_with_start(gravity, None, clear)
+    }
+
+    /// Keep node-based rejection diagnostics, but only filter edges if this
+    /// start can use them. The incomplete graph never escapes this query.
+    pub(super) fn route_to_hatch_avoiding(
+        &self,
+        start: Vec2,
+        target: Vec2,
+        gravity: f32,
+        clear: impl Fn(Vec2) -> bool,
+    ) -> GroundRoute {
+        self.avoiding_with_start(gravity, Some(start), clear)
+            .route_to_hatch(start, target)
+    }
+
+    fn avoiding_with_start(
+        &self,
+        gravity: f32,
+        start: Option<Vec2>,
+        clear: impl Fn(Vec2) -> bool,
+    ) -> Self {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("ground_avoiding");
         let mut map = self.clone();
@@ -182,6 +217,13 @@ impl GroundMap {
         });
         #[cfg(feature = "sensor-profile")]
         drop(_nodes_profile);
+        if start.is_some_and(|start| {
+            !map.nearest_node(start)
+                .is_some_and(|node| node.supports_route_start(start))
+        }) {
+            map.edges.clear();
+            return map;
+        }
         #[cfg(feature = "sensor-profile")]
         let _edges_profile = super::sensor_profile::Scope::new("ground_avoiding_edges");
         #[cfg(feature = "sensor-profile")]

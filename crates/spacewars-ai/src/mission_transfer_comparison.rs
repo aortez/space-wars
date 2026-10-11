@@ -142,6 +142,8 @@ impl TransferComparisonJob {
             || before.bounded_acquisition != actual.bounded_acquisition
             || before.cover_response != actual.cover_response
             || before.initial_cover != actual.initial_cover
+            || before.telemetry.live_claim_stopping_disabled
+                != actual.telemetry.live_claim_stopping_disabled
             || before.telemetry.destination_retry.is_some()
                 != actual.telemetry.destination_retry.is_some()
             || config(before) != config(actual)

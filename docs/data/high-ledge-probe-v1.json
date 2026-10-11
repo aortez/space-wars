@@ -1,0 +1,365 @@
+{
+  "schema": 1,
+  "profile": "native_high_ledge_probe_v1",
+  "complete": true,
+  "decision": "local_flight_viable_requires_runtime_forecast_and_full_recovery_qualification",
+  "runtime_source_commit": "f873542be4f3200d9f157bb22868f416aa9b9566",
+  "binary": {
+    "path": "/home/data/workspace/space-wars3/target/high-ledge-probe/v1/surface_mission_soak",
+    "sha256": "d69d816c159036c86a35f7131a3189b17ff84c09429e47d083454b98f25cd273"
+  },
+  "baseline_binary": {
+    "path": "/home/data/workspace/space-wars3/target/crossing-arrival/v1/surface_mission_soak",
+    "sha256": "a38633e18aacc47271fb3759753a7d01ffde5293467198c4ccef8f97cb14bafa"
+  },
+  "frozen_inputs": 938,
+  "main_replays": 1,
+  "fresh_games": 0,
+  "game_retries": 0,
+  "audit_resumes": 0,
+  "main_parity": {
+    "exact_streams": [
+      "capture-evidence.jsonl",
+      "destination-behavior.jsonl",
+      "destination-cover.jsonl",
+      "flag-survey-work.jsonl",
+      "flag-survey.jsonl",
+      "impact.jsonl",
+      "landing-handoffs.jsonl",
+      "mission-evaluation-work.jsonl",
+      "mission-evaluations.jsonl",
+      "trace.jsonl"
+    ],
+    "projected_streams": [],
+    "sensor_rows": 59192,
+    "planning_rows": 5841,
+    "non_timing_report": true,
+    "physical_and_planning_results": true
+  },
+  "observer_rows": 59192,
+  "observer_overrides": 0,
+  "probe": {
+    "results": [
+      {
+        "tick": 22575,
+        "clear_candidates": 21,
+        "control_exact_ticks": 1104,
+        "flight": {
+          "rows": 648,
+          "success": true,
+          "reason": "crossing_complete",
+          "launch_tick": 22952,
+          "last_tick": 23222,
+          "lowest_charge": 0.45555412769317627
+        }
+      },
+      {
+        "tick": 22965,
+        "clear_candidates": 21,
+        "control_exact_ticks": 714,
+        "flight": {
+          "rows": 274,
+          "success": true,
+          "reason": "crossing_complete",
+          "launch_tick": 22969,
+          "last_tick": 23238,
+          "lowest_charge": 0.4611096978187561
+        }
+      }
+    ],
+    "reference_ticks": 1104,
+    "successful_local_flights": 2,
+    "default_promotion": false
+  },
+  "receipts": [
+    {
+      "source_tick": 22575,
+      "takeoff_node": 275,
+      "landing_node": 283,
+      "launch_tick": 22952,
+      "completion_tick": 23222,
+      "source_to_completion_seconds": 10.783333333333333,
+      "launch_to_completion_seconds": 4.5,
+      "ground_budget_remaining_seconds": 7.6,
+      "lowest_charge": 0.45555412769317627,
+      "burn_counter_increase_seconds": 1.633324146270752,
+      "foot_to_destination": 0.11956449440333264,
+      "relative_speed": 0.6870348932199639,
+      "flight_interruptions": 0,
+      "initial_charge": 0.7999990582466125,
+      "claim_status": "need_settle",
+      "recovery": {
+        "blocked_attempts": 0,
+        "placement": null,
+        "planet": null,
+        "pod_ejections": 1,
+        "rebuild_interruptions": 0,
+        "rebuild_progress": 0.0,
+        "rebuild_required_seconds": 8.0,
+        "rebuilds": 0,
+        "scuttle_progress": 0.0,
+        "scuttle_required_seconds": 3.0,
+        "ships_lost": 1,
+        "status": "need_settle"
+      }
+    },
+    {
+      "source_tick": 22965,
+      "takeoff_node": 275,
+      "landing_node": 283,
+      "launch_tick": 22969,
+      "completion_tick": 23238,
+      "source_to_completion_seconds": 4.55,
+      "launch_to_completion_seconds": 4.483333333333333,
+      "ground_budget_remaining_seconds": 7.333333333333333,
+      "lowest_charge": 0.4611096978187561,
+      "burn_counter_increase_seconds": 1.6166577339172363,
+      "foot_to_destination": 0.1396635650244846,
+      "relative_speed": 0.7740169380904739,
+      "flight_interruptions": 0,
+      "initial_charge": 1.0,
+      "claim_status": "need_settle",
+      "recovery": {
+        "blocked_attempts": 0,
+        "placement": null,
+        "planet": null,
+        "pod_ejections": 1,
+        "rebuild_interruptions": 0,
+        "rebuild_progress": 0.0,
+        "rebuild_required_seconds": 8.0,
+        "rebuilds": 0,
+        "scuttle_progress": 0.0,
+        "scuttle_required_seconds": 3.0,
+        "ships_lost": 1,
+        "status": "need_settle"
+      }
+    }
+  ],
+  "launch_separation_ticks": 17,
+  "full_recovery_qualified": false,
+  "default_promotion": false,
+  "validation": {
+    "jetpack-tests": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "surface_sortie::jetpack"
+      ],
+      "exit_code": 0,
+      "sha256": "01b5d0cafecb4d0790198ca099d6960bbb37316667663adc1074a51ff8f7cfba",
+      "passed": 11
+    },
+    "harness-tests": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "exit_code": 0,
+      "sha256": "88f89d2e952e2b5198172fcdd8c4a6414b1c9cb8be5526068780166c10ddb003",
+      "passed": 60
+    },
+    "all-python-tests": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/tests"
+      ],
+      "exit_code": 0,
+      "sha256": "99c4ed73228722d8196907562225ad9f7e82aa06316fa0ce805be59e6d9f7fe5",
+      "passed": 938
+    },
+    "bot-clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "spacewars-ai",
+        "--lib",
+        "--tests",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "sha256": "a6651b51eae8e42112b6d72d7381e8e27addea3a8185888a7f91c89c9ecc8882"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile"
+      ],
+      "exit_code": 0,
+      "sha256": "a1f71e2ed7b93adce766da8046ad82cf256a4ba6424eb40947045de71ea570c8"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-spacewars",
+        "--lib",
+        "-p",
+        "spacewars-ai",
+        "--example",
+        "surface_mission_soak",
+        "--features",
+        "sensor-profile",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "sha256": "279cb8684ce08fa7ba8d22dad1e0940de58b8552e8ae1dc24ce88b5392e184f1",
+      "limitation": "Eight pre-existing scenario lints in unchanged files; no new-file diagnostics. Bot-scoped Clippy passes.",
+      "unchanged_files": [
+        "scenarios/spacewars/src/lib.rs",
+        "scenarios/spacewars/src/surface_sortie.rs",
+        "scenarios/spacewars/src/surface_sortie/pilot.rs",
+        "scenarios/spacewars/src/surface_sortie/render.rs",
+        "scenarios/spacewars/src/terrain/loose.rs"
+      ]
+    }
+  },
+  "archive": {
+    "path": "/home/data/workspace/space-wars3/target/high-ledge-probe/v1/archives/replay-a553f6c08e5f.tar.gz",
+    "sha256": "d89e885213dbbbacda15d95e9ad78d2082cd413cddfeea44d2c95493f3181655",
+    "bytes": 198479264,
+    "raw_bytes": 1417616645,
+    "files": {
+      "capture-evidence.jsonl": {
+        "sha256": "d1b3dec186ba67a5075e1d4a38f864ce3931f6306d0755430efecd2b43e68340",
+        "bytes": 313079352
+      },
+      "destination-behavior.jsonl": {
+        "sha256": "b091d1e2e8104804d18f3324d014ec797f6f50ab49e61a8273079d1dce4d2b5b",
+        "bytes": 23224136
+      },
+      "destination-cover.jsonl": {
+        "sha256": "5cdb128715ad4fa286a6f23b61da533dd02abfba5f77d635919dc149fae6bfcd",
+        "bytes": 1612734
+      },
+      "flag-survey-work.jsonl": {
+        "sha256": "0129243097edd573e8b2ad2174472a000a399e1fb18cd73aaefc8ec6dd19502d",
+        "bytes": 6778711
+      },
+      "flag-survey.jsonl": {
+        "sha256": "a6449dd63233e756b5fa638beec86a606084f6d019e9ea4835cb27d1e8a257fe",
+        "bytes": 12024
+      },
+      "high-ledge-flight-22575.jsonl": {
+        "sha256": "43d30894058153561ed142e8921413d3351f222c6e09300acc3c0500c6b22605",
+        "bytes": 5286080
+      },
+      "high-ledge-flight-22965.jsonl": {
+        "sha256": "9082b72a1d50f78688de74b22f43fb6aadc32cd5d7db7b8a2fe97f34faa90954",
+        "bytes": 2268266
+      },
+      "high-ledge-probe.json": {
+        "sha256": "de65efc036df52e5e9d5bf1bf8a8168305de57a5721d38d07a4faccb36f33793",
+        "bytes": 684462
+      },
+      "high-ledge-reference.jsonl": {
+        "sha256": "03b38dbbf0b0f9236ff449123e4c175f0d0167972240315d4596592d0b4054e8",
+        "bytes": 5490796
+      },
+      "impact.jsonl": {
+        "sha256": "e26c1bd985dedb4d785fab2fe5b859f4f6bd3d08ed0f87ff2a7273dc4439e044",
+        "bytes": 174875284
+      },
+      "landing-handoffs.jsonl": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "live-planning.csv": {
+        "sha256": "614a626779f4da7c47e9c19b5c5b029711bf868b1b9e0dbe1cc2683a05e677d0",
+        "bytes": 404915
+      },
+      "mission-evaluation-work.jsonl": {
+        "sha256": "34a7579517d1992dd34294aaa64403e3501b90a666cccbbb48fcc4328d3e2192",
+        "bytes": 4872017
+      },
+      "mission-evaluations.jsonl": {
+        "sha256": "0832c321d07392012283a8a0d504af722401a1f65a67c37866ca6c1dc9aa1d45",
+        "bytes": 16914446
+      },
+      "new-world1-p2-asteroids3-no-stop-audit.json": {
+        "sha256": "fa9990136cd571aefdfec4046f23ad03d3e6831b0deda1b8819c97b12d66dc1f",
+        "bytes": 362326
+      },
+      "report.json": {
+        "sha256": "12c547a02c4c42ae558d55be9d55dfff0c389234ee854e5c9e83ba674b655289",
+        "bytes": 18366619
+      },
+      "sensors.jsonl": {
+        "sha256": "d34fda85a0e9b0c89fd98dba44d8b7a5632c8bfb8c6a3d12ec755013a50eb5d0",
+        "bytes": 66287543
+      },
+      "trace.jsonl": {
+        "sha256": "612c956e6409bdb9d070228550d8d80e4d3b4ba0fb37555ab5741a49eba2df39",
+        "bytes": 777096934
+      }
+    }
+  },
+  "review_bundle": {
+    "path": "docs/data/high-ledge-probe-v1.json.gz",
+    "sha256": "3d1413b958bf9ba22cba337034446a04480427129e1ac0dedcd3ccc85109a375",
+    "bytes": 2090702
+  },
+  "plan_sha256": "762e038ed535bc01c4a89d015dfd32910ad0875df13ef6362195f152031bdd37",
+  "summary_sha256": "bf96ec70c2a94d235ca374aef52eea37ae498b3862a9b56a4b0d1dbec39711c3"
+}

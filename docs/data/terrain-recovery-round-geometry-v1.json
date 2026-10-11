@@ -1,0 +1,1799 @@
+{
+  "schema": 1,
+  "runtime": {
+    "source_commit": "2e813b53c4fb39b64b287906c52c77dcb85025cd",
+    "source_input_count": 2367,
+    "source_inputs_sha256": "660ba4b451de524a62e62d05053a1fb0a8c4b537bff553f9291f49ca757c5cdb",
+    "binary_sha256": "43890e4e31be71662bc2cb64501a09f3e32750e2abe28e4568e6c551273f8444",
+    "command": [
+      "/home/data/workspace/spacewars-handoffs/recovery-round-geometry-20261009/round-geometry-inspection",
+      "combat_pilot::recovery_diagnostic::candidate::round_footing::geometry::frozen_round_footing_geometry",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "env": {
+      "SPACEWARS_RECOVERY_OUT": "/home/data/workspace/spacewars-handoffs/recovery-round-geometry-20261009/output",
+      "RUST_MIN_STACK": "16777216"
+    },
+    "started_unix": 1791613961.427013,
+    "fork_tick": 16500,
+    "end_tick": 34500,
+    "material_sample_ticks": 60,
+    "exit_code": 0,
+    "seconds": 30.850436210632324
+  },
+  "retained_ticks": 34500,
+  "retained_files": [
+    "fork.json",
+    "fork-controllers.txt",
+    "fork-frame-p1.json",
+    "fork-frame-p2.json",
+    "final.json",
+    "final-controllers.txt",
+    "final-frame-p1.json",
+    "final-frame-p2.json"
+  ],
+  "fork_rendered_boundary": [
+    {
+      "cell": [
+        78,
+        112
+      ],
+      "local_bounds": [
+        17.5,
+        51.5,
+        18.5,
+        52.5
+      ],
+      "rendered_rectangle": [
+        11.499968466054053,
+        43.49995055508295,
+        19.500004956028782,
+        52.500016437557
+      ]
+    },
+    {
+      "cell": [
+        78,
+        113
+      ],
+      "local_bounds": [
+        17.5,
+        52.5,
+        18.5,
+        53.5
+      ],
+      "rendered_rectangle": [
+        11.499976428381917,
+        52.49996495158778,
+        18.499967563696565,
+        53.50001184951527
+      ]
+    },
+    {
+      "cell": [
+        78,
+        114
+      ],
+      "local_bounds": [
+        17.5,
+        53.5,
+        18.5,
+        54.5
+      ],
+      "rendered_rectangle": [
+        17.500012202744724,
+        53.50001184951527,
+        18.499978268383064,
+        55.50001966812128
+      ]
+    },
+    {
+      "cell": [
+        78,
+        115
+      ],
+      "local_bounds": [
+        17.5,
+        54.5,
+        18.5,
+        55.5
+      ],
+      "rendered_rectangle": [
+        17.500012202744724,
+        53.50001184951527,
+        18.499978268383064,
+        55.50001966812128
+      ]
+    },
+    {
+      "cell": [
+        79,
+        112
+      ],
+      "local_bounds": [
+        18.5,
+        51.5,
+        19.5,
+        52.5
+      ],
+      "rendered_rectangle": [
+        11.499968466054053,
+        43.49995055508295,
+        19.500004956028782,
+        52.500016437557
+      ]
+    },
+    {
+      "cell": [
+        79,
+        115
+      ],
+      "local_bounds": [
+        18.5,
+        54.5,
+        19.5,
+        55.5
+      ],
+      "rendered_rectangle": [
+        18.499978268383064,
+        54.499992163065585,
+        20.499990447624718,
+        55.50001966812128
+      ]
+    },
+    {
+      "cell": [
+        80,
+        112
+      ],
+      "local_bounds": [
+        19.5,
+        51.5,
+        20.5,
+        52.5
+      ],
+      "rendered_rectangle": [
+        19.499992670570073,
+        51.49999172448854,
+        26.499986585747997,
+        52.50003862241603
+      ]
+    },
+    {
+      "cell": [
+        80,
+        115
+      ],
+      "local_bounds": [
+        19.5,
+        54.5,
+        20.5,
+        55.5
+      ],
+      "rendered_rectangle": [
+        18.499978268383064,
+        54.499992163065585,
+        20.499990447624718,
+        55.50001966812128
+      ]
+    },
+    {
+      "cell": [
+        81,
+        112
+      ],
+      "local_bounds": [
+        20.5,
+        51.5,
+        21.5,
+        52.5
+      ],
+      "rendered_rectangle": [
+        19.499992670570073,
+        51.49999172448854,
+        26.499986585747997,
+        52.50003862241603
+      ]
+    },
+    {
+      "cell": [
+        81,
+        113
+      ],
+      "local_bounds": [
+        20.5,
+        52.5,
+        21.5,
+        53.5
+      ],
+      "rendered_rectangle": [
+        20.499969839118904,
+        52.49997919949982,
+        24.50000212242534,
+        53.50000946787594
+      ]
+    },
+    {
+      "cell": [
+        81,
+        114
+      ],
+      "local_bounds": [
+        20.5,
+        53.5,
+        21.5,
+        54.5
+      ],
+      "rendered_rectangle": [
+        20.499969839118904,
+        53.50000946787594,
+        23.500028518064003,
+        54.50001753043112
+      ]
+    },
+    {
+      "cell": [
+        81,
+        115
+      ],
+      "local_bounds": [
+        20.5,
+        54.5,
+        21.5,
+        55.5
+      ],
+      "rendered_rectangle": [
+        20.499977763942063,
+        54.4999596673252,
+        22.500017659102525,
+        55.500003420251076
+      ]
+    }
+  ],
+  "first_sample_with_exterior_connection": 25500,
+  "open_sample_count": 5,
+  "sample_failures": [],
+  "artifact_receipts": {
+    "output/control-actions.jsonl": {
+      "bytes": 17211642,
+      "sha256": "4504fa12190d23bfa6a7fd29b4f0b57535ce6af1e1038ef52df83d7c50e231fc"
+    },
+    "output/control-events.jsonl": {
+      "bytes": 111391,
+      "sha256": "8be01d4f36604f3d290436749b606f793c779393370b996cae2dfbf85abff2d6"
+    },
+    "output/control-samples.jsonl": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "output/final-controllers.txt": {
+      "bytes": 833087,
+      "sha256": "e79d426de24cca10246574de252dbb1daa1353eee2f87968d795a4932a1cd491"
+    },
+    "output/final-frame-p1.json": {
+      "bytes": 531111,
+      "sha256": "10a5a08337cfe99730004ceed332d0d0042555dba389b29a9ec35a022369a3fd"
+    },
+    "output/final-frame-p2.json": {
+      "bytes": 530600,
+      "sha256": "aa90ea97e41efb756a7415b70537937d257236c96c74979d0babc54bf3043f78"
+    },
+    "output/final.json": {
+      "bytes": 486606,
+      "sha256": "e3552719d41c42ed94a2d21c859aa6b6ae0423433ace1ca4195baed30dddab67"
+    },
+    "output/fork-controllers.txt": {
+      "bytes": 833101,
+      "sha256": "973d2e6cd80a6f0d98d9287019dc9fb9bf342e0ee698c00bd8260f6980f84a99"
+    },
+    "output/fork-frame-p1.json": {
+      "bytes": 459617,
+      "sha256": "aeea3e633b486f4943e43e77c5124ed46bd3ff27c2b967f71d1a16aa8fbfabd3"
+    },
+    "output/fork-frame-p2.json": {
+      "bytes": 459107,
+      "sha256": "cec26543ba3321ca5dce6845ffb46594de8dd46bd9dadab720e86b77f257b9ec"
+    },
+    "output/fork.json": {
+      "bytes": 477307,
+      "sha256": "bf71f0ed0c844a2442255b5127a16f5a27ec54cb25308cf8fe31a9b4951e1689"
+    },
+    "output/material-samples.jsonl": {
+      "bytes": 9507260,
+      "sha256": "e2c0c9a3108797f9e49efcda87afe60d707d44b6d58e7016832202e3666ef14d"
+    },
+    "output/summary.json": {
+      "bytes": 275,
+      "sha256": "3e32907c45b213f8f9e031ee64c739d3929a4a033d49300809b53ee0abf28a26"
+    }
+  },
+  "auditor_sha256": "98902cbc205f3079709103dd17528b818188a567f83e2094d6e01233c93f758d",
+  "helper_sha256": "2ab5b41f0904a9adf0368fab353a2a0231ea91a443fa34fd90cb59b993dbd556",
+  "full_audit_sha256": "fb7812dc203ee91c418a2ea0ae3813d63820341e58a8aac23fdc3000244a3933",
+  "material_sample_count": 301,
+  "closed_sample_count": 296,
+  "selected_samples": [
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.807104110717773,
+        "y": 52.92247009277344
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 1,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": 0.8323028683662415,
+            "y": -0.5543209910392761
+          },
+          "player": "player_2",
+          "position": {
+            "x": 547.3397216796875,
+            "y": 465.54522705078125
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 0,
+        "owner": "player_2",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "approach_flag"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 809,
+        "stable": true,
+        "standing_clear": true,
+        "tick": 16500,
+        "version": 1
+      },
+      "revision": 809,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 544.98914, y: 533.6225 }, angle: -0.95248693, linear_velocity: Vec2 { x: -0.5302914, y: 0.6692041 }, angular_velocity: -0.16107428 }, up: Vec2 { x: 0.8011639, y: 0.59844494 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 544.67114, y: 533.3165 }, local_surface: ContactPoint { position: Vec2 { x: 18.69891, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: 0.5545263, y: 0.8321662 }, velocity: Vec2 { x: -0.49951145, y: 0.6695527 }, angular_velocity: 0.014993547, separation: -0.00768137 }), relative_speed: -0.094836175, contacts: 1, jumps: 0, balance: Balanced, recovery_progress: 0.0, settled_seconds: 0.0, knockdowns: 3, recoveries: 1, last_knockdown: Some(SpacelingDisturbance { velocity_change: 1.3484725, angular_speed: 99.483795 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 18.712039947509766,
+          "y": 52.491539001464844
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 18.69891, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": 0.5545263290405273,
+          "y": 0.8321661949157715
+        },
+        "separation": -0.007681369781494141,
+        "world_position": {
+          "x": 544.671142578125,
+          "y": 533.3165283203125
+        }
+      },
+      "tick": 16500,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            79,
+            113
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            78,
+            113
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            115
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            115
+          ],
+          [
+            81,
+            113
+          ],
+          [
+            81,
+            114
+          ]
+        ]
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            79,
+            113
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            78,
+            115
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            115
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            115
+          ],
+          [
+            81,
+            112
+          ],
+          [
+            81,
+            113
+          ],
+          [
+            81,
+            114
+          ],
+          [
+            81,
+            115
+          ]
+        ]
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 80,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 19.5593318939209,
+        "y": 52.917232513427734
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": -0.9970933794975281,
+            "y": -0.07618909329175949
+          },
+          "player": "player_1",
+          "position": {
+            "x": 446.171142578125,
+            "y": 515.3878173828125
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 1,
+        "owner": "player_1",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "secured"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1263,
+        "stable": true,
+        "standing_clear": true,
+        "tick": 25440,
+        "version": 1
+      },
+      "revision": 1263,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.74637, y: 515.47076 }, angle: 1.2567781, linear_velocity: Vec2 { x: -0.20504458, y: -0.86766374 }, angular_velocity: -0.18593359 }, up: Vec2 { x: -0.9615965, y: 0.2744672 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 446.18005, y: 515.40247 }, local_surface: ContactPoint { position: Vec2 { x: 19.445028, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: -0.9971124, y: -0.075939834 }, velocity: Vec2 { x: -0.2309407, y: -0.80766284 }, angular_velocity: 0.014999361, separation: -0.010261536 }), relative_speed: -0.14123367, contacts: 2, jumps: 0, balance: Balanced, recovery_progress: 0.0, settled_seconds: 0.0, knockdowns: 3, recoveries: 1, last_knockdown: Some(SpacelingDisturbance { velocity_change: 1.3484725, angular_speed: 99.483795 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 19.458189010620117,
+          "y": 52.490013122558594
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 19.445028, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": -0.9971123933792114,
+          "y": -0.0759398341178894
+        },
+        "separation": -0.01026153564453125,
+        "world_position": {
+          "x": 446.1800537109375,
+          "y": 515.4024658203125
+        }
+      },
+      "tick": 25440,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            79,
+            113
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            78,
+            113
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            115
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            115
+          ],
+          [
+            81,
+            113
+          ],
+          [
+            81,
+            114
+          ]
+        ]
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            79,
+            113
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            78,
+            115
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            115
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            115
+          ],
+          [
+            81,
+            112
+          ],
+          [
+            81,
+            113
+          ],
+          [
+            81,
+            114
+          ],
+          [
+            81,
+            115
+          ]
+        ]
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.870365142822266,
+        "y": 52.64099884033203
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": -0.9958385229110718,
+            "y": -0.09113527834415436
+          },
+          "player": "player_1",
+          "position": {
+            "x": 445.9464111328125,
+            "y": 514.5787353515625
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 1,
+        "owner": "player_1",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "secured"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "knocked_down",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1268,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 25500,
+        "version": 1
+      },
+      "revision": 1268,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.8583, y: 513.9944 }, angle: 0.08498773, linear_velocity: Vec2 { x: -0.21048184, y: -0.8129616 }, angular_velocity: 0.016685773 }, up: Vec2 { x: -0.96811754, y: 0.25049648 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 446.03293, y: 513.72253 }, local_surface: ContactPoint { position: Vec2 { x: 18.5706, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: -0.9958613, y: -0.09088633 }, velocity: Vec2 { x: -0.20622006, y: -0.8101505 }, angular_velocity: 0.014998912, separation: -0.0069565177 }), relative_speed: 7.728829e-5, contacts: 4, jumps: 0, balance: KnockedDown, recovery_progress: 0.0, settled_seconds: 0.050000004, knockdowns: 4, recoveries: 1, last_knockdown: Some(SpacelingDisturbance { velocity_change: 2.6731517, angular_speed: 17.984737 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 18.58373260498047,
+          "y": 52.49188232421875
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 18.5706, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": -0.995861291885376,
+          "y": -0.09088633209466934
+        },
+        "separation": -0.006956517696380615,
+        "world_position": {
+          "x": 446.0329284667969,
+          "y": 513.7225341796875
+        }
+      },
+      "tick": 25500,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2762,
+        "cells": null,
+        "occupied_boundary": null
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2763,
+        "cells": null,
+        "occupied_boundary": null
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.821258544921875,
+        "y": 52.63972854614258
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": -0.9943596124649048,
+            "y": -0.10606095939874649
+          },
+          "player": "player_1",
+          "position": {
+            "x": 445.7338562011719,
+            "y": 513.766357421875
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 1,
+        "owner": "player_1",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "secured"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "recovering",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1271,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 25560,
+        "version": 1
+      },
+      "revision": 1271,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.66098, y: 513.1321 }, angle: 0.11679723, linear_velocity: Vec2 { x: -0.1954573, y: -0.8221697 }, angular_velocity: 0.0037152423 }, up: Vec2 { x: -0.9719574, y: 0.23515688 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 445.84137, y: 512.8652 }, local_surface: ContactPoint { position: Vec2 { x: 18.523571, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: -0.99438614, y: -0.105812386 }, velocity: Vec2 { x: -0.19302326, y: -0.81284755 }, angular_velocity: 0.014998914, separation: -0.013404846 }), relative_speed: -0.008450776, contacts: 4, jumps: 0, balance: Recovering, recovery_progress: 0.97916657, settled_seconds: 0.0, knockdowns: 4, recoveries: 1, last_knockdown: Some(SpacelingDisturbance { velocity_change: 2.6731517, angular_speed: 17.984737 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 18.536725997924805,
+          "y": 52.4886589050293
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 18.523571, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": -0.9943861365318298,
+          "y": -0.10581238567829132
+        },
+        "separation": -0.01340484619140625,
+        "world_position": {
+          "x": 445.84136962890625,
+          "y": 512.8651733398438
+        }
+      },
+      "tick": 25560,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2758,
+        "cells": null,
+        "occupied_boundary": null
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2759,
+        "cells": null,
+        "occupied_boundary": null
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.795700073242188,
+        "y": 52.68122100830078
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": -0.9926570653915405,
+            "y": -0.12096278369426727
+          },
+          "player": "player_1",
+          "position": {
+            "x": 445.5334777832031,
+            "y": 512.950927734375
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 1,
+        "owner": "player_1",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "secured"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "recovering",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1273,
+        "stable": false,
+        "standing_clear": false,
+        "tick": 25620,
+        "version": 1
+      },
+      "revision": 1273,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.43204, y: 512.2852 }, angle: 0.2663217, linear_velocity: Vec2 { x: -1.1501322, y: -1.431981 }, angular_velocity: 3.487764 }, up: Vec2 { x: -0.9754752, y: 0.22010946 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 445.65405, y: 512.0139 }, local_surface: ContactPoint { position: Vec2 { x: 18.498976, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: -0.99265856, y: -0.120950244 }, velocity: Vec2 { x: -0.18165702, y: -0.81561774 }, angular_velocity: 0.014998912, separation: -0.012114912 }), relative_speed: 0.15950423, contacts: 1, jumps: 0, balance: Recovering, recovery_progress: 1.0, settled_seconds: 0.0, knockdowns: 4, recoveries: 1, last_knockdown: Some(SpacelingDisturbance { velocity_change: 2.6731517, angular_speed: 17.984737 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 18.499534606933594,
+          "y": 52.49365234375
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 18.498976, y: 52.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": -0.9926585555076599,
+          "y": -0.12095024436712265
+        },
+        "separation": -0.012114912271499634,
+        "world_position": {
+          "x": 445.654052734375,
+          "y": 512.013916015625
+        }
+      },
+      "tick": 25620,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 2,
+        "cells": [
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            113
+          ],
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            113
+          ]
+        ]
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 2,
+        "cells": [
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            112
+          ],
+          [
+            77,
+            113
+          ],
+          [
+            77,
+            114
+          ],
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ]
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.542003631591797,
+        "y": 52.69253921508789
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": null,
+        "flag_interaction_range": 3.0,
+        "neutralizations": 2,
+        "owner": null,
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "need_support"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "recovering",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1277,
+        "stable": false,
+        "standing_clear": false,
+        "tick": 25680,
+        "version": 1
+      },
+      "revision": 1277,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.27716, y: 511.21252 }, angle: 1.4923968, linear_velocity: Vec2 { x: 0.7254478, y: -0.5342009 }, angular_velocity: 3.476087 }, up: Vec2 { x: -0.979624, y: 0.20084034 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }, position: Vec2 { x: 445.67664, y: 511.09232 }, local_surface: ContactPoint { position: Vec2 { x: 0.36316407, y: 0.34367406 }, normal: Vec2 { x: 0.72632813, y: 0.6873481 } }, normal: Vec2 { x: -0.787339, y: 0.61652046 }, velocity: Vec2 { x: -0.18371372, y: -0.8395569 }, angular_velocity: 0.0434912, separation: -0.011496097 }), relative_speed: 2.151859, contacts: 3, jumps: 0, balance: Recovering, recovery_progress: 0.10416667, settled_seconds: 0.0, knockdowns: 5, recoveries: 2, last_knockdown: Some(SpacelingDisturbance { velocity_change: 6.1615653, angular_speed: 30.81564 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }",
+        "local_position": {
+          "x": 18.3686466217041,
+          "y": 52.31309509277344
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 0.36316407, y: 0.34367406 }, normal: Vec2 { x: 0.72632813, y: 0.6873481 } }",
+        "normal": {
+          "x": -0.7873389720916748,
+          "y": 0.6165204644203186
+        },
+        "separation": -0.011496096849441528,
+        "world_position": {
+          "x": 445.6766357421875,
+          "y": 511.0923156738281
+        }
+      },
+      "tick": 25680,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2740,
+        "cells": null,
+        "occupied_boundary": null
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2741,
+        "cells": null,
+        "occupied_boundary": null
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.533906936645508,
+        "y": 52.65262985229492
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": null,
+        "flag_interaction_range": 3.0,
+        "neutralizations": 2,
+        "owner": null,
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "need_support"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "recovering",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1279,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 25740,
+        "version": 1
+      },
+      "revision": 1279,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.15582, y: 510.38852 }, angle: 1.5781513, linear_velocity: Vec2 { x: -0.14068653, y: -0.8295333 }, angular_velocity: 0.046561085 }, up: Vec2 { x: -0.9824824, y: 0.18635544 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }, position: Vec2 { x: 445.55927, y: 510.3076 }, local_surface: ContactPoint { position: Vec2 { x: 0.40211087, y: 0.29716465 }, normal: Vec2 { x: 0.80422175, y: 0.5943293 } }, normal: Vec2 { x: -0.72283095, y: 0.69102484 }, velocity: Vec2 { x: -0.15557544, y: -0.8306262 }, angular_velocity: 0.024056671, separation: -0.020025492 }), relative_speed: 0.027260758, contacts: 4, jumps: 0, balance: Recovering, recovery_progress: 1.0, settled_seconds: 0.0, knockdowns: 5, recoveries: 2, last_knockdown: Some(SpacelingDisturbance { velocity_change: 6.1615653, angular_speed: 30.81564 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }",
+        "local_position": {
+          "x": 18.393108367919922,
+          "y": 52.265987396240234
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 0.40211087, y: 0.29716465 }, normal: Vec2 { x: 0.80422175, y: 0.5943293 } }",
+        "normal": {
+          "x": -0.7228309512138367,
+          "y": 0.6910248398780823
+        },
+        "separation": -0.02002549171447754,
+        "world_position": {
+          "x": 445.55926513671875,
+          "y": 510.3075866699219
+        }
+      },
+      "tick": 25740,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2737,
+        "cells": null,
+        "occupied_boundary": null
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2738,
+        "cells": null,
+        "occupied_boundary": null
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 113
+      },
+      "actor_local": {
+        "x": 18.538089752197266,
+        "y": 52.64392852783203
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": null,
+        "flag_interaction_range": 3.0,
+        "neutralizations": 2,
+        "owner": null,
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "need_support"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1280,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 25800,
+        "version": 1
+      },
+      "revision": 1280,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.01407, y: 509.57034 }, angle: 1.5499814, linear_velocity: Vec2 { x: -0.1414327, y: -0.8346635 }, angular_velocity: 0.052342944 }, up: Vec2 { x: -0.98514533, y: 0.17172268 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }, position: Vec2 { x: 445.41833, y: 509.47876 }, local_surface: ContactPoint { position: Vec2 { x: 0.42302507, y: 0.26655173 }, normal: Vec2 { x: 0.84605014, y: 0.53310347 } }, normal: Vec2 { x: -0.71727884, y: 0.6967863 }, velocity: Vec2 { x: -0.14954057, y: -0.8327641 }, angular_velocity: 0.03421655, separation: -0.015814424 }), relative_speed: 0.022805214, contacts: 4, jumps: 0, balance: Balanced, recovery_progress: 0.0, settled_seconds: 0.0, knockdowns: 5, recoveries: 3, last_knockdown: Some(SpacelingDisturbance { velocity_change: 6.1615653, angular_speed: 30.81564 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(1125899906847969), role: ColliderRole(0), part: 0 }",
+        "local_position": {
+          "x": 18.38086700439453,
+          "y": 52.26039123535156
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 0.42302507, y: 0.26655173 }, normal: Vec2 { x: 0.84605014, y: 0.53310347 } }",
+        "normal": {
+          "x": -0.7172788381576538,
+          "y": 0.6967862844467163
+        },
+        "separation": -0.01581442356109619,
+        "world_position": {
+          "x": 445.4183349609375,
+          "y": 509.478759765625
+        }
+      },
+      "tick": 25800,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2737,
+        "cells": null,
+        "occupied_boundary": null
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": true,
+        "cell_count": 2738,
+        "cells": null,
+        "occupied_boundary": null
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 78,
+        "y": 112
+      },
+      "actor_local": {
+        "x": 18.21022605895996,
+        "y": 51.90184783935547
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 2,
+        "claimant": null,
+        "flag": null,
+        "flag_interaction_range": 3.0,
+        "neutralizations": 2,
+        "owner": null,
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "need_settle"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "balanced",
+        "crawl": [
+          null,
+          null
+        ],
+        "crawl_clearance": [
+          null,
+          null
+        ],
+        "crawl_floor": [
+          null,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1283,
+        "stable": true,
+        "standing_clear": true,
+        "tick": 25860,
+        "version": 1
+      },
+      "revision": 1283,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 445.66574, y: 508.55585 }, angle: 1.2367779, linear_velocity: Vec2 { x: 0.16546074, y: -1.6893657 }, angular_velocity: -0.8887577 }, up: Vec2 { x: -0.987752, y: 0.1560322 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 446.091, y: 508.5144 }, local_surface: ContactPoint { position: Vec2 { x: 18.079927, y: 51.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: -0.9836632, y: -0.18001865 }, velocity: Vec2 { x: -0.1266129, y: -0.8086178 }, angular_velocity: 0.014998914, separation: -0.00885573 }), relative_speed: -1.2840883, contacts: 1, jumps: 0, balance: Balanced, recovery_progress: 0.0, settled_seconds: 0.0, knockdowns: 5, recoveries: 3, last_knockdown: Some(SpacelingDisturbance { velocity_change: 6.1615653, angular_speed: 30.81564 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 18.092803955078125,
+          "y": 51.491024017333984
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 18.079927, y: 51.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": -0.9836632013320923,
+          "y": -0.18001864850521088
+        },
+        "separation": -0.008855730295181274,
+        "world_position": {
+          "x": 446.09100341796875,
+          "y": 508.514404296875
+        }
+      },
+      "tick": 25860,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            112
+          ],
+          [
+            77,
+            113
+          ],
+          [
+            78,
+            111
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            111
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            113
+          ]
+        ]
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            111
+          ],
+          [
+            77,
+            112
+          ],
+          [
+            77,
+            113
+          ],
+          [
+            77,
+            114
+          ],
+          [
+            78,
+            111
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            111
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            111
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ]
+      }
+    },
+    {
+      "actor_cell": {
+        "x": 79,
+        "y": 112
+      },
+      "actor_local": {
+        "x": 19.249591827392578,
+        "y": 51.91876983642578
+      },
+      "cell_size": 1.0,
+      "claim": {
+        "captures": 3,
+        "claimant": null,
+        "flag": {
+          "normal": {
+            "x": 0.6970065832138062,
+            "y": -0.7170647382736206
+          },
+          "player": "player_1",
+          "position": {
+            "x": 522.9439697265625,
+            "y": 450.4815673828125
+          },
+          "raised_fraction": 1.0
+        },
+        "flag_interaction_range": 3.0,
+        "neutralizations": 2,
+        "owner": "player_1",
+        "phase": "idle",
+        "planet": 0,
+        "progress": 0.0,
+        "stage_required_seconds": 3.0,
+        "status": "secured"
+      },
+      "height": 121,
+      "physical_state_unchanged": true,
+      "planet": 0,
+      "posture": {
+        "balance": "balanced",
+        "crawl": [
+          {
+            "direction": -1.0,
+            "position": {
+              "x": 18.64958381652832,
+              "y": 51.9189338684082
+            }
+          },
+          null
+        ],
+        "crawl_clearance": [
+          0.64000004529953,
+          0.0
+        ],
+        "crawl_floor": [
+          true,
+          null
+        ],
+        "get_up_attempts": 0,
+        "get_up_result": "not_requested",
+        "owner": "player_1",
+        "planet": 0,
+        "revision": 1642,
+        "stable": true,
+        "standing_clear": false,
+        "tick": 34500,
+        "version": 1
+      },
+      "revision": 1642,
+      "spaceling_debug": "Some(SpacelingSnapshot { motion: BodyMotion { position: Vec2 { x: 522.3845, y: 449.3538 }, angle: -2.744951, linear_velocity: Vec2 { x: 0.7796031, y: 0.37904277 }, angular_velocity: -0.14298987 }, up: Vec2 { x: 0.40402466, y: -0.914748 }, support: Some(SurfaceContact { collider: ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }, position: Vec2 { x: 522.15497, y: 449.7286 }, local_surface: ContactPoint { position: Vec2 { x: 19.140083, y: 51.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }, normal: Vec2 { x: 0.6968272, y: -0.7172391 }, velocity: Vec2 { x: 0.7543038, y: 0.33262387 }, angular_velocity: 0.015004276, separation: -0.010461807 }), relative_speed: -0.11180454, contacts: 2, jumps: 0, balance: Balanced, recovery_progress: 0.0, settled_seconds: 0.0, knockdowns: 5, recoveries: 3, last_knockdown: Some(SpacelingDisturbance { velocity_change: 6.1615653, angular_speed: 30.81564 }), get_up_attempts: 0, get_up_result: NotRequested })",
+      "support": {
+        "collider": "ColliderId { entity: PhysicsId(100), role: ColliderRole(1014), part: 0 }",
+        "local_position": {
+          "x": 19.15294647216797,
+          "y": 51.4900016784668
+        },
+        "local_surface": "ContactPoint { position: Vec2 { x: 19.140083, y: 51.5 }, normal: Vec2 { x: -0.0, y: 1.0 } }",
+        "normal": {
+          "x": 0.6968271732330322,
+          "y": -0.7172390818595886
+        },
+        "separation": -0.010461807250976562,
+        "world_position": {
+          "x": 522.1549682617188,
+          "y": 449.7286071777344
+        }
+      },
+      "tick": 34500,
+      "width": 121,
+      "four_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            112
+          ],
+          [
+            77,
+            113
+          ],
+          [
+            78,
+            111
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            111
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            113
+          ]
+        ]
+      },
+      "eight_neighbor": {
+        "failure": null,
+        "exterior_connected": false,
+        "cell_count": 4,
+        "cells": [
+          [
+            78,
+            112
+          ],
+          [
+            78,
+            113
+          ],
+          [
+            79,
+            112
+          ],
+          [
+            79,
+            113
+          ]
+        ],
+        "occupied_boundary": [
+          [
+            77,
+            111
+          ],
+          [
+            77,
+            112
+          ],
+          [
+            77,
+            113
+          ],
+          [
+            77,
+            114
+          ],
+          [
+            78,
+            111
+          ],
+          [
+            78,
+            114
+          ],
+          [
+            79,
+            111
+          ],
+          [
+            79,
+            114
+          ],
+          [
+            80,
+            111
+          ],
+          [
+            80,
+            112
+          ],
+          [
+            80,
+            113
+          ],
+          [
+            80,
+            114
+          ]
+        ]
+      }
+    }
+  ]
+}
