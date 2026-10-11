@@ -49,6 +49,8 @@ impl TOIEntry {
         end_time: Real,
         smallest_contact_dist: Real,
     ) -> Option<Self> {
+        #[cfg(feature = "ccd-diagnostics")]
+        let _toi_span = crate::counters::ccd_probe::Span::new(false);
         assert!(start_time <= end_time);
         if rb1.is_none() && rb2.is_none() {
             return None;
@@ -75,13 +77,19 @@ impl TOIEntry {
         // We may be slightly over-conservative by taking the `max(0.0)` here.
         // But removing the `max` doesn't really affect performances so let's
         // keep it since more conservatism is good at this stage.
-        let thickness = (co1.shape.0.ccd_thickness() + co2.shape.0.ccd_thickness())
-            + smallest_contact_dist.max(0.0);
+        let thickness = {
+            #[cfg(feature = "ccd-diagnostics")]
+            let _thickness_span = crate::counters::ccd_probe::Span::new(true);
+            (co1.shape.0.ccd_thickness() + co2.shape.0.ccd_thickness())
+                + smallest_contact_dist.max(0.0)
+        };
         let is_pseudo_intersection_test = co1.is_sensor()
             || co2.is_sensor()
             || !co1.flags.solver_groups.test(co2.flags.solver_groups);
 
         if (end_time - start_time) * vel12 < thickness {
+            #[cfg(feature = "ccd-diagnostics")]
+            crate::counters::ccd_probe::rejected();
             return None;
         }
 

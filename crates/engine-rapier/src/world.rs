@@ -24,6 +24,8 @@ use serde::{Deserialize, Serialize};
 mod ball_cast;
 pub use ball_cast::{BallCastHit, BallCastOptions, BallCastStatus};
 mod ccd;
+#[cfg(feature = "ccd-diagnostics")]
+pub mod ccd_diagnostics;
 mod clearance;
 pub(crate) use clearance::{SolidDependency, SolidObstacles};
 #[cfg(feature = "query-diagnostics")]

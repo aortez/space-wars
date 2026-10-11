@@ -55,6 +55,7 @@ features = [
 status = "actively-developed"
 
 [features]
+ccd-diagnostics = ["std"]
 alloc = [
     "nalgebra/alloc",
     "parry2d/alloc",
