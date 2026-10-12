@@ -19,6 +19,7 @@ use scenario_spacewars::{
 use serde::Serialize;
 
 pub const RULE_PILOT_V4_POLICY_ID: &str = "rule_pilot_v4";
+pub const DIRECT_LASER_WINDOW_PROFILE: &str = "material_direct_laser_window_v1";
 #[cfg(feature = "sensor-profile")]
 mod terrain_recovery;
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -35,6 +36,8 @@ impl CombatIntent {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CombatPilotTelemetry {
     pub policy: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub laser_window_profile: Option<&'static str>,
     pub goal: &'static str,
     pub target: Option<PlayerId>,
     pub engagement_ticks: u64,
@@ -103,6 +106,7 @@ impl RulePilotV4 {
             terrain_recovery: false,
             telemetry: CombatPilotTelemetry {
                 policy: RULE_PILOT_V4_POLICY_ID,
+                laser_window_profile: None,
                 goal: "takeoff",
                 target: None,
                 engagement_ticks: 0,
@@ -128,14 +132,23 @@ impl RulePilotV4 {
         pilot
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let direct_laser_window = self.telemetry.laser_window_profile.is_some();
         #[cfg(feature = "sensor-profile")]
         let terrain_recovery = self.terrain_recovery;
         *self = Self::with_combat_breaks(context, self.telemetry.breaks.config);
+        self.set_direct_laser_window(direct_laser_window);
         #[cfg(feature = "sensor-profile")]
         self.set_terrain_recovery(terrain_recovery);
     }
     pub fn telemetry(&self) -> &CombatPilotTelemetry {
         &self.telemetry
+    }
+    pub(crate) fn set_direct_laser_window(&mut self, enabled: bool) {
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        self.telemetry.laser_window_profile = enabled.then_some(DIRECT_LASER_WINDOW_PROFILE);
     }
     pub fn label(&self) -> &'static str {
         self.telemetry.goal
@@ -266,6 +279,15 @@ impl RulePilotV4 {
                 o.cannon_ready,
                 &config,
             );
+            // The laser follows the present heading; cannon rounds need lead.
+            // This option only changes the firing gate, not steering or safety.
+            let laser = if self.telemetry.laser_window_profile.is_some() {
+                o.laser_available
+                    && shortest_heading_error(local).abs() < 0.08
+                    && solution.distance <= config.laser_range
+            } else {
+                solution.intent.laser
+            };
             if !target.ground_occluded && solution.distance < 260.0 {
                 if self.telemetry.breaks.config.interval_seconds > 0 {
                     if self.telemetry.breaks.remaining_engagement_ticks == 0 {
@@ -290,10 +312,7 @@ impl RulePilotV4 {
                     self.telemetry.breaks.last_reengaged_tick = Some(p.tick);
                     self.awaiting_break_return = false;
                 }
-                if self.awaiting_rejoin
-                    && target.visible
-                    && (solution.intent.laser || solution.intent.cannon)
-                {
+                if self.awaiting_rejoin && target.visible && (laser || solution.intent.cannon) {
                     self.telemetry.rejoined_tick = Some(p.tick);
                     self.telemetry.combat_returns += 1;
                     self.awaiting_rejoin = false;
@@ -315,7 +334,7 @@ impl RulePilotV4 {
                         },
                     },
                     weapons: SurfaceWeaponAction {
-                        laser: target.visible && solution.intent.laser,
+                        laser: target.visible && laser,
                         cannon: target.visible && solution.intent.cannon,
                     },
                 };
@@ -453,6 +472,92 @@ mod tests {
         target.ground_occluded = false;
         target.visible = true;
         o
+    }
+
+    fn crossing_target() -> CombatObservationV2 {
+        let mut o = clear_flight();
+        let p = &mut o.recovery.flight.pilot;
+        p.ship.angle = 0.0;
+        p.ship.spin = 0.0;
+        let target = o.target.as_mut().unwrap();
+        target.motion.position = p.ship.position + Vec2::Y * 120.0;
+        target.motion.velocity = p.ship.velocity + Vec2::X * 45.0;
+        o.laser_available = true;
+        o.cannon_ready = false;
+        o
+    }
+
+    fn laser_window_pilot(enabled: bool) -> RulePilotV4 {
+        let mut pilot = RulePilotV4::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: 42,
+        });
+        pilot.set_direct_laser_window(enabled);
+        pilot
+    }
+
+    #[test]
+    fn direct_laser_window_takes_crossing_shot_without_changing_guidance() {
+        let o = crossing_target();
+        let control = laser_window_pilot(false).intent(&o);
+        let candidate = laser_window_pilot(true).intent(&o);
+        assert!(!control.weapons.laser);
+        assert!(candidate.weapons.laser);
+        assert_eq!(candidate.flight, control.flight);
+        assert_eq!(candidate.weapons.cannon, control.weapons.cannon);
+    }
+
+    #[test]
+    fn direct_laser_window_does_not_fire_laser_at_missile_lead() {
+        let mut o = crossing_target();
+        o.cannon_ready = true;
+        let p = &mut o.recovery.flight.pilot;
+        let aim = crate::intercept_position(Vec2::Y * 120.0, Vec2::X * 45.0, 300.0, 1.0);
+        p.ship.angle = -shortest_heading_error(aim);
+        let control = laser_window_pilot(false).intent(&o);
+        let candidate = laser_window_pilot(true).intent(&o);
+        assert!(control.weapons.laser && control.weapons.cannon);
+        assert!(!candidate.weapons.laser && candidate.weapons.cannon);
+        assert_eq!(candidate.flight, control.flight);
+    }
+
+    #[test]
+    fn direct_laser_window_keeps_safety_visibility_readiness_and_break_gates() {
+        for gate in [
+            "ground", "hidden", "occluded", "unready", "range", "unarmed", "break",
+        ] {
+            let mut o = crossing_target();
+            let mut pilot = laser_window_pilot(true);
+            match gate {
+                "ground" => {
+                    let p = &mut o.recovery.flight.pilot;
+                    p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 20.0);
+                    o.target.as_mut().unwrap().motion.position = p.ship.position + Vec2::Y * 120.0;
+                }
+                "hidden" => o.target.as_mut().unwrap().visible = false,
+                "occluded" => o.target.as_mut().unwrap().ground_occluded = true,
+                "unready" => o.laser_available = false,
+                "range" => o.target.as_mut().unwrap().motion.position += Vec2::Y * 200.0,
+                "unarmed" => o.recovery.flight.pilot.controls_armed = false,
+                "break" => {
+                    pilot.telemetry.breaks.active_until_tick =
+                        Some(o.recovery.flight.pilot.tick + 60)
+                }
+                _ => unreachable!(),
+            }
+            assert!(!pilot.intent(&o).weapons.laser, "{gate}");
+        }
+    }
+
+    #[test]
+    fn direct_laser_window_survives_reset_and_repeated_observation() {
+        let o = crossing_target();
+        let mut pilot = laser_window_pilot(true);
+        let first = pilot.intent(&o);
+        assert!(first.weapons.laser);
+        assert_eq!(pilot.intent(&o), first);
+        pilot.reset(pilot.context);
+        assert_eq!(pilot.intent(&o), first);
     }
 
     #[test]
