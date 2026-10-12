@@ -270,7 +270,7 @@ fn generate_field(radius: f32, seed: u64) -> Result<Terrain, TerrainError> {
         return Err(TerrainError("terrain planet radius must be 5..150"));
     }
     let r = radius.ceil() as i32;
-    let limit = (radius * BODY_BOUNDS_RADIUS_SCALE).powi(2);
+    let limit = radius * BODY_BOUNDS_RADIUS_SCALE;
     Terrain::generate(
         (r * 2 + 1) as u32,
         (r * 2 + 1) as u32,
@@ -288,7 +288,9 @@ fn generate_field(radius: f32, seed: u64) -> Result<Terrain, TerrainError> {
         |coord| {
             let x = coord.x - r;
             let y = coord.y - r;
-            if (x * x + y * y) as f32 > limit {
+            // Match the surface sample's distance calculation: squaring a
+            // rounded radius can classify a zero-distance boundary cell as void.
+            if ((x * x + y * y) as f32).sqrt() > limit {
                 return MaterialId::VOID;
             }
             let mut h = seed

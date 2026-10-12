@@ -913,3 +913,27 @@ diagnostics** on the baseline and rollout sources; it is not reported as a pass.
 The [rollout receipt](data/combat-clearance-rollout-v1.json) records the source
 and binary hashes, comparison commands, frozen references and validation logs.
 Full local receipts are under `target/recovery-clearance-rollout/v1/`.
+
+The rollout's first CI run exposed a separate new-world generation failure:
+the rematch test selects fresh random seeds, and material terrain could reject
+its own surface samples before any bot decision. Seed **377**, planet **1**,
+reproduces the same error deterministically. Its radius (`0x4205e217` as `f32`
+bits) puts cells such as `(33, 3)` at zero signed distance, while the squared
+radius rounds below their squared distance and classifies them as void.
+
+Material generation now uses the same square-root distance as the surface
+samples. The strict sample/material validation is unchanged. The retained
+regression fails before the correction and passes afterward, including the
+adjacent representable radii. Reproduce it with:
+
+```sh
+RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci \
+  -p scenario-spacewars --lib \
+  terrain::tests::generated_planet_accepts_cells_at_a_rounded_surface_boundary -- --exact
+```
+
+With the correction, **3,053 workspace tests** pass and the same four actual
+client replays still match all **122,831 ticks**, final worlds, match results and
+complete bot telemetry. The [follow-up receipt](data/combat-clearance-rollout-v2.json)
+records the failing CI case, deterministic reproduction, corrected source and
+binary identity, regression results and repeated integration comparisons.

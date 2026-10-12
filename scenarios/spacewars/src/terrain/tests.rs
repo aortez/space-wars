@@ -1,6 +1,49 @@
 use super::*;
 use engine_rapier::world::{CollisionGroups, RayCastOptions};
 
+#[test]
+fn generated_planet_accepts_cells_at_a_rounded_surface_boundary() {
+    // Seed 377 puts the second planet's (33, 3) cell at zero signed distance,
+    // although squaring its rounded radius falls just below 33^2 + 3^2.
+    let mut state = SpacewarsScenario::init(
+        SpacewarsConfig {
+            universe_radius: 1600,
+            use_starfield: false,
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        },
+        377,
+    );
+    state.terrain.surface = TerrainSurface::Interpolated;
+    let radius = state.planets[1].radius;
+    assert_eq!(radius.to_bits(), 0x4205e217);
+    state.enable_planet_terrain(1).unwrap();
+    let field = state.planet_terrain(1).unwrap();
+    for point in [
+        Vec2::new(33.0, 3.0),
+        Vec2::new(-33.0, -3.0),
+        Vec2::new(3.0, -33.0),
+        Vec2::new(-3.0, 33.0),
+    ] {
+        assert_eq!(radius * BODY_BOUNDS_RADIUS_SCALE - point.length(), 0.0);
+        assert_ne!(
+            field
+                .cell(field.local_to_cell(point).unwrap())
+                .unwrap()
+                .material,
+            MaterialId::VOID
+        );
+    }
+    // Adjacent representable radii exercise both sides of the boundary.
+    for bits in [radius.to_bits() - 1, radius.to_bits(), radius.to_bits() + 1] {
+        let radius = f32::from_bits(bits);
+        generate_field(radius, 377 ^ 1)
+            .unwrap()
+            .with_surface_distances(|p| radius * BODY_BOUNDS_RADIUS_SCALE - p.length())
+            .unwrap();
+    }
+}
+
 impl SpacewarsState {
     /// Controlled actor fixtures use the same next-tick release boundary as an
     /// impact, with explicit local impulse parameters to isolate support changes.
