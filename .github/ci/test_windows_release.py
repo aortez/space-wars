@@ -168,6 +168,25 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('github.run_id', upload['with']['name'])
         self.assertIn('github.run_attempt', upload['with']['name'])
 
+    def test_publication_permissions_and_success_gate(self):
+        workflow = self.load('windows-nightly.yml')
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        build = workflow['jobs']['windows-release']
+        self.assertNotIn('permissions', build)
+        publish = workflow['jobs']['publish']
+        self.assertEqual(publish['needs'], 'windows-release')
+        self.assertEqual(publish['if'], "${{ needs.windows-release.result == 'success' }}")
+        self.assertEqual(publish['permissions'], {'contents': 'write'})
+        self.assertEqual(publish['concurrency'], {'group': 'windows-nightly-publication', 'cancel-in-progress': 'false'})
+        download = publish['steps'][1]
+        self.assertEqual(download['with']['artifact-ids'], '${{ needs.windows-release.outputs.artifact }}')
+        self.assertEqual(publish['steps'][0]['with']['ref'], '${{ needs.windows-release.outputs.source }}')
+        self.assertIn('steps.evidence.outputs.artifact-id', build['outputs']['artifact'])
+        ci = self.load('ci.yml')
+        self.assertNotIn('publish', ci['jobs'])
+        self.assertNotIn('publish_nightly', str(ci))
+        self.assertNotIn('contents: write', (ROOT / '.github/workflows/ci.yml').read_text())
+
     def test_candidate_head_and_shared_release_path(self):
         ci = self.load('ci.yml')
         job = ci['jobs']['windows-release']
