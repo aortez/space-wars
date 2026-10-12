@@ -496,3 +496,92 @@ No production resource option, default, recovery behavior or device changes are
 part of this diagnostic. Maximum missile reload cadence itself costs
 `25 / 2 = 12.5` energy/second, exceeding regeneration even without laser fire.
 The reserve therefore cannot guarantee indefinitely sustained missile cadence.
+
+### Completed early-reserve diagnostic
+
+The plan and rule were committed as `54d4478` before either native continuation
+ran. The unchanged arm reproduces all **13,403** candidate reference ticks,
+including the replayed prefix, and its final state, controllers and both player
+frames match byte for byte. Both arms start from identical physical and
+controller copies at 7,680. The old empty-reload diagnostic was rerun with the
+shared harness: all three summaries, final files and **21,483** recorded decision
+rows still match its retained evidence, apart from added diagnostic metadata.
+
+The earlier reserve does protect a reload before ammunition runs out:
+
+- The latch closes at **7,991** after a native reload charge. The first altered
+  request is **7,997**, with one missile loaded, a paid reload underway and
+  22.53 energy. All inputs, decision hashes and physical-state hashes match the
+  candidate through the decision before applying that first suppression.
+- At **8,230**, energy is **27.57**, versus **14.57** in the unchanged candidate.
+  The native loader starts the next reload at **8,231**, and the replacement
+  missile launches at **8,351**, the previously missed opportunity.
+- The next reload must still wait until **8,366**: at 8,351 only 22.53 energy
+  remains. Reserving energy does not make maximum missile cadence sustainable.
+
+Every one of the **258** altered input ticks satisfies the frozen latch rule;
+relative to that arm's bot decision, only P2's laser flag changes from on to off.
+No cannon request is overridden.
+The latch closes three times, at native reload charges, and never cuts an
+already-running laser-only request interval in this continuation. The resumed
+burst at **8,186–8,230** lasts 45 ticks and ends with a cannon launch. All ten
+applied laser-only intervals last at least six ticks; no one-tick switching
+appears. These intervals describe input continuity, not measured visible beam
+length or a universal continuity guarantee.
+
+That stability has a substantial cost: the latch stays closed for **459 ticks
+(7.65 seconds)** at 8,231–8,689 while the native loader replenishes ammunition.
+Before its first ship loss the early-reserve bot records **194 laser hit ticks**,
+versus **466** in the unchanged candidate. The two first ships survive for
+different lengths of time, so these totals are not equal-exposure accuracy rates.
+
+| Evaluated P2 result | Direct laser | Direct laser + early reserve |
+| --- | ---: | ---: |
+| Reload after the one ending at 8,231 | 8,567 | 8,231 |
+| Missile launch at 8,351 | No | Yes |
+| Missiles launched before first ship loss | 6 | 8 |
+| Laser hit ticks before first ship loss | 466 | 194 |
+| First ship loss | 8,807 | 8,920 |
+| Completed recoveries | 0 | 1 |
+| Total ship losses | 1 | 2 |
+| Native ending | Loses at 13,403 | Loses at 18,466 |
+
+The reserve continuation rebuilds at **10,780**, boards at **10,854** and records
+recovery completion at **10,855**. Its rebuilt ship is lost at **15,107**; the
+second pod is destroyed at **17,944**, releasing the pilot. Native world impact
+kills the on-foot pilot at **18,466**. Recovery policy was never reset or edited.
+
+Do not attribute that different recovery history solely to the restored missile.
+The first opponent-health difference is already at **7,999**; P1 motion differs
+at **8,034** and P2 motion at **8,045**, before the restored reload or shot.
+Suppressing laser fire changes the fight itself, not just the resource balance.
+The retained report includes these first differences and the native damage data.
+
+**Decision: retain defaults and keep the resource rule diagnostic-only.** This
+fixed early reserve restores a specific missile opportunity without the feared
+frame-by-frame switching, but withholds considerable laser fire and still loses
+the retained game. One continuation cannot establish a general outcome benefit
+or invalidate the independent qualification failure. Do not tune these
+thresholds or select a new production candidate from this result. The separate
+retained attack/avoidance cycle remains available for the next focused diagnosis.
+
+The [machine-readable early-reserve report](data/combat-early-reserve-v1.json.gz)
+contains both summaries, exact override intervals, latch transitions, reloads,
+actual launches, input intervals, mission events, checkpoints, source/binary
+identity and artifact SHA-256 receipts. Raw evidence and the report-generation
+script are retained under `target/combat-155/early-reserve-v1`.
+
+Validation: **463 AI unit tests**, strict Clippy, formatting, both explicit native
+diagnostics, all override checks, exact replay comparisons and physical/material
+and shared planning-work audits pass. No device or production setting changed.
+
+Reproduce the early diagnostic using a fresh output directory:
+
+```sh
+RUST_MIN_STACK=16777216 \
+SPACEWARS_COMBAT_CANDIDATE="$PWD/target/combat-155/confirmation-candidate-v1/03-round-8s-p2/output" \
+SPACEWARS_COMBAT_ENERGY_OUT=/tmp/spacewars-combat-early-reserve \
+target/combat-155/early-reserve-v1/ai-tests \
+  mission_pilot::terrain_recovery::qualification::combat_energy::retained_combat_early_reserve \
+  --ignored --exact --nocapture
+```
