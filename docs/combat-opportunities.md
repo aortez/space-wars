@@ -647,3 +647,84 @@ experiments unchanged.
 
 Focused tests cover expiry, restart, ordinary clearance/range release, a real
 destination change, default omission, clone/cache consistency and reset semantics.
+
+### Completed handoff comparison
+
+Implementation, tests and the four-game plan were frozen at **`abe7e92`**.
+Both unchanged games reproduce all **33,262** reference ticks, their final JSON
+and both player frames byte for byte. Controller text matches after removing
+exactly two new `hunt_clearance_handoff: None,` lines; it is not claimed to be
+byte-identical before that schema normalization.
+
+Both enabled runs first change an action at **14,683**. All preceding actions,
+physical-state hashes and typed decision hashes match their references after
+omitting only the new profile identifier. At the first changed action the
+physical state and P1 input still match. Inputs remain native bot decisions;
+there are no controller resets, forced actions or world edits.
+
+The premature releases at **14,683 and 15,403 fall from two to zero in each
+configuration**. With standard laser, the original climb now continues until
+**15,174**: anchor clearance is 153.40 and the other nearby planet finally clears
+140.10. With direct laser it continues until **15,278**, with clearances 140.09
+and 145.78. Both have valid outward radial motion. At the later pursuit restart
+there is no active climb to discard in either changed trajectory. The focused
+restart test independently covers preserving one when present.
+
+| Evaluated P2 result | Standard laser | Standard + handoff | Direct laser | Direct + handoff |
+| --- | ---: | ---: | ---: | ---: |
+| Native outcome | Win | Win | Win | Win |
+| Finished tick | 17,146 | 17,585 | 16,116 | 23,744 |
+| Completed departures | 3 | 3 | 3 | 3 |
+| Ship losses | 0 | 0 | 0 | 0 |
+| Final pilot health | 100% | 100% | 100% | 100% |
+| Final ship hull | 26.53% | 26.53% | 26.53% | 24.37% |
+| Owned planets at ending | 3 | 3 | 3 | 2 |
+
+This fixes the identified loss of safety memory, **not every climb/attack
+cycle**. Standard-laser pursuit still makes inward passes and re-enters clearance
+when falling speed warrants it. The direct-laser continuation also has ordinary
+300-unit opponent-range releases before full clearance; that existing rule was
+not changed. Every recorded release is retained and independently classified
+from the before/after controller state and native observation geometry.
+
+Neither retained win demonstrates stronger combat. All four endings are opponent
+deaths from native impacts. Standard control ends on a planet impact; its handoff
+run ends on an asteroid impact. Direct control ends on a terrain-fragment impact;
+its handoff run ends on world impact. Both changed games take longer. The latter
+continues for another **7,628 ticks**, loses ownership of one planet, takes some
+additional hull damage and ends during a new capture attempt. These later costs
+remain visible; the earlier control ending does not provide matched exposure.
+
+**Decision: advance the handoff option with the standard laser policy to a
+separate comparison, while keeping defaults unchanged.** The frozen mechanism
+check passes, including both wins and safety/work audits. It does not qualify
+the handoff option for rollout, rescue the failed direct-laser candidate, or
+establish that their combination should be selected. The next comparison should
+use both terrain shapes, both asteroid settings and both evaluated seats, and
+check survival, missions, outcomes and actual handoff exercise.
+
+The [handoff report](data/combat-clearance-handoff-v1.json.gz) retains all four
+summaries, native terminal damage, premature and ordinary releases, pursuit
+handoffs, phase intervals, first-change checkpoints, validation and source/binary/
+trace SHA-256 receipts. Its **74,591** trace rows are complete and ordered, and
+their shared charged-work totals stay within the configured limits. Raw files
+and the report-generation script are under
+`target/combat-155/clearance-handoff-v1`.
+
+Validation: **467 AI unit tests**, **21 physical combat/mission integration
+tests**, strict AI Clippy, formatting, desktop client checking and all four native
+games pass. The additional local Pi GPU client check could not run to completion
+because this host lacks the `libseat.pc` development metadata. Its failure log is
+retained; no dependency workaround, device deployment or setting change was made.
+
+Reproduce with the retained binary and a fresh output directory:
+
+```sh
+RUST_MIN_STACK=16777216 \
+SPACEWARS_COMBAT_CONTROL="$PWD/target/combat-155/confirmation-control-v1/15-angular-8s-p2/output" \
+SPACEWARS_COMBAT_CANDIDATE="$PWD/target/combat-155/confirmation-candidate-v1/15-angular-8s-p2/output" \
+SPACEWARS_COMBAT_CLEARANCE_OUT=/tmp/spacewars-combat-clearance-handoff \
+target/combat-155/clearance-handoff-v1/ai-tests \
+  mission_pilot::terrain_recovery::qualification::combat_clearance::retained_combat_clearance_handoff \
+  --ignored --exact --nocapture
+```
