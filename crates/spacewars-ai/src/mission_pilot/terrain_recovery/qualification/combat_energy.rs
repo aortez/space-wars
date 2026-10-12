@@ -49,7 +49,7 @@ impl EarlyReserve {
     }
 }
 
-fn reference(path: &Path) -> Vec<Recorded> {
+pub(super) fn reference(path: &Path) -> Vec<Recorded> {
     BufReader::new(File::open(path.join("actions.jsonl")).unwrap())
         .lines()
         .map(|line| serde_json::from_str(&line.unwrap()).unwrap())
@@ -166,20 +166,39 @@ fn continue_run(out: &Path, initial: &Run, recorded: &[Recorded], intervention: 
     );
 }
 
-fn verify_final(out: &Path, reference: &Path) {
+pub(super) fn verify_final(out: &Path, reference: &Path) -> bool {
     // Compare the serialization itself: parsing decimal floats back into Value
     // can round a number differently even when both files are byte-identical.
+    let mut normalized_debug = false;
     for file in [
         "final.json",
         "final-controllers.txt",
         "final-frame-p1.json",
         "final-frame-p2.json",
     ] {
-        assert!(
-            fs::read(out.join(file)).unwrap() == fs::read(reference.join(file)).unwrap(),
-            "retained {file} differs"
-        );
+        let actual = fs::read(out.join(file)).unwrap();
+        let expected = fs::read(reference.join(file)).unwrap();
+        if actual == expected {
+            continue;
+        }
+        // A new disabled profile is omitted from JSON but derives Debug as
+        // None. Permit only that schema addition, never controller-state drift.
+        assert_eq!(file, "final-controllers.txt", "retained {file} differs");
+        let actual = String::from_utf8(actual).unwrap();
+        let expected = String::from_utf8(expected).unwrap();
+        let added = |line: &&str| line.trim() == "hunt_clearance_handoff: None,";
+        assert_eq!(actual.lines().filter(added).count(), 2);
+        assert_eq!(expected.lines().filter(added).count(), 0);
+        let normalized = actual
+            .lines()
+            .filter(|line| !added(line))
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        assert_eq!(normalized, expected, "retained controller state differs");
+        normalized_debug = true;
     }
+    normalized_debug
 }
 
 #[test]
@@ -209,7 +228,7 @@ fn retained_combat_reload_competition() {
         &control_rows,
         Intervention::Unchanged,
     );
-    verify_final(&out.join("original"), control);
+    let control_debug_normalized = verify_final(&out.join("original"), control);
 
     let mut run = initialize(&case, true);
     for row in &candidate_rows[..FORK as usize] {
@@ -225,7 +244,7 @@ fn retained_combat_reload_competition() {
         &candidate_rows,
         Intervention::Unchanged,
     );
-    verify_final(&out.join("candidate"), candidate);
+    let candidate_debug_normalized = verify_final(&out.join("candidate"), candidate);
     continue_run(
         &out.join("reserve-reload"),
         &run,
@@ -238,6 +257,7 @@ fn retained_combat_reload_competition() {
             "control_reference_ticks_verified":control_rows.len(),
             "candidate_reference_ticks_verified":candidate_rows.len(),
             "control_and_candidate_final_snapshots_match":true,
+            "controller_debug_normalized_new_disabled_profile":[control_debug_normalized,candidate_debug_normalized],
             "both_candidate_arms_clone_same_physics_and_controllers":true,
             "production_policy_changed":false,"only_override":"suppress candidate laser while empty with no paid reload and energy below reload cost",
             "round_energy_cost":ROUND_ENERGY_COST,"energy_regen_per_second":ENERGY_REGEN_PER_SECOND,
@@ -333,7 +353,7 @@ fn retained_combat_early_reserve() {
         &recorded,
         Intervention::Unchanged,
     );
-    verify_final(&out.join("candidate"), candidate);
+    let debug_normalized = verify_final(&out.join("candidate"), candidate);
     continue_run(
         &out.join("early-reserve"),
         &run,
@@ -346,6 +366,7 @@ fn retained_combat_early_reserve() {
             "case":case,"fork_tick":EARLY_FORK,
             "candidate_reference_ticks_verified":recorded.len(),
             "candidate_final_snapshots_match":true,
+            "controller_debug_normalized_new_disabled_profile":debug_normalized,
             "both_arms_clone_same_physics_and_controllers":true,
             "production_policy_changed":false,
             "only_override":"suppress candidate laser below the early reserve; preserve every cannon request",

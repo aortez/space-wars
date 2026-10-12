@@ -115,6 +115,11 @@ const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
 const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
 const PURSUIT_LOST_SIGHT_TICKS: u64 = 6 * 60;
 const PURSUIT_CLIMB_CLEARANCE: f32 = 140.0;
+pub const HUNT_CLEARANCE_HANDOFF_PROFILE: &str = "material_hunt_clearance_handoff_v1";
+
+#[cfg(test)]
+#[path = "mission_hunt_clearance_tests.rs"]
+mod hunt_clearance_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -180,6 +185,8 @@ pub struct MissionTelemetry {
     pub opponent: Option<PlayerId>,
     pub combat: Option<CombatPilotTelemetry>,
     pub pursuit: Option<MissionPursuit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hunt_clearance_handoff: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pursuit_health: Option<PursuitHealthTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -301,6 +308,7 @@ impl MaterialMissionPilot {
                 opponent: None,
                 combat: None,
                 pursuit: None,
+                hunt_clearance_handoff: None,
                 pursuit_health: None,
                 pursuit_climb_laser: None,
                 disengagement: None,
@@ -358,6 +366,7 @@ impl MaterialMissionPilot {
         let pursuit_health = self.telemetry.pursuit_health.is_some();
         let pursuit_climb_laser = self.telemetry.pursuit_climb_laser.is_some();
         let direct_laser_window = self.patrol.telemetry().laser_window_profile.is_some();
+        let hunt_clearance_handoff = self.telemetry.hunt_clearance_handoff.is_some();
         let active_flight_checks = self.active_flight_checks;
         let bounded_acquisition = self.bounded_acquisition;
         let cover_retry_cooldown = self.cover_retry_cooldown;
@@ -389,6 +398,7 @@ impl MaterialMissionPilot {
         self.configure_pursuit_health(pursuit_health);
         self.configure_pursuit_climb_laser(pursuit_climb_laser);
         self.configure_direct_laser_window(direct_laser_window);
+        self.configure_hunt_clearance_handoff(hunt_clearance_handoff);
         self.bounded_acquisition = bounded_acquisition;
         self.cover_retry_cooldown = cover_retry_cooldown;
         self.cover_response = cover_response;
@@ -774,6 +784,9 @@ impl MaterialMissionPilot {
         probe: Option<&mut DestinationProbeResult>,
         defer_new_pursuit: bool,
     ) -> CombatIntent {
+        let continued_climb = matches!(self.telemetry.goal, MissionGoal::Hunt | MissionGoal::Watch)
+            .then_some(self.pursuit_climb)
+            .flatten();
         self.telemetry.avoidance = None;
         self.telemetry.opponent = None;
         self.telemetry.combat = None;
@@ -880,7 +893,7 @@ impl MaterialMissionPilot {
         }
         self.prepare_escape_travel(o);
         if self.pursuit_opportunity(o, defer_new_pursuit) {
-            return self.hunt(o);
+            return self.continue_hunt(o, continued_climb);
         }
         if let Some(intent) = self.disengagement_intent(o) {
             return intent;
@@ -976,7 +989,7 @@ impl MaterialMissionPilot {
                     self.telemetry.reason = Some("waiting before another landing attempt");
                     return self.patrol.intent(c);
                 }
-                return self.hunt(o);
+                return self.continue_hunt(o, continued_climb);
             }
         }
         let target = o
@@ -1236,6 +1249,32 @@ impl MaterialMissionPilot {
             "configure before the first intent"
         );
         self.patrol.set_direct_laser_window(enabled);
+    }
+
+    pub(crate) fn configure_hunt_clearance_handoff(&mut self, enabled: bool) {
+        assert!(!enabled || self.policy == crate::mission_policy::MissionPolicy::ValuePlanner);
+        assert!(
+            self.previous_tick.is_none(),
+            "configure before the first intent"
+        );
+        self.telemetry.hunt_clearance_handoff = enabled.then_some(HUNT_CLEARANCE_HANDOFF_PROFILE);
+    }
+
+    fn continue_hunt(
+        &mut self,
+        o: &MissionObservationV1,
+        continued_climb: Option<usize>,
+    ) -> CombatIntent {
+        // Pursuit timers can end/restart while the mission keeps hunting. Carry
+        // its active safety climb through that bookkeeping, but not through a
+        // different selected mission. hunt still checks normal clearance/range.
+        if self.telemetry.hunt_clearance_handoff.is_some()
+            && o.opponent.is_some()
+            && self.pursuit_climb.is_none()
+        {
+            self.pursuit_climb = continued_climb;
+        }
+        self.hunt(o)
     }
 
     fn hunt(&mut self, o: &MissionObservationV1) -> CombatIntent {

@@ -585,3 +585,65 @@ target/combat-155/early-reserve-v1/ai-tests \
   mission_pilot::terrain_recovery::qualification::combat_energy::retained_combat_early_reserve \
   --ignored --exact --nocapture
 ```
+
+## Clearance cycle: pursuit bookkeeping discards an active climb
+
+The retained second-world Angular/asteroids/P2 cycle has two premature releases
+that also occur with the **current standard laser policy**. Its pursuit starts
+at 12,883. At **14,683**, the 30-second pursuit budget expires and `end_pursuit`
+clears `pursuit_climb`. Because P2 already owns every planet, destination
+selection falls straight back to hunting. At **15,403**, the 12-second pursuit
+retry expires; starting a pursuit calls `reconsider`, which clears the climb
+again. Neither event is physical evidence that the climb has finished.
+
+| Handoff | Standard laser clearance | Direct laser clearance | Required clearance |
+| --- | ---: | ---: | ---: |
+| Pursuit ends, 14,683 | 107.72 | 105.43 | 140 |
+| Pursuit restarts, 15,403 | 132.40 | 107.16 | 140 |
+
+In both games the opponent remains within 300 units and the original anchor
+planet still exists. The ordinary climb release conditions therefore have not
+been met. The resumed inward firing turns later trigger genuine falling-speed
+clearance checks; those entries should remain authoritative. The first is at
+14,801 for the standard laser and 14,768 for the direct-laser candidate.
+
+### Frozen handoff experiment
+
+Test one opt-in profile, `material_hunt_clearance_handoff_v1`, before broader
+qualification. Keep the standard bot defaults and failed laser/resource
+experiments unchanged.
+
+- At the start of a mission decision, remember an active climb only if the
+  previous mission goal is Hunt or Watch. If pursuit bookkeeping selects hunting
+  again during that same decision, carry that climb into the existing `hunt`
+  logic. Its normal anchor, all-planet clearance, falling-speed and opponent-range
+  checks still determine whether to release it.
+- Do not restore it for a real transition to travel, landing, recovery or another
+  mission. Preserve pursuit budgets/retries, mission selection, guidance,
+  weapons, break schedules, native physics and shared work limits. The option
+  is configured before the first intent; it survives reset while transient
+  climb memory does not. No runtime selection or device default enables it.
+- Run exactly four native games in the retained world
+  `2178709192992772276`, Angular/slumping, eight-second mixed asteroids, P2
+  Recovery v1 versus P1 standard Value v13: original standard laser, original
+  direct laser, and each with the handoff option. Establish both unchanged
+  references before running either experimental game.
+- The unchanged games must reproduce all **17,146 / 16,116** original inputs,
+  decision hashes, physical-state hashes, final JSON and player frames. A new
+  disabled profile field appears as `None` only in derived controller Debug;
+  remove exactly those two new lines for the old controller-file comparison.
+  All other controller text must match. Retain that schema distinction.
+- Enabled games must reproduce their reference inputs, physical state and
+  decisions through the first changed action, ignoring only the new profile
+  identifier in typed decision serialization. The first expected action change
+  is **14,683**, on identical physical state with the opponent's action unchanged.
+  Continue to native match endings; record climb entry/releases, every planet's
+  clearance/radial motion, pursuit events, weapons, damage, recovery and outcome.
+  Do not inject inputs, reset controllers, change thresholds or add seeds.
+- Success for this diagnosis means the timer handoffs no longer bypass an active
+  climb, normal release still occurs, and the retained wins and physical/work
+  audits hold. This does not prove stronger combat or eliminate every legitimate
+  climb/attack pass. Any promotion still requires a separate comparison.
+
+Focused tests cover expiry, restart, ordinary clearance/range release, a real
+destination change, default omission, clone/cache consistency and reset semantics.

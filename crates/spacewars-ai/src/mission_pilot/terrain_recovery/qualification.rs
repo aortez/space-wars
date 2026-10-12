@@ -24,6 +24,7 @@ use std::{
 
 mod angular_diagnosis;
 mod arrival_diagnosis;
+mod combat_clearance;
 mod combat_diagnosis;
 mod combat_energy;
 mod connectivity;
@@ -125,7 +126,7 @@ struct Run {
     shadow: FlagValueShadow,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct Decision {
     sites: [Option<LandingSiteId>; 2],
     observations: [MissionObservationV1; 2],

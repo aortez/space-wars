@@ -195,6 +195,11 @@ impl MissionBot {
         self.0.configure_direct_laser_window(enabled);
         self
     }
+    /// Experimental continuity of an active clearance climb while hunting.
+    pub fn with_hunt_clearance_handoff(mut self, enabled: bool) -> Self {
+        self.0.configure_hunt_clearance_handoff(enabled);
+        self
+    }
     /// Opt-in v13 defense while airborne and still awaiting the first capture site.
     pub fn with_acquisition_defense(mut self, enabled: bool) -> Self {
         self.0.configure_acquisition_defense(enabled);
