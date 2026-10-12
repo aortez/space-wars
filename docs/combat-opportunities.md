@@ -452,3 +452,47 @@ target/combat-155/reload-competition-v2/ai-tests \
 ```
 
 Choose a fresh output directory; the diagnostic refuses to overwrite evidence.
+
+## Early energy reserve: frozen diagnostic plan
+
+The late empty-cannon reservation established reload competition but lost its
+continuation. Test one separate question: can an earlier reserve improve native
+missile availability while avoiding frame-by-frame interruptions of the laser?
+This is a mechanism study on the same retained failure, not qualification for
+promotion. Keep both previous failures and the independent confirmation screen.
+
+Freeze the following before running the new continuation:
+
+- Use the same first lost win (world `16775363816852070040`, Round, eight-second
+  asteroids, P2). Replay the direct-laser candidate from its initial state to
+  **7,680**, its first changed laser request relative to the original bot.
+  Clone the complete native state and both controllers. Verify the unchanged
+  arm against all 13,403 reference ticks and its four final files byte for byte.
+- Start a diagnostic reserve latch open. Update it every decision, including
+  aim/safety breaks: close below **25 energy**; once closed, reopen at **29**.
+  These are one native reload cost plus a restart margin of
+  `(12 - 10) × 2 = 4` energy, covering one reload period of net continuous laser
+  drain. Clear the latch if supply is absent. Apply it at any ammunition count
+  or reload progress, so saving can start before an empty, unpaid loader.
+- Suppress only an already-proposed P2 laser request while the latch is closed
+  and cannon is false. Preserve cannon requests, steering, safety, aiming,
+  recovery, the reactive opponent and native supply rules. Never force the
+  laser on. Native reload charges and cannon priority can still interrupt a
+  burst; the two-second margin is conditional on no new reload charge.
+- Continue both arms to their native ending. Retain exact input overrides,
+  latch transitions, loaded ammunition and reload starts, launches, uninterrupted
+  laser-request intervals, native hit ticks, damage, recovery and outcome.
+  Verify the first override's physical state and all subsequent changes are
+  only the stated laser suppression. Check material conservation, physical
+  health and the existing shared planning-work bounds.
+- Do not adjust thresholds, fork time or seed after observing the result.
+  A restored shot alone is insufficient. Inspect whether saving starts before
+  ammunition exhaustion, whether the previously missed reload is affordable
+  on time, and whether the latch itself fragments permitted beam bursts.
+  Any later production candidate needs separate qualification; this retained
+  game cannot establish an outcome improvement.
+
+No production resource option, default, recovery behavior or device changes are
+part of this diagnostic. Maximum missile reload cadence itself costs
+`25 / 2 = 12.5` energy/second, exceeding regeneration even without laser fire.
+The reserve therefore cannot guarantee indefinitely sustained missile cadence.
