@@ -4,6 +4,7 @@ use engine_common::Action;
 /// recordings, keyboard input and controllers share the same behavior.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Controls {
+    pub drive: f32,
     pub aim: f32,
     pub power: f32,
     pub fire: bool,
@@ -33,9 +34,14 @@ pub enum Command {
     Drop,
     Hillside,
     Roof,
+    DriveLeft,
+    DriveRight,
+    CpuDrive,
+    Suspension,
+    Course,
 }
 impl Command {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 21] = [
         Self::AimDown,
         Self::AimUp,
         Self::PowerDown,
@@ -52,6 +58,11 @@ impl Command {
         Self::Drop,
         Self::Hillside,
         Self::Roof,
+        Self::DriveLeft,
+        Self::DriveRight,
+        Self::CpuDrive,
+        Self::Suspension,
+        Self::Course,
     ];
 }
 
@@ -76,6 +87,7 @@ impl ScorchedAction {
                         c.collapse as u8,
                         c.barrage as u8,
                     ],
+                    c.drive.to_le_bytes().as_slice(),
                 ]
                 .concat(),
             ),
@@ -88,19 +100,29 @@ impl ScorchedAction {
             return None;
         };
         match *kind {
-            1 if [12, 14].contains(&payload.len()) && payload[8..].iter().all(|v| *v <= 1) => {
+            1 if [12, 14, 18].contains(&payload.len())
+                && payload[8..payload.len().min(14)].iter().all(|v| *v <= 1) =>
+            {
                 let aim = f32::from_le_bytes(payload[0..4].try_into().ok()?);
                 let power = f32::from_le_bytes(payload[4..8].try_into().ok()?);
-                (aim.is_finite() && power.is_finite()).then_some(Self::Controls(Controls {
-                    aim: aim.clamp(-1.0, 1.0),
-                    power: power.clamp(-1.0, 1.0),
-                    fire: payload[8] != 0,
-                    select: payload[9] != 0,
-                    demo: payload[10] != 0,
-                    shape: payload[11] != 0,
-                    collapse: payload.get(12) == Some(&1),
-                    barrage: payload.get(13) == Some(&1),
-                }))
+                let drive = if payload.len() == 18 {
+                    f32::from_le_bytes(payload[14..18].try_into().ok()?)
+                } else {
+                    0.0
+                };
+                (aim.is_finite() && power.is_finite() && drive.is_finite()).then_some(
+                    Self::Controls(Controls {
+                        drive: drive.clamp(-1.0, 1.0),
+                        aim: aim.clamp(-1.0, 1.0),
+                        power: power.clamp(-1.0, 1.0),
+                        fire: payload[8] != 0,
+                        select: payload[9] != 0,
+                        demo: payload[10] != 0,
+                        shape: payload[11] != 0,
+                        collapse: payload.get(12) == Some(&1),
+                        barrage: payload.get(13) == Some(&1),
+                    }),
+                )
             }
             2 if payload.len() == 1 => Command::ALL
                 .get(payload[0] as usize)

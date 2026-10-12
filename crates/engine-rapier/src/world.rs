@@ -34,10 +34,12 @@ mod connectivity;
 pub use connectivity::{CapsuleConnectivity, ConnectivityGrid};
 mod forecast_body;
 mod query_snapshot;
+mod surface_drive;
 pub use query_snapshot::{
     AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
     QueryRegion, QuerySnapshot, RegionChanges,
 };
+pub use surface_drive::SurfaceDrive;
 
 const SNAPSHOT_VERSION: u32 = 1;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
@@ -1203,6 +1205,16 @@ impl PhysicsWorld {
     }
 
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
+        self.step_with_surface_drives(dt_seconds, &[])
+    }
+
+    /// Advance with transient moving surfaces. The caller supplies each step's
+    /// commands; no motor configuration is hidden outside a scenario snapshot.
+    pub fn step_with_surface_drives(
+        &mut self,
+        dt_seconds: f32,
+        drives: &[SurfaceDrive],
+    ) -> PhysicsStepMetrics {
         let _span = crate::profile::span("world_step");
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
             self.contact_events.clear();
@@ -1239,15 +1251,24 @@ impl PhysicsWorld {
             }
         }
 
+        let hooks = surface_drive::DriveHooks(drives);
+        let restored_hooks = hooks.enable(&mut self.raw, &self.collider_indices, &self.colliders);
         let started = Instant::now();
         if self.collect_events {
             self.contact_event_collector.clear();
             self.raw
-                .step_with_events(&(), &self.contact_event_collector);
+                .step_with_events(&hooks, &self.contact_event_collector);
+        } else if !drives.is_empty() {
+            self.raw.step_with_events(&hooks, &());
         } else {
             self.raw.step();
         }
         let wall_time = started.elapsed();
+        for (handle, flags) in restored_hooks {
+            if let Some(collider) = self.raw.colliders.get_mut(handle) {
+                collider.set_active_hooks(flags);
+            }
+        }
         let counters = self.raw.physics_pipeline.counters;
         for (handle, target) in kinematic_targets {
             let body = &mut self.raw.bodies[handle];

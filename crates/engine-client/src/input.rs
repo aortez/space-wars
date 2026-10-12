@@ -585,6 +585,24 @@ impl ClientInput {
             .is_some_and(|pad| pad.connected && pad.left_bumper)
     }
 
+    /// Separate track control from the right-stick turret. The cabinet's
+    /// single joystick drives while Tank is held and aims otherwise.
+    pub(crate) fn scorched_gamepad_motion(&self) -> (f32, f32) {
+        self.gamepads
+            .borrow()
+            .seat(0)
+            .filter(|pad| pad.connected)
+            .map_or((0.0, 0.0), |pad| {
+                let dpad = f32::from(pad.dpad_right) - f32::from(pad.dpad_left);
+                let drive = if pad.west && (pad.dpad_left || pad.dpad_right) {
+                    dpad
+                } else {
+                    shape_stick(pad.left_stick_x)
+                };
+                (drive, if pad.west { 0.0 } else { dpad })
+            })
+    }
+
     pub(crate) fn terrain_gamepad_tools(&self) -> TerrainGamepadTools {
         let gamepads = self.gamepads.borrow();
         gamepads.seat(0).filter(|pad| pad.connected).map_or_else(

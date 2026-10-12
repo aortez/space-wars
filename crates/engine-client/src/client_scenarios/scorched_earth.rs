@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Scorched Earth: Left/Right or A/D adjusts elevation; Up/Down or W/S adjusts power. Hold Space to fire. Tab selects the other tank. V toggles the scripted duel; T switches Round/Angular dirt and resets. K toggles collapse; J cycles duel, barrage, bank, low drop, high drop, hillside and roof. Hillside uses ordinary tank shells to undermine a ledge; Demo fires three shots, or turn it off to aim and fire yourself. Roof fires one shot under a bridge: compare weak and strong physics. In hillside/roof, K cycles the combined physics preset. In bank/drop tests, K cycles off/weak/strong strength and replays the test. Drop tests release the same clump after two seconds; hard landings can chip weak dirt. Hold Tab+T for the bank test or Tab+K for combined physics (isolated strength in bank/drop tests). R restarts with the same seed. The other tank returns fire automatically. On-screen buttons provide the same controls. Gamepad: d-pad or right stick aims and changes power, bottom face fires, left face selects a tank, top face switches dirt, right shoulder toggles Demo; left shoulder cycles duel/barrage/bank/low drop/high drop/hillside/roof. In bank/drop tests, right face changes strength; in hillside/roof it changes the combined physics preset. Hold left+top face for the bank test or left+right face for strength. Start/Esc opens the pause menu. Destroy the opponent or its footing. Material capacity rejections preserve the dirt; combat damage still applies.",
+    controls_help: "Scorched Earth: A/D drives; Left/Right adjusts elevation; Up/Down or W/S adjusts power. Hold Space to fire. Tap/release Tab to select the other tank, or hold Tab+Left/Right to drive. V toggles Demo; the CPU drives into range, stops and shoots. When stopped on tilted terrain, it can seek nearby flatter footing and hold it for a shot. CPU drive ON/stationary provides a stationary comparison. Hold the on-screen Drive buttons to move. Sprung wheels/Rigid tracks resets the same scene with larger physical wheels and suspension or the original rigid hull; scripted lab scenes keep their original hulls. Wheels have limited motor torque and real spring/damper travel. T switches Round/Angular dirt and resets. K toggles collapse; Drive course cycles flat, step, slope, trench and rubble, then returns to the duel. Courses disable firing and park the far tank; V switches CPU/manual and Reset repeats the obstacle. The course driver button cycles Goal driver, stationary and Range driver. Goal driver travels to the flag, stops there, and can retreat for a bounded retry; changing drivers preserves its retry history until Reset. The HUD shows progress, support, route refusal and spring lengths. J cycles duel, barrage, bank, low drop, high drop, hillside, roof and the driving courses. Hillside Demo fires three shots; Roof fires one shot under a bridge. Turn Demo off to drive/aim/fire manually in those encounters. Bank/Drop/Barrage retain their stationary fixtures. In hillside/roof, K cycles combined physics; in bank/drop it cycles strength. Hold Tab+T for the bank test or Tab+K for physics. R restarts with the same seed. Gamepad: left stick drives; right stick aims/power. D-pad aims/power; hold left face (Tank) with horizontal d-pad to drive on a Picade. Tap/release left face selects a tank; bottom face/right trigger fires, top face switches dirt, right shoulder toggles Demo; left shoulder cycles scenes. Right face toggles collapse/strength; Tank+top face opens Bank, Tank+right face changes physics. Start/Esc pauses. Unsupported or overturned tracks cannot propel the tank; no automatic righting. Destroy the opponent or its footing. Material capacity rejections preserve dirt; combat damage still applies.",
     create,
 };
 
@@ -40,7 +40,15 @@ fn create(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(ScorchedClient {
-        state: ScorchedScenario::init(ScorchedConfig::default(), seed),
+        state: ScorchedScenario::init(
+            ScorchedConfig {
+                suspension: true,
+                cpu_footing: [true; 2],
+                course_goal_driving: true,
+                ..Default::default()
+            },
+            seed,
+        ),
     }))
 }
 impl ClientScenario for ScorchedClient {
@@ -78,7 +86,8 @@ impl ClientScenario for ScorchedClient {
     }
 }
 fn controls(input: &ClientInput) -> Controls {
-    let (horizontal, fire, collapse) = input.spaceling_gamepad_input(0);
+    let (_, fire, collapse) = input.spaceling_gamepad_input(0);
+    let (drive, horizontal) = input.scorched_gamepad_motion();
     let (stick, trigger, vertical) = input.terrain_gamepad_mining();
     let tools = input.terrain_gamepad_tools();
     let pressed = |a, b| input.is_pressed(a) || input.is_pressed(b);
@@ -89,9 +98,16 @@ fn controls(input: &ClientInput) -> Controls {
         _ => fallback,
     };
     Controls {
+        drive: axis(
+            input.is_pressed(GameKey::P1TurnLeft)
+                || (input.is_pressed(GameKey::NesSelect) && input.is_pressed(GameKey::NesLeft)),
+            input.is_pressed(GameKey::P1TurnRight)
+                || (input.is_pressed(GameKey::NesSelect) && input.is_pressed(GameKey::NesRight)),
+            drive,
+        ),
         aim: axis(
-            pressed(GameKey::P1TurnLeft, GameKey::NesLeft),
-            pressed(GameKey::P1TurnRight, GameKey::NesRight),
+            input.is_pressed(GameKey::NesLeft) && !input.is_pressed(GameKey::NesSelect),
+            input.is_pressed(GameKey::NesRight) && !input.is_pressed(GameKey::NesSelect),
             if stick.x != 0.0 { stick.x } else { horizontal },
         ),
         power: axis(
@@ -131,12 +147,14 @@ mod tests {
                 right_bumper: true,
                 right_stick_x: 0.8,
                 right_stick_y: 0.7,
+                left_stick_x: 0.9,
                 ..Default::default()
             },
         );
         let c = controls(&input);
         assert!(c.fire && c.select && c.shape && c.demo && c.collapse && c.barrage);
         assert!(c.aim > 0.0 && c.power > 0.0);
+        assert!(c.drive > 0.0);
         pads.borrow_mut().set_seat(0, GamepadSeatInput::default());
         assert_eq!(controls(&input), Controls::default());
     }
@@ -165,48 +183,102 @@ mod tests {
     }
 
     #[test]
+    fn drive_and_aim_are_independent_and_picade_chord_only_drives() {
+        let mut keyboard = ClientInput::default();
+        keyboard.press(GameKey::P1TurnRight);
+        keyboard.press(GameKey::NesLeft);
+        let c = controls(&keyboard);
+        assert_eq!((c.drive, c.aim), (1.0, -1.0));
+        let pads = Rc::new(RefCell::new(GamepadInput::default()));
+        let pad = ClientInput::new(Rc::clone(&pads));
+        pads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                left_stick_x: 1.0,
+                right_stick_x: -1.0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(controls(&pad), c);
+        keyboard.clear();
+        keyboard.press(GameKey::NesSelect);
+        keyboard.press(GameKey::NesRight);
+        pads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                west: true,
+                dpad_right: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(controls(&pad), controls(&keyboard));
+        let c = controls(&pad);
+        assert_eq!((c.drive, c.aim), (1.0, 0.0));
+        assert!(c.select);
+    }
+
+    #[test]
     fn tanks_and_controls_remain_visible_in_landscape_and_portrait() {
         use crate::raster::{RasterOptions, RasterRenderer};
-        let scene = ScorchedClient {
-            state: ScorchedScenario::init(ScorchedConfig::default(), 42),
-        };
-        for viewport in [Viewport::new(800.0, 480.0), Viewport::new(800.0, 1280.0)] {
-            let frames = scene.render_frames(RenderBackend::Vector, viewport);
-            assert_eq!(frames, scene.render_frames(RenderBackend::Raster, viewport));
-            let overlay =
-                crate::render::raster_text_overlay(&frames, viewport, scene.frame_layout());
-            for label in [
-                "YOU · 100",
-                "CPU · 100",
-                "Angle −",
-                "Reset",
-                "Hills",
-                "Physics: off",
-                "Drop test",
-            ] {
-                let item = overlay.iter().find(|p| p.text == label).expect(label);
-                assert!(item.x >= 0.0 && item.x < viewport.width, "{label}");
-                assert!(item.y >= 0.0 && item.y < viewport.height, "{label}");
-            }
-            let image = RasterRenderer::new().image_from_frames_with_layout(
-                &frames,
-                viewport,
-                scene.frame_layout(),
-                RasterOptions::default(),
-            );
-            let pixels = image.to_rgb8().unwrap();
-            for (r, g, b) in [(97_u8, 207_u8, 171_u8), (245, 135, 79)] {
-                assert!(
-                    pixels
-                        .as_slice()
-                        .iter()
-                        .filter(|p| p.r.abs_diff(r) <= 1
-                            && p.g.abs_diff(g) <= 1
-                            && p.b.abs_diff(b) <= 1)
-                        .count()
-                        > 80,
-                    "both physical tank hulls must be visible"
+        for suspension in [false, true] {
+            let scene = ScorchedClient {
+                state: ScorchedScenario::init(
+                    ScorchedConfig {
+                        suspension,
+                        ..Default::default()
+                    },
+                    42,
+                ),
+            };
+            for viewport in [Viewport::new(800.0, 480.0), Viewport::new(800.0, 1280.0)] {
+                let frames = scene.render_frames(RenderBackend::Vector, viewport);
+                assert_eq!(frames, scene.render_frames(RenderBackend::Raster, viewport));
+                let overlay =
+                    crate::render::raster_text_overlay(&frames, viewport, scene.frame_layout());
+                for label in [
+                    "YOU · 100",
+                    "CPU · 100",
+                    "Angle −",
+                    "Reset",
+                    "Hills",
+                    "Physics: off",
+                    "Drop test",
+                    "Drive left",
+                    "Drive right",
+                    "CPU drive ON",
+                    if suspension {
+                        "Sprung wheels"
+                    } else {
+                        "Rigid tracks"
+                    },
+                    "Drive course",
+                ] {
+                    let item = overlay.iter().find(|p| p.text == label).expect(label);
+                    assert!(item.x >= 0.0 && item.x < viewport.width, "{label}");
+                    assert!(item.y >= 0.0 && item.y < viewport.height, "{label}");
+                }
+                let image = RasterRenderer::new().image_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scene.frame_layout(),
+                    RasterOptions::default(),
                 );
+                let pixels = image.to_rgb8().unwrap();
+                for (r, g, b) in [(97_u8, 207_u8, 171_u8), (245, 135, 79)] {
+                    assert!(
+                        pixels
+                            .as_slice()
+                            .iter()
+                            .filter(|p| p.r.abs_diff(r) <= 1
+                                && p.g.abs_diff(g) <= 1
+                                && p.b.abs_diff(b) <= 1)
+                            .count()
+                            > 80,
+                        "both physical tank hulls must be visible"
+                    );
+                }
             }
         }
     }
