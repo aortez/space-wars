@@ -185,6 +185,9 @@ fn create_with_seats(
                 settings.combat_breaks,
             )
             .with_recovery_profile(recovery_profiles[seat])
+            .with_hunt_clearance_handoff(
+                recovery_profiles[seat] == MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1,
+            )
         }),
     })
 }
@@ -419,10 +422,18 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_recovery_profile_p1={}\nmission_recovery_profile_p2={}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
+                "{}\nmission_recovery_profile_p1={}\nmission_recovery_profile_p2={}\nmission_hunt_clearance_handoff_p1={}\nmission_hunt_clearance_handoff_p2={}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
                 self.profile.diagnostics(&self.pilots),
                 self.recovery_profiles[0].id(),
                 self.recovery_profiles[1].id(),
+                self.pilots[0]
+                    .telemetry()
+                    .hunt_clearance_handoff
+                    .unwrap_or("off"),
+                self.pilots[1]
+                    .telemetry()
+                    .hunt_clearance_handoff
+                    .unwrap_or("off"),
                 serde_json::to_string(&self.pilots.each_ref().map(|p| {
                     spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
                 }))
@@ -679,7 +690,8 @@ mod tests {
                     },
                     settings.combat_breaks,
                 )
-                .with_recovery_profile(recovery);
+                .with_recovery_profile(recovery)
+                .with_hunt_clearance_handoff(*controller == RecoveryBot);
                 assert_eq!(
                     format!("{:?}", client.pilots[seat]),
                     format!("{expected:?}")
@@ -748,6 +760,14 @@ mod tests {
                     seat + 1,
                     if controllers[seat] != Human { 31 } else { 0 }
                 )));
+                let handoff = if controllers[seat] == RecoveryBot {
+                    "material_hunt_clearance_handoff_v1"
+                } else {
+                    "off"
+                };
+                assert!(diagnostics.lines().any(|line| {
+                    line == format!("mission_hunt_clearance_handoff_p{}={handoff}", seat + 1)
+                }));
             }
             let frames = client.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));
             for seat in 0..2 {
@@ -801,6 +821,41 @@ mod tests {
                     .iter()
                     .all(|p| p.alive() && p.health == 100.0)
             );
+        }
+    }
+
+    #[test]
+    fn legacy_mission_presets_do_not_select_recovery_handoff() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_1_controller = RecoveryBot;
+        settings.spacewars.player_2_controller = RecoveryBot;
+        for registration in [
+            &TRAVEL_REGISTRATION,
+            &TRAVEL_DUEL_REGISTRATION,
+            &ARENA_REGISTRATION,
+            &ARENA_DUEL_REGISTRATION,
+        ] {
+            let mut client = (registration.create)(
+                42,
+                &settings,
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+                &ScenarioAsset::None,
+            )
+            .unwrap();
+            client.step(&[], Duration::from_nanos(16_666_667));
+            let client = client
+                .as_any()
+                .downcast_ref::<MaterialMissionClientScenario>()
+                .unwrap();
+            assert_eq!(
+                client.recovery_profiles,
+                [MissionRecoveryProfile::Standard; 2]
+            );
+            for pilot in &client.pilots {
+                assert_eq!(pilot.policy(), MissionPolicy::Legacy);
+                assert_eq!(pilot.telemetry().hunt_clearance_handoff, None);
+            }
         }
     }
 

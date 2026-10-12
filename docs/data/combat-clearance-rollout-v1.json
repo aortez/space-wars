@@ -1,0 +1,319 @@
+{
+  "schema": "combat-clearance-rollout-v1",
+  "plan": {
+    "base": "299439e78f614e039b6f7037b3c06aef94c56b33",
+    "branch": "bot/recovery-clearance-rollout",
+    "source_patch_sha256": "d6662f4372afaeb370a2627532b531f86af286507394cc1b012f02ebf2fa13a3",
+    "cases": [
+      "16-round-0s-p1",
+      "20-angular-0s-p1",
+      "27-round-8s-p2",
+      "31-angular-8s-p2"
+    ],
+    "reference_root": "target/combat-155/clearance-qualification-candidate-v1",
+    "selection": "All three exercised handoff pairs plus one retained Angular/asteroids/P2 case with a completed recovery. No new seeds or policy tuning.",
+    "checks": [
+      "every retained pre-step physical checksum",
+      "complete original match length and outcome",
+      "final world and both brain telemetry snapshots",
+      "selected handoff profile at every tick",
+      "ordinary native rebuild offsets at every tick",
+      "regular client tests and launcher persistence through restart"
+    ]
+  },
+  "runtime": {
+    "base": "299439e78f614e039b6f7037b3c06aef94c56b33",
+    "patch_sha256": "d6662f4372afaeb370a2627532b531f86af286507394cc1b012f02ebf2fa13a3",
+    "rustc": "rustc 1.89.0 (29483883e 2025-08-04)",
+    "binaries": {
+      "ui_control_functional-tests": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/ui_control_functional-tests",
+        "sha256": "ebdef762a5b88088575bd5208603bde3d2168da8455d6e2e6fbc99743ef8372a"
+      },
+      "engine-client": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client",
+        "sha256": "c0751b2da9b931756df96a89f863f5fb0df5c50206ec7be25fb9830be5ba4d3f"
+      },
+      "engine-client-tests": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client-tests",
+        "sha256": "388bef442609433058ba31412a352b762788d20a32d2b93f16f4a9f10c6746e9"
+      }
+    }
+  },
+  "source_files_sha256": {
+    "crates/engine-client/src/client_scenarios/surface_sortie/mission.rs": "8ec00cb1a505bef41e88c1fe94e8194363bf63c8d49d634628bf0035d708bbf3",
+    "crates/engine-client/src/client_scenarios/surface_sortie/mission/recovery_tests.rs": "2927fc02162cb9d19e1787b4b4146572295724a93703c33c15f5b61b71d9cc86",
+    "crates/engine-client/tests/ui_control_functional/spacewars_match.rs": "0e63eb98ad2704eddf4f1520ae30e6d85c71586af240b0b7c3bbc6748e2f6d2b"
+  },
+  "validation": {
+    "client_tests": {
+      "passed": 689,
+      "failed": 0,
+      "ignored": 4,
+      "log_sha256": "66ad7ae7375664c1653017213b98a2a0e3afd75d4fb6cb196177b745bdba95bd"
+    },
+    "launcher_functional": {
+      "passed": 1,
+      "controller_pairs": 16,
+      "renderers": [
+        "vector",
+        "raster"
+      ],
+      "restart_checked": true,
+      "raster_scale": 1.0,
+      "log_sha256": "e91b5d83550efc81fdff48b9f55f53f9b3e7557d3d56cfe6ba69c4139228a726"
+    },
+    "native_replays": {
+      "passed": 4,
+      "ticks": 122831,
+      "checks": "Every pre-step physical checksum, final world/match/brain telemetry, handoff selection and native rebuild offsets. Recorded controls are never applied.",
+      "completed_recovery_case": "31-angular-8s-p2"
+    },
+    "formatting": "passed",
+    "strict_client_clippy": {
+      "result": "same 29 pre-existing diagnostics; strict client Clippy does not pass",
+      "baseline_head": "415ba42aa4a941efa4b9b04cf7302d7991bf9302",
+      "baseline_source_matches_rollout_base": true,
+      "diagnostics": [
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/bluetooth.rs:179:9"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/bluetooth.rs:180:13"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/bluetooth/worker.rs:135:5"
+        },
+        {
+          "message": "the loop variable `seat` is used to index `pilots`",
+          "location": "crates/engine-client/src/client_scenarios/surface_sortie/mission/profiling.rs:165:21"
+        },
+        {
+          "message": "variant name ends with the enum's name",
+          "location": "crates/engine-client/src/frame_trace.rs:19:9"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/gamepad.rs:604:13"
+        },
+        {
+          "message": "method `reuses_storage` is never used",
+          "location": "crates/engine-client/src/gpu_scene/plan_control.rs:35:12"
+        },
+        {
+          "message": "method `single_pass` is never used",
+          "location": "crates/engine-client/src/gpu_scene/writer_control.rs:80:12"
+        },
+        {
+          "message": "this function has too many arguments (15/7)",
+          "location": "crates/engine-client/src/host.rs:1001:1"
+        },
+        {
+          "message": "this function has too many arguments (9/7)",
+          "location": "crates/engine-client/src/host.rs:1357:1"
+        },
+        {
+          "message": "this function has too many arguments (10/7)",
+          "location": "crates/engine-client/src/host.rs:1400:1"
+        },
+        {
+          "message": "this function has too many arguments (9/7)",
+          "location": "crates/engine-client/src/host.rs:1599:1"
+        },
+        {
+          "message": "call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes",
+          "location": "crates/engine-client/src/host.rs:1697:17"
+        },
+        {
+          "message": "call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes",
+          "location": "crates/engine-client/src/host.rs:718:9"
+        },
+        {
+          "message": "call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes",
+          "location": "crates/engine-client/src/host.rs:816:9"
+        },
+        {
+          "message": "call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes",
+          "location": "crates/engine-client/src/host.rs:847:13"
+        },
+        {
+          "message": "call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes",
+          "location": "crates/engine-client/src/host.rs:858:13"
+        },
+        {
+          "message": "clamp-like pattern without using clamp function",
+          "location": "crates/engine-client/src/main.rs:2637:5"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "location": "crates/engine-client/src/main.rs:2643:1"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/presentation_probe/raster.rs:272:21"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "location": "crates/engine-client/src/raster.rs:1317:1"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "location": "crates/engine-client/src/raster.rs:1508:1"
+        },
+        {
+          "message": "this function has too many arguments (9/7)",
+          "location": "crates/engine-client/src/raster.rs:1634:1"
+        },
+        {
+          "message": "this function has too many arguments (9/7)",
+          "location": "crates/engine-client/src/raster.rs:385:1"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "location": "crates/engine-client/src/raster.rs:430:1"
+        },
+        {
+          "message": "called `unwrap` on `starfield_cache` after checking its variant with `is_some`",
+          "location": "crates/engine-client/src/raster.rs:619:44"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "location": "crates/engine-client/src/raster.rs:662:13"
+        },
+        {
+          "message": "deref which would be done by auto-deref",
+          "location": "crates/engine-client/src/raster.rs:670:25"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "location": "crates/engine-client/src/raster.rs:687:5"
+        }
+      ],
+      "candidate_log_sha256": "36811648082ea82cbf3c9cc71b48645f4a5ae930f385c8eaf212cf2e0272cf28",
+      "baseline_log_sha256": "849451867e2c386e9520508574ad583c9742017163c62b7380f1662ce0d5bbbe"
+    }
+  },
+  "replays": [
+    {
+      "case": "16-round-0s-p1",
+      "reference": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/16-round-0s-p1/output",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/16-round-0s-p1/output"
+      },
+      "reference_sha256": {
+        "case.json": "56a5e3cd23d55eb338770a99d371e368013817a72dc1ef5d25cea43fd57d02eb",
+        "initial.json": "0f949f7587f17a47774c25cc874a9a19b916333a48325ab4a0f06c15db8b1a97",
+        "actions.jsonl": "7ec29de4072fd76c7cd80eb47b3eea216ab38d05d5dec3b5f40d8b8620bacb23",
+        "final.json": "cdf317da3e61a1cd0ec87f6c0ad1948329df9a3ce1b63bf2cf6787e24bba931d",
+        "summary.json": "fc2f043de497c85101f9487e76be49c05ca22d07f67be588db86609623465b7e"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 9.324013147001097,
+      "log_sha256": "5305487819e69a7a3af9c133482a893145de2610cd08ad71f7ac519a0aeed85a",
+      "reference_ticks": 23266,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "20-angular-0s-p1",
+      "reference": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/20-angular-0s-p1/output",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/20-angular-0s-p1/output"
+      },
+      "reference_sha256": {
+        "case.json": "1d0b1b67e6d172ad67a33985126abf2290535b496a9f4a1bf1d09cf484643032",
+        "initial.json": "efdaccff08959735b8e6bc8dd61091ea10a349d44d55e9ba66f39ae5267d07ec",
+        "actions.jsonl": "aaeb255119c5ce8c33f143b51f48759fe7e78bdcbb7ed3cb2ac79cbc7f351962",
+        "final.json": "e1eb888f62a3bc66da1e29fc132dd462c23c4595ba576b9d3cf6ecb452fa0e78",
+        "summary.json": "21ee505f12099b7821260b7440db00ad2f63ede2061354b0b3b744e55938ed1d"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 38.84217491399613,
+      "log_sha256": "a99d98034055986f32d38fd1f92e97897753e66d16b17d5764710ffe09195480",
+      "reference_ticks": 36000,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "27-round-8s-p2",
+      "reference": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/27-round-8s-p2/output",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/27-round-8s-p2/output"
+      },
+      "reference_sha256": {
+        "case.json": "33637daaea6ad2989e11fab65681bdcddc425233ccf85b27a0c5e87a2484f8a0",
+        "initial.json": "d0339713f916662331216843e4f787d3dbf1ed002c29d9a30fe7ee6eeb8a2d03",
+        "actions.jsonl": "bfb5d50925ca019ef15b0e4b0bd58ee4402dee625439535be805a5681adb3550",
+        "final.json": "e82db9febf29ff409e4e6a705227bf873e524ffac41dc893638d1e5fb447a804",
+        "summary.json": "508e12cdb442095482b7ef65434c730fa7aba74c019614eb90b2497c63f7fe49"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 76.58606376700482,
+      "log_sha256": "91050a84819ef66c1119986bd545a0143b12ddb454892eb76697d33640bb1cfb",
+      "reference_ticks": 36000,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "31-angular-8s-p2",
+      "reference": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/31-angular-8s-p2/output",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v1/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/31-angular-8s-p2/output"
+      },
+      "reference_sha256": {
+        "case.json": "2bd955c3795a2c5cb8c3b86e4ee0744ce1ced2c1d3ac744cafbe0fc5933477b1",
+        "initial.json": "cdfe12b8d5bbef4d5fb128e853167556d12cac55d3671e362276921c0f44da90",
+        "actions.jsonl": "2d9ee9672fc577b8b4297e84f3624b97566d9dfa8b2d860bbbcf4cfa4febe170",
+        "final.json": "13dc0b0f9eb602c2b607373e44d5e7a79845327bf6e474b4b44c5b7cec65d148",
+        "summary.json": "021cf266cc3b100a70e4b80dadff4f14ae68f535a2f3ada5366f4db5db1ce8de"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 49.741071153999656,
+      "log_sha256": "1cbe2e5b2f57e61e6e5353bb5f0433b61362e5f0b9815d25741820a38b077d1c",
+      "reference_ticks": 27565,
+      "reference_completed_recoveries": 1,
+      "passed": true
+    }
+  ],
+  "limits": [
+    "Focused production-host integration checks using frozen qualification cases; not a new combat qualification.",
+    "Replay does not separately capture emitted action bytes; it checks every retained pre-step physical checksum and complete final brain telemetry.",
+    "Historical recovery-only replay explicitly disables the handoff before its first decision; the new clearance replay uses the launcher selection unchanged.",
+    "Device deployment and CI are tracked separately from these local test receipts."
+  ]
+}
