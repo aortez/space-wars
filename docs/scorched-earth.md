@@ -304,8 +304,47 @@ samples, so they do not isolate controller overhead or predict Picade frame rate
 
 The user accepted this CPU footing behavior following the local preview. It is
 the current combat-driving baseline alongside the accepted hill-climbing tuning.
-Integration with current main and isolated Picade validation remain before
-packaging the driving work for review.
+
+### Integrated driving validation, 2026-10-11
+
+The accepted work is consolidated on main `6742d9f`, including its shared CCD,
+terrain-clipping and client updates. The clean rebase changed no accepted source
+file. Implementation revision `ba2fe55` passes 1,546 affected unit tests across
+the client, shared physics/terrain, Scorched Earth, Rover Lab and Spacewars,
+plus the Scorched UI lifecycle test on both vector and raster renderers.
+Formatting and strict scenario-only Clippy pass.
+
+The [integration receipt](data/tank-driving-integration-20261011.json) records
+all commands, binary identities and results. All 36 desktop benchmark cases
+retain their accepted observation hashes. All 36 Picade runs pass replay and
+material audits with exactly the same final hashes as the desktop. The two
+frozen footing comparisons also produce identical full reports across x86_64
+and AArch64; their native starting snapshots match the accepted captures.
+[Frozen traces](data/tank-driving-integration-traces-20261011.json.gz) retain
+both architectures' controller histories, shots and motion.
+
+Picade measurements below are whole simulation-update mean/P95 milliseconds,
+medians of three serial 30-second seed-42 samples per mode/shape. The runner is
+Rust 1.89.0 release with fat LTO, one codegen unit and static CRT linkage on a
+Raspberry Pi 4. Dirt shapes alternate across repetitions.
+
+| Dirt | Stationary rigid | Driving rigid | Driving wheels | Wheels + footing |
+| --- | ---: | ---: | ---: | ---: |
+| Round | 1.774 / 4.875 | 1.431 / 3.733 | 1.464 / 3.580 | 1.479 / 3.612 |
+| Angular | 1.994 / 4.966 | 1.274 / 3.303 | 1.494 / 3.893 | 1.528 / 3.954 |
+
+Seed 42 does not activate a footing goal. Separate seed-314 Round and seed-310
+Angular runs do, with P95s of 4.135 and 2.977 ms respectively. The Weak/Strong
+destruction smoke runs reach 6.820–8.930 ms P95; the worst individual update
+across the matrix is 29.585 ms. Hillside, Roof and Barrage also pass. Moving
+tanks change impact locations and debris populations, so these workloads do
+not isolate controller overhead. They measure simulation cost, not rendered FPS.
+
+The existing kiosk match was paused during measurement and resumed afterward.
+No competing benchmark was present. Temperature endpoints range from 67.192
+to 74.010°C; firmware throttle flags and undervoltage alarms remain zero.
+Physical cabinet feel remains a hands-on follow-up; the automated control
+mapping and both-renderer lifecycle checks ran on the desktop.
 
 ### Driving course and blocked-case baseline, 2026-10-11
 
