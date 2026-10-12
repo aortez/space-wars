@@ -776,11 +776,14 @@ candidate. Compare using `tools/analyze-combat-clearance.py <control-root>
 ### Audit correction after the frozen games
 
 All 64 games completed on the frozen `363bd97` binary. The first analysis
-attempt rejected Round/asteroids/P2 in world four at tick **12,693**. Its first
-changed controller fields are `combat_active` and `reason`: the control ends
-pursuit, clears its unfinished anchor, then immediately re-enters a local combat
-climb on that same anchor. The candidate continues the mission climb. Looking
-only for an absent or replaced anchor misses this path.
+attempt rejected a same-anchor local-combat re-entry. The first such pair in
+matrix order is Round/no asteroids/P1 in world three, at tick **22,565**; the
+initial focused diagnosis examined the same pattern in Round/asteroids/P2 in
+world four at **12,693**. The first changed fields are `combat_active` and
+`reason`: the control ends pursuit, clears its unfinished anchor, then
+immediately re-enters a local combat climb on that same anchor. The candidate
+continues the mission climb. Looking only for an absent or replaced anchor
+misses this path.
 
 Audit v2 recognizes that specific same-anchor re-entry: identical prior state,
 geometry, pursuit transition and mission events; an unfinished climb; control
@@ -790,3 +793,71 @@ mission climb. The added regression test rejects ordinary combat, a real mission
 change, a missing handoff and an out-of-range opponent. The original failed
 analysis log and frozen analyzers remain in the evidence directory. No native
 game, bot implementation, seed, threshold or acceptance criterion changed.
+
+### Completed broader qualification
+
+The declared screen **passes with the standard laser**, using audit v2 from
+`f932f4d`. Advance the handoff option to review; keep production defaults and the
+failed direct-laser promotion decision unchanged. Four fresh worlds are a
+bounded regression comparison, not evidence of stronger combat.
+
+| Evaluated bot, 32 games per arm | Standard control | Standard + handoff |
+| --- | ---: | ---: |
+| Wins / match points | 17 | 17 |
+| Ship losses | 15 | 15 |
+| Pilot deaths | 14 | 14 |
+| Completed departures | 77 | 77 |
+| Completed recoveries | 6 | 6 |
+| Owned planets at endings, summed | 47 | 47 |
+| Elapsed native ticks, summed | 626,250 | 626,250 |
+| Premature anchor loss or replacement | 3 | 0 |
+
+There are **no individual-pair regressions** in match outcome, ship losses,
+pilot deaths, completed departures/recoveries or ending ownership. The two
+games with changed inputs both retain their wins and reach the same 36,000-tick
+limit. Both retain pilot health and ownership; Angular/P1 ends with 68.59% hull
+versus 68.19%, and Round/P2 retains 98.90%. Laser hit ticks change from 10,953 to
+10,990 and cannon hits from 420 to 419 across the batch. These weapon differences
+are recorded, not used to claim improved fighting strength.
+
+Only **three pairs across two fresh worlds** change controller behavior:
+
+- World three, Round/no asteroids/P1: first controller change at **22,565**,
+  where preserving the mission climb avoids local-combat re-entry on the same
+  anchor. **Every encoded input remains identical through the ending at 23,266**;
+  native final state and player frames also match. This is controller exercise,
+  not a third changed physical trajectory.
+- World three, Angular/no asteroids/P1: first changed controller and input at
+  **19,131**. The control ends pursuit because the opponent stayed hidden and
+  replaces unfinished anchor 0 with anchor 1. The candidate keeps anchor 0.
+  The control later drops an unfinished climb at **21,905**; the candidate's
+  later budget expiry at **21,940** preserves it. Both finish with three owned
+  planets, three departures and no ship losses.
+- World four, Round/eight-second asteroids/P2: first changed controller and
+  input at **12,693**, the same-anchor local-combat re-entry described above.
+  The control also loses an unfinished anchor at **15,213**; the candidate keeps
+  it. Both finish with two owned planets, three departures and no ship losses.
+
+The other **29 pairs** have identical complete inputs and normalized decisions,
+plus identical final native/player state and controller text after removing only
+the enabled option identifier. All 32 initial snapshots match on the same basis.
+The two first changed inputs have identical pre-step physical hashes and
+unchanged opponent inputs. The audit covers **1,252,500 native match ticks**,
+**2,505,000 per-seat combat rows**, and every shared-work charge. No experiment
+was rerun or tuned after observing results.
+
+The raw `retained_handoffs` counter describes an unfinished anchor in mission
+climb mode after bookkeeping. A disabled control can clear and immediately
+re-enter that same mission climb, so that count alone does not establish that
+the option changed behavior. The paired controller/input audits establish the
+three exercised pairs above. Local-combat re-entry is counted separately.
+
+The [qualification report](data/combat-clearance-qualification-v1.json.gz)
+contains the frozen plan, both arms, per-pair audits, all clearance events,
+outcomes, artifact checksums, validation receipts and the failed first-analysis
+record with its correction. Full traces remain in the two raw roots above.
+Validation: **467 AI tests**, **nine Python analysis tests**, strict AI Clippy,
+formatting and all **64 native games** pass. The previously recorded 21 physical
+integration tests and desktop client check remain applicable because this step
+changes only the diagnostic harness and analysis; no production bot code changed.
+The previously noted local Pi GPU `libseat.pc` limitation remains unchanged.
