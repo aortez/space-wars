@@ -16,6 +16,7 @@ def handoff(tick=0):
                 before=dict(goal='hunt', climb=0, pursuit=dict(started_tick=0)),
                 goal='hunt', reason=None, pursuit=None, pursuit_climb=None,
                 mission_events=[],
+                combat_active=False, combat_goal='engage ship',
                 geometry=[dict(planet=0, clearance=110, radial_speed=10),
                           dict(planet=1, clearance=160, radial_speed=10)],
                 opponent_range=200, ship_health=100, weapons={})
@@ -26,6 +27,7 @@ class ClearanceQualificationTests(unittest.TestCase):
         row = handoff()
         self.assertTrue(C.clearance_event(row)['premature_release'])
         row['pursuit_climb'] = 0
+        row['reason'] = 'climbing for a firing pass'
         self.assertTrue(C.clearance_event(row)['retained_handoff'])
         row['pursuit_climb'] = 1  # Replacing an unfinished anchor also loses safety memory.
         self.assertTrue(C.clearance_event(row)['premature_release'])
@@ -47,6 +49,22 @@ class ClearanceQualificationTests(unittest.TestCase):
         row['geometry'][0]['clearance'] = 150
         row['geometry'][1]['clearance'] = 139
         self.assertTrue(C.clearance_event(row)['premature_release'])
+
+    def test_same_anchor_reentry_is_distinct_from_preserved_mission_clearance(self):
+        row = handoff() | dict(pursuit_climb=0, combat_active=True,
+                               combat_goal='climb clear of ground')
+        event = C.clearance_event(row)
+        self.assertTrue(event['reentered_combat_climb'])
+        self.assertFalse(event['premature_release'])
+        self.assertFalse(event['retained_handoff'])
+        kept = row | dict(reason='climbing for a firing pass', combat_active=False)
+        self.assertTrue(C.clearance_event(kept)['retained_handoff'])
+        self.assertFalse(C.clearance_event(kept)['reentered_combat_climb'])
+        for changes in [dict(combat_active=False), dict(combat_goal='engage ship'),
+                        dict(opponent_range=301), dict(goal='transfer'),
+                        dict(pursuit=dict(started_tick=0))]:
+            event = C.clearance_event(row | changes)
+            self.assertFalse(event and event['reentered_combat_climb'])
 
     def test_profile_pairing_rejects_confounds(self):
         old = dict(seed=1, candidate_seat=1, direct_laser_window=False,
@@ -94,7 +112,8 @@ class ClearanceQualificationTests(unittest.TestCase):
                     other = handoff(tick) | dict(seat=0)
                     evaluated = handoff(tick)
                     if enabled:
-                        evaluated.update(pursuit_climb=0, hunt_clearance_handoff=C.PROFILE)
+                        evaluated.update(pursuit_climb=0, hunt_clearance_handoff=C.PROFILE,
+                                         reason='climbing for a firing pass')
                     combat.extend([other, evaluated])
                     action = dict(tick=tick, actions=[0]*6, scenario_before_step_fnv64='same',
                                   normalized_decision_fnv64='new' if enabled else 'old')

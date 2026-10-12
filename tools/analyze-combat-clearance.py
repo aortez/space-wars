@@ -46,12 +46,21 @@ def clearance_event(row):
         return None
     reason = release_reason(row)
     continued = before['goal'] in ['hunt', 'watch'] and reason == 'unfinished'
+    mission_climb = (row['reason'] == 'climbing for a firing pass'
+                     and not row['combat_active'])
+    local_climb = (row['reason'] is None and row['combat_active']
+                   and row['combat_goal'] == 'climb clear of ground')
     return {k: copy.deepcopy(row[k]) for k in [
         'tick', 'before', 'goal', 'reason', 'pursuit', 'pursuit_climb',
-        'geometry', 'opponent_range', 'ship_health', 'weapons', 'mission_events']} | {
+        'geometry', 'opponent_range', 'ship_health', 'weapons', 'mission_events',
+        'combat_active', 'combat_goal']} | {
         'release_reason': reason, 'pursuit_boundary': boundary,
         'premature_release': changed_anchor and continued,
-        'retained_handoff': bookkeeping and not changed_anchor and continued,
+        'retained_handoff': bookkeeping and not changed_anchor and continued and mission_climb,
+        # end_pursuit/reconsider can clear the anchor and hunt can re-enter the
+        # local combat climb on that same decision. Equal anchors do not imply
+        # that the mission clearance controller was preserved through it.
+        'reentered_combat_climb': bookkeeping and not changed_anchor and continued and local_climb,
     }
 
 
@@ -89,6 +98,7 @@ def audit_case(case):
             clearance_events=events[seat],
             premature_releases=sum(e['premature_release'] for e in events[seat]),
             retained_handoffs=sum(e['retained_handoff'] for e in events[seat]),
+            reentered_combat_climbs=sum(e['reentered_combat_climb'] for e in events[seat]),
             final_pilot_health=summary['match']['pilots'][seat]['health'],
             final_ship_health=pilot['ship_health'],
             final_owned_planets=summary['match']['owned_planets'][seat],
@@ -146,9 +156,11 @@ def audit_prefix(old, new, first):
                 assert current_seat == seat, 'opponent controller changed before handoff'
                 before, after = clearance_event(a), clearance_event(b)
                 assert before and after, 'first controller change is not a handoff'
-                assert before['premature_release'] and after['retained_handoff']
+                assert (before['premature_release'] or before['reentered_combat_climb'])
+                assert after['retained_handoff']
                 assert a['before'] == b['before'] and a['geometry'] == b['geometry']
                 assert a['pursuit'] == b['pursuit']
+                assert a['mission_events'] == b['mission_events']
                 cause = dict(tick=tick, control=before, candidate=after)
         a, b = [next(stream) for stream in actions]
         assert a['tick'] == b['tick'] == tick
@@ -200,7 +212,8 @@ def compare(control, candidate):
     for old, new, pair in zip(control['cases'], candidate['cases'], pairs):
         pair['prefix_audit'] = audit_prefix(old, new, pair['first_input_change'])
         for total, result, case in zip([a, b], [pair['control'], pair['candidate']], [old, new]):
-            for key in ['premature_releases', 'retained_handoffs', 'final_owned_planets']:
+            for key in ['premature_releases', 'retained_handoffs', 'reentered_combat_climbs',
+                        'final_owned_planets']:
                 total[key] += result[key]
             total['elapsed_ticks'] += case['end_tick']
     exercised = [p for p in pairs if p['prefix_audit']['first_controller_change']]
@@ -228,7 +241,8 @@ def main():
     plan = A.read(args.plan)
     assert plan['schema'] == 'combat-clearance-qualification-v1'
     assert len(frozen_matrix(plan, False)) == plan['pairs']
-    report = dict(plan=plan, plan_sha256=A.digest(args.plan),
+    report = dict(audit_schema='combat-clearance-audit-v2',
+                  plan=plan, plan_sha256=A.digest(args.plan),
                   analyzer_sha256=A.digest(Path(__file__)),
                   common_analyzer_sha256=A.digest(Path(A.__file__)),
                   control=audit_root(args.control, plan, False),

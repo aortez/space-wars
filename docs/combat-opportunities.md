@@ -772,3 +772,21 @@ followed by the four seeds above; add `--hunt-clearance-handoff` only for the
 candidate. Compare using `tools/analyze-combat-clearance.py <control-root>
 <candidate-root> --plan docs/data/combat-clearance-qualification-v1-plan.json
 --out <report.json>`.
+
+### Audit correction after the frozen games
+
+All 64 games completed on the frozen `363bd97` binary. The first analysis
+attempt rejected Round/asteroids/P2 in world four at tick **12,693**. Its first
+changed controller fields are `combat_active` and `reason`: the control ends
+pursuit, clears its unfinished anchor, then immediately re-enters a local combat
+climb on that same anchor. The candidate continues the mission climb. Looking
+only for an absent or replaced anchor misses this path.
+
+Audit v2 recognizes that specific same-anchor re-entry: identical prior state,
+geometry, pursuit transition and mission events; an unfinished climb; control
+delegation to `climb clear of ground`; and candidate continuation of the mission
+clearance climb. It also stops counting that control re-entry as a preserved
+mission climb. The added regression test rejects ordinary combat, a real mission
+change, a missing handoff and an out-of-range opponent. The original failed
+analysis log and frozen analyzers remain in the evidence directory. No native
+game, bot implementation, seed, threshold or acceptance criterion changed.
