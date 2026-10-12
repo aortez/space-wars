@@ -1,0 +1,29 @@
+{
+  "schema": "combat-clearance-qualification-v1",
+  "seed_derivation": "First eight SHA-256 bytes, little endian, of combat-155-clearance-qualification-v1:{0..3}",
+  "seeds": [9847768328830853557, 13228584838475544469, 2022759036850641902, 315794691381735312],
+  "shapes": ["round", "angular"],
+  "asteroid_intervals": [0, 8],
+  "seats": [0, 1],
+  "pairs": 32,
+  "candidate": "material_hunt_clearance_handoff_v1",
+  "laser": "standard, in both arms",
+  "evaluated_bot": "Recovery v1 / material_mission_v13 / terrain_recovery_supported_hatch_ordinary_offsets_v1",
+  "opponent": "standard Value v13",
+  "match_seconds": 600,
+  "break_interval_seconds": 15,
+  "break_duration_seconds": 4,
+  "host_work": {"graph": 4, "physics_queries": 384},
+  "screen": [
+    "All 32 pairs complete with native physics/material audits and shared work limits passing.",
+    "Both arms use the same frozen binary and worlds, with only the evaluated seat's handoff profile different.",
+    "Physics remains identical before the first changed input, and the opponent's first input is unchanged.",
+    "The first controller difference must preserve an unfinished climb when pursuit/replan bookkeeping selects hunting again; ignore only the selected profile identifier.",
+    "At least one fresh pair exercises that controller difference; zero such pairs is inconclusive, not a pass.",
+    "The evaluated candidate has zero premature clearance releases while hunting continues.",
+    "Aggregate match points and wins do not fall; pilot deaths and ship losses do not increase.",
+    "Aggregate completed departures do not fall. Record recoveries, final ownership, weapons, damage and exposure separately.",
+    "Retain every lost win and per-pair survival or mission regression for review even if aggregates pass."
+  ],
+  "decision": "A pass advances only to review. Defaults remain unchanged. Do not add seeds or tune thresholds against these results."
+}

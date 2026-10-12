@@ -728,3 +728,47 @@ target/combat-155/clearance-handoff-v1/ai-tests \
   mission_pilot::terrain_recovery::qualification::combat_clearance::retained_combat_clearance_handoff \
   --ignored --exact --nocapture
 ```
+
+## Frozen broader clearance qualification
+
+The next trial isolates `material_hunt_clearance_handoff_v1` with the **standard
+laser in both arms**. Its [frozen plan](data/combat-clearance-qualification-v1-plan.json)
+defines four fresh worlds, derived from SHA-256 of
+`combat-155-clearance-qualification-v1:{0..3}` (first eight bytes, little endian):
+`9847768328830853557`, `13228584838475544469`, `2022759036850641902`, and
+`315794691381735312`. Each runs Round and Angular/slumping, no asteroids and
+eight-second mixed asteroids, and both evaluated seats: **32 pairs / 64 games**.
+
+Both arms use the same frozen test binary, native 600-second matches, Recovery
+v1 against standard Value v13, existing combat breaks and shared work limits.
+Only the evaluated seat's handoff option changes. There are no laser probes,
+input overrides, controller resets, physics changes or resource reservations.
+
+The comparison records the selected profiles, controller state before each
+decision, all-planet clearance/radial motion, current mission events, normalized
+typed decision hashes and actual actions. It checks identical physical state up
+to the first changed input and an unchanged opponent input at that point. The
+first controller change must be a carried unfinished climb when bookkeeping
+selects hunting again; its encoded flight input may change on a later tick.
+Unexercised pairs must retain identical final state and controllers after
+removing only the profile identifier. Native audits, complete ordered traces
+and shared work bounds are mandatory throughout.
+
+To advance to review, at least one fresh pair must actually exercise the fix,
+the candidate must have zero premature clearance releases, aggregate wins and
+match points must not fall, pilot deaths and ship losses must not rise, and
+completed departures must not fall. Retain per-pair lost wins and survival or
+mission regressions even if totals pass. Record recoveries, ownership, damage,
+weapons and elapsed exposure separately; more shots are not an acceptance
+criterion. Zero exercised pairs is inconclusive. No seed additions or threshold
+tuning against these results, and no automatic default change after a pass.
+
+The plan, runner, analyzer and diagnostic instrumentation are committed before
+running any qualification game. Raw roots are
+`target/combat-155/clearance-qualification-control-v1` and
+`target/combat-155/clearance-qualification-candidate-v1`. Run each with
+`tools/run-combat-opportunities.py --binary <frozen-ai-tests> --jobs 2 --seeds`
+followed by the four seeds above; add `--hunt-clearance-handoff` only for the
+candidate. Compare using `tools/analyze-combat-clearance.py <control-root>
+<candidate-root> --plan docs/data/combat-clearance-qualification-v1-plan.json
+--out <report.json>`.

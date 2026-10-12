@@ -159,7 +159,8 @@ def analyze_root(root):
     return {'directory': str(root), 'runtime': read(root / 'runtime.json'), 'cases': cases}
 
 
-def first_change(control, candidate):
+def first_change(control, candidate, experiment='direct-laser'):
+    assert experiment in ['direct-laser', 'clearance-handoff']
     a = rows(Path(control['directory']) / 'output/actions.jsonl')
     b = rows(Path(candidate['directory']) / 'output/actions.jsonl')
     seat = candidate['case']['candidate_seat']
@@ -180,38 +181,53 @@ def first_change(control, candidate):
         if old['actions'] != new['actions']:
             assert len(old['actions']) == len(new['actions']) == 6
             changed = [i for i, (a, b) in enumerate(zip(old['actions'], new['actions'])) if a != b]
-            assert changed == [seat*3+2], changed
-            old_weapon, new_weapon = old['actions'][changed[0]], new['actions'][changed[0]]
-            # Scenario actions are externally tagged; only the laser payload byte changes.
-            before, after = old_weapon['Scenario'], new_weapon['Scenario']
-            assert before['kind'] == after['kind']
-            assert len(before['payload']) == len(after['payload']) == 3
-            assert before['payload'][0] == after['payload'][0] == seat
-            assert before['payload'][2] == after['payload'][2]
-            assert before['payload'][1] != after['payload'][1]
-            first = {'tick': old['tick'], 'before': old_weapon, 'after': new_weapon}
+            if experiment == 'direct-laser':
+                assert changed == [seat*3+2], changed
+                old_weapon, new_weapon = old['actions'][changed[0]], new['actions'][changed[0]]
+                # Only the laser payload byte may change in the firing experiment.
+                before, after = old_weapon['Scenario'], new_weapon['Scenario']
+                assert before['kind'] == after['kind']
+                assert len(before['payload']) == len(after['payload']) == 3
+                assert before['payload'][0] == after['payload'][0] == seat
+                assert before['payload'][2] == after['payload'][2]
+                assert before['payload'][1] != after['payload'][1]
+                first = {'tick': old['tick'], 'before': old_weapon, 'after': new_weapon}
+            else:
+                assert all(seat*3 <= i < seat*3+3 for i in changed), 'opponent changed first'
+                first = {'tick': old['tick'], 'changed_action_indices': changed,
+                         'before': old['actions'], 'after': new['actions']}
     assert counts == [control['end_tick'], candidate['end_tick']], 'incomplete action trace'
     if first is None:
         assert control['outcome'] == candidate['outcome']
     return first
 
 
-def compare(control, candidate):
+def validate_pair(old, new, experiment):
+    option = {'direct-laser': 'direct_laser_window',
+              'clearance-handoff': 'hunt_clearance_handoff'}[experiment]
+    assert not old.get(option, False) and new.get(option, False), 'wrong candidate option'
+    assert {k: v for k, v in old.items() if k != option} == {
+        k: v for k, v in new.items() if k != option}, 'paired case settings differ'
+    assert not old.get('probe_laser', False), 'paired qualification cannot use probes'
+    other = 'hunt_clearance_handoff' if experiment == 'direct-laser' else 'direct_laser_window'
+    assert not old.get(other, False), 'mixed experimental profiles'
+
+
+def paired_results(control, candidate, experiment):
     assert control['runtime']['binary_sha256'] == candidate['runtime']['binary_sha256']
     assert len(control['cases']) == len(candidate['cases'])
     totals = [Counter(), Counter()]
     pairs = []
     for old, new in zip(control['cases'], candidate['cases']):
-        assert not old['case']['direct_laser_window'] and new['case']['direct_laser_window']
-        for key in ['seed', 'shape', 'slumping', 'candidate_seat', 'asteroid_interval_seconds']:
-            assert old['case'][key] == new['case'][key]
-        first = first_change(old, new)
+        validate_pair(old['case'], new['case'], experiment)
+        first = first_change(old, new, experiment)
         seat = old['case']['candidate_seat']
         a, b = old['seats'][seat], new['seats'][seat]
         for total, result in zip(totals, [a, b]):
             for key in ['points', 'ships_lost', 'completed_sorties', 'completed_recoveries']:
                 total[key] += result[key]
             total['pilot_deaths'] += result['pilot_death_tick'] is not None
+            total['wins'] += result['points'] == 1
             total['laser_hit_ticks'] += result['weapons']['laser_hit_ticks']
             total['cannon_hits'] += result['weapons']['cannon_hits']
             total['short_climb_engage_climb'] += len(result['short_climb_engage_climb'])
@@ -220,7 +236,11 @@ def compare(control, candidate):
                       'control': a, 'candidate': b,
                       'end_ticks': [old['end_tick'], new['end_tick']],
                       'lost_win': a['points'] == 1 and b['points'] < 1})
-    a, b = totals
+    return totals, pairs
+
+
+def compare(control, candidate):
+    (a, b), pairs = paired_results(control, candidate, 'direct-laser')
     screen = {'points_not_lower': b['points'] >= a['points'],
               'pilot_deaths_not_higher': b['pilot_deaths'] <= a['pilot_deaths'],
               'ship_losses_not_higher': b['ships_lost'] <= a['ships_lost'],

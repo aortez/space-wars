@@ -13,6 +13,8 @@ struct CombatCase {
     probe_laser: bool,
     #[serde(default)]
     direct_laser_window: bool,
+    #[serde(default)]
+    hunt_clearance_handoff: bool,
 }
 
 #[test]
@@ -38,6 +40,13 @@ fn combat_opportunities_match() {
             .expect("candidate seat required");
         run.brains[seat].configure_direct_laser_window(true);
     }
+    if case.hunt_clearance_handoff {
+        let seat = case
+            .mission
+            .candidate_seat
+            .expect("candidate seat required");
+        run.brains[seat].configure_hunt_clearance_handoff(true);
+    }
     save_state(out, "initial", &run);
     let initial_cells = run.state.terrain_diagnostics().occupied_cells;
     let file = |name| BufWriter::new(File::create(out.join(name)).unwrap());
@@ -52,13 +61,24 @@ fn combat_opportunities_match() {
             break;
         }
         assert_eq!(run.state.tick(), tick);
+        let before = run.brains.each_ref().map(|bot| {
+            json!({"goal":bot.telemetry.goal,"pursuit":bot.telemetry.pursuit,
+                "climb":bot.pursuit_climb,"next_pursuit_tick":bot.next_pursuit_tick})
+        });
         let (decision, mut cost) = run.decide(case.mission.candidate_seat);
+        // Omit only the selection identifier, preserving typed f32 serialization.
+        // A paired run must still expose every actual controller difference.
+        let mut normalized = decision.clone();
+        for brain in &mut normalized.brains {
+            brain.hunt_clearance_handoff = None;
+        }
         let round = run.state.match_observation().unwrap();
         line(
             &mut actions,
             &json!({
                 "tick":tick,"actions":decision.actions,
                 "decision_fnv64":fnv64(&serde_json::to_vec(&decision).unwrap()),
+                "normalized_decision_fnv64":fnv64(&serde_json::to_vec(&normalized).unwrap()),
                 "scenario_before_step_fnv64":fnv64(&SurfaceSortieScenario::observe(&run.state).payload)
             }),
         );
@@ -104,31 +124,47 @@ fn combat_opportunities_match() {
             let direct_window = aim.as_ref().is_some_and(|a| a["direct_window"] == true);
             let break_until = pilot.patrol.telemetry().breaks.active_until_tick;
             let active_combat = b.combat.as_ref().is_some_and(|c| c.goal == "engage ship");
-            line(
-                &mut rows,
-                &json!({
-                    "tick":tick,"seat":seat,"goal":b.goal,"reason":b.reason,
-                    "combat_goal":pilot.patrol.telemetry().goal,"combat_active":b.combat.is_some(),
+            let geometry: Vec<_> = o
+                .planets
+                .iter()
+                .map(|planet| {
+                    let radial = p.ship.position - planet.motion.position;
+                    let speed = (p.ship.velocity - planet.motion.velocity).dot(radial.normalized());
+                    json!({"planet":planet.index,"clearance":radial.length()-planet.radius,
+                    "radial_speed":speed,"owner":planet.claim.as_ref().and_then(|c|c.owner)})
+                })
+                .collect();
+            let mut row = json!({
+                "tick":tick,"seat":seat,"goal":b.goal,"reason":b.reason,
+                "combat_goal":pilot.patrol.telemetry().goal,"combat_active":b.combat.is_some(),
                 "laser_window_profile":pilot.patrol.telemetry().laser_window_profile,
-                    "pursuit":b.pursuit,"pursuit_climb":pilot.pursuit_climb,
-                    "break_until":break_until,"avoidance":b.avoidance,
-                    "capture_active":pilot.capture.is_some(),"recovery_active":pilot.recovery.is_some(),
-                    "controls_armed":p.controls_armed,"queries_ready":p.queries_ready,
-                    "ship_available":p.ship_available,"ship_form":p.ship_form,"location":p.location,
-                    "ship":p.ship,"ship_health":p.ship_health,"planet":p.planet.index,
-                    "altitude":radial.length()-p.planet.radius,"falling":falling,
-                    "local_climb_entry":40.0+falling*2.0+falling*falling/60.0,
-                    "mission_climb_entry":70.0+falling*falling/50.0,
-                    "target":c.target,"aim":aim,"laser_available":c.laser_available,
-                    "cannon_ready":c.cannon_ready,"supply":c.supply,
-                    "weapons":c.weapons,"laser":weapons.laser,"cannon":weapons.cannon,
-                    "damage":run.state.damage_observation(seat),
+                "pursuit":b.pursuit,"pursuit_climb":pilot.pursuit_climb,
+                "break_until":break_until,"avoidance":b.avoidance,
+                "capture_active":pilot.capture.is_some(),"recovery_active":pilot.recovery.is_some(),
+                "controls_armed":p.controls_armed,"queries_ready":p.queries_ready,
+                "ship_available":p.ship_available,"ship_form":p.ship_form,"location":p.location,
+                "ship":p.ship,"ship_health":p.ship_health,"planet":p.planet.index,
+                "altitude":radial.length()-p.planet.radius,"falling":falling,
+                "local_climb_entry":40.0+falling*2.0+falling*falling/60.0,
+                "mission_climb_entry":70.0+falling*falling/50.0,
+                "target":c.target,"aim":aim,"laser_available":c.laser_available,
+                "cannon_ready":c.cannon_ready,"supply":c.supply,
+                "weapons":c.weapons,"laser":weapons.laser,"cannon":weapons.cannon,
+                "damage":run.state.damage_observation(seat),
                 "pilot_health":round.pilots[seat].health,
                 "pilot_damage":round.pilots[seat].last_damage.filter(|d|d.tick==tick),
-                    "completed_sorties":b.completed_sorties,"completed_recoveries":b.completed_recoveries,
-                    "recovery":p.recovery
-                }),
+                "completed_sorties":b.completed_sorties,"completed_recoveries":b.completed_recoveries,
+                "recovery":p.recovery
+            });
+            row.as_object_mut().unwrap().extend(
+                json!({
+                    "hunt_clearance_handoff":b.hunt_clearance_handoff,"before":before[seat],
+                    "next_pursuit_tick":pilot.next_pursuit_tick,"geometry":geometry,
+                    "mission_events":b.events.iter().filter(|e|e.tick==tick).collect::<Vec<_>>(),
+                    "opponent_range":o.opponent.as_ref().map(|op|op.motion.position.distance_to(p.ship.position))
+                }).as_object().unwrap().clone(),
             );
+            line(&mut rows, &row);
             // Probe a bounded, spaced sample of declined, ready, present-aim
             // windows. Native collision/damage is the evidence of an actual hit.
             if case.probe_laser

@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--seats', nargs='+', type=int, choices=[0, 1], default=[0, 1])
     parser.add_argument('--probe-laser', action='store_true')
     parser.add_argument('--direct-laser-window', action='store_true')
+    parser.add_argument('--hunt-clearance-handoff', action='store_true')
     parser.add_argument('--jobs', type=int, choices=[1, 2, 3, 4], default=2)
     args = parser.parse_args()
     root = args.root.resolve()
@@ -45,7 +46,8 @@ def main():
     cases = [{'seed': seed, 'shape': shape, 'slumping': True,
               'candidate_seat': seat, 'asteroid_interval_seconds': interval,
               'probe_laser': args.probe_laser,
-              'direct_laser_window': args.direct_laser_window}
+              'direct_laser_window': args.direct_laser_window,
+              'hunt_clearance_handoff': args.hunt_clearance_handoff}
              for seed, shape, interval, seat in itertools.product(
                  args.seeds, args.shapes, args.intervals, args.seats)]
     write(root / 'matrix.json', cases)
