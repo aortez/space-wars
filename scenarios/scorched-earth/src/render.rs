@@ -59,8 +59,11 @@ fn text(
     );
 }
 fn line(frame: &mut RenderFrame, a: Vec2, b: Vec2, color: RenderColor, width: f32) {
+    line_at(frame, 5, a, b, color, width);
+}
+fn line_at(frame: &mut RenderFrame, layer: i32, a: Vec2, b: Vec2, color: RenderColor, width: f32) {
     frame.push_primitive(
-        5,
+        layer,
         RenderPrimitive::Line(RenderLine::new(
             point(a),
             point(b),
@@ -80,8 +83,12 @@ fn circle(frame: &mut RenderFrame, at: Vec2, radius: f32, color: RenderColor) {
     );
 }
 fn button_center(index: usize) -> Vec2 {
-    if index >= 11 {
-        Vec2::new((index as f32 - 13.0) * 17.5, 19.0)
+    if index == 20 {
+        Vec2::new(41.25, 19.0)
+    } else if index >= 16 {
+        Vec2::new((index as f32 - 17.5) * 22.0, -30.0)
+    } else if index >= 11 {
+        Vec2::new((index as f32 - 13.5) * 16.5, 19.0)
     } else {
         Vec2::new((index as f32 - 5.0) * 8.5, -26.0)
     }
@@ -168,6 +175,17 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
             circle(&mut frame, m.position, grain.radius(), color);
         }
     }
+    if let Some(course) = state.config.course {
+        let finish = Vec2::new(course.finish_x(), course.floor(course.finish_x()) + 0.3);
+        line(&mut frame, finish, finish + Vec2::Y * 5.0, TEAMS[0], 1.5);
+        text(
+            &mut frame,
+            finish + Vec2::new(0.0, 6.0),
+            "FINISH",
+            10.0,
+            TEAMS[0],
+        );
+    }
     for (i, tank) in state.tanks.iter().enumerate() {
         let m = state.physics.motion(tank.body).unwrap();
         let local = |x, y| m.position + Vec2::new(x, y).rotate_radians(m.angle);
@@ -176,26 +194,68 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         } else {
             RenderColor::rgb(0.24, 0.25, 0.26)
         };
-        polygon(
-            &mut frame,
-            4,
-            [
-                local(-1.7, -0.65),
-                local(1.7, -0.65),
-                local(1.9, 0.0),
-                local(1.4, 0.6),
-                local(-1.4, 0.6),
-                local(-1.9, 0.0),
-            ],
-            color,
-        );
-        for x in [-1.2, -0.4, 0.4, 1.2] {
-            circle(
+        if let Some(gear) = &state.running_gear[i] {
+            let spec = suspension::spec(state.config.wheel_tuning);
+            let snapshot = gear.snapshot(&state.physics).unwrap();
+            polygon(
                 &mut frame,
-                local(x, -0.5),
-                0.30,
-                RenderColor::rgb(0.08, 0.11, 0.12),
+                4,
+                [
+                    local(-spec.chassis_half_width, -spec.chassis_half_height),
+                    local(spec.chassis_half_width, -spec.chassis_half_height),
+                    local(spec.chassis_half_width, spec.chassis_half_height),
+                    local(-spec.chassis_half_width, spec.chassis_half_height),
+                ],
+                color,
             );
+            for (wheel, anchor) in snapshot.wheels.iter().zip(snapshot.suspension_anchors) {
+                line(&mut frame, anchor, wheel.position, INK, 1.5);
+                frame.push_primitive(
+                    6,
+                    RenderPrimitive::Circle(RenderCircle {
+                        center: point(wheel.position),
+                        radius: spec.wheel_radius,
+                        fill: Some(Fill::new(RenderColor::rgb(0.08, 0.11, 0.12))),
+                        stroke: Some(Stroke::new(RenderColor::rgb(0.35, 0.43, 0.43), 1.0)),
+                    }),
+                );
+                for spoke in 0..3 {
+                    let direction = Vec2::from_radians(
+                        wheel.angle + spoke as f32 * std::f32::consts::TAU / 3.0,
+                    );
+                    line_at(
+                        &mut frame,
+                        7,
+                        wheel.position,
+                        wheel.position + direction * spec.wheel_radius * 0.75,
+                        color,
+                        1.0,
+                    );
+                }
+                circle(&mut frame, wheel.position, 0.14, color);
+            }
+        } else {
+            polygon(
+                &mut frame,
+                4,
+                [
+                    local(-1.7, -0.65),
+                    local(1.7, -0.65),
+                    local(1.9, 0.0),
+                    local(1.4, 0.6),
+                    local(-1.4, 0.6),
+                    local(-1.9, 0.0),
+                ],
+                color,
+            );
+            for x in [-1.2, -0.4, 0.4, 1.2] {
+                circle(
+                    &mut frame,
+                    local(x, -0.5),
+                    0.30,
+                    RenderColor::rgb(0.08, 0.11, 0.12),
+                );
+            }
         }
         let (pivot, muzzle) = state.muzzle(i);
         circle(&mut frame, pivot, 0.7, color);
@@ -210,7 +270,9 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
                 },
             format!(
                 "{} · {:.0}",
-                if i == state.selected && !state.config.demo {
+                if state.config.course.is_some() && i == 1 {
+                    "PARKED"
+                } else if i == state.selected && !state.config.demo {
                     "YOU"
                 } else {
                     "CPU"
@@ -262,18 +324,49 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(0.0, 24.0),
-        format!(
-            "Tank {}   ·   angle {:.0}°   ·   power {:.0}   ·   {} dirt   ·   collapse {}",
-            state.selected + 1,
-            tank.elevation.to_degrees(),
-            tank.speed,
-            shape,
-            if state.config.slumping { "ON" } else { "off" }
-        ),
+        if state.config.course.is_some() {
+            format!(
+                "Driving course · {} dirt · physics {}",
+                shape,
+                state.config.cohesion.label()
+            )
+        } else {
+            format!(
+                "Tank {} · {:.0}° · power {:.0} · {} · collapse {}",
+                state.selected + 1,
+                tank.elevation.to_degrees(),
+                tank.speed,
+                shape,
+                if state.config.slumping { "ON" } else { "off" }
+            )
+        },
         15.0,
         TEAMS[state.selected],
     );
-    let result = if state.config.roof {
+    let course_snapshot = state
+        .config
+        .course
+        .map(|_| driving_lab::snapshot(state, 0, 1.0));
+    let course_goal = state.course_decision.as_ref().filter(|_| {
+        state.config.course.is_some()
+            && state.config.course_goal_driving
+            && state.config.cpu_driving
+            && state.config.demo
+    });
+    let result = if let (Some(course), Some(drive)) = (state.config.course, &course_snapshot) {
+        format!(
+            "{} · {:.1} / {:.1} units · {}{}",
+            course.description(),
+            drive.position[0] - course::START_X,
+            course.finish_x() - course::START_X,
+            if drive.position[0] >= course.finish_x() {
+                "FINISHED"
+            } else {
+                drive.driving.mode
+            },
+            course_goal.map_or(String::new(), |g| format!(" · retries {}/2", g.retries)),
+        )
+    } else if state.config.roof {
         let d = state.cohesion_diagnostics();
         format!(
             "Roof · {} shots · {} roof cracks · {} ledge breaks · {} clump breaks",
@@ -374,15 +467,31 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(0.0, -22.3),
-        format!(
-            "{} / {} loose  ·  {} returned  ·  {} {}  ·  {} capacity rejections",
-            state.loose_cells(),
-            state.config.max_grains,
-            state.deposited_cells(),
-            events,
-            event_label,
-            rejections
-        ),
+        if let Some(drive) = &course_snapshot {
+            format!(
+                "Support {} · route {}{}{}",
+                if drive.supported { "yes" } else { "no" },
+                drive.ground.reason.unwrap_or("clear"),
+                drive.suspension_lengths.map_or(String::new(), |v| format!(
+                    " · springs {:.2} / {:.2}",
+                    v[0], v[1]
+                )),
+                course_goal.map_or(String::new(), |g| format!(
+                    " · speed {:.1}/{:.1}",
+                    g.actual_speed, g.desired_speed
+                )),
+            )
+        } else {
+            format!(
+                "{} / {} loose  ·  {} returned  ·  {} {}  ·  {} capacity rejections",
+                state.loose_cells(),
+                state.config.max_grains,
+                state.deposited_cells(),
+                events,
+                event_label,
+                rejections
+            )
+        },
         12.0,
         INK,
     );
@@ -403,8 +512,10 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         } else {
             "Collapse"
         },
-        if state.config.roof {
-            "Duel"
+        if let Some(course) = state.config.course {
+            course.next().map_or("Duel", DrivingCourse::label)
+        } else if state.config.roof {
+            "Course"
         } else if state.config.hillside {
             "Roof"
         } else if state.config.drop_height == Some(DropHeight::High) {
@@ -453,6 +564,36 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
         },
         "Hillside",
         "Roof",
+        "Drive left",
+        "Drive right",
+        if state.config.cpu_driving {
+            if state.config.course.is_some() {
+                if state.config.course_goal_driving {
+                    "Goal driver"
+                } else {
+                    "Range driver"
+                }
+            } else {
+                "CPU drive ON"
+            }
+        } else {
+            "CPU stationary"
+        },
+        if !suspension::enabled(state.config) && state.config.suspension {
+            "Wheels: lab off"
+        } else if state.config.suspension {
+            "Sprung wheels"
+        } else {
+            "Rigid tracks"
+        },
+        match state.config.course {
+            None => "Drive course",
+            Some(DrivingCourse::Flat) => "Course: flat",
+            Some(DrivingCourse::Step) => "Course: step",
+            Some(DrivingCourse::Slope) => "Course: slope",
+            Some(DrivingCourse::Trench) => "Course: trench",
+            Some(DrivingCourse::Rubble) => "Course: rubble",
+        },
     ]
     .into_iter()
     .enumerate()
@@ -471,6 +612,9 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
                 || (i == 13 && state.config.drop_height.is_some())
                 || (i == 14 && state.config.hillside)
                 || (i == 15 && state.config.roof)
+                || (i == 18 && state.config.cpu_driving)
+                || (i == 19 && suspension::enabled(state.config))
+                || (i == 20 && state.config.course.is_some())
             {
                 RenderColor::rgb(0.28, 0.36, 0.27)
             } else {
@@ -482,14 +626,16 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(0.0, if state.config.roof { 21.8 } else { 14.5 }),
-        if state.config.roof {
+        if state.config.course.is_some() {
+            "Drive to the flag · V: CPU / manual · J: next course · R: reset · Firing disabled"
+        } else if state.config.roof {
             "Demo: one shot under the roof · East: physics · North: dirt · Reset: replay"
         } else if state.config.hillside {
             "Fire at the bank · Demo: three shots · East: physics · North: dirt"
         } else if state.config.undercut || state.config.drop_height.is_some() {
             "Picade: East strength · North dirt · Left shoulder next test"
         } else {
-            "Hold Tank + Dirt: bank test · Hold Tank + Collapse: strength"
+            "A/D or left stick drive · Arrows aim/power · Picade: hold Tank + joystick to drive"
         },
         11.0,
         INK,
@@ -505,12 +651,5 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
             line(&mut frame, a, b, color, 1.5);
         }
     }
-    text(
-        &mut frame,
-        Vec2::new(0.0, -30.0),
-        "Arrows aim/power · Space fire · Tab tank · V demo · T dirt · K collapse · J next scene · R restart",
-        11.0,
-        INK,
-    );
     frame
 }

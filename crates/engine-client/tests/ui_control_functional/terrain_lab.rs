@@ -215,6 +215,21 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                     grains > 10,
                     "shell did not displace visible dirt on {renderer}: {grains} pixels"
                 );
+                // Barrage -> bank -> two drops -> hillside -> roof -> flat -> step.
+                // Exercise the course through the same scene-cycle controller
+                // input used by the Picade, then retain both renderer captures.
+                for _ in 0..7 {
+                    let request = spacewars_control::InputPressRequest::new(
+                        &state,
+                        spacewars_control::InputButton::LeftShoulder,
+                    );
+                    state = harness
+                        .client
+                        .input_press_before(&request, Instant::now() + Duration::from_secs(4))
+                        .unwrap()
+                        .state;
+                }
+                harness.capture_screenshot(&format!("{scenario}-{renderer}-driving-course.png"));
             }
             if scenario == "terrain-grains" {
                 // Fire is edge-triggered. Two long button holds can let every

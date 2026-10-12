@@ -3,7 +3,7 @@ use clap::{Parser, ValueEnum};
 use engine_common::Scenario;
 use engine_rapier::terrain::{GrainShape, SettlingWork};
 use scenario_scorched_earth::{
-    BankStrength, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario,
+    BankStrength, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario, WheelTuning,
 };
 use std::time::{Duration, Instant};
 
@@ -35,6 +35,21 @@ struct Args {
     limit: u32,
     #[arg(long)]
     replay: bool,
+    /// Compare moving CPU tanks; omitted retains the original stationary duel.
+    #[arg(long)]
+    cpu_driving: bool,
+    /// Enable nearby firing-footing goals for the moving CPU comparison.
+    #[arg(long, requires = "cpu_driving")]
+    cpu_footing: bool,
+    /// Use larger physical wheels with native spring/damper suspension.
+    #[arg(long)]
+    suspension: bool,
+    /// Fix drive torque explicitly when comparing old and new wheel settings.
+    #[arg(long, requires = "suspension")]
+    wheel_torque: Option<f32>,
+    /// Fix motor response; 80 reproduces retained wheel benchmark settings.
+    #[arg(long, requires = "suspension")]
+    wheel_damping: Option<f32>,
     /// Rain shells independently of tank health, then measure a quiet tail.
     #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=600))]
     bombardment_seconds: u32,
@@ -89,11 +104,35 @@ fn add_work(sum: &mut SettlingWork, work: SettlingWork) {
 fn main() {
     let args = Args::parse();
     assert!(
+        args.wheel_torque
+            .is_none_or(|v| v.is_finite() && (30.0..=480.0).contains(&v)),
+        "wheel torque must be finite and in 30..=480"
+    );
+    assert!(
+        args.wheel_damping
+            .is_none_or(|v| v.is_finite() && (1.0..=2400.0).contains(&v)),
+        "motor damping must be finite and in 1..=2400"
+    );
+    assert!(
         args.bombardment_seconds <= args.seconds,
         "bombardment must fit inside --seconds"
     );
     let config = ScorchedConfig {
         demo: true,
+        cpu_driving: args.cpu_driving,
+        cpu_footing: [args.cpu_footing; 2],
+        suspension: args.suspension,
+        wheel_tuning: WheelTuning {
+            motor_torque: args
+                .wheel_torque
+                .unwrap_or(WheelTuning::default().motor_torque),
+            motor_damping: args
+                .wheel_damping
+                .unwrap_or(WheelTuning::default().motor_damping),
+            ..Default::default()
+        },
+        course: None,
+        course_goal_driving: false,
         undercut: args.undercut,
         hillside: args.hillside,
         roof: args.roof,
@@ -191,6 +230,7 @@ fn main() {
                         "cohesion": state.cohesion_diagnostics(),
                         "impact_fracture": state.impact_diagnostics(),
                         "observation_hash": format!("{:016x}", state.observation_hash()),
+                        "driving": state.driving_diagnostics(),
                     })
                 );
             }
@@ -252,7 +292,12 @@ fn main() {
     println!(
         "{}",
         serde_json::json!({
-            "workload": if args.roof { "scorched-earth-roof-v1" } else if args.hillside { "scorched-earth-hillside-v2" } else if args.drop.is_some() { "scorched-earth-drop-v1" } else if args.undercut { "scorched-earth-undercut-v1" } else if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else { "scorched-earth-scripted-duel-v2" },
+            "workload": if args.roof { "scorched-earth-roof-v1" } else if args.hillside { "scorched-earth-hillside-v2" } else if args.drop.is_some() { "scorched-earth-drop-v1" } else if args.undercut { "scorched-earth-undercut-v1" } else if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else if args.suspension { "scorched-earth-wheeled-duel-v1" } else if args.cpu_driving { "scorched-earth-driving-duel-v1" } else { "scorched-earth-scripted-duel-v2" },
+            "cpu_driving": args.cpu_driving, "cpu_footing": args.cpu_footing,
+            "driving": state.driving_diagnostics(),
+            "footing": args.cpu_footing.then(|| scenario_scorched_earth::driving_lab::combat_tanks(&state).map(|tank| tank.controller["footing"].clone())),
+            "suspension": args.suspension,
+            "wheel_tuning": args.suspension.then_some(config.wheel_tuning),
             "slumping_enabled": state.config.slumping,
             "cohesion_strength": state.config.cohesion.label(),
             "drop": state.config.drop_height.map(DropHeight::label), "breakup": state.config.breakup,

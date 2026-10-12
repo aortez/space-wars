@@ -7,9 +7,9 @@ cargo run --locked --release -p engine-client -- --scenario scorched-earth --see
 ```
 
 This first playable slice of [#25](https://github.com/aortez/space-wars/issues/25)
-puts two physical tanks on seeded hills with downward gravity. Aim and fire at
-the opponent, or undermine its footing. The other tank returns fire every five
-seconds. The first tank reduced to zero health loses; **Reset** starts again on
+puts two physical tanks on seeded hills with downward gravity. Drive into position,
+aim and fire at the opponent, or undermine its footing. The CPU repositions and
+stops to shoot on a five-second cadence when it has stable footing. The first tank reduced to zero health loses; **Reset** starts again on
 the same hills. A simultaneous destruction is a draw.
 
 ![Angular dirt after repeated shell impacts on the Picade](screenshots/scorched-earth/picade-angular-impact.png)
@@ -18,29 +18,692 @@ the same hills. A simultaneous destruction is a draw.
 
 | Action | Keyboard | Controller |
 | --- | --- | --- |
-| Lower / raise elevation | Left / Right, A / D | D-pad left / right, right-stick X |
+| Drive left / right | A / D; hold Tab + Left / Right | Left stick; hold left face + horizontal D-pad |
+| Lower / raise elevation | Left / Right | D-pad left / right, right-stick X |
 | Lower / raise power | Down / Up, S / W | D-pad down / up, right-stick Y |
 | Fire (hold to repeat) | Space | Bottom face, right trigger |
-| Take control of the other tank | Tab | Left face |
-| Toggle the scripted CPU duel | V | Right shoulder |
+| Take control of the other tank | Tap and release Tab | Tap and release left face |
+| Toggle Demo (CPU controls both tanks) | V | Right shoulder |
 | Switch Angular / Round dirt and reset | T | Top face |
 | Toggle surface collapse; strength in bank/drop, physics in hillside/roof | K | Right face |
-| Cycle duel / barrage / bank / low drop / high drop / hillside | J | Left shoulder |
+| Cycle duel / barrage / bank / low drop / high drop / hillside / roof / driving courses | J | Left shoulder |
 | Open / leave bank test | Tab + T | Hold left + top face |
 | Cycle combined physics; strength only in bank/drop | Tab + K | Hold left + right face |
 | Reset current setup | R | On-screen Reset |
 | Pause | Esc | Start |
 
-The on-screen controls also adjust aim/power, fire, select a tank, toggle Demo,
+Hold the on-screen **Drive left/right** buttons to move; releasing, dragging off,
+or cancelling the pointer stops the command. **CPU drive ON / CPU stationary**
+switches between local repositioning and the retained stationary aiming policy.
+**Sprung wheels / Rigid tracks** resets the same scene with the selected running
+gear. The playable client initially uses sprung wheels. Scripted lab runs keep
+their original hulls and show **Wheels: lab off** when that override applies.
+The other on-screen controls adjust aim/power, fire, select a tank, toggle Demo,
 switch dirt, and reset. The on-screen **Reset** retains the current dirt shape
-and Demo, collapse, scene and strength choices. Camera framing fits the entire battlefield in landscape and
+and Demo, CPU driving, running gear, collapse, scene and strength choices. Camera framing fits the entire battlefield in landscape and
 narrow windows. The host provides the normal launcher, pause, and renderer controls.
 
-**Angular** is the initial dirt choice. **Demo** drives both tanks with the same
-seeded aiming sweep used by the headless runner. It estimates ballistic range
+**Drive course** opens the flat baseline and cycles through step, slope, trench,
+and rubble, then returns to the duel. **J / left shoulder** also advances these
+courses after Roof. **V / right shoulder** switches CPU/manual driving; **R**
+restarts the current course. The far tank stays parked, selection stays on the
+test tank, and firing is disabled. Dirt, physics and running-gear comparisons
+retain their existing controls.
+
+In the playable courses, **Goal driver** travels to the flag and stops. Click
+that driver button to cycle **Goal driver → CPU stationary → Range driver**.
+Range driver retains the normal combat repositioning policy. The HUD shows the
+goal's current action, actual/desired speed and used retries. Changing driver
+or switching to manual preserves the goal's history; Reset starts a fresh run.
+
+**Angular** is the initial dirt choice. **Demo** controls both tanks with the same
+repositioning policy and seeded aiming sweep used by the headless runner. It estimates ballistic range
 but varies its aim; intervening terrain and loose grains can intercept shots.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
-Human shots have a 1.25-second cooldown. The tanks currently cannot drive.
+Human shots have a 1.25-second cooldown.
+
+## Tank driving
+
+The first pass for [#195](https://github.com/aortez/space-wars/issues/195) includes
+manual and CPU driving. The drive command ramps toward 2.5 world units/s at
+5 world units/s². In **Rigid tracks**, a moving contact surface in the shared native physics world
+supplies traction through ordinary friction. The solver determines chassis
+movement and transfers the opposite reaction to loose ground and falling clumps.
+There are no pose corrections, velocity overrides, added normal forces, or
+automatic righting. Releasing drive ramps the track command down; native friction
+then holds or slides the hull according to its contacts.
+
+Propulsion requires live native contacts beneath the hull. Rigid tracks require
+contact normals within 40° of upward ground; the lower bevel is powered too,
+so a track can move around tile corners. Sprung wheels apply that 40° limit to
+the wheelbase grade and chassis pitch, admitting short 45° cell faces on a
+shallower hill. They still require an upward-facing contact aligned beneath
+the chassis; terrain probes alone cannot enable the motors.
+Airborne, inverted, and inadequately supported hulls receive no drive. This is a
+support threshold, not a guarantee of climbing every 40° slope: available
+friction, hull geometry, rubble and changing footing still matter. Pausing,
+switching tanks, and toggling Demo clear drive input. A held axis must return to
+neutral before driving a newly selected tank.
+
+The CPU makes a local decision every half second: approach beyond 32 units,
+back away within 18, and try to clear a blocked barrel otherwise. A terrain
+height profile checks the next four units while moving, including ground
+changed by a crater. Nine downward probes are spaced half a unit apart.
+Adjacent samples may rise or fall by one cell plus 0.08 units of tolerance;
+longer spans across at least the wheelbase/contact footprint retain a 40°
+slope limit. A short 45° interpolated face alone no longer rejects the route.
+It refuses large steps, drops, missing ground, other tanks and the world edge,
+brakes before its shot,
+and waits for a supported, stable firing pose. Three unsuccessful progress
+checks produce a three-second retry cooldown; an unstable firing pose also has
+a bounded wait. This is local repositioning, with no route search around large
+obstacles. A CPU may hold at a crater and keep firing rather than cross it.
+
+In the playable client, a stopped CPU on a tilt of at least 20° also checks for
+nearby flatter footing. It can make a short move along a safe route, brake when
+both wheels have settled on a better patch, and hold that position for its next
+shot. It reuses the course driver's speed control and bounded retries. Existing
+spacing, aim, shot timing and native support rules still apply; a new crater
+can stop the move immediately without replacing its destination or retry history.
+
+Bank, Drop and Barrage keep their stationary fixtures. Hillside and Roof keep
+their scripted Demo shots; turn Demo off to drive manually in those encounters.
+The headless runner retains the stationary duel by default; add `--cpu-driving`
+to exercise the retained range-only CPUs, and add `--cpu-footing` for the playable
+footing behavior. Both modes report drive distance, powered ticks,
+planning checks and final controller mode with `--diagnostics`.
+
+### Sprung-wheel comparison
+
+The next prototype uses two larger physical wheels per tank, each on its own
+spring and damper. It reuses `engine_rapier::rover::RoverAssembly`, with mass and
+motor response configurable for the heavier tank. Existing Rover Lab and
+Spacewars rover settings keep their original defaults. The native joint model
+provides spring travel and torque-limited rotation ([Rapier joint documentation](https://rapier.rs/docs/user_guides/rust/joints/)).
+
+The wheel radius is 0.65 world units, versus the old decorative wheel radius of
+0.30. Suspension rests at 0.55 with ±0.22 travel; stiffness is 3,500, damping 300,
+and each wheel has a drive-torque limit of 300 and braking limit of 120. Motor
+velocity-error damping is 240; this lets the heavier tank sustain useful drive
+under load while retaining the 2.5-unit/s target and command acceleration ramp. The
+visible hubs and spokes follow actual wheel position and rotation. The hull
+can pitch while the wheels move independently over a step. Drive force comes
+from tire contacts, so wheels can slip against loose dirt and transmit forces
+back into it. Releasing the controls applies the wheel brakes after the drive
+command ramps down. Unsupported and inverted tanks receive no motor drive.
+
+This comparison simulates wheels and suspension. There is no flexible belt,
+track tension, or individual link chain. A belt would add a continuous contact
+footprint and different behavior over gaps; that remains a separate comparison
+to consider after reviewing this prototype. Both player and CPU use the new
+running gear without changing the CPU's range/ground-check policy.
+
+The scenario/benchmark default stays rigid for retained fixtures. Use both
+`--suspension --cpu-driving` to benchmark moving sprung-wheel tanks, or only
+`--suspension` to compare stationary firing on the new suspension. The playable
+client starts with sprung wheels; the on-screen comparison button switches back.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_benchmark -- --shape angular --seconds 30 --seed 42 \
+  --suspension --cpu-driving --replay --diagnostics
+```
+
+The original torque-90 [sprung-wheel results](data/tank-suspension-20261011.json) retain 36 desktop
+runs with source/binary identities and commands. Every run conserves material
+and passes full replay. Rigid stationary/moving duel, Hillside, Roof and Barrage
+hashes still match the prior driving build for both shapes. Across the affected
+packages, 1,464 unit tests pass; the Scorched display lifecycle test also passes
+on both renderers. New fixtures check independent suspension travel over a
+0.5-unit step, braking/reversing, CPU stopped firing, airborne drive refusal,
+assembly switching and crater replay with both shapes and Off/Weak/Strong.
+
+For 30-second seed-42 sprung-wheel runs (`ci`, median of three), Round stationary
+mean/P95 is 0.544/1.931 ms and moving is 0.225/0.706 ms. Angular stationary is
+0.380/1.124 ms and moving is 0.278/0.868 ms. Moving tanks produce different shots
+and substantially different debris populations; these numbers do not isolate
+suspension overhead or establish a general speedup. The prototype adds four
+wheel bodies and four suspension joints across the two tanks. Picade timings
+for this revision remain pending.
+
+### Ordinary hill climbing, 2026-10-11
+
+A manual report on the seed-42 duel hills exposed a limitation the 20° driving
+course did not cover. With torque 120 and motor damping 80, a held drive stalls
+around X=-10 on the approximately 30° ascent. Native support stays valid, the
+hull has no contacts, the rear wheel stops against a cell corner, and the front
+wheel spins. The same failure occurs with firing disabled. This is a reproduced
+approach on the same seeded hills, not an extraction of the reported live game.
+
+The tank now uses torque 300 and motor damping 240. The original wheel geometry,
+mass, suspension, target speed, braking torque and support rules remain the
+controls for this comparison. Raising torque alone to 300 still failed some
+live-fire runs; motor response under load matters too. Enlarging the wheels
+without corresponding gearing reduced the available ground force and did not
+solve the stall. The shared Rover Lab and Spacewars rover defaults are unaffected.
+
+The [manual hill comparisons](data/tank-duel-climb-20261011.json) retain quiet and
+live-fire runs, with continuous drive and with two-second releases at X=-10,
+-6 and -2. All eight candidate runs reach X=8 alive and supported; all eight
+old-setting controls fail to reach it within 40 seconds. Times below start when
+drive is first held, after two seconds of initial settling, and include the
+six seconds of intentional stops where applicable.
+
+| Terrain / opponent | Continuous drive | Three hill starts |
+| --- | ---: | ---: |
+| Quiet, either dirt shape | 18.07 s | 24.82 s |
+| Angular, live enemy fire | 19.07 s | 26.43 s |
+| Round, live enemy fire | 20.12 s | 27.63 s |
+
+These are separately initialized tuning comparisons, with identical seed and
+input schedules; terrain and shot outcomes can diverge after motion changes.
+They do not prove that arbitrary craters are traversable. The new regression
+tests use normal manual input on ordinary hills, including braking and restarting
+on three inclines, plus a climb during enemy fire. Existing course, airborne,
+inverted, steep-grade, braking and material-conservation checks also remain.
+
+The user accepted the revised behavior after trying the updated local build.
+Torque 300 and motor damping 240 are the accepted hill-climbing baseline for
+further gameplay review.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_duel_lab -- --shape angular --seconds 40 --replay \
+  --stop-at=-10 --stop-at=-6 --stop-at=-2 --capture-dir /tmp/tank-duel-hill
+```
+
+Add `--quiet` to park the opponent and suppress new shots. Add `--torque 120
+--motor-damping 80` to reproduce the previous wheel settings. The lab records
+wheel/hull contacts, per-second motion, brake intervals and the first stall's
+native snapshot. Held drive bypasses CPU route selection but retains native
+support and motors. `scorched_driving_lab` and `scorched_benchmark` accept
+`--wheel-torque 120 --wheel-damping 80` for retained comparisons;
+`scorched_support_lab` deliberately retains damping 80 for its frozen cases.
+
+### CPU firing footing, 2026-10-11
+
+The next ordinary-match review keeps the accepted motors, suspension, range
+policy, aim and shot schedule. When a stopped tank is tilted at least 20°, it
+looks 2.5 units in either direction for a supported route to flatter terrain.
+The existing nine-probe profile must pass, and the destination footprint must
+predict at most 18° tilt with at least 8° improvement. The usual firing-range
+band is retained when already in range.
+
+The estimate only selects a destination. Completion requires actual supported
+footing, both wheel contacts for sprung tanks, at least 8° improvement to at
+most 18°, and low linear/angular speed. After travelling at least 0.75 units,
+the controller can brake once on a better patch before its predicted destination.
+An unsuccessful settling attempt resumes the existing goal after one second.
+Success holds the position until the next shot, subject to support, firing and
+close-opponent spacing decisions. An unsuitable destination or exhausted goal
+is remembered until the tank moves four units away. Terrain edits cannot start
+unlimited fresh attempts at the same location.
+
+The goal controller now lives in the production driving module; the lab exports
+remain available. Intentional firing stops and manual/CPU switches suspend
+progress measurement while preserving the destination, best progress, cooldown
+and used retries. Newly unsafe routes stop the command immediately. Native
+contacts, motor limits and the acceleration ramp continue to determine motion.
+
+`scorched_cpu_lab` records complete ordinary matches, including both controllers,
+ground probes, support, shots, footing candidates and per-second motion. Its
+fork mode finds an opportunity with the retained CPU, clones the native world
+and both controllers, then enables footing for only the selected tank. The
+opponent remains unchanged. No controller reset, body adjustment or motor/aim
+change is used at the fork.
+
+```sh
+# Full ordinary matches with the playable controller, including replay.
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_cpu_lab -- --shape round --seed 314 --seconds 60 \
+  --footing --replay --capture-dir /tmp/tank-cpu-match
+
+# Continue exactly the same captured world with the old and new controller.
+target/ci/examples/scorched_cpu_lab --shape round --seed 314 \
+  --fork-player 2 --seconds 20 --replay --capture-dir /tmp/tank-cpu-round
+target/ci/examples/scorched_cpu_lab --shape angular --seed 310 \
+  --fork-player 2 --seconds 20 --replay --capture-dir /tmp/tank-cpu-angular
+
+# Time normal updates separately from the detailed diagnostic traces.
+target/ci/examples/scorched_benchmark --shape round --seed 314 --seconds 30 \
+  --cpu-driving --cpu-footing --suspension --replay
+```
+
+The [review receipt](data/tank-cpu-footing-20261011.json) and
+[full traces](data/tank-cpu-footing-traces-20261011.json.gz) retain the captures,
+commands, source identities and validation. Two naturally occurring opportunities
+complete a move and hold for a shot:
+
+| Frozen case, tank 2 | Initial tilt | Candidate at checkpoint | Range-only control at checkpoint |
+| --- | ---: | ---: | ---: |
+| Round, seed 314, fork tick 645; checkpoint 780 | 31.3° | 13.5° | 24.5° |
+| Angular, seed 310, fork tick 193; checkpoint 360 | 24.3° | 9.8° | 22.4° |
+
+The Round tank moves about 1.5 units by that checkpoint; the Angular tank moves
+about 0.7. Later enemy impacts can change the footing again. These are useful
+local positioning changes, not evidence of improved survival or win rates.
+
+The full-match review covers 12 retained controls and 18 enabled matches across
+both shapes, rigid and sprung running gear, and Off/Weak/Strong destruction.
+All replay and conserve material. The 12 controls retain their previous hashes.
+Footing goals activate in six of the 18 enabled matches: six of seven goals
+complete; one is blocked by changing ground before the match ends. The two
+separate frozen comparisons also replay exactly. Most ordinary matches do not
+need a footing goal, and this controller does not find routes across arbitrary
+cratered terrain.
+
+Validation passes 57 scenario tests, four client control/render tests, formatting
+and strict scenario-only Clippy. New regressions cover actual settled arrival
+and firing, a fresh crater stopping the move, and CPU toggles retaining goal
+history. Existing course, climbing, unsupported-drive and retry tests remain.
+All 26 existing benchmark hashes remain unchanged; ten additional footing-enabled
+benchmark runs pass replay and conservation, including both gears and destruction
+strengths. Their individual update P95s range from 0.635 to 1.954 ms on the desktop
+(`ci` profile). These are different combat/debris workloads and single timing
+samples, so they do not isolate controller overhead or predict Picade frame rate.
+
+The user accepted this CPU footing behavior following the local preview. It is
+the current combat-driving baseline alongside the accepted hill-climbing tuning.
+
+### Integrated driving validation, 2026-10-11
+
+The accepted work is consolidated on main `6742d9f`, including its shared CCD,
+terrain-clipping and client updates. The clean rebase changed no accepted source
+file. Implementation revision `ba2fe55` passes 1,546 affected unit tests across
+the client, shared physics/terrain, Scorched Earth, Rover Lab and Spacewars,
+plus the Scorched UI lifecycle test on both vector and raster renderers.
+Formatting and strict scenario-only Clippy pass.
+
+The [integration receipt](data/tank-driving-integration-20261011.json) records
+all commands, binary identities and results. All 36 desktop benchmark cases
+retain their accepted observation hashes. All 36 Picade runs pass replay and
+material audits with exactly the same final hashes as the desktop. The two
+frozen footing comparisons also produce identical full reports across x86_64
+and AArch64; their native starting snapshots match the accepted captures.
+[Frozen traces](data/tank-driving-integration-traces-20261011.json.gz) retain
+both architectures' controller histories, shots and motion.
+
+Picade measurements below are whole simulation-update mean/P95 milliseconds,
+medians of three serial 30-second seed-42 samples per mode/shape. The runner is
+Rust 1.89.0 release with fat LTO, one codegen unit and static CRT linkage on a
+Raspberry Pi 4. Dirt shapes alternate across repetitions.
+
+| Dirt | Stationary rigid | Driving rigid | Driving wheels | Wheels + footing |
+| --- | ---: | ---: | ---: | ---: |
+| Round | 1.774 / 4.875 | 1.431 / 3.733 | 1.464 / 3.580 | 1.479 / 3.612 |
+| Angular | 1.994 / 4.966 | 1.274 / 3.303 | 1.494 / 3.893 | 1.528 / 3.954 |
+
+Seed 42 does not activate a footing goal. Separate seed-314 Round and seed-310
+Angular runs do, with P95s of 4.135 and 2.977 ms respectively. The Weak/Strong
+destruction smoke runs reach 6.820–8.930 ms P95; the worst individual update
+across the matrix is 29.585 ms. Hillside, Roof and Barrage also pass. Moving
+tanks change impact locations and debris populations, so these workloads do
+not isolate controller overhead. They measure simulation cost, not rendered FPS.
+
+The existing kiosk match was paused during measurement and resumed afterward.
+No competing benchmark was present. Temperature endpoints range from 67.192
+to 74.010°C; firmware throttle flags and undervoltage alarms remain zero.
+Physical cabinet feel remains a hands-on follow-up; the automated control
+mapping and both-renderer lifecycle checks ran on the desktop.
+
+### Driving course and blocked-case baseline, 2026-10-11
+
+The five driving courses use the normal terrain geometry, contact solver,
+support gate, motors and dirt lifecycle. A finish flag is 19 units ahead of the
+starting chassis. The HUD shows signed progress, the last controller mode,
+current support, the route-probe refusal and both spring lengths. Changing
+running gear, dirt or physics restarts the same obstacle.
+
+The headless comparison clones one settled state into four continuations:
+current CPU, retained two-probe CPU, neutral drive, and held drive in the intended direction. Held
+drive bypasses only CPU route selection. It retains native support checks,
+acceleration, torque limits, collisions, the other tank and ordinary firing
+rules. No controller history, cooldown, body, velocity, contact or joint is
+reset at the fork. The other tank uses the retained ground check in every
+continuation, isolating the candidate's change to the selected tank. The neutral continuation exposes motion from gravity and
+combat. Overridden trials retain the stored CPU mode; their trace labels do
+not represent fresh CPU decisions.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_driving_lab -- --course slope --shape angular --replay \
+  --capture-dir /tmp/tank-slope
+
+# Reproduce the original blocked duel, preserving combat and controller history.
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_driving_lab -- --blocked --reference-prefix \
+  --reference-support --wheel-torque 90 --wheel-damping 80 --seed 42 --shape angular --replay \
+  --capture-dir /tmp/tank-blocked
+```
+
+Use `--course flat|step|slope|trench|rubble`, `--rigid` for the original tracks,
+`--shape round`, or `--strength weak|strong`. Courses settle for 120 ticks before
+the fork. `--blocked` instead captures after 60 consecutive blocked-ground ticks
+within a 30-second search, without resetting the controller. Add
+`--reference-prefix` to reproduce the older controller's failure state; omit it
+to look for a current failure. Each trial
+runs 12 seconds by default; `--seconds` changes that duration. `--player 2` is
+available for ordinary duels. The capture directory contains the native Rapier
+snapshot, starting observation/controller state, and full report. Reproduction
+uses the recorded source, arguments and capture tick; the native snapshot alone
+does not contain all scenario state.
+
+The original baseline's [results and source/binary identities](data/tank-driving-course-20261011.json)
+and [per-second traces](data/tank-driving-course-traces-20261011.json.gz) retain
+32 cases before the profile change: both gears and dirt shapes on five courses, four blocked duels, and
+eight rubble strength controls. All three continuations and their initialization
+prefixes repeat exactly and conserve material. These are behavior measurements,
+with no performance claim.
+
+Before the profile change, both dirt shapes gave this result over 12 seconds:
+
+| Course | CPU, both gears | Held drive, wheels | Held drive, rigid tracks |
+| --- | --- | --- | --- |
+| Flat | Finishes | Finishes | Finishes |
+| 0.5-unit step | Finishes, with brief refusals | Finishes | Finishes |
+| Nominal 20° slope | Stops before climbing | Stalls partway up | Finishes |
+| 2-wide, 2-deep trench | Stops before the trench | Tips over | Gets stuck |
+| Redeposited rubble | Stops before the pile | Stalls on the pile | Finishes |
+
+The slope uses the existing half-unit grid and contains local 45° faces; this
+is not a measurement of the maximum smooth slope either vehicle can climb.
+The rubble is released through the shared material transfer with no kick. In
+these runs all grains redeposit during the settling prefix, including Weak and
+Strong, so this course measures uneven returned dirt rather than sustained
+loose-pile traction. The ordinary duel continuations do include fresh debris.
+
+The captured seed-42 wheeled duel starts at tick 124. Its CPU rejects a 45°
+terrain face. From exactly that state, held drive advances 11.90 units with Round
+and 11.88 with Angular; unchanged CPU progress is 1.46 and -0.76 respectively.
+Neutral progress is -0.15 and -0.76. The held tank remains supported and alive at
+the end. These cases establish a missed driving opportunity, while the trench
+case shows why simply relaxing every refusal would be a poor adjustment.
+The wheels also stall physically on the slope with a live 2.5 drive command;
+that limitation needs separate mechanical tuning. A failed held-drive run does
+not establish that every possible maneuver would fail.
+
+In that baseline, all 14 existing stationary/moving duels, Hillside, Roof and Barrage comparison
+hashes remain unchanged across both shapes. The 35 scenario tests, four client
+tests and the display lifecycle test on both renderers pass. Scenario-only
+strict Clippy passes; the dependency-inclusive check stops at a pre-existing
+`collapsible_else_if` lint in `engine-rapier/src/spaceling.rs:395`.
+
+### CPU terrain-profile check, 2026-10-11
+
+The production CPU now uses the height profile above. The retained two-probe
+check is isolated in `driving_lab::reference` for reproduction; gameplay uses
+the new check. Support contacts, drive/brake response, suspension settings,
+range selection, firing readiness and retry cooldowns retain their behavior.
+
+The [profile comparison](data/tank-cpu-ground-20261011.json) records 24 course
+and frozen-duel cases, each with four continuations and complete replay;
+[full traces](data/tank-cpu-ground-traces-20261011.json.gz) retain the samples.
+Every starting observation and native snapshot matches the original course
+receipt. Reference CPU, neutral and held-drive continuations also reproduce
+their original final observations. In the candidate continuation only the
+selected tank's ground check changes.
+
+| Frozen seed-42 case | Reference CPU net progress | Candidate CPU net progress |
+| --- | ---: | ---: |
+| Round wheels | 1.46 | 11.91 |
+| Angular wheels | -0.76 | 11.77 |
+| Round rigid tracks | 0.15 | 15.54 |
+| Angular rigid tracks | 0.16 | 15.54 |
+
+These are signed horizontal world units over 12 seconds from the captured
+state. Moving changes later impacts, so held drive and neutral remain controls.
+The wheeled CPU crosses the small step without route-check pauses, finishing
+in 8.47 seconds after the settled start instead of 10.67. Both gears still stop
+before the trench, about half a unit earlier than the reference. The rigid CPU
+now finishes the slope and returned-rubble courses. The wheels advance to their
+remaining stall and reach the existing cooldown; this pass does not change
+the motor support gate or add route search. The goal experiment below identifies
+false support refusals during that climb.
+
+The footprint slope check also rejects a sustained steep staircase even when
+each individual increment fits the cell-step limit. Regression coverage includes
+forward/reverse steps and drops, altered ground, stopping before the trench,
+bounded retry at a physical stall, original frozen-state identities, successful
+continuations, and stable stopping before firing.
+
+All 38 scenario tests, four affected client tests, and the display lifecycle
+test covering both renderers pass. Scenario-only strict Clippy and formatting
+also pass. The existing benchmark runner covers 26 before/after cases: ten
+stationary duel, Hillside, Roof and Barrage cases keep their observation hashes;
+16 moving matches cover both shapes, both gears, three seeds and wheeled
+Weak/Strong dirt. All pass full replay and material checks. These are behavioral
+comparisons; the runs do not establish a performance change.
+
+### Goal driving and physical comparisons, 2026-10-11
+
+`scorched_driving_lab --goal` adds a fifth continuation: reach the course flag
+and settle within 0.2 world units. It started as a headless experiment; the
+updated controller is now also selectable in playable driving courses, as
+described below. Ordinary combat retains its existing range policy.
+The intended integration is for combat to choose a destination or acceptable
+range, and for a travel controller to handle speed and measured progress.
+
+The original experiment requests 2.5 units/second on flat ground and at most 1.5 on
+uneven ground, then tapers speed near the destination. It compares that target
+with chassis velocity along the sampled route and adjusts the ordinary drive
+input. Native wheel motors retain their torque limits, acceleration ramp,
+braking and contact requirements. It does not move bodies directly or learn
+new parameters during a trial. Three seconds without improving the best
+distance starts a three-second cooldown, with two retries per goal. Rocking,
+rolling backward and terrain changes do not replenish the retry allowance.
+Unsafe ground is a separate blocked outcome.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_driving_lab -- \
+  --course step --shape angular --seconds 30 --goal --replay
+
+# Change only torque; wheel size, cruising speed and brakes stay fixed.
+target/ci/examples/scorched_driving_lab \
+  --course slope --shape angular --seconds 30 --goal --wheel-torque 135 --replay
+
+# Change wheel geometry at constant wheel mass and cruising speed.
+target/ci/examples/scorched_driving_lab \
+  --course slope --shape angular --seconds 30 --goal --wheel-radius 0.8 --replay
+```
+
+`--cruise-speed` accepts 0.1–2.5. Wheel torque accepts 30–480, motor damping
+1–2400 and radius 0.5–1.0; current defaults are 300, 240 and 0.65 respectively.
+Larger wheels retain their mass by adjusting density; their inertia and lever
+arms change with their geometry. Each report records the settings. CPU,
+reference, neutral, held and goal trials share the same complete starting
+state within each setting. Different radii require different physical starts.
+
+The pre-repair [results](data/tank-goal-driving-20261011.json) and
+[full traces](data/tank-goal-driving-traces-20261011.json.gz) cover 48 cases,
+both dirt shapes and both running gears, using the original support gate and
+torque-90 baseline. Goal driving arrives and stays stopped
+on flat and step courses: the wheels take 8.87 and 10.52 seconds from the settled
+start. The rigid tracks also reach the slope and returned-rubble goals. Both
+gears refuse the trench. Speed tracking, reverse travel, stopping, bounded
+attempts and complete controller/physics replay have regression coverage.
+
+With the old support gate, the torque sweep (90, 110, 120, 135, 150, 180) does not clear the wheeled slope
+or rubble course, including under continuously held input. Radius 0.8 and 0.95
+at torque 90 stall sooner. That experiment did not change the defaults.
+The contact trace explains an additional defect: on the slope, both wheels can
+touch 45-degree cell faces with the chassis near 20 degrees. Both contacts fail
+the old 40-degree support-normal cutoff, and the following tick commands
+zero drive despite real ground contact. For example, the torque-135 goal trial
+hits this at ticks 552–554. A terrain-profile route check alone cannot fix the
+separate motor support gate. The follow-up below corrects that classification
+while retaining airborne and steep-slope constraints.
+
+All 42 scenario tests and four affected client tests pass, as do scenario-only
+strict Clippy and formatting. All 24 prior diagnostic reports and all 26 existing
+benchmark observation hashes remain unchanged with default settings. The new
+matrix passes replay and material checks throughout; it makes no performance
+claim.
+
+### Wheel support and climbing torque, 2026-10-11
+
+The wheel support gate now measures grade across the two actual wheel centers
+and limits chassis pitch to 40°. It still needs a live contact with a positive
+world-up normal and a local-up component of at least 0.5. This admits the small
+45° terrain faces under a tank pitched about 20°, without authorizing drive
+from terrain rays, vertical walls, an inverted chassis or airborne wheels.
+Rigid-track support and the shared terrain engine are unchanged.
+
+Torque 90 still reaches a physical stall after correcting support. Torque 120
+was adopted for this course comparison, before the ordinary-hill correction
+above; wheel radius, mass, top speed, acceleration, suspension and brake torque
+were unchanged. From the
+same 120-tick settling prefix, both held input and the ordinary CPU pass these
+courses with Round and Angular dirt:
+
+| Course | Time to finish at torque 120 | Torque 90, repaired support |
+| --- | ---: | --- |
+| Flat | 8.10 s | Pass |
+| Step | 8.42 s | Pass |
+| Slope | 9.90 s | Stalls |
+| Returned rubble | 9.53 s | Stalls |
+
+The CPU still refuses the trench. These finish times measure simulated travel,
+not processor performance. Rubble largely redeposits during the settling prefix,
+so this remains a rough-ground test rather than sustained loose-grain traction.
+
+The [receipt](data/tank-wheel-support-20261011.json) and
+[full traces](data/tank-wheel-support-traces-20261011.json.gz) retain 20 course
+comparisons and 12 frozen failure comparisons. The new `scorched_support_lab`
+captures the first old-gate support refusal, then clones the entire native world
+and the already-running goal controller into old/new support pairs with goal,
+held and neutral input. Cooldowns, progress history and retry budgets are never
+reset. Different torque settings have different physical starting states.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_support_lab -- --course slope --shape angular \
+  --wheel-torque 90 --seconds 30 --replay --capture-dir /tmp/tank-support
+
+# Reproduce a pre-repair comparison, including its old physical settings.
+target/ci/examples/scorched_driving_lab --course slope --shape angular \
+  --wheel-torque 90 --wheel-damping 80 --reference-support --reference-goal --goal --seconds 30 --replay
+```
+
+At the fork, all 12 frozen cases have live contacts accepted by the corrected
+gate and rejected by the old one. That does not guarantee recovery: at torque 120 the slow captured
+slope/rubble attempts still stall, even under held input. At torque 135 the
+captured rubble goal recovers with both shapes, while the captured slope does
+not. The fresh goal experiment also still stalls on slope/rubble at torque 120:
+its 1.5-unit/s rough-ground target has different climbing behavior from a normal
+2.5-unit/s approach. Those retained failures are the controls for the following
+goal-controller change.
+
+Validation passes 46 scenario tests, four affected client tests, strict
+scenario-only Clippy and formatting. Tests cover the actual corner failure,
+ordinary CPU and held-input crossings, stable slope braking, live-contact 50°
+drive refusal in both directions, inversion, airborne driving, trench refusal,
+material conservation and replay. Six explicit old-support comparisons match
+their previously captured native starts and all five final observation hashes.
+All 26 existing benchmark cases pass material/replay checks; the 14 rigid and
+scripted cases retain their hashes, while the 12 wheel cases reflect the changed
+support/tuning. The display lifecycle test passes on both renderers. Incidental
+timings do not establish a performance change.
+
+### Goal climbing and bounded retreat, 2026-10-11
+
+The goal controller now keeps its requested cruising speed on a climb: either
+the forward terrain profile rises more than 0.08 per unit, or the chassis is
+still pitched uphill by more than 5°. Keeping speed until the chassis clears
+the crest avoids slowing while the rear wheel is still climbing. Other uneven
+ground retains the 1.5-unit/s target, and the approach to the destination still
+tapers speed. These goal-policy comparisons held the earlier torque-120,
+damping-80 settings, wheel size, suspension, brakes and native support gates
+fixed.
+
+After three seconds of failed progress, a retry consumes one of the same two
+allowances and waits the same three-second cooldown. If the route behind is
+safe, it backs up at up to 1.5 units/s for a four-unit run-up, then brakes before
+trying forward again. The target is measured from the actual post-cooldown
+position, accounting for any rollback. Rear terrain is checked every tick;
+new holes or hazards stop the retreat, and a six-second deadline bounds an
+unsuccessful maneuver. Overall best distance and used retries are retained.
+After a completed retreat, progress within the new attempt is also measured
+monotonically, allowing time to cover the deliberate run-up. Rocking and terrain
+edits cannot replenish the allowance. Arrival requires live support.
+
+The [receipt](data/tank-goal-climb-20261011.json) and
+[full traces](data/tank-goal-climb-traces-20261011.json.gz) cover 20 fresh course
+comparisons and eight frozen failures, all with replay and material checks.
+Both shapes and both running gears reach and stop at flat, step, slope and
+returned-rubble goals; both refuse the trench. With wheels, arrival from the
+settled start takes 8.87, 9.23, 10.72 and 11.38 simulated seconds respectively.
+
+The four original support-refusal captures retain their native starting world
+and already-running controller. On the corrected support, the old goal policy
+still stalls; the revised policy arrives after one retreat, using one retry.
+The four mechanical-stall captures use corrected support throughout and retain
+the old controller's already-consumed retry and pending cooldown. The revised
+policy arrives after that cooldown without needing another retreat. These are
+different interventions from resetting the controller at the fork.
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_support_lab -- --shape angular --course slope \
+  --wheel-torque 120 --compare-goal --seconds 45 --replay
+
+# Fork at the original goal's mechanical-stall cooldown on corrected support.
+target/ci/examples/scorched_support_lab --shape round --course rubble \
+  --wheel-torque 120 --compare-goal --stalled-prefix --seconds 45 --replay
+
+# Retain the old goal policy in an otherwise current course comparison.
+target/ci/examples/scorched_driving_lab --course slope --goal \
+  --reference-goal --seconds 45 --replay
+```
+
+The playable client defaults to Goal driver in the courses. V enables it; R
+restarts the obstacle. The existing driver button provides stationary and
+range-policy comparisons. At this stage integration was course-only: ordinary
+combat still chose its drive input with the range controller. All 26 existing
+benchmark hashes remain unchanged. Four old support comparisons also reproduce
+their native starts, goal histories and all six final continuation hashes.
+
+Validation passes 52 scenario tests, four affected client tests, strict
+scenario-only Clippy and formatting. Coverage includes both shapes, native
+replay, stopping, recovering the retained stalls, a newly blasted hole behind
+the tank, retreat timeout, airborne arrival refusal, exhausted retries and
+history across manual/driver switches. The display lifecycle test covers both
+renderers. These finite courses establish a useful next prototype, not general
+path planning or reliable travel across arbitrary destruction.
+
+### Rigid-track first-pass validation, 2026-10-11
+
+[The retained results](data/tank-driving-20261011.json) identify the main baseline
+(`ca9b229`), candidate source files, binaries and all 34 desktop runs. All runs
+conserve material and pass complete replay. Stationary duel, Hillside, Roof and
+Barrage observation hashes match main exactly for both dirt shapes. Weak/Strong
+moving duels also pass. There are 1,455 passing affected unit tests and one
+display lifecycle test covering both renderers. Fixtures include level travel,
+reversing, braking, a 25° climb, 50° propulsion refusal, crater debris, CPU
+stop/fire, cliff refusal and bounded retries against an obstruction.
+
+These are median whole-update timings from three serial 30-second seed-42 runs
+per row, Rust 1.89.0 `ci` profile, on the desktop:
+
+| Dirt | CPU | Mean ms | P95 ms |
+| --- | --- | ---: | ---: |
+| Round | Stationary | 0.305 | 1.054 |
+| Round | Driving | 0.428 | 1.388 |
+| Angular | Stationary | 0.356 | 1.124 |
+| Angular | Driving | 0.369 | 1.245 |
+
+Moving tanks alter impact locations and debris workloads, so this is not an
+isolated controller-cost measurement. Round stationary timing is essentially
+unchanged from main. Angular measurements varied substantially: baseline means
+ranged 0.353–0.517 ms and candidate means 0.351–0.526 ms; no speedup is claimed.
+Both CPUs actually move and fire on the normal seed-42 map. The local controller
+eventually holds at blocked ground, which remains a useful hands-on tuning case.
+
+The aarch64 build passed four replay/audit runs on the Picade. Its timings are
+excluded because another independently owned benchmark was active. Our timing
+run was stopped without changing that workload. An isolated Picade timing pass
+and physical cabinet control review remain pending; these desktop results are
+not a rendered FPS claim.
 
 ## Roof comparison
 
@@ -1066,8 +1729,9 @@ and tank knockback still apply, so a full pool does not make tanks invulnerable.
 This is bounded rigid-grain behavior, not a calibrated soil model. Whole-cell
 deposition can leave ledges, a settled pile may remain loose, and sustained fire
 can exhaust the pool. Cohesion, stress-based slope failure, shock propagation, compression,
-fluids and napalm remain later work. Tank traction/driving, weapons, sound and
-broader round progression are also outside this first slice.
+fluids and napalm remain later work. The driving pass adds basic native traction
+and local CPU repositioning; additional weapons, sound and broader round
+progression remain outside this slice.
 
 ## Repeatable development
 
@@ -1081,6 +1745,8 @@ cargo run --locked --release -p scenario-scorched-earth \
   --example scorched_benchmark -- --shape angular --seconds 30 --seed 42 --replay
 cargo run --locked --release -p scenario-scorched-earth \
   --example scorched_benchmark -- --shape round --seconds 30 --seed 42 --replay
+cargo run --locked --release -p scenario-scorched-earth \
+  --example scorched_benchmark -- --shape angular --seconds 30 --seed 42 --cpu-driving --replay --diagnostics
 
 SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \
   cargo test --locked --profile ci -p engine-client --test ui_control_functional \

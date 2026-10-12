@@ -427,9 +427,14 @@ fn zero_time_bad_input_reset_and_held_toggles_preserve_session_contract() {
     for _ in 0..20 {
         step(&mut state, std::slice::from_ref(&select));
     }
-    assert_eq!(state.selected, 1);
+    assert_eq!(
+        state.selected, 0,
+        "Tank waits for release to distinguish a drive chord"
+    );
     step(&mut state, &[]);
+    assert_eq!(state.selected, 1);
     step(&mut state, &[select]);
+    step(&mut state, &[]);
     assert_eq!(state.selected, 0);
     state.command(Command::Reset);
     assert_eq!(ScorchedScenario::observe(&state).payload, initial);

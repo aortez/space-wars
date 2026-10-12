@@ -1,0 +1,2129 @@
+{
+  "base_revision": "ca9b22950309ab5277733c6869bb6cb3efea935e",
+  "reference": "First manual/CPU driving pass, before sprung wheels. Uncommitted, identified by binary hash.",
+  "reference_binary_sha256": "68c046e68a7566b65d9feb1fd3427e9db7c404d30f2cbd5456e0d070957de745",
+  "candidate_binary_sha256": "2cfdfa5eaba0269c257831b507f5cba8f76e8ec0ea0feebd6fbe4e01565f6bb6",
+  "toolchain": "1.89.0",
+  "profile": "ci",
+  "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+  "runs": [
+    {
+      "variant": "reference",
+      "shape": "round",
+      "case": "rigid-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 48,
+          "solid": 10345
+        },
+        "max_ms": 4.280013,
+        "mean_ms": 0.3055708150000007,
+        "observation_hash": "f6d2c18dc7084426",
+        "p95_ms": 1.058008,
+        "peak_bodies": 97,
+        "peak_contacts": 155,
+        "peak_loose": 94,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "ticks": 1800,
+        "workload": "scorched-earth-scripted-duel-v2"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "rigid-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 48,
+          "solid": 10345
+        },
+        "max_ms": 4.348542,
+        "mean_ms": 0.3094205033333338,
+        "observation_hash": "f6d2c18dc7084426",
+        "p95_ms": 1.0613650000000001,
+        "peak_bodies": 97,
+        "peak_contacts": 155,
+        "peak_loose": 94,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-scripted-duel-v2"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "round",
+      "case": "rigid-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.6310932636260986,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 111,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 7.459857940673828,
+            "mode": "blocked ground",
+            "planning_checks": 25,
+            "powered_ticks": 257,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 90,
+          "solid": 10303
+        },
+        "max_ms": 4.975677,
+        "mean_ms": 0.426536852777778,
+        "observation_hash": "60828e15c4cd0405",
+        "p95_ms": 1.328399,
+        "peak_bodies": 136,
+        "peak_contacts": 226,
+        "peak_loose": 133,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "ticks": 1800,
+        "workload": "scorched-earth-driving-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "rigid-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.6310932636260986,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 111,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 7.459857940673828,
+            "mode": "blocked ground",
+            "planning_checks": 25,
+            "powered_ticks": 257,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 90,
+          "solid": 10303
+        },
+        "max_ms": 5.010212,
+        "mean_ms": 0.4325893427777771,
+        "observation_hash": "60828e15c4cd0405",
+        "p95_ms": 1.363556,
+        "peak_bodies": 136,
+        "peak_contacts": 226,
+        "peak_loose": 133,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-driving-duel-v1"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "round",
+      "case": "hillside",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 3,
+        "material": {
+          "initial": 3070,
+          "loose": 38,
+          "solid": 3032
+        },
+        "max_ms": 4.304238,
+        "mean_ms": 0.17191741111111108,
+        "observation_hash": "e3b096469bc671e4",
+        "p95_ms": 0.384406,
+        "peak_bodies": 56,
+        "peak_contacts": 95,
+        "peak_loose": 52,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 3,
+        "ticks": 1800,
+        "workload": "scorched-earth-hillside-v2"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "hillside",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 3,
+        "material": {
+          "initial": 3070,
+          "loose": 38,
+          "solid": 3032
+        },
+        "max_ms": 4.374161,
+        "mean_ms": 0.17187236944444448,
+        "observation_hash": "e3b096469bc671e4",
+        "p95_ms": 0.38669000000000003,
+        "peak_bodies": 56,
+        "peak_contacts": 95,
+        "peak_loose": 52,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 3,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-hillside-v2"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "round",
+      "case": "roof",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 1,
+        "material": {
+          "initial": 3576,
+          "loose": 48,
+          "solid": 3528
+        },
+        "max_ms": 2.6494639999999996,
+        "mean_ms": 0.1587523950000001,
+        "observation_hash": "c37016e60aeea0ab",
+        "p95_ms": 0.366713,
+        "peak_bodies": 52,
+        "peak_contacts": 91,
+        "peak_loose": 48,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 1,
+        "ticks": 1800,
+        "workload": "scorched-earth-roof-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "roof",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 1,
+        "material": {
+          "initial": 3576,
+          "loose": 48,
+          "solid": 3528
+        },
+        "max_ms": 2.6837079999999998,
+        "mean_ms": 0.16251965166666668,
+        "observation_hash": "c37016e60aeea0ab",
+        "p95_ms": 0.388254,
+        "peak_bodies": 52,
+        "peak_contacts": 91,
+        "peak_loose": 48,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 1,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-roof-v1"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "round",
+      "case": "barrage",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 8,
+        "material": {
+          "initial": 10393,
+          "loose": 76,
+          "solid": 10317
+        },
+        "max_ms": 5.188188,
+        "mean_ms": 0.6534922866666671,
+        "observation_hash": "e843dfad43162fcd",
+        "p95_ms": 2.961042,
+        "peak_bodies": 192,
+        "peak_contacts": 342,
+        "peak_loose": 189,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 8,
+        "ticks": 1800,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "barrage",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 8,
+        "material": {
+          "initial": 10393,
+          "loose": 76,
+          "solid": 10317
+        },
+        "max_ms": 5.474208,
+        "mean_ms": 0.6643835805555559,
+        "observation_hash": "e843dfad43162fcd",
+        "p95_ms": 2.9623850000000003,
+        "peak_bodies": 192,
+        "peak_contacts": 342,
+        "peak_loose": 189,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 8,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 60,
+          "solid": 10333
+        },
+        "max_ms": 4.989923,
+        "mean_ms": 0.5468310672222222,
+        "observation_hash": "341812d784107174",
+        "p95_ms": 1.965702,
+        "peak_bodies": 161,
+        "peak_contacts": 273,
+        "peak_loose": 154,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.663770318031311,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 89,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.738378524780273,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 435,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 23,
+          "solid": 10370
+        },
+        "max_ms": 2.967073,
+        "mean_ms": 0.22488170444444458,
+        "observation_hash": "3b9fe5e91ab94b26",
+        "p95_ms": 0.705863,
+        "peak_bodies": 80,
+        "peak_contacts": 129,
+        "peak_loose": 73,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-stationary",
+      "repetition": 1,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 60,
+          "solid": 10333
+        },
+        "max_ms": 4.8263739999999995,
+        "mean_ms": 0.5436726961111115,
+        "observation_hash": "341812d784107174",
+        "p95_ms": 1.925627,
+        "peak_bodies": 161,
+        "peak_contacts": 273,
+        "peak_loose": 154,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-driving",
+      "repetition": 1,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.663770318031311,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 89,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.738378524780273,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 435,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 23,
+          "solid": 10370
+        },
+        "max_ms": 2.913031,
+        "mean_ms": 0.22517723888888902,
+        "observation_hash": "3b9fe5e91ab94b26",
+        "p95_ms": 0.744516,
+        "peak_bodies": 80,
+        "peak_contacts": 129,
+        "peak_loose": 73,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-stationary",
+      "repetition": 2,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 60,
+          "solid": 10333
+        },
+        "max_ms": 4.812779,
+        "mean_ms": 0.5430042333333333,
+        "observation_hash": "341812d784107174",
+        "p95_ms": 1.9310969999999998,
+        "peak_bodies": 161,
+        "peak_contacts": 273,
+        "peak_loose": 154,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-driving",
+      "repetition": 2,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.663770318031311,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 89,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.738378524780273,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 435,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 23,
+          "solid": 10370
+        },
+        "max_ms": 2.918041,
+        "mean_ms": 0.21942588166666666,
+        "observation_hash": "3b9fe5e91ab94b26",
+        "p95_ms": 0.695333,
+        "peak_bodies": 80,
+        "peak_contacts": 129,
+        "peak_loose": 73,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-driving-weak",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 8.41680908203125,
+            "mode": "blocked ground",
+            "planning_checks": 26,
+            "powered_ticks": 421,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.469356536865234,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 504,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 96,
+          "solid": 10297
+        },
+        "max_ms": 4.0433259999999995,
+        "mean_ms": 0.29430875777777765,
+        "observation_hash": "876b0d8c9d754a2d",
+        "p95_ms": 0.909928,
+        "peak_bodies": 103,
+        "peak_contacts": 161,
+        "peak_loose": 96,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "round",
+      "case": "wheels-driving-strong",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving",
+        "--cohesion",
+        "strong",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 8.41680908203125,
+            "mode": "blocked ground",
+            "planning_checks": 26,
+            "powered_ticks": 421,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.469356536865234,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 504,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 96,
+          "solid": 10297
+        },
+        "max_ms": 4.521359,
+        "mean_ms": 0.2983531611111113,
+        "observation_hash": "6c705e8faccb9e38",
+        "p95_ms": 0.9146169999999999,
+        "peak_bodies": 103,
+        "peak_contacts": 161,
+        "peak_loose": 96,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "round",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "angular",
+      "case": "rigid-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 49,
+          "solid": 10344
+        },
+        "max_ms": 4.459973,
+        "mean_ms": 0.3531894949999999,
+        "observation_hash": "a033cd117334e7a2",
+        "p95_ms": 1.073577,
+        "peak_bodies": 94,
+        "peak_contacts": 144,
+        "peak_loose": 91,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "ticks": 1800,
+        "workload": "scorched-earth-scripted-duel-v2"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "rigid-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 49,
+          "solid": 10344
+        },
+        "max_ms": 4.462648,
+        "mean_ms": 0.3505822649999998,
+        "observation_hash": "a033cd117334e7a2",
+        "p95_ms": 1.075691,
+        "peak_bodies": 94,
+        "peak_contacts": 144,
+        "peak_loose": 91,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-scripted-duel-v2"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "angular",
+      "case": "rigid-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.4007526636123657,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 74,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 7.171542167663574,
+            "mode": "blocked ground",
+            "planning_checks": 25,
+            "powered_ticks": 227,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 69,
+          "solid": 10324
+        },
+        "max_ms": 4.814953,
+        "mean_ms": 0.3406471816666667,
+        "observation_hash": "d5c2353113baaa57",
+        "p95_ms": 1.146074,
+        "peak_bodies": 78,
+        "peak_contacts": 131,
+        "peak_loose": 75,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "ticks": 1800,
+        "workload": "scorched-earth-driving-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "rigid-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.4007526636123657,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 74,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 7.171542167663574,
+            "mode": "blocked ground",
+            "planning_checks": 25,
+            "powered_ticks": 227,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 69,
+          "solid": 10324
+        },
+        "max_ms": 4.87683,
+        "mean_ms": 0.34648923611111127,
+        "observation_hash": "d5c2353113baaa57",
+        "p95_ms": 1.162005,
+        "peak_bodies": 78,
+        "peak_contacts": 131,
+        "peak_loose": 75,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-driving-duel-v1"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "angular",
+      "case": "hillside",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 3,
+        "material": {
+          "initial": 3070,
+          "loose": 2,
+          "solid": 3068
+        },
+        "max_ms": 4.046572,
+        "mean_ms": 0.20770405444444456,
+        "observation_hash": "42341fe4777c6d09",
+        "p95_ms": 0.375388,
+        "peak_bodies": 63,
+        "peak_contacts": 91,
+        "peak_loose": 58,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 3,
+        "ticks": 1800,
+        "workload": "scorched-earth-hillside-v2"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "hillside",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 3,
+        "material": {
+          "initial": 3070,
+          "loose": 2,
+          "solid": 3068
+        },
+        "max_ms": 3.9847550000000003,
+        "mean_ms": 0.19940116722222226,
+        "observation_hash": "42341fe4777c6d09",
+        "p95_ms": 0.358167,
+        "peak_bodies": 63,
+        "peak_contacts": 91,
+        "peak_loose": 58,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 3,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-hillside-v2"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "angular",
+      "case": "roof",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 1,
+        "material": {
+          "initial": 3576,
+          "loose": 47,
+          "solid": 3529
+        },
+        "max_ms": 2.73761,
+        "mean_ms": 0.1996155294444444,
+        "observation_hash": "bb0e02224e0538a7",
+        "p95_ms": 0.5155029999999999,
+        "peak_bodies": 52,
+        "peak_contacts": 85,
+        "peak_loose": 48,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 1,
+        "ticks": 1800,
+        "workload": "scorched-earth-roof-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "roof",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 1,
+        "material": {
+          "initial": 3576,
+          "loose": 47,
+          "solid": 3529
+        },
+        "max_ms": 2.864469,
+        "mean_ms": 0.2068957461111108,
+        "observation_hash": "bb0e02224e0538a7",
+        "p95_ms": 0.521735,
+        "peak_bodies": 52,
+        "peak_contacts": 85,
+        "peak_loose": 48,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 1,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-roof-v1"
+      }
+    },
+    {
+      "variant": "reference",
+      "shape": "angular",
+      "case": "barrage",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 8,
+        "material": {
+          "initial": 10393,
+          "loose": 4,
+          "solid": 10389
+        },
+        "max_ms": 4.084724,
+        "mean_ms": 0.3077464933333332,
+        "observation_hash": "7a9674a3d9e51cd1",
+        "p95_ms": 1.093756,
+        "peak_bodies": 92,
+        "peak_contacts": 156,
+        "peak_loose": 89,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 8,
+        "ticks": 1800,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "barrage",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 8,
+        "material": {
+          "initial": 10393,
+          "loose": 4,
+          "solid": 10389
+        },
+        "max_ms": 4.174703999999999,
+        "mean_ms": 0.3073312766666663,
+        "observation_hash": "7a9674a3d9e51cd1",
+        "p95_ms": 1.124664,
+        "peak_bodies": 92,
+        "peak_contacts": 156,
+        "peak_loose": 89,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 8,
+        "suspension": false,
+        "ticks": 1800,
+        "workload": "scorched-earth-bombardment-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-stationary",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 53,
+          "solid": 10340
+        },
+        "max_ms": 4.258482,
+        "mean_ms": 0.380385992222222,
+        "observation_hash": "88d49f8b238cdbe9",
+        "p95_ms": 1.115276,
+        "peak_bodies": 94,
+        "peak_contacts": 147,
+        "peak_loose": 87,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-driving",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.2435755729675293,
+            "mode": "blocked ground",
+            "planning_checks": 24,
+            "powered_ticks": 130,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.254298210144043,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 390,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 40,
+          "solid": 10353
+        },
+        "max_ms": 4.039228,
+        "mean_ms": 0.28117881111111104,
+        "observation_hash": "2fc2f9fdb2fa3487",
+        "p95_ms": 0.871757,
+        "peak_bodies": 79,
+        "peak_contacts": 121,
+        "peak_loose": 72,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-stationary",
+      "repetition": 1,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 53,
+          "solid": 10340
+        },
+        "max_ms": 4.226221,
+        "mean_ms": 0.37309575388888894,
+        "observation_hash": "88d49f8b238cdbe9",
+        "p95_ms": 1.1242839999999998,
+        "peak_bodies": 94,
+        "peak_contacts": 147,
+        "peak_loose": 87,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-driving",
+      "repetition": 1,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.2435755729675293,
+            "mode": "blocked ground",
+            "planning_checks": 24,
+            "powered_ticks": 130,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.254298210144043,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 390,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 40,
+          "solid": 10353
+        },
+        "max_ms": 4.037364,
+        "mean_ms": 0.2760853055555558,
+        "observation_hash": "2fc2f9fdb2fa3487",
+        "p95_ms": 0.868089,
+        "peak_bodies": 79,
+        "peak_contacts": 121,
+        "peak_loose": 72,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-stationary",
+      "repetition": 2,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "result": {
+        "cpu_driving": false,
+        "driving": [
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 0.0,
+            "mode": "idle",
+            "planning_checks": 0,
+            "powered_ticks": 0,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 53,
+          "solid": 10340
+        },
+        "max_ms": 4.327091,
+        "mean_ms": 0.38472624166666686,
+        "observation_hash": "88d49f8b238cdbe9",
+        "p95_ms": 1.15438,
+        "peak_bodies": 94,
+        "peak_contacts": 147,
+        "peak_loose": 87,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-driving",
+      "repetition": 2,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.2435755729675293,
+            "mode": "blocked ground",
+            "planning_checks": 24,
+            "powered_ticks": 130,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 9.254298210144043,
+            "mode": "blocked ground",
+            "planning_checks": 29,
+            "powered_ticks": 390,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 40,
+          "solid": 10353
+        },
+        "max_ms": 4.007087,
+        "mean_ms": 0.2777962388888887,
+        "observation_hash": "2fc2f9fdb2fa3487",
+        "p95_ms": 0.861237,
+        "peak_bodies": 79,
+        "peak_contacts": 121,
+        "peak_loose": 72,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-driving-weak",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving",
+        "--cohesion",
+        "weak",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.234562635421753,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 95,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 8.600570678710938,
+            "mode": "blocked ground",
+            "planning_checks": 28,
+            "powered_ticks": 360,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 6.38078,
+        "mean_ms": 0.3917144288888889,
+        "observation_hash": "fd56d798afa40601",
+        "p95_ms": 1.1713120000000001,
+        "peak_bodies": 100,
+        "peak_contacts": 154,
+        "peak_loose": 93,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    },
+    {
+      "variant": "candidate",
+      "shape": "angular",
+      "case": "wheels-driving-strong",
+      "repetition": 0,
+      "arguments": [
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension",
+        "--cpu-driving",
+        "--cohesion",
+        "strong",
+        "--slumping",
+        "--breakup"
+      ],
+      "result": {
+        "cpu_driving": true,
+        "driving": [
+          {
+            "distance_while_driven": 1.234562635421753,
+            "mode": "blocked ground",
+            "planning_checks": 23,
+            "powered_ticks": 95,
+            "track_speed": 0.0
+          },
+          {
+            "distance_while_driven": 8.600570678710938,
+            "mode": "blocked ground",
+            "planning_checks": 28,
+            "powered_ticks": 360,
+            "track_speed": 0.0
+          }
+        ],
+        "impacts": 11,
+        "material": {
+          "initial": 10393,
+          "loose": 50,
+          "solid": 10343
+        },
+        "max_ms": 6.48127,
+        "mean_ms": 0.39405011555555586,
+        "observation_hash": "841b32ea3d4833df",
+        "p95_ms": 1.1714220000000002,
+        "peak_bodies": 100,
+        "peak_contacts": 154,
+        "peak_loose": 93,
+        "rejected_blasts": 0,
+        "replay_checked": true,
+        "seed": 42,
+        "shape": "angular",
+        "shots": 11,
+        "suspension": true,
+        "ticks": 1800,
+        "workload": "scorched-earth-wheeled-duel-v1"
+      }
+    }
+  ],
+  "source_files_sha256": {
+    "crates/engine-client/src/client_scenarios/scorched_earth.rs": "dc73fd24db9705bac3c2d549c2241794e88cad6e37c546590b0355a94dccc64c",
+    "crates/engine-client/src/input.rs": "e2ae20e48bd30d87d68ef5a15164f665a549156aa7de04e6026b46627400fde0",
+    "crates/engine-rapier/src/rover.rs": "672f6cb50400b2624ef3dc92689e19803999d61115553536bb8efca2766d904d",
+    "crates/engine-rapier/src/world.rs": "8737cc3153f31fe2358de5f47f351140db768a61d368683471d6496d57fa8cc1",
+    "crates/engine-rapier/src/world/surface_drive.rs": "0788753e47142cab72e516956ccd1ee93af9c399f4deb7c7c587ab2a639fdae0",
+    "scenarios/scorched-earth/examples/scorched_benchmark.rs": "d23f71775343e65992f92326ba6284647a265b5c1114e62cf26b6e13f8961ba8",
+    "scenarios/scorched-earth/src/action.rs": "268cfd266eda3297e68af459792a0c219074a91d1cf476c3452c4f233c345bcb",
+    "scenarios/scorched-earth/src/driving.rs": "e0fc0c7555013106858758494cbf09c2c319b66c1a80d3032096d4b5c5365b0d",
+    "scenarios/scorched-earth/src/driving/tests.rs": "45538b7d014e8f1cc746f5bc80399bcc20bd8bf1b229c2c59beeefdd563530f6",
+    "scenarios/scorched-earth/src/lib.rs": "126d0a2ceee121ef10071bc89452f0fda8b621ee0a26b4897c67b3d75417ddbb",
+    "scenarios/scorched-earth/src/render.rs": "964100fb307fcd2cef8a484470aa205dfb5290156a03307771be00dbd3d08176",
+    "scenarios/scorched-earth/src/suspension.rs": "086ae35c63b660732568f08b7f515ab33626bf75183730c950613a05f6cc0821",
+    "scenarios/scorched-earth/src/suspension/tests.rs": "41d735b5eb399e5eaf83cc125a77e41557247f910f517e9037380d2feea96b56",
+    "scenarios/scorched-earth/src/tests.rs": "d9d952f597b7c112d2c21aae89becf5e7ad0a85bd818b3d244338507530aa7ed"
+  },
+  "source_state": "Uncommitted implementation on feat/scorched-tank-driving-195. Manifest includes a subsequent presentation-only wheel-outline change; measured executable is identified by its binary hash.",
+  "notes": [
+    "All 36 runs passed replay and material audits.",
+    "Reference rigid stationary/moving duel, Hillside, Roof and Barrage observation hashes match candidate for both shapes.",
+    "Moving wheels change firing positions and debris workloads; these timings do not isolate motor/suspension overhead or establish a general speedup.",
+    "UI preview was closed during serial runs. These are headless update timings, excluding rendering, audit and replay.",
+    "Picade timing remains pending; this pass did not use the device."
+  ],
+  "validation": {
+    "affected_unit_tests": 1464,
+    "ui_lifecycle_tests": 1,
+    "fixtures": [
+      "Flat driving, braking and reverse in both shapes with Off/Weak/Strong",
+      "Independent suspension travel while climbing a 0.5-unit step",
+      "No airborne drive and native suspension travel limits",
+      "CPU actual displacement and stopped firing",
+      "Toggle assembly rebuild, scripted fixture override and manual encounter selection",
+      "Clone replay and conserved crater debris with sprung wheels",
+      "Rover mass/motor parameter validation and binary round-trip continuation",
+      "Both running-gear layouts in landscape and portrait, both renderers"
+    ]
+  }
+}

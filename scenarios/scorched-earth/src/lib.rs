@@ -21,17 +21,24 @@ use serde::Serialize;
 
 mod action;
 mod bank;
+mod course;
+mod driving;
+pub mod driving_lab;
 mod drop_test;
 mod hillside;
 mod material;
 mod render;
 mod roof;
+mod suspension;
 #[cfg(test)]
 mod tests;
 pub use action::{Command, Controls, ScorchedAction};
+pub use course::DrivingCourse;
+pub use driving::DrivingDiagnostics;
 pub use drop_test::DropHeight;
 pub use engine_rapier::terrain::DirtStrength as BankStrength;
 pub use material::MaterialBalance;
+pub use suspension::WheelTuning;
 
 pub const FIXED_HZ: u32 = 60;
 const DT: f32 = 1.0 / FIXED_HZ as f32;
@@ -47,6 +54,19 @@ pub struct ScorchedConfig {
     pub shape: GrainShape,
     pub max_grains: usize,
     pub demo: bool,
+    /// Local CPU repositioning; disable for the retained stationary duel.
+    pub cpu_driving: bool,
+    /// Seek nearby flatter firing positions; per-tank switches permit isolated
+    /// comparisons with the retained range-only CPU.
+    pub cpu_footing: [bool; 2],
+    /// Compare real sprung wheels with the original rigid moving surface.
+    pub suspension: bool,
+    /// Explicit wheel experiments; the default retains the established assembly.
+    pub wheel_tuning: WheelTuning,
+    /// Repeatable driving obstacle, with firing disabled and the far tank parked.
+    pub course: Option<DrivingCourse>,
+    /// Course-only travel controller; ordinary combat retains its range policy.
+    pub course_goal_driving: bool,
     /// Zero selects the normal duel. Otherwise rain scripted shells for this
     /// duration, then keep solving the altered world without new impacts.
     pub bombardment_seconds: u32,
@@ -68,6 +88,12 @@ impl Default for ScorchedConfig {
             shape: GrainShape::Hexagon,
             max_grains: 192,
             demo: false,
+            cpu_driving: true,
+            cpu_footing: [false; 2],
+            suspension: false,
+            wheel_tuning: WheelTuning::default(),
+            course: None,
+            course_goal_driving: false,
             bombardment_seconds: 0,
             slumping: false,
             cohesion: BankStrength::Off,
@@ -125,6 +151,15 @@ pub struct ScorchedState {
     shells: Vec<Shell>,
     selected: usize,
     previous: Controls,
+    driving: [driving::TankDrive; 2],
+    course_goal: Option<driving_lab::TravelGoal>,
+    course_decision: Option<driving_lab::GoalDecision>,
+    running_gear: [Option<engine_rapier::rover::RoverAssembly>; 2],
+    manual_drive_armed: bool,
+    select_used: bool,
+    pointer_drive: f32,
+    nudge_drive: f32,
+    nudge_until: u64,
     flashes: Vec<(Vec2, u64)>,
     status: &'static str,
 }
@@ -138,8 +173,16 @@ fn hill(x: f32, seed: u64) -> f32 {
 
 impl ScorchedState {
     pub fn new(mut config: ScorchedConfig, seed: u64) -> Self {
+        config.wheel_tuning = config.wheel_tuning.bounded();
         config.max_grains = config.max_grains.clamp(1, 512);
         config.bombardment_seconds = config.bombardment_seconds.min(600);
+        if config.course.is_some() {
+            config.roof = false;
+            config.hillside = false;
+            config.undercut = false;
+            config.drop_height = None;
+            config.bombardment_seconds = 0;
+        }
         if config.roof {
             config.hillside = false;
         }
@@ -155,7 +198,9 @@ impl ScorchedState {
             config.demo = false;
             config.bombardment_seconds = 0;
         }
-        let field = if config.roof {
+        let field = if let Some(course) = config.course {
+            course.terrain()
+        } else if config.roof {
             roof::terrain()
         } else if config.hillside {
             hillside::terrain(seed)
@@ -220,10 +265,13 @@ impl ScorchedState {
             assembly,
             edited_chunks: Vec::new(),
         };
+        let mut running_gear = [None, None];
         let tanks = std::array::from_fn(|index| {
             let id = PhysicsId::new(10 + index as u64);
-            let body = BodyId::new(id, BodyRole::PRIMARY);
-            let x = if config.roof {
+            let mut body = BodyId::new(id, BodyRole::PRIMARY);
+            let x = if config.course.is_some() {
+                if index == 0 { course::START_X } else { 38.0 }
+            } else if config.roof {
                 if index == 0 { 0.0 } else { 4.0 }
             } else if index == 0 {
                 if config.hillside { -1.0 } else { -27.0 }
@@ -243,40 +291,51 @@ impl ScorchedState {
             );
             collider.density = 8.0;
             collider.friction = 1.0;
-            assert!(physics.insert_body(
-                body,
-                BodySpec {
-                    position: Vec2::new(
-                        x,
-                        if config.roof {
-                            if index == 0 { 15.0 } else { -8.7 }
-                        } else if config.drop_height.is_some() {
-                            -8.0
-                        } else if config.undercut || config.hillside {
-                            if index == 0 {
-                                9.0
-                            } else if config.hillside {
-                                -8.7
-                            } else {
-                                -8.0
-                            }
-                        } else {
-                            hill(x, seed) + 2.0
-                        }
-                    ),
-                    angular_damping: 2.0,
-                    ccd_enabled: true,
-                    ..Default::default()
+            let position = Vec2::new(
+                x,
+                if let Some(course) = config.course {
+                    course.floor(x) + 2.0
+                } else if config.roof {
+                    if index == 0 { 15.0 } else { -8.7 }
+                } else if config.drop_height.is_some() {
+                    -8.0
+                } else if config.undercut || config.hillside {
+                    if index == 0 {
+                        9.0
+                    } else if config.hillside {
+                        -8.7
+                    } else {
+                        -8.0
+                    }
+                } else {
+                    hill(x, seed) + 2.0
                 },
-                &[collider]
-            ));
+            );
+            if suspension::enabled(config) {
+                let assembly = suspension::insert(&mut physics, id, position, config.wheel_tuning);
+                body = assembly.bodies()[0];
+                running_gear[index] = Some(assembly);
+            } else {
+                assert!(physics.insert_body(
+                    body,
+                    BodySpec {
+                        position,
+                        angular_damping: 2.0,
+                        ccd_enabled: true,
+                        ..Default::default()
+                    },
+                    &[collider]
+                ));
+            }
             Tank {
                 body,
                 elevation: 50.0_f32.to_radians(),
                 speed: 32.0,
                 facing: if index == 0 { 1.0 } else { -1.0 },
                 health: 100.0,
-                next_shot: if config.hillside || config.roof {
+                next_shot: if config.course.is_some() {
+                    u64::MAX
+                } else if config.hillside || config.roof {
                     0
                 } else {
                     index as u64 * 300
@@ -296,6 +355,9 @@ impl ScorchedState {
             terrain.push(clump);
         }
         physics.step(DT);
+        let driving = std::array::from_fn(|i| {
+            driving::TankDrive::new(physics.motion(tanks[i].body).unwrap().position)
+        });
         let mut state = Self {
             tick: 0,
             config,
@@ -325,9 +387,23 @@ impl ScorchedState {
             shells: Vec::new(),
             selected: if config.hillside || config.roof { 1 } else { 0 },
             previous: Controls::default(),
+            driving,
+            course_goal: config
+                .course
+                .map(|course| driving_lab::TravelGoal::new(course.finish_x(), 2.5)),
+            course_decision: None,
+            running_gear,
+            manual_drive_armed: false,
+            select_used: false,
+            pointer_drive: 0.0,
+            nudge_drive: 0.0,
+            nudge_until: 0,
             flashes: Vec::new(),
-            status: "Aim and fire. The other tank returns fire; Demo controls both.",
+            status: "Drive into position, aim and fire. Demo controls both tanks.",
         };
+        if state.config.course == Some(DrivingCourse::Rubble) {
+            state.release_course_rubble();
+        }
         if state.config.roof {
             state.aim_at_roof();
         } else if state.config.hillside {
@@ -375,6 +451,7 @@ impl ScorchedState {
     }
     fn fire(&mut self, player: usize) {
         if self.config.undercut
+            || self.config.course.is_some()
             || self.config.drop_height.is_some()
             || self.config.bombardment_seconds > 0
             || !self.fighting()
@@ -437,7 +514,40 @@ impl ScorchedState {
         self.tanks[player].elevation = angle;
         self.tanks[player].speed = (speed * (0.93 + phase as f32 * 0.025)).clamp(12.0, 48.0);
     }
-    fn advance(&mut self) {
+    fn advance(&mut self, drive: f32) {
+        let goal_axis = if self.config.course.is_some()
+            && self.config.course_goal_driving
+            && self.config.demo
+            && self.config.cpu_driving
+        {
+            let mut goal = self.course_goal.take().expect("course has a goal");
+            let decision = goal.decide(self, 0);
+            let axis = decision.axis;
+            self.driving[0].diagnostics.mode = decision.mode;
+            self.course_decision = Some(decision);
+            self.course_goal = Some(goal);
+            Some((0, axis))
+        } else {
+            None
+        };
+        self.advance_with_drive_override(
+            drive,
+            goal_axis,
+            driving::CURRENT_GROUND_CHECKS,
+            driving::CURRENT_SUPPORT_CHECKS,
+        );
+    }
+
+    // The diagnostic fork changes only one drive axis. Physics, controller
+    // history, shot scheduling and the other tank continue from the same clone.
+    fn advance_with_drive_override(
+        &mut self,
+        drive: f32,
+        override_axis: Option<(usize, f32)>,
+        ground_checks: [driving::GroundCheckFn; 2],
+        support_checks: [driving::SupportCheckFn; 2],
+    ) {
+        let drives = self.prepare_driving(drive, override_axis, ground_checks, support_checks);
         if self.config.roof {
             self.advance_roof();
         } else if self.config.hillside {
@@ -467,10 +577,11 @@ impl ScorchedState {
                 });
                 self.shots += 1;
             }
-        } else if self.fighting() {
-            for player in 0..2 {
+        } else if self.config.course.is_none() && self.fighting() {
+            for (player, support_check) in support_checks.into_iter().enumerate() {
                 if (self.config.demo || player != self.selected)
                     && self.tick >= self.tanks[player].next_shot
+                    && (!self.config.cpu_driving || self.ready_to_shoot(player, support_check))
                 {
                     self.aim_bot(player);
                     self.fire(player);
@@ -483,7 +594,7 @@ impl ScorchedState {
             self.terrain.iter().map(|f| (f.assembly.body(), &f.terrain)),
             DT,
         );
-        self.last_physics = self.physics.step(DT);
+        self.last_physics = self.physics.step_with_surface_drives(DT, &drives);
         self.loose.sample_impact_contacts(&self.physics);
         let mut impacts = Vec::new();
         self.shells.retain_mut(|shell| {
@@ -529,8 +640,14 @@ impl ScorchedState {
             Command::PowerDown => self.tanks[self.selected].speed -= 1.0,
             Command::PowerUp => self.tanks[self.selected].speed += 1.0,
             Command::Fire => self.fire(self.selected),
-            Command::Select => self.selected = 1 - self.selected,
+            Command::Select => {
+                if self.config.course.is_none() {
+                    self.selected = 1 - self.selected;
+                }
+                self.clear_driving_input();
+            }
             Command::Demo => {
+                self.clear_driving_input();
                 self.config.demo = !self.config.demo;
                 if self.config.hillside || self.config.roof {
                     *self = Self::new(self.config, self.seed);
@@ -555,8 +672,11 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::Barrage => {
-                if self.config.roof {
+                if let Some(course) = self.config.course {
+                    self.config.course = course.next();
+                } else if self.config.roof {
                     self.config.roof = false;
+                    self.config.course = Some(DrivingCourse::Flat);
                 } else if self.config.hillside {
                     self.config.hillside = false;
                     self.config.roof = true;
@@ -585,7 +705,9 @@ impl ScorchedState {
                 } else {
                     self.config.bombardment_seconds = 60;
                 }
-                self.config.demo = self.config.hillside || self.config.roof;
+                if self.config.course.is_none() {
+                    self.config.demo = self.config.hillside || self.config.roof;
+                }
                 *self = Self::new(self.config, self.seed);
             }
             Command::Shape => {
@@ -597,6 +719,7 @@ impl ScorchedState {
             }
             Command::Reset => *self = Self::new(self.config, self.seed),
             Command::Roof => {
+                self.config.course = None;
                 self.config.roof = !self.config.roof;
                 self.config.demo = self.config.roof;
                 self.config.hillside = false;
@@ -609,6 +732,7 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::Hillside => {
+                self.config.course = None;
                 self.config.roof = false;
                 self.config.hillside = !self.config.hillside;
                 self.config.demo = self.config.hillside;
@@ -621,6 +745,7 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::Bank => {
+                self.config.course = None;
                 self.config.roof = false;
                 self.config.hillside = false;
                 self.config.undercut = !self.config.undercut;
@@ -635,6 +760,7 @@ impl ScorchedState {
                 *self = Self::new(self.config, self.seed);
             }
             Command::Drop => {
+                self.config.course = None;
                 self.config.roof = false;
                 self.config.hillside = false;
                 self.config.drop_height = match self.config.drop_height {
@@ -657,6 +783,45 @@ impl ScorchedState {
                 } else {
                     self.config = self.config.with_destruction(self.config.cohesion.next());
                 }
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::DriveLeft | Command::DriveRight => {
+                self.nudge_drive = if command == Command::DriveLeft {
+                    -1.0
+                } else {
+                    1.0
+                };
+                self.nudge_until = self.tick + 20;
+                self.manual_drive_armed = true;
+            }
+            Command::CpuDrive => {
+                if self.config.course.is_some()
+                    && self.config.cpu_driving
+                    && !self.config.course_goal_driving
+                {
+                    self.config.course_goal_driving = true;
+                } else {
+                    self.config.cpu_driving = !self.config.cpu_driving;
+                    if self.config.cpu_driving && self.config.course.is_some() {
+                        self.config.course_goal_driving = false;
+                    }
+                }
+                self.clear_driving_input();
+            }
+            Command::Suspension => {
+                self.config.suspension = !self.config.suspension;
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::Course => {
+                self.config.course = self
+                    .config
+                    .course
+                    .map_or(Some(DrivingCourse::Flat), |c| c.next());
+                self.config.roof = false;
+                self.config.hillside = false;
+                self.config.undercut = false;
+                self.config.drop_height = None;
+                self.config.bombardment_seconds = 0;
                 *self = Self::new(self.config, self.seed);
             }
         }
@@ -691,6 +856,8 @@ impl Scenario for ScorchedScenario {
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
         if dt.is_zero() {
             state.previous = Controls::default();
+            state.clear_driving_input();
+            state.select_used = false;
             return StepResult::default();
         }
         let mut controls = Controls::default();
@@ -700,19 +867,44 @@ impl Scenario for ScorchedScenario {
                 Some(ScorchedAction::Command(c)) => state.command(c),
                 None => {}
             }
-            if let Action::Pointer(p) = action
-                && p.phase == PointerPhase::Press
-                && let Some(command) = render::button_at(Vec2::new(p.position.x, p.position.y))
-            {
-                state.command(command);
+            if let Action::Pointer(p) = action {
+                let command = render::button_at(Vec2::new(p.position.x, p.position.y));
+                match p.phase {
+                    PointerPhase::Press => match command {
+                        Some(Command::DriveLeft | Command::DriveRight) => {
+                            state.pointer_drive = if command == Some(Command::DriveLeft) {
+                                -1.0
+                            } else {
+                                1.0
+                            };
+                            state.manual_drive_armed = true;
+                        }
+                        Some(c) => state.command(c),
+                        None => {}
+                    },
+                    PointerPhase::Drag
+                        if command
+                            != Some(if state.pointer_drive < 0.0 {
+                                Command::DriveLeft
+                            } else {
+                                Command::DriveRight
+                            }) =>
+                    {
+                        state.pointer_drive = 0.0
+                    }
+                    PointerPhase::Release | PointerPhase::Cancel => state.pointer_drive = 0.0,
+                    _ => {}
+                }
             }
         }
+        // Defer a tap until release so a later joystick/chord press cannot
+        // inadvertently transfer control to the other tank first.
+        let select_used = state.select_used
+            || (controls.select && (controls.shape || controls.collapse || controls.drive != 0.0));
+        if !controls.select && state.previous.select && !select_used {
+            state.command(Command::Select);
+        }
         for (held, before, command) in [
-            (
-                controls.select && !controls.shape && !controls.collapse,
-                state.previous.select,
-                Command::Select,
-            ),
             (controls.demo, state.previous.demo, Command::Demo),
             (
                 controls.shape && !controls.select,
@@ -740,6 +932,23 @@ impl Scenario for ScorchedScenario {
                 state.command(command)
             }
         }
+        state.select_used = controls.select && select_used;
+        if controls.drive == 0.0 {
+            state.manual_drive_armed = true;
+        }
+        let manual_drive = if state.manual_drive_armed {
+            if controls.drive != 0.0 {
+                controls.drive
+            } else if state.pointer_drive != 0.0 {
+                state.pointer_drive
+            } else if state.tick < state.nudge_until {
+                state.nudge_drive
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
         if !state.config.demo {
             state.tanks[state.selected].elevation += controls.aim * DT * 40.0_f32.to_radians();
             state.tanks[state.selected].speed += controls.power * DT * 12.0;
@@ -749,7 +958,7 @@ impl Scenario for ScorchedScenario {
             }
         }
         state.previous = controls;
-        state.advance();
+        state.advance(manual_drive);
         StepResult::default()
     }
     fn observe(state: &Self::State) -> Observation {
@@ -788,6 +997,17 @@ impl Scenario for ScorchedScenario {
             "tanks": tanks, "shells": state.shells,
         });
         // Preserve existing observations when the experiment is disabled.
+        if let Some(course) = state.config.course {
+            payload["course"] = serde_json::json!(course);
+            // History remains part of replay even while manual/range driving
+            // suspends the goal. Only Reset or a new course creates a new goal.
+            if state.config.course_goal_driving || state.course_decision.is_some() {
+                payload["course_goal_driving"] =
+                    serde_json::json!(state.config.course_goal_driving);
+                payload["course_goal"] = serde_json::json!(state.course_goal);
+                payload["course_decision"] = serde_json::json!(state.course_decision);
+            }
+        }
         if state.config.roof {
             payload["roof"] = serde_json::json!(true);
         }
@@ -802,6 +1022,28 @@ impl Scenario for ScorchedScenario {
         }
         if state.config.breakup {
             payload["breakup"] = serde_json::json!(true);
+        }
+        if state.config.cpu_driving || state.driving.iter().any(|d| d.has_history()) {
+            payload["cpu_driving"] = serde_json::json!(state.config.cpu_driving);
+            payload["driving"] = serde_json::json!(state.driving);
+        }
+        if state.config.cpu_footing.iter().any(|enabled| *enabled) {
+            payload["cpu_footing"] = serde_json::json!(state.config.cpu_footing);
+        }
+        if state.config.suspension {
+            payload["suspension"] = serde_json::json!(true);
+            // Keep legacy capture identities; record every changed tuning,
+            // including a new default, rather than silently relabeling it.
+            if state.config.wheel_tuning != WheelTuning::REFERENCE {
+                payload["wheel_tuning"] = serde_json::json!(state.config.wheel_tuning);
+            }
+            payload["wheel_motion"] = serde_json::json!(
+                state
+                    .running_gear
+                    .iter()
+                    .map(|gear| { gear.as_ref().map(|gear| gear.bodies().map(motion)) })
+                    .collect::<Vec<_>>()
+            );
         }
         Observation {
             payload: serde_json::to_vec(&payload).expect("finite scenario observation"),

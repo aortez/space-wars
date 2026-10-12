@@ -62,7 +62,9 @@ pub struct RoverSpec {
     pub surface_angle: f32,
     pub chassis_half_width: f32,
     pub chassis_half_height: f32,
+    pub chassis_density: f32,
     pub wheel_radius: f32,
+    pub wheel_density: f32,
     pub wheel_offset: f32,
     pub suspension_anchor_height: f32,
     pub suspension_rest_length: f32,
@@ -73,6 +75,8 @@ pub struct RoverSpec {
     pub wheel_target_speed: f32,
     pub wheel_motor_torque: f32,
     pub wheel_brake_torque: f32,
+    /// Velocity-error damping for the force-based drive and brake motors.
+    pub wheel_motor_damping: f32,
     pub collision_groups: CollisionGroups,
 }
 
@@ -82,7 +86,9 @@ impl Default for RoverSpec {
             surface_angle: std::f32::consts::FRAC_PI_2,
             chassis_half_width: 2.2,
             chassis_half_height: 0.6,
+            chassis_density: 1.0,
             wheel_radius: 0.75,
+            wheel_density: 0.8,
             wheel_offset: 1.45,
             suspension_anchor_height: -0.35,
             suspension_rest_length: 0.85,
@@ -93,6 +99,7 @@ impl Default for RoverSpec {
             wheel_target_speed: 7.0,
             wheel_motor_torque: 80.0,
             wheel_brake_torque: 100.0,
+            wheel_motor_damping: 1.0,
             collision_groups: CollisionGroups::ALL,
         }
     }
@@ -229,6 +236,12 @@ pub struct RoverAssembly {
     target_wheel_speed: f32,
     motor_torque: f32,
     brake_torque: f32,
+    #[serde(default = "default_motor_damping")]
+    motor_damping: f32,
+}
+
+fn default_motor_damping() -> f32 {
+    1.0
 }
 
 impl RoverAssembly {
@@ -290,7 +303,7 @@ impl RoverAssembly {
             spec.chassis_half_width,
             spec.chassis_half_height,
         );
-        chassis_shape.density = 1.0;
+        chassis_shape.density = spec.chassis_density;
         chassis_shape.friction = 0.7;
         chassis_shape.restitution = 0.0;
         chassis_shape.collision_groups = spec.collision_groups;
@@ -332,7 +345,7 @@ impl RoverAssembly {
         for index in 0..2 {
             let side = if index == 0 { -1.0 } else { 1.0 };
             let mut wheel_shape = ColliderSpec::ball(wheel_colliders[index], spec.wheel_radius);
-            wheel_shape.density = 0.8;
+            wheel_shape.density = spec.wheel_density;
             wheel_shape.friction = 1.6;
             wheel_shape.restitution = 0.0;
             wheel_shape.collision_groups = spec.collision_groups;
@@ -397,6 +410,7 @@ impl RoverAssembly {
             target_wheel_speed: spec.wheel_target_speed,
             motor_torque: spec.wheel_motor_torque,
             brake_torque: spec.wheel_brake_torque,
+            motor_damping: spec.wheel_motor_damping,
         })
     }
 
@@ -406,6 +420,10 @@ impl RoverAssembly {
 
     pub fn bodies(&self) -> [BodyId; 3] {
         [self.chassis, self.wheels[0], self.wheels[1]]
+    }
+
+    pub fn wheel_colliders(&self) -> [ColliderId; 2] {
+        self.wheel_colliders
     }
 
     pub fn set_control(&self, physics: &mut PhysicsWorld, control: RoverControl) -> bool {
@@ -421,7 +439,7 @@ impl RoverAssembly {
             if control.brake {
                 joint
                     .data
-                    .set_motor_velocity(JointAxis::AngX, 0.0, 1.0)
+                    .set_motor_velocity(JointAxis::AngX, 0.0, self.motor_damping)
                     .set_motor_max_force(JointAxis::AngX, self.brake_torque);
                 joint
                     .data
@@ -429,7 +447,11 @@ impl RoverAssembly {
             } else if throttle.abs() > f32::EPSILON {
                 joint
                     .data
-                    .set_motor_velocity(JointAxis::AngX, -throttle * self.target_wheel_speed, 1.0)
+                    .set_motor_velocity(
+                        JointAxis::AngX,
+                        -throttle * self.target_wheel_speed,
+                        self.motor_damping,
+                    )
                     .set_motor_max_force(JointAxis::AngX, self.motor_torque);
                 joint
                     .data
@@ -580,7 +602,9 @@ fn valid_rover_spec(spec: RoverSpec) -> bool {
         spec.surface_angle,
         spec.chassis_half_width,
         spec.chassis_half_height,
+        spec.chassis_density,
         spec.wheel_radius,
+        spec.wheel_density,
         spec.wheel_offset,
         spec.suspension_rest_length,
         spec.suspension_travel,
@@ -590,6 +614,7 @@ fn valid_rover_spec(spec: RoverSpec) -> bool {
         spec.wheel_target_speed,
         spec.wheel_motor_torque,
         spec.wheel_brake_torque,
+        spec.wheel_motor_damping,
     ]
     .into_iter()
     .all(|value| value.is_finite() && value > 0.0)
@@ -604,6 +629,58 @@ mod tests {
 
     const PLANET: PhysicsId = PhysicsId::new(1);
     const ROVER: PhysicsId = PhysicsId::new(2);
+
+    #[test]
+    fn configurable_mass_and_motor_damping_validate_and_round_trip() {
+        let mut physics = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let pose = RoverSpawnPose {
+            wheel_center: Vec2::Y,
+            up_angle: std::f32::consts::FRAC_PI_2,
+        };
+        for spec in [
+            RoverSpec {
+                chassis_density: 0.0,
+                ..Default::default()
+            },
+            RoverSpec {
+                wheel_density: f32::NAN,
+                ..Default::default()
+            },
+            RoverSpec {
+                wheel_motor_damping: -1.0,
+                ..Default::default()
+            },
+        ] {
+            assert!(RoverAssembly::insert_at(&mut physics, ROVER, pose, spec).is_none());
+            assert!(!physics.contains_entity(ROVER));
+        }
+        let spec = RoverSpec {
+            chassis_density: 10.0,
+            wheel_density: 2.2,
+            wheel_motor_damping: 80.0,
+            ..Default::default()
+        };
+        let rover = RoverAssembly::insert_at(&mut physics, ROVER, pose, spec).unwrap();
+        assert!(physics.body_mass(rover.bodies()[0]).unwrap() > 50.0);
+        let bytes = bincode::serialize(&rover).unwrap();
+        let decoded: RoverAssembly = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(bincode::serialize(&decoded).unwrap(), bytes);
+        let mut replay = physics.clone();
+        let control = RoverControl {
+            throttle: 1.0,
+            brake: false,
+        };
+        for _ in 0..30 {
+            rover.set_control(&mut physics, control);
+            decoded.set_control(&mut replay, control);
+            physics.step(1.0 / 60.0);
+            replay.step(1.0 / 60.0);
+        }
+        assert_eq!(
+            physics.snapshot_bytes().unwrap(),
+            replay.snapshot_bytes().unwrap()
+        );
+    }
 
     fn gravity(position: Vec2) -> Vec2 {
         let inward = -position;
