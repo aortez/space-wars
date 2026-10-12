@@ -668,7 +668,12 @@ host pause menu.
 
 ## Windows nightly downloads
 
-Open [Windows nightly in Actions](https://github.com/aortez/space-wars/actions/workflows/windows-nightly.yml)
+Download [windows-client.zip](https://github.com/aortez/space-wars/releases/download/nightly/windows-client.zip)
+from the prerelease [Nightly release](https://github.com/aortez/space-wars/releases/tag/nightly)
+and extract it into a writable folder. This stable URL serves the latest
+successfully published nightly; publication failures are visible in Actions.
+
+For diagnostic evidence, open [Windows nightly in Actions](https://github.com/aortez/space-wars/actions/workflows/windows-nightly.yml)
 and select the latest **successful** run. Sign into GitHub to download its
 `windows-release-<commit>-<run>-<attempt>` artifact. Extract the downloaded
 artifact ZIP, then extract its `windows-client.zip` into a writable folder.
@@ -694,9 +699,20 @@ all payload files. CLI and headless tools are excluded.
 
 Both the daily 08:23 UTC schedule and **Run workflow** build current `main`,
 even when manually invoked from another branch or when main has not changed.
-Artifacts expire after **two days**; additional manual runs consume storage.
+The Release ZIP is replaced in place and remains available beyond the diagnostic
+artifact retention of **two days**. Each publication records the source commit,
+run ID, attempt and ZIP SHA-256 in the Release notes. Compare that digest with
+`Get-FileHash windows-client.zip -Algorithm SHA256` before extraction. The ZIP's
+build-info.json identifies the source; the `nightly` tag anchors the first release,
+so use the rolling notes and bundled metadata for provenance. Reruns of unchanged
+main still publish their validated run. Publishers are serialized and older
+run IDs/attempts cannot overwrite a newer publication reservation. An interrupted
+publication is marked in the notes; rerunning reconciles its assets. During the
+final asset rename the stable URL can briefly be unavailable. PR CI validates
+packages and never publishes this production Release.
+Additional manual runs consume artifact storage.
 GitHub can delay scheduled runs and disables schedules in public repositories
-after 60 days of inactivity. If downloads have expired, trigger a manual run.
+after 60 days of inactivity. If newer output is needed, trigger a manual run.
 The workflow summary reports measured ZIP bytes and the default renderer's
 separate outcome. Software launcher/Falling startup is required on the hosted
 Windows runner; default OpenGL can fail there. Captures require visual review

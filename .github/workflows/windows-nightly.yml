@@ -14,17 +14,22 @@ jobs:
     name: Windows nightly release
     runs-on: windows-2025
     timeout-minutes: 60
+    outputs:
+      source: ${{ steps.source.outputs.sha }}
+      artifact: ${{ steps.evidence.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
           persist-credentials: false
       - name: Record resolved main head
+        id: source
         shell: pwsh
         run: |
           $head = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Cannot resolve main' }
           "RELEASE_SHA=$head" >> $env:GITHUB_ENV
+          "sha=$head" >> $env:GITHUB_OUTPUT
       - uses: dtolnay/rust-toolchain@1.89.0
         with:
           targets: x86_64-pc-windows-msvc
@@ -33,6 +38,7 @@ jobs:
         shell: pwsh
         run: .github/ci/windows-release.ps1 -SourceCommit $env:RELEASE_SHA -OutputDirectory "$env:RUNNER_TEMP/windows-release-evidence"
       - name: Upload release and failure evidence
+        id: evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -40,3 +46,34 @@ jobs:
           path: ${{ runner.temp }}/windows-release-evidence/
           retention-days: 2
           if-no-files-found: error
+
+  publish:
+    name: Publish rolling Windows nightly
+    needs: windows-release
+    if: ${{ needs.windows-release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    concurrency:
+      group: windows-nightly-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.windows-release.outputs.source }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.windows-release.outputs.artifact }}
+          path: ${{ runner.temp }}/nightly-evidence
+          merge-multiple: true
+      - name: Publish validated ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.windows-release.outputs.source }}
+          BUILD_RESULT: ${{ needs.windows-release.result }}
+        run: >-
+          python3 .github/ci/publish_nightly.py
+          --directory "$RUNNER_TEMP/nightly-evidence"
+          --source "$RELEASE_SHA" --build-result "$BUILD_RESULT"
