@@ -1,0 +1,2762 @@
+{
+  "source": {
+    "base": "0eb044cd7481b1df93096c2fa97360b383fa0a9b",
+    "branch": "feat/scorched-calibrated-bots-199",
+    "changed_source_sha256": "57afcbdcd4d94394853d11856aba35315cb4ec6e63226d66d7295cb9a29c3712",
+    "files": {
+      "crates/engine-client/src/client_scenarios/scorched_earth.rs": "ed277b7fb09bdb49ee3522b1229e4a2133c8f5d3acd4132f059b1e8cd91191d3",
+      "scenarios/scorched-earth/examples/scorched_aim_lab.rs": "dcca7a9d5711871254de6fc4fccc4f0d45c955b58eb078fe7d20ed83955a2cc1",
+      "scenarios/scorched-earth/examples/scorched_benchmark.rs": "f00170c31023b350d8742f1667227192cf61bdce9e28ce28d32b6f653a51005a",
+      "scenarios/scorched-earth/src/action.rs": "ff8eca5c8b1cef78676c0d9fe273a875de40219e93537b9b0090e825b43390bc",
+      "scenarios/scorched-earth/src/bot.rs": "cd916e56ef7938b2f63ee8867863c9e945644f0aeedf6e677cda67783aa19cd7",
+      "scenarios/scorched-earth/src/bot/aim.rs": "a4234852805f82c6fc1e9422ea4d33ad065b6344c94616d9922021cf5f7f7df6",
+      "scenarios/scorched-earth/src/bot/tests.rs": "3c58e202b1d3cc3af1fea1c50127b0e47a7fa009b5d010462809605469115289",
+      "scenarios/scorched-earth/src/bot_lab.rs": "d95f6a210998b479b46dfde39daa7a17ce9dcb2fa1cb98d9e026042c1bb4cdb1",
+      "scenarios/scorched-earth/src/driving.rs": "223f02357ef390352e358c818001b344484e62c976b586c8a98251fa69924329",
+      "scenarios/scorched-earth/src/driving/tests.rs": "4895c57c838f34993d3fc71d965c5230821fd819baee8b731c616e62a1ef63e8",
+      "scenarios/scorched-earth/src/lib.rs": "5bbfec5b242bc4c35fb4e85794f870873e0c185876bffcc167c21527a4a2c608",
+      "scenarios/scorched-earth/src/material.rs": "42234e1b503379f902feda520e379dbc70843bbb530d352228f726e3460c41f1",
+      "scenarios/scorched-earth/src/render.rs": "c6d8eab33387439f88154e5e143534d2a40862de8eaf4bf80136371efb0afa61",
+      "scenarios/scorched-earth/src/tests.rs": "be2e9c68f022ce93ac74efcb1d2fa24601cc83e26c912575230451c2eafe0702"
+    }
+  },
+  "toolchain": "cargo +1.89.0 --locked --profile ci",
+  "scope": "Desktop first-pass review; headless update timings are not isolated AI costs or Picade rendered frame times. No win-rate claim.",
+  "binaries": {
+    "target/ci/examples/scorched_benchmark": "6863f1b240001196de02da871639646d8d1a90b47843ec53460a7d5ea9294f2f",
+    "target/ci/examples/scorched_aim_lab": "0a4cce7a8b5d3e1c349099a594390c02fe239ee24850bc8e7be277b61a9e4993",
+    "target/ci/engine-client": "0cd7d2b21582deac87c3b1d7e2a8e587f9686a2f51e972f8a04c48ae216f69db"
+  },
+  "retained": [
+    {
+      "case": "angular-123-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "aff83ba095ff81e4",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-123-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "cfd7b4df683535ad",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-42-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "205f55eee06fe0d1",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "cb26d24ae201edb7",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-7-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "ef81f3e0e43d4f36",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-7-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "f25b881a76b056fe",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-barrage",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15"
+      ],
+      "observation_hash": "d8cee031a53927ec",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-hillside",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--require-lifecycle"
+      ],
+      "observation_hash": "42341fe4777c6d09",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-roof",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--require-roof"
+      ],
+      "observation_hash": "bb0e02224e0538a7",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "observation_hash": "a033cd117334e7a2",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-wheels-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "observation_hash": "8e97b6e7fd46fb60",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-wheels-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "c44f57de7a1e8864",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-wheels-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "6ef77b1c1b358ce6",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-123-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "8ebdbf04e0ecdcba",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-123-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "3bcd940fdc195d57",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-42-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "27dadb8594794311",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "d61cc47a17f8f23b",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-7-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "9593e07b0667187e",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-7-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "b4bf674f4b86651a",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-barrage",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15"
+      ],
+      "observation_hash": "9ef12dfeba96d958",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-hillside",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--require-lifecycle"
+      ],
+      "observation_hash": "e3b096469bc671e4",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-roof",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--require-roof"
+      ],
+      "observation_hash": "c37016e60aeea0ab",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "observation_hash": "f6d2c18dc7084426",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-wheels-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "observation_hash": "27c62413790d58f2",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-wheels-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "7f368d12b0ffdb9e",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "round-wheels-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "3db745c56eeb6a3d",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-angular-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "42",
+        "--suspension"
+      ],
+      "observation_hash": "25f392c24276b086",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-angular-310-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "310",
+        "--suspension"
+      ],
+      "observation_hash": "4a4fd9ed5bd99ee6",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-angular-314-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "0c9504e117e92570",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-angular-314-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "7255f4b6e8f8e1a1",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-angular-314-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314"
+      ],
+      "observation_hash": "b9eef77378841db8",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-round-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "42",
+        "--suspension"
+      ],
+      "observation_hash": "e2b152150874b744",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-round-314-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension"
+      ],
+      "observation_hash": "756b0ae4850cf1aa",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-round-314-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "eefe9fbaf5a1930a",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-round-314-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "915f9ab9e671b77b",
+      "matches_previous": true,
+      "replay_checked": true
+    },
+    {
+      "case": "footing-round-314-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314"
+      ],
+      "observation_hash": "cc6851b496a65472",
+      "matches_previous": true,
+      "replay_checked": true
+    }
+  ],
+  "duels": [
+    {
+      "case": "duel-round-7-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 11,
+      "winner": null,
+      "mean_ms": 0.243915608888889,
+      "p95_ms": 0.802498,
+      "observation_hash": "3d1393af30011b15",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-7-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 9,
+      "winner": 1,
+      "mean_ms": 0.25785371333333335,
+      "p95_ms": 0.801275,
+      "observation_hash": "2e362a2995708eee",
+      "bots": [
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 4,
+          "useful_shots": 1,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-7-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 9,
+      "winner": 1,
+      "mean_ms": 0.27576748666666645,
+      "p95_ms": 0.9216219999999999,
+      "observation_hash": "bdee0c6a462f8520",
+      "bots": [
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 1
+        },
+        {
+          "outcomes": 4,
+          "useful_shots": 1,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 2
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-42-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 11,
+      "winner": 2,
+      "mean_ms": 0.23629664185185187,
+      "p95_ms": 0.700926,
+      "observation_hash": "f6bfc1cf07d9df7e",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-42-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 13,
+      "winner": null,
+      "mean_ms": 0.2722437300000002,
+      "p95_ms": 0.80406,
+      "observation_hash": "9fdf6f7a0b46dddb",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 4,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-42-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 13,
+      "winner": null,
+      "mean_ms": 0.2643212518518514,
+      "p95_ms": 0.841461,
+      "observation_hash": "5dbca435830ae2c7",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 4,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 2
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 2
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-123-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 9,
+      "winner": 2,
+      "mean_ms": 0.16922555037037026,
+      "p95_ms": 0.382102,
+      "observation_hash": "29bba3eec50247f0",
+      "bots": [
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 4,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-123-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 13,
+      "winner": 2,
+      "mean_ms": 0.32211577999999974,
+      "p95_ms": 1.013917,
+      "observation_hash": "ae6087f58fd83f3c",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 2,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-123-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 15,
+      "winner": 2,
+      "mean_ms": 0.3537343281481482,
+      "p95_ms": 1.083488,
+      "observation_hash": "efb0971e0f0c5343",
+      "bots": [
+        {
+          "outcomes": 8,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 2
+        },
+        {
+          "outcomes": 7,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 2
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-314-reactive-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "shots": 17,
+      "winner": 2,
+      "mean_ms": 0.5732324240740737,
+      "p95_ms": 1.5791950000000001,
+      "observation_hash": "b103be0c079e7fa0",
+      "bots": [
+        {
+          "outcomes": 9,
+          "useful_shots": 1,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 4
+        },
+        {
+          "outcomes": 8,
+          "useful_shots": 4,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 3
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-round-314-reactive-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "shots": 17,
+      "winner": 2,
+      "mean_ms": 0.5715621577777782,
+      "p95_ms": 1.57627,
+      "observation_hash": "fcd4e36f005d7cd7",
+      "bots": [
+        {
+          "outcomes": 9,
+          "useful_shots": 1,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 4
+        },
+        {
+          "outcomes": 8,
+          "useful_shots": 4,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 3
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-7-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 11,
+      "winner": null,
+      "mean_ms": 0.297702638148149,
+      "p95_ms": 0.727756,
+      "observation_hash": "53332491c0f48fe3",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-7-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 13,
+      "winner": 2,
+      "mean_ms": 0.3621386540740746,
+      "p95_ms": 1.016521,
+      "observation_hash": "de60a22edda00540",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 5,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-7-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 15,
+      "winner": null,
+      "mean_ms": 0.2597878233333334,
+      "p95_ms": 0.754757,
+      "observation_hash": "3a9545103e4b77d6",
+      "bots": [
+        {
+          "outcomes": 8,
+          "useful_shots": 4,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 7,
+          "useful_shots": 3,
+          "relocations": 2,
+          "relocations_finished": 2,
+          "relocation_refusals": 1
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-42-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 11,
+      "winner": 2,
+      "mean_ms": 0.2665772896296295,
+      "p95_ms": 0.780375,
+      "observation_hash": "2153b0f576b6a973",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-42-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 11,
+      "winner": null,
+      "mean_ms": 0.4217309781481486,
+      "p95_ms": 1.1920730000000002,
+      "observation_hash": "054cf670a8cbeb7d",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 2,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-42-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 11,
+      "winner": 2,
+      "mean_ms": 0.2557613351851851,
+      "p95_ms": 0.774444,
+      "observation_hash": "e50f5efbc7fe7aa4",
+      "bots": [
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 1
+        },
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 2
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-123-sweep",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "sweep"
+      ],
+      "shots": 9,
+      "winner": 2,
+      "mean_ms": 0.21666957777777804,
+      "p95_ms": 0.6931799999999999,
+      "observation_hash": "db9c524cf1e172a4",
+      "bots": [
+        {
+          "outcomes": 5,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 4,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-123-calibrated",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "calibrated"
+      ],
+      "shots": 13,
+      "winner": 2,
+      "mean_ms": 0.6186357874074072,
+      "p95_ms": 2.226199,
+      "observation_hash": "a5aae435ea968171",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 2,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 0
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-123-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "shots": 13,
+      "winner": 2,
+      "mean_ms": 0.5111259751851852,
+      "p95_ms": 1.368718,
+      "observation_hash": "f20fbb4a7b4fb317",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 2,
+          "relocations": 1,
+          "relocations_finished": 1,
+          "relocation_refusals": 3
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 3
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-314-reactive-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "shots": 13,
+      "winner": 1,
+      "mean_ms": 0.4854975251851851,
+      "p95_ms": 1.4867210000000002,
+      "observation_hash": "5afbf8399d53602a",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 2
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 1,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 3
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "duel-angular-314-reactive-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "shots": 13,
+      "winner": 1,
+      "mean_ms": 0.4871223625925937,
+      "p95_ms": 1.50733,
+      "observation_hash": "9f8fbe8fbc14bf45",
+      "bots": [
+        {
+          "outcomes": 7,
+          "useful_shots": 3,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 2
+        },
+        {
+          "outcomes": 6,
+          "useful_shots": 1,
+          "relocations": 0,
+          "relocations_finished": 0,
+          "relocation_refusals": 3
+        }
+      ],
+      "replay_checked": true
+    }
+  ],
+  "stationary": [
+    {
+      "case": "aim-round-flat-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "round",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 1.354626178741455,
+          "damage": [
+            0.0,
+            32.39665222167969
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            15.533485412597656
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            2.0867996215820312
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 1.7746758460998535,
+          "damage": [
+            0.0,
+            29.577266693115234
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.475616455078125,
+          "elevation": 0.8552113175392151,
+          "closest": 0.7876108884811401,
+          "damage": [
+            0.0,
+            20.40579605102539
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-flat-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 2,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 5.517902374267578,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            35.45543670654297
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            35.45543670654297
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            29.089126586914062
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-uphill-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "round",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 28.103349685668945,
+          "elevation": 0.9075711965560913,
+          "closest": 1.383312702178955,
+          "damage": [
+            0.0,
+            31.847015380859375
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 29.12272071838379,
+          "elevation": 0.9599310755729675,
+          "closest": 2.9485185146331787,
+          "damage": [
+            0.0,
+            10.757461547851562
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 30.36241912841797,
+          "elevation": 1.0122909545898438,
+          "closest": 4.6588826179504395,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 26.62063217163086,
+          "elevation": 0.8028514385223389,
+          "closest": 1.8541786670684814,
+          "damage": [
+            0.0,
+            29.020748138427734
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 27.27560806274414,
+          "elevation": 0.8552113175392151,
+          "closest": 0.9129437208175659,
+          "damage": [
+            0.0,
+            28.374774932861328
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-uphill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.223007202148438
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.223007202148438
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.22300910949707
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            6.330976486206055
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-downhill-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "round",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 25.038549423217773,
+          "elevation": 0.9075711965560913,
+          "closest": 1.3220635652542114,
+          "damage": [
+            0.0,
+            32.74555969238281
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 26.256437301635742,
+          "elevation": 0.9599310755729675,
+          "closest": 2.7703349590301514,
+          "damage": [
+            0.0,
+            18.7806396484375
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 27.67803955078125,
+          "elevation": 1.0122909545898438,
+          "closest": 4.309981822967529,
+          "damage": [
+            0.0,
+            5.067192077636719
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 23.08721923828125,
+          "elevation": 0.8028514385223389,
+          "closest": 1.730082631111145,
+          "damage": [
+            0.0,
+            29.889421463012695
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 23.990535736083984,
+          "elevation": 0.8552113175392151,
+          "closest": 0.722600519657135,
+          "damage": [
+            0.0,
+            13.517187118530273
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-downhill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 4,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 9.260172843933105,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 3.1960599422454834,
+          "damage": [
+            0.0,
+            11.649360656738281
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 23.0,
+          "elevation": 0.8726646304130554,
+          "closest": 2.7010092735290527,
+          "damage": [
+            0.0,
+            23.092933654785156
+          ],
+          "assessment": "short"
+        },
+        {
+          "power": 24.25,
+          "elevation": 0.8726646304130554,
+          "closest": 0.6053931713104248,
+          "damage": [
+            0.0,
+            37.76224899291992
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 24.25,
+          "elevation": 0.8726646304130554,
+          "closest": 0.6053931713104248,
+          "damage": [
+            0.0,
+            27.49545669555664
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-ridge-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "round",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 6,
+      "shots": [
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 27.10690689086914,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            14.112350463867188
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            2.0867996215820312
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 25.504724502563477,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 25.475616455078125,
+          "elevation": 0.8552113175392151,
+          "closest": 24.188312530517578,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 1.354626178741455,
+          "damage": [
+            0.0,
+            32.39665603637695
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            15.53348159790039
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            2.0867996215820312
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 22.383249282836914,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-round-ridge-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 2,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 27.125965118408203,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            36.03034973144531
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            36.03034973144531
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            27.939300537109375
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-flat-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "angular",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 1.354626178741455,
+          "damage": [
+            0.0,
+            32.39665222167969
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            14.112350463867188
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            2.0867996215820312
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 1.7746758460998535,
+          "damage": [
+            0.0,
+            29.577266693115234
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.475616455078125,
+          "elevation": 0.8552113175392151,
+          "closest": 0.7876108884811401,
+          "damage": [
+            0.0,
+            21.82693099975586
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-flat-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 2,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 5.517902374267578,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            35.45543670654297
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            35.45543670654297
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 0.9349376559257507,
+          "damage": [
+            0.0,
+            29.089126586914062
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-uphill-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "angular",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 28.103349685668945,
+          "elevation": 0.9075711965560913,
+          "closest": 1.383312702178955,
+          "damage": [
+            0.0,
+            31.847015380859375
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 29.12272071838379,
+          "elevation": 0.9599310755729675,
+          "closest": 2.9485185146331787,
+          "damage": [
+            0.0,
+            10.757461547851562
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 30.36241912841797,
+          "elevation": 1.0122909545898438,
+          "closest": 4.6588826179504395,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 26.62063217163086,
+          "elevation": 0.8028514385223389,
+          "closest": 1.8541786670684814,
+          "damage": [
+            0.0,
+            29.020748138427734
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 27.27560806274414,
+          "elevation": 0.8552113175392151,
+          "closest": 0.9129437208175659,
+          "damage": [
+            0.0,
+            28.374774932861328
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-uphill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.223007202148438
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.223007202148438
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            31.22300910949707
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 1.4322898387908936,
+          "damage": [
+            0.0,
+            6.330976486206055
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-downhill-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "angular",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 1,
+      "shots": [
+        {
+          "power": 25.038549423217773,
+          "elevation": 0.9075711965560913,
+          "closest": 1.3220635652542114,
+          "damage": [
+            0.0,
+            32.74555969238281
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 26.256437301635742,
+          "elevation": 0.9599310755729675,
+          "closest": 2.7703349590301514,
+          "damage": [
+            0.0,
+            16.406612396240234
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 27.67803955078125,
+          "elevation": 1.0122909545898438,
+          "closest": 4.309981822967529,
+          "damage": [
+            0.0,
+            5.067192077636719
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 23.08721923828125,
+          "elevation": 0.8028514385223389,
+          "closest": 1.730082631111145,
+          "damage": [
+            0.0,
+            29.889421463012695
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 23.990535736083984,
+          "elevation": 0.8552113175392151,
+          "closest": 0.722600519657135,
+          "damage": [
+            0.0,
+            15.891214370727539
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-downhill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 4,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 9.260172843933105,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 25.5,
+          "elevation": 0.8726646304130554,
+          "closest": 3.1960599422454834,
+          "damage": [
+            0.0,
+            11.649360656738281
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 23.0,
+          "elevation": 0.8726646304130554,
+          "closest": 2.7010092735290527,
+          "damage": [
+            0.0,
+            23.092933654785156
+          ],
+          "assessment": "short"
+        },
+        {
+          "power": 24.25,
+          "elevation": 0.8726646304130554,
+          "closest": 0.6053931713104248,
+          "damage": [
+            0.0,
+            37.76224899291992
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 24.25,
+          "elevation": 0.8726646304130554,
+          "closest": 0.6053931713104248,
+          "damage": [
+            0.0,
+            27.49545669555664
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-ridge-sweep",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "angular",
+        "--bot",
+        "sweep",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": null,
+      "shots": [
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 27.10690689086914,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            14.112350463867188
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            2.0867996215820312
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 25.504724502563477,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 25.475616455078125,
+          "elevation": 0.8552113175392151,
+          "closest": 24.421220779418945,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 26.438682556152344,
+          "elevation": 0.9075711965560913,
+          "closest": 23.765047073364258,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 27.578529357910156,
+          "elevation": 0.9599310755729675,
+          "closest": 2.859880208969116,
+          "damage": [
+            0.0,
+            14.112350463867188
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 28.927263259887695,
+          "elevation": 1.0122909545898438,
+          "closest": 4.475581169128418,
+          "damage": [
+            0.0,
+            0.44814300537109375
+          ],
+          "assessment": "long"
+        },
+        {
+          "power": 24.66615104675293,
+          "elevation": 0.8028514385223389,
+          "closest": 24.213138580322266,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        }
+      ],
+      "replay_checked": true
+    },
+    {
+      "case": "aim-angular-ridge-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "first_useful_shot": 2,
+      "shots": [
+        {
+          "power": 28.0,
+          "elevation": 0.8726646304130554,
+          "closest": 27.125965118408203,
+          "damage": [
+            0.0,
+            0.0
+          ],
+          "assessment": "blocked arc"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            36.03034973144531
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            36.03034973144531
+          ],
+          "assessment": "useful hit"
+        },
+        {
+          "power": 28.0,
+          "elevation": 1.0471975803375244,
+          "closest": 0.8528069853782654,
+          "damage": [
+            0.0,
+            27.939300537109375
+          ],
+          "assessment": "useful hit"
+        }
+      ],
+      "replay_checked": true
+    }
+  ],
+  "validation": {
+    "scenario_unit_tests": 70,
+    "scenario_tests_log": "/tmp/spacewars-bots-199/scenario-tests.log",
+    "client_test_command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p scenario-scorched-earth -p engine-client",
+    "client_tests_passed": true,
+    "format_passed": true,
+    "strict_scenario_clippy_passed": true,
+    "retained_replays": 36,
+    "ordinary_and_destruction_replays": 22,
+    "stationary_replays": 16,
+    "material_audits_passed": true,
+    "rendered_lifecycle": {
+      "passed": true,
+      "renderers": [
+        "vector",
+        "raster"
+      ],
+      "display": "Temporary extracted Ubuntu Xvfb 21.1.22, 1280x800x24",
+      "log": "/tmp/spacewars-bots-199/ui-test-virtual.log",
+      "initial_direct_display_failure": "Short inputs were missed while the background window advanced slowly; identical binary and test passed on the virtual display."
+    }
+  }
+}

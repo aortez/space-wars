@@ -1,0 +1,3261 @@
+{
+  "created_utc": "2026-10-12T03:14:27.459634+00:00",
+  "base_commit": "0eb044cd7481b1df93096c2fa97360b383fa0a9b",
+  "branch": "feat/scorched-calibrated-bots-199",
+  "source_manifest_sha256": "1aab7dbf02162f1e9ccd0be9d6137938e06e4a4d3d48f06f38e6ce277a1e9824",
+  "source_files": [
+    {
+      "path": "crates/engine-client/src/client_scenarios/scorched_earth.rs",
+      "sha256": "ed277b7fb09bdb49ee3522b1229e4a2133c8f5d3acd4132f059b1e8cd91191d3"
+    },
+    {
+      "path": "scenarios/scorched-earth/examples/scorched_aim_lab.rs",
+      "sha256": "dcca7a9d5711871254de6fc4fccc4f0d45c955b58eb078fe7d20ed83955a2cc1"
+    },
+    {
+      "path": "scenarios/scorched-earth/examples/scorched_benchmark.rs",
+      "sha256": "f00170c31023b350d8742f1667227192cf61bdce9e28ce28d32b6f653a51005a"
+    },
+    {
+      "path": "scenarios/scorched-earth/examples/scorched_relocation_lab.rs",
+      "sha256": "5bc8a612bcf18f4e8284bc7199b05d31286b27402cdc373d439582930141c617"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/action.rs",
+      "sha256": "ff8eca5c8b1cef78676c0d9fe273a875de40219e93537b9b0090e825b43390bc"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot.rs",
+      "sha256": "cf30d43eb8d979ee6ed0b29bdab4b1592a3ffa78e31dd506b5f6a24e96048fcf"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot/aim.rs",
+      "sha256": "a4234852805f82c6fc1e9422ea4d33ad065b6344c94616d9922021cf5f7f7df6"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot/comparison.rs",
+      "sha256": "5852762c2ed28cd8d09e1aade9dfe60ee064ea94a36001834ff08cfe55a338c4"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot/position.rs",
+      "sha256": "e8e9bfd80e3d3d65c48aa10e482eedb7b2458348e714dd9e5a27b6fb74978b41"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot/tests.rs",
+      "sha256": "799926e13dc3545b0337789d27b0f4688183c58957dcd93443ece1b46ae58c81"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/bot_lab.rs",
+      "sha256": "753050c3dc4da0147d15cc848f70395731232c3323dafa986d43cf80f7887a5b"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/driving.rs",
+      "sha256": "223f02357ef390352e358c818001b344484e62c976b586c8a98251fa69924329"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/driving/tests.rs",
+      "sha256": "4895c57c838f34993d3fc71d965c5230821fd819baee8b731c616e62a1ef63e8"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/lib.rs",
+      "sha256": "5bbfec5b242bc4c35fb4e85794f870873e0c185876bffcc167c21527a4a2c608"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/material.rs",
+      "sha256": "42234e1b503379f902feda520e379dbc70843bbb530d352228f726e3460c41f1"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/render.rs",
+      "sha256": "c6d8eab33387439f88154e5e143534d2a40862de8eaf4bf80136371efb0afa61"
+    },
+    {
+      "path": "scenarios/scorched-earth/src/tests.rs",
+      "sha256": "be2e9c68f022ce93ac74efcb1d2fa24601cc83e26c912575230451c2eafe0702"
+    }
+  ],
+  "binaries": {
+    "target/ci/examples/scorched_relocation_lab": "d7bec3167c9529612e98b2fae612677b535ddc54d5bf091aff1558e2fe3a2b1a",
+    "target/ci/examples/scorched_benchmark": "4297a2646375891489208c2ffffb9b49f105303dce65ed048dfcf8b1f2d5fa00",
+    "target/ci/examples/scorched_aim_lab": "2f021cdbcf02bea8431dab533a36511989fad50cd9397ca22092db3d5f6adaf5",
+    "target/ci/engine-client": "6e4132cfeaec38ef78eb3d17cfa3f225a5bf79638a0b4dc8ec82f33fe9c276ac"
+  },
+  "archive": "docs/data/tank-relocation-traces-20261011.json.gz",
+  "archive_sha256": "e01b87d868f292dc2916e38040c56f75e227de3867efbf148790c4486e7f9615",
+  "validation": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "clippy",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-scorched-earth",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "scenario-tests",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-scorched-earth"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "client-tests-invalid-target",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "engine-client",
+        "--lib",
+        "client_scenarios::scorched_earth"
+      ],
+      "exit_code": 101,
+      "resolved_by": "client-tests: this package has a binary target, no library"
+    },
+    {
+      "name": "client-tests",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "test",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "engine-client",
+        "--bin",
+        "engine-client",
+        "client_scenarios::scorched_earth"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "examples-build",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "scenario-scorched-earth",
+        "--examples"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "client-build",
+      "command": [
+        "cargo",
+        "+1.89.0",
+        "build",
+        "--locked",
+        "--profile",
+        "ci",
+        "-p",
+        "engine-client",
+        "--bin",
+        "engine-client"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "counts": {
+    "comparison": 36,
+    "retained": 36,
+    "duel": 18,
+    "stationary": 8
+  },
+  "eligible_checkpoints": 21,
+  "metrics": {
+    "continue_aiming": {
+      "accepted": 0,
+      "outcomes": {
+        "declined": 21
+      }
+    },
+    "reference_move": {
+      "accepted": 21,
+      "outcomes": {
+        "blocked ground": 8,
+        "arrived": 11,
+        "no support": 2
+      }
+    },
+    "current_move": {
+      "accepted": 11,
+      "outcomes": {
+        "declined": 10,
+        "arrived": 9,
+        "blocked ground": 1,
+        "no support": 1
+      }
+    },
+    "damage_taken_current_vs_continue_aiming_1hp_tolerance": {
+      "within_1hp": 15,
+      "less": 3,
+      "more": 3
+    }
+  },
+  "limits": [
+    "Matched decisions from a retained original-policy prefix, not independent win-rate samples.",
+    "The subject cannot start another relocation in any arm; normal range/footing and the original opponent policy continue.",
+    "Horizons end at battle end or 20 seconds; damage is capped by remaining health.",
+    "A reached goal does not establish tactical benefit; accepted movement can discard a promising aim correction.",
+    "Timing is whole-scene desktop measurement, not isolated AI cost or Pi qualification."
+  ],
+  "comparisons": [
+    {
+      "case": "round-7-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "5c14e7ab67d0e8ef",
+      "tick": 1035,
+      "player": 0,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 5.266666666666667,
+        "match_ended": true,
+        "damage_taken": 24.87094497680664,
+        "enemy_health_lost": 41.57645797729492,
+        "first_fire_seconds": 3.3,
+        "first_useful_shot_seconds": 5.25,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -18.647247314453125,
+        "elapsed_seconds": 5.3,
+        "match_ended": true,
+        "damage_taken": 38.7718505859375,
+        "enemy_health_lost": 41.57645797729492,
+        "first_fire_seconds": 3.3,
+        "first_useful_shot_seconds": 5.283333333333333,
+        "relocation": {
+          "destination_x": -18.647247314453125,
+          "ended": 1065,
+          "origin": {
+            "x": -15.647248268127441,
+            "y": -8.52781867980957
+          },
+          "position": {
+            "x": -15.900477409362793,
+            "y": -8.374895095825195
+          },
+          "reason": "blocked ground",
+          "started": 1035
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 5.266666666666667,
+        "match_ended": true,
+        "damage_taken": 24.87094497680664,
+        "enemy_health_lost": 41.57645797729492,
+        "first_fire_seconds": 3.3,
+        "first_useful_shot_seconds": 5.25,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-7-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "bda1b544d84f98e8",
+      "tick": 1046,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 5.116666666666666,
+        "match_ended": true,
+        "damage_taken": 28.886737823486328,
+        "enemy_health_lost": 38.40259552001953,
+        "first_fire_seconds": 2.566666666666667,
+        "first_useful_shot_seconds": 4.916666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 21.914716720581055,
+        "elapsed_seconds": 5.116666666666666,
+        "match_ended": true,
+        "damage_taken": 28.886737823486328,
+        "enemy_health_lost": 38.7718505859375,
+        "first_fire_seconds": 2.566666666666667,
+        "first_useful_shot_seconds": 4.916666666666667,
+        "relocation": {
+          "destination_x": 21.914716720581055,
+          "ended": 1057,
+          "origin": {
+            "x": 18.914716720581055,
+            "y": -0.9427238702774048
+          },
+          "position": {
+            "x": 19.0624942779541,
+            "y": -0.9285789132118225
+          },
+          "reason": "blocked ground",
+          "started": 1046
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 5.116666666666666,
+        "match_ended": true,
+        "damage_taken": 28.886737823486328,
+        "enemy_health_lost": 38.40259552001953,
+        "first_fire_seconds": 2.566666666666667,
+        "first_useful_shot_seconds": 4.916666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-42-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "67fd0c44968015d4",
+      "tick": 1398,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 8.933333333333334,
+        "match_ended": true,
+        "damage_taken": 30.40813446044922,
+        "enemy_health_lost": 62.85895538330078,
+        "first_fire_seconds": 1.7,
+        "first_useful_shot_seconds": 3.9,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 11.857511520385742,
+        "elapsed_seconds": 8.933333333333334,
+        "match_ended": true,
+        "damage_taken": 30.499645233154297,
+        "enemy_health_lost": 62.85895538330078,
+        "first_fire_seconds": 1.7,
+        "first_useful_shot_seconds": 3.9166666666666665,
+        "relocation": {
+          "destination_x": 11.857511520385742,
+          "ended": 1405,
+          "origin": {
+            "x": 14.857511520385742,
+            "y": -1.4684109687805176
+          },
+          "position": {
+            "x": 14.849454879760742,
+            "y": -1.4754294157028198
+          },
+          "reason": "blocked ground",
+          "started": 1398
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 8.933333333333334,
+        "match_ended": true,
+        "damage_taken": 30.40813446044922,
+        "enemy_health_lost": 62.85895538330078,
+        "first_fire_seconds": 1.7,
+        "first_useful_shot_seconds": 3.9,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-42-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-123-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "946dc5650499880a",
+      "tick": 1633,
+      "player": 0,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 5.05,
+        "match_ended": true,
+        "damage_taken": 22.54336929321289,
+        "enemy_health_lost": 10.905717849731445,
+        "first_fire_seconds": 3.533333333333333,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -18.14206314086914,
+        "elapsed_seconds": 10.083333333333334,
+        "match_ended": true,
+        "damage_taken": 22.54336929321289,
+        "enemy_health_lost": 12.995525360107422,
+        "first_fire_seconds": 3.533333333333333,
+        "first_useful_shot_seconds": null,
+        "relocation": {
+          "destination_x": -18.14206314086914,
+          "ended": 1819,
+          "origin": {
+            "x": -15.142064094543457,
+            "y": -6.630349636077881
+          },
+          "position": {
+            "x": -17.963823318481445,
+            "y": -6.562363147735596
+          },
+          "reason": "arrived",
+          "started": 1633
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -17.14206314086914,
+        "elapsed_seconds": 10.25,
+        "match_ended": true,
+        "damage_taken": 22.54336929321289,
+        "enemy_health_lost": 24.802764892578125,
+        "first_fire_seconds": 3.533333333333333,
+        "first_useful_shot_seconds": null,
+        "relocation": {
+          "destination_x": -17.14206314086914,
+          "ended": 1823,
+          "origin": {
+            "x": -15.142064094543457,
+            "y": -6.630349636077881
+          },
+          "position": {
+            "x": -16.94346046447754,
+            "y": -6.76372766494751
+          },
+          "reason": "arrived",
+          "started": 1633
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-123-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "78bdcd3b6d848a6a",
+      "tick": 1719,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 13.566666666666666,
+        "match_ended": true,
+        "damage_taken": 7.873567581176758,
+        "enemy_health_lost": 22.54336929321289,
+        "first_fire_seconds": 1.35,
+        "first_useful_shot_seconds": 13.55,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 23.02972412109375,
+        "elapsed_seconds": 8.65,
+        "match_ended": true,
+        "damage_taken": 2.0898075103759766,
+        "enemy_health_lost": 22.54336929321289,
+        "first_fire_seconds": 1.35,
+        "first_useful_shot_seconds": 8.633333333333333,
+        "relocation": {
+          "destination_x": 23.02972412109375,
+          "ended": 1741,
+          "origin": {
+            "x": 20.02972412109375,
+            "y": -2.904623031616211
+          },
+          "position": {
+            "x": 20.03665542602539,
+            "y": -2.899569034576416
+          },
+          "reason": "blocked ground",
+          "started": 1719
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 13.566666666666666,
+        "match_ended": true,
+        "damage_taken": 7.873567581176758,
+        "enemy_health_lost": 22.54336929321289,
+        "first_fire_seconds": 1.35,
+        "first_useful_shot_seconds": 13.55,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-19-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "19",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "38f23dd00420d888",
+      "tick": 777,
+      "player": 1,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 19.25,
+        "match_ended": true,
+        "damage_taken": 52.548736572265625,
+        "enemy_health_lost": 65.93910217285156,
+        "first_fire_seconds": 2.05,
+        "first_useful_shot_seconds": 4.35,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 12.56782341003418,
+        "elapsed_seconds": 14.383333333333333,
+        "match_ended": true,
+        "damage_taken": 35.76033401489258,
+        "enemy_health_lost": 65.93910217285156,
+        "first_fire_seconds": 2.05,
+        "first_useful_shot_seconds": 4.35,
+        "relocation": {
+          "destination_x": 12.56782341003418,
+          "ended": 801,
+          "origin": {
+            "x": 15.56782341003418,
+            "y": -1.2888232469558716
+          },
+          "position": {
+            "x": 15.25222110748291,
+            "y": -1.3076112270355225
+          },
+          "reason": "blocked ground",
+          "started": 777
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": 17.56782341003418,
+        "elapsed_seconds": 14.4,
+        "match_ended": true,
+        "damage_taken": 52.34843826293945,
+        "enemy_health_lost": 65.93910217285156,
+        "first_fire_seconds": 2.05,
+        "first_useful_shot_seconds": 4.366666666666666,
+        "relocation": {
+          "destination_x": 17.56782341003418,
+          "ended": 889,
+          "origin": {
+            "x": 15.56782341003418,
+            "y": -1.2888232469558716
+          },
+          "position": {
+            "x": 17.38817596435547,
+            "y": -1.0278823375701904
+          },
+          "reason": "arrived",
+          "started": 777
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-19-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "19",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "5067a3095fa87ca5",
+      "tick": 1039,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 9.883333333333333,
+        "match_ended": true,
+        "damage_taken": 30.856651306152344,
+        "enemy_health_lost": 48.4436149597168,
+        "first_fire_seconds": 3.2666666666666666,
+        "first_useful_shot_seconds": 5.083333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -15.753820419311523,
+        "elapsed_seconds": 10.016666666666667,
+        "match_ended": true,
+        "damage_taken": 30.856651306152344,
+        "enemy_health_lost": 35.76033401489258,
+        "first_fire_seconds": 3.216666666666667,
+        "first_useful_shot_seconds": 5.083333333333333,
+        "relocation": {
+          "destination_x": -15.753820419311523,
+          "ended": 1066,
+          "origin": {
+            "x": -18.753820419311523,
+            "y": -8.238186836242676
+          },
+          "position": {
+            "x": -18.77052879333496,
+            "y": -8.305405616760254
+          },
+          "reason": "blocked ground",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -16.253820419311523,
+        "elapsed_seconds": 10.016666666666667,
+        "match_ended": true,
+        "damage_taken": 30.856651306152344,
+        "enemy_health_lost": 35.76033401489258,
+        "first_fire_seconds": 3.216666666666667,
+        "first_useful_shot_seconds": 5.083333333333333,
+        "relocation": {
+          "destination_x": -16.253820419311523,
+          "ended": 1066,
+          "origin": {
+            "x": -18.753820419311523,
+            "y": -8.238186836242676
+          },
+          "position": {
+            "x": -18.77052879333496,
+            "y": -8.305405616760254
+          },
+          "reason": "blocked ground",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-77-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "77",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "562ad33afb2e67d3",
+      "tick": 1032,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 9.966666666666667,
+        "match_ended": true,
+        "damage_taken": 10.702247619628906,
+        "enemy_health_lost": 61.4145622253418,
+        "first_fire_seconds": 3.15,
+        "first_useful_shot_seconds": 4.966666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -19.627323150634766,
+        "elapsed_seconds": 10.0,
+        "match_ended": true,
+        "damage_taken": 15.909027099609375,
+        "enemy_health_lost": 61.4145622253418,
+        "first_fire_seconds": 3.15,
+        "first_useful_shot_seconds": 4.983333333333333,
+        "relocation": {
+          "destination_x": -19.627323150634766,
+          "ended": 1097,
+          "origin": {
+            "x": -16.627323150634766,
+            "y": -7.789830207824707
+          },
+          "position": {
+            "x": -16.991247177124023,
+            "y": -7.408459186553955
+          },
+          "reason": "blocked ground",
+          "started": 1032
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 9.966666666666667,
+        "match_ended": true,
+        "damage_taken": 10.702247619628906,
+        "enemy_health_lost": 61.4145622253418,
+        "first_fire_seconds": 3.15,
+        "first_useful_shot_seconds": 4.966666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-77-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "77",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-310-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "310",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-310-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "310",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-999-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "999",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "040914fd1156f5fc",
+      "tick": 1039,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 5.166666666666667,
+        "match_ended": true,
+        "damage_taken": 38.12317657470703,
+        "enemy_health_lost": 52.42985534667969,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": 5.15,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -12.322431564331055,
+        "elapsed_seconds": 14.866666666666667,
+        "match_ended": true,
+        "damage_taken": 63.256893157958984,
+        "enemy_health_lost": 49.5638427734375,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": null,
+        "relocation": {
+          "destination_x": -12.322431564331055,
+          "ended": 1210,
+          "origin": {
+            "x": -15.322431564331055,
+            "y": -8.78894329071045
+          },
+          "position": {
+            "x": -12.498746871948242,
+            "y": -8.289864540100098
+          },
+          "reason": "arrived",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -13.322431564331055,
+        "elapsed_seconds": 5.2,
+        "match_ended": true,
+        "damage_taken": 31.68393898010254,
+        "enemy_health_lost": 52.42985534667969,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": 5.183333333333334,
+        "relocation": {
+          "destination_x": -13.322431564331055,
+          "ended": 1174,
+          "origin": {
+            "x": -15.322431564331055,
+            "y": -8.78894329071045
+          },
+          "position": {
+            "x": -13.518336296081543,
+            "y": -8.761202812194824
+          },
+          "reason": "arrived",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-999-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "999",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-42-1-weak",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--cohesion",
+        "weak",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "a745826296127b28",
+      "tick": 751,
+      "player": 1,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 14.866666666666667,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 49.432735443115234,
+        "first_fire_seconds": 2.4833333333333334,
+        "first_useful_shot_seconds": 14.566666666666666,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 19.8524169921875,
+        "elapsed_seconds": 15.883333333333333,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 33.27655029296875,
+        "first_fire_seconds": 2.6166666666666667,
+        "first_useful_shot_seconds": 5.0,
+        "relocation": {
+          "destination_x": 19.8524169921875,
+          "ended": 908,
+          "origin": {
+            "x": 16.8524169921875,
+            "y": -1.3338921070098877
+          },
+          "position": {
+            "x": 19.673938751220703,
+            "y": -1.0778229236602783
+          },
+          "reason": "arrived",
+          "started": 751
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 14.866666666666667,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 49.432735443115234,
+        "first_fire_seconds": 2.4833333333333334,
+        "first_useful_shot_seconds": 14.566666666666666,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-42-1-strong",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--cohesion",
+        "strong",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "7f67ddab4e4b1398",
+      "tick": 751,
+      "player": 1,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 14.866666666666667,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 49.432735443115234,
+        "first_fire_seconds": 2.4833333333333334,
+        "first_useful_shot_seconds": 14.566666666666666,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 19.8524169921875,
+        "elapsed_seconds": 15.883333333333333,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 33.27655029296875,
+        "first_fire_seconds": 2.6166666666666667,
+        "first_useful_shot_seconds": 5.0,
+        "relocation": {
+          "destination_x": 19.8524169921875,
+          "ended": 908,
+          "origin": {
+            "x": 16.8524169921875,
+            "y": -1.3338921070098877
+          },
+          "position": {
+            "x": 19.673938751220703,
+            "y": -1.0778229236602783
+          },
+          "reason": "arrived",
+          "started": 751
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 14.866666666666667,
+        "match_ended": true,
+        "damage_taken": 62.62976837158203,
+        "enemy_health_lost": 49.432735443115234,
+        "first_fire_seconds": 2.4833333333333334,
+        "first_useful_shot_seconds": 14.566666666666666,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "round-314-1-weak",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--cohesion",
+        "weak",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "round-314-1-strong",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--cohesion",
+        "strong",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-7-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "c8ff9993e64923fd",
+      "tick": 764,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 20.0,
+        "match_ended": false,
+        "damage_taken": 59.988121032714844,
+        "enemy_health_lost": 74.10980224609375,
+        "first_fire_seconds": 2.2666666666666666,
+        "first_useful_shot_seconds": 9.483333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 13.861913681030273,
+        "elapsed_seconds": 19.766666666666666,
+        "match_ended": true,
+        "damage_taken": 60.27211380004883,
+        "enemy_health_lost": 75.88682556152344,
+        "first_fire_seconds": 2.5833333333333335,
+        "first_useful_shot_seconds": 9.8,
+        "relocation": {
+          "destination_x": 13.861913681030273,
+          "ended": 919,
+          "origin": {
+            "x": 16.861913681030273,
+            "y": -1.0616679191589355
+          },
+          "position": {
+            "x": 14.040952682495117,
+            "y": -1.5176180601119995
+          },
+          "reason": "arrived",
+          "started": 764
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": 14.361913681030273,
+        "elapsed_seconds": 20.0,
+        "match_ended": false,
+        "damage_taken": 43.81256866455078,
+        "enemy_health_lost": 69.40953826904297,
+        "first_fire_seconds": 2.2666666666666666,
+        "first_useful_shot_seconds": 9.483333333333333,
+        "relocation": {
+          "destination_x": 14.361913681030273,
+          "ended": 892,
+          "origin": {
+            "x": 16.861913681030273,
+            "y": -1.0616679191589355
+          },
+          "position": {
+            "x": 14.540401458740234,
+            "y": -1.2970552444458008
+          },
+          "reason": "arrived",
+          "started": 764
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-7-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "bffa523623d46955",
+      "tick": 1519,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 7.183333333333334,
+        "match_ended": true,
+        "damage_taken": 24.616207122802734,
+        "enemy_health_lost": 38.84481430053711,
+        "first_fire_seconds": 0.0,
+        "first_useful_shot_seconds": 2.216666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 11.315046310424805,
+        "elapsed_seconds": 11.916666666666666,
+        "match_ended": true,
+        "damage_taken": 24.616207122802734,
+        "enemy_health_lost": 51.25716018676758,
+        "first_fire_seconds": 1.1833333333333333,
+        "first_useful_shot_seconds": 8.216666666666667,
+        "relocation": {
+          "destination_x": 11.315046310424805,
+          "ended": 1580,
+          "origin": {
+            "x": 14.315046310424805,
+            "y": -1.6603244543075562
+          },
+          "position": {
+            "x": 12.65056324005127,
+            "y": -1.5239108800888062
+          },
+          "reason": "no support",
+          "started": 1519
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": 11.815046310424805,
+        "elapsed_seconds": 11.916666666666666,
+        "match_ended": true,
+        "damage_taken": 24.616207122802734,
+        "enemy_health_lost": 52.036746978759766,
+        "first_fire_seconds": 1.1333333333333333,
+        "first_useful_shot_seconds": 8.166666666666666,
+        "relocation": {
+          "destination_x": 11.815046310424805,
+          "ended": 1580,
+          "origin": {
+            "x": 14.315046310424805,
+            "y": -1.6603244543075562
+          },
+          "position": {
+            "x": 12.782957077026367,
+            "y": -1.524583339691162
+          },
+          "reason": "no support",
+          "started": 1519
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-42-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "a0c240735e7ff2ce",
+      "tick": 754,
+      "player": 1,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 14.566666666666666,
+        "match_ended": true,
+        "damage_taken": 36.242530822753906,
+        "enemy_health_lost": 65.28199005126953,
+        "first_fire_seconds": 2.433333333333333,
+        "first_useful_shot_seconds": 9.55,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": 18.709917068481445,
+        "elapsed_seconds": 14.916666666666666,
+        "match_ended": true,
+        "damage_taken": 43.50590515136719,
+        "enemy_health_lost": 65.28199005126953,
+        "first_fire_seconds": 2.7333333333333334,
+        "first_useful_shot_seconds": 5.05,
+        "relocation": {
+          "destination_x": 18.709917068481445,
+          "ended": 918,
+          "origin": {
+            "x": 15.709917068481445,
+            "y": -1.2571877241134644
+          },
+          "position": {
+            "x": 18.52399253845215,
+            "y": -1.036836862564087
+          },
+          "reason": "arrived",
+          "started": 754
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": 17.709917068481445,
+        "elapsed_seconds": 14.566666666666666,
+        "match_ended": true,
+        "damage_taken": 9.768043518066406,
+        "enemy_health_lost": 65.28199005126953,
+        "first_fire_seconds": 2.433333333333333,
+        "first_useful_shot_seconds": 4.733333333333333,
+        "relocation": {
+          "destination_x": 17.709917068481445,
+          "ended": 890,
+          "origin": {
+            "x": 15.709917068481445,
+            "y": -1.2571877241134644
+          },
+          "position": {
+            "x": 17.529287338256836,
+            "y": -1.2893513441085815
+          },
+          "reason": "arrived",
+          "started": 754
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-42-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "64c1b2eebbaa892a",
+      "tick": 1058,
+      "player": 0,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 9.866666666666667,
+        "match_ended": true,
+        "damage_taken": 26.437305450439453,
+        "enemy_health_lost": 43.44922637939453,
+        "first_fire_seconds": 2.966666666666667,
+        "first_useful_shot_seconds": 9.733333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -12.777543067932129,
+        "elapsed_seconds": 9.85,
+        "match_ended": true,
+        "damage_taken": 26.437305450439453,
+        "enemy_health_lost": 43.50590515136719,
+        "first_fire_seconds": 2.966666666666667,
+        "first_useful_shot_seconds": 9.733333333333333,
+        "relocation": {
+          "destination_x": -12.777543067932129,
+          "ended": 1063,
+          "origin": {
+            "x": -15.777543067932129,
+            "y": -8.301141738891602
+          },
+          "position": {
+            "x": -15.790121078491211,
+            "y": -8.520005226135254
+          },
+          "reason": "blocked ground",
+          "started": 1058
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 9.866666666666667,
+        "match_ended": true,
+        "damage_taken": 26.437305450439453,
+        "enemy_health_lost": 43.44922637939453,
+        "first_fire_seconds": 2.966666666666667,
+        "first_useful_shot_seconds": 9.733333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-123-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "5632f327fe45e1ff",
+      "tick": 1346,
+      "player": 0,
+      "matches_frozen_controls": true,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 10.05,
+        "match_ended": true,
+        "damage_taken": 10.60647964477539,
+        "enemy_health_lost": 22.106124877929688,
+        "first_fire_seconds": 2.95,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -18.391937255859375,
+        "elapsed_seconds": 10.0,
+        "match_ended": true,
+        "damage_taken": 10.60647964477539,
+        "enemy_health_lost": 0.0,
+        "first_fire_seconds": 3.9,
+        "first_useful_shot_seconds": null,
+        "relocation": {
+          "destination_x": -18.391937255859375,
+          "ended": 1579,
+          "origin": {
+            "x": -15.391938209533691,
+            "y": -6.783647060394287
+          },
+          "position": {
+            "x": -18.19352912902832,
+            "y": -6.6181135177612305
+          },
+          "reason": "no support",
+          "started": 1346
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -17.391937255859375,
+        "elapsed_seconds": 15.083333333333334,
+        "match_ended": true,
+        "damage_taken": 10.60647964477539,
+        "enemy_health_lost": 37.2960319519043,
+        "first_fire_seconds": 3.1333333333333333,
+        "first_useful_shot_seconds": 10.783333333333333,
+        "relocation": {
+          "destination_x": -17.391937255859375,
+          "ended": 1534,
+          "origin": {
+            "x": -15.391938209533691,
+            "y": -6.783647060394287
+          },
+          "position": {
+            "x": -17.215112686157227,
+            "y": -6.602410316467285
+          },
+          "reason": "arrived",
+          "started": 1346
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-123-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-19-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "19",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "b260862efd4cb96f",
+      "tick": 1042,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 10.016666666666667,
+        "match_ended": true,
+        "damage_taken": 30.40277671813965,
+        "enemy_health_lost": 47.332115173339844,
+        "first_fire_seconds": 3.1666666666666665,
+        "first_useful_shot_seconds": 4.983333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -13.002485275268555,
+        "elapsed_seconds": 9.9,
+        "match_ended": true,
+        "damage_taken": 50.02651596069336,
+        "enemy_health_lost": 39.50178909301758,
+        "first_fire_seconds": 3.1666666666666665,
+        "first_useful_shot_seconds": 4.916666666666667,
+        "relocation": {
+          "destination_x": -13.002485275268555,
+          "ended": 1186,
+          "origin": {
+            "x": -16.002485275268555,
+            "y": -8.527530670166016
+          },
+          "position": {
+            "x": -13.18065357208252,
+            "y": -8.289532661437988
+          },
+          "reason": "arrived",
+          "started": 1042
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -13.502485275268555,
+        "elapsed_seconds": 9.9,
+        "match_ended": true,
+        "damage_taken": 50.02651596069336,
+        "enemy_health_lost": 41.467960357666016,
+        "first_fire_seconds": 3.1666666666666665,
+        "first_useful_shot_seconds": 4.933333333333334,
+        "relocation": {
+          "destination_x": -13.502485275268555,
+          "ended": 1182,
+          "origin": {
+            "x": -16.002485275268555,
+            "y": -8.527530670166016
+          },
+          "position": {
+            "x": -13.67960262298584,
+            "y": -8.289552688598633
+          },
+          "reason": "arrived",
+          "started": 1042
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-19-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "19",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-77-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "77",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "27d01d486715a6e2",
+      "tick": 1032,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 10.016666666666667,
+        "match_ended": true,
+        "damage_taken": 40.69520568847656,
+        "enemy_health_lost": 62.326480865478516,
+        "first_fire_seconds": 3.15,
+        "first_useful_shot_seconds": 4.983333333333333,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -19.301403045654297,
+        "elapsed_seconds": 15.116666666666667,
+        "match_ended": true,
+        "damage_taken": 88.14458465576172,
+        "enemy_health_lost": 25.447025299072266,
+        "first_fire_seconds": 3.3,
+        "first_useful_shot_seconds": 10.483333333333333,
+        "relocation": {
+          "destination_x": -19.301403045654297,
+          "ended": 1229,
+          "origin": {
+            "x": -16.301403045654297,
+            "y": -7.768301010131836
+          },
+          "position": {
+            "x": -19.104106903076172,
+            "y": -7.203200340270996
+          },
+          "reason": "arrived",
+          "started": 1032
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -18.301403045654297,
+        "elapsed_seconds": 19.966666666666665,
+        "match_ended": true,
+        "damage_taken": 88.14458465576172,
+        "enemy_health_lost": 53.66415786743164,
+        "first_fire_seconds": 3.15,
+        "first_useful_shot_seconds": 15.0,
+        "relocation": {
+          "destination_x": -18.301403045654297,
+          "ended": 1159,
+          "origin": {
+            "x": -16.301403045654297,
+            "y": -7.768301010131836
+          },
+          "position": {
+            "x": -18.120784759521484,
+            "y": -7.52772855758667
+          },
+          "reason": "arrived",
+          "started": 1032
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-77-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "77",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-310-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "310",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-310-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "310",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-999-1",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "999",
+        "--opportunity",
+        "1",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "778a5cbc344ac2ee",
+      "tick": 1039,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 5.183333333333334,
+        "match_ended": true,
+        "damage_taken": 30.956703186035156,
+        "enemy_health_lost": 52.65966796875,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": 5.166666666666667,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -13.632209777832031,
+        "elapsed_seconds": 5.216666666666667,
+        "match_ended": true,
+        "damage_taken": 33.804256439208984,
+        "enemy_health_lost": 52.65966796875,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": 5.2,
+        "relocation": {
+          "destination_x": -13.632209777832031,
+          "ended": 1192,
+          "origin": {
+            "x": -16.63220977783203,
+            "y": -8.789793968200684
+          },
+          "position": {
+            "x": -13.813990592956543,
+            "y": -8.789681434631348
+          },
+          "reason": "arrived",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": -14.132209777832031,
+        "elapsed_seconds": 5.15,
+        "match_ended": true,
+        "damage_taken": 37.29841232299805,
+        "enemy_health_lost": 52.65966796875,
+        "first_fire_seconds": 3.3666666666666667,
+        "first_useful_shot_seconds": 5.133333333333334,
+        "relocation": {
+          "destination_x": -14.132209777832031,
+          "ended": 1186,
+          "origin": {
+            "x": -16.63220977783203,
+            "y": -8.789793968200684
+          },
+          "position": {
+            "x": -14.315235137939453,
+            "y": -8.789722442626953
+          },
+          "reason": "arrived",
+          "started": 1039
+        },
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-999-2",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "999",
+        "--opportunity",
+        "2",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-42-1-weak",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--cohesion",
+        "weak",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "9e54679b53054c1d",
+      "tick": 1332,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 4.983333333333333,
+        "match_ended": true,
+        "damage_taken": 22.326107025146484,
+        "enemy_health_lost": 38.82245635986328,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -14.129985809326172,
+        "elapsed_seconds": 9.85,
+        "match_ended": true,
+        "damage_taken": 17.7739200592041,
+        "enemy_health_lost": 59.9347038269043,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": 5.3,
+        "relocation": {
+          "destination_x": -14.129985809326172,
+          "ended": 1507,
+          "origin": {
+            "x": -17.129985809326172,
+            "y": -8.446640968322754
+          },
+          "position": {
+            "x": -14.318851470947266,
+            "y": -8.338841438293457
+          },
+          "reason": "arrived",
+          "started": 1332
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 4.983333333333333,
+        "match_ended": true,
+        "damage_taken": 22.326107025146484,
+        "enemy_health_lost": 38.82245635986328,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-42-1-strong",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--cohesion",
+        "strong",
+        "--replay"
+      ],
+      "found": true,
+      "replay_checked": true,
+      "checkpoint_hash": "bbfe878e2db2663f",
+      "tick": 1332,
+      "player": 0,
+      "matches_frozen_controls": false,
+      "continue_aiming": {
+        "destination_x": null,
+        "elapsed_seconds": 4.983333333333333,
+        "match_ended": true,
+        "damage_taken": 22.326107025146484,
+        "enemy_health_lost": 38.82245635986328,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      },
+      "reference_move": {
+        "destination_x": -14.129985809326172,
+        "elapsed_seconds": 9.85,
+        "match_ended": true,
+        "damage_taken": 17.7739200592041,
+        "enemy_health_lost": 59.9347038269043,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": 5.3,
+        "relocation": {
+          "destination_x": -14.129985809326172,
+          "ended": 1507,
+          "origin": {
+            "x": -17.129985809326172,
+            "y": -8.446640968322754
+          },
+          "position": {
+            "x": -14.318851470947266,
+            "y": -8.338841438293457
+          },
+          "reason": "arrived",
+          "started": 1332
+        },
+        "relocation_active_at_end": false
+      },
+      "current_move": {
+        "destination_x": null,
+        "elapsed_seconds": 4.983333333333333,
+        "match_ended": true,
+        "damage_taken": 22.326107025146484,
+        "enemy_health_lost": 38.82245635986328,
+        "first_fire_seconds": 3.4,
+        "first_useful_shot_seconds": null,
+        "relocation": null,
+        "relocation_active_at_end": false
+      }
+    },
+    {
+      "case": "angular-314-1-weak",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--cohesion",
+        "weak",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    },
+    {
+      "case": "angular-314-1-strong",
+      "command": [
+        "target/ci/examples/scorched_relocation_lab",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--cohesion",
+        "strong",
+        "--replay"
+      ],
+      "found": false,
+      "replay_checked": true
+    }
+  ],
+  "benchmarks": [
+    {
+      "kind": "retained",
+      "case": "angular-123-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "aff83ba095ff81e4",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-123-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "cfd7b4df683535ad",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-42-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "205f55eee06fe0d1",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "cb26d24ae201edb7",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-7-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "ef81f3e0e43d4f36",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-7-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "f25b881a76b056fe",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-barrage",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15"
+      ],
+      "observation_hash": "d8cee031a53927ec",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-hillside",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--require-lifecycle"
+      ],
+      "observation_hash": "42341fe4777c6d09",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-roof",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--require-roof"
+      ],
+      "observation_hash": "bb0e02224e0538a7",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "observation_hash": "a033cd117334e7a2",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-wheels-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "observation_hash": "8e97b6e7fd46fb60",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-wheels-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "c44f57de7a1e8864",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "angular-wheels-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "6ef77b1c1b358ce6",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-123-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "8ebdbf04e0ecdcba",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-123-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "3bcd940fdc195d57",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-42-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "27dadb8594794311",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "d61cc47a17f8f23b",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-7-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving"
+      ],
+      "observation_hash": "9593e07b0667187e",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-7-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension"
+      ],
+      "observation_hash": "b4bf674f4b86651a",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-barrage",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--bombardment-seconds",
+        "15"
+      ],
+      "observation_hash": "9ef12dfeba96d958",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-hillside",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--hillside",
+        "--cohesion",
+        "weak",
+        "--require-lifecycle"
+      ],
+      "observation_hash": "e3b096469bc671e4",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-roof",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--roof",
+        "--cohesion",
+        "weak",
+        "--require-roof"
+      ],
+      "observation_hash": "c37016e60aeea0ab",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay"
+      ],
+      "observation_hash": "f6d2c18dc7084426",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-wheels-stationary",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--suspension"
+      ],
+      "observation_hash": "27c62413790d58f2",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-wheels-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "7f368d12b0ffdb9e",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "round-wheels-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "3db745c56eeb6a3d",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-angular-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "42",
+        "--suspension"
+      ],
+      "observation_hash": "25f392c24276b086",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-angular-310-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "310",
+        "--suspension"
+      ],
+      "observation_hash": "4a4fd9ed5bd99ee6",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-angular-314-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "0c9504e117e92570",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-angular-314-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "7255f4b6e8f8e1a1",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-angular-314-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314"
+      ],
+      "observation_hash": "b9eef77378841db8",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-round-42-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "42",
+        "--suspension"
+      ],
+      "observation_hash": "e2b152150874b744",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-round-314-wheels",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension"
+      ],
+      "observation_hash": "756b0ae4850cf1aa",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-round-314-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "eefe9fbaf5a1930a",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-round-314-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314",
+        "--suspension",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "915f9ab9e671b77b",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "retained",
+      "case": "footing-round-314-rigid",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seconds",
+        "30",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--seed",
+        "314"
+      ],
+      "observation_hash": "cc6851b496a65472",
+      "matches_previous": true,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-7-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "a272c15fac66b228",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-42-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "3c135b62f746d167",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-123-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "b86dbae75c9d514a",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-19-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "19",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "8ec9abadca3673e7",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-77-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "77",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "e93ff3b7661f7aa0",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-310-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "310",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "236e28ee35a6bb1e",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-999-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "999",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "5a821407268f63ea",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-314-reactive-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "bfa9c4eae75c0816",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-round-314-reactive-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "round",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "e2271245ce715b31",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-round-flat-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "bc8a98618c3369f4",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-round-uphill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "f875d803dc03cf54",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-round-downhill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "6edf78d6beedfc3f",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-round-ridge-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "round",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "2a2a75b4fb51b59d",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-7-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "7",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "981e899c2601082a",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-42-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "42",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "1d5d1f701f57c4cc",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-123-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "123",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "cc4fa636ab9e38d2",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-19-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "19",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "545ead2f646d3392",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-77-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "77",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "2bf94226b5e3f8ed",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-310-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "310",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "58c995ee49ec5fb9",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-999-reactive",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "999",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive"
+      ],
+      "observation_hash": "af65634cc7a5935d",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-314-reactive-weak",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "weak",
+        "--breakup"
+      ],
+      "observation_hash": "29f4027196321a52",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "duel",
+      "case": "duel-angular-314-reactive-strong",
+      "command": [
+        "target/ci/examples/scorched_benchmark",
+        "--shape",
+        "angular",
+        "--seed",
+        "314",
+        "--seconds",
+        "45",
+        "--replay",
+        "--cpu-driving",
+        "--cpu-footing",
+        "--suspension",
+        "--bot",
+        "reactive",
+        "--slumping",
+        "--cohesion",
+        "strong",
+        "--breakup"
+      ],
+      "observation_hash": "12b6b6e711ccea4d",
+      "matches_previous": null,
+      "matches_previous_shots": null
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-angular-flat-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "flat",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "f5894785ec94723f",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-angular-uphill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "uphill",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "05cd9c8c1f3d6aeb",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-angular-downhill-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "downhill",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "509f20feee708586",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    },
+    {
+      "kind": "stationary",
+      "case": "aim-angular-ridge-calibrated",
+      "command": [
+        "target/ci/examples/scorched_aim_lab",
+        "--case",
+        "ridge",
+        "--shape",
+        "angular",
+        "--bot",
+        "calibrated",
+        "--seconds",
+        "45",
+        "--replay"
+      ],
+      "observation_hash": "3a02bed79a1e9af1",
+      "matches_previous": null,
+      "matches_previous_shots": true
+    }
+  ]
+}

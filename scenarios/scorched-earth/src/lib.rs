@@ -21,6 +21,8 @@ use serde::Serialize;
 
 mod action;
 mod bank;
+mod bot;
+pub mod bot_lab;
 mod course;
 mod driving;
 pub mod driving_lab;
@@ -33,6 +35,7 @@ mod suspension;
 #[cfg(test)]
 mod tests;
 pub use action::{Command, Controls, ScorchedAction};
+pub use bot::{CpuPolicy, ShotObservation};
 pub use course::DrivingCourse;
 pub use driving::DrivingDiagnostics;
 pub use drop_test::DropHeight;
@@ -59,6 +62,8 @@ pub struct ScorchedConfig {
     /// Seek nearby flatter firing positions; per-tank switches permit isolated
     /// comparisons with the retained range-only CPU.
     pub cpu_footing: [bool; 2],
+    /// Retain the sweep for controlled comparisons and scripted fixtures.
+    pub cpu_policy: [CpuPolicy; 2],
     /// Compare real sprung wheels with the original rigid moving surface.
     pub suspension: bool,
     /// Explicit wheel experiments; the default retains the established assembly.
@@ -90,6 +95,7 @@ impl Default for ScorchedConfig {
             demo: false,
             cpu_driving: true,
             cpu_footing: [false; 2],
+            cpu_policy: [CpuPolicy::Sweep; 2],
             suspension: false,
             wheel_tuning: WheelTuning::default(),
             course: None,
@@ -128,6 +134,10 @@ struct Shell {
     position: Vec2,
     velocity: Vec2,
     age: u32,
+    // Included separately in observations when the learned policy is enabled,
+    // preserving the established sweep's physical replay identities.
+    #[serde(skip)]
+    flight: Option<bot::Flight>,
 }
 
 #[derive(Clone)]
@@ -149,6 +159,8 @@ pub struct ScorchedState {
     initial_cells: u64,
     tanks: [Tank; 2],
     shells: Vec<Shell>,
+    bots: [bot::Bot; 2],
+    shot_observations: Vec<ShotObservation>,
     selected: usize,
     previous: Controls,
     driving: [driving::TankDrive; 2],
@@ -385,6 +397,8 @@ impl ScorchedState {
             initial_cells,
             tanks,
             shells: Vec::new(),
+            bots: Default::default(),
+            shot_observations: Vec::new(),
             selected: if config.hillside || config.roof { 1 } else { 0 },
             previous: Controls::default(),
             driving,
@@ -476,17 +490,24 @@ impl ScorchedState {
                 },
             )
             .map_or(muzzle, |hit| hit.point);
+        let velocity = tank.direction() * tank.speed + motion.linear_velocity;
+        let flight = self.record_launch(player, position, velocity, position != muzzle);
         self.shells.push(Shell {
             owner: player,
             position,
-            velocity: tank.direction() * tank.speed + motion.linear_velocity,
+            velocity,
             age: 0,
+            flight: Some(flight),
         });
         self.tanks[player].next_shot = self.tick + 75;
         self.tanks[player].shots += 1;
         self.shots += 1;
     }
     fn aim_bot(&mut self, player: usize) {
+        if self.calibrated_cpu(player) {
+            self.aim_calibrated(player);
+            return;
+        }
         let origin = self
             .physics
             .motion(self.tanks[player].body)
@@ -574,6 +595,7 @@ impl ScorchedState {
                     position: Vec2::new(-24.0 + phase as f32 * 6.0, 24.0),
                     velocity: Vec2::new(0.0, -8.0),
                     age: 10,
+                    flight: None,
                 });
                 self.shots += 1;
             }
@@ -581,6 +603,7 @@ impl ScorchedState {
             for (player, support_check) in support_checks.into_iter().enumerate() {
                 if (self.config.demo || player != self.selected)
                     && self.tick >= self.tanks[player].next_shot
+                    && self.bot_allows_fire(player)
                     && (!self.config.cpu_driving || self.ready_to_shoot(player, support_check))
                 {
                     self.aim_bot(player);
@@ -596,7 +619,7 @@ impl ScorchedState {
         );
         self.last_physics = self.physics.step_with_surface_drives(DT, &drives);
         self.loose.sample_impact_contacts(&self.physics);
-        let mut impacts = Vec::new();
+        let mut finished = Vec::new();
         self.shells.retain_mut(|shell| {
             let movement = shell.velocity * DT + Vec2::new(0.0, -0.5 * GRAVITY * DT * DT);
             let hit = self.physics.cast_ray(
@@ -608,17 +631,57 @@ impl ScorchedState {
                     ..Default::default()
                 },
             );
+            let end = hit
+                .as_ref()
+                .map_or(shell.position + movement, |hit| hit.point);
+            if let Some(flight) = &mut shell.flight {
+                let target = self
+                    .physics
+                    .motion(self.tanks[1 - shell.owner].body)
+                    .unwrap()
+                    .position;
+                flight.observe(shell.position, end, target);
+            }
             if let Some(hit) = hit {
-                impacts.push(hit.point);
+                let kind = if hit.collider.entity == self.tanks[1 - shell.owner].body.entity {
+                    "opponent"
+                } else if hit.collider.entity == self.tanks[shell.owner].body.entity {
+                    "self"
+                } else {
+                    "terrain"
+                };
+                finished.push((*shell, hit.point, kind, true));
                 return false;
             }
             shell.position += movement;
             shell.velocity.y -= GRAVITY * DT;
             shell.age += 1;
-            shell.age < 600 && shell.position.y > -50.0 && shell.position.x.abs() < 100.0
+            let alive =
+                shell.age < 600 && shell.position.y > -50.0 && shell.position.x.abs() < 100.0;
+            if !alive {
+                finished.push((
+                    *shell,
+                    shell.position,
+                    if shell.age >= 600 {
+                        "expired"
+                    } else {
+                        "out of bounds"
+                    },
+                    false,
+                ));
+            }
+            alive
         });
-        for point in impacts {
-            self.explode(point);
+        for (shell, point, kind, impact) in finished {
+            let health = self.tanks.map(|tank| tank.health);
+            if impact {
+                if shell.flight.is_some() {
+                    self.explode_from(point, Some(shell.owner));
+                } else {
+                    self.explode(point);
+                }
+            }
+            self.record_outcome(shell, point, kind, health);
         }
         self.slump();
         self.fracture_banks();
@@ -810,6 +873,10 @@ impl ScorchedState {
             }
             Command::Suspension => {
                 self.config.suspension = !self.config.suspension;
+                *self = Self::new(self.config, self.seed);
+            }
+            Command::CpuAim => {
+                self.config.cpu_policy = [self.config.cpu_policy[0].next(); 2];
                 *self = Self::new(self.config, self.seed);
             }
             Command::Course => {
@@ -1029,6 +1096,13 @@ impl Scenario for ScorchedScenario {
         }
         if state.config.cpu_footing.iter().any(|enabled| *enabled) {
             payload["cpu_footing"] = serde_json::json!(state.config.cpu_footing);
+        }
+        if state.config.cpu_policy != [CpuPolicy::Sweep; 2] {
+            payload["cpu_policy"] = serde_json::json!(state.config.cpu_policy);
+            payload["bots"] = serde_json::json!(state.bots);
+            payload["flight_observations"] =
+                serde_json::json!(state.shells.iter().map(|s| s.flight).collect::<Vec<_>>());
+            payload["shot_observations"] = serde_json::json!(state.shot_observations);
         }
         if state.config.suspension {
             payload["suspension"] = serde_json::json!(true);

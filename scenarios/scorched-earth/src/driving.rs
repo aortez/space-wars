@@ -70,6 +70,16 @@ impl TankDrive {
     pub fn has_history(&self) -> bool {
         self.diagnostics.powered_ticks > 0 || self.diagnostics.planning_checks > 0
     }
+
+    pub(super) fn suspend_cpu_plan(&mut self) {
+        // An intentional combat stop or relocation is not a range-driver stall.
+        self.cpu_direction = 0.0;
+        self.stalled_plans = 0;
+        self.next_plan = 0;
+        if let Some(footing) = &mut self.footing {
+            footing.suspend();
+        }
+    }
 }
 
 impl ScorchedState {
@@ -316,11 +326,16 @@ impl ScorchedState {
             } else if let Some((_, axis)) = override_axis.filter(|(i, _)| *i == player) {
                 axis
             } else if is_cpu && cpu_enabled {
-                let axis = self.cpu_drive(player, ground_check, support_checks[player]);
-                if self.config.cpu_footing[player] && self.config.course.is_none() {
-                    self.seek_firing_footing(player, axis)
-                } else {
+                if let Some(axis) = self.bot_drive(player) {
+                    self.driving[player].suspend_cpu_plan();
                     axis
+                } else {
+                    let axis = self.cpu_drive(player, ground_check, support_checks[player]);
+                    if self.config.cpu_footing[player] && self.config.course.is_none() {
+                        self.seek_firing_footing(player, axis)
+                    } else {
+                        axis
+                    }
                 }
             } else if playable && !is_cpu {
                 self.driving[player].diagnostics.mode = "manual";

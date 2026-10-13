@@ -56,11 +56,249 @@ Range driver retains the normal combat repositioning policy. The HUD shows the
 goal's current action, actual/desired speed and used retries. Changing driver
 or switching to manual preserves the goal's history; Reset starts a fresh run.
 
-**Angular** is the initial dirt choice. **Demo** controls both tanks with the same
-repositioning policy and seeded aiming sweep used by the headless runner. It estimates ballistic range
-but varies its aim; intervening terrain and loose grains can intercept shots.
+**Angular** is the initial dirt choice. **Demo** controls both tanks with the
+selected CPU policy. The playable default is **Learning + move**; the bottom-right
+button cycles **Sweep → Learning → Learning + move**, restarting the same seed
+for comparison. The headless default retains the original seeded sweep.
 Power is muzzle speed (12–48 world units/s); elevation ranges from 5° to 85°.
 Human shots have a 1.25-second cooldown.
+
+## CPU aiming and hit reaction
+
+The first pass for [#199](https://github.com/aortez/space-wars/issues/199) learns
+from real shells. A coarse, flat-ground power estimate starts a 50° arc. Clean
+short/long observations adjust power in 2.5-unit steps; a valid bracket narrows
+by bisection. A hill or blocked barrel raises the arc by 10°, up to 80°. An actual
+damaging shot passing within 2.5 units of the target establishes a useful
+solution. Weak splash damage alone does not stop calibration. These are initial
+playtesting thresholds, not a guarantee of a hit within a fixed number of shots.
+
+Each launch retains its owner, actual muzzle/velocity, angle/power, tank poses
+and shot ID. A bounded flight observation records closest approach and crossing
+height at the target's original X. Movement exceeding 1.5 units during flight
+invalidates a static-target correction. Collisions, leaving the arena and the
+ten-second shell lifetime all release the pending-shot gate. The last 64 shot
+outcomes are retained for inspection, including actual damage and miss reason.
+There are no hidden simulated trial shots or deliberately forced opening misses.
+
+Moving either tank more than one unit, or changing the shooter's pitch by more
+than 8°, clears the local bracket/confidence while retaining the learned power
+scale. Unrelated terrain edits do not reset learning. Intervening terrain is
+reassessed through observed obstructions; this first pass does not forecast a
+new trajectory through every terrain change. Changing ground can therefore
+cost another ranging shot even with previously acquired aim.
+
+**Learning + move** adds the agreed incoming-hit preference. A recent enemy hit
+(within three seconds) while aim is uncertain can select a destination two or
+2.5 units away in either direction. Existing route and native support checks
+still apply. Each candidate's three-unit footprint must be continuous fixed
+terrain, with predicted pitch at most 18°, profile deviation at most 0.35 units,
+and an unobstructed estimated barrel position. The footprint fits within the
+existing four-unit route lookahead. Candidates keep 12–40 units of separation;
+scoring prefers level, smooth ground and the ordinary 18–32 unit firing range.
+No suitable option means continuing the firing policy. Self damage and
+unattributed lab blasts do not trigger this preference.
+
+A retained travel goal handles the move, with a four-second deadline. Its end
+starts a ten-second relocation cooldown, and another shot must be fired before
+another reactive move is permitted. Repeated hits do not renew the deadline or
+retry budget. The controller explicitly defers firing during relocation, then
+brakes and resumes calibration. CPU stationary disables movement without
+blocking shots. Labels above CPU tanks expose ranging, watching a shot, acquired
+aim and relocation. Manual/Demo changes preserve history; Reset or changing the
+bot comparison policy starts a new match and clears it.
+
+Before accepting a relocation, a recent, untried power correction can earn one
+shot first. It must come from an actual calibrated short/long result observed
+within three seconds, still apply to the current firing geometry, and change
+power. The tank must have support, a clear barrel and its next scheduled shot
+due within four seconds. A shell already in flight is not a new correction.
+This preference is considered only when there is an otherwise suitable move.
+
+The tank brakes for that correction without changing its shot schedule. It has
+four seconds to launch and six seconds total to observe the result. Changed
+geometry, lost support, a blocked barrel or an invalidated correction ends the
+preference early. Further hits cannot extend it or queue an automatic move when
+it ends. Normal range/footing and hit decisions resume afterward. The same shot
+observation cannot earn another preference, and a new one cannot start within
+ten seconds of the previous start. Diagnostics retain the evidence shot ID,
+protected shot ID, deadlines, end reason and geometry; the HUD shows `try
+correction` or `watching correction` while active.
+
+The destination estimate is not a promise that moving will reduce incoming
+damage: terrain can change en route, and moving can cost a useful aim correction.
+Diagnostics retain the last move's origin, destination, end position, exact
+start/end ticks, and reason (`arrived`, `blocked ground`, `no support`, `stalled`,
+or `deadline`). An ended attempt is not counted as an arrival.
+
+The physics, weapons, ordinary five-second CPU shot interval, range driver and
+footing checks remain shared. Waiting for an outstanding shot can extend the
+interval. Bank/Drop/Hillside/Roof/Barrage and driving courses retain their scripts;
+the learned policy is only used in ordinary duels.
+
+Reproduce a controlled comparison with fixed tanks and the actual shell/blast
+path (cases: `flat`, `uphill`, `downhill`, `ridge`; `duel` uses normal moving tanks):
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_aim_lab -- --case ridge --shape angular --bot calibrated --replay
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_benchmark -- --seed 42 --shape round --seconds 45 \
+  --cpu-driving --cpu-footing --suspension --bot reactive --replay
+```
+
+Both runners accept `--bot sweep|calibrated|reactive`. The aiming lab emits
+per-shot results and per-second controller/pose traces; the benchmark keeps
+observations and replay outside its update timer. A normal duel is not an
+isolated timing measurement of the controller: different shots change the dirt,
+contacts and battle duration. General route planning and difficulty levels are
+not part of this first pass.
+
+Compare one real incoming-hit opportunity from identical physics and controller
+history, including shots already in flight:
+
+```sh
+cargo +1.89.0 run --locked --profile ci -p scenario-scorched-earth \
+  --example scorched_relocation_lab -- --seed 42 --shape angular \
+  --opportunity 1 --seconds 20 --replay
+```
+
+The four continuations decline the move, use the original three-unit selector,
+use the retained destination selector without correction priority, or use the
+current policy. A retained original-policy prefix preserves the checkpoint
+while the candidate changes. The opponent keeps that same policy in every
+continuation. Later reactive moves by the subject are suppressed in every arm
+for this diagnostic window; ordinary range/footing,
+aim learning, shot scheduling and physical motion remain enabled. This isolates
+one decision, rather than comparing freshly initialized controllers or forcing
+the control tank to remain at a fixed position.
+
+The report includes candidate rejection reasons, movement termination, damage,
+travel, shots and half-second traces. Time to the next useful shot counts only
+shots launched after the fork; an old in-flight hit cannot masquerade as aim
+reacquisition. Runs stop at match end or the requested horizon and report their
+actual duration. `--opportunity` selects a later eligible hit with an original
+route; `--search-seconds` bounds the search. Missing opportunities are reported
+without synthetic hits or resets. `--cohesion weak|strong` enables the matching
+destruction preset. Ordinary full-policy duels remain a separate integration
+check because these diagnostic continuations suppress subsequent subject moves.
+
+### First aiming review, 2026-10-11
+
+[Source identities and results](data/tank-aiming-20261011.json), with
+[complete commands, shot records and traces](data/tank-aiming-traces-20261011.json.gz),
+record 74 replay-checked desktop runs. All material audits passed. All 36 retained
+driving/destruction benchmarks keep their previous observation hashes with
+Sweep selected. The new matrix adds 18 ordinary policy comparisons, four
+reactive Weak/Strong destruction runs, and 16 fixed-tank aiming comparisons.
+
+| Fixed-tank case | First useful learned shot, Round / Angular |
+| --- | --- |
+| Flat | 2 / 2 |
+| Uphill | 1 / 1 |
+| Downhill | 4 / 4 |
+| Ridge | 2 / 2 |
+
+The ridge response changes from 50° to 60° after the first blocked shot; it
+retains the successful arc rather than cycling back through the hill. Flat
+ground corrects power from 28 to 25.5. Downhill keeps correcting a weak splash
+instead of treating it as solved aim. The uphill initial estimate happens to
+work; learning does not force a miss. The sweep already hits on its first shot
+in several fixtures, so these results establish acquisition and retention, not
+a universal improvement in first-shot accuracy or match win rate.
+
+Six of ten reactive ordinary/destruction runs start a relocation, with eleven
+attempts total. An attempt ending does not guarantee that it reached its goal:
+changed support or the deadline can end it. Separate regression cases establish
+actual movement, resumed firing, no-safe-route fallback, reliable-aim hold,
+repeated-hit bounds and driving-toggle behavior.
+
+The 70 scenario tests, client test suite, formatting and strict scenario Clippy
+pass. The rendered launch/pause/restart check passes in both renderers on a
+temporary Xvfb display. An initial direct-desktop run missed short inputs while
+the window advanced slowly in the background; no gameplay or test assertion was
+weakened for the successful virtual-display run. Device frame pacing and broader
+bot difficulty tuning remain separate follow-ups.
+
+### Relocation comparison, 2026-10-11
+
+[Source identities and comparison results](data/tank-relocation-20261011.json)
+and the [complete source patch, commands and traces](data/tank-relocation-traces-20261011.json.gz)
+retain 98 replay-checked commands: 36 bounded opportunity searches, 36 existing
+driving/destruction benchmarks, 18 ordinary Reactive duels and eight stationary
+calibration checks. All 36 retained observation hashes and all eight stationary
+shot histories match the earlier captures. All material audits pass. The 74
+scenario tests, four Scorched Earth client checks, formatting, strict scenario
+Clippy and desktop client build pass.
+
+The searches find 21 eligible checkpoints across both dirt shapes and the
+Off/Weak/Strong destruction settings. The original selector attempts all 21:
+11 arrive, eight stop on obstructed ground and two lose support. The candidate
+declines ten destinations and attempts 11: nine arrive, one stops on obstructed
+ground and one loses support. The ten initial checkpoints retain exactly the
+same prefix hashes and complete control/reference continuations as the capture
+made before tuning destination selection.
+
+Destination reliability improves, but the tactical comparison remains mixed.
+Against continuing to aim, the candidate takes over one health point less damage
+in three cases, more in three, and stays within one point in 15. These are
+correlated diagnostic cases, not a win-rate sample. Both branch duration and
+remaining health limit the damage totals. Angular seed 42's first opportunity
+reaches a shorter nearby patch and produces a useful new shot after 4.73 seconds,
+versus 9.55 seconds for continuing to aim. Angular seed 77 is a counterexample:
+moving reaches its destination but delays a useful shot from 4.98 to 15 seconds
+and the tank loses the continuation. These traces preserve a concrete follow-up:
+weigh the value of the next aim correction when deciding whether to relocate.
+No change to shot cadence, native driving physics or retry budgets is included
+in this destination pass. No new Pi timing qualification is claimed.
+
+### Correction priority review, 2026-10-12
+
+[Source identities and results](data/tank-shot-priority-20261012.json), with the
+[complete source patch, commands and traces](data/tank-shot-priority-traces-20261012.json.gz),
+retain 134 replay-checked commands: 60 opportunity searches, 36 existing
+driving/destruction benchmarks, 30 ordinary Reactive duels and eight stationary
+calibration runs. All material audits pass. All 36 retained physics observation
+hashes and all eight stationary calibration reports match the previous pass.
+The 78 scenario tests, four Scorched Earth client tests, formatting, strict
+scenario Clippy and desktop client build pass.
+
+The searches retain all 21 earlier checkpoints and find 13 more across the new
+seeds 202, 271, 512, 1001, 4099 and 9001, using both dirt shapes. Every earlier
+checkpoint hash and complete continue-aiming, original-move and destination-move
+continuation is preserved. Of the 34 eligible checkpoints, correction priority
+activates three times. The other 31 current-policy continuations exactly match
+the destination selector without this preference.
+
+| Case / subject | Protected correction ends | Next useful new shot: destination / current |
+| --- | --- | --- |
+| Angular 77 / left tank | Useful hit after 5.05 s | 15.00 s / 5.05 s |
+| Angular 7 / right tank | Correction invalidated after 0.70 s | 9.48 s / 9.48 s |
+| Round 4099 / left tank | Support lost after 2.97 s | None before defeat / 5.07 s |
+
+In Angular 77, the tank fires at its unchanged scheduled time, 3.15 seconds
+after the checkpoint. Braking preserves the correction, and the tank wins the
+continuation with 53.7 health instead of losing after moving. Continuing normal
+aiming without this braking preference is also successful, with a useful shot
+after 4.98 seconds and 47.4 health remaining. This addresses the captured
+relocation regression without making the weapon fire sooner.
+
+The two early cancellations do not protect a launch: ordinary behavior resumes.
+Angular 7 subsequently wins its continuation with 11.4 health, but takes more
+damage than the destination control, which is still running at the 20-second
+horizon. Round 4099 still loses despite landing a useful shot. The ordinary
+full-policy duels retain these same three priority end reasons; they remain
+separate integration runs because the diagnostic arms suppress later subject
+relocations. The new search seeds were not used to tune the thresholds, but
+some seeds produce identical courses; these correlated cases do not establish
+a match win-rate improvement.
+
+The added regression checks cover the actual scheduled launch and hit,
+cloning during its flight, repeated hits with no launch, changed target geometry,
+new barrel obstruction, driving toggles and a late observation. Deadlines and
+evidence reuse remain bounded. This pass changes the decision between moving
+and trying a correction; native driving, terrain physics and shot cadence are
+unchanged. No new Pi timing qualification is claimed.
 
 ## Tank driving
 

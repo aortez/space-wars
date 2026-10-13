@@ -566,7 +566,7 @@ fn pointer_driving_releases_on_drag_cancel_and_pause() {
     };
     ScorchedScenario::step(
         &mut state,
-        &[pointer(PointerPhase::Press, -11.0)],
+        &[pointer(PointerPhase::Press, -20.0)],
         Duration::from_secs_f64(1.0 / 60.0),
     );
     for _ in 0..40 {
@@ -582,14 +582,14 @@ fn pointer_driving_releases_on_drag_cancel_and_pause() {
     for phase in [PointerPhase::Cancel, PointerPhase::Release] {
         ScorchedScenario::step(
             &mut state,
-            &[pointer(PointerPhase::Press, -11.0), pointer(phase, -11.0)],
+            &[pointer(PointerPhase::Press, -20.0), pointer(phase, -20.0)],
             Duration::from_secs_f64(1.0 / 60.0),
         );
         assert_eq!(state.pointer_drive, 0.0);
     }
     ScorchedScenario::step(
         &mut state,
-        &[pointer(PointerPhase::Press, -11.0)],
+        &[pointer(PointerPhase::Press, -20.0)],
         Duration::from_secs_f64(1.0 / 60.0),
     );
     ScorchedScenario::step(&mut state, &[], Duration::ZERO);

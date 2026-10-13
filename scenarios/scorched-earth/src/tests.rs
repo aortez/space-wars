@@ -453,6 +453,7 @@ fn swept_shell_hits_ground_instead_of_skipping_through_it() {
         position: Vec2::new(0.0, 5.0),
         velocity: Vec2::new(0.0, -1000.0),
         age: 10,
+        flight: None,
     });
     step(&mut state, &[]);
     assert!(state.shells.is_empty());

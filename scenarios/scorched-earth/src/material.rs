@@ -109,6 +109,10 @@ impl ScorchedState {
     }
 
     pub(super) fn explode(&mut self, point: Vec2) {
+        self.explode_from(point, None);
+    }
+
+    pub(super) fn explode_from(&mut self, point: Vec2, owner: Option<usize>) {
         self.impacts += 1;
         self.flashes.push((point, self.tick));
         self.release_material(point);
@@ -133,11 +137,15 @@ impl ScorchedState {
         .apply(&mut self.physics, bodies);
         // Combat damage is independent of whether the bounded material pool
         // admitted this edit. Capacity cannot make a tank invulnerable.
-        for tank in &mut self.tanks {
+        for (player, tank) in self.tanks.iter_mut().enumerate() {
             let motion = self.physics.motion(tank.body).unwrap();
             let distance = motion.position.distance_to(point);
             if distance < 6.0 {
+                let before = tank.health;
                 tank.health = (tank.health - 42.0 * (1.0 - distance / 6.0)).max(0.0);
+                if owner.is_some_and(|owner| owner != player) && tank.health < before {
+                    self.bots[player].hit(self.tick, before - tank.health);
+                }
             }
         }
         RadialImpulse {
