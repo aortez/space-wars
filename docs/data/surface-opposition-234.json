@@ -3,7 +3,7 @@
   "date": "2026-10-12",
   "branch": "feat/planet-surface-opposition-234",
   "base": "db6f020d86da0b3cbd72e13d13aa86c0f8c68593",
-  "source_state": "validated pre-commit snapshot; Rust file identities retained below",
+  "source_state": "initial implementation at b144c195ff56002da96c1a3284d4bffe477c2b03; follow-up fixture identities recorded in ci_followup",
   "rust_source_sha256": {
     "crates/engine-client/src/client_scenarios/surface_sortie.rs": "a6f2170d2c82dbc4a66380053c57ad8967a028ee9115c4f207f66a0ddd280ab3",
     "crates/engine-client/src/client_scenarios/surface_sortie/hud/tests.rs": "977a0ea3f26c60e5ae5796ebbd387e85211587b92431eb3138c8fc1958bb700e",
@@ -417,5 +417,52 @@
       }
     ]
   },
-  "local_raw_artifacts": "/tmp/spacewars-opposition-234"
+  "local_raw_artifacts": "/tmp/spacewars-opposition-234",
+  "ci_followup": {
+    "date": "2026-10-13",
+    "baseline": "b144c195ff56002da96c1a3284d4bffe477c2b03",
+    "rust_source_sha256": {
+      "crates/spacewars-ai/tests/support/unopposed_capture.rs": "93251eae9df4e85890b36df84564a7ad740fe0894a7a7f166619749c323753db",
+      "crates/spacewars-ai/tests/surface_mission.rs": "b1768b038331df1e24d82934ec9c8d51433acdd18bbf60e5ecc4f719d1dbdbca"
+    },
+    "original_ci": {
+      "url": "https://github.com/aortez/space-wars/actions/runs/38352809161",
+      "workspace_passed": 3085,
+      "workspace_failed": 1,
+      "pr_ui_passed": 49,
+      "failing_test": "physical_mission_captures_then_finds_and_hits_the_opponent"
+    },
+    "reproduction": {
+      "runtime": "Ubuntu 24.04.4; glibc 2.39-0ubuntu8.9; Rust 1.89.0",
+      "command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p spacewars-ai --features terrain-recovery --test surface_mission physical_mission_captures_then_finds_and_hits_the_opponent -- --exact --nocapture",
+      "baseline_receipt": "ubuntu24-baseline.log",
+      "baseline_result": "reproduced the exact CI failure, including mission event ticks",
+      "diagnostic_receipt": "ubuntu24-baseline-diagnostic.log",
+      "diagnostic_result": "seed 7, seat 0, mirror false: opponent became an escape pod at tick 6246, with zero weapon hits, before the final capture sortie finished"
+    },
+    "fix": "Test-only opponent thrust requires landing-foot contact with the planet being claimed and releases on departure. Captures elsewhere leave the opponent idle. The combat test checks that its native ship survives until a weapon hit.",
+    "validation": {
+      "local_ai": {
+        "passed": 589,
+        "ignored": 1,
+        "receipt": "ai-revised-tests.log"
+      },
+      "ubuntu24_mission": {
+        "passed": 20,
+        "receipt": "ubuntu24-mission-revised.log"
+      },
+      "ubuntu24_ai": {
+        "passed": 589,
+        "ignored": 1,
+        "command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p spacewars-ai --features terrain-recovery --tests --no-fail-fast",
+        "receipt": "ubuntu24-ai-revised.log"
+      },
+      "ai_ci_clippy": {
+        "status": "passed",
+        "command": "cargo +1.89.0 clippy --locked --profile ci -p spacewars-ai --features sensor-profile --lib --tests --no-deps -- -D warnings",
+        "receipt": "ai-revised-clippy.log"
+      },
+      "format_and_diff": "passed"
+    }
+  }
 }

@@ -388,6 +388,14 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
             if hits.cannon_hits > 0 || hits.laser_hit_ticks > 0 {
                 break;
             }
+            let opponent = state.observation(actor.opponent().index());
+            assert_eq!(
+                opponent.vehicle_form,
+                ShipForm::Ship,
+                "seed {seed} seat {seat} mirror {mirror}: target lost before any weapon hit: \
+                 {opponent:?}; mission {:?}",
+                brain.telemetry()
+            );
         }
         let hits = state.combat_telemetry(seat);
         assert!(

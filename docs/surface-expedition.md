@@ -317,12 +317,15 @@ material. The workflow example uses the main match host on a controlled
 one-planet start; it never writes ownership or fabricates contacts.
 
 Positive AI flight/capture fixtures now let their otherwise idle opponent
-depart through real controls during capture. Their subject controllers and
-physics remain unchanged. A separate tactical test holds the defender in
-place for three seconds, requires no reported capture, then verifies completion
-after departure. Recovery retains its existing timeout and identifies surface
-opposition without extending its clock or treating the changing reason as
-progress. Destination selection and attacking defenders remain separate AI work.
+depart through real controls only when its landing feet support it on the
+planet being claimed, releasing thrust as soon as that contact clears.
+Captures elsewhere leave it idle, preserving the target for later combat.
+Their subject controllers and physics remain unchanged. A separate tactical
+test holds the defender in place for three seconds, requires no reported
+capture, then verifies completion after departure. Recovery retains its
+existing timeout and identifies surface opposition without extending its
+clock or treating the changing reason as progress. Destination selection and
+attacking defenders remain separate AI work.
 
 The [#234 validation receipt](data/surface-opposition-234.json) records the local
 source identities, 599 scenario tests, 589 AI tests, 41 client tests and both
@@ -331,6 +334,14 @@ the entire scenario still reports existing lints outside this change. Native
 test/build logs and the local UI captures are retained in the receipt's artifact
 directory. The HUD workflow renders at 800×480, 1024×768 and 480×800; it is a
 desktop check, not a new Pi deployment or a performance benchmark.
+
+The receipt also records the CI follow-up on Ubuntu 24.04: repeated thrust
+in the original fixture destroyed the seed-7 opponent at tick 6,246 before
+combat began. Restricting thrust to blocking contact preserves the native
+target; the capture-then-combat test now diagnoses premature target loss
+directly. The failure was reproduced with the original source and runtime
+before validating the corrected fixture. All 589 AI tests pass on both the
+development host and Ubuntu 24.04 after the correction.
 
 A controlled two-planet journey uses only player actions after fixture setup:
 claim A, board, launch, coast, brake/turn, land on B, claim, reboard and depart.
