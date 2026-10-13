@@ -11,6 +11,9 @@ fn idle(state: &mut SurfaceSortieState, ticks: usize) {
 }
 fn parked(surface: TerrainSurface) -> SurfaceSortieState {
     let mut state = SurfaceSortieScenario::init_surface_comparison(42, 2, surface);
+    // This fixture compares physical surfaces with a friendly parked vehicle.
+    // Hostile force/capture integration is covered by the opposition tests.
+    state.world.ships[1].owner_id = 0;
     idle(&mut state, 600);
     for p in 0..2 {
         assert_eq!(
@@ -37,6 +40,9 @@ fn matched_fields_land_exit_and_claim_on_diagonal_ground() {
         TerrainSurface::Interpolated,
     ] {
         let mut state = SurfaceSortieScenario::init_surface_comparison(42, 2, surface);
+        // This fixture compares physical surfaces with a friendly parked vehicle.
+        // Hostile force/capture integration is covered by the opposition tests.
+        state.world.ships[1].owner_id = 0;
         idle(&mut state, 600);
         fields.push(state.world.terrain.planets[&0].field.cells().to_vec());
         println!(

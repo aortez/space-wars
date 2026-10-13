@@ -175,6 +175,60 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         );
     }
     assert_eq!(sortie.state.player_hud(0).mode, "ON FOOT");
+    // Exercise the match host with real contacts and controls, rather than
+    // prescribing a claim prompt or ownership for the screenshots.
+    let mut state = SurfaceSortieScenario::init_material_combat_flight(42, &[]);
+    state.enable_match_rules();
+    let mut opposition = super::super::SurfaceSortieClientScenario::new(state);
+    for _ in 0..240 {
+        opposition.step(&[], dt);
+    }
+    opposition.step(
+        &[SurfaceSortieAction {
+            interact_held: true,
+            ..Default::default()
+        }
+        .encode(PlayerId::PLAYER_1)],
+        dt,
+    );
+    for _ in 0..240 {
+        opposition.step(
+            &[SurfaceSortieAction::default().encode(PlayerId::PLAYER_1)],
+            dt,
+        );
+    }
+    let claim = opposition.state.observation(0).planet_claim.unwrap();
+    assert_eq!(
+        claim.status,
+        scenario_spacewars::surface_sortie::PlanetClaimStatus::OpposingSurfaceForces
+    );
+    assert_eq!(claim.owner, None);
+    assert_eq!(
+        opposition.state.player_hud(0).prompt.unwrap().title,
+        "Opposing surface forces"
+    );
+    let mut secured = super::super::SurfaceSortieClientScenario::new(opposition.state.clone());
+    for _ in 0..241 {
+        secured.step(
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2)],
+            dt,
+        );
+    }
+    assert_eq!(
+        secured.state.observation(0).planet_claim.unwrap().owner,
+        Some(PlayerId::PLAYER_1)
+    );
+    assert!(
+        secured
+            .state
+            .player_hud(0)
+            .prompt
+            .is_none_or(|p| p.title != "Opposing surface forces")
+    );
     let mut settings = engine_common::Settings::default();
     settings.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
     settings.spacewars.player_2_controller = engine_common::SpacewarsController::PlannerBot;
@@ -190,6 +244,7 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
     for (profile, viewport) in [
         ("picade", Viewport::new(1024.0, 768.0)),
         ("hyperpixel", Viewport::new(800.0, 480.0)),
+        ("portrait", Viewport::new(480.0, 800.0)),
     ] {
         window
             .window()
@@ -197,7 +252,14 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         for (name, scenario) in [
             ("on-foot", &sortie as &dyn ClientScenario),
             ("flight", flight.as_ref()),
+            ("opposition-blocked", &opposition as &dyn ClientScenario),
+            ("opposition-cleared", &secured as &dyn ClientScenario),
         ] {
+            window.set_performance_overlay_enabled(!name.starts_with("opposition"));
+            assert_eq!(
+                scenario.render_frames(RenderBackend::Raster, viewport),
+                scenario.render_frames(RenderBackend::Vector, viewport)
+            );
             for (backend, scale, suffix) in [
                 (RenderBackend::Raster, 1.0, "raster-1x"),
                 (RenderBackend::Raster, 2.0, "raster-2x"),

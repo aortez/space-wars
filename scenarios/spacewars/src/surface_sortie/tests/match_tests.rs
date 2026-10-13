@@ -174,7 +174,18 @@ fn resting_walking_jumping_and_rebuilding_do_not_reset_or_drain_pilot_health() {
     state.pilots[0].vitals.as_mut().unwrap().health = 61.0;
     idle(&mut state, 180);
     disembark(&mut state);
-    idle(&mut state, 180);
+    // Clear the opposing surface force through ordinary takeoff before claiming.
+    for _ in 0..180 {
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2)],
+            Duration::from_nanos(16_666_667),
+        );
+    }
     assert_eq!(state.world.planets[0].owner_id, Some(0));
     for _ in 0..30 {
         tick(

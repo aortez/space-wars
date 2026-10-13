@@ -8,6 +8,8 @@ use spacewars_ai::{
     flight_pilot::{FlightGoal, FlightIntent, RulePilotV2},
 };
 use std::time::Duration;
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 #[test]
 fn grounded_circuit_brake_land_claim_and_depart_both_directions_and_seats() {
@@ -94,7 +96,7 @@ fn grounded_circuit_brake_land_claim_and_depart_both_directions_and_seats() {
                         break;
                     }
                 }
-                SurfaceSortieScenario::step(&mut state, &action.encode(owner), DT);
+                capture_fixture::step(&mut state, owner, &action.encode(owner), DT);
             }
             assert!(
                 brain.telemetry().completed_tick.is_some(),

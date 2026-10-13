@@ -17,6 +17,8 @@ use spacewars_ai::{
     recovery_task::{RecoverShipTask, RecoveryGoal, TaskStatus},
 };
 use std::time::Duration;
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 
 #[test]
@@ -1876,7 +1878,7 @@ fn real_strike_recovers_and_departs_in_both_seats_and_angles() {
                     }
                     .encode(owner),
                 );
-                SurfaceSortieScenario::step(&mut s, &actions, DT);
+                capture_fixture::step(&mut s, owner, &actions, DT);
                 if brain.telemetry().departed_tick.is_some() {
                     break;
                 }
@@ -2154,6 +2156,59 @@ fn hostile_ground_gets_one_fixed_extension_without_restarting_the_recovery_clock
     assert_eq!(
         task.telemetry().reason,
         Some("recovery exceeded combined flight and ground budget")
+    );
+}
+
+#[test]
+fn surface_opposition_never_counts_as_recovery_progress_or_restarts_its_budget() {
+    use scenario_spacewars::surface_sortie::{
+        PlanetClaimStatus, surface_forces::SurfaceOpposition,
+    };
+    let (mut task, mut o) = airborne_pod();
+    let p = &mut o.flight.pilot;
+    p.tick = 0;
+    p.location = PilotLocation::OnFoot;
+    p.ship_available = false;
+    p.balanced = true;
+    p.supported_planet = Some(p.planet.index);
+    p.actor = Some(p.ship);
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = None;
+    claim.status = PlanetClaimStatus::OpposingSurfaceForces;
+    claim.opposition = SurfaceOpposition {
+        ships: 1,
+        ..Default::default()
+    };
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::Claim);
+    assert_eq!(task.telemetry().status, TaskStatus::Running);
+    let start = task.telemetry().started_tick;
+    let budget = task.telemetry().ground_budget_ticks;
+    let progress = task.telemetry().last_progress_tick;
+    let mut replay = task.clone();
+    for tick in [300, 600, 900, 901] {
+        o.flight.pilot.tick = tick;
+        let claim = o.flight.pilot.planet.claim.as_mut().unwrap();
+        // The reason can disappear and recur; neither is actual flag progress.
+        claim.opposition.ships = u16::from(tick != 600);
+        claim.status = if tick == 600 {
+            PlanetClaimStatus::Ready
+        } else {
+            PlanetClaimStatus::OpposingSurfaceForces
+        };
+        assert_eq!(task.step(&o), replay.step(&o));
+        assert_eq!(task.telemetry(), replay.telemetry());
+        assert_eq!(task.telemetry().started_tick, start);
+        assert_eq!(task.telemetry().ground_budget_ticks, budget);
+        if tick <= 900 {
+            assert_eq!(task.telemetry().last_progress_tick, progress);
+            assert_eq!(task.telemetry().status, TaskStatus::Running);
+        }
+    }
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("opposing surface forces prevent capture")
     );
 }
 

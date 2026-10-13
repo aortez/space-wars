@@ -2,6 +2,7 @@ use super::*;
 use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
+mod opposition;
 
 const P1: PlayerId = PlayerId::PLAYER_1;
 const P2: PlayerId = PlayerId::PLAYER_2;
@@ -123,6 +124,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P1, 7.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
     assert_eq!(owner, None);
@@ -133,6 +135,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P1, 7.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(1),
     );
     assert_eq!(owner, Some(0));
@@ -141,6 +144,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P2, 20.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(20),
     );
     assert_eq!(owner, Some(0));
@@ -153,6 +157,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P2, 8.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(1),
     );
     assert_eq!(owner, Some(0));
@@ -163,6 +168,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P2, 8.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
     assert_eq!(owner, None);
@@ -175,6 +181,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P2, 8.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
     assert_eq!(owner, None, "lowering time must not count toward raising");
@@ -182,6 +189,7 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
         &mut owner,
         frame(),
         &[standing(P2, 8.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(1),
     );
     assert_eq!(owner, Some(1));
@@ -201,32 +209,58 @@ fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
 fn interruptions_reset_only_the_unfinished_stage_and_never_borrow_another_claim() {
     let mut claim = SurfacePlanetClaim::new(0);
     let mut owner = None;
-    claim.update(&mut owner, frame(), &[standing(P1, 0.0)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P1, 0.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     claim.update(
         &mut owner,
         frame(),
         &[standing(P2, 1.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
     let mut airborne = standing(P2, 1.0);
     airborne.planet = None;
     airborne.anchor = None;
     airborne.status = PlanetClaimStatus::NeedSupport;
-    claim.update(&mut owner, frame(), &[airborne], Duration::from_secs(10));
+    claim.update(
+        &mut owner,
+        frame(),
+        &[airborne],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        Duration::from_secs(10),
+    );
     assert_eq!(owner, Some(0));
     let reset = claim.observation(owner, frame(), 1);
     assert_eq!(reset.phase, PlanetClaimPhase::Idle);
     assert_eq!(reset.status, PlanetClaimStatus::NeedSupport);
     assert_eq!(reset.flag.unwrap().raised_fraction, 1.0);
-    claim.update(&mut owner, frame(), &[standing(P2, 1.0)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P2, 1.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     assert_eq!(owner, None);
     claim.update(
         &mut owner,
         frame(),
         &[standing(P2, 1.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
-    claim.update(&mut owner, frame(), &[airborne], Duration::from_secs(1));
+    claim.update(
+        &mut owner,
+        frame(),
+        &[airborne],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        Duration::from_secs(1),
+    );
     assert_eq!(
         owner, None,
         "completed neutralization survives an interrupted raise"
@@ -236,6 +270,7 @@ fn interruptions_reset_only_the_unfinished_stage_and_never_borrow_another_claim(
         &mut owner,
         frame(),
         &[standing(P1, -9.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(1),
     );
     assert_eq!(owner, None);
@@ -244,6 +279,7 @@ fn interruptions_reset_only_the_unfinished_stage_and_never_borrow_another_claim(
         &mut owner,
         frame(),
         &[standing(P1, -9.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(2),
     );
     assert_eq!(owner, Some(0));
@@ -251,25 +287,45 @@ fn interruptions_reset_only_the_unfinished_stage_and_never_borrow_another_claim(
 }
 
 #[test]
-fn contests_are_local_to_existing_flags_and_independent_of_seat_order() {
+fn distant_defenders_pause_flag_work_independently_of_seat_order_or_balance() {
     let mut a = SurfacePlanetClaim::new(0);
     let mut b = SurfacePlanetClaim::new(0);
     let mut owner_a = None;
     let mut owner_b = None;
     for (claim, owner) in [(&mut a, &mut owner_a), (&mut b, &mut owner_b)] {
-        claim.update(owner, frame(), &[standing(P1, 0.0)], FLAG_STAGE_TIME);
-        claim.update(owner, frame(), &[standing(P2, 1.0)], Duration::from_secs(1));
+        claim.update(
+            owner,
+            frame(),
+            &[standing(P1, 0.0)],
+            Default::default(),
+            FLAG_STAGE_TIME,
+        );
+        claim.update(
+            owner,
+            frame(),
+            &[standing(P2, 1.0)],
+            Default::default(),
+            Duration::from_secs(1),
+        );
     }
+    let forces = [SurfaceOpposition {
+        pilots: 1,
+        ..Default::default()
+    }; 2];
+    let mut defender = standing(P1, 20.0);
+    defender.status = PlanetClaimStatus::NeedBalance;
     a.update(
         &mut owner_a,
         frame(),
-        &[standing(P1, -1.0), standing(P2, 1.0)],
+        &[defender, standing(P2, 1.0)],
+        forces,
         Duration::from_secs(20),
     );
     b.update(
         &mut owner_b,
         frame(),
-        &[standing(P2, 1.0), standing(P1, -1.0)],
+        &[standing(P2, 1.0), defender],
+        forces,
         Duration::from_secs(20),
     );
     for player in 0..2 {
@@ -277,33 +333,27 @@ fn contests_are_local_to_existing_flags_and_independent_of_seat_order() {
             a.observation(owner_a, frame(), player),
             b.observation(owner_b, frame(), player)
         );
-        assert_eq!(
-            a.observation(owner_a, frame(), player).status,
-            PlanetClaimStatus::Contested
-        );
     }
+    assert_eq!(owner_a, Some(0));
+    assert_eq!(a.statuses[1], PlanetClaimStatus::OpposingSurfaceForces);
     assert_eq!(a.observation(owner_a, frame(), 1).progress, 1.0 / 3.0);
+    // Only clearing the actual opposition permits the same valid attempt to resume.
     a.update(
         &mut owner_a,
         frame(),
-        &[standing(P1, 20.0), standing(P2, 1.0)],
+        &[standing(P2, 1.0)],
+        Default::default(),
         Duration::from_secs(2),
     );
-    assert_eq!(
-        owner_a, None,
-        "a distant defender cannot contest the old flag"
-    );
+    assert_eq!(owner_a, None);
     a.update(
         &mut owner_a,
         frame(),
-        &[standing(P1, 20.0), standing(P2, 1.0)],
+        &[standing(P2, 1.0)],
+        Default::default(),
         FLAG_STAGE_TIME,
     );
-    assert_eq!(
-        owner_a,
-        Some(1),
-        "a distant opponent cannot contest the new flag either"
-    );
+    assert_eq!(owner_a, Some(1));
 }
 
 #[test]
@@ -314,12 +364,19 @@ fn simultaneous_neutral_claimants_do_not_win_by_iteration_order() {
         &mut owner,
         frame(),
         &[standing(P2, 10.0), standing(P1, -10.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
         Duration::from_secs(20),
     );
     assert_eq!(owner, None);
     assert!(claim.flag.is_none());
     assert_eq!(claim.statuses, [PlanetClaimStatus::Contested; 2]);
-    claim.update(&mut owner, frame(), &[standing(P1, -10.0)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P1, -10.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     assert_eq!(owner, Some(0));
 }
 
@@ -328,7 +385,13 @@ fn flags_keep_the_exact_contact_anchor_as_the_planet_rotates_and_translates() {
     let mut claim = SurfacePlanetClaim::new(0);
     let mut owner = None;
     let candidate = standing(P1, 17.0);
-    claim.update(&mut owner, frame(), &[candidate], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[candidate],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     let moved = motion::SurfaceFrame {
         position: Vec2::new(-100.0, 300.0),
         angle: 1.9,
@@ -348,18 +411,42 @@ fn flags_keep_the_exact_contact_anchor_as_the_planet_rotates_and_translates() {
 fn nearby_support_on_another_planet_cannot_lower_a_flag() {
     let mut claim = SurfacePlanetClaim::new(0);
     let mut owner = None;
-    claim.update(&mut owner, frame(), &[standing(P1, 0.0)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P1, 0.0)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     let mut foreign = standing(P2, 0.0);
     foreign.planet = Some(1);
-    claim.update(&mut owner, frame(), &[foreign], Duration::from_secs(30));
+    claim.update(
+        &mut owner,
+        frame(),
+        &[foreign],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        Duration::from_secs(30),
+    );
     assert_eq!(owner, Some(0));
     assert_eq!(claim.statuses[1], PlanetClaimStatus::Elsewhere);
     assert!(claim.progress.is_none());
     // Verify both sides of the declared range using the same completed frame.
-    claim.update(&mut owner, frame(), &[standing(P2, 3.01)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P2, 3.01)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     assert_eq!(owner, Some(0));
     assert_eq!(claim.statuses[1], PlanetClaimStatus::ApproachFlag);
-    claim.update(&mut owner, frame(), &[standing(P2, 2.99)], FLAG_STAGE_TIME);
+    claim.update(
+        &mut owner,
+        frame(),
+        &[standing(P2, 2.99)],
+        [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
+        FLAG_STAGE_TIME,
+    );
     assert_eq!(owner, None);
     assert_eq!(claim.neutralizations, 1);
 }
@@ -479,16 +566,31 @@ fn landing_disembarking_and_waiting_claims_without_a_terminal_on_moving_planets(
 }
 
 #[test]
-fn another_landing_cannot_lower_the_flag_until_the_pilot_reaches_it() {
+fn another_landing_cannot_lower_the_flag_until_the_defender_departs_and_pilot_reaches_it() {
     let mut state = fixture(SurfaceMotionPreset::Orbit, 0.0, 2);
     assert!(state.vehicle_settled(0) && state.vehicle_settled(1));
     step(&mut state, [INTERACT, NEUTRAL]);
     idle(&mut state, 240);
-    assert_eq!(state.world.planets[0].owner_id, Some(0));
+    assert_eq!(state.world.planets[0].owner_id, None);
+    assert_eq!(
+        state.claim_observation(0, 0).unwrap().status,
+        PlanetClaimStatus::OpposingSurfaceForces
+    );
+    // Install the original owner's flag as a fixture. Claiming while the
+    // opposing landed ship remained here would now correctly be forbidden.
+    let anchor = state.claim_candidate(0).anchor.unwrap();
+    state.claims[0].flag = Some(PlanetFlag { player: P1, anchor });
+    state.world.planets[0].owner_id = Some(0);
     step(&mut state, [INTERACT, NEUTRAL]);
     idle(&mut state, 1);
     step(&mut state, [NEUTRAL, INTERACT]);
-    idle(&mut state, 240);
+    let departing = SurfaceSortieAction {
+        primary_held: true,
+        ..NEUTRAL
+    };
+    for _ in 0..120 {
+        step(&mut state, [departing, NEUTRAL]);
+    }
     let old_flag = state.claim_observation(0, 1).unwrap().flag.unwrap();
     assert_eq!(state.world.planets[0].owner_id, Some(0));
     assert_eq!(
@@ -522,7 +624,7 @@ fn another_landing_cannot_lower_the_flag_until_the_pilot_reaches_it() {
     let mut saw_lowering = false;
     let mut saw_neutral = false;
     for _ in 0..480 {
-        idle(&mut state, 1);
+        step(&mut state, [departing, NEUTRAL]);
         let claim = state.claim_observation(0, 1).unwrap();
         match claim.phase {
             PlanetClaimPhase::Lowering => {
@@ -549,7 +651,7 @@ fn another_landing_cannot_lower_the_flag_until_the_pilot_reaches_it() {
         "{:?}",
         state.observation(1)
     );
-    assert_eq!(state.claims[0].captures, 2);
+    assert_eq!(state.claims[0].captures, 1);
     assert_eq!(state.claims[0].neutralizations, 1);
 }
 

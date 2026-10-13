@@ -12,6 +12,8 @@ use spacewars_ai::{
     mission_pilot::{MaterialMissionPilot, MissionGoal},
 };
 use std::{collections::BTreeSet, time::Duration};
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 fn context(seat: usize) -> BrainReset {
     BrainReset {
@@ -157,7 +159,7 @@ fn both_seats_physically_capture_board_and_depart_from_both_planets() {
             let mut intent = brain.intent(&o);
             intent.weapons = Default::default();
             let actions = intent.encode(context(seat).actor);
-            SurfaceSortieScenario::step(&mut state, &actions, DT);
+            capture_fixture::step(&mut state, context(seat).actor, &actions, DT);
             if brain.telemetry().completed_sorties >= 2 {
                 break;
             }
@@ -381,7 +383,7 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
                 );
                 hunted = true;
             }
-            SurfaceSortieScenario::step(&mut state, &intent.encode(actor), DT);
+            capture_fixture::step(&mut state, actor, &intent.encode(actor), DT);
             let hits = state.combat_telemetry(seat);
             if hits.cannon_hits > 0 || hits.laser_hit_ticks > 0 {
                 break;
@@ -399,7 +401,7 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
 
 #[test]
 fn pursuit_reaches_weapon_contact_after_physical_capture_preparation() {
-    // These parked opponents exposed routing through intervening bodies and
+    // These opponents exposed routing through intervening bodies and
     // repeated climb/aim transitions. Preparation retains the full-mission
     // budget; contact has its own window so late claims cannot hide a stall.
     for (seed, seat, mirror) in [(0, 1, false), (42, 0, true), (7, 1, true)] {
@@ -432,7 +434,7 @@ fn pursuit_reaches_weapon_contact_after_physical_capture_preparation() {
             } else {
                 intent.weapons = Default::default();
             }
-            SurfaceSortieScenario::step(&mut state, &intent.encode(actor), DT);
+            capture_fixture::step(&mut state, actor, &intent.encode(actor), DT);
             let combat = state.combat_telemetry(seat);
             if combat.cannon_hits > 0 || combat.laser_hit_ticks > 0 {
                 hit = true;
@@ -488,7 +490,12 @@ fn inner_planet_solar_approach_completes_a_real_capture_and_departure() {
         if brain.telemetry().goal == MissionGoal::AvoidSun && brain.telemetry().capture.is_some() {
             approach_escapes += 1;
         }
-        SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_2), DT);
+        capture_fixture::step(
+            &mut state,
+            PlayerId::PLAYER_2,
+            &intent.encode(PlayerId::PLAYER_2),
+            DT,
+        );
         if let Some(event) = brain
             .telemetry()
             .events
@@ -535,7 +542,7 @@ fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
             let o = state.mission_observation(seat, brain.site_request());
             let mut intent = brain.intent(&o);
             intent.weapons = Default::default();
-            SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+            capture_fixture::step(&mut state, owner, &intent.encode(owner), DT);
             if brain.telemetry().completed_sorties >= required {
                 break;
             }
@@ -600,7 +607,7 @@ fn large_moving_planets_land_exit_claim_and_depart_in_both_reflections() {
             }
             let mut intent = pilot.intent(&o);
             intent.weapons = Default::default();
-            SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+            capture_fixture::step(&mut state, owner, &intent.encode(owner), DT);
             if pilot.telemetry().completed_sorties > 0 {
                 break;
             }
@@ -723,7 +730,12 @@ fn generated_corner_return_boards_the_original_ship_and_departs() {
             );
             let mut intent = pilot.intent(&o);
             intent.weapons = Default::default();
-            SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), DT);
+            capture_fixture::step(
+                &mut state,
+                PlayerId::PLAYER_1,
+                &intent.encode(PlayerId::PLAYER_1),
+                DT,
+            );
             if pilot
                 .telemetry()
                 .events

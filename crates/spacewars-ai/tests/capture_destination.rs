@@ -1,5 +1,4 @@
 //! Native-host ordering, cadenced real surveys and ordinary physical controls.
-use engine_common::Scenario;
 use engine_core::planning::Work;
 use scenario_spacewars::{
     PlayerId,
@@ -15,6 +14,8 @@ use spacewars_ai::{
 };
 use std::time::Duration;
 
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 const WORK: Work = Work {
     graph: 4,
@@ -139,7 +140,7 @@ impl Run {
             assert!(used.graph + graph.graph + used_flags.graph <= WORK.graph);
             assert!(used.physics_queries + used_flags.physics_queries <= WORK.physics_queries);
         }
-        SurfaceSortieScenario::step(&mut self.state, &intent.encode(actor), DT);
+        capture_fixture::step(&mut self.state, actor, &intent.encode(actor), DT);
         intent
     }
 }
@@ -241,7 +242,12 @@ fn no_completed_comparison_is_exact_v10_fallback_through_flag_capture() {
                 evaluator.advance(run.state.tick(), Work::default()),
                 Work::default()
             );
-            SurfaceSortieScenario::step(&mut run.state, &expected.encode(PlayerId::PLAYER_1), DT);
+            capture_fixture::step(
+                &mut run.state,
+                PlayerId::PLAYER_1,
+                &expected.encode(PlayerId::PLAYER_1),
+                DT,
+            );
         }
         assert!(run.bot.telemetry().completed_sorties > 0);
         assert_eq!(

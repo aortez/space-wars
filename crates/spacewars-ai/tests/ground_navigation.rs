@@ -1724,6 +1724,7 @@ fn claim_footing_rejects_stale_or_unmeasured_proposals_and_leaves_contests_alone
         PlanetClaimStatus::Ready,
         PlanetClaimStatus::Raising,
         PlanetClaimStatus::Contested,
+        PlanetClaimStatus::OpposingSurfaceForces,
     ] {
         let (context, mut o) = fixture();
         invalid_claim(&mut o);

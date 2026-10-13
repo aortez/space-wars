@@ -36,6 +36,7 @@ impl GroundNavigationTask {
                 | PlanetClaimStatus::Lowering
                 | PlanetClaimStatus::Raising
                 | PlanetClaimStatus::Contested
+                | PlanetClaimStatus::OpposingSurfaceForces
                 | PlanetClaimStatus::Secured
         ) {
             if active {

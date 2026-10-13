@@ -25,6 +25,7 @@ pub(crate) const MATCH_REGISTRATION: ScenarioRegistration = ScenarioRegistration
         "P2: num4/6 move, 8 thrust/jump, 5 brake, 2 transfer;\n",
         "PageDown cruise/size, End laser/mine, Home missile.\n",
         "Land on both feet, exit, stand 3s to claim; owned ground 8s rebuild.\n",
+        "Clear opposing surface forces to claim. Nearby flying ships do not block.\n",
         "Ship and pod hulls fully protect the pilot. On foot is most fragile.\n",
         "A broken pod releases the pilot. Boarding never repairs hull or health.\n",
         "Ship ejection grants 3s protection. Pilot death ends the round."

@@ -1,0 +1,421 @@
+{
+  "issue": 234,
+  "date": "2026-10-12",
+  "branch": "feat/planet-surface-opposition-234",
+  "base": "db6f020d86da0b3cbd72e13d13aa86c0f8c68593",
+  "source_state": "validated pre-commit snapshot; Rust file identities retained below",
+  "rust_source_sha256": {
+    "crates/engine-client/src/client_scenarios/surface_sortie.rs": "a6f2170d2c82dbc4a66380053c57ad8967a028ee9115c4f207f66a0ddd280ab3",
+    "crates/engine-client/src/client_scenarios/surface_sortie/hud/tests.rs": "977a0ea3f26c60e5ae5796ebbd387e85211587b92431eb3138c8fc1958bb700e",
+    "crates/engine-client/src/client_scenarios/surface_sortie/mission.rs": "adff6f01e0e7e8ec5fecacd7d35fbb803b2bc7f18e6eb95a2f2edd7faca2ff25",
+    "crates/spacewars-ai/src/ground_task/claim.rs": "29b487c8b0ea609714e8094728517ca6b027517f26959e7eb41f449fe9f80cbf",
+    "crates/spacewars-ai/src/mission_successors/sortie_tests.rs": "6e0076dbb0b5629c5d9c214f0e7120a986e47b081162a4c540e26099e2bc8862",
+    "crates/spacewars-ai/src/recovery_task.rs": "5049e4e4efa8d4a0dc6a380967ec001441aa0df77023926276215e08563ee8e1",
+    "crates/spacewars-ai/src/tactical_sortie.rs": "2dcf051b320081b56fbc8953be31bb5ed7de5326031711aedc976fc33fb0f337",
+    "crates/spacewars-ai/tests/capture_destination.rs": "9125c937b09d6a87c61ab89b7b3b1287077eeb97f9fb3571d9c9346b14e5971d",
+    "crates/spacewars-ai/tests/ground_jetpack.rs": "725029b061a8b3a704de861c58a1aeb0d1fc2bce1f2392568c1ce577032208e8",
+    "crates/spacewars-ai/tests/ground_navigation.rs": "912e7b85de97fe11d304ca67bb7a9e443c2f23c2019da3a4b9e14c501db33d8f",
+    "crates/spacewars-ai/tests/ground_walk.rs": "a0427cc5bcd75555a554e1bb0619b501cbbafdfe38a834c5aa179ecda032bea1",
+    "crates/spacewars-ai/tests/jetpack_crossing.rs": "55e2542e3a21025f2bfb5a009a23cf14cd2d75bf84cb0165f76a700cb8570334",
+    "crates/spacewars-ai/tests/jetpack_forecast.rs": "625fbbb8397083eea629ebf9175c5af78b89d33124ee7ccda29c245027f9b1db",
+    "crates/spacewars-ai/tests/support/unopposed_capture.rs": "0a6f18d64e7b348889ef3e13c0a133796abe9c04b1833e4a69a647dcd9b81634",
+    "crates/spacewars-ai/tests/surface_flight.rs": "e955ac5ac0d5d1c5380f45b49cf6f456ed78b78f82e7995edfc92b3b24497dea",
+    "crates/spacewars-ai/tests/surface_mission.rs": "808e263061ea04e1e248bfe40423bcd24a55aaf36fa638b39b4a38777ba7072f",
+    "crates/spacewars-ai/tests/surface_pilot.rs": "bd333922ab10abfda1e9bf2bde98719411f6f4c06d07b5c1ab2ef253f4427163",
+    "crates/spacewars-ai/tests/surface_recovery.rs": "dedccff817009bc6175f6fd86ed1e5ef9bf86ce4352f253b1cd22033f53aae68",
+    "scenarios/spacewars/examples/surface_opposition.rs": "43993262daa72e2bdfb96a7f251d7ac22ecfe13d80d6945901d718bed4237824",
+    "scenarios/spacewars/src/surface_sortie.rs": "6b9b378c43ae6a9e22cf48d0fd5c6cea1d940a6e00c17cc78ab52a785e4f8e46",
+    "scenarios/spacewars/src/surface_sortie/claim.rs": "4fe44491db566077b6da34c2e17d2a5d6723c74ff20f4f8934cd37ee1b7cb59c",
+    "scenarios/spacewars/src/surface_sortie/claim/tests.rs": "397eda7d7b1279dde8a2f961fc2d7839c69e16b86d6dba1613a67e5712ff42fb",
+    "scenarios/spacewars/src/surface_sortie/claim/tests/opposition.rs": "e8f77d5d06f84043b6b9f21a34c99e3c3617fa377644b9d0c4f00188f206f594",
+    "scenarios/spacewars/src/surface_sortie/comparison/tests.rs": "0bc271ce30156b5f78bc67984950ac0e712ec52736e64c5c945608c55a191baf",
+    "scenarios/spacewars/src/surface_sortie/hud.rs": "f2b4c7b867676adad18cf81ad7959c522825f2f11c56601bbf2308411dc8c3a1",
+    "scenarios/spacewars/src/surface_sortie/material/tests.rs": "108b773d9e56b0dab541f0ca1311ffbbd46f41f27b90d85c8b2d17c083c0dd88",
+    "scenarios/spacewars/src/surface_sortie/surface_forces.rs": "9cdb4c628839ac4d105521e7b0edd4711a198ffe6119c5f807292a1cb078d633",
+    "scenarios/spacewars/src/surface_sortie/surface_forces/tests.rs": "703651990915210456b5abd7eee5d0a8db802c7514ae56e1f0cf729971e804f3",
+    "scenarios/spacewars/src/surface_sortie/tests/match_tests.rs": "b2d7602058b370d10596c581aad8389d7f1aa0f3329be4937cf9ac2ea5acba32",
+    "scenarios/spacewars/src/surface_sortie/tests/multiplayer_tests.rs": "c0bb19461fd4af0c91e7ede419d951dabc197eeae834a5c784de8c26beb95cd2"
+  },
+  "contract": {
+    "contact_grace_seconds": 1,
+    "departure_distance_world_units": 8,
+    "maximum_registered_ground_forces": 32,
+    "maximum_colliders_per_ground_force": 4,
+    "claim_observation_version": 12,
+    "ships_need_current_foot_contact": true,
+    "thrust_clears_ship_presence": true
+  },
+  "validation": {
+    "scenario_lib": {
+      "passed": 599,
+      "ignored": 1,
+      "command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p scenario-spacewars -p spacewars-ai --features spacewars-ai/terrain-recovery --lib --tests",
+      "receipt": "native-ai-tests.log: first package completed; subsequent AI failures were resolved in ai-integration-tests.log"
+    },
+    "ai": {
+      "passed": 589,
+      "ignored": 1,
+      "command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p spacewars-ai --features terrain-recovery --tests --no-fail-fast",
+      "receipt": "ai-integration-tests.log"
+    },
+    "client_surface_sortie": {
+      "passed": 41,
+      "ignored_unit_tests": 3,
+      "ignored_functional_workflows": 4,
+      "command": "RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci -p engine-client surface_sortie",
+      "receipt": "client-tests.log"
+    },
+    "hud_final": {
+      "passed": 1,
+      "sizes": [
+        [
+          800,
+          480
+        ],
+        [
+          1024,
+          768
+        ],
+        [
+          480,
+          800
+        ]
+      ],
+      "raster_scales": [
+        1,
+        2
+      ],
+      "vector_raster_frames_equal": true,
+      "receipt": "hud-final.log"
+    },
+    "ai_ci_clippy": {
+      "status": "passed",
+      "command": "cargo +1.89.0 clippy --locked --profile ci -p spacewars-ai --features sensor-profile --lib --tests --no-deps -- -D warnings",
+      "receipt": "ai-clippy.log"
+    },
+    "scenario_wide_strict_clippy": {
+      "status": "blocked_by_existing_lints",
+      "receipt": "clippy.log",
+      "note": "Existing collapsible_if, unnecessary_literal_unwrap, field_reassign_with_default, too_many_arguments, items_after_test_module and assertions_on_constants diagnostics; none in new surface-force, claim-gate, or opposition-test code."
+    },
+    "build": {
+      "status": "passed",
+      "receipt": "final-build.log",
+      "note": "Existing two unused GPU helper warnings in engine-client."
+    },
+    "local_ui": {
+      "scenario": "spacewars-terrain",
+      "seed": 42,
+      "players": 2,
+      "backend": "vector",
+      "status": "Verified real P1 exit blocks; P2 ordinary thrust allows a visible completed flag. The live session resumed before the planned restart and was left as-is.",
+      "screenshots": [
+        "live-blocked.png",
+        "live-cleared.png"
+      ]
+    }
+  },
+  "workflow": {
+    "command": "cargo +1.89.0 run --locked --profile ci -p scenario-spacewars --example surface_opposition -- --replay",
+    "replay_checked": true,
+    "cases": [
+      {
+        "blocked": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "opposition": {
+            "ground_units": 0,
+            "pilots": 0,
+            "ships": 1
+          },
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "opposing_surface_forces"
+        },
+        "cleared": {
+          "captures": 0,
+          "claimant": "player_1",
+          "flag": {
+            "normal": {
+              "x": -0.12019997090101242,
+              "y": 0.9927496910095215
+            },
+            "player": "player_1",
+            "position": {
+              "x": 500.9173278808594,
+              "y": 559.038330078125
+            },
+            "raised_fraction": 0.0055555556900799274
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "raising",
+          "planet": 0,
+          "progress": 0.0055555556900799274,
+          "stage_required_seconds": 3.0,
+          "status": "raising"
+        },
+        "material": {
+          "budget_skips": 0,
+          "cannon_hits": 0,
+          "cell_bytes": 29282,
+          "cohesion": {
+            "capacity_denials": 0,
+            "failures": 0,
+            "fragment_denials": 0,
+            "held_checks": 0,
+            "irregular_failures": 0,
+            "irregular_held_checks": 0,
+            "last_load": 0.0,
+            "last_resistance": 0.0,
+            "pending": 0,
+            "released_cells": 0,
+            "roof_failures": 0,
+            "roof_held_checks": 0,
+            "scanned": 0,
+            "tracking_overflow": 0
+          },
+          "deposited_cells": 0,
+          "fastest_body": "BodyId { entity: PhysicsId(10001), role: BodyRole(0) }",
+          "fragments": 0,
+          "impact_fracture": {
+            "budget_skips": 0,
+            "capacity_denials": 0,
+            "contact_overflow": 0,
+            "failures": 0,
+            "fragment_denials": 0,
+            "held_checks": 0,
+            "peak_severity": 0.0,
+            "pending": 0,
+            "released_cells": 0,
+            "scanned": 0,
+            "stale_hits": 0
+          },
+          "issues": [],
+          "last_capacity_rejection": null,
+          "loose_available": 192,
+          "loose_cells": 0,
+          "loose_limit": 192,
+          "max_speed": 69.74478149414062,
+          "max_spin": 0.07584332674741745,
+          "motion_hash": "da008adce50ce1f1",
+          "occupied_cells": 11069,
+          "pending_edits": 0,
+          "physics_bodies": 5,
+          "physics_colliders": 24,
+          "rejected_releases": 0,
+          "removed_cells": 0,
+          "settling": {
+            "budget": 0,
+            "moving": 0,
+            "no_room": 0,
+            "obstructed": 0,
+            "unstable": 0,
+            "unsupported": 0,
+            "waiting": 0
+          },
+          "slumping": {
+            "capacity_blocked": 0,
+            "capacity_denials": 0,
+            "fragment_blocked": 0,
+            "fragment_denials": 0,
+            "pending": 0,
+            "released_cells": 0,
+            "scanned": 0,
+            "tracking_overflow": 0
+          },
+          "supported_bases": 0,
+          "surface_sample_bytes": 0,
+          "terrain_colliders": 16,
+          "terrain_polygon_vertices": 0,
+          "terrain_polygons": 0,
+          "terrain_rectangles": 192
+        },
+        "observation_hash": "bd094e82a2893378",
+        "secured": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": -0.17950864136219025,
+              "y": 0.983756422996521
+            },
+            "player": "player_1",
+            "position": {
+              "x": 497.3757629394531,
+              "y": 558.987060546875
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_1",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        },
+        "seed": 42,
+        "shape": "Round",
+        "ticks": 722
+      },
+      {
+        "blocked": {
+          "captures": 0,
+          "claimant": null,
+          "flag": null,
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "opposition": {
+            "ground_units": 0,
+            "pilots": 0,
+            "ships": 1
+          },
+          "owner": null,
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "opposing_surface_forces"
+        },
+        "cleared": {
+          "captures": 0,
+          "claimant": "player_1",
+          "flag": {
+            "normal": {
+              "x": -0.12019997090101242,
+              "y": 0.9927496910095215
+            },
+            "player": "player_1",
+            "position": {
+              "x": 500.9173278808594,
+              "y": 559.038330078125
+            },
+            "raised_fraction": 0.0055555556900799274
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": null,
+          "phase": "raising",
+          "planet": 0,
+          "progress": 0.0055555556900799274,
+          "stage_required_seconds": 3.0,
+          "status": "raising"
+        },
+        "material": {
+          "budget_skips": 0,
+          "cannon_hits": 0,
+          "cell_bytes": 29282,
+          "cohesion": {
+            "capacity_denials": 0,
+            "failures": 0,
+            "fragment_denials": 0,
+            "held_checks": 0,
+            "irregular_failures": 0,
+            "irregular_held_checks": 0,
+            "last_load": 0.0,
+            "last_resistance": 0.0,
+            "pending": 0,
+            "released_cells": 0,
+            "roof_failures": 0,
+            "roof_held_checks": 0,
+            "scanned": 0,
+            "tracking_overflow": 0
+          },
+          "deposited_cells": 0,
+          "fastest_body": "BodyId { entity: PhysicsId(10001), role: BodyRole(0) }",
+          "fragments": 0,
+          "impact_fracture": {
+            "budget_skips": 0,
+            "capacity_denials": 0,
+            "contact_overflow": 0,
+            "failures": 0,
+            "fragment_denials": 0,
+            "held_checks": 0,
+            "peak_severity": 0.0,
+            "pending": 0,
+            "released_cells": 0,
+            "scanned": 0,
+            "stale_hits": 0
+          },
+          "issues": [],
+          "last_capacity_rejection": null,
+          "loose_available": 192,
+          "loose_cells": 0,
+          "loose_limit": 192,
+          "max_speed": 69.74478149414062,
+          "max_spin": 0.07584332674741745,
+          "motion_hash": "da008adce50ce1f1",
+          "occupied_cells": 11069,
+          "pending_edits": 0,
+          "physics_bodies": 5,
+          "physics_colliders": 24,
+          "rejected_releases": 0,
+          "removed_cells": 0,
+          "settling": {
+            "budget": 0,
+            "moving": 0,
+            "no_room": 0,
+            "obstructed": 0,
+            "unstable": 0,
+            "unsupported": 0,
+            "waiting": 0
+          },
+          "slumping": {
+            "capacity_blocked": 0,
+            "capacity_denials": 0,
+            "fragment_blocked": 0,
+            "fragment_denials": 0,
+            "pending": 0,
+            "released_cells": 0,
+            "scanned": 0,
+            "tracking_overflow": 0
+          },
+          "supported_bases": 0,
+          "surface_sample_bytes": 0,
+          "terrain_colliders": 16,
+          "terrain_polygon_vertices": 0,
+          "terrain_polygons": 0,
+          "terrain_rectangles": 192
+        },
+        "observation_hash": "23d1290f7008e9a2",
+        "secured": {
+          "captures": 1,
+          "claimant": null,
+          "flag": {
+            "normal": {
+              "x": -0.17950864136219025,
+              "y": 0.983756422996521
+            },
+            "player": "player_1",
+            "position": {
+              "x": 497.3757629394531,
+              "y": 558.987060546875
+            },
+            "raised_fraction": 1.0
+          },
+          "flag_interaction_range": 3.0,
+          "neutralizations": 0,
+          "owner": "player_1",
+          "phase": "idle",
+          "planet": 0,
+          "progress": 0.0,
+          "stage_required_seconds": 3.0,
+          "status": "secured"
+        },
+        "seed": 42,
+        "shape": "Hexagon",
+        "ticks": 722
+      }
+    ]
+  },
+  "local_raw_artifacts": "/tmp/spacewars-opposition-234"
+}

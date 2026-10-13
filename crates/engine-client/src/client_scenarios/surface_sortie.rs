@@ -78,7 +78,7 @@ pub(super) const WORLD_REGISTRATION: ScenarioRegistration = ScenarioRegistration
 pub(super) const EXPEDITION_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "surface-expedition",
     controls_help: concat!(
-        "Surface Expedition: land rear-first, B / X to get out, then stand still on the surface for 3 seconds to claim a neutral planet. Your flag is planted where you stand. An existing enemy flag must be approached (within 3 units) and lowered for 3 seconds before your own flag can rise for another 3 seconds. Opponents near the flag pause progress. Leaving, jumping or losing balance resets the unfinished stage; a fully lowered flag leaves the planet neutral. Minimap colors show planet ownership and triangles locate flags. ",
+        "Surface Expedition: land rear-first, B / X to get out, then stand still on the surface for 3 seconds to claim a neutral planet. Your flag is planted where you stand. An existing enemy flag must be approached (within 3 units) and lowered for 3 seconds before your own flag can rise for another 3 seconds. Opposing pilots and landed ships anywhere on the planet pause capture; nearby flying ships do not. Leaving, jumping or losing balance resets the unfinished stage; a fully lowered flag leaves the planet neutral. Minimap colors show planet ownership and triangles locate flags. ",
         "A / Space thrusts or jumps; left/right turns or walks; Down / S brakes; B / X boards your own landed ship or pod at the cyan hatch. Choose 1 or 2 players in Settings. P2 keyboard: numpad 4/6 turns/walks, 8 thrusts/jumps, 5 brakes, 2 boards/exits. Each assigned gamepad controls its own pilot; release controls after transfers and vehicle loss/replacement. Start / Esc pauses; R restarts. ",
         "Loss drill: hold A+B+Down (Space+X+S; P2 numpad 8+2+5) for 3 seconds to destroy your assigned full ship; release early to cancel. An occupied ship leaves a flyable pod; an empty ship leaves the existing spaceling alive, not an empty pod. Land the pod rear-first and exit, even on a neutral planet. With no full ship, stand still on an owned planet for 8 seconds to rebuild nearby; no outpost or flag proximity is required. Losing support, balance or ownership resets progress. If space is blocked, move to another clear spot. Board the replacement normally after it settles. Ships start at full health; pods and spacelings remain invulnerable in this lab. No outposts, repair, weapons, ship swapping or remote rescue; ordinary Spacewars is unchanged."
     ),
@@ -93,7 +93,7 @@ struct SurfaceSortieClientScenario {
 
 pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain",
-    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Hold RB/J to sweep wings and cruise; release to open, then brake for landing. Open wings turn faster; sweeping adds speed. P2 uses PageDown for wings aboard. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Gamepad X calls a light asteroid; RB+X calls a heavy one (keyboard K / J+K; P2 Home / PageDown+Home). One rock per press, 3s cooldown. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
+    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. Opposing surface forces anywhere on the planet block capture; nearby flying ships do not. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Hold RB/J to sweep wings and cruise; release to open, then brake for landing. Open wings turn faster; sweeping adds speed. P2 uses PageDown for wings aboard. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Gamepad X calls a light asteroid; RB+X calls a heavy one (keyboard K / J+K; P2 Home / PageDown+Home). One rock per press, 3s cooldown. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
     create: create_material,
     ..EXPEDITION_REGISTRATION
 };
@@ -1025,7 +1025,18 @@ mod tests {
         assert_eq!(host.brain.telemetry(), &initial);
         assert!(!host.strike_sent);
         for _ in 0..180 * 60 {
-            host.step(&interference, Duration::from_nanos(16_666_667));
+            // Let the human leave while P2 captures; an idle landed opponent
+            // now defends the planet. P2's interference must still be ignored.
+            let mut actions = interference.to_vec();
+            actions.push(
+                SurfaceSortieAction {
+                    primary_held: host.sortie.state.location(1)
+                        == scenario_spacewars::surface_sortie::PilotLocation::OnFoot,
+                    ..Default::default()
+                }
+                .encode(PlayerId::PLAYER_1),
+            );
+            host.step(&actions, Duration::from_nanos(16_666_667));
             if host.brain.telemetry().departed_tick.is_some() {
                 break;
             }
@@ -1144,12 +1155,24 @@ mod tests {
         for _ in 0..180 * 60 {
             let o = reference.flight_pilot_observation(1, brain.site_request());
             let action = brain.intent(&o);
+            // Identical real P1 takeoff in both controls keeps the capture
+            // unopposed while the test still rejects all direct P2 inputs.
+            let departure = SurfaceSortieAction {
+                primary_held: reference.location(1)
+                    == scenario_spacewars::surface_sortie::PilotLocation::OnFoot,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1);
+            let mut expected = action.encode(PlayerId::PLAYER_2).to_vec();
+            expected.push(departure.clone());
             SurfaceSortieScenario::step(
                 &mut reference,
-                &action.encode(PlayerId::PLAYER_2),
+                &expected,
                 Duration::from_nanos(16_666_667),
             );
-            host.step(&interfering, Duration::from_nanos(16_666_667));
+            let mut actions = interfering.to_vec();
+            actions.push(departure);
+            host.step(&actions, Duration::from_nanos(16_666_667));
             assert_eq!(host.sortie.state.observation(1), reference.observation(1));
             if host.brain.telemetry().completed_tick.is_some() {
                 break;

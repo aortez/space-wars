@@ -638,7 +638,14 @@ impl RecoverShipTask {
                 if self.telemetry.status != TaskStatus::Blocked
                     && p.tick.saturating_sub(self.telemetry.last_progress_tick) > 15 * 60
                 {
-                    self.block("no supported claim progress", p.tick);
+                    self.block(
+                        if claim.is_some_and(|c| !c.opposition.is_empty()) {
+                            "opposing surface forces prevent capture"
+                        } else {
+                            "no supported claim progress"
+                        },
+                        p.tick,
+                    );
                 }
                 return action;
             }
