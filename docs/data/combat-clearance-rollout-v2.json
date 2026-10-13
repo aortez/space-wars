@@ -1,0 +1,183 @@
+{
+  "purpose": "Recovery v1 rollout validation after the CI-discovered generated-terrain boundary correction",
+  "runtime": {
+    "base": "7a7ea4ab11e78c19fa1cc5b116390f3734186f1b",
+    "patch_sha256": "0c419b0232b2bac082231b8dd8f97cb61abf9a1db64aa8b1ffc65a5c52464e2d",
+    "reason": "Retest rollout with the seed-377 terrain boundary generation correction exposed by CI run 38198930622.",
+    "replay_cases": [
+      "16-round-0s-p1",
+      "20-angular-0s-p1",
+      "27-round-8s-p2",
+      "31-angular-8s-p2"
+    ],
+    "scope": "Same qualification references and assertions; new client executable.",
+    "binaries": {
+      "ui_control_functional-tests": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/ui_control_functional-tests",
+        "sha256": "ebdef762a5b88088575bd5208603bde3d2168da8455d6e2e6fbc99743ef8372a"
+      },
+      "engine-client": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client",
+        "sha256": "b799be583fb72008a8f8d9ebda82092623211b9fbb125e05c4e01414cf7cecb2"
+      },
+      "engine-client-tests": {
+        "path": "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client-tests",
+        "sha256": "24a193f1df4859243582cd700796b14bb50eef95e79305fe39bf25bffb6dcaa6"
+      }
+    },
+    "rustc": "rustc 1.89.0 (29483883e 2025-08-04)"
+  },
+  "diagnosis": {
+    "ci_run": "https://github.com/aortez/space-wars/actions/runs/38198930622/job/114647747113",
+    "failed_test": "host::tests::new_material_worlds_rematch_the_latest_seed_and_reset_held_controls",
+    "error": "TerrainError(\"surface samples disagree with material\")",
+    "ci_random_seed": "Not recorded by the original test; seed 377 independently reproduces the same error.",
+    "reproducer": {
+      "seed": 377,
+      "planet": 1,
+      "radius_f32_bits": "0x4205e217",
+      "radius": 33.47079086303711,
+      "boundary_point": [
+        33,
+        3
+      ],
+      "scaled_radius": 33.13608169555664,
+      "squared_radius": 1097.9998779296875,
+      "squared_point_distance": 1098,
+      "signed_distance": 0.0
+    },
+    "change": "Use the same square-root distance for material membership and surface samples; retain strict sample validation.",
+    "regression": "terrain::tests::generated_planet_accepts_cells_at_a_rounded_surface_boundary",
+    "regression_before": {
+      "exit_code": 101,
+      "log_sha256": "7da70639821b8a83596b365792acb9bf35e1bb61fa511b488b5294d06284ba1b"
+    },
+    "regression_after": {
+      "exit_code": 0,
+      "log_sha256": "c4774ff518b221e025e409703b9491fd5b0bd9e5765adf1fbb345836310a0b68"
+    },
+    "coverage": "Generated planet seed 377, four boundary orientations, and adjacent representable radii."
+  },
+  "workspace": {
+    "passed": 3053,
+    "failed": 0,
+    "ignored": 64,
+    "exit_code": 0,
+    "command": "RUST_MIN_STACK=16777216 SPACEWARS_CLOCK_REGRESSION_DIR=target/recovery-clearance-rollout/v2/clock-regression cargo +1.89.0 test --locked --workspace --all-targets --profile ci",
+    "log_sha256": "3b8c1c19f4ebaf1afca2cea351d15481ca45b52351115ffe153ab525bba16f6e"
+  },
+  "replays": [
+    {
+      "case": "16-round-0s-p1",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/16-round-0s-p1/output"
+      },
+      "reference_sha256": {
+        "case.json": "56a5e3cd23d55eb338770a99d371e368013817a72dc1ef5d25cea43fd57d02eb",
+        "initial.json": "0f949f7587f17a47774c25cc874a9a19b916333a48325ab4a0f06c15db8b1a97",
+        "actions.jsonl": "7ec29de4072fd76c7cd80eb47b3eea216ab38d05d5dec3b5f40d8b8620bacb23",
+        "final.json": "cdf317da3e61a1cd0ec87f6c0ad1948329df9a3ce1b63bf2cf6787e24bba931d",
+        "summary.json": "fc2f043de497c85101f9487e76be49c05ca22d07f67be588db86609623465b7e"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 9.015982543998689,
+      "log_sha256": "8a05aced934c10cee199f671ed66692ccdfca5ddeaa91931585bd54a4e5ca892",
+      "reference_ticks": 23266,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "20-angular-0s-p1",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/20-angular-0s-p1/output"
+      },
+      "reference_sha256": {
+        "case.json": "1d0b1b67e6d172ad67a33985126abf2290535b496a9f4a1bf1d09cf484643032",
+        "initial.json": "efdaccff08959735b8e6bc8dd61091ea10a349d44d55e9ba66f39ae5267d07ec",
+        "actions.jsonl": "aaeb255119c5ce8c33f143b51f48759fe7e78bdcbb7ed3cb2ac79cbc7f351962",
+        "final.json": "e1eb888f62a3bc66da1e29fc132dd462c23c4595ba576b9d3cf6ecb452fa0e78",
+        "summary.json": "21ee505f12099b7821260b7440db00ad2f63ede2061354b0b3b744e55938ed1d"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 40.772154373000376,
+      "log_sha256": "0de8612c151a769c1871ea66060895df5d5fd05dca7acf3e05a6706593b8f131",
+      "reference_ticks": 36000,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "27-round-8s-p2",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/27-round-8s-p2/output"
+      },
+      "reference_sha256": {
+        "case.json": "33637daaea6ad2989e11fab65681bdcddc425233ccf85b27a0c5e87a2484f8a0",
+        "initial.json": "d0339713f916662331216843e4f787d3dbf1ed002c29d9a30fe7ee6eeb8a2d03",
+        "actions.jsonl": "bfb5d50925ca019ef15b0e4b0bd58ee4402dee625439535be805a5681adb3550",
+        "final.json": "e82db9febf29ff409e4e6a705227bf873e524ffac41dc893638d1e5fb447a804",
+        "summary.json": "508e12cdb442095482b7ef65434c730fa7aba74c019614eb90b2497c63f7fe49"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 79.53040521799994,
+      "log_sha256": "24ef726aba932d54ff195c17dbfcb11053bf749f2143eb29900d637ff8b32993",
+      "reference_ticks": 36000,
+      "reference_completed_recoveries": 0,
+      "passed": true
+    },
+    {
+      "case": "31-angular-8s-p2",
+      "command": [
+        "/home/data/workspace/space-wars3/target/recovery-clearance-rollout/v2/engine-client-tests",
+        "client_scenarios::surface_sortie::mission::recovery_tests::live_clearance_matches_retained_qualification",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "environment": {
+        "RUST_MIN_STACK": "16777216",
+        "SPACEWARS_LIVE_CLEARANCE_REFERENCE": "/home/data/workspace/space-wars3/target/combat-155/clearance-qualification-candidate-v1/31-angular-8s-p2/output"
+      },
+      "reference_sha256": {
+        "case.json": "2bd955c3795a2c5cb8c3b86e4ee0744ce1ced2c1d3ac744cafbe0fc5933477b1",
+        "initial.json": "cdfe12b8d5bbef4d5fb128e853167556d12cac55d3671e362276921c0f44da90",
+        "actions.jsonl": "2d9ee9672fc577b8b4297e84f3624b97566d9dfa8b2d860bbbcf4cfa4febe170",
+        "final.json": "13dc0b0f9eb602c2b607373e44d5e7a79845327bf6e474b4b44c5b7cec65d148",
+        "summary.json": "021cf266cc3b100a70e4b80dadff4f14ae68f535a2f3ada5366f4db5db1ce8de"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 50.840328127997054,
+      "log_sha256": "148d289b51c54a2e30af55400cd0ef4c723057bdcbb750cd56e926c38e376ccc",
+      "reference_ticks": 27565,
+      "reference_completed_recoveries": 1,
+      "passed": true
+    }
+  ],
+  "matched_native_ticks": 122831,
+  "formatting": "passed",
+  "ci": "Fresh CI required for the correction; the original run passed 7 other jobs and all 49 PR UI cases.",
+  "local_receipts": "target/recovery-clearance-rollout/v2/"
+}

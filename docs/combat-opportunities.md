@@ -861,3 +861,79 @@ formatting and all **64 native games** pass. The previously recorded 21 physical
 integration tests and desktop client check remain applicable because this step
 changes only the diagnostic harness and analysis; no production bot code changed.
 The previously noted local Pi GPU `libseat.pc` limitation remains unchanged.
+
+### Recovery v1 production selection
+
+The normal Spacewars launcher's **Recovery bot v1** now selects
+`material_hunt_clearance_handoff_v1` alongside
+`terrain_recovery_supported_hatch_ordinary_offsets_v1`. It uses the standard
+laser and the existing Value v13 mission policy. The recovery profile itself
+retains its original meaning for historical comparisons and other hosts.
+Controller settings, automatic controller filling, other bot choices and
+legacy mission presets retain their existing behavior.
+
+Runtime diagnostics expose `mission_hunt_clearance_handoff_p1` and
+`mission_hunt_clearance_handoff_p2`, each containing the selected profile ID or
+`off`. The selected controller configures the option before its first decision,
+including after restarting a match. HUD and scoreboard names stay
+**Recovery bot v1**.
+
+The production client passes **689 unit tests** and the display-backed launcher
+test, covering 16 controller pairings, both renderers and restart at **1x**.
+Four frozen qualification cases also pass through the actual client:
+
+| Candidate reference | Purpose | Matched native ticks |
+| --- | --- | ---: |
+| `16-round-0s-p1` | Same-anchor handoff with unchanged physical trajectory | 23,266 |
+| `20-angular-0s-p1` | Preserved anchor through hidden-opponent and budget handoffs | 36,000 |
+| `27-round-8s-p2` | Preserved climb with asteroid damage | 36,000 |
+| `31-angular-8s-p2` | Completed recovery with asteroid damage | 27,565 |
+
+Every retained pre-step world checksum matches across **122,831 ticks**, as do
+the final world, match result and both bots' complete telemetry. The handoff
+profile and ordinary native rebuild offsets are checked on every tick. Recorded
+controls are never applied to the live client; emitted action bytes are not
+separately captured by this host check. These are integration checks of the
+qualified behavior, not a new qualification or playing-strength claim.
+
+Reproduce with a candidate `output` directory from the frozen qualification:
+
+```sh
+RUST_MIN_STACK=16777216 SPACEWARS_LIVE_CLEARANCE_REFERENCE=/path/to/case/output \
+  cargo +1.89.0 test --locked --profile ci -p engine-client --bin engine-client \
+  live_clearance_matches_retained_qualification -- --ignored --nocapture
+```
+
+The older `SPACEWARS_LIVE_RECOVERY_REFERENCE` entry point explicitly disables
+the handoff before its first decision to preserve its historical recovery-only
+comparison. The new clearance entry point uses the launcher's selection as-is.
+
+Formatting passes. Strict client Clippy stops on the same **29 pre-existing
+diagnostics** on the baseline and rollout sources; it is not reported as a pass.
+The [rollout receipt](data/combat-clearance-rollout-v1.json) records the source
+and binary hashes, comparison commands, frozen references and validation logs.
+Full local receipts are under `target/recovery-clearance-rollout/v1/`.
+
+The rollout's first CI run exposed a separate new-world generation failure:
+the rematch test selects fresh random seeds, and material terrain could reject
+its own surface samples before any bot decision. Seed **377**, planet **1**,
+reproduces the same error deterministically. Its radius (`0x4205e217` as `f32`
+bits) puts cells such as `(33, 3)` at zero signed distance, while the squared
+radius rounds below their squared distance and classifies them as void.
+
+Material generation now uses the same square-root distance as the surface
+samples. The strict sample/material validation is unchanged. The retained
+regression fails before the correction and passes afterward, including the
+adjacent representable radii. Reproduce it with:
+
+```sh
+RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --profile ci \
+  -p scenario-spacewars --lib \
+  terrain::tests::generated_planet_accepts_cells_at_a_rounded_surface_boundary -- --exact
+```
+
+With the correction, **3,053 workspace tests** pass and the same four actual
+client replays still match all **122,831 ticks**, final worlds, match results and
+complete bot telemetry. The [follow-up receipt](data/combat-clearance-rollout-v2.json)
+records the failing CI case, deterministic reproduction, corrected source and
+binary identity, regression results and repeated integration comparisons.

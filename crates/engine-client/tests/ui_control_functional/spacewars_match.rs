@@ -159,6 +159,8 @@ fn assert_recovery_profiles(harness: &mut FunctionalHarness, p1: &str, p2: &str)
     let diagnostics = performance::wait_status(harness, |status| {
         status.contains_key("mission_recovery_profile_p1")
             && status.contains_key("mission_recovery_profile_p2")
+            && status.contains_key("mission_hunt_clearance_handoff_p1")
+            && status.contains_key("mission_hunt_clearance_handoff_p2")
     });
     for (seat, controller) in [p1, p2].iter().enumerate() {
         let profile = if *controller == "recovery v1" {
@@ -168,6 +170,13 @@ fn assert_recovery_profiles(harness: &mut FunctionalHarness, p1: &str, p2: &str)
         };
         let key = format!("mission_recovery_profile_p{}", seat + 1);
         assert_eq!(diagnostics[&key], profile, "{diagnostics:?}");
+        let handoff = if *controller == "recovery v1" {
+            "material_hunt_clearance_handoff_v1"
+        } else {
+            "off"
+        };
+        let key = format!("mission_hunt_clearance_handoff_p{}", seat + 1);
+        assert_eq!(diagnostics[&key], handoff, "{diagnostics:?}");
     }
 }
 

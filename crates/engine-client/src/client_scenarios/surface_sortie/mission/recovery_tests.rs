@@ -7,12 +7,23 @@ use std::{
     path::PathBuf,
 };
 
-/// Replay through the production host, never applying the recorded controls.
-/// The reference directory comes from the retained qualification package.
+/// Keep the historical recovery-only profile reproducible through the host.
 #[test]
 #[ignore = "full native match; SPACEWARS_LIVE_RECOVERY_REFERENCE must name a frozen case output"]
 fn live_recovery_matches_retained_qualification() {
     let directory = PathBuf::from(std::env::var_os("SPACEWARS_LIVE_RECOVERY_REFERENCE").unwrap());
+    replay_retained(directory, false);
+}
+
+/// Replay the selected production bot without applying any recorded controls.
+#[test]
+#[ignore = "full native match; SPACEWARS_LIVE_CLEARANCE_REFERENCE must name a frozen candidate output"]
+fn live_clearance_matches_retained_qualification() {
+    let directory = PathBuf::from(std::env::var_os("SPACEWARS_LIVE_CLEARANCE_REFERENCE").unwrap());
+    replay_retained(directory, true);
+}
+
+fn replay_retained(directory: PathBuf, handoff: bool) {
     let read = |name: &str| -> Value {
         serde_json::from_reader(File::open(directory.join(name)).unwrap()).unwrap()
     };
@@ -20,15 +31,21 @@ fn live_recovery_matches_retained_qualification() {
     let seed = case["seed"].as_u64().unwrap();
     let candidate = case["candidate_seat"].as_u64().unwrap() as usize;
     assert!(candidate < 2);
-    let profiles = read("profiles.json");
-    assert_eq!(
-        profiles[candidate],
-        MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1.id()
-    );
-    assert_eq!(
-        profiles[1 - candidate],
-        MissionRecoveryProfile::Standard.id()
-    );
+    if handoff {
+        assert_eq!(case["hunt_clearance_handoff"], true);
+        assert_eq!(case["direct_laser_window"], false);
+        assert_eq!(case["probe_laser"], false);
+    } else {
+        let profiles = read("profiles.json");
+        assert_eq!(
+            profiles[candidate],
+            MissionRecoveryProfile::SupportedHatchOrdinaryOffsetsV1.id()
+        );
+        assert_eq!(
+            profiles[1 - candidate],
+            MissionRecoveryProfile::Standard.id()
+        );
+    }
     let mut settings = Settings::default();
     let mut controllers = [SpacewarsController::ValueBot; 2];
     controllers[candidate] = SpacewarsController::RecoveryBot;
@@ -67,6 +84,17 @@ fn live_recovery_matches_retained_qualification() {
         .as_any_mut()
         .downcast_mut::<MaterialMissionClientScenario>()
         .unwrap();
+    assert_eq!(
+        host.pilots[candidate].telemetry().hunt_clearance_handoff,
+        Some("material_hunt_clearance_handoff_v1")
+    );
+    if !handoff {
+        // These archived controls predate the separately qualified combat option.
+        // Only this historical comparison disables the launcher's selection.
+        host.pilots[candidate] = host.pilots[candidate]
+            .clone()
+            .with_hunt_clearance_handoff(false);
+    }
     host.sortie
         .state
         .enable_loose_terrain_with_config(config)
@@ -98,6 +126,10 @@ fn live_recovery_matches_retained_qualification() {
                 host.sortie.state.rebuild_refinement_enabled(seat),
                 Some(false)
             );
+            assert_eq!(
+                host.pilots[seat].telemetry().hunt_clearance_handoff,
+                (handoff && seat == candidate).then_some("material_hunt_clearance_handoff_v1")
+            );
         }
         if ticks % 6000 == 0 {
             eprintln!("matched {ticks} live ticks: {}", directory.display());
@@ -116,9 +148,15 @@ fn live_recovery_matches_retained_qualification() {
     let actual: Value = serde_json::from_slice(&serde_json::to_vec(&actual).unwrap()).unwrap();
     assert_eq!(actual["match"], expected["match"]);
     assert_eq!(actual["brains"], expected["brains"]);
-    assert!(host.pilots[candidate].telemetry().completed_recoveries > 0);
+    if !handoff {
+        assert!(host.pilots[candidate].telemetry().completed_recoveries > 0);
+    }
     assert_eq!(
         host.round_result().unwrap().controllers[candidate],
         "Recovery bot v1"
+    );
+    eprintln!(
+        "matched {ticks} live world hashes, final world, match and brain telemetry; handoff={handoff}: {}",
+        directory.display()
     );
 }
