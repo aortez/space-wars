@@ -39,9 +39,10 @@ pub enum Command {
     CpuDrive,
     Suspension,
     Course,
+    CpuAim,
 }
 impl Command {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::AimDown,
         Self::AimUp,
         Self::PowerDown,
@@ -63,6 +64,7 @@ impl Command {
         Self::CpuDrive,
         Self::Suspension,
         Self::Course,
+        Self::CpuAim,
     ];
 }
 

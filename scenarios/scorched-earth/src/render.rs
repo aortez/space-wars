@@ -86,7 +86,8 @@ fn button_center(index: usize) -> Vec2 {
     if index == 20 {
         Vec2::new(41.25, 19.0)
     } else if index >= 16 {
-        Vec2::new((index as f32 - 17.5) * 22.0, -30.0)
+        let slot = if index == 21 { 4 } else { index - 16 };
+        Vec2::new(slot as f32 * 20.0 - 40.0, -30.0)
     } else if index >= 11 {
         Vec2::new((index as f32 - 13.5) * 16.5, 19.0)
     } else {
@@ -282,6 +283,16 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
             12.0,
             color,
         );
+        if state.fighting() && state.calibrated_cpu(i) && (state.config.demo || i != state.selected)
+        {
+            text(
+                &mut frame,
+                m.position + Vec2::Y * 6.5,
+                state.bots[i].mode,
+                10.0,
+                color,
+            );
+        }
     }
     for shell in &state.shells {
         line(
@@ -594,6 +605,7 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
             Some(DrivingCourse::Trench) => "Course: trench",
             Some(DrivingCourse::Rubble) => "Course: rubble",
         },
+        state.config.cpu_policy[0].label(),
     ]
     .into_iter()
     .enumerate()
@@ -615,6 +627,7 @@ pub(super) fn frame(state: &ScorchedState) -> RenderFrame {
                 || (i == 18 && state.config.cpu_driving)
                 || (i == 19 && suspension::enabled(state.config))
                 || (i == 20 && state.config.course.is_some())
+                || (i == 21 && state.config.cpu_policy[0] != CpuPolicy::Sweep)
             {
                 RenderColor::rgb(0.28, 0.36, 0.27)
             } else {

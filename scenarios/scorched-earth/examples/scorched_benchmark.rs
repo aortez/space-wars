@@ -3,7 +3,7 @@ use clap::{Parser, ValueEnum};
 use engine_common::Scenario;
 use engine_rapier::terrain::{GrainShape, SettlingWork};
 use scenario_scorched_earth::{
-    BankStrength, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario, WheelTuning,
+    BankStrength, CpuPolicy, DropHeight, FIXED_HZ, ScorchedConfig, ScorchedScenario, WheelTuning,
 };
 use std::time::{Duration, Instant};
 
@@ -41,6 +41,9 @@ struct Args {
     /// Enable nearby firing-footing goals for the moving CPU comparison.
     #[arg(long, requires = "cpu_driving")]
     cpu_footing: bool,
+    /// Retain the sweep, learn from shots, or also relocate after incoming hits.
+    #[arg(long, default_value = "sweep", value_parser = ["sweep", "calibrated", "reactive"])]
+    bot: String,
     /// Use larger physical wheels with native spring/damper suspension.
     #[arg(long)]
     suspension: bool,
@@ -121,6 +124,11 @@ fn main() {
         demo: true,
         cpu_driving: args.cpu_driving,
         cpu_footing: [args.cpu_footing; 2],
+        cpu_policy: [match args.bot.as_str() {
+            "calibrated" => CpuPolicy::Calibrated,
+            "reactive" => CpuPolicy::Reactive,
+            _ => CpuPolicy::Sweep,
+        }; 2],
         suspension: args.suspension,
         wheel_tuning: WheelTuning {
             motor_torque: args
@@ -289,36 +297,35 @@ fn main() {
         replay.audit().unwrap();
     }
     timings.sort_by(f64::total_cmp);
-    println!(
-        "{}",
-        serde_json::json!({
-            "workload": if args.roof { "scorched-earth-roof-v1" } else if args.hillside { "scorched-earth-hillside-v2" } else if args.drop.is_some() { "scorched-earth-drop-v1" } else if args.undercut { "scorched-earth-undercut-v1" } else if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else if args.suspension { "scorched-earth-wheeled-duel-v1" } else if args.cpu_driving { "scorched-earth-driving-duel-v1" } else { "scorched-earth-scripted-duel-v2" },
-            "cpu_driving": args.cpu_driving, "cpu_footing": args.cpu_footing,
-            "driving": state.driving_diagnostics(),
-            "footing": args.cpu_footing.then(|| scenario_scorched_earth::driving_lab::combat_tanks(&state).map(|tank| tank.controller["footing"].clone())),
-            "suspension": args.suspension,
-            "wheel_tuning": args.suspension.then_some(config.wheel_tuning),
-            "slumping_enabled": state.config.slumping,
-            "cohesion_strength": state.config.cohesion.label(),
-            "drop": state.config.drop_height.map(DropHeight::label), "breakup": state.config.breakup,
-            "seed": args.seed, "ticks": ticks, "bombardment_seconds": args.bombardment_seconds,
-            "shape": match args.shape { Shape::Round => "round", Shape::Angular => "angular" },
-            "grain_limit": args.limit, "shots": state.shots, "impacts": state.impacts,
-            "rejected_blasts": state.rejected_blasts, "deposited_cells": state.deposited_cells(),
-            "peak_loose": peak_loose, "peak_bodies": peak_bodies, "peak_contacts": peak_contacts,
-            "mean_ms": timings.iter().sum::<f64>() / timings.len() as f64,
-            "p95_ms": timings[(timings.len() * 95 / 100).min(timings.len() - 1)],
-            "max_ms": timings.last(), "material": state.audit().unwrap(),
-            "observation_hash": format!("{:016x}", state.observation_hash()), "replay_checked": args.replay,
-            "winner": state.winner().map(|p| p + 1),
-            "phases": { "active": timing(&active), "tail": timing(&tail) },
-            "settling": state.settling_diagnostics(),
-            "available_slots": state.config.max_grains - state.loose_cells(),
-            "last_capacity_rejection": state.last_capacity_rejection,
-            "packing_work": packing_work, "tail_packing_work": tail_work,
-            "slumping": state.slumping_diagnostics(),
-                        "cohesion": state.cohesion_diagnostics(),
-                        "impact_fracture": state.impact_diagnostics(),
-        })
-    );
+    let mut report = serde_json::json!({
+        "workload": if args.roof { "scorched-earth-roof-v1" } else if args.hillside { "scorched-earth-hillside-v2" } else if args.drop.is_some() { "scorched-earth-drop-v1" } else if args.undercut { "scorched-earth-undercut-v1" } else if args.bombardment_seconds > 0 { "scorched-earth-bombardment-v1" } else if args.suspension { "scorched-earth-wheeled-duel-v1" } else if args.cpu_driving { "scorched-earth-driving-duel-v1" } else { "scorched-earth-scripted-duel-v2" },
+        "cpu_driving": args.cpu_driving, "cpu_footing": args.cpu_footing,
+        "driving": state.driving_diagnostics(),
+        "footing": args.cpu_footing.then(|| scenario_scorched_earth::driving_lab::combat_tanks(&state).map(|tank| tank.controller["footing"].clone())),
+        "suspension": args.suspension,
+        "wheel_tuning": args.suspension.then_some(config.wheel_tuning),
+        "slumping_enabled": state.config.slumping,
+        "cohesion_strength": state.config.cohesion.label(),
+        "drop": state.config.drop_height.map(DropHeight::label), "breakup": state.config.breakup,
+        "seed": args.seed, "ticks": ticks, "bombardment_seconds": args.bombardment_seconds,
+        "shape": match args.shape { Shape::Round => "round", Shape::Angular => "angular" },
+        "grain_limit": args.limit, "shots": state.shots, "impacts": state.impacts,
+        "rejected_blasts": state.rejected_blasts, "deposited_cells": state.deposited_cells(),
+        "peak_loose": peak_loose, "peak_bodies": peak_bodies, "peak_contacts": peak_contacts,
+        "mean_ms": timings.iter().sum::<f64>() / timings.len() as f64,
+        "p95_ms": timings[(timings.len() * 95 / 100).min(timings.len() - 1)],
+        "max_ms": timings.last(), "material": state.audit().unwrap(),
+        "observation_hash": format!("{:016x}", state.observation_hash()), "replay_checked": args.replay,
+        "winner": state.winner().map(|p| p + 1),
+        "phases": { "active": timing(&active), "tail": timing(&tail) },
+        "settling": state.settling_diagnostics(),
+        "available_slots": state.config.max_grains - state.loose_cells(),
+        "last_capacity_rejection": state.last_capacity_rejection,
+        "packing_work": packing_work, "tail_packing_work": tail_work,
+        "slumping": state.slumping_diagnostics(),
+                    "cohesion": state.cohesion_diagnostics(),
+                    "impact_fracture": state.impact_diagnostics(),
+    });
+    report["bot"] = serde_json::json!({"policy": args.bot, "controllers": state.cpu_diagnostics(), "shots": state.shot_observations()});
+    println!("{}", report);
 }
