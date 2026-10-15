@@ -10,6 +10,8 @@ pub mod spaceling_geometry;
 #[cfg(feature = "ccd-diagnostics")]
 pub mod step_diagnostics;
 pub mod surface_sortie;
+pub mod tank_fixture;
+pub mod tanks;
 mod terrain;
 pub mod terrain_art;
 pub mod thrusters;
@@ -196,6 +198,7 @@ const GRAVITY_ROVER_TAG: u64 = 5;
 const GRAVITY_ROVER_FRAME_TAG: u64 = 6;
 const GRAVITY_SURFACE_PILOT_TAG: u64 = 7;
 const GRAVITY_TERRAIN_FRAGMENT_TAG: u64 = 8;
+const GRAVITY_TANK_TAG: u64 = 9;
 const ROVER_BODY_COUNT: u64 = 3;
 
 pub const SPACEWARS_PLAYER_COUNT: usize = 2;
@@ -1316,7 +1319,7 @@ impl Scenario for SpacewarsScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
-        Self::step_with_surface_pilots(state, actions, dt, &mut [], None, None)
+        Self::step_with_surface_pilots(state, actions, dt, &mut [], None, None, false)
     }
 
     fn observe(state: &Self::State) -> Observation {
@@ -1352,8 +1355,9 @@ impl SpacewarsScenario {
         surface_pilots: &mut [surface_sortie::SurfacePilot],
         prepared_terrain: Option<(Duration, Duration)>,
         asteroid_pressure: Option<&mut surface_sortie::asteroids::AsteroidPressure>,
+        passive_pilots: bool,
     ) -> StepResult {
-        let experimental = !surface_pilots.is_empty();
+        let experimental = !surface_pilots.is_empty() && !passive_pilots;
         state.last_step_metrics = SpacewarsStepMetrics::default();
         if state.winner.is_some() {
             return StepResult::default();
@@ -1456,8 +1460,8 @@ impl SpacewarsScenario {
         motion_diagnostics_time +=
             terrain::capture_motion(state, TerrainMotionStage::BeforeGravity);
         let gravity_started = Instant::now();
-        let gravity = if experimental {
-            apply_world_gravity_with_pilots(state, surface_pilots, dt)
+        let gravity = if !surface_pilots.is_empty() {
+            apply_world_gravity_with_pilots(state, surface_pilots, dt, passive_pilots)
         } else {
             apply_world_gravity(state)
         };
@@ -1465,7 +1469,7 @@ impl SpacewarsScenario {
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterGravity);
 
         let mut thruster_outputs = [thrusters::ThrusterOutput::default(); SPACEWARS_PLAYER_COUNT];
-        for pilot in surface_pilots.iter_mut() {
+        for pilot in surface_pilots.iter_mut().filter(|_| !passive_pilots) {
             thruster_outputs[pilot.vehicle_index()] = pilot.control_vehicle(
                 &mut state.physics,
                 &state.ships[pilot.vehicle_index()],
@@ -2204,7 +2208,7 @@ fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
                 };
                 LaserTarget::Debris(debris)
             }
-            Some(MechanicalEntity::World) | None => continue,
+            Some(MechanicalEntity::World | MechanicalEntity::Tank(_)) | None => continue,
         };
         let hit = LaserHit {
             shooter,
@@ -2525,13 +2529,14 @@ fn body_mass(radius: f32) -> f32 {
 }
 
 fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
-    apply_world_gravity_with_pilots(state, &mut [], state.config.delta_time())
+    apply_world_gravity_with_pilots(state, &mut [], state.config.delta_time(), false)
 }
 
 fn apply_world_gravity_with_pilots(
     state: &mut SpacewarsState,
     pilots: &mut [surface_sortie::SurfacePilot],
     dt: f32,
+    passive_pilots: bool,
 ) -> GravityStepMetrics {
     let SpacewarsState {
         tick,
@@ -2550,6 +2555,7 @@ fn apply_world_gravity_with_pilots(
     // Forces persist in Rapier. Each tick owns a fresh gravity/control force
     // budget, including ticks where a source disappears or its field is zero.
     physics.world.clear_forces();
+    physics.tanks.begin_gravity_step();
     physics.distributed_gravity = terrain.loose.is_some();
     gravity_participants.clear();
     for pilot in pilots.iter_mut() {
@@ -2568,7 +2574,7 @@ fn apply_world_gravity_with_pilots(
         // actors and contacts still describe the completed step. Sample the
         // same current frame for gravity and controls. Legacy gameplay retains
         // its established integration order and deterministic baselines.
-        let position = if !pilots.is_empty() {
+        let position = if !pilots.is_empty() && !passive_pilots {
             physics
                 .world
                 .motion(physics.planet_body(index))
@@ -2599,7 +2605,8 @@ fn apply_world_gravity_with_pilots(
             .enumerate()
             .filter(|(index, ship)| {
                 !physics.ship_is_constrained(*index)
-                    && (pilots.is_empty()
+                    && (passive_pilots
+                        || pilots.is_empty()
                         || (!ship.dead
                             && pilots.iter().any(|pilot| pilot.vehicle_index() == *index)))
             })
@@ -2611,6 +2618,14 @@ fn apply_world_gravity_with_pilots(
                 )
             }),
     );
+    let tank_bodies = physics.tanks.bodies();
+    for (index, body) in tank_bodies.iter().enumerate() {
+        gravity_participants.push(GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_TANK_TAG, index as u64),
+            physics.world.center_of_mass(*body).expect("tank body"),
+            1.0,
+        ));
+    }
     for rover in rovers {
         let Some(motions) = physics.rover_body_motions(rover) else {
             continue;
@@ -2702,11 +2717,22 @@ fn apply_world_gravity_with_pilots(
         let (tag, payload) = split_gravity_id(output.id);
         if output.velocity_delta == Vec2::ZERO
             && tag != GRAVITY_ROVER_TAG
+            && tag != GRAVITY_TANK_TAG
             && tag != GRAVITY_SURFACE_PILOT_TAG
         {
             continue;
         }
         match tag {
+            GRAVITY_TANK_TAG => {
+                physics
+                    .tanks
+                    .record_gravity(tank_bodies[payload as usize], output.velocity_delta / dt);
+                assert!(physics.apply_gravity_delta(
+                    tank_bodies[payload as usize],
+                    output.velocity_delta,
+                    dt
+                ));
+            }
             GRAVITY_SURFACE_PILOT_TAG => {
                 if let Some(pilot) = pilots
                     .iter_mut()
@@ -6062,6 +6088,12 @@ fn render_state_with_camera(
         }
     }
 
+    for id in state.tank_ids() {
+        if let Some(tank) = state.tank_snapshot(id) {
+            render_tank(&mut frame, &tank);
+        }
+    }
+
     if options.show_exhaust {
         for ship in &state.ships {
             render_exhaust(&mut frame, ship);
@@ -6680,6 +6712,56 @@ fn blend_color(from: RenderColor, to: RenderColor, t: f32) -> RenderColor {
         from.b + (to.b - from.b) * t,
         from.a + (to.a - from.a) * t,
     )
+}
+
+fn render_tank(frame: &mut RenderFrame, tank: &tanks::TankSnapshot) {
+    let spec = physics::tank_spec();
+    let color = RenderColor::rgb(0.60, 0.68, 0.32);
+    let outline = RenderColor::rgb(0.07, 0.09, 0.06);
+    for wheel in tank.assembly.wheels {
+        frame.push_primitive(
+            ROVER_LAYER,
+            RenderPrimitive::Circle(RenderCircle {
+                center: render_point(wheel.position),
+                radius: spec.wheel_radius,
+                fill: Some(Fill::new(outline)),
+                stroke: Some(Stroke::new(color, 0.2)),
+            }),
+        );
+    }
+    let chassis = tank.assembly.chassis;
+    let points = [
+        Vec2::new(-spec.chassis_half_width, -spec.chassis_half_height),
+        Vec2::new(spec.chassis_half_width, -spec.chassis_half_height),
+        Vec2::new(spec.chassis_half_width, spec.chassis_half_height),
+        Vec2::new(-spec.chassis_half_width, spec.chassis_half_height),
+    ]
+    .map(|p| render_point(chassis.position + p.rotate_radians(chassis.angle)));
+    frame.push_primitive(
+        ROVER_LAYER,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: points.to_vec(),
+            fill: Some(Fill::new(color)),
+            stroke: Some(Stroke::new(outline, 0.2)),
+        }),
+    );
+    frame.push_primitive(
+        ROVER_LAYER + 1,
+        RenderPrimitive::Line(engine_common::RenderLine::new(
+            render_point(tank.mount_position),
+            render_point(tank.muzzle_position),
+            Stroke::new(color, 0.5),
+        )),
+    );
+    frame.push_primitive(
+        ROVER_LAYER + 1,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(tank.mount_position),
+            radius: 0.65,
+            fill: Some(Fill::new(color)),
+            stroke: Some(Stroke::new(outline, 0.2)),
+        }),
+    );
 }
 
 fn render_rover(

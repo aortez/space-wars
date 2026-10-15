@@ -445,6 +445,7 @@ pub(crate) fn apply_contacts(
                         MechanicalEntity::Ship(i) => ("ship", Some(i as u64)),
                         MechanicalEntity::Spaceling(i) => ("spaceling", Some(i as u64)),
                         MechanicalEntity::Rover(i) => ("rover", Some(i)),
+                        MechanicalEntity::Tank(i) => ("tank", Some(i)),
                         MechanicalEntity::Debris(i) => (
                             debris.map_or("debris", |(_, d)| match d.kind {
                                 DebrisKind::Shell => "missile",

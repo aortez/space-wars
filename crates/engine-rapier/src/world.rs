@@ -773,6 +773,10 @@ impl PhysicsWorld {
         self.bodies.len()
     }
 
+    pub fn joint_count(&self) -> usize {
+        self.joints.len()
+    }
+
     pub fn collider_count(&self) -> usize {
         self.colliders.len()
     }
@@ -1400,47 +1404,93 @@ impl PhysicsWorld {
         &self,
         collider: ColliderId,
     ) -> impl Iterator<Item = SurfaceContact> + '_ {
+        self.surface_contacts_budgeted(collider, None)
+    }
+
+    /// Each pair, manifold and solver contact consumes one unit before filtering.
+    /// Exhaustion yields no further support, including for empty manifolds.
+    pub fn surface_contacts_bounded<'a>(
+        &'a self,
+        collider: ColliderId,
+        remaining: &'a std::cell::Cell<usize>,
+    ) -> impl Iterator<Item = SurfaceContact> + 'a {
+        self.surface_contacts_budgeted(collider, Some(remaining))
+    }
+
+    fn surface_contacts_budgeted<'a>(
+        &'a self,
+        collider: ColliderId,
+        remaining: Option<&'a std::cell::Cell<usize>>,
+    ) -> impl Iterator<Item = SurfaceContact> + 'a {
+        let consume = move || {
+            remaining.is_none_or(|budget| {
+                let available = budget.get();
+                budget.set(available.saturating_sub(1));
+                available > 0
+            })
+        };
         self.collider_handle(collider)
             .into_iter()
             .flat_map(move |handle| {
-                self.raw.contact_pairs_with(handle).flat_map(move |pair| {
-                    let (other, direction) = if pair.collider1 == handle {
-                        (pair.collider2, -1.0)
-                    } else {
-                        (pair.collider1, 1.0)
-                    };
-                    let other = self.raw.colliders.get(other);
-                    pair.manifolds.iter().flat_map(move |manifold| {
-                        manifold
-                            .data
-                            .solver_contacts
+                self.raw
+                    .contact_pairs_with(handle)
+                    .take_while(move |_| consume())
+                    .flat_map(move |pair| {
+                        let (other, direction) = if pair.collider1 == handle {
+                            (pair.collider2, -1.0)
+                        } else {
+                            (pair.collider1, 1.0)
+                        };
+                        let other = self.raw.colliders.get(other);
+                        pair.manifolds
                             .iter()
-                            .filter_map(move |contact| {
-                                let other = other?;
-                                let body = self.raw.bodies.get(other.parent()?)?;
-                                let point = manifold.points.get(contact.contact_id[0] as usize)?;
-                                let (subshape, position, normal) = if direction < 0.0 {
-                                    (manifold.subshape_pos2, point.local_p2, manifold.local_n2)
-                                } else {
-                                    (manifold.subshape_pos1, point.local_p1, manifold.local_n1)
-                                };
-                                let pose = other.position_wrt_parent().copied().unwrap_or_default()
-                                    * subshape.unwrap_or_default();
-                                Some(SurfaceContact {
-                                    collider: decode_collider(other.user_data)?,
-                                    position: from_rapier(contact.point),
-                                    local_surface: ContactPoint {
-                                        position: from_rapier(pose * position),
-                                        normal: from_rapier(pose.rotation * normal),
-                                    },
-                                    normal: from_rapier(manifold.data.normal) * direction,
-                                    velocity: from_rapier(body.velocity_at_point(contact.point)),
-                                    angular_velocity: body.angvel(),
-                                    separation: contact.dist,
-                                })
+                            .take_while(move |_| consume())
+                            .flat_map(move |manifold| {
+                                manifold
+                                    .data
+                                    .solver_contacts
+                                    .iter()
+                                    .take_while(move |_| consume())
+                                    .filter_map(move |contact| {
+                                        let other = other?;
+                                        let body = self.raw.bodies.get(other.parent()?)?;
+                                        let point =
+                                            manifold.points.get(contact.contact_id[0] as usize)?;
+                                        let (subshape, position, normal) = if direction < 0.0 {
+                                            (
+                                                manifold.subshape_pos2,
+                                                point.local_p2,
+                                                manifold.local_n2,
+                                            )
+                                        } else {
+                                            (
+                                                manifold.subshape_pos1,
+                                                point.local_p1,
+                                                manifold.local_n1,
+                                            )
+                                        };
+                                        let pose = other
+                                            .position_wrt_parent()
+                                            .copied()
+                                            .unwrap_or_default()
+                                            * subshape.unwrap_or_default();
+                                        Some(SurfaceContact {
+                                            collider: decode_collider(other.user_data)?,
+                                            position: from_rapier(contact.point),
+                                            local_surface: ContactPoint {
+                                                position: from_rapier(pose * position),
+                                                normal: from_rapier(pose.rotation * normal),
+                                            },
+                                            normal: from_rapier(manifold.data.normal) * direction,
+                                            velocity: from_rapier(
+                                                body.velocity_at_point(contact.point),
+                                            ),
+                                            angular_velocity: body.angvel(),
+                                            separation: contact.dist,
+                                        })
+                                    })
                             })
                     })
-                })
             })
     }
 
@@ -1616,6 +1666,134 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    /// Linear, metered route queries. Every collider (including rejected ones)
+    /// and every compound child consumes a unit before geometry dispatch. The
+    /// caller must refuse driving on Err; partial hits never establish safety.
+    pub fn tank_route_query(
+        &self,
+        origin: Vec2,
+        direction: Vec2,
+        options: RayCastOptions,
+        capsule_position: Vec2,
+        capsule_angle: f32,
+        half_segment: f32,
+        radius: f32,
+        clearance_groups: CollisionGroups,
+        remaining: &mut usize,
+    ) -> Result<(Option<RayHit>, bool), ()> {
+        if !finite_vec2(origin)
+            || !finite_vec2(direction)
+            || direction.length_squared() <= f32::EPSILON
+            || !finite_vec2(capsule_position)
+            || !capsule_angle.is_finite()
+            || !half_segment.is_finite()
+            || half_segment < 0.0
+            || !radius.is_finite()
+            || radius <= 0.0
+            || !options.max_distance.is_finite()
+            || options.max_distance < 0.0
+        {
+            return Err(());
+        }
+        let direction = direction.normalized();
+        let ray = Ray::new(to_rapier(origin), to_rapier(direction));
+        let capsule = SharedShape::capsule_y(half_segment, radius);
+        let capsule_pose = Pose::new(to_rapier(capsule_position), capsule_angle);
+        use rapier2d::parry::bounding_volume::{Aabb, BoundingVolume};
+        let ray_end = to_rapier(origin + direction * options.max_distance);
+        let ray_start = to_rapier(origin);
+        let mut bounds = Aabb::new(ray_start.min(ray_end), ray_start.max(ray_end));
+        bounds.merge(&capsule.compute_aabb(&capsule_pose));
+        let mut nearest: Option<RayHit> = None;
+        let mut clear = true;
+        let spend = |remaining: &mut usize| -> Result<(), ()> {
+            *remaining = remaining.checked_sub(1).ok_or(())?;
+            Ok(())
+        };
+        for entry in &self.colliders {
+            spend(remaining)?;
+            let collider = self.raw.colliders.get(entry.handle).ok_or(())?;
+            if collider.is_sensor() {
+                continue;
+            }
+            let id = decode_collider(collider.user_data).ok_or(())?;
+            if Some(id.entity) == options.exclude_entity {
+                continue;
+            }
+            let groups = collider.collision_groups();
+            let matches = |wanted: CollisionGroups| {
+                groups.memberships.bits() & wanted.filter != 0
+                    && groups.filter.bits() & wanted.memberships != 0
+            };
+            let ground = matches(options.collision_groups);
+            let obstacle = matches(clearance_groups);
+            if !ground && !obstacle {
+                continue;
+            }
+            let mut visit = |pose: Pose,
+                             shape: &dyn rapier2d::parry::shape::Shape,
+                             remaining: &mut usize|
+             -> Result<(), ()> {
+                // Convex dispatch has no composite traversal. Charge vertices
+                // too, so a large convex hull cannot hide work behind one unit.
+                if let Some(poly) = shape.as_convex_polygon() {
+                    for _ in poly.points() {
+                        spend(remaining)?;
+                    }
+                }
+                if shape.as_composite_shape().is_some() {
+                    return Err(());
+                }
+                if ground {
+                    if let Some(hit) = shape.cast_ray_and_get_normal(
+                        &pose,
+                        &ray,
+                        options.max_distance,
+                        options.solid,
+                    ) {
+                        if nearest.is_none_or(|old| hit.time_of_impact < old.distance) {
+                            nearest = Some(RayHit {
+                                collider: id,
+                                point: origin + direction * hit.time_of_impact,
+                                normal: from_rapier(hit.normal),
+                                distance: hit.time_of_impact,
+                            });
+                        }
+                    }
+                }
+                if obstacle {
+                    clear &= rapier2d::parry::query::intersection_test(
+                        &capsule_pose,
+                        capsule.as_ref(),
+                        &pose,
+                        shape,
+                    )
+                    .map_err(|_| ())?
+                        == false;
+                }
+                Ok(())
+            };
+            if let Some(compound) = collider.shape().as_compound() {
+                // The compound stores its root AABB. This constant-time test
+                // skips remote chunks without entering their BVH or children.
+                if !compound
+                    .local_aabb()
+                    .transform_by(collider.position())
+                    .intersects(&bounds)
+                {
+                    continue;
+                }
+                for (local, shape) in compound.shapes() {
+                    spend(remaining)?;
+                    visit(*collider.position() * *local, shape.as_ref(), remaining)?;
+                }
+            } else {
+                visit(*collider.position(), collider.shape(), remaining)?;
+            }
+        }
+        Ok((nearest, clear))
     }
 
     pub fn collider_body(&self, id: ColliderId) -> Option<BodyId> {
@@ -3238,6 +3416,29 @@ mod tests {
             world.step(1.0 / 60.0);
             let before = world.snapshot_bytes().unwrap();
             let contact = world.surface_contacts(actor_collider).next().unwrap();
+            let budget = std::cell::Cell::new(0);
+            assert!(
+                world
+                    .surface_contacts_bounded(actor_collider, &budget)
+                    .next()
+                    .is_none()
+            );
+            // A pair and manifold exhaust two units before a contact is visited.
+            budget.set(2);
+            assert!(
+                world
+                    .surface_contacts_bounded(actor_collider, &budget)
+                    .next()
+                    .is_none()
+            );
+            assert_eq!(budget.get(), 0);
+            budget.set(128);
+            let bounded = world
+                .surface_contacts_bounded(actor_collider, &budget)
+                .next()
+                .unwrap();
+            assert_eq!(bounded, contact);
+            assert!(budget.get() < 128);
             assert_eq!(contact.collider, floor_collider);
             assert!((contact.local_surface.position.y - 0.5).abs() < 1e-5);
             assert!(contact.local_surface.normal.distance_to(Vec2::Y) < 1e-5);

@@ -75,8 +75,10 @@ pub struct RoverSpec {
     pub wheel_target_speed: f32,
     pub wheel_motor_torque: f32,
     pub wheel_brake_torque: f32,
-    /// Velocity-error damping for the force-based drive and brake motors.
+    /// Velocity-error damping for the force-based drive motor.
     pub wheel_motor_damping: f32,
+    /// Optional brake damping override; otherwise inherits drive damping.
+    pub wheel_brake_damping: Option<f32>,
     pub collision_groups: CollisionGroups,
 }
 
@@ -100,6 +102,7 @@ impl Default for RoverSpec {
             wheel_motor_torque: 80.0,
             wheel_brake_torque: 100.0,
             wheel_motor_damping: 1.0,
+            wheel_brake_damping: None,
             collision_groups: CollisionGroups::ALL,
         }
     }
@@ -238,6 +241,8 @@ pub struct RoverAssembly {
     brake_torque: f32,
     #[serde(default = "default_motor_damping")]
     motor_damping: f32,
+    #[serde(default = "default_motor_damping")]
+    brake_damping: f32,
 }
 
 fn default_motor_damping() -> f32 {
@@ -411,6 +416,7 @@ impl RoverAssembly {
             motor_torque: spec.wheel_motor_torque,
             brake_torque: spec.wheel_brake_torque,
             motor_damping: spec.wheel_motor_damping,
+            brake_damping: spec.wheel_brake_damping.unwrap_or(spec.wheel_motor_damping),
         })
     }
 
@@ -439,7 +445,7 @@ impl RoverAssembly {
             if control.brake {
                 joint
                     .data
-                    .set_motor_velocity(JointAxis::AngX, 0.0, self.motor_damping)
+                    .set_motor_velocity(JointAxis::AngX, 0.0, self.brake_damping)
                     .set_motor_max_force(JointAxis::AngX, self.brake_torque);
                 joint
                     .data
@@ -509,6 +515,20 @@ impl RoverAssembly {
     }
 
     pub fn snapshot(&self, physics: &PhysicsWorld) -> Option<RoverSnapshot> {
+        self.snapshot_with_budget(physics, None)
+    }
+
+    /// Bounded presentation snapshot. Impulse events are omitted to avoid a
+    /// global event scan; existing rover/Scorched snapshots retain that metric.
+    pub fn snapshot_bounded(&self, physics: &PhysicsWorld, budget: usize) -> Option<RoverSnapshot> {
+        self.snapshot_with_budget(physics, Some(budget))
+    }
+
+    fn snapshot_with_budget(
+        &self,
+        physics: &PhysicsWorld,
+        budget: Option<usize>,
+    ) -> Option<RoverSnapshot> {
         let chassis = physics.motion(self.chassis)?;
         let wheels = [
             physics.motion(self.wheels[0])?,
@@ -519,9 +539,49 @@ impl RoverAssembly {
             .map(|anchor| chassis.position + anchor.rotate_radians(chassis.angle));
         let suspension_lengths =
             [0, 1].map(|index| suspension_anchors[index].distance_to(wheels[index].position));
-        let support = self.support_state(physics, chassis);
+        let remaining = std::cell::Cell::new(budget.unwrap_or(0));
+        let support = if budget.is_some() {
+            let mut grounded_wheels = [false; 2];
+            let mut normal_sum = Vec2::ZERO;
+            let mut wheel_contacts = Vec::new();
+            for (index, collider) in self.wheel_colliders.into_iter().enumerate() {
+                for contact in physics.surface_contacts_bounded(collider, &remaining) {
+                    let support_normal = contact.normal.normalized();
+                    if support_normal.dot(Vec2::Y.rotate_radians(chassis.angle))
+                        >= MIN_SUPPORT_ALIGNMENT
+                    {
+                        grounded_wheels[index] = true;
+                        normal_sum += support_normal;
+                    }
+                    wheel_contacts.push(ContactPoint {
+                        position: contact.position,
+                        normal: -contact.normal,
+                    });
+                }
+            }
+            RoverSupportState {
+                grounded_wheels,
+                normal: (normal_sum.length_squared() > f32::EPSILON)
+                    .then(|| normal_sum.normalized()),
+                max_impulse: 0.0,
+                wheel_contacts,
+            }
+        } else {
+            self.support_state(physics, chassis)
+        };
         let mut contacts = support.wheel_contacts;
-        contacts.extend(physics.contact_points(self.chassis_collider));
+        if budget.is_some() {
+            contacts.extend(
+                physics
+                    .surface_contacts_bounded(self.chassis_collider, &remaining)
+                    .map(|contact| ContactPoint {
+                        position: contact.position,
+                        normal: -contact.normal,
+                    }),
+            );
+        } else {
+            contacts.extend(physics.contact_points(self.chassis_collider));
+        }
         Some(RoverSnapshot {
             chassis,
             wheels,
@@ -618,6 +678,9 @@ fn valid_rover_spec(spec: RoverSpec) -> bool {
     ]
     .into_iter()
     .all(|value| value.is_finite() && value > 0.0)
+        && spec
+            .wheel_brake_damping
+            .is_none_or(|value| value.is_finite() && value > 0.0)
         && spec.suspension_anchor_height.is_finite()
         && spec.suspension_travel < spec.suspension_rest_length
 }
@@ -650,6 +713,10 @@ mod tests {
                 wheel_motor_damping: -1.0,
                 ..Default::default()
             },
+            RoverSpec {
+                wheel_brake_damping: Some(f32::NAN),
+                ..Default::default()
+            },
         ] {
             assert!(RoverAssembly::insert_at(&mut physics, ROVER, pose, spec).is_none());
             assert!(!physics.contains_entity(ROVER));
@@ -658,6 +725,7 @@ mod tests {
             chassis_density: 10.0,
             wheel_density: 2.2,
             wheel_motor_damping: 80.0,
+            wheel_brake_damping: Some(800.0),
             ..Default::default()
         };
         let rover = RoverAssembly::insert_at(&mut physics, ROVER, pose, spec).unwrap();
@@ -666,15 +734,17 @@ mod tests {
         let decoded: RoverAssembly = bincode::deserialize(&bytes).unwrap();
         assert_eq!(bincode::serialize(&decoded).unwrap(), bytes);
         let mut replay = physics.clone();
-        let control = RoverControl {
-            throttle: 1.0,
-            brake: false,
-        };
-        for _ in 0..30 {
-            rover.set_control(&mut physics, control);
-            decoded.set_control(&mut replay, control);
-            physics.step(1.0 / 60.0);
-            replay.step(1.0 / 60.0);
+        for brake in [false, true] {
+            let control = RoverControl {
+                throttle: 1.0,
+                brake,
+            };
+            for _ in 0..30 {
+                rover.set_control(&mut physics, control);
+                decoded.set_control(&mut replay, control);
+                physics.step(1.0 / 60.0);
+                replay.step(1.0 / 60.0);
+            }
         }
         assert_eq!(
             physics.snapshot_bytes().unwrap(),
@@ -768,6 +838,15 @@ mod tests {
         let (mut physics, _, _, rover) = test_world();
         settle_rover(&mut physics, &rover);
         let snapshot = rover.snapshot(&physics).unwrap();
+        let bounded = rover.snapshot_bounded(&physics, 128).unwrap();
+        assert_eq!(bounded.chassis, snapshot.chassis);
+        assert_eq!(bounded.wheels, snapshot.wheels);
+        assert_eq!(bounded.grounded_wheels, snapshot.grounded_wheels);
+        assert_eq!(bounded.support_normal, snapshot.support_normal);
+        let exhausted = rover.snapshot_bounded(&physics, 0).unwrap();
+        assert!(exhausted.contacts.is_empty());
+        assert!(!exhausted.is_grounded());
+        assert_eq!(exhausted.chassis, snapshot.chassis);
         assert!(!snapshot.contacts.is_empty());
         assert!(snapshot.is_grounded());
         assert!(snapshot.support_normal.is_some());
