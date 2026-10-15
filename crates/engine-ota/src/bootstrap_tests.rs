@@ -299,21 +299,21 @@ fn dirty_mismatched_and_incomplete_images_are_not_bootstrap_plans() {
 }
 
 #[cfg(target_os = "linux")]
-mod linux {
+pub(crate) mod linux {
     use super::*;
     use std::fs;
     use std::os::unix::fs::{PermissionsExt, symlink};
     use std::path::PathBuf;
     use std::process::Command;
 
-    struct Fixture {
-        directory: tempfile::TempDir,
+    pub(crate) struct Fixture {
+        pub(crate) directory: tempfile::TempDir,
         root: PathBuf,
         boot: PathBuf,
         assets: Assets,
     }
     impl Fixture {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let directory = tempfile::tempdir().unwrap();
             let boot = directory.path().join("boot");
             let mut assets = Assets::new();
@@ -380,10 +380,10 @@ mod linux {
                 assets,
             }
         }
-        fn output(&self) -> PathBuf {
+        pub(crate) fn output(&self) -> PathBuf {
             self.directory.path().join("package")
         }
-        fn build(&self) -> Result<BootstrapPackage> {
+        pub(crate) fn build(&self) -> Result<BootstrapPackage> {
             build_package(
                 &self.root,
                 &self.boot,

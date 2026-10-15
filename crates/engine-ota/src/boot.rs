@@ -106,7 +106,7 @@ impl BootManifest {
     }
 }
 
-fn unique_files<'de, D: serde::Deserializer<'de>>(
+pub(crate) fn unique_files<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<BTreeMap<String, Blob>, D::Error> {
     struct Files;

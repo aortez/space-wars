@@ -7,7 +7,7 @@ use crate::file_command::FileCommand;
 use crate::image_tools::ImageTools;
 use crate::owned_fs::{name, open_at, unchanged};
 use crate::{Blob, ImageFormat, ImageIdentity, MAX_COMPRESSED_BYTES, Result, Sha256};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256 as Hasher};
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
@@ -18,7 +18,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-const MAX_ROOT_BYTES: u64 = 3 * 1024 * 1024 * 1024;
+pub(super) const MAX_ROOT_BYTES: u64 = 3 * 1024 * 1024 * 1024;
 const NOTICE: &str = "Supervised bootstrap artifact, not a signed OTA candidate.\n\
 This directory does not install itself or enable automatic updates.\n\
 The board/profile/target/PARTUUIDs are operator-supplied planning inputs.\n\
@@ -29,10 +29,11 @@ Do not copy the canonical boot tree over a running legacy device in one step.\n\
 Do not create a production qualification record from this package.\n\
 See docs/ota-updates.md for the remaining supervised migration procedure.\n";
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BootstrapPackage {
     pub schema: u32,
-    pub purpose: &'static str,
+    pub purpose: String,
     pub image: ImageIdentity,
     pub format: ImageFormat,
     pub compressed: Blob,
@@ -40,6 +41,7 @@ pub struct BootstrapPackage {
     pub plan: BootPlan,
     /// Exact package files, excluding this record and its checksum list.
     /// Checksums detect accidental changes; they are not feed signatures.
+    #[serde(deserialize_with = "crate::boot::unique_files")]
     pub files: BTreeMap<String, Blob>,
 }
 
@@ -257,7 +259,7 @@ pub fn build_package(
     files.insert("rootfs.ext4.zst".into(), compressed.clone());
     let package = BootstrapPackage {
         schema: 1,
-        purpose: "supervised-bootstrap",
+        purpose: "supervised-bootstrap".into(),
         image,
         format: ImageFormat::RootfsExt4Zstd,
         compressed,
@@ -407,6 +409,10 @@ fn sync_directories(path: &Path) -> Result<()> {
             sync_directories(&entry.path())?;
         }
     }
-    directory(path)?.sync_all()?;
+    // Packages are transferred to a private root-owned data directory. Keep
+    // every generated directory private regardless of the workstation umask.
+    let directory = directory(path)?;
+    directory.set_permissions(fs::Permissions::from_mode(0o700))?;
+    directory.sync_all()?;
     Ok(())
 }

@@ -76,6 +76,7 @@ pub fn import_root_keys() -> Result<engine_ota::access_linux::AccessStatus> {
 }
 
 fn authorize(lock: &InstallLock) -> Result<()> {
+    engine_ota::bootstrap::require_no_active_bootstrap(lock)?;
     // New, unprovisioned development images may use the operator tools. Once
     // recovery exists, missing/corrupt state must never masquerade as that case.
     let mut provisioned = false;

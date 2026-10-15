@@ -76,6 +76,53 @@ impl Fixture {
 }
 
 #[test]
+fn bootstrap_requires_both_preserved_roles_without_importing_or_promoting_keys() {
+    let fixture = Fixture::new();
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+    fixture.put("home/spacewars/.ssh/authorized_keys", key().as_bytes());
+    fixture.init().unwrap();
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+    assert!(fixture.stored("root").is_empty());
+    fixture.put("root/.ssh/authorized_keys", key().as_bytes());
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+    import_under(&fixture.root, &fixture.data, fixture.owners).unwrap();
+    let status = preserved_under(&fixture.data, fixture.owners.root).unwrap();
+    assert_eq!(status.root_keys, 1);
+    assert_eq!(status.runtime_keys, 1);
+    fs::write(
+        fixture.temp.path().join("data/spacewars-access/spacewars"),
+        b"",
+    )
+    .unwrap();
+    assert!(preserved_under(&fixture.data, fixture.owners.root).is_err());
+}
+
+#[test]
+fn interrupted_bootstrap_keeps_existing_roles_but_never_reimports_missing_roles() {
+    let fixture = Fixture::new();
+    fixture.put("root/.ssh/authorized_keys", key().as_bytes());
+    fixture.put("home/spacewars/.ssh/authorized_keys", key().as_bytes());
+    let active = fixture.temp.path().join("data/spacewars-bootstrap/active");
+    fs::create_dir_all(&active).unwrap();
+    fs::set_permissions(active.parent().unwrap(), Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(&active, Permissions::from_mode(0o700)).unwrap();
+    assert!(fixture.init().is_err());
+    assert!(!fixture.temp.path().join("data/spacewars-access").exists());
+    // Simulate roles already established before the supervised attempt.
+    fs::remove_dir(&active).unwrap();
+    assert_eq!(fixture.init().unwrap().root_keys, 1);
+    fs::create_dir(&active).unwrap();
+    let root = fixture.stored("root");
+    let runtime = fixture.stored("spacewars");
+    fixture.put("root/.ssh/authorized_keys", b"malformed replacement");
+    let status = fixture.init().unwrap();
+    assert!(!status.initialized);
+    assert_eq!(status.root_keys, 1);
+    assert_eq!(fixture.stored("root"), root);
+    assert_eq!(fixture.stored("spacewars"), runtime);
+}
+
+#[test]
 fn first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys() {
     let fixture = Fixture::new();
     let runtime = format!(

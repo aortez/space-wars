@@ -5,8 +5,10 @@ and preserves its existing `/data` partition. Normal rootfs OTA cannot perform
 this first migration: the new kernel and recovery initramfs differ from the
 installed boot assets.
 
-**Implemented:** read-only legacy inventory and workstation package creation.
-**Remaining:** the root apply/resume procedure, supervised boot verification,
+**Implemented:** read-only legacy inventory, workstation package creation,
+root-only package validation and a durable preparation reservation.
+**Remaining:** recovery-copy creation, root/boot apply and recovery of those
+operations, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -66,7 +68,9 @@ file metadata required throughout. The output is real, checksummed zstd with a
 bounded window; a Yocto `.ext4.gz` must first be expanded, never merely renamed.
 
 It publishes one new private directory only after writing and flushing its
-contents. An existing directory or symlink is never replaced. Files include:
+contents. Every nested directory is mode 0700, independent of the workstation
+umask; files are mode 0600. An existing directory or symlink is never replaced.
+Files include:
 
 | Path | Purpose |
 | --- | --- |
@@ -83,6 +87,56 @@ key is shipped in the package. The device's own state must remain authoritative.
 The canonical trial command line remains unprepared. The separate temporary
 trial receives a random attempt identity; that identity grants no production
 installation or watchdog-completion authority.
+
+## Root package check and preparation reservation
+
+The separate `bootstrap_check` example accepts only the SHA-256 of `bundle.json`,
+supplied over the authenticated operator connection. Its package path is fixed
+at `/data/spacewars-bootstrap/package`; the parent and every package directory
+must be private and root-owned on the actual data filesystem. Neither the
+package's own checksum list nor a kiosk request supplies installation authority.
+
+The checker takes the shared install lock, hashes every declared file, rejects
+unknown files and duplicate metadata keys, and reconstructs the complete boot
+plan from checked assets and newly observed board/profile/root UUIDs. Retained
+firmware and hardware configuration must match. Capacity includes FAT allocation,
+staged assets, canonical growth, the largest atomic replacement, reserves and
+space for recovery copies. Data-content backup sizing remains an additional
+requirement. No root partition, boot selector or persistent journal is written
+by the check. Its report always says `ready_for_write: false`.
+
+`bootstrap_prepare` uses the same check and additionally requires both root and
+runtime login keys already preserved in `/data/spacewars-access`. Establish
+those separate roles with the root manager's `initialize-access` and, if needed,
+`import-root-keys` operations while the old home files remain available. A
+runtime key is never automatically promoted to root. Key presence is not proof
+that either SSH login works; both intended logins still need verification.
+
+Preparation writes only `/data/spacewars-bootstrap/active/binding.json`. It binds
+the operator-selected package to the physical device, layout, original and
+target slots, kernel, profile and complete original boot-file inventory. The
+record and directory are flushed before success. A repeat preparation accepts
+only the same inputs, retains the original record and reports `resumed: true`.
+An ordinary legacy reboot is allowed; its new boot ID does not overwrite the
+first observed ID. Missing, corrupt, partial or conflicting state requires
+explicit reconciliation, and is never deleted or silently reinitialized.
+
+An active reservation blocks mutations through the **new** maintenance tools.
+New-image SSH initialization retains an existing access store and refuses to
+reimport keys if that store has disappeared during bootstrap. These guards do
+not change the legacy tools already installed on the Pis; their unsigned write
+and reboot paths still must be closed before trial. Only preparation can resume
+today; copying/writing/booting phases are not implemented by these examples.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_check \
+  --example bootstrap_prepare --target aarch64-unknown-linux-gnu
+```
+
+Both examples reject non-root execution before accessing the package. Their
+only argument is the separately reviewed bundle hash; neither accepts a device,
+destination path, URL or arbitrary command. Do not reserve a live attempt until
+its remaining recovery and apply procedure is ready for supervised execution.
 
 ## Why stage the OS boot assets separately
 
@@ -155,7 +209,7 @@ The hostname regression covers normal/trial selection and invalid naming files.
 The unprivileged Pi probe and full clean-image package checks are recorded
 separately from later device migration evidence.
 
-The clean `514264c9723d` image built successfully. Its build ID is
+The previously validated clean `514264c9723d` image built successfully. Its build ID is
 `rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3`;
 the immutable boot identity remains unchanged. Packages are available in the
 build workspace at `target/ota-bootstrap-514264c-pi5` and
@@ -173,6 +227,14 @@ unchanged. The Picade was unreachable; its package still needs a fresh live
 preflight. Root SSH on the Pi 5 continued to reject the existing key.
 [Source identities, artifact hashes and validation evidence](data/ota-bootstrap-20261015.json)
 record these limits and the outstanding migration work.
+
+The newer device checker, preparation record and maintenance/access guards are
+tested separately from that image. The repackaged private Pi 5 kit at
+`target/ota-bootstrap-private-514264c-pi5` contains the same clean root image;
+its newer directory permissions pass the device package reader. A read-only
+workstation test checks that real package against an explicitly synthetic Pi 5
+context. It is not a privileged live-device preflight. A future clean image
+must include the new guards before the supervised migration is attempted.
 
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1

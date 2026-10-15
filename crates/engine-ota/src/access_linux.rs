@@ -55,11 +55,36 @@ pub fn import_root_key(lock: &InstallLock) -> Result<AccessStatus> {
     import_under(&root, &data, OWNERS)
 }
 
+/// Bootstrap must preserve both roles before reserving an attempt, because a
+/// later root image must never import new/default keys if this store is lost.
+pub(crate) fn preserved_for_bootstrap(lock: &InstallLock) -> Result<AccessStatus> {
+    lock.check()?;
+    let data = crate::recovery_linux::open_data_mount()?;
+    preserved_under(&data, OWNERS.root)
+}
+
+fn preserved_under(data: &File, owner: u32) -> Result<AccessStatus> {
+    let directory = open_at(data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+    if directory.metadata()?.dev() != data.metadata()?.dev() {
+        return Err(invalid("persistent access is not on the data filesystem"));
+    }
+    let status = status(&directory, owner, false)?;
+    if status.root_keys == 0 || status.runtime_keys == 0 {
+        return Err(invalid(
+            "bootstrap requires separately preserved root and runtime login keys",
+        ));
+    }
+    Ok(status)
+}
+
 fn initialize_under(root: &File, data: &File, owners: Owners) -> Result<AccessStatus> {
     check_directory(data, owners.root, 0o755)?;
     if let Some(directory) = optional_directory(data, DIRECTORY)? {
         return status(&directory, owners.root, false);
     }
+    // An interrupted migration must retain its prepared roles. Importing the
+    // new root's empty/default files would silently replace missing device keys.
+    crate::bootstrap::require_no_active_under(data, owners.root)?;
     // Once recovery has been provisioned, a missing store is data loss, not
     // another first boot. Never fall back to keys shipped in a later rootfs.
     if let Some(system) = optional_directory(data, "spacewars-system")? {

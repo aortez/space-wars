@@ -1,5 +1,6 @@
 //! Supervised bootstrap planning, separate from signed rootfs OTA authority.
-//! These plans never write a device, enable OTA, change selectors or reboot.
+//! Preparation may reserve a root-private attempt on /data. It never writes
+//! a root partition, enables OTA, changes selectors or reboots.
 use crate::boot::{BootCommandLine, BootManifest, SlotRoots};
 use crate::recovery::Slot;
 use crate::{Blob, Error, ImageIdentity, Result, Sha256};
@@ -15,6 +16,15 @@ pub use package::{BootstrapPackage, build_package};
 #[path = "bootstrap_inspect.rs"]
 mod inspect;
 pub use inspect::{LegacyBootEvidence, inspect_legacy_boot};
+
+#[path = "bootstrap_device.rs"]
+mod device;
+pub use device::{PackageCheck, check_installed_package, prepare_installed_package};
+
+#[path = "bootstrap_state.rs"]
+mod state;
+pub(crate) use state::require_no_active_under;
+pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap};
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
 
@@ -46,7 +56,8 @@ impl Board {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BootPlan {
     pub schema: u32,
     pub boot_identity: Sha256,
@@ -57,10 +68,12 @@ pub struct BootPlan {
     pub trial_id: Sha256,
     /// Copy these exact artifact assets beneath /boot/sw-bootstrap. Only one
     /// copy of the common Pi kernel is needed in the temporary staging area.
+    #[serde(deserialize_with = "crate::boot::unique_files")]
     pub staged_assets: BTreeMap<String, Blob>,
     pub staged_asset_bytes: u64,
     /// Must match the live firmware before staging; bootstrap does not update
     /// EEPROM or replace GPU firmware to make an incompatible boot set work.
+    #[serde(deserialize_with = "crate::boot::unique_files")]
     pub unchanged_firmware: BTreeMap<String, Blob>,
     pub trial_config: String,
     pub normal_config: String,
@@ -305,4 +318,4 @@ fn invalid(message: &str) -> Error {
 
 #[cfg(test)]
 #[path = "bootstrap_tests.rs"]
-mod tests;
+pub(crate) mod tests;
