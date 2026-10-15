@@ -246,6 +246,36 @@ impl SpacewarsState {
         Ok(())
     }
 
+    /// Development fixture release through the ordinary conserved material path.
+    pub(crate) fn queue_fixture_release(
+        &mut self,
+        planet: usize,
+        local: Vec2,
+        radius: u32,
+    ) -> Result<(), TerrainError> {
+        let field = self
+            .planet_terrain(planet)
+            .ok_or(TerrainError("missing fixture material"))?;
+        let center = field
+            .local_to_cell(local)
+            .ok_or(TerrainError("release outside fixture"))?;
+        let edit = TerrainEdit {
+            brush: Brush::Circle { center, radius },
+            mode: EditMode::Remove,
+        };
+        let _ = field.brush_cells(edit.brush)?;
+        self.terrain.pending.push(PendingEdit {
+            body: physics::planet_entity(planet),
+            edit,
+            blast: Some(RadialImpulse {
+                center: local,
+                radius: radius as f32 * 2.0,
+                speed: 0.0,
+            }),
+        });
+        Ok(())
+    }
+
     pub(super) fn queue_material_edit(
         &mut self,
         body: PhysicsId,

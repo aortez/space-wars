@@ -277,6 +277,38 @@ impl SurfacePilot {
         }
     }
 
+    /// Passive normal-scale comparison actor for the shared tank fixture.
+    pub(super) fn tank_comparison(world: &mut SpacewarsState) -> Self {
+        let mut pilot = Self::new(PlayerId::PLAYER_1, 0, false);
+        pilot.body = Some(
+            SpacelingAssembly::insert(
+                &mut world.physics.world,
+                pilot_physics_id(pilot.owner),
+                Vec2::new(540.0, 555.0),
+                0.0,
+                SurfaceSortieState::spec(),
+            )
+            .expect("comparison pilot admission"),
+        );
+        pilot
+    }
+
+    pub(super) fn render_comparison(
+        &self,
+        physics: &physics::SpacewarsPhysics,
+        frame: &mut RenderFrame,
+    ) {
+        if let Some(snapshot) = self.snapshot(physics) {
+            render::draw_spaceling(
+                frame,
+                snapshot,
+                self.facing,
+                self.gait_phase,
+                RenderColor::rgb(0.25, 0.93, 0.8),
+            );
+        }
+    }
+
     pub(super) fn snapshot(
         &self,
         physics: &physics::SpacewarsPhysics,
@@ -881,6 +913,7 @@ impl Scenario for SurfaceSortieScenario {
             &mut state.pilots,
             Some(prepared),
             Some(&mut state.asteroids),
+            false,
         );
         state.release_destroyed_pods();
         state.reconcile_recovery_vehicles();

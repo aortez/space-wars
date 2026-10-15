@@ -148,6 +148,7 @@ pub(super) fn diagnose(
                 Some(MechanicalEntity::Ship(_)) => "ship or pod",
                 Some(MechanicalEntity::Spaceling(_)) => "spaceling",
                 Some(MechanicalEntity::Rover(_)) => "rover",
+                Some(MechanicalEntity::Tank(_)) => "tank",
                 Some(MechanicalEntity::Debris(_)) => "debris",
                 None => "unclassified",
             };

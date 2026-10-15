@@ -654,7 +654,9 @@ impl FunctionalHarness {
         seed: u64,
         settings: Option<engine_common::Settings>,
     ) -> Result<Self, String> {
-        let artifact_root = workspace_root().join("target/functional-test-artifacts");
+        let artifact_root = std::env::var_os("SPACEWARS_FUNCTIONAL_ARTIFACT_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| workspace_root().join("target/functional-test-artifacts"));
         fs::create_dir_all(&artifact_root).map_err(|error| {
             format!(
                 "could not create artifact root {}: {error}",

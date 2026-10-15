@@ -16,6 +16,7 @@ mod falling;
 mod nes;
 mod null;
 mod pizza;
+mod planetary_tanks;
 mod rover_lab;
 mod scorched_earth;
 mod spaceling_lab;
@@ -439,6 +440,10 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     spaceling_lab::REGISTRATION,
     terrain_lab::REGISTRATION,
     terrain_grains::REGISTRATION,
+    planetary_tanks::REGISTRATION,
+    planetary_tanks::ANGULAR_REGISTRATION,
+    planetary_tanks::COMPARISON_REGISTRATION,
+    planetary_tanks::ANGULAR_COMPARISON_REGISTRATION,
     surface_sortie::MATCH_REGISTRATION,
     spacewars::REGISTRATION,
     surface_sortie::REGISTRATION,
@@ -543,6 +548,10 @@ mod tests {
                 "spaceling-lab",
                 "terrain-lab",
                 "terrain-grains",
+                "planetary-tank-fixture",
+                "planetary-tank-fixture-angular",
+                "planetary-tank-comparison",
+                "planetary-tank-comparison-angular",
                 "spacewars",
                 "spacewars-classic",
                 "surface-sortie",

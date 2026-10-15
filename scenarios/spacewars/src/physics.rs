@@ -74,6 +74,7 @@ const GROUP_BODY: u32 = 1 << 5;
 const GROUP_WORLD: u32 = 1 << 6;
 const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
 const GROUP_ROVER: u32 = 1 << 9;
+const GROUP_TANK: u32 = 1 << 14;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_SPACELING: u32 = 1 << 11;
 const GROUP_MATERIAL: u32 = 1 << 12;
@@ -86,8 +87,13 @@ const GROUP_SUN: u32 = 1 << 13;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
 // GROUP_BODY also includes dynamic terrain fragments. Celestial and boundary
 // filters must accept that group as well as ordinary ships, debris, and rovers.
-const GROUP_ALL_SOLIDS: u32 =
-    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER | GROUP_SPACELING;
+const GROUP_ALL_SOLIDS: u32 = GROUP_ALL_SHIPS
+    | GROUP_DEBRIS
+    | GROUP_BODY
+    | GROUP_WORLD
+    | GROUP_ROVER
+    | GROUP_SPACELING
+    | GROUP_TANK;
 
 pub(super) fn spaceling_collision_groups() -> CollisionGroups {
     CollisionGroups::new(
@@ -98,6 +104,7 @@ pub(super) fn spaceling_collision_groups() -> CollisionGroups {
             | GROUP_ALL_SHIPS
             | GROUP_DEBRIS
             | GROUP_WORLD
+            | GROUP_TANK
             | GROUP_SPACELING,
     )
 }
@@ -116,6 +123,35 @@ pub(super) fn terrain_spec() -> engine_rapier::terrain::TerrainSpec {
         collision_groups: CollisionGroups::new(GROUP_BODY | GROUP_MATERIAL, GROUP_ALL_SOLIDS),
         ..Default::default()
     }
+}
+
+pub(super) fn tank_spec() -> RoverSpec {
+    RoverSpec {
+        wheel_target_speed: 2.5 / 0.75,
+        // Force-based damping must resist the tangential component of planetary
+        // gravity as well as accelerate the assembly. Torque caps alone do not
+        // hold a wheel: the motor produces damping * relative speed error.
+        wheel_motor_damping: 100.0,
+        wheel_brake_damping: Some(1000.0),
+        wheel_motor_torque: 3000.0,
+        wheel_brake_torque: 5000.0,
+        collision_groups: CollisionGroups::new(
+            GROUP_TANK,
+            GROUP_MATERIAL
+                | GROUP_SUN
+                | GROUP_ALL_SHIPS
+                | GROUP_DEBRIS
+                | GROUP_WORLD
+                | GROUP_TANK
+                | GROUP_SPACELING
+                | GROUP_BODY,
+        ),
+        ..spacewars_rover_spec()
+    }
+}
+
+pub(super) fn tank_material_groups() -> CollisionGroups {
+    CollisionGroups::new(GROUP_TANK, GROUP_MATERIAL)
 }
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
@@ -153,6 +189,7 @@ pub(super) enum MechanicalEntity {
     Ship(usize),
     Spaceling(usize),
     Rover(u64),
+    Tank(u64),
     Debris(u64),
 }
 
@@ -214,6 +251,7 @@ struct RoverPhysicsEntry {
 #[derive(Debug, Clone)]
 pub(super) struct SpacewarsPhysics {
     pub(super) world: PhysicsWorld,
+    pub(super) tanks: super::tanks::Tanks,
     pub(super) terrain_fragments: BTreeSet<u64>,
     pub(super) material_planets: BTreeSet<usize>,
     /// Derived from the loose-material setting at the start of the gravity step.
@@ -284,6 +322,7 @@ impl SpacewarsPhysics {
                 max_ccd_substeps: 4,
                 collect_events: true,
             }),
+            tanks: super::tanks::Tanks::default(),
             terrain_fragments: BTreeSet::new(),
             material_planets: BTreeSet::new(),
             distributed_gravity: false,
@@ -482,8 +521,13 @@ impl SpacewarsPhysics {
     }
 
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
+        self.tanks
+            .prepare_controls(&mut self.world, self.material_queries_dirty);
         self.capture_pre_step_motions();
         let metrics = self.world.step(dt_seconds);
+        if dt_seconds.is_finite() && dt_seconds > 0.0 {
+            self.tanks.record_physics_step();
+        }
         if dt_seconds.is_finite() && dt_seconds > 0.0 {
             self.material_queries_dirty = false;
         }
@@ -875,6 +919,9 @@ impl SpacewarsPhysics {
                 );
             }
         }
+        for bodies in self.tanks.bodies().chunks_exact(3) {
+            capture(MechanicalEntity::Tank(bodies[0].entity.value()), bodies[0]);
+        }
         for id in &self.terrain_fragments {
             capture(
                 MechanicalEntity::TerrainFragment(*id),
@@ -958,7 +1005,10 @@ impl SpacewarsPhysics {
             MechanicalEntity::Debris(id) | MechanicalEntity::TerrainFragment(id) => {
                 PhysicsId::new(id)
             }
-            MechanicalEntity::World | MechanicalEntity::Body(_) | MechanicalEntity::Rover(_) => {
+            MechanicalEntity::World
+            | MechanicalEntity::Body(_)
+            | MechanicalEntity::Rover(_)
+            | MechanicalEntity::Tank(_) => {
                 return false;
             }
         };
@@ -1602,7 +1652,8 @@ fn ship_collision_groups(ship: &ShipState, docked: bool) -> CollisionGroups {
         ShipForm::EscapePod if ship.owner_id == 0 => GROUP_POD_0,
         ShipForm::EscapePod => GROUP_POD_1,
     };
-    let mut filter = GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR | GROUP_SPACELING;
+    let mut filter =
+        GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR | GROUP_SPACELING | GROUP_TANK;
     if !docked {
         filter |= GROUP_BODY | GROUP_ALL_SHIPS;
     }
@@ -1925,6 +1976,7 @@ pub(super) fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
         value if (ROVER_ENTITY_BASE..DEBRIS_ENTITY_BASE).contains(&value) => {
             Some(MechanicalEntity::Rover(value - ROVER_ENTITY_BASE))
         }
+        value if value > super::tanks::ENTITY_BASE => Some(MechanicalEntity::Tank(value)),
         value if value >= super::terrain::FRAGMENT_ID_BASE => {
             Some(MechanicalEntity::TerrainFragment(value))
         }
