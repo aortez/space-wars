@@ -781,6 +781,19 @@ service sandbox behavior and physical interruption tests remain required.
 [Key-preservation source and execution evidence](data/ota-access-20261015.json)
 records this checkpoint.
 
+The subsequent clean image from `71826f0` passes packaging and artifact checks:
+the access unit is enabled, both daemon drop-ins match the source, and the
+default socket-activated daemon waits for initialization. The image contains
+no login keys; flash-time injection or separately provided operator access
+supplies those. Host systemd accepts the packaged units and their dependencies.
+The actual 520,093,696-byte ext4 image also passes complete temporary-file
+writing, read-only fsck, embedded identity checks and readback. Its packaged
+manager runs on the Pi 5 and rejects both access commands from UID 1000.
+The boot manifest, immutable boot identity and partition geometry remain
+unchanged. These are artifact checks, not an authenticated release or a physical
+installation. [Clean access-image evidence](data/ota-access-image-20261015.json)
+retains the exact build and results.
+
 ## Signed feed contract
 
 The client pins `tough = 0.24.0`; [its local patch](../vendor/tough/SPACEWARS_PATCH.md)
