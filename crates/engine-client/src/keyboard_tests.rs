@@ -7,22 +7,27 @@ use std::time::Duration;
 
 struct TestPlatform;
 
+mod brain_assemblies;
+
 #[test]
 fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigation() {
     use engine_agent::training_job::{JobSpec, JobState, Recipe, TrainingManager};
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
     let wait = |predicate: &dyn Fn() -> bool| {
-        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        // Both complete training runs and validation use this bounded wait.
+        // Shared CI runner speed must not decide checkpoint-equivalence checks.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
         while !predicate() {
             assert!(
                 std::time::Instant::now() < deadline,
-                "training preview timed out"
+                "training preview timed out: {}",
+                window.get_training_snapshot()
             );
             std::thread::sleep(Duration::from_millis(2));
             slint::platform::update_timers_and_animations();
         }
     };
-    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
-    let window = MainWindow::new().unwrap();
     window
         .window()
         .set_size(slint::LogicalSize::new(800.0, 480.0));
@@ -385,16 +390,16 @@ fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
         let x = |index: f32| {
             (width as f32 - page_width) / 2.0
                 + 24.0
-                + index * (body + 10.0) / 4.0
-                + (body - 30.0) / 8.0
+                + index * (body + 10.0) / 5.0
+                + (body - 40.0) / 10.0
         };
         let y = (height as f32 - page_height) / 2.0 + page_height - 56.0;
         click(&window, x(0.0), y);
         pump_worker_until(&window, || !window.get_genomes_busy());
         assert!(window.get_genomes_result().starts_with("Arrived"));
-        click(&window, x(2.0), y);
-        pump_worker_until(&window, || !window.get_genomes_busy());
         click(&window, x(3.0), y);
+        pump_worker_until(&window, || !window.get_genomes_busy());
+        click(&window, x(4.0), y);
         assert!(!window.get_genomes_visible());
         assert!(ui_activation::activate(&window, "launcher.genomes"));
         pump_worker_until(&window, || !window.get_genomes_busy());

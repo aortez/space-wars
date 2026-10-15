@@ -28,9 +28,13 @@ starting it. Current/Best animated replays use a separate bounded worker, with
 pinning and playback speed independent of training. Six fixed monitoring cases
 are checked periodically outside selection and saved with the job. The separate
 runner and broader brain composition below remain planned.
-The first [guidance component browser](../genome-browser.md) now supports saved
-genomes, fixed stationary/moving practice trials with trajectory previews, and
-single-genome seeding. Evaluation-history UI, full brain browsing, and general
+The [genome browser](../genome-browser.md) now supports saved components,
+fixed stationary/moving practice trials with trajectory previews, and
+single-genome seeding. Its Brains tab saves the complete arrival-practice
+assembly, exposes its handwritten/learned parts and exact dependency, and can
+copy it with compatible replacement guidance. Behavior identities, names and
+trial receipts remain separate. This first assembly owns one guidance slot;
+evaluation-history UI, whole learned brains, broader hybrids and general
 gameplay assignment remain open.
 
 ## Product requirements

@@ -479,6 +479,14 @@ export component MainWindow inherits Window {
     in-out property <bool> genomes-visible: false;
     in-out property <int> genomes-focus: 0;
     in-out property <bool> genomes-moving: false;
+    in property <bool> genomes-brains: false;
+    in property <bool> genomes-copying: false;
+    in property <bool> genomes-saveable: false;
+    in property <bool> genomes-copyable: false;
+    in property <bool> genomes-practice-choice: false;
+    in property <string> genomes-dependency;
+    in property <string> genomes-definition;
+    in property <string> genomes-copy-source;
     in property <bool> genomes-busy: false;
     in property <bool> genomes-compatible: false;
     in property <bool> genomes-seedable: false;
@@ -2616,45 +2624,80 @@ export component MainWindow inherits Window {
         x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
         MenuPage {
             available-width: parent.width; available-height: parent.height;
-            heading: "Genomes";
-            subtitle: "Ship pilot · Guidance components · Fixed practice brain";
-            hint: root.genomes-busy ? "Working in a separate world · Back leaves this view" : "Blue: ship path · Gold: target path · White: final ship position";
+            heading: root.genomes-copying ? "Copy brain" : "Genomes";
+            subtitle: root.genomes-copying ? "Choose replacement guidance for a saved practice brain" : root.genomes-brains ? "Saved practice brains · Handwritten host and learned guidance" : "Ship guidance · Save a component as a complete practice brain";
+            hint: root.genomes-busy ? "Working… · Back leaves this view" : root.genomes-copying ? "Save copy keeps the original" : root.genomes-brains ? "Copy swaps guidance · Part shows it" : "Save a brain · Seed a new run";
+            if !root.genomes-copying: Rectangle {
+                x: 24px; y: 76px; width: parent.width - 48px; height: 32px;
+                for label[index] in ["Components", "Brains"]: MenuButton {
+                    x: index * (parent.width + 10px) / 2; width: (parent.width - 10px) / 2; height: parent.height;
+                    text: label; primary: index == (root.genomes-brains ? 1 : 0);
+                    selected: root.genomes-focus == 0 && index == (root.genomes-brains ? 0 : 1);
+                    enabled: !root.genomes-busy;
+                    activated => { root.genomes-focus = 0; root.genomes-command(index == 0 ? "genomes.components" : "genomes.brains"); }
+                }
+            }
+            if root.genomes-copying: Text {
+                x: 24px; y: 76px; width: parent.width - 48px; height: 32px;
+                text: root.genomes-copy-source; color: #c7d0dc; font-size: 13px; wrap: word-wrap; overflow: elide;
+            }
             ChoiceRow {
-                x: 24px; y: 84px; width: parent.width - 48px; height: 44px;
-                label: "Genome"; label-fraction: 0.20; value: root.genomes-label;
-                enabled: !root.genomes-busy && root.genomes-count > 0; selected: root.genomes-focus == 0;
-                previous => { root.genomes-focus = 0; root.genomes-command("genomes.previous"); }
-                next => { root.genomes-focus = 0; root.genomes-command("genomes.next"); }
+                x: 24px; y: 116px; width: parent.width - 48px; height: 40px;
+                label: root.genomes-brains ? "Brain" : "Guidance"; label-fraction: 0.20; value: root.genomes-label;
+                enabled: !root.genomes-busy && root.genomes-count > 0; selected: root.genomes-focus == 1;
+                previous => { root.genomes-focus = 1; root.genomes-command("genomes.previous"); }
+                next => { root.genomes-focus = 1; root.genomes-command("genomes.next"); }
             }
             Text {
-                x: 24px; y: 136px; width: parent.width - 48px; height: 48px;
+                x: 24px; y: 164px; width: parent.width - 48px; height: 60px;
                 text: root.genomes-detail; color: #c7d0dc; font-size: 14px; wrap: word-wrap; overflow: elide;
             }
-            ChoiceRow {
-                x: 24px; y: 192px; width: parent.width - 48px; height: 44px;
+            if !root.genomes-copying: ChoiceRow {
+                x: 24px; y: 232px; width: parent.width - 48px; height: 40px;
                 label: "Practice"; label-fraction: 0.25;
                 value: root.genomes-moving ? "Moving target" : "Stationary target";
-                enabled: !root.genomes-busy && root.genomes-compatible; selected: root.genomes-focus == 1;
-                previous => { root.genomes-focus = 1; root.genomes-command("genomes.practice.previous"); }
-                next => { root.genomes-focus = 1; root.genomes-command("genomes.practice.next"); }
+                enabled: !root.genomes-busy && root.genomes-practice-choice; selected: root.genomes-focus == 2;
+                previous => { root.genomes-focus = 2; root.genomes-command("genomes.practice.previous"); }
+                next => { root.genomes-focus = 2; root.genomes-command("genomes.practice.next"); }
+            }
+            if root.genomes-copying: Text {
+                x: 24px; y: 232px; width: parent.width - 48px; height: 40px;
+                text: root.genomes-saveable ? "This compatible guidance creates a different brain. Try it after saving." : "Choose a different, compatible Guidance v1 component.";
+                color: #80d8ff; font-size: 14px; wrap: word-wrap; overflow: elide;
             }
             Text {
-                x: 24px; y: 244px; width: parent.width - 48px; height: 44px;
-                text: root.genomes-error != "" ? root.genomes-error : !root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "" ? root.genomes-warning : root.genomes-result;
-                color: root.genomes-error != "" || (!root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "") ? #ffb0a0 : #80d8ff;
+                x: 24px; y: 280px; width: parent.width - 48px; height: 44px;
+                text: root.genomes-error != "" ? root.genomes-error
+                    : root.genomes-brains && root.genomes-count > 0 && !root.genomes-compatible ? root.genomes-result
+                    : !root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "" ? root.genomes-warning
+                    : root.genomes-copying ? "The handwritten host, target source, and coordinator stay pinned to the original definition."
+                    : root.genomes-result;
+                color: root.genomes-error != ""
+                    || (root.genomes-brains && root.genomes-count > 0 && !root.genomes-compatible)
+                    || (!root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "") ? #ffb0a0 : #80d8ff;
                 font-size: 14px; wrap: word-wrap; overflow: elide;
             }
-            Image {
-                x: 24px; y: 292px; width: parent.width - 48px; height: 68px;
+            if !root.genomes-copying: Image {
+                x: 24px; y: 328px; width: parent.width - 48px; height: max(24px, parent.height - 416px);
                 source: root.genomes-plot; image-fit: contain;
             }
-            Rectangle {
+            if !root.genomes-copying: Rectangle {
                 x: 24px; y: parent.height - 80px; width: parent.width - 48px; height: 48px;
-                for label[index] in ["Try", "Use seed", "Refresh", "Back"]: MenuButton {
-                    x: index * (parent.width + 10px) / 4; y: 0px; width: (parent.width - 30px) / 4; height: parent.height;
-                    text: label; primary: index == 0; selected: root.genomes-focus == index + 2;
-                    enabled: index == 3 || (!root.genomes-busy && (index == 2 || (index == 0 ? root.genomes-compatible : root.genomes-seedable && root.training-can-start)));
-                    activated => { root.genomes-command(["genomes.try", "genomes.seed", "genomes.refresh", "genomes.back"][index]); }
+                for label[index] in ["Try", root.genomes-brains ? "Copy" : "Seed", root.genomes-brains ? "Part" : "Save", "Refresh", "Back"]: MenuButton {
+                    x: index * (parent.width + 10px) / 5; y: 0px; width: (parent.width - 40px) / 5; height: parent.height;
+                    text: label; primary: index == 0; selected: root.genomes-focus == index + 3;
+                    text-size: 14px; text-padding: 6px;
+                    enabled: index == 4 || (!root.genomes-busy && (index == 3 || (index == 0 ? root.genomes-compatible : index == 1 ? (root.genomes-brains ? root.genomes-copyable : root.genomes-seedable && root.training-can-start) : (root.genomes-brains ? root.genomes-count > 0 : root.genomes-saveable))));
+                    activated => { root.genomes-focus = index + 3; root.genomes-command(["genomes.try", root.genomes-brains ? "genomes.copy" : "genomes.seed", root.genomes-brains ? "genomes.inspect" : "genomes.save", "genomes.refresh", "genomes.back"][index]); }
+                }
+            }
+            if root.genomes-copying: Rectangle {
+                x: 24px; y: parent.height - 80px; width: parent.width - 48px; height: 48px;
+                for label[index] in ["Save copy", root.genomes-busy ? "Back" : "Cancel"]: MenuButton {
+                    x: index * (parent.width + 10px) / 2; width: (parent.width - 10px) / 2; height: parent.height;
+                    text: label; primary: index == 0; selected: root.genomes-focus == (index == 0 ? 4 : 7);
+                    enabled: index == 1 || (!root.genomes-busy && root.genomes-saveable);
+                    activated => { root.genomes-focus = index == 0 ? 4 : 7; root.genomes-command(index == 0 ? "genomes.copy.save" : "genomes.back"); }
                 }
             }
         }

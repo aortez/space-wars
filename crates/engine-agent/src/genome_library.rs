@@ -123,6 +123,14 @@ pub fn save(root: &Path, entry: &Entry) -> Result<(), EvolutionError> {
     Ok(())
 }
 fn load(path: &Path) -> Result<Entry, EvolutionError> {
+    if !path
+        .symlink_metadata()
+        .map_err(error)?
+        .file_type()
+        .is_file()
+    {
+        return Err(error("genome artifact must be a regular file"));
+    }
     let bytes = read_bounded(path, MAX_ENTRY_BYTES)?;
     let envelope: Envelope = serde_json::from_slice(&bytes).map_err(error)?;
     if hash(&serde_json::to_vec(&envelope.entry).map_err(error)?) != envelope.sha256 {
@@ -133,6 +141,34 @@ fn load(path: &Path) -> Result<Entry, EvolutionError> {
         return Err(error("genome filename and identity differ"));
     }
     Ok(envelope.entry)
+}
+
+pub(crate) fn valid_id(id: &str) -> bool {
+    id.len() == 64
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Resolve the exact dependency even when it falls beyond the browser scan.
+/// A damaged saved artifact never falls back to a bundled copy of that ID.
+pub fn resolve(root: &Path, id: &str) -> Result<Entry, EvolutionError> {
+    if !valid_id(id) {
+        return Err(error("invalid genome ID"));
+    }
+    let path = root.join(format!("{id}.json"));
+    match path.symlink_metadata() {
+        Ok(_) => load(&path),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => bundled()?
+            .into_iter()
+            .find(|entry| entry.id == id)
+            .ok_or_else(|| {
+                error(format!(
+                    "Missing guidance genome {id}. Restore its library artifact."
+                ))
+            }),
+        Err(e) => Err(error(e)),
+    }
 }
 #[derive(Debug, Clone, Default)]
 pub struct Catalog {
@@ -294,7 +330,8 @@ fn bundled() -> Result<Vec<Entry>, EvolutionError> {
     Ok(entries)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Practice {
     Stationary,
     Moving,
