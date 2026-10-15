@@ -174,6 +174,7 @@ component MenuButton inherits Rectangle {
     in property <string> detail;
     in property <string> badge;
     in property <length> text-padding: 12px;
+    in property <length> text-size: 16px;
     in property <bool> selected: false;
     in property <bool> enabled: true;
     in property <bool> primary: false;
@@ -193,7 +194,7 @@ component MenuButton inherits Rectangle {
         height: root.detail == "" ? parent.height : 24px;
         text: root.text;
         color: button-touch.pressed || root.selected ? #ffffff : #d9e1ec;
-        font-size: 16px;
+        font-size: root.text-size;
         font-weight: button-touch.pressed || root.selected ? 700 : 500;
         wrap: word-wrap;
         overflow: elide;
@@ -520,7 +521,19 @@ export component MainWindow inherits Window {
     in property <string> training-run-label;
     in property <string> training-best;
     in property <string> training-saved;
+    in property <string> training-validation;
     in property <[TrainingPoint]> training-points;
+    in-out property <int> training-preview-mode: 0;
+    in-out property <int> training-preview-speed: 0;
+    in-out property <string> training-preview-speed-label: "1×";
+    in-out property <bool> training-preview-follow: true;
+    in property <image> training-preview-image;
+    in property <string> training-preview-label;
+    in property <string> training-preview-detail;
+    in property <string> training-preview-id;
+    in property <int> training-preview-tick;
+    out property <int> training-preview-width: Math.max(64, Math.min(root.width / 1px - 32, 760) - 48);
+    out property <int> training-preview-height: Math.max(48, Math.min(root.height / 1px - 24, 520) - 386);
     callback training-open();
     callback training-command(string);
     in property <bool> launcher-busy: false;
@@ -2669,32 +2682,43 @@ export component MainWindow inherits Window {
             if !root.training-setup: Rectangle {
                 x: 24px; y: 84px; width: parent.width - 48px; height: parent.height - 180px;
                 Text {
-                    x: 0px; y: 0px; width: parent.width; height: 28px;
+                    x: 0px; y: 0px; width: parent.width; height: 24px;
                     text: root.training-status; color: root.training-error == "" ? #80d8ff : #ffb0a0;
-                    font-size: 20px; font-weight: 600; overflow: elide;
+                    font-size: 18px; font-weight: 600; overflow: elide;
                 }
                 Text {
-                    x: 0px; y: 32px; width: parent.width; height: 24px;
-                    text: root.training-progress-label; color: #c7d0dc; font-size: 15px; overflow: elide;
+                    x: 0px; y: 26px; width: parent.width; height: 20px;
+                    text: root.training-progress-label; color: #c7d0dc; font-size: 13px; overflow: elide;
                 }
                 Rectangle {
-                    x: 0px; y: 63px; width: parent.width; height: 10px; background: #26394d;
+                    x: 0px; y: 50px; width: parent.width; height: 6px; background: #26394d;
                     Rectangle { x: 0px; y: 0px; width: parent.width * root.training-progress; height: parent.height; background: #80d8ff; }
                 }
-                Text {
-                    x: 0px; y: 84px; width: parent.width; height: root.training-error == "" ? 30px : 130px;
-                    text: root.training-error == "" ? root.training-best : root.training-error;
-                    color: root.training-error == "" ? #ffffff : #ffb0a0;
-                    font-size: root.training-error == "" ? 17px : 15px; wrap: word-wrap; overflow: elide;
+                for title[index] in ["Progress", "Current", "Best", root.training-preview-speed-label, root.training-preview-follow ? "Follow" : "Pinned"]: MenuButton {
+                    x: index * (parent.width + 6px) / 5; y: 62px;
+                    width: (parent.width - 24px) / 5; height: 36px;
+                    text-padding: 4px; text-size: 14px;
+                    text: title; selected: root.training-focus == index + 4;
+                    primary: index < 3 && index == root.training-preview-mode;
+                    enabled: root.training-has-job && (index < 3 || root.training-preview-mode != 0);
+                    activated => {
+                        root.training-focus = index + 4;
+                        root.training-command("training.preview." + ["progress", "current", "best", "speed", "follow"][index]);
+                    }
                 }
-                if root.training-error == "": Rectangle {
-                    x: 0px; y: 126px; width: parent.width; height: 126px;
+                if root.training-error != "": Text {
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
+                    text: root.training-error; color: #ffb0a0;
+                    font-size: 15px; wrap: word-wrap; overflow: elide;
+                }
+                if root.training-error == "" && root.training-preview-mode == 0: Rectangle {
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
                     Text {
-                        x: 0px; y: 0px; width: parent.width; height: 22px;
-                        text: "TRAINING ARRIVALS BY GENERATION"; color: #9fb4cc; font-size: 12px;
+                        x: 0px; y: 0px; width: parent.width; height: 20px;
+                        text: root.training-best; color: #ffffff; font-size: 14px; overflow: elide;
                     }
                     Rectangle {
-                        x: 0px; y: 26px; width: parent.width; height: 70px;
+                        x: 0px; y: 26px; width: parent.width; height: parent.height - 70px;
                         background: #080f1c;
                         for point[index] in root.training-points: Rectangle {
                             y: 0px; x: index * parent.width / Math.max(1, root.training-points.length);
@@ -2710,14 +2734,33 @@ export component MainWindow inherits Window {
                         }
                     }
                     Text {
-                        x: 0px; y: 101px; width: parent.width; height: 22px;
-                        text: "Gold: selected best   Blue: median   ·   Training cases only";
-                        color: #9fb4cc; font-size: 12px; overflow: elide;
+                        x: 0px; y: parent.height - 40px; width: parent.width; height: 18px;
+                        text: "Training arrivals · Gold: best / Blue: median";
+                        color: #9fb4cc; font-size: 11px; overflow: elide;
+                    }
+                    Text {
+                        x: 0px; y: parent.height - 20px; width: parent.width; height: 18px;
+                        text: root.training-validation; color: #b9dbb2; font-size: 11px; overflow: elide;
+                    }
+                }
+                if root.training-error == "" && root.training-preview-mode != 0: Rectangle {
+                    x: 0px; y: 106px; width: parent.width; height: parent.height - 132px;
+                    Text {
+                        x: 0px; y: 0px; width: parent.width; height: 32px;
+                        text: root.training-preview-label; color: #c7d0dc; font-size: 12px; wrap: word-wrap; overflow: elide;
+                    }
+                    Rectangle {
+                        x: 0px; y: 36px; width: parent.width; height: parent.height - 74px; background: #080f1c;
+                        Image { width: parent.width; height: parent.height; source: root.training-preview-image; image-fit: contain; }
+                    }
+                    Text {
+                        x: 0px; y: parent.height - 34px; width: parent.width; height: 32px;
+                        text: root.training-preview-detail; color: #c7d0dc; font-size: 12px; wrap: word-wrap; overflow: elide;
                     }
                 }
                 Text {
-                    x: 0px; y: 256px; width: parent.width; height: 30px;
-                    text: root.training-saved; color: #c7d0dc; font-size: 13px; wrap: word-wrap; overflow: elide;
+                    x: 0px; y: parent.height - 20px; width: parent.width; height: 18px;
+                    text: root.training-saved; color: #c7d0dc; font-size: 11px; overflow: elide;
                 }
             }
 

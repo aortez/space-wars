@@ -264,3 +264,68 @@ fn selected_genome_seeds_a_fresh_run_and_survives_exact_resume() {
         control.run.encode().unwrap()
     );
 }
+
+#[test]
+fn previews_and_periodic_validation_do_not_change_evolution_and_resume_pending_validation() {
+    let root = tempfile::tempdir().unwrap();
+    let spec = JobSpec {
+        recipe: Recipe::MixedArrival,
+        population: 4,
+        generations: 4,
+        seed: 19,
+        ..JobSpec::default()
+    };
+    let mut job = Job::new(spec.clone()).unwrap();
+    let mut control = Run::new(&spec).unwrap();
+    for _ in 0..4 {
+        job.advance().unwrap();
+    }
+    assert!(job.validation_pending());
+    job.save(root.path()).unwrap();
+    atomic_write(&root.path().join("latest"), job.id.as_bytes()).unwrap();
+    let manager = TrainingManager::new(root.path().into()).unwrap();
+    let paused = wait_for(&manager.control(), |s| s.state == JobState::Paused);
+    assert!(paused.validation.is_empty());
+    // Read-only replay inputs remain usable after the worker has advanced.
+    let source = manager.control().preview_candidates();
+    let replay = source.best.as_ref().unwrap().replay(1).unwrap();
+    assert_eq!(replay.brain.controller, paused.best_id.unwrap());
+    assert!(!replay.trace.is_empty() && replay.trace.len() <= 1200);
+    assert_eq!(replay, source.best.unwrap().replay(1).unwrap());
+    assert_eq!(manager.control().snapshot().evaluated_candidates, 4);
+    manager.control().resume().unwrap();
+    let completed = wait_for(&manager.control(), |s| s.state == JobState::Completed);
+    assert_eq!(
+        completed
+            .validation
+            .iter()
+            .map(|v| v.generation)
+            .collect::<Vec<_>>(),
+        [1, 4]
+    );
+    assert!(completed.validation.iter().all(|v| v.cases.len() == 6));
+    drop(manager);
+    let restored = Job::load_latest(root.path()).unwrap().unwrap();
+    while !control.complete() {
+        control.advance().unwrap();
+    }
+    assert_eq!(restored.run.encode().unwrap(), control.encode().unwrap());
+    assert_eq!(restored.validation, completed.validation);
+    assert!(restored.finished());
+    // Validation provenance is checked even with a valid outer checksum.
+    let path = root.path().join(format!("{}.json", restored.id));
+    let mut saved: Envelope = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    saved.job.validation[0].genome_id = "different model".into();
+    saved.sha256 = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&saved.job).unwrap())
+    );
+    fs::write(path, serde_json::to_vec(&saved).unwrap()).unwrap();
+    assert!(
+        Job::load_latest(root.path())
+            .err()
+            .unwrap()
+            .0
+            .contains("validation")
+    );
+}

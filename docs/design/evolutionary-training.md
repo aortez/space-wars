@@ -22,9 +22,12 @@ training case, retain all 107 previous cases, and pass 48/48 new cases. These
 runs share one parent genome and one material world/build; the result does not
 establish a general pilot. A first [managed job and Training view](../managed-training.md)
 now runs those recipes with bounded progress, atomic saves, pause/stop/resume,
-and genome export. It uses one worker inside the client, pauses at candidate
-boundaries, and restores the latest job without starting it. The separate
-runner, animated previews, and broader brain composition below remain planned.
+and genome export. It uses one training worker inside the client, pauses at
+candidate/validation batch boundaries, and restores the latest job without
+starting it. Current/Best animated replays use a separate bounded worker, with
+pinning and playback speed independent of training. Six fixed monitoring cases
+are checked periodically outside selection and saved with the job. The separate
+runner and broader brain composition below remain planned.
 The first [guidance component browser](../genome-browser.md) now supports saved
 genomes, fixed stationary/moving practice trials with trajectory previews, and
 single-genome seeding. Evaluation-history UI, full brain browsing, and general

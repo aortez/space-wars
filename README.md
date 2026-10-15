@@ -513,8 +513,9 @@ cases. One retained genome passes the 11 declared cases and
 [seeded mixed curriculum](docs/ship-mixed-training-experiment.md) produces three
 finalists that each retain all 107 previous cases and pass 48/48 new cases.
 The launcher now includes [local Training setup and progress](docs/managed-training.md),
-with one managed worker, automatic checkpoints, pause/stop/resume, and saved
-genome export. The [guidance genome browser](docs/genome-browser.md) adds saved
+with one managed training worker, automatic checkpoints, pause/stop/resume,
+Current/Best replays, periodic validation, and saved genome export.
+The [guidance genome browser](docs/genome-browser.md) adds saved
 components, stationary/moving practice trials with trajectory previews, and
 selection as a seed for a new training run. General match assignment remains planned.
 The commands below run the existing rule-bot evaluations.

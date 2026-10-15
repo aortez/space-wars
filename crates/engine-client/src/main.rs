@@ -45,6 +45,7 @@ mod sound_controls;
 #[cfg(test)]
 mod thruster_visual_tests;
 mod training_controls;
+mod training_preview;
 mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;

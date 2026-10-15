@@ -11,6 +11,7 @@ use crate::{
     ship_arrival::ArrivalFitness,
     ship_curriculum::{self, CurriculumFitness},
     ship_qualification, ship_training,
+    training_validation::{self, ValidationResult},
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -111,6 +112,7 @@ pub enum JobState {
     Ready,
     Starting,
     Running,
+    Validating,
     Saving,
     PauseRequested,
     Paused,
@@ -129,6 +131,7 @@ impl JobState {
             Self::Loading
                 | Self::Starting
                 | Self::Running
+                | Self::Validating
                 | Self::Saving
                 | Self::PauseRequested
                 | Self::ResumeRequested
@@ -158,8 +161,45 @@ pub struct JobSnapshot {
     pub evaluation_millis: u64,
     pub best_id: Option<String>,
     pub history: Vec<GenerationProgress>,
+    pub validation: Vec<ValidationResult>,
     pub can_resume: bool,
     pub error: Option<String>,
+}
+
+/// Small immutable inputs for an independent replay. They never contain a live
+/// world, evaluator RNG, or a way to submit fitness back to the training run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewCandidate {
+    pub run_id: String,
+    pub recipe: Recipe,
+    pub generation: usize,
+    pub candidate: Option<usize>,
+    pub genome: DenseGenome,
+}
+
+impl PreviewCandidate {
+    pub fn replay(
+        &self,
+        case_index: usize,
+    ) -> Result<crate::ship_arrival::ArrivalEpisode, EvolutionError> {
+        let cases = match self.recipe {
+            Recipe::StationaryArrival => ship_training::cases(ship_training::Partition::Training),
+            Recipe::MixedArrival => ship_curriculum::cases(ship_curriculum::Partition::Training),
+            Recipe::DiagnosticLine => return Err(error("line diagnostic has no ship preview")),
+        };
+        let model = DenseModel::new(self.genome.clone()).map_err(error)?;
+        crate::ship_arrival::run_episode(
+            cases[case_index % cases.len()].clone(),
+            spacewars_ai::guidance::Policy::Model(model),
+            true,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PreviewCandidates {
+    pub current: Option<Arc<PreviewCandidate>>,
+    pub best: Option<Arc<PreviewCandidate>>,
 }
 
 trait ProgressFitness: Clone + Ord + Serialize + DeserializeOwned {
@@ -205,6 +245,43 @@ enum Run {
 }
 
 impl Run {
+    fn previews(&self, id: &str, recipe: Recipe) -> PreviewCandidates {
+        fn collect<F: ProgressFitness>(
+            run: &EvolutionRun<F>,
+            id: &str,
+            recipe: Recipe,
+        ) -> PreviewCandidates {
+            let index = run
+                .fitness()
+                .iter()
+                .position(Option::is_none)
+                .unwrap_or(run.config().population - 1);
+            PreviewCandidates {
+                current: Some(Arc::new(PreviewCandidate {
+                    run_id: id.into(),
+                    recipe,
+                    generation: run.generation() + 1,
+                    candidate: Some(index + 1),
+                    genome: run.population()[index].genome.clone(),
+                })),
+                best: run.history().last().map(|h| {
+                    Arc::new(PreviewCandidate {
+                        run_id: id.into(),
+                        recipe,
+                        generation: h.generation + 1,
+                        candidate: None,
+                        genome: h.best_genome.clone(),
+                    })
+                }),
+            }
+        }
+        match self {
+            Self::Stationary(r) => collect(r, id, recipe),
+            Self::Mixed(r) => collect(r, id, recipe),
+            Self::Line(_) => PreviewCandidates::default(),
+        }
+    }
+
     fn new(spec: &JobSpec) -> Result<Self, EvolutionError> {
         let config = spec.config()?;
         Ok(match spec.recipe {
@@ -301,6 +378,14 @@ impl Run {
             Self::Line(r) => r.history().last().map(|h| &h.best_genome),
         }
     }
+    fn best_id_at(&self, generation: usize) -> Option<&str> {
+        let index = generation.checked_sub(1)?;
+        match self {
+            Self::Stationary(r) => r.history().get(index).map(|h| h.best_id.as_str()),
+            Self::Mixed(r) => r.history().get(index).map(|h| h.best_id.as_str()),
+            Self::Line(_) => None,
+        }
+    }
     fn progress(&self, snapshot: &mut JobSnapshot) {
         fn fill<F: ProgressFitness>(run: &EvolutionRun<F>, snapshot: &mut JobSnapshot) {
             snapshot.completed_generations = run.history().len();
@@ -343,6 +428,8 @@ struct SavedJob {
     evaluation_millis: u64,
     // Preserve the inner checkpoint's exact serialized bytes and checksum.
     checkpoint: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    validation: Vec<ValidationResult>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -358,6 +445,7 @@ struct Job {
     run: Run,
     evaluation_millis: u64,
     saved_candidates: usize,
+    validation: Vec<ValidationResult>,
 }
 
 fn valid_id(id: &str) -> bool {
@@ -380,6 +468,7 @@ impl Job {
             run,
             evaluation_millis: 0,
             saved_candidates: 0,
+            validation: vec![],
         })
     }
     fn snapshot(&self, state: JobState) -> JobSnapshot {
@@ -389,7 +478,8 @@ impl Job {
             spec: Some(self.spec.clone()),
             saved_candidates: self.saved_candidates,
             evaluation_millis: self.evaluation_millis,
-            can_resume: !self.run.complete()
+            validation: self.validation.clone(),
+            can_resume: !self.finished()
                 && matches!(
                     state,
                     JobState::Paused | JobState::Stopped | JobState::Failed
@@ -406,6 +496,7 @@ impl Job {
             spec: self.spec.clone(),
             evaluation_millis: self.evaluation_millis,
             checkpoint: String::from_utf8(self.run.encode()?).map_err(error)?,
+            validation: self.validation.clone(),
         };
         let digest = format!(
             "{:x}",
@@ -475,12 +566,25 @@ impl Job {
         }
         let saved = envelope.job;
         let run = Run::decode(&saved.spec, saved.checkpoint.as_bytes())?;
+        let mut previous = 0;
+        for result in &saved.validation {
+            result.check()?;
+            if result.generation <= previous
+                || run.best_id_at(result.generation) != Some(&result.genome_id)
+            {
+                return Err(error(
+                    "validation does not identify an evaluated generation",
+                ));
+            }
+            previous = result.generation;
+        }
         let mut job = Self {
             id,
             spec: saved.spec,
             run,
             evaluation_millis: saved.evaluation_millis,
             saved_candidates: 0,
+            validation: saved.validation,
         };
         job.saved_candidates = job.snapshot(JobState::Paused).evaluated_candidates;
         Ok(Some(job))
@@ -493,6 +597,34 @@ impl Job {
             .saturating_add(start.elapsed().as_millis() as u64);
         result.map(|_| ())
     }
+    fn validation_pending(&self) -> bool {
+        if self.spec.recipe == Recipe::DiagnosticLine {
+            return false;
+        }
+        let mut progress = JobSnapshot::default();
+        self.run.progress(&mut progress);
+        let n = progress.completed_generations;
+        n > 0
+            && (n == 1 || n % 4 == 0 || self.run.complete())
+            && self.validation.last().is_none_or(|v| v.generation < n)
+    }
+    fn finished(&self) -> bool {
+        self.run.complete() && !self.validation_pending()
+    }
+    fn validate_best(&mut self) -> Result<(), EvolutionError> {
+        let mut progress = JobSnapshot::default();
+        self.run.progress(&mut progress);
+        let model = DenseModel::new(
+            self.run
+                .best()
+                .ok_or_else(|| error("no saved generation"))?
+                .clone(),
+        )
+        .map_err(error)?;
+        let result = training_validation::evaluate(&model, progress.completed_generations)?;
+        self.validation.push(result);
+        Ok(())
+    }
 }
 
 enum Command {
@@ -503,6 +635,7 @@ enum Command {
 }
 struct Shared {
     snapshot: JobSnapshot,
+    previews: PreviewCandidates,
     command: Option<Command>,
     shutdown: bool,
 }
@@ -521,6 +654,9 @@ impl JobControl {
     pub fn snapshot(&self) -> JobSnapshot {
         self.channel.shared.lock().unwrap().snapshot.clone()
     }
+    pub fn preview_candidates(&self) -> PreviewCandidates {
+        self.channel.shared.lock().unwrap().previews.clone()
+    }
     fn request(&self, command: Command) -> Result<(), EvolutionError> {
         let mut shared = self.channel.shared.lock().unwrap();
         if shared.shutdown || shared.command.is_some() {
@@ -532,14 +668,23 @@ impl JobControl {
                 spec.config()?;
                 JobState::Starting
             }
-            Command::Pause if matches!(state, JobState::Running | JobState::Saving) => {
+            Command::Pause
+                if matches!(
+                    state,
+                    JobState::Running | JobState::Validating | JobState::Saving
+                ) =>
+            {
                 JobState::PauseRequested
             }
             Command::Resume if shared.snapshot.can_resume => JobState::ResumeRequested,
             Command::Stop
                 if matches!(
                     state,
-                    JobState::Running | JobState::Saving | JobState::Paused | JobState::Failed
+                    JobState::Running
+                        | JobState::Validating
+                        | JobState::Saving
+                        | JobState::Paused
+                        | JobState::Failed
                 ) && shared.snapshot.run_id.is_some() =>
             {
                 JobState::StopRequested
@@ -547,6 +692,7 @@ impl JobControl {
             _ => return Err(error("training command is not available in this state")),
         };
         if let Command::Start(spec) = &command {
+            shared.previews = PreviewCandidates::default();
             shared.snapshot = JobSnapshot {
                 spec: Some(spec.clone()),
                 ..JobSnapshot::default()
@@ -585,6 +731,7 @@ impl TrainingManager {
         let channel = Arc::new(Channel {
             shared: Mutex::new(Shared {
                 snapshot: JobSnapshot::default(),
+                previews: PreviewCandidates::default(),
                 command: None,
                 shutdown: false,
             }),
@@ -629,6 +776,11 @@ fn publish(channel: &Channel, mut snapshot: JobSnapshot) {
     shared.snapshot = snapshot;
 }
 
+fn publish_previews(channel: &Channel, job: &Job) {
+    let previews = job.run.previews(&job.id, job.spec.recipe);
+    channel.shared.lock().unwrap().previews = previews;
+}
+
 fn storage_lock(root: &Path) -> Result<File, EvolutionError> {
     fs::create_dir_all(root).map_err(error)?;
     let file = OpenOptions::new()
@@ -663,6 +815,9 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
     };
     let mut job = match Job::load_latest(&root) {
         Ok(job) => {
+            if let Some(job) = &job {
+                publish_previews(&channel, job);
+            }
             publish(
                 &channel,
                 job.as_ref().map_or_else(
@@ -671,7 +826,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                         ..JobSnapshot::default()
                     },
                     |j| {
-                        j.snapshot(if j.run.complete() {
+                        j.snapshot(if j.finished() {
                             JobState::Completed
                         } else {
                             JobState::Paused
@@ -705,7 +860,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                 drop(shared);
                 if let Some(job) = job.as_mut() {
                     let result = job.save(&root);
-                    let mut snapshot = job.snapshot(if job.run.complete() {
+                    let mut snapshot = job.snapshot(if job.finished() {
                         JobState::Completed
                     } else {
                         JobState::Stopped
@@ -738,6 +893,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                             next.save(&root)?;
                             atomic_write(&root.join("latest"), next.id.as_bytes())?;
                             job = Some(next);
+                            publish_previews(&channel, job.as_ref().unwrap());
                             running = true;
                         }
                         Command::Pause | Command::Stop => {
@@ -746,7 +902,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                                 .as_mut()
                                 .ok_or_else(|| error("no resumable training job"))?;
                             job.save(&root)?;
-                            let state = if job.run.complete() {
+                            let state = if job.finished() {
                                 JobState::Completed
                             } else if matches!(command, Command::Pause) {
                                 JobState::Paused
@@ -760,20 +916,26 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                                 .as_mut()
                                 .ok_or_else(|| error("no resumable training job"))?;
                             job.save(&root)?;
-                            running = !job.run.complete();
+                            running = !job.finished();
                         }
                     }
                 } else if running {
                     let job = job.as_mut().expect("running job");
-                    job.advance()?;
+                    if job.validation_pending() {
+                        publish(&channel, job.snapshot(JobState::Validating));
+                        job.validate_best()?;
+                    } else {
+                        job.advance()?;
+                    }
                     publish(&channel, job.snapshot(JobState::Saving));
                     job.save(&root)?;
-                    running = !job.run.complete();
+                    publish_previews(&channel, job);
+                    running = !job.finished();
                 }
                 if running {
                     publish(&channel, job.as_ref().unwrap().snapshot(JobState::Running));
                 } else if let Some(job) = &job
-                    && job.run.complete()
+                    && job.finished()
                 {
                     publish(&channel, job.snapshot(JobState::Completed));
                 }
@@ -787,6 +949,7 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
                 // Partially unwound mutable state must never overwrite the last
                 // durable checkpoint. A restart can offer that checkpoint.
                 job = None;
+                channel.shared.lock().unwrap().previews = PreviewCandidates::default();
                 Some("training worker failed; reopen the app to restore the last checkpoint".into())
             }
         };

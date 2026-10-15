@@ -10,6 +10,7 @@ use crate::{MainWindow, TrainingPoint};
 pub(crate) struct Training {
     // Stop refreshing before joining the worker at application shutdown.
     _timer: Timer,
+    _preview: crate::training_preview::Preview,
     _manager: TrainingManager,
 }
 
@@ -19,6 +20,8 @@ pub(crate) fn install(
 ) -> Result<Training, engine_agent::evolution::EvolutionError> {
     let manager = TrainingManager::new(root)?;
     let control = manager.control();
+    let preview = crate::training_preview::install(window, control.clone())
+        .map_err(|e| engine_agent::evolution::EvolutionError(e.to_string()))?;
     publish(window, &control.snapshot());
     publish_setup(window);
     let weak = window.as_weak();
@@ -46,6 +49,10 @@ pub(crate) fn install(
             return;
         }
         let result = match id.as_str() {
+            id if id.starts_with("training.preview.") => {
+                crate::training_preview::command(&window, id);
+                return;
+            }
             "training.back" => {
                 window.set_training_visible(false);
                 return;
@@ -96,6 +103,7 @@ pub(crate) fn install(
     });
     Ok(Training {
         _timer: timer,
+        _preview: preview,
         _manager: manager,
     })
 }
@@ -215,6 +223,7 @@ fn state_label(state: JobState) -> &'static str {
         JobState::Ready => "Ready",
         JobState::Starting => "Starting…",
         JobState::Running => "Training",
+        JobState::Validating => "Checking fixed validation cases…",
         JobState::Saving => "Saving checkpoint…",
         JobState::PauseRequested => "Pausing after this candidate…",
         JobState::Paused => "Paused · checkpoint saved",
@@ -243,18 +252,39 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
     );
     window.set_training_snapshot(serde_json::to_string(snapshot).unwrap().into());
     window.set_training_error(snapshot.error.as_deref().unwrap_or("").into());
+    window.set_training_validation(
+        snapshot
+            .validation
+            .last()
+            .map_or_else(
+                || "Validation: waiting for a completed generation".into(),
+                |v| {
+                    format!(
+                        "Validation · Gen {}: {} / {} arrivals · Outside selection",
+                        v.generation,
+                        v.arrivals(),
+                        v.cases.len()
+                    )
+                },
+            )
+            .into(),
+    );
     window
         .set_training_can_start(!snapshot.state.busy() && snapshot.state != JobState::Unavailable);
     window.set_training_can_pause(matches!(
         snapshot.state,
-        JobState::Running | JobState::Saving
+        JobState::Running | JobState::Validating | JobState::Saving
     ));
     window.set_training_can_resume(snapshot.can_resume);
     window.set_training_can_stop(
         snapshot.run_id.is_some()
             && matches!(
                 snapshot.state,
-                JobState::Running | JobState::Saving | JobState::Paused | JobState::Failed
+                JobState::Running
+                    | JobState::Validating
+                    | JobState::Saving
+                    | JobState::Paused
+                    | JobState::Failed
             ),
     );
     window.set_training_launcher_label(
@@ -399,6 +429,33 @@ pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
             window.get_training_has_job(),
         ));
     } else {
+        for (id, label) in [
+            ("progress", "Progress"),
+            ("current", "Current replay"),
+            ("best", "Best replay"),
+            ("speed", "Replay speed"),
+            ("follow", "Follow latest or pin replay"),
+        ] {
+            controls.push(UiControl::new(
+                format!("training.preview.{id}"),
+                label,
+                window.get_training_has_job()
+                    && (matches!(id, "progress" | "current" | "best")
+                        || window.get_training_preview_mode() != 0),
+            ));
+        }
+        controls.push(
+            UiControl::new("training.preview.id", "Replay genome", false)
+                .with_value(window.get_training_preview_id().to_string()),
+        );
+        controls.push(
+            UiControl::new("training.preview.tick", "Replay tick", false)
+                .with_value(window.get_training_preview_tick().to_string()),
+        );
+        controls.push(
+            UiControl::new("training.preview.detail", "Replay details", false)
+                .with_value(window.get_training_preview_detail().to_string()),
+        );
         controls.push(UiControl::new(
             "training.pause",
             "Pause",
@@ -442,6 +499,11 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
             0 => "training.pause",
             1 => "training.stop",
             2 => "training.new",
+            4 => "training.preview.progress",
+            5 => "training.preview.current",
+            6 => "training.preview.best",
+            7 => "training.preview.speed",
+            8 => "training.preview.follow",
             _ => "training.back",
         }
     }
@@ -453,7 +515,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     let count = if setup {
         if window.get_training_has_job() { 8 } else { 7 }
     } else {
-        4
+        9
     };
     match action {
         UiAction::Up | UiAction::Down => {
