@@ -256,6 +256,13 @@ and the Picade did not resolve.
 [Preparation validation evidence](data/ota-bootstrap-preparation-20261015.json)
 records the source and image identities separately.
 
+The shared-writer refactoring at `ff78362` passed all 124 OTA tests, Clippy,
+Rust 1.89 checks and the AArch64 test build. Its eight file-backed writer tests
+also passed on the Pi 5 as UID 1000. The actual 520,093,696-byte clean image passed
+the complete writer, filesystem check and readback on the workstation using an
+anonymous temporary target file. This did not exercise any live root partition
+or authorize a bootstrap install.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
