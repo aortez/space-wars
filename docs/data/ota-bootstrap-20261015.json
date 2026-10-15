@@ -1,0 +1,855 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-15",
+  "implementation_source": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+  "scope": "Workstation bootstrap packages, clean-image checks and unprivileged legacy Pi inventory/temporary-file tests; no supervised migration or physical recovery qualification",
+  "source_files_sha256": {
+    "crates/engine-ota/src/bootstrap.rs": "94a8a1d5ef481280d5db9835852a719da4985feaf020893ca55f076043e836ec",
+    "crates/engine-ota/src/bootstrap_package.rs": "f734619617d51f1ff1722941910dd99d34f6ec47ca8701d9869052fc58841762",
+    "crates/engine-ota/src/bootstrap_inspect.rs": "8571ce333baef836b41fa798fe458d0459c3093305eb26d64faf987ed7f543f4",
+    "crates/engine-ota/src/bootstrap_tests.rs": "8bcf56eeb065baa2640269f31214a0f350df9fd6801168f7d111867014a06182",
+    "crates/engine-ota/src/boot.rs": "72d76bd5b4df1d1fc5f815018fae0a25cb220dd25e3ed6289cf1a05d67206c0a",
+    "crates/engine-ota/src/boot_files.rs": "9d2a168bc3ddba6c1d439b676c959a81fff02ea3f3f4d16f73f0f7cdcfeaadb2",
+    "crates/engine-ota/examples/bootstrap_package.rs": "94080c864e1643d77ca1eb9f7238120f8715df7c3a040b30937a7be2a15d51a2",
+    "crates/engine-ota/examples/bootstrap_probe.rs": "c2cc074e06adc537bd20c305e6f213d0d5f7b253a3315def587a205858e903e8",
+    "yocto/meta-spacewars/lib/spacewars/boot_identity.py": "06d0d273c50fb474a52aa94f277451a5ee2edcee3773c8e38fae1db8a8ea1f61"
+  },
+  "host_validation": {
+    "ota_tests_passed": 111,
+    "os_manager_tests_passed": 38,
+    "existing_ignored_tests": 2,
+    "extra_real_clean_artifact_writer_test_passed": true,
+    "node_tests_passed": 38,
+    "python_tests_passed": 63,
+    "clippy_warnings_denied": true,
+    "rust_1_89_check": true,
+    "aarch64_tests_built": true
+  },
+  "logs": {
+    "ota-bootstrap-host-tests-final.log": {
+      "sha256": "db3e376bf9e0755000a3e894fa7d1cc907296343d23e9c80794ff240f49b2c2c",
+      "bytes": 16098,
+      "passed": 149,
+      "failed": 0,
+      "ignored": 2
+    },
+    "ota-bootstrap-clippy-final.log": {
+      "sha256": "9f546bc8d48fd9c5d9542016b76cd55bdc74f49d8607a6dcf040a214b3685bb8",
+      "bytes": 454
+    },
+    "ota-bootstrap-msrv-final.log": {
+      "sha256": "1b044defa42e10c104680a5b18f1d197c5bea6e08b33716b9e03cd4db8594034",
+      "bytes": 260
+    },
+    "ota-bootstrap-aarch64-tests.log": {
+      "sha256": "a2f8b61e7cb378eb3d455b7846bd7049b62f04c3068ddbb0a2187bdb0f1a28f5",
+      "bytes": 379
+    },
+    "ota-bootstrap-tooling-tests.log": {
+      "sha256": "da29d54be7f733510a61e123436b3cae2cac937dbaae251cba917889c65a7298",
+      "bytes": 4685
+    },
+    "ota-bootstrap-pi5-tests.log": {
+      "sha256": "274070d96a6eec3ff585a4cb0b2b74091bdf273ab1fbd6737ccb8715694b296c",
+      "bytes": 826,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ota-bootstrap-pi5-hostname-test.log": {
+      "sha256": "29149284c4b4ceda734f1b1b2a17e2b6e759d12f8720c2dcffb2d12cfd165a14",
+      "bytes": 230,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ota-bootstrap-yocto-build.log": {
+      "sha256": "7108b332ab8d4e30e29dfa9675166474d0283ce26663cfaab3e6ef26fa735ef0",
+      "bytes": 16509
+    },
+    "ota-bootstrap-clean-artifact-writer.log": {
+      "sha256": "b93e6d44c3870ba3d7530dab0d519da9162f258711ba831c72f422f6a3011119",
+      "bytes": 1588,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ota-bootstrap-packaged-pi5.log": {
+      "sha256": "e574bf573ee0688e0fb47618936d71dd91b7d08b96e80f7ee5256b8519f05e19",
+      "bytes": 1626
+    }
+  },
+  "artifact": {
+    "rootfs": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015214214.ext4.gz",
+      "compressed_bytes": 134027880,
+      "compressed_sha256": "2d3bf694f63f93d43439e132381a62513560a2e9e0f6b89b1e4b64291874bde1",
+      "expanded_bytes": 520093696,
+      "expanded_sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+    },
+    "disk": {
+      "name": "spacewars-image-raspberrypi-spacewars.rootfs-20261015214214.wic.gz",
+      "compressed_bytes": 183509540,
+      "compressed_sha256": "ea8bbb66e10fb865a1aaf2cb65be9d71b3fc7a5998b94498e3f3041d38c5460d",
+      "expanded_bytes": 7679770624,
+      "expanded_sha256": "fe93d9284a5d52108f7ad91cbd403b58db5e1116fa22729f61b1f90294cdc3d6"
+    },
+    "partition_table": [
+      {
+        "number": 1,
+        "type": 12,
+        "start_sector": 8192,
+        "sectors": 307200
+      },
+      {
+        "number": 2,
+        "type": 131,
+        "start_sector": 319488,
+        "sectors": 6291456
+      },
+      {
+        "number": 3,
+        "type": 131,
+        "start_sector": 6610944,
+        "sectors": 6291456
+      },
+      {
+        "number": 4,
+        "type": 131,
+        "start_sector": 12902400,
+        "sectors": 2097152
+      }
+    ],
+    "root_partuuids": [
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ],
+    "identity": {
+      "architecture": "aarch64",
+      "binaries": {
+        "client": {
+          "bytes": 23426808,
+          "sha256": "e8bbc543dbc7c26394978df4f2d18ecaa6442b879efd92885457b43729c60360"
+        },
+        "os_manager": {
+          "bytes": 3684624,
+          "sha256": "a9729b511b697c26c6bdf81fab77322c6cebb578cb66c04917692c4d8ed268d3"
+        }
+      },
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3",
+      "data": {
+        "reads": {
+          "max": 1,
+          "min": 1
+        },
+        "writes": 1
+      },
+      "layout": "spacewars-ab-v1",
+      "machine": "raspberrypi-spacewars",
+      "recovery_protocol": 1,
+      "rootfs_tree": "608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3",
+      "schema": 1,
+      "source": {
+        "commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+        "dirty": false,
+        "revision": "514264c9723d",
+        "schema": 1
+      },
+      "updater_protocol": 1
+    },
+    "boot_probe": {
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "hardware_profile": "hdmi",
+      "immutable_bytes": 85396458,
+      "immutable_files": 103,
+      "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+      "provisioned_default": null,
+      "trial": null
+    },
+    "rootfs_record_matches_sidecar": true,
+    "rootfs_and_fat_manifest_match": true,
+    "default_cmdline_unchanged": true,
+    "trial_uses_full_config_copy": true,
+    "boot_contains_exact_initramfs_sha256": "461ab4531c05f96c235610855951be26cb4b764e7d7ea2c9da075087b9485c4a",
+    "audit_directory": "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw",
+    "probe_command": [
+      "cargo",
+      "run",
+      "--locked",
+      "-p",
+      "engine-ota",
+      "--example",
+      "boot_artifact_probe",
+      "--",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/boot",
+      "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/image.json",
+      "076c4a2a-02",
+      "076c4a2a-03"
+    ]
+  },
+  "packages": [
+    {
+      "board": "pi5",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3",
+      "compressed": {
+        "bytes": 128386085,
+        "sha256": "d969f5ad44cf6933745eac17c6eca8a22ff07210caf44a9c07dda0e2227ac006"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi5",
+      "profile": "hyperpixel",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+        "dirty": false,
+        "revision": "514264c9723d",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35599908,
+      "target": "a",
+      "canonical_boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "hyperpixel",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": "a",
+        "trial": null
+      },
+      "file_checksums_verified": 193,
+      "expanded_root_roundtrip_verified": true,
+      "frame_details": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi5/rootfs.ext4.zst \n# Zstandard Frames: 1\nDictID: 0\nWindow Size: 64.0 MiB (67108864 B)\nCompressed Size: 122 MiB (128386085 B)\nDecompressed Size: 496 MiB (520093696 B)\nRatio: 4.0510\nCheck: XXH64 1def408d\n\n*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***\n",
+      "bundle_sha256": "fe0f93273a406d9592811dd664ab8dbf9078a3d12446469783473810fdefc628",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "bootstrap_package",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/rootfs.ext4",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi5",
+        "pi5",
+        "hyperpixel",
+        "076c4a2a-02",
+        "076c4a2a-03",
+        "a"
+      ],
+      "pi5_comparison": {
+        "matching_retained_firmware_files": 18,
+        "boot_free_bytes": 79437824,
+        "stage_allocation_bytes": 35803136,
+        "canonical_growth_bytes": 8028160,
+        "largest_temporary_replacement_bytes": 27402240,
+        "directory_reserve_bytes": 65536,
+        "spare_reserve_bytes": 4194304,
+        "estimated_peak_additional_bytes": 75493376,
+        "capacity_estimate_only": true,
+        "root_preflight_complete": false
+      }
+    },
+    {
+      "board": "pi4",
+      "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+      "build_id": "rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3",
+      "compressed": {
+        "bytes": 128386085,
+        "sha256": "d969f5ad44cf6933745eac17c6eca8a22ff07210caf44a9c07dda0e2227ac006"
+      },
+      "device_changes": false,
+      "expanded": {
+        "bytes": 520093696,
+        "sha256": "7d63e950f48a66100d8db7bed122990a39c88b2bd797a114320ae7d672036081"
+      },
+      "output": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi4",
+      "profile": "picade",
+      "purpose": "supervised-bootstrap",
+      "source": {
+        "commit": "514264c9723d13db493b9fd2e6503f8c5859a4e3",
+        "dirty": false,
+        "revision": "514264c9723d",
+        "schema": 1
+      },
+      "staged_asset_bytes": 35574861,
+      "target": "b",
+      "canonical_boot_probe": {
+        "boot_identity": "fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238",
+        "hardware_profile": "picade",
+        "immutable_bytes": 85396458,
+        "immutable_files": 103,
+        "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+        "provisioned_default": "b",
+        "trial": null
+      },
+      "file_checksums_verified": 193,
+      "expanded_root_roundtrip_verified": true,
+      "frame_details": "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi4/rootfs.ext4.zst \n# Zstandard Frames: 1\nDictID: 0\nWindow Size: 64.0 MiB (67108864 B)\nCompressed Size: 122 MiB (128386085 B)\nDecompressed Size: 496 MiB (520093696 B)\nRatio: 4.0510\nCheck: XXH64 1def408d\n\n*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***\n",
+      "bundle_sha256": "0d3df80cde4eee43fd1d817b3e77e6f368bfb73db6348e881583f9f9722cb73e",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "engine-ota",
+        "--example",
+        "bootstrap_package",
+        "--",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/rootfs.ext4",
+        "/home/data/workspace/space-wars-ota/target/ota-boot-audit-cfcq39hw/boot",
+        "/home/data/workspace/space-wars-ota/target/ota-bootstrap-514264c-pi4",
+        "pi4",
+        "picade",
+        "076c4a2a-02",
+        "076c4a2a-03",
+        "b"
+      ],
+      "live_device_check": "unavailable; Picade did not resolve; planning inputs need fresh validation"
+    }
+  ],
+  "pi5": {
+    "inventory": {
+      "schema": 1,
+      "purpose": "read-only-legacy-bootstrap-inventory",
+      "physical": {
+        "model": "Raspberry Pi 5 Model B Rev 1.1",
+        "serial": "ddde6ffbe45bcea8",
+        "bootloader_revision": "2bb2ae640058a2f3aa8dcbdc2da33302e509668d",
+        "medium_sectors": 240328704,
+        "medium": {
+          "ID_BUS": "usb",
+          "ID_MODEL": "SanDisk_3.2Gen1",
+          "ID_MODEL_ID": "5591",
+          "ID_REVISION": "1.00",
+          "ID_SERIAL": "USB_SanDisk_3.2Gen1_0401843f23a06e8d407779c23f89428fc6f81f6b4c71579cecb2ef50a2e3dbca3747000000000000000000004cbc7cb2ff89801891558107c63087e7-0:0",
+          "ID_TYPE": "disk",
+          "ID_VENDOR": "USB",
+          "ID_VENDOR_ID": "0781"
+        }
+      },
+      "boot_id": "de606400-dc75-446e-b26b-385592b0f562",
+      "layout": {
+        "disk_name": "sda",
+        "disk_device": {
+          "major": 8,
+          "minor": 0
+        },
+        "disk_sectors": 240328704,
+        "active": "b",
+        "partitions": [
+          {
+            "number": 1,
+            "name": "sda1",
+            "device": {
+              "major": 8,
+              "minor": 1
+            },
+            "start_sector": 8192,
+            "sectors": 307200,
+            "partuuid": "076c4a2a-01"
+          },
+          {
+            "number": 2,
+            "name": "sda2",
+            "device": {
+              "major": 8,
+              "minor": 2
+            },
+            "start_sector": 319488,
+            "sectors": 6291456,
+            "partuuid": "076c4a2a-02"
+          },
+          {
+            "number": 3,
+            "name": "sda3",
+            "device": {
+              "major": 8,
+              "minor": 3
+            },
+            "start_sector": 6610944,
+            "sectors": 6291456,
+            "partuuid": "076c4a2a-03"
+          },
+          {
+            "number": 4,
+            "name": "sda4",
+            "device": {
+              "major": 8,
+              "minor": 4
+            },
+            "start_sector": 12902400,
+            "sectors": 203393401,
+            "partuuid": "076c4a2a-04"
+          }
+        ],
+        "layout_id": "7b0a4016a278673bfaf5c36314be8199016dea5c2ba6c1660b52b585f49081c5"
+      },
+      "kernel_build_id": "4d7dcbe8205972a1d0673a2e40d6f1f2cb1a8fa6",
+      "hardware_profile": "hyperpixel",
+      "hardware_configuration": [
+        "[all]",
+        "dtoverlay=vc4-kms-dpi-hyperpixel4"
+      ],
+      "hostname": "spacewars",
+      "boot_files": {
+        "bcm2711-rpi-4-b.dtb": {
+          "bytes": 56156,
+          "sha256": "d3b18f9dee8b220255203ad1b1ac52e73d6cfec261f80bfab8eb1cf6ed4b74d3"
+        },
+        "bcm2712-rpi-5-b.dtb": {
+          "bytes": 81203,
+          "sha256": "e6bd4a60d24ffeb26141a5150ca1687c1b1e1833429da1878027471eb9278aa3"
+        },
+        "boot_slot": {
+          "bytes": 2,
+          "sha256": "0263829989b6fd954f72baaf2fc64bc2e2f01d692d4de72986ea808f6e99813f"
+        },
+        "bootcode.bin": {
+          "bytes": 52476,
+          "sha256": "b7f7faf1a1c6957e2abb79b5a5171eea7e75de60745481ab9c3890801619cef9"
+        },
+        "cmdline.txt": {
+          "bytes": 102,
+          "sha256": "44b3b7dd6aff65d9c0714ca80bca49070b76916ff5260be4b27353421f60281d"
+        },
+        "config.txt": {
+          "bytes": 2600,
+          "sha256": "3f754e688a595fa7b7cd1761015ec999faf3648c838e785637cb67f54c2aef4a"
+        },
+        "fixup.dat": {
+          "bytes": 7325,
+          "sha256": "35b72b06f658102d1eee57c29fde503e4a590edd280a314ab69874ca9ea5233b"
+        },
+        "fixup4.dat": {
+          "bytes": 5456,
+          "sha256": "ca84b2fae239fc9041ac1bdc8648c1e33b9c6e67c4bd073b651b96dc2726c553"
+        },
+        "fixup4cd.dat": {
+          "bytes": 3230,
+          "sha256": "5c3fbb36333731e503c5a2a4b57edff680d837441d0f098cb5fdb1b0120ef740"
+        },
+        "fixup4db.dat": {
+          "bytes": 8449,
+          "sha256": "b88caeb93bac9a2fa5d841f335fb238dc0e525aff1625c8097b0d603df184097"
+        },
+        "fixup4x.dat": {
+          "bytes": 8449,
+          "sha256": "9e289996528566451095d6f0bebf48c19cff74c75de8f1836ede731e994be42b"
+        },
+        "fixup_cd.dat": {
+          "bytes": 3230,
+          "sha256": "5c3fbb36333731e503c5a2a4b57edff680d837441d0f098cb5fdb1b0120ef740"
+        },
+        "fixup_db.dat": {
+          "bytes": 10294,
+          "sha256": "4347feed2a5406fb450a9847779b55eac8d28ecbfa616e319658194cb4258673"
+        },
+        "fixup_x.dat": {
+          "bytes": 10290,
+          "sha256": "fb2c372c5fa33b9059a05bd6ce8d1998f19d8e855ead897808a429fe102ed0d4"
+        },
+        "hostname.txt": {
+          "bytes": 10,
+          "sha256": "a4e082409857e6e7236a30c4a29381f011d4005b5e93db4d83dd87d0bb6d362e"
+        },
+        "kernel8.img": {
+          "bytes": 27400704,
+          "sha256": "5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb"
+        },
+        "kernel_2712.img": {
+          "bytes": 27400704,
+          "sha256": "5a1037279fc79f1cdb2832e92e70786e917e20b8b7a05ed049bf3a6116cc4cdb"
+        },
+        "overlays/at86rf233.dtbo": {
+          "bytes": 1632,
+          "sha256": "9a32aa74b08c621afab689e07645561df3b28a7b36cce566e8f7e55ec53b7ef1"
+        },
+        "overlays/bcm2712d0.dtbo": {
+          "bytes": 1507,
+          "sha256": "7e05af38d7c19b4a4d42ee3d798761b8d71d93235c06191d25e821cbbbc4033d"
+        },
+        "overlays/disable-bt.dtbo": {
+          "bytes": 1073,
+          "sha256": "ea69d22dedc607fee75eec57d8a4cc0f0eab93cd75393e61a64c49fbac912d02"
+        },
+        "overlays/disable-wifi.dtbo": {
+          "bytes": 387,
+          "sha256": "86aa3709da415b8be306aacfe2b0261a601e2e0b2523281d5eb72093b379d892"
+        },
+        "overlays/dwc2.dtbo": {
+          "bytes": 801,
+          "sha256": "3e6f8e33e5749bcb2a5c7808b48123e65e88fc465d64ec16b74d50ffe5037e34"
+        },
+        "overlays/gpio-ir-tx.dtbo": {
+          "bytes": 1096,
+          "sha256": "002e452a750d34d8061a46a663173dff3f5dc6c9482723ee2d9bb2023513f2b7"
+        },
+        "overlays/gpio-ir.dtbo": {
+          "bytes": 1259,
+          "sha256": "08e37cbd9f457b43dc2778d08c77a4ec1a54991db1e28e81472962b798b0eda1"
+        },
+        "overlays/gpio-key.dtbo": {
+          "bytes": 1373,
+          "sha256": "d17f7b5631f473e2f1615fc0f1aef3726342599bd2b1fa9308fbb45b0ac6d5b0"
+        },
+        "overlays/gpio-poweroff.dtbo": {
+          "bytes": 1191,
+          "sha256": "c85fa3d2a22e3c8dd674274b9d1cec804a3c466993b743cd9920716460d9cefd"
+        },
+        "overlays/gpio-shutdown.dtbo": {
+          "bytes": 1462,
+          "sha256": "b8acb53c7e6924c8d2e6a86616e66775c701ee4835e9c51d68b8aa0f029664cb"
+        },
+        "overlays/hifiberry-amp.dtbo": {
+          "bytes": 792,
+          "sha256": "f7e999c5ff6f040e66310aecd489419246c96133ed1325abd99af36f01b41271"
+        },
+        "overlays/hifiberry-amp100.dtbo": {
+          "bytes": 2258,
+          "sha256": "ac49031c60891cd2873acb6e469da9acbfbce61836d279a4304df19d597d2f3d"
+        },
+        "overlays/hifiberry-amp3.dtbo": {
+          "bytes": 1469,
+          "sha256": "65f05acfafc08e5f7f748cbb95d6c2a92cb64baf391167c873093953be07e142"
+        },
+        "overlays/hifiberry-amp4pro.dtbo": {
+          "bytes": 1922,
+          "sha256": "8138810b942de8a9d4a5e9ad3e0b9bb577c922c09064f09f6935c6e57da87979"
+        },
+        "overlays/hifiberry-dac.dtbo": {
+          "bytes": 668,
+          "sha256": "a8d754ab27835a6af86bd3f38946e73a95b828fa5f1d393e6a21abcd093ec094"
+        },
+        "overlays/hifiberry-dacplus.dtbo": {
+          "bytes": 2104,
+          "sha256": "3291ac66f448e624c28e89d0fec26b79abcf01801232250ec62cc793a69b6c10"
+        },
+        "overlays/hifiberry-dacplusadc.dtbo": {
+          "bytes": 1990,
+          "sha256": "3de5c55fb81d53b375399fa90af4bcb53b4c89d80aaeba7b3ba8d7df98752d84"
+        },
+        "overlays/hifiberry-dacplusadcpro.dtbo": {
+          "bytes": 2267,
+          "sha256": "689d0e662d7f029ef43bc5e91e42e2295c04e7441f0d72af23e38c970ebe53cd"
+        },
+        "overlays/hifiberry-dacplusdsp.dtbo": {
+          "bytes": 712,
+          "sha256": "82b366455446d401b30ebb067f8a69ba0afb78605645a3d420a5c81addce6d6b"
+        },
+        "overlays/hifiberry-dacplushd.dtbo": {
+          "bytes": 1662,
+          "sha256": "fedaf91cdc19cd9149e2e1686ad5599ba14b08c53094ad1c32344a956b573c6a"
+        },
+        "overlays/hifiberry-digi-pro.dtbo": {
+          "bytes": 1138,
+          "sha256": "7cd43b4f002f67de6623118d0e81becaabb399341ad97798d441f83633a999b8"
+        },
+        "overlays/hifiberry-digi.dtbo": {
+          "bytes": 972,
+          "sha256": "19a1d8b88cbfd5790718e384d6c0bdd4fd9525c67fb0d58bb98bb530232c2153"
+        },
+        "overlays/i2c-gpio.dtbo": {
+          "bytes": 1055,
+          "sha256": "6144f5353fb35faba981ff02b328b58438a760206fa81ed622cde9f6eb4c75b7"
+        },
+        "overlays/i2c-rtc.dtbo": {
+          "bytes": 8443,
+          "sha256": "478fe3b9d1c663ebd5d2e87c352339f8c5fe8a18087cd91e0d5570d90ecdf4d8"
+        },
+        "overlays/imx219.dtbo": {
+          "bytes": 3307,
+          "sha256": "dded1145822d0cd8d28a4641b55f1cfe888ed1098a81d0cc0bad6b74786690c7"
+        },
+        "overlays/imx477.dtbo": {
+          "bytes": 3720,
+          "sha256": "4a47215755502be910e9696ea1e7e9e92618e2e2bf72620689eb325afef49f6e"
+        },
+        "overlays/imx708.dtbo": {
+          "bytes": 3981,
+          "sha256": "a2094e663c238cf93b9dff1da1e8156199f770ef24b8fd108214aaa2033e6981"
+        },
+        "overlays/iqaudio-dac.dtbo": {
+          "bytes": 1285,
+          "sha256": "720cda46aa3d63a2720199ed5b79986566db080f978af80e4ee6edb03d139a11"
+        },
+        "overlays/iqaudio-dacplus.dtbo": {
+          "bytes": 1524,
+          "sha256": "84dd4b864c9cc4f6fb702a65ab1cd985588a5134c2b663fec68d50ac137fb313"
+        },
+        "overlays/justboom-both.dtbo": {
+          "bytes": 1653,
+          "sha256": "e4f651d042e60cd77095925bf35fb9f1c4659f68555c337a6cede162f784776a"
+        },
+        "overlays/justboom-dac.dtbo": {
+          "bytes": 1289,
+          "sha256": "b196a46030c8d06ddb71bf9f4dcc012003c5bc295121e0b3985d416ab76e04c9"
+        },
+        "overlays/justboom-digi.dtbo": {
+          "bytes": 968,
+          "sha256": "63baf2f5ccc3b1d294699285420b4e1262b48c85a0e1b6af49a07df457285e27"
+        },
+        "overlays/mcp2515-can0.dtbo": {
+          "bytes": 1793,
+          "sha256": "e3ccb45591e7b61b9113249a8e7a5d43a3be8a6d029b22e99b32fae1b39aea79"
+        },
+        "overlays/mcp2515-can1.dtbo": {
+          "bytes": 1793,
+          "sha256": "9aa4618ae19e4aa69c5b491075482b0f2adedd64416af8f41edaff3f3fb1637c"
+        },
+        "overlays/mcp3008.dtbo": {
+          "bytes": 4309,
+          "sha256": "66a8bfbe242b0e328920b6f7a35270de1151c999c9e791b4179a61fb7d552943"
+        },
+        "overlays/miniuart-bt.dtbo": {
+          "bytes": 1566,
+          "sha256": "c38c12945f14ac0c71b609a48c94566b3c323a9cfd39d8cb286799e87e14197e"
+        },
+        "overlays/overlay_map.dtb": {
+          "bytes": 5451,
+          "sha256": "f06bca0d2a2ff851f236dbc3672d47e2525597db9ab1dc79e0c0c16ec9275151"
+        },
+        "overlays/picade.dtbo": {
+          "bytes": 7009,
+          "sha256": "0943b44cd11262a55df0fcbb011c6c61d7f607784c61f1c8d76643f984bcefa1"
+        },
+        "overlays/pitft22.dtbo": {
+          "bytes": 1688,
+          "sha256": "a2e88e005ef247e374a6435bc45a8c858f3e5470646e419a5aec56dde111ed19"
+        },
+        "overlays/pitft28-capacitive.dtbo": {
+          "bytes": 2453,
+          "sha256": "f682113af3ba08721727bd44c3517208269bafc20e23f8efbd24cd585f44ec8a"
+        },
+        "overlays/pitft28-resistive.dtbo": {
+          "bytes": 3111,
+          "sha256": "b808057a25647498f22b14e4b8209f64997e5b8f9bee27c73eb5b67aafac067a"
+        },
+        "overlays/pitft35-resistive.dtbo": {
+          "bytes": 3213,
+          "sha256": "a5ef62d3c4940e54e27b3af71302e6642285c96914d11a83295966ec36301ca9"
+        },
+        "overlays/pps-gpio.dtbo": {
+          "bytes": 1189,
+          "sha256": "f6c6b0d193d0e1744f8f2a367550bebcfb844829294a9a5e5503c266cf8b30cf"
+        },
+        "overlays/rpi-backlight.dtbo": {
+          "bytes": 489,
+          "sha256": "2b716d465875fc61299b161a588e2454b62d31eccb2af8eb59df531a29d43de1"
+        },
+        "overlays/rpi-ft5406.dtbo": {
+          "bytes": 842,
+          "sha256": "3c11ba601b55ce8b53b3de59a781b99a24338a58bf300fdbce8b6cc286f7056f"
+        },
+        "overlays/rpi-poe.dtbo": {
+          "bytes": 4333,
+          "sha256": "45e740115b710c084415fe37022957fe3140f90da4dc8006f3436697efb043da"
+        },
+        "overlays/uart0-pi5.dtbo": {
+          "bytes": 627,
+          "sha256": "65faf0bd5cb5f0a0612dcd012d870e9f2723fde8a640004837107c446469c6be"
+        },
+        "overlays/uart0.dtbo": {
+          "bytes": 936,
+          "sha256": "426e6f5d0a2291b4ae6c2d4fec91ca5d67e3c6b8aad072e3d7461463f494e82f"
+        },
+        "overlays/uart1-pi5.dtbo": {
+          "bytes": 627,
+          "sha256": "311d6a61ac66ae561c46f9eafdece73164943169bb9584d467429be190d0f289"
+        },
+        "overlays/uart1.dtbo": {
+          "bytes": 988,
+          "sha256": "aa1b2d0c4f47767ed3df1d9e27b6e29cc5c4dcc3a9439d4dac006bf700418d80"
+        },
+        "overlays/uart2-pi5.dtbo": {
+          "bytes": 627,
+          "sha256": "f304c5e194bbeadd5fb90715241d5639c608bc418725a13069dad0a7abf7ecd1"
+        },
+        "overlays/uart2.dtbo": {
+          "bytes": 493,
+          "sha256": "ab5ad4490a2ca3ab1eea693ded5a310816f573df86359cb40e6381f39ebeb47d"
+        },
+        "overlays/uart3-pi5.dtbo": {
+          "bytes": 627,
+          "sha256": "a7acee744b991f85057712ba2c0e2e75ea08906f5c53e7ad0c13aba39af80156"
+        },
+        "overlays/uart3.dtbo": {
+          "bytes": 493,
+          "sha256": "af6f894d7af6fcd19fb979454aee7ce4d73e41b9f89e020a8cff4ec7e9e974f4"
+        },
+        "overlays/uart4-pi5.dtbo": {
+          "bytes": 627,
+          "sha256": "0908b03b4941736203b22850bff37aca8959fd4dbf44a82714a1f995f7932435"
+        },
+        "overlays/uart4.dtbo": {
+          "bytes": 493,
+          "sha256": "899b56566a25788f1269d177b839cb60cdf22f0b6d257183c4f2af3da38f8aef"
+        },
+        "overlays/uart5.dtbo": {
+          "bytes": 493,
+          "sha256": "21ffe78c8ebe59d0dbbce97d0e6e7f12015c9d5de04788f3b2f15c9633679dbc"
+        },
+        "overlays/vc4-fkms-v3d-pi4.dtbo": {
+          "bytes": 1559,
+          "sha256": "eae7ebead84e86c3d287453ccfe443560c28f53189d6afa657a7f1d084c77c32"
+        },
+        "overlays/vc4-fkms-v3d.dtbo": {
+          "bytes": 1559,
+          "sha256": "28cb0536449dc907d1300a195ba0be9087d4f47f125c456e2394ab91157d0754"
+        },
+        "overlays/vc4-kms-dpi-hyperpixel4.dtbo": {
+          "bytes": 3853,
+          "sha256": "81b92a48d00a6e44ad971920cfcfe069f123432041c0e5b06a3c70b02410a286"
+        },
+        "overlays/vc4-kms-dsi-7inch.dtbo": {
+          "bytes": 4336,
+          "sha256": "f94a8c3c9b0941b37193e29c30bb8be944282078a5fcbcec9c8663f29052f5d9"
+        },
+        "overlays/vc4-kms-dsi-ili9881-5inch.dtbo": {
+          "bytes": 3394,
+          "sha256": "27e5161dc77673b18386874376339a215c7b1c7cf007e81ef7f64495d3bc6194"
+        },
+        "overlays/vc4-kms-dsi-ili9881-7inch.dtbo": {
+          "bytes": 3447,
+          "sha256": "6b0b5f5e90b2416a08f7743a7bd53122e2cfbbe482cde8d1089129d182b60bfc"
+        },
+        "overlays/vc4-kms-v3d-pi4.dtbo": {
+          "bytes": 3913,
+          "sha256": "155ec071f26a8d45c4524ee00c5037ad7ceb8cc81d221640b9d9d7177c416ddf"
+        },
+        "overlays/vc4-kms-v3d-pi5.dtbo": {
+          "bytes": 3330,
+          "sha256": "ce7c13094e3a3359c2087bed0e38ae84e28877a9991a4aef5c660fc9d0803d09"
+        },
+        "overlays/vc4-kms-v3d.dtbo": {
+          "bytes": 2760,
+          "sha256": "a28591cf7daaa1f740351c8ea8e8586e9041dcab7e912fb58186d2b4d8469e56"
+        },
+        "overlays/w1-gpio-pi5.dtbo": {
+          "bytes": 1169,
+          "sha256": "3d2372c30a6b5f3d67b7ac8723372a00652f70422bed5c9ca9407ee5cc43343c"
+        },
+        "overlays/w1-gpio-pullup.dtbo": {
+          "bytes": 1171,
+          "sha256": "a0414dbe921539de9e0060667a4bf93416d3a00cc6d9116924caf456d2c448e0"
+        },
+        "overlays/w1-gpio.dtbo": {
+          "bytes": 1036,
+          "sha256": "cb2c36f9ae4a8fca087b40bb0c29fe67fdda2a7f546ceb97c3c189f1fae1ac5c"
+        },
+        "overlays/wm8960-soundcard.dtbo": {
+          "bytes": 2368,
+          "sha256": "6abddc36f8d2841862eedf45d84fd52659ed1d69453be83bc572fd2e2181a260"
+        },
+        "rpi-bootfiles-20250430.stamp": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "spacewars-boot-id": {
+          "bytes": 65,
+          "sha256": "8064d361f880a6a7f39a233f762ede9ebe78982249563df641299b60b54d9779"
+        },
+        "spacewars-device.txt": {
+          "bytes": 125,
+          "sha256": "1b82d3164045fa229aa4eb99faa1c7df6828515ac760e4dd2e448ea6f67ce786"
+        },
+        "spacewars-profiles/hdmi.txt": {
+          "bytes": 81,
+          "sha256": "74728c300db90648fcd8f9ef7042b6d1d98d2fd4e88007f70f77fe1fc809db76"
+        },
+        "spacewars-profiles/hyperpixel.txt": {
+          "bytes": 117,
+          "sha256": "b8eb81cf2e192f92b09951bc29e0829e291a660c71f4b77eb947914effd20f3f"
+        },
+        "spacewars-profiles/picade.txt": {
+          "bytes": 569,
+          "sha256": "0d912a0e3ed4ff07c2e0de4f71b324cf109c2414a5a6239110992c8c96beb796"
+        },
+        "start.elf": {
+          "bytes": 2988128,
+          "sha256": "ab505256b80c54a8c34684156e2146ebd373a389cd1b95a4d6accdc54b7f93a5"
+        },
+        "start4.elf": {
+          "bytes": 2263968,
+          "sha256": "2cc344f6171797317ae0b6197191803b45e2f3cda091f0da31c0a3f0bfc47593"
+        },
+        "start4cd.elf": {
+          "bytes": 814140,
+          "sha256": "3b395c8863690d016ab97fa34ca804bc8ca5b1883af6f308779e6be529db348d"
+        },
+        "start4db.elf": {
+          "bytes": 3762408,
+          "sha256": "200a956862dca534dd6625d10d8c9c494bb8a5038853bf397812654fad15b59f"
+        },
+        "start4x.elf": {
+          "bytes": 3011592,
+          "sha256": "afa1df2e4fad7f451094fc5d92af189a3246b2850c4ee389cef4bdef680e1210"
+        },
+        "start_cd.elf": {
+          "bytes": 814140,
+          "sha256": "cdc15ee27a13cd78a32bab73f167e7a38e8b217526fc2827a114e5bbd7564e4e"
+        },
+        "start_db.elf": {
+          "bytes": 4834408,
+          "sha256": "f98cf53e2c42aac49010c06dffa02ad9a46db016cdf1efb79f59851a3748d2af"
+        },
+        "start_x.elf": {
+          "bytes": 3735336,
+          "sha256": "7a89b23d0dcebf76f20cebbc5b47bd7f3e710201a8d0897896e76b4dfb9c4f74"
+        }
+      },
+      "boot_free_bytes": 79437824,
+      "boot_allocation_bytes": 4096,
+      "data_free_bytes": 94367899648,
+      "root_preflight_complete": false
+    },
+    "inventory_after_sha256": "fbf87c828b7ce79b39709874e0873e12b33296b329823644f731f15de112811c",
+    "boot_id_and_entire_boot_inventory_unchanged": true,
+    "tests_run_as_uid": 1000,
+    "temporary_file_bootstrap_tests_passed": 7,
+    "hostname_test_passed": 1,
+    "stripped_test_executable_sha256": "3b238c163f65f5d65aa8cbfc8507c4094b4ba5d9d4e1a0ce7e78a2d82b5c2e4e",
+    "probe_executable_sha256": "5c658248cff0284bc0fde12f48b8396f67a49d92b67e701e5554d9db7bcbecb8",
+    "initial_probe_executable_sha256": "e4d97f01e9bf7e556ef226be458a4c54a7c947194cd824cfde399f2f0cf0b189",
+    "packaged_manager_rejects_root_commands_as_uid_1000": true,
+    "root_ssh": "existing key rejected; no root access established"
+  },
+  "picade": {
+    "live_checks": "unavailable: mDNS did not resolve and last known address was unreachable",
+    "package": "prepared using last observed layout; requires fresh device preflight"
+  },
+  "preserved_access_image_checks": {
+    "enabled_access_service": true,
+    "socket_and_daemon_ssh_dropins": true,
+    "private_operator_workers": true,
+    "runtime_unsigned_install_and_reboot_grants_removed_in_artifact": true,
+    "no_login_keys_shipped": true,
+    "packaged_binaries_match_image_identity": true
+  },
+  "not_performed": [
+    "root execution on either Pi",
+    "raw partition write",
+    "boot selector change",
+    "watchdog open",
+    "reboot",
+    "RTC/time/radio/EEPROM change",
+    "key migration",
+    "recovery/trust bootstrap",
+    "production OTA enablement",
+    "signed feed publication"
+  ],
+  "remaining": [
+    "root apply/resume implementation with verified backups and access preservation",
+    "supervised first trial and staged/canonical normal boots",
+    "explicit normal-boot recovery baseline",
+    "physical Pi 4/5 recovery qualification",
+    "remaining feed/service/network/UI automatic-update integration"
+  ]
+}

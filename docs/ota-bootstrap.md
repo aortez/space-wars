@@ -155,6 +155,25 @@ The hostname regression covers normal/trial selection and invalid naming files.
 The unprivileged Pi probe and full clean-image package checks are recorded
 separately from later device migration evidence.
 
+The clean `514264c9723d` image built successfully. Its build ID is
+`rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3`;
+the immutable boot identity remains unchanged. Packages are available in the
+build workspace at `target/ota-bootstrap-514264c-pi5` and
+`target/ota-bootstrap-514264c-pi4`. Each passed all 193 listed checksum checks,
+rootfs decompression/hash verification and canonical boot-selection inspection.
+The file-backed writer also accepted the exact clean artifact, using only an
+anonymous temporary regular file as its target.
+
+All 111 OTA and 38 device-manager tests passed, along with 38 Node and 63 Python
+tooling tests, Clippy with warnings denied, Rust 1.89 checks and the AArch64 test
+build. The seven new bootstrap tests and hostname regression passed as UID 1000
+on the Pi 5. The actual packaged manager loads there and rejects both privileged
+key commands from that account. Its boot ID and all 101 boot files remained
+unchanged. The Picade was unreachable; its package still needs a fresh live
+preflight. Root SSH on the Pi 5 continued to reject the existing key.
+[Source identities, artifact hashes and validation evidence](data/ota-bootstrap-20261015.json)
+record these limits and the outstanding migration work.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
