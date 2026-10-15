@@ -12,6 +12,8 @@ pub mod boot;
 mod boot_files;
 #[cfg(target_os = "linux")]
 pub mod boot_linux;
+#[cfg(target_os = "linux")]
+pub mod bootstrap;
 mod contract;
 #[cfg(target_os = "linux")]
 pub mod coordinator;

@@ -1,7 +1,7 @@
 //! Boot filesystem operations beneath one pinned, verified directory handle.
 use crate::boot::{
-    BootCommandLine, BootManifest, MUTABLE_BOOT_FILES, SlotRoots, TrialSelection, asset_path,
-    hardware_profile,
+    BootCommandLine, BootManifest, MUTABLE_BOOT_FILES, OPTIONAL_BOOT_FILES, SlotRoots,
+    TrialSelection, asset_path, hardware_profile,
 };
 use crate::owned_fs::{io_result, open_at, owned, read_file, unchanged};
 use crate::recovery::Slot;
@@ -163,13 +163,18 @@ impl BootFiles {
                 self.inventory(&child, &sub, expected, found, temporary)?;
             } else {
                 let leftover = prefix.is_empty() && temporary_name(&component);
-                if !expected.contains(&path) && !leftover {
+                let optional =
+                    prefix.is_empty() && OPTIONAL_BOOT_FILES.contains(&component.as_str());
+                if !expected.contains(&path) && !leftover && !optional {
                     return Err(invalid(format!("unexpected boot file: {path}")));
                 }
                 let file = open_at(directory, &component, libc::O_RDONLY, 0)?;
                 let metadata = file.metadata()?;
                 self.owned(&metadata, false)?;
-                if leftover {
+                if optional {
+                    let bytes = read_file(file, self.owner, 64)?;
+                    crate::boot::hostname(&bytes)?;
+                } else if leftover {
                     *temporary += 1;
                     if *temporary > 16 || metadata.len() > 8192 {
                         return Err(invalid("excessive or oversized interrupted selector files"));

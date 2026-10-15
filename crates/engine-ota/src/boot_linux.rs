@@ -32,7 +32,7 @@ impl PhysicalIdentity {
         Sha256::digest(&bytes)
     }
 
-    fn inspect(layout: &DiskLayout) -> Result<Self> {
+    pub(crate) fn inspect(layout: &DiskLayout) -> Result<Self> {
         let model = property("/sys/firmware/devicetree/base/model", 128)?;
         let serial = property("/sys/firmware/devicetree/base/serial-number", 64)?;
         let firmware = property(
@@ -381,7 +381,7 @@ impl<'a> BootController<'a> {
     }
 }
 
-fn check_mount(directory: &File, layout: &DiskLayout, writable: bool) -> Result<()> {
+pub(crate) fn check_mount(directory: &File, layout: &DiskLayout, writable: bool) -> Result<()> {
     let mut stat = std::mem::MaybeUninit::<libc::statfs>::uninit();
     // SAFETY: directory is live and fstatfs initializes stat on success.
     io_result(unsafe { libc::fstatfs(directory.as_raw_fd(), stat.as_mut_ptr()) })?;
@@ -404,7 +404,7 @@ fn check_mount(directory: &File, layout: &DiskLayout, writable: bool) -> Result<
     Ok(())
 }
 
-fn read(path: &str, limit: u64) -> Result<Vec<u8>> {
+pub(crate) fn read(path: &str, limit: u64) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     File::open(path)
         .map_err(|error| invalid(format!("{path}: {error}")))?
@@ -416,7 +416,7 @@ fn read(path: &str, limit: u64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn text(path: &str, limit: u64) -> Result<String> {
+pub(crate) fn text(path: &str, limit: u64) -> Result<String> {
     String::from_utf8(read(path, limit)?).map_err(|_| invalid("non-UTF8 kernel/device evidence"))
 }
 
@@ -431,7 +431,7 @@ fn property(path: &str, limit: u64) -> Result<String> {
     Ok(String::from_utf8(value.to_vec()).expect("ASCII property"))
 }
 
-fn parse_tryboot(bytes: &[u8]) -> Result<bool> {
+pub(crate) fn parse_tryboot(bytes: &[u8]) -> Result<bool> {
     match bytes {
         [0, 0, 0, 0] => Ok(false),
         [0, 0, 0, 1] => Ok(true),

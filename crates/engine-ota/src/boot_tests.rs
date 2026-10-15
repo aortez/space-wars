@@ -43,6 +43,8 @@ fn malformed_asset_sets_cannot_hide_missing_mutable_or_ambiguous_files() {
     for name in [
         "cmdline.txt",
         "CMDLINE.TXT",
+        "hostname.txt",
+        "HOSTNAME.TXT",
         "../escape",
         "/absolute",
         "overlays/../escape",

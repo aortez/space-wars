@@ -17,6 +17,9 @@ pub const MUTABLE_BOOT_FILES: &[&str] = &[
     "spacewars-boot-id",
     "spacewars-boot-manifest.json",
 ];
+// Flash-time device naming is not kernel or slot-selection authority. Fresh
+// images omit this file; existing devices keep their validated hostname.
+pub const OPTIONAL_BOOT_FILES: &[&str] = &["hostname.txt"];
 const REQUIRED_ASSETS: &[&str] = &[
     "config.txt",
     "tryboot.txt",
@@ -84,6 +87,7 @@ impl BootManifest {
         for (path, blob) in &self.files {
             if !asset_path(path)
                 || MUTABLE_BOOT_FILES.contains(&path.to_ascii_lowercase().as_str())
+                || OPTIONAL_BOOT_FILES.contains(&path.to_ascii_lowercase().as_str())
                 || !folded.insert(path.to_ascii_lowercase())
                 || blob.bytes > MAX_BOOT_ASSET_BYTES
             {
@@ -138,6 +142,23 @@ pub(crate) fn asset_path(path: &str) -> bool {
         && path
             .split('/')
             .all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
+/// One bounded DNS host label, as written by the flash tool. This is device
+/// naming only, never an alternate boot configuration or command line.
+pub fn hostname(bytes: &[u8]) -> Result<&str> {
+    let text = std::str::from_utf8(bytes).map_err(|_| failure("invalid hostname encoding"))?;
+    let value = text.strip_suffix('\n').unwrap_or(text);
+    if !(1..=63).contains(&value.len())
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        || !value.as_bytes()[0].is_ascii_alphanumeric()
+        || !value.as_bytes()[value.len() - 1].is_ascii_alphanumeric()
+    {
+        return invalid("invalid device hostname");
+    }
+    Ok(value)
 }
 
 #[derive(Clone, Debug)]

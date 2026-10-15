@@ -1,0 +1,162 @@
+# Preparing the existing Pis for OTA
+
+The selected migration uses separately authenticated root access on each Pi
+and preserves its existing `/data` partition. Normal rootfs OTA cannot perform
+this first migration: the new kernel and recovery initramfs differ from the
+installed boot assets.
+
+**Implemented:** read-only legacy inventory and workstation package creation.
+**Remaining:** the root apply/resume procedure, supervised boot verification,
+canonical boot migration, recovery-journal provisioning and physical failure
+qualification. A package is not a signed OTA candidate or an enabled updater.
+
+## Read the existing device
+
+Build `bootstrap_probe` for AArch64, copy it to an ordinary account's temporary
+directory, and run it without sudo:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_probe \
+  --target aarch64-unknown-linux-gnu
+```
+
+The example takes no arguments. It reads the mounted root/boot/data layout,
+partition UUIDs, actual board/USB/EEPROM identity, firmware tryboot state,
+running kernel build ID, original boot files, selected hardware profile,
+hostname and free space. It hashes the boot inventory twice and rereads the
+physical layout to detect changes during inspection. It does not open a block
+device or watchdog, take the install lock, write persistent state or reboot.
+
+This first-stage probe accepts the existing standard legacy configuration and
+requires its default root arguments to match the running root. An unfamiliar
+configuration, existing trial/partition-selection configuration, or interrupted
+bootstrap needs explicit review. The report always says
+`root_preflight_complete: false`: unprivileged inspection does not establish
+the private key/journal state, successful backups or safe installation.
+
+The Pi 5 currently runs slot B with HyperPixel. Its hostname file is
+`hostname.txt`, which the new boot verifier now accepts as an optional, bounded
+DNS host label. It is excluded from the immutable boot identity and preserved
+through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
+it must be archived and removed during canonical migration, never used to choose
+the writable partition. Reobserve both devices before preparing an attempt.
+
+## Build the workstation package
+
+Use an expanded `.ext4` artifact and the boot directory extracted from that
+same clean Yocto build. The output directory must not exist. The current Pi 5
+inventory supplies the following planning inputs:
+
+```sh
+cargo run --locked -p engine-ota --example bootstrap_package -- \
+  /path/to/rootfs.ext4 /path/to/extracted-boot /path/to/new-pi5-package \
+  pi5 hyperpixel 076c4a2a-02 076c4a2a-03 a
+```
+
+For the Picade, use `pi4 picade` and the inactive slot/UUIDs from a fresh probe.
+These command arguments are planning inputs; the eventual root apply command
+must derive them again from live evidence under the installation lock.
+
+The builder pins regular input files, rejects links in asset paths, checks a
+clean complete ext4 header, runs read-only `e2fsck`, and reads the actual image
+identity and both executable hashes with bounded `debugfs` calls. It validates
+every copied boot asset against that image's immutable manifest. It hashes the
+expanded root before inspection and again while compressing it, with unchanged
+file metadata required throughout. The output is real, checksummed zstd with a
+bounded window; a Yocto `.ext4.gz` must first be expanded, never merely renamed.
+
+It publishes one new private directory only after writing and flushing its
+contents. An existing directory or symlink is never replaced. Files include:
+
+| Path | Purpose |
+| --- | --- |
+| `bundle.json`, `image.json` | Clean image identity, plan and exact file hashes |
+| `SHA256SUMS` | Transfer-integrity checks, including `bundle.json`; not signatures |
+| `rootfs.ext4.zst` | Actual compressed root filesystem |
+| `engine-os-manager` | Exact manager extracted from that filesystem, not executed by the builder |
+| `boot/` | Complete canonical boot assets and generated normal selectors |
+| `sw-bootstrap/` | One common kernel, selected board DTB, initramfs, overlays and staged command lines |
+| `trial-config.txt`, `normal-config.txt` | Explicit staged boot paths for the supervised migration |
+
+No device hostname, login key, host key, Wi-Fi credential or production signing
+key is shipped in the package. The device's own state must remain authoritative.
+The canonical trial command line remains unprepared. The separate temporary
+trial receives a random attempt identity; that identity grants no production
+installation or watchdog-completion authority.
+
+## Why stage the OS boot assets separately
+
+The Pi 5's boot filesystem has 79,437,824 bytes available in the captured
+inventory. A second complete boot tree is too large; the staged OS assets use
+35,599,908 bytes before FAT allocation and generated selector files. The plan
+retains GPU firmware and EEPROM. All 18 retained firmware files matched the
+live Pi 5; apply must compare them again, not assume another board matches.
+
+The staged configuration explicitly selects the common kernel, selected DTB,
+initramfs, command line and overlay directory. It inlines the checked hardware
+profile. This avoids relying on `os_prefix`, which the firmware can ignore if
+its viability checks fail, and avoids an include for bootloader-handled
+settings. These are source/documentation conclusions, still awaiting physical
+boot verification. [Raspberry Pi configuration documentation](https://www.raspberrypi.com/documentation/computers/config_txt.html#os_prefix)
+
+The intended first trial uses the firmware's one-shot `tryboot.txt`, with the
+original normal configuration retained. A later reset should use the original
+default; that behavior and watchdog expiry must be measured on both installed
+boards. [Raspberry Pi tryboot documentation](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot)
+
+## Remaining supervised migration
+
+The following sequence is the implementation contract, **not a completed apply
+tool or instructions to copy the whole boot tree onto a live Pi**:
+
+1. Establish the selected root access, take the shared install lock, repeat
+   the device and private-state preflight, and preserve verified recovery
+   copies. Retain boot files, the overwritten inactive root, access/network
+   configuration and data state with appropriate private permissions and an
+   independently available recovery copy. Existing journals/trust records must
+   never be overwritten as if the device were fresh.
+2. Preserve root and kiosk login keys as separate roles while the old home
+   files still exist; retain SSH host keys. Verify both intended logins. Disable
+   the old kiosk-accessible unsigned install/reboot paths before a trial; the
+   old default root must remain controlled if rollback returns to it.
+3. Recheck firmware, inactive-slot identity/capacity and free space for the
+   package, backups, staged assets and later atomic file replacements. Write
+   and read back only the inactive root, verify its filesystem/image identity,
+   and flush the staged boot assets. Publish the temporary trial selector last.
+4. Perform the supervised one-shot boot with nearby recovery available. Observe
+   actual root/kernel/profile, data/access and kiosk health within the existing
+   boot deadline. A separate bootstrap health path must not fabricate a
+   production recovery journal or disable the watchdog through an exception.
+5. After a successful supervised trial, select a normal boot using the staged
+   assets and reboot normally. Keep the backed-up legacy configuration/assets
+   available until the canonical migration is proven.
+6. From the confirmed staged normal boot, migrate canonical assets using
+   flushed replacements and publish the canonical default last. A full second
+   tree is not needed: capacity must cover the staged set, growth of the
+   canonical set, its largest temporary replacement and a reserve. Preserve
+   `hostname.txt`, archive the legacy breadcrumb, and verify a canonical normal
+   boot before removing the temporary stage.
+7. Only then explicitly establish the good recovery baseline from the observed
+   normal boot. Do not advertise the overwritten/legacy root as a qualified
+   retained image. Complete Pi 4/5 failure qualification and the remaining feed,
+   service and UI integration before enabling automatic installation.
+
+Power loss can damage the shared FAT boot filesystem. Staging and atomic
+replacements do not remove the need for independent recovery during bootstrap.
+No physical recovery qualification follows from passing the workstation tests.
+
+## Validation
+
+The fixture tests use actual small ext4 files and exercise supported board and
+display profiles, explicit root selection, dirty/mismatched images, unsafe
+directives, symlink/changed assets, executable mismatch, unchanged input bytes,
+zstd round-trip, file checksums, private output and refusal to replace a kit.
+The hostname regression covers normal/trial selection and invalid naming files.
+The unprivileged Pi probe and full clean-image package checks are recorded
+separately from later device migration evidence.
+
+```sh
+cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
+cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
+cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets
+```

@@ -52,6 +52,14 @@ class RecoveryBootAssetsTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     prepare_recovery_boot(self.root, self.entries)
 
+    def test_device_hostname_is_preserved_outside_immutable_boot_identity(self):
+        _, original = prepare_recovery_boot(self.root, self.entries)
+        (self.root / "hostname.txt").write_text("sw-picade\n")
+        manifest, named = prepare_recovery_boot(self.root, self.entries + " hostname.txt")
+        self.assertEqual(original, named)
+        self.assertNotIn("hostname.txt", manifest["files"])
+        self.assertEqual((self.root / "hostname.txt").read_text(), "sw-picade\n")
+
     def test_fat_collisions_and_changed_kernel_build_id_are_rejected(self):
         (self.root / "KERNEL8.IMG").write_bytes(b"case collision")
         with self.assertRaises(ValueError):

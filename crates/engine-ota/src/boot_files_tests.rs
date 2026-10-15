@@ -148,6 +148,50 @@ fn trial_writes_preserve_default_and_manifest_and_promotion_preserves_trial() {
 }
 
 #[test]
+fn optional_device_hostname_survives_trial_and_promotion_without_affecting_boot_identity() {
+    let fixture = Fixture::new();
+    fixture.open().unwrap();
+    fs::write(fixture.path("hostname.txt"), b"sw-picade\n").unwrap();
+    fs::set_permissions(
+        fixture.path("hostname.txt"),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    let mut files = fixture.open().unwrap();
+    files
+        .select(
+            &roots(),
+            Slot::B,
+            Some(Sha256::digest(b"trial")),
+            |_| Ok(()),
+        )
+        .unwrap();
+    files.select(&roots(), Slot::B, None, |_| Ok(())).unwrap();
+    assert_eq!(files.identity(), fixture.identity);
+    assert_eq!(
+        fs::read(fixture.path("hostname.txt")).unwrap(),
+        b"sw-picade\n"
+    );
+    fs::write(fixture.path("hostname.txt"), b"spacewars").unwrap();
+    files.verify().unwrap();
+    for bad in [
+        b"".as_slice(),
+        b"-host",
+        b"host-",
+        b"host.example",
+        b"host\nroot=/dev/sda2",
+        b"host\0",
+        &[b'a'; 64],
+    ] {
+        fs::write(fixture.path("hostname.txt"), bad).unwrap();
+        assert!(files.verify().is_err());
+    }
+    fs::remove_file(fixture.path("hostname.txt")).unwrap();
+    symlink("cmdline.txt", fixture.path("hostname.txt")).unwrap();
+    assert!(files.verify().is_err());
+}
+
+#[test]
 fn changed_immutable_assets_or_selectors_block_writes_without_overwriting_evidence() {
     for name in [
         "kernel8.img",

@@ -51,6 +51,7 @@ def boot_identity(deploy_dir, entries):
 MUTABLE_BOOT_FILES = {
     "cmdline.txt", "spacewars-trial.txt", "spacewars-device.txt",
     "spacewars-boot-id", "spacewars-boot-manifest.json",
+    "hostname.txt",
 }
 GENERATED_BOOT_FILES = {
     "spacewars-cmdline.txt", "spacewars-trial.txt", "tryboot.txt",

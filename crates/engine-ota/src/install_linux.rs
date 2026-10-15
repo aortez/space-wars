@@ -425,7 +425,7 @@ impl<R: Read> Read for HashReader<R> {
     }
 }
 
-fn check_ext4_header(header: &[u8], expanded: u64) -> Result<()> {
+pub(crate) fn check_ext4_header(header: &[u8], expanded: u64) -> Result<()> {
     if header.len() < 2048 {
         return Err(invalid("truncated filesystem header"));
     }
