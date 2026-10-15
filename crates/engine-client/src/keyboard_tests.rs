@@ -12,19 +12,22 @@ mod brain_assemblies;
 #[test]
 fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigation() {
     use engine_agent::training_job::{JobSpec, JobState, Recipe, TrainingManager};
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
     let wait = |predicate: &dyn Fn() -> bool| {
-        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        // Both complete training runs and validation use this bounded wait.
+        // Shared CI runner speed must not decide checkpoint-equivalence checks.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
         while !predicate() {
             assert!(
                 std::time::Instant::now() < deadline,
-                "training preview timed out"
+                "training preview timed out: {}",
+                window.get_training_snapshot()
             );
             std::thread::sleep(Duration::from_millis(2));
             slint::platform::update_timers_and_animations();
         }
     };
-    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
-    let window = MainWindow::new().unwrap();
     window
         .window()
         .set_size(slint::LogicalSize::new(800.0, 480.0));

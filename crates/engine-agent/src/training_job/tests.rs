@@ -11,8 +11,11 @@ fn diagnostic() -> JobSpec {
     }
 }
 
+#[track_caller]
 fn wait_for(control: &JobControl, condition: impl Fn(&JobSnapshot) -> bool) -> JobSnapshot {
-    let deadline = Instant::now() + Duration::from_secs(10);
+    // This also waits for full simulation training and validation on shared CI
+    // runners. It bounds hangs; it is not a training-performance assertion.
+    let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         let snapshot = control.snapshot();
         if condition(&snapshot) {
