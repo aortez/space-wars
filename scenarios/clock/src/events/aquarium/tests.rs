@@ -394,11 +394,18 @@ fn duck_scattering_is_local_and_schooling_resumes_after_it_leaves() {
 
 #[test]
 fn cancellation_resize_and_replacement_release_owned_resources_and_apply_deferred_fonts() {
-    for tick in [60, 600, 1900, 2300, 2900] {
+    for (tick, phase) in [
+        (60, EventPhase::Filling),
+        (FILL_TICKS + 240, EventPhase::Swimming),
+        (FILL_TICKS + SWIM_TICKS + 100, EventPhase::Exiting),
+        (DRAIN_AT + 200, EventPhase::Draining),
+        (DRAIN_AT + DRAIN_TICKS + 80, EventPhase::Clearing),
+    ] {
         let mut state = ready(800.0 / 480.0, tick, ClockFont::ALL[0]);
         for _ in 0..tick {
             state.advance_tick();
         }
+        assert_eq!(state.event_phase(), Some(phase));
         let mut settings = state.settings();
         settings.fonts.selected = ClockFont::ALL[1];
         state.configure(settings);

@@ -667,7 +667,7 @@ it by default and retain previous choices. An explicit preview works when its
 automatic switch or the event profile is Off. Automatic reuse has a 45-second
 per-event cooldown within the existing global scheduler.
 
-The 50-second sequence comprises **6 seconds filling, 24 swimming, 5 departure,
+The 66-second sequence comprises **6 seconds filling, 40 swimming, 5 departure,
 12 draining, and 3 residual recovery**. The inlet finishes after 5.5 seconds;
 fish admission is staggered. Fish gather near the passage during the last eight
 seconds of swimming and count as exited only after their complete silhouette
@@ -683,10 +683,11 @@ longer loads the floor. The maximum gap is 18% of the screen width. Speed and
 downward acceleration are bounded, and closing yields to an occupied duck hull.
 
 The floor can begin closing as water leaves; its peak angle need not reach the
-full-load target. The 800×480, seed-177 fixture peaks at 9.49°. At 47 seconds,
-95.08% of its water has physically drained. By the penultimate tick, 95.75%
-has drained, 4.23% has been reclaimed, and 0.02% remains. The final three seconds
-explicitly recover residual water, rather than treating all cleanup as drainage.
+full-load target. In the 66-second, 800×480, seed-177 fixture, 95.08% of the water
+has physically drained after the 12-second drain (at 63 seconds). By the
+penultimate tick, 95.75% has drained, 4.23% has been reclaimed, and 0.02% remains.
+The final three seconds explicitly recover residual water, rather than treating
+all cleanup as drainage.
 
 #### Fish, digits and the duck
 
@@ -800,7 +801,7 @@ For CPU-only full-cycle benchmarks:
 
 ```sh
 ./benchmark-clock.sh --client target/ci/engine-client \
-  --cases aquarium,rain,meltdown --seconds 53 --repeats 3 \
+  --cases aquarium,rain,meltdown --seconds 69 --repeats 3 \
   --scales 1 --renderer raster
 ```
 

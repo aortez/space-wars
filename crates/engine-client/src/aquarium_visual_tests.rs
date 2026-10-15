@@ -4,7 +4,10 @@ use crate::{
     thruster_visual_tests::{raster, svg, write_png},
 };
 use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
-use scenario_clock::{ClockAction, ClockConfig, ClockDuckInput, ClockReading, ClockScenario};
+use scenario_clock::{
+    ClockAction, ClockConfig, ClockDuckInput, ClockReading, ClockScenario, EVENT_CATALOG,
+    EventPhase,
+};
 use std::{path::PathBuf, time::Duration};
 
 #[test]
@@ -157,13 +160,23 @@ fn aquarium_full_cycle_renders_in_both_adapters() {
             ],
             Duration::ZERO,
         );
-        for tick in 0..=3000 {
-            if [
-                0, 180, 360, 720, 1200, 1740, 1860, 2040, 2099, 2100, 2130, 2160, 2190, 2220, 2280,
-                2400, 2580, 2700, 2820, 2910, 2999, 3000,
-            ]
-            .contains(&tick)
-            {
+        let duration = EVENT_CATALOG[ClockEventKind::Aquarium as usize].duration_ticks;
+        for tick in 0..=duration {
+            // Sample within each phase so a longer swim cannot turn the
+            // drainage/cleanup captures into more pictures of a full tank.
+            let phase_tick = state.phase_tick();
+            let capture = match state.event_phase() {
+                Some(EventPhase::Filling) => [0, 180].contains(&phase_tick),
+                Some(EventPhase::Swimming) => [0, 360, 840, 1800].contains(&phase_tick),
+                Some(EventPhase::Exiting) => [60, 240, 299].contains(&phase_tick),
+                Some(EventPhase::Draining) => {
+                    [0, 30, 60, 90, 120, 180, 300, 480, 600].contains(&phase_tick)
+                }
+                Some(EventPhase::Clearing) => [0, 90, 179].contains(&phase_tick),
+                None => tick == duration,
+                _ => false,
+            };
+            if capture {
                 let frame = ClockScenario::render_frame(&state);
                 let pixels = raster(&frame, viewport);
                 let vector = svg(&frame, viewport);

@@ -1,5 +1,12 @@
 # Aquarium qualification — 2026-10-14
 
+This report records the initial **50-second** event in commit `23d432e`.
+Swimming was subsequently extended from 24 to 40 seconds, making the event
+**66 seconds**. The original measurements and evidence below are retained with
+their original duration; current full-cycle benchmark runs need 69 measured
+seconds instead of 53. See the [timing follow-up](#66-second-timing-follow-up)
+for the new checks.
+
 The Aquarium event completed five live cycles on `sw-picade.local`, including
 two consecutive events sharing the same player duck. All 12 fish exited before
 drainage in each cycle, with no failed exits or capacity-limited water steps.
@@ -150,3 +157,55 @@ around submerged cavities. The 120 Hz / 128-parcel stress fixture remains
 capacity-limited; a separately provisioned 256-slot diagnostic demonstrates
 the time-step control. Production uses 60 Hz and 128 slots. Device checks are
 bounded observations, not a long unattended soak or hands-on cabinet review.
+
+## 66-second timing follow-up
+
+Swimming now lasts 40 seconds. Fill/departure/drain/recovery remain 6/5/12/3
+seconds, for 66 seconds (3,960 ticks) total. Fish still gather during the final
+eight seconds of swimming. This follow-up changes the swim constant, the catalog
+test's bound, phase selection in the capture/interruption tests, and documentation.
+The original evidence above continues to describe the initial 50-second version.
+
+Review covered phase/catalog consistency, event ownership and cleanup, native
+duck/glyph contacts, the shared water changes and their opt-in/default paths,
+and the resource and performance bounds. It found stale absolute timestamps in
+the render and interruption fixtures, an old catalog duration bound, and the
+53-second benchmark example. These now cover the full 66-second event. No
+blocking behavior defect was found in this review; the water approximation,
+120 Hz stress capacity limit and software-rendering costs remain documented.
+
+All 334 Clock tests and all three Aquarium renderer tests pass with the new
+timing. Captures still cover 22 full-event moments in each of three layouts,
+plus the isolated drains and duck controls, in both adapters. Scoped Clock
+Clippy, formatting and diff checks pass. The 800×480 seed-177 capture at tick
+3,780 reports 95.08% physically drained; tick 3,959 reports 95.75% drained,
+4.23% reclaimed and 0.02% remaining, matching the earlier drain behavior.
+
+The compatible GPU build was deployed to the same Picade. Client SHA-256:
+`66e48e0754923b056e7c5bb112cb3445255776959ef0d030bb1710627749e304`.
+The CLI and runtime compatibility signature are unchanged. Source identity is
+base `23d432ed4490a1f6a99ce229b3084d483761f960` plus the changed Rust file hashes
+in the [follow-up evidence](data/clock-aquarium-timing-20261014.json.gz).
+
+One full live cycle with a player duck completed in 66.55 seconds of sampled
+wall time. Public diagnostics matched the phase boundaries at ticks
+360/2,760/3,060/3,780 and the catalog duration of 3,960. All 12 fish exited, there
+were no failed exits or capacity-limited steps, and parcels peaked at 97/128.
+The same duck session remained after cleanup with four bodies/four colliders.
+The periodic sampler missed the clearing phase during a held input; its retained
+post-input snapshot at tick 3,938 records clearing and is included in the
+state validation. The initial sampler assertion and this validation are both
+retained rather than treating missing polling data as a simulation failure.
+
+With that duck present, screenshot-free swimming and draining traces each
+completed 240 flips at 60.004 Hz with zero skipped refreshes. Their interval
+p95/max were 16.669/16.675 ms and 16.670/16.683 ms respectively; mean loop CPU
+times were 7.248 and 7.827 ms. The same measurement limits described above apply.
+
+A single updated CPU-only raster run measured 69 simulated seconds (4,140
+frames), after two warm-up seconds, with the kiosk paused. It averaged 0.252 ms
+step, 0.257 ms scene, 15.249 ms preparation and 15.765 ms total per frame; the
+worst interval p95 was 19.748 ms. The governor remained `ondemand`, with
+before/after temperatures of 66.7/72.5°C. This longer full-water workload is
+not a same-workload regression comparison with the original 53-second run,
+and a single repetition does not characterize run-to-run variance.

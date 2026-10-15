@@ -26,7 +26,7 @@ use navigation::Obstacle;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 pub const FILL_TICKS: u64 = 6 * 60;
-pub const SWIM_TICKS: u64 = 24 * 60;
+pub const SWIM_TICKS: u64 = 40 * 60;
 pub const EXIT_TICKS: u64 = 5 * 60;
 pub const DRAIN_TICKS: u64 = 12 * 60;
 pub const CLEAR_TICKS: u64 = 3 * 60;
