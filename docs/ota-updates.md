@@ -648,7 +648,7 @@ SPACEWARS_OTA_TEST_EXT4=/absolute/path/to/rootfs.ext4 \
   -- --ignored --nocapture
 ```
 
-The current development artifact passes format, byte readback and filesystem
+The earlier dirty development artifact passes format, byte readback and filesystem
 checks, then is correctly rejected because its source record is dirty. That
 test does not authenticate a release or make the artifact installable. No real
 block-device write, boot change, watchdog operation or reboot has been tested
@@ -702,6 +702,25 @@ identity; automatic-install admission must account for that development state
 instead of treating the old image record as proof of the replacement binary.
 [Source and execution evidence](data/ota-maintenance-20261015.json) records
 this boundary without claiming completed bootstrap or automatic updates.
+
+### Clean image integration check
+
+A full Yocto build from clean commit `b400523` succeeds. The actual ext4 image
+contains the exact guarded wrappers and disabled legacy helpers, with private
+workers owned by root and mode 0700. The kiosk's image account belongs only to
+its own, input, video and audio groups. Its packaged sudo rules allow bounded
+logs and the two fixed renderer modes; unsigned installers and generic reboot
+are absent. The immutable boot identity and four-partition geometry are unchanged.
+
+The complete clean rootfs also passes the writer's temporary-file artifact
+test, including real read-only fsck, descriptor/embedded identity agreement
+and the second readback hash. Its packaged manager runs on the Pi 5 and rejects
+maintenance from the real kiosk UID. This is source/artifact validation, not a
+signed release, a block-device installation or live sudo/boot qualification.
+Persistent operator-key migration and the remaining service integration are
+still required before bootstrap and rollout.
+[Clean image, writer and packaged-command evidence](data/ota-clean-image-20261015.json)
+retains the exact artifacts and checks.
 
 ## Signed feed contract
 
