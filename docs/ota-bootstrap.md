@@ -241,6 +241,18 @@ behavior on the original root, so returning to it cannot resurrect deleted
 credentials. Live migration, private data/configuration backup and independent
 export remain pending.
 
+The clean `c14c53f` image contains this importer and exact service wiring. All
+140 OTA and 38 manager host tests, 101 Yocto tooling tests, Clippy and Rust 1.89
+checks pass. The six network-preservation cases also pass on the Pi 5 as UID
+1000 with synthetic temporary profiles. The packaged manager rejects that UID's
+privileged initialization request. Static image ownership/dependency checks and
+`systemd-analyze verify` pass; this does not establish live service sandbox or
+reboot behavior. The Pi 5's boot ID, all 101 boot files, physical layout, kernel
+and hardware profile remain unchanged.
+[Source, artifact and device evidence](data/ota-network-preservation-20261015.json)
+records this checkpoint. Existing bootstrap kits built from `514264c` contain
+the earlier manager; they do not acquire this behavior from the new source tree.
+
 ## Why stage the OS boot assets separately
 
 The Pi 5's boot filesystem has 79,437,824 bytes available in the captured
@@ -284,8 +296,11 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    and flush the staged boot assets. Publish the temporary trial selector last.
 4. Perform the supervised one-shot boot with nearby recovery available. Observe
    actual root/kernel/profile, data/access and kiosk health within the existing
-   boot deadline. A separate bootstrap health path must not fabricate a
-   production recovery journal or disable the watchdog through an exception.
+   boot deadline. Local persistent-store or bind failures must prevent promotion;
+   Internet connectivity must remain independent of that health decision.
+   These persistence health checks are still to be integrated. A separate
+   bootstrap health path must not fabricate a production recovery journal or
+   disable the watchdog through an exception.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.
