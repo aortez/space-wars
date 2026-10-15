@@ -61,7 +61,8 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
     }
     let root = open_directory(Path::new("/"), 0)?;
     let boot = open_at(&root, "boot", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    check_mount(&boot, &layout, true)?;
+    // Inventory also runs during the read-only window used for boot backups.
+    check_mount(&boot, &layout, false)?;
     let data = open_data_mount()?;
     let kernel = kernel_build_id(&read("/sys/kernel/notes", 64 * 1024)?)?;
     let mut files = BTreeMap::new();

@@ -51,7 +51,11 @@ struct Envelope {
 }
 
 impl BootstrapBinding {
-    pub(super) fn observed(check: &PackageCheck, legacy: &LegacyBootEvidence) -> Result<Self> {
+    pub(super) fn observed(
+        package_sha256: Sha256,
+        target: Slot,
+        legacy: &LegacyBootEvidence,
+    ) -> Result<Self> {
         let bytes = |sectors: u64| {
             sectors
                 .checked_mul(512)
@@ -59,12 +63,12 @@ impl BootstrapBinding {
         };
         let binding = Self {
             schema: 1,
-            package_sha256: check.package_sha256,
-            device_id: check.device_id,
-            layout_id: check.layout_id,
+            package_sha256,
+            device_id: legacy.physical.fingerprint(),
+            layout_id: legacy.layout.layout_id,
             original_boot_id: legacy.boot_id.clone(),
             original_slot: legacy.layout.active,
-            target: check.plan.target,
+            target,
             kernel_build_id: legacy.kernel_build_id.clone(),
             hardware_profile: legacy.hardware_profile.clone(),
             boot_partition_bytes: bytes(legacy.layout.partitions[0].sectors)?,
@@ -90,6 +94,8 @@ impl BootstrapBinding {
             )
             || self.boot_partition_bytes == 0
             || self.inactive_partition_bytes == 0
+            || self.boot_partition_bytes > super::package::MAX_ROOT_BYTES
+            || self.inactive_partition_bytes > super::package::MAX_ROOT_BYTES
             || self.original_boot_files.is_empty()
             || self.original_boot_files.len() > 1024
             || self
@@ -153,21 +159,29 @@ pub(super) fn existing(
     let Some(active) = optional_directory(parent, ACTIVE, owner)? else {
         return Ok(None);
     };
+    let binding = read_binding(&active, owner)?;
+    binding.matches(current)?;
+    Ok(Some(binding))
+}
+
+pub(super) fn read_binding(active: &File, owner: u32) -> Result<BootstrapBinding> {
+    owned(&active.metadata()?, true, owner, true)?;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", active.as_raw_fd()))? {
-        if entry?.file_name() != RECORD {
+        let name = entry?.file_name();
+        if name != RECORD && name != super::backup::DIRECTORY {
             return Err(invalid(
                 "unexpected bootstrap preparation state; reconciliation required",
             ));
         }
     }
-    let file = super::device::private_asset(&active, RECORD, owner)?;
+    let file = super::device::private_asset(active, RECORD, owner)?;
     let bytes = read_file(file, owner, MAX_BYTES)?;
     let envelope: Envelope = serde_json::from_slice(&bytes)?;
     if Sha256::digest(&serde_json::to_vec(&envelope.binding)?) != envelope.checksum {
         return Err(invalid("bootstrap preparation checksum mismatch"));
     }
-    envelope.binding.matches(current)?;
-    Ok(Some(envelope.binding))
+    envelope.binding.validate()?;
+    Ok(envelope.binding)
 }
 
 /// A failed initialization deliberately leaves its reservation in place. Never
@@ -214,7 +228,11 @@ pub(super) fn begin(
     Ok((binding, resumed))
 }
 
-fn optional_directory(parent: &File, component: &str, owner: u32) -> Result<Option<File>> {
+pub(super) fn optional_directory(
+    parent: &File,
+    component: &str,
+    owner: u32,
+) -> Result<Option<File>> {
     let directory = match open_at(parent, component, libc::O_RDONLY | libc::O_DIRECTORY, 0) {
         Ok(directory) => directory,
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),

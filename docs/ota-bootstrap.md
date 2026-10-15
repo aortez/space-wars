@@ -6,8 +6,9 @@ this first migration: the new kernel and recovery initramfs differ from the
 installed boot assets.
 
 **Implemented:** read-only legacy inventory, workstation package creation,
-root-only package validation and a durable preparation reservation.
-**Remaining:** recovery-copy creation, root/boot apply and recovery of those
+root-only package validation, a durable preparation reservation, raw boot/inactive
+root recovery copies and an independent-export verifier.
+**Remaining:** data/configuration recovery copies, root/boot apply and recovery of those
 operations, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
@@ -125,8 +126,9 @@ An active reservation blocks mutations through the **new** maintenance tools.
 New-image SSH initialization retains an existing access store and refuses to
 reimport keys if that store has disappeared during bootstrap. These guards do
 not change the legacy tools already installed on the Pis; their unsigned write
-and reboot paths still must be closed before trial. Only preparation can resume
-today; copying/writing/booting phases are not implemented by these examples.
+and reboot paths still must be closed before trial. Preparation and raw recovery
+copies can resume today; installation and booting phases are not implemented by
+these examples.
 
 ```sh
 cargo build --locked -p engine-ota --example bootstrap_check \
@@ -146,6 +148,66 @@ and durable writing transaction. The bootstrap path can compare the complete
 packaged image identity without constructing fictional release metadata. This
 internal refactoring does not add a bootstrap installation command or grant
 write authority to a preparation record.
+
+## Raw recovery copies and independent export
+
+`bootstrap_backup` takes the same separately selected bundle hash. It requires
+an existing valid preparation, preserved login roles and a read-only boot
+filesystem, including its underlying FAT superblock. A read-only bind view of a
+writable filesystem is insufficient. The command does not remount anything or
+stop services; those actions belong to the supervised backup window.
+
+Under the shared install lock it reobserves the layout, then opens only the boot
+and inactive-root block devices **for reading**. It checks their actual device
+numbers, ownership and capacities; the inactive root is exclusively claimed to
+reject a mounted filesystem. Copies go to these private directories:
+
+```text
+/data/spacewars-bootstrap/active/
+  binding.json
+  recovery-copies/
+    boot/partition.img
+    boot/record.json
+    inactive-root/partition.img
+    inactive-root/record.json
+```
+
+Each copy is length-bounded and hashed while reading, flushed, read back and
+compared with a second complete read of its source. Its receipt binds the hash
+and partition role to the original preparation. The image and receipt are
+published together by a flushed directory rename. Existing completed copies are
+verified and retained; corruption or a conflicting record requires reconciliation.
+Only a validated, unpublished `.boot.pending` or `.inactive-root.pending` copy
+can be restarted. Pending scratch space is reclaimed before remeasuring free
+space. Completed verified copies count toward the requirement, so a resume does
+not demand space for duplicates. The data reserve and additional preservation
+allowance still apply.
+
+The report contains `copies_sha256`, covering both receipts. Keep that value
+from the authenticated device connection, then independently copy the complete
+`active` directory to a private workstation directory. Preserve mode 0700 for
+directories and 0600 for files. Verify it with:
+
+```sh
+cargo run --locked -p engine-ota --example bootstrap_verify_backup -- \
+  /path/to/exported-active DEVICE_REPORTED_COPIES_SHA256
+```
+
+This verifier reads regular files only and checks the separately supplied digest
+before hashing the large image files. An export's own checksum records cannot
+substitute for the device-reported digest. Partial exports, links, changed files,
+unknown contents and mismatched preparation records are rejected.
+
+Raw-copy completion still reports `ready_for_write: false`. These copies do not
+cover current `/data` contents or all configuration on the running root; that
+preservation, independent recovery availability, legacy privilege closure,
+installation checkpoints and physical restore testing remain required. No raw
+backup command has been executed on either installed Pi yet.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_backup \
+  --target aarch64-unknown-linux-gnu
+```
 
 ## Why stage the OS boot assets separately
 

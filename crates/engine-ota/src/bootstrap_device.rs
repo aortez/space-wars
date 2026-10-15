@@ -41,6 +41,17 @@ pub struct PackageCheck {
     pub ready_for_write: bool,
 }
 
+impl PackageCheck {
+    fn require_data_space(&self) -> Result<()> {
+        if self.data_required_bytes > self.data_available_bytes {
+            return Err(invalid(
+                "insufficient data space for bootstrap recovery copies",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Capacity {
     pub available_bytes: u64,
@@ -68,65 +79,27 @@ pub fn prepare_installed_package(expected: Sha256) -> Result<super::PreparationR
 
 fn prepare_or_check(expected: Sha256, reserve: bool) -> Result<super::PreparationReport> {
     let lock = InstallLock::acquire()?;
-    let data = crate::recovery_linux::open_data_mount()?;
-    reject_provisioned(&data)?;
-    let parent = open_at(&data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    owned(&parent.metadata()?, true, 0, true)?;
-    if parent.metadata()?.dev() != data.metadata()?.dev() {
-        return Err(invalid("bootstrap package is not on the data filesystem"));
-    }
-    for entry in fs::read_dir(format!("/proc/self/fd/{}", parent.as_raw_fd()))? {
-        let name = entry?.file_name();
-        if name != PACKAGE && name != super::state::ACTIVE {
-            return Err(invalid(
-                "existing bootstrap state needs resume/reconciliation",
-            ));
-        }
-    }
-    let directory = open_at(&parent, PACKAGE, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    let mut package = OperatorPackage::under(directory, 0, expected)?;
-    let legacy = inspect_legacy_boot()?;
-    if crate::recovery_linux::DeviceNumber::from_dev(data.metadata()?.dev())
-        != legacy.layout.partitions[3].device
-    {
-        return Err(invalid("persistent data changed during package inspection"));
-    }
-    let report = package.check_device(&legacy)?;
-    let observed = super::BootstrapBinding::observed(&report, &legacy)?;
-    let existing = super::state::existing(&parent, 0, &observed)?;
-    lock.check()?;
-    package.check()?;
-    let named_parent = open_at(&data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    let named = open_at(
-        &named_parent,
-        PACKAGE,
-        libc::O_RDONLY | libc::O_DIRECTORY,
-        0,
-    )?;
-    let current_data = crate::recovery_linux::open_data_mount()?;
-    if parent.metadata()?.dev() != named_parent.metadata()?.dev()
-        || parent.metadata()?.ino() != named_parent.metadata()?.ino()
-        || named.metadata()?.dev() != package.directory.metadata()?.dev()
-        || named.metadata()?.ino() != package.directory.metadata()?.ino()
-        || current_data.metadata()?.dev() != data.metadata()?.dev()
-        || current_data.metadata()?.ino() != data.metadata()?.ino()
-    {
-        return Err(invalid("bootstrap package directory was replaced"));
-    }
+    let inspected = Installed::open(expected, &lock, true)?;
     let preserved_access = if reserve {
         Some(crate::access_linux::preserved_for_bootstrap(&lock)?)
     } else {
         None
     };
     let (binding, resumed) = if reserve {
-        super::state::begin(&parent, 0, &observed)?
+        super::state::begin(&inspected.parent, 0, &inspected.observed)?
     } else {
-        let resumed = existing.is_some();
-        (existing.unwrap_or(observed), resumed)
+        let resumed = inspected.existing.is_some();
+        (
+            inspected
+                .existing
+                .clone()
+                .unwrap_or_else(|| inspected.observed.clone()),
+            resumed,
+        )
     };
-    lock.check()?;
+    inspected.check(&lock)?;
     Ok(super::PreparationReport {
-        check: report,
+        check: inspected.report,
         binding,
         resumed,
         preserved_access,
@@ -136,6 +109,129 @@ fn prepare_or_check(expected: Sha256, reserve: bool) -> Result<super::Preparatio
             "read-only package check; no new preparation recorded"
         },
     })
+}
+
+/// Copies only the observed boot and inactive-root devices, both opened for
+/// reading, into the fixed private reservation. No install or selector change.
+pub fn backup_installed_package(
+    expected: Sha256,
+    mut report: impl FnMut(super::BackupProgress),
+) -> Result<super::BackupReport> {
+    let lock = InstallLock::acquire()?;
+    // Backup resumes may reclaim a known unpublished partial copy. Validate
+    // all other inputs now; remeasure actual free space after that reset.
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before taking recovery copies"))?;
+    crate::access_linux::preserved_for_bootstrap(&lock)?;
+    let result = super::backup::create(
+        &inspected.parent,
+        &inspected.data,
+        binding,
+        &inspected.legacy.layout,
+        &lock,
+        inspected.report.data_required_bytes,
+        &mut report,
+    )?;
+    inspected.check(&lock)?;
+    // Backups never relax the original-file binding. Detect a changed layout,
+    // physical device or boot tree before reporting completion.
+    let after = inspect_legacy_boot()?;
+    let current =
+        super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
+    super::state::existing(&inspected.parent, 0, &current)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    if after.physical != inspected.legacy.physical || after.layout != inspected.legacy.layout {
+        return Err(invalid("device changed while taking recovery copies"));
+    }
+    Ok(result)
+}
+
+struct Installed {
+    data: File,
+    parent: File,
+    package: OperatorPackage,
+    legacy: LegacyBootEvidence,
+    report: PackageCheck,
+    observed: super::BootstrapBinding,
+    existing: Option<super::BootstrapBinding>,
+}
+
+impl Installed {
+    fn open(expected: Sha256, lock: &InstallLock, require_data_space: bool) -> Result<Self> {
+        lock.check()?;
+        let data = crate::recovery_linux::open_data_mount()?;
+        reject_provisioned(&data)?;
+        let parent = open_at(&data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+        owned(&parent.metadata()?, true, 0, true)?;
+        if parent.metadata()?.dev() != data.metadata()?.dev() {
+            return Err(invalid("bootstrap package is not on the data filesystem"));
+        }
+        for entry in fs::read_dir(format!("/proc/self/fd/{}", parent.as_raw_fd()))? {
+            let name = entry?.file_name();
+            if name != PACKAGE && name != super::state::ACTIVE {
+                return Err(invalid(
+                    "existing bootstrap state needs resume/reconciliation",
+                ));
+            }
+        }
+        let directory = open_at(&parent, PACKAGE, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+        let mut package = OperatorPackage::under(directory, 0, expected)?;
+        let legacy = inspect_legacy_boot()?;
+        if crate::recovery_linux::DeviceNumber::from_dev(data.metadata()?.dev())
+            != legacy.layout.partitions[3].device
+        {
+            return Err(invalid("persistent data changed during package inspection"));
+        }
+        let observed =
+            super::BootstrapBinding::observed(expected, package.record.plan.target, &legacy)?;
+        let existing = super::state::existing(&parent, 0, &observed)?;
+        let credit = if let Some(binding) = existing.as_ref() {
+            super::backup::verified_bytes(&parent, 0, binding)?
+        } else {
+            0
+        };
+        let report = package.check_device_with_credit(&legacy, credit)?;
+        if require_data_space {
+            report.require_data_space()?;
+        }
+        let inspected = Self {
+            data,
+            parent,
+            package,
+            legacy,
+            report,
+            observed,
+            existing,
+        };
+        inspected.check(lock)?;
+        Ok(inspected)
+    }
+
+    fn check(&self, lock: &InstallLock) -> Result<()> {
+        lock.check()?;
+        self.package.check()?;
+        let named_parent = open_at(&self.data, DIRECTORY, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+        let named = open_at(
+            &named_parent,
+            PACKAGE,
+            libc::O_RDONLY | libc::O_DIRECTORY,
+            0,
+        )?;
+        let current_data = crate::recovery_linux::open_data_mount()?;
+        if self.parent.metadata()?.dev() != named_parent.metadata()?.dev()
+            || self.parent.metadata()?.ino() != named_parent.metadata()?.ino()
+            || named.metadata()?.dev() != self.package.directory.metadata()?.dev()
+            || named.metadata()?.ino() != self.package.directory.metadata()?.ino()
+            || current_data.metadata()?.dev() != self.data.metadata()?.dev()
+            || current_data.metadata()?.ino() != self.data.metadata()?.ino()
+        {
+            return Err(invalid("bootstrap package directory was replaced"));
+        }
+        Ok(())
+    }
 }
 
 fn reject_provisioned(data: &File) -> Result<()> {
@@ -396,7 +492,18 @@ impl OperatorPackage {
         Ok(())
     }
 
+    #[cfg(test)]
     fn check_device(&mut self, legacy: &LegacyBootEvidence) -> Result<PackageCheck> {
+        let report = self.check_device_with_credit(legacy, 0)?;
+        report.require_data_space()?;
+        Ok(report)
+    }
+
+    fn check_device_with_credit(
+        &mut self,
+        legacy: &LegacyBootEvidence,
+        backup_credit: u64,
+    ) -> Result<PackageCheck> {
         self.check()?;
         let roots = SlotRoots::new(
             legacy.layout.partitions[1].partuuid.clone(),
@@ -493,15 +600,13 @@ impl OperatorPackage {
         // copies, a second package-sized allowance for small/data preservation
         // work, and the common 256 MiB free-space reserve. Data backup planning
         // must additionally account for its observed content before writing.
-        let data_required_bytes = raw_backups
+        if backup_credit > raw_backups {
+            return Err(invalid("recovery-copy credit exceeds observed capacity"));
+        }
+        let data_required_bytes = (raw_backups - backup_credit)
             .checked_add(package_bytes)
             .and_then(|n| n.checked_add(256 * 1024 * 1024))
             .ok_or_else(|| invalid("data capacity overflow"))?;
-        if data_required_bytes > legacy.data_free_bytes {
-            return Err(invalid(
-                "insufficient data space for bootstrap recovery copies",
-            ));
-        }
         Ok(PackageCheck {
             schema: 1,
             scope: "operator package and legacy compatibility; backup/access/handoff still required",

@@ -130,6 +130,31 @@ fn private_package_checks_assets_and_rederives_the_live_inactive_target() {
 }
 
 #[test]
+fn verified_backup_credit_keeps_resume_space_checks_without_demanding_duplicate_copies() {
+    let fixture = Fixture::new();
+    let record = fixture.build().unwrap();
+    let mut package = open(&fixture).unwrap();
+    let mut device = legacy(&record);
+    let original = package.check_device(&device).unwrap();
+    let raw =
+        (device.layout.partitions[0].sectors + device.layout.inactive_partition().sectors) * 512;
+    device.data_free_bytes = original.data_required_bytes - raw;
+    assert!(package.check_device(&device).is_err());
+    let resumed = package.check_device_with_credit(&device, raw).unwrap();
+    resumed.require_data_space().unwrap();
+    assert_eq!(resumed.data_required_bytes, device.data_free_bytes);
+    device.data_free_bytes -= 1;
+    assert!(
+        package
+            .check_device_with_credit(&device, raw)
+            .unwrap()
+            .require_data_space()
+            .is_err()
+    );
+    assert!(package.check_device_with_credit(&device, raw + 1).is_err());
+}
+
+#[test]
 fn invented_plans_cannot_override_checked_assets_even_with_an_operator_hash() {
     let fixture = Fixture::new();
     let record = fixture.build().unwrap();

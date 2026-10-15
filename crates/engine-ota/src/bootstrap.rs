@@ -24,6 +24,14 @@ pub use device::{PackageCheck, check_installed_package, prepare_installed_packag
 #[path = "bootstrap_state.rs"]
 mod state;
 pub(crate) use state::require_no_active_under;
+
+#[path = "bootstrap_backup.rs"]
+mod backup;
+pub use backup::{
+    BackupExportCheck, BackupPartition, BackupProgress, BackupReceipt, BackupReport, BackupStage,
+    verify_backup_export,
+};
+pub use device::backup_installed_package;
 pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap};
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
