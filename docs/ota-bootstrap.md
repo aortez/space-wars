@@ -236,6 +236,17 @@ workstation test checks that real package against an explicitly synthetic Pi 5
 context. It is not a privileged live-device preflight. A future clean image
 must include the new guards before the supervised migration is attempted.
 
+At `0ed6e5fe01a8`, all 122 OTA tests and 38 manager tests passed, along with
+Clippy, Rust 1.89 checks and AArch64 builds. All 19 bootstrap-related tests passed
+on the Pi 5 as UID 1000 using temporary fixtures. Both root-only examples rejected
+that account. A fresh inventory confirmed the same boot ID, physical device,
+layout and all 101 boot files. No device reservation, partition write or boot
+change was performed. The real private package passed all 193 checksums and
+expanded-root round-trip validation. Root SSH still rejected the current key,
+and the Picade did not resolve.
+[Preparation validation evidence](data/ota-bootstrap-preparation-20261015.json)
+records the source and image identities separately.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
