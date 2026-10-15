@@ -3,10 +3,432 @@ use super::*;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Key, Platform, PlatformError, WindowAdapter, WindowEvent};
 use std::cell::Cell;
-#[cfg(unix)]
 use std::time::Duration;
 
 struct TestPlatform;
+
+#[test]
+fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigation() {
+    use engine_agent::training_job::{JobSpec, JobState, Recipe, TrainingManager};
+    let wait = |predicate: &dyn Fn() -> bool| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        while !predicate() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "training preview timed out"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+            slint::platform::update_timers_and_animations();
+        }
+    };
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("observed");
+    let runtime = training_controls::install(&window, root.clone()).unwrap();
+    install_ui_navigation(&window);
+    install_keyboard_navigation(
+        &window,
+        Rc::new(RefCell::new(input::ClientInput::default())),
+    );
+    window.set_launcher_visible(true);
+    window.show().unwrap();
+    wait(&|| window.get_training_status_code() == "ready");
+    assert!(ui_activation::activate(&window, "launcher.training"));
+    window.set_training_recipe(1);
+    window.set_training_population(8);
+    window.set_training_generations(4);
+    window.set_training_seed(21);
+    training_controls::publish_setup(&window);
+    assert!(ui_activation::activate(&window, "training.start"));
+    wait(&|| window.get_training_can_pause());
+    // Real keyboard dispatch reaches Current, leaving job-control focus intact.
+    window.set_training_focus(5);
+    key(&window, Key::Return);
+    assert_eq!(window.get_training_preview_mode(), 1);
+    wait(&|| !window.get_training_preview_id().is_empty());
+    assert!(
+        window
+            .get_training_preview_label()
+            .starts_with("Replay · Sample")
+    );
+    assert!(ui_activation::activate(&window, "training.pause"));
+    wait(&|| window.get_training_status_code() == "paused");
+    assert!(ui_activation::activate(&window, "training.preview.follow"));
+    assert!(!window.get_training_preview_follow());
+    let pinned = window.get_training_preview_id();
+    wait(&|| window.get_training_preview_tick() >= 20);
+    for _ in 0..3 {
+        assert!(ui_activation::activate(&window, "training.preview.speed"));
+    }
+    assert_eq!(window.get_training_preview_speed_label(), "Still");
+    let frozen = window.get_training_preview_tick();
+    let until = std::time::Instant::now() + Duration::from_millis(170);
+    wait(&|| std::time::Instant::now() >= until);
+    assert_eq!(window.get_training_preview_tick(), frozen);
+    assert!(ui_activation::activate(&window, "training.resume"));
+    key(&window, Key::Escape);
+    assert!(!window.get_training_visible());
+    wait(&|| window.get_training_status_code() == "completed");
+    assert!(ui_activation::activate(&window, "launcher.training"));
+    assert_eq!(window.get_training_preview_id(), pinned);
+    assert!(ui_activation::activate(&window, "training.preview.best"));
+    wait(&|| {
+        window
+            .get_training_preview_label()
+            .starts_with("Replay · Best")
+    });
+    let completed: serde_json::Value =
+        serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    assert_eq!(
+        window.get_training_preview_id().as_str(),
+        completed["best_id"].as_str().unwrap()
+    );
+    assert_eq!(completed["validation"].as_array().unwrap().len(), 2);
+    assert!(
+        window
+            .get_training_validation()
+            .contains("Outside selection")
+    );
+    // Unobserved control performs exactly the same selection and validation.
+    let control_root = directory.path().join("control");
+    let control = TrainingManager::new(control_root.clone()).unwrap();
+    wait(&|| control.control().snapshot().state == JobState::Ready);
+    control
+        .control()
+        .start(JobSpec {
+            recipe: Recipe::MixedArrival,
+            seed: 21,
+            population: 8,
+            generations: 4,
+            initial_genomes: None,
+        })
+        .unwrap();
+    wait(&|| control.control().snapshot().state == JobState::Completed);
+    let load = |path: &std::path::Path, id: &str| -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(path.join(format!("{id}.json"))).unwrap()).unwrap()
+    };
+    let observed = load(&root, completed["run_id"].as_str().unwrap());
+    let unobserved = load(
+        &control_root,
+        control.control().snapshot().run_id.as_ref().unwrap(),
+    );
+    assert_eq!(
+        observed["job"]["checkpoint"],
+        unobserved["job"]["checkpoint"]
+    );
+    assert_eq!(
+        observed["job"]["validation"],
+        unobserved["job"]["validation"]
+    );
+    // All five replay controls are reachable through actual touch at 1×.
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(width as f32, height as f32));
+        slint::platform::update_timers_and_animations();
+        window.window().take_snapshot().unwrap();
+        let page_width = (width as f32 - 32.0).min(760.0);
+        let page_height = (height as f32 - 24.0).min(520.0);
+        let body = page_width - 48.0;
+        let y = (height as f32 - page_height) / 2.0 + 84.0 + 62.0 + 18.0;
+        let x = |i: f32| {
+            (width as f32 - page_width) / 2.0 + 24.0 + i * (body + 6.0) / 5.0 + (body - 24.0) / 10.0
+        };
+        for mode in 0..3 {
+            click(&window, x(mode as f32), y);
+            assert_eq!(window.get_training_preview_mode(), mode);
+            if mode == 2 {
+                wait(&|| {
+                    window
+                        .get_training_preview_label()
+                        .starts_with("Replay · Best")
+                });
+            }
+        }
+        let speed = window.get_training_preview_speed();
+        click(&window, x(3.0), y);
+        assert_eq!(window.get_training_preview_speed(), (speed + 1) % 4);
+        let follow = window.get_training_preview_follow();
+        click(&window, x(4.0), y);
+        assert_ne!(window.get_training_preview_follow(), follow);
+        // Freeze a useful mid-flight frame for consistent rendered evidence.
+        while window.get_training_preview_speed() != 2 {
+            window.invoke_training_command("training.preview.speed".into());
+        }
+        wait(&|| window.get_training_preview_tick() >= 60);
+        window.invoke_training_command("training.preview.speed".into());
+        if let Some(output) = std::env::var_os("SPACEWARS_PREVIEW_ARTIFACTS") {
+            let output = std::path::PathBuf::from(output);
+            std::fs::create_dir_all(&output).unwrap();
+            for (id, name) in [
+                ("training.preview.best", "best-replay"),
+                ("training.preview.progress", "validated-progress"),
+            ] {
+                window.invoke_training_command(id.into());
+                slint::platform::update_timers_and_animations();
+                if name == "best-replay" {
+                    wait(&|| {
+                        window.get_training_preview_image().size().width
+                            == window.get_training_preview_width() as u32
+                            && window.get_training_preview_image().size().height
+                                == window.get_training_preview_height() as u32
+                    });
+                }
+                let pixels = window.window().take_snapshot().unwrap();
+                let file =
+                    std::fs::File::create(output.join(format!("{name}-{width}x{height}.png")))
+                        .unwrap();
+                let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                encoder.set_color(png::ColorType::Rgba);
+                encoder.set_depth(png::BitDepth::Eight);
+                encoder
+                    .write_header()
+                    .unwrap()
+                    .write_image_data(pixels.as_bytes())
+                    .unwrap();
+            }
+        }
+    }
+    // A new run must clear old replay identity, including replies in flight.
+    assert!(ui_activation::activate(&window, "training.new"));
+    window.set_training_seed(22);
+    assert!(ui_activation::activate(&window, "training.start"));
+    wait(&|| window.get_training_can_pause());
+    assert!(ui_activation::activate(&window, "training.preview.best"));
+    wait(&|| window.get_training_preview_id().is_empty());
+    drop(runtime); // joins both workers with the view still open
+}
+
+#[test]
+fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigation() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    let directory = tempfile::tempdir().unwrap();
+    let runtime = training_controls::install(&window, directory.path().join("training")).unwrap();
+    install_ui_navigation(&window);
+    install_keyboard_navigation(
+        &window,
+        Rc::new(RefCell::new(input::ClientInput::default())),
+    );
+    window.set_launcher_visible(true);
+    window.show().unwrap();
+    pump_worker_until(&window, || window.get_training_status_code() == "ready");
+    window.set_launcher_focus_index(4);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_launcher_focus_index(), 7);
+    key(&window, Key::Return);
+    assert!(window.get_training_visible());
+    assert!(window.get_training_setup());
+    // Touch selects the mixed recipe through the same callback as control IDs.
+    window.window().take_snapshot().unwrap();
+    click(&window, 728.0, 118.0);
+    assert_eq!(window.get_training_recipe(), 1);
+    for id in [
+        "training.population.previous",
+        "training.population.previous",
+        "training.generations.previous",
+        "training.generations.previous",
+    ] {
+        assert!(ui_activation::activate(&window, id));
+    }
+    assert_eq!(window.get_training_population(), 8);
+    assert_eq!(window.get_training_generations(), 8);
+    assert!(ui_activation::activate(&window, "training.start"));
+    pump_worker_until(&window, || window.get_training_can_pause());
+    assert!(window.get_training_active());
+    assert!(!window.get_training_setup());
+    assert!(!ui_activation::activate(&window, "training.start"));
+    window.set_training_focus(0);
+    key(&window, Key::Return);
+    pump_worker_until(&window, || window.get_training_status_code() == "paused");
+    assert!(!window.get_training_active());
+    let before: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    assert_eq!(before["evaluated_candidates"], before["saved_candidates"]);
+    assert!(ui_activation::activate(&window, "training.resume"));
+    key(&window, Key::Escape);
+    assert!(!window.get_training_visible());
+    assert!(window.get_training_active());
+    pump_worker_until(&window, || {
+        let after: serde_json::Value =
+            serde_json::from_str(&window.get_training_snapshot()).unwrap();
+        after["evaluated_candidates"].as_u64() > before["evaluated_candidates"].as_u64()
+    });
+    assert!(ui_activation::activate(&window, "launcher.training"));
+    assert!(!window.get_training_setup());
+    assert!(ui_activation::activate(&window, "training.stop"));
+    pump_worker_until(&window, || window.get_training_status_code() == "stopped");
+    let stopped = window.get_training_snapshot();
+    drop(runtime);
+    let restored = training_controls::install(&window, directory.path().join("training")).unwrap();
+    pump_worker_until(&window, || window.get_training_status_code() == "paused");
+    let restored_snapshot: serde_json::Value =
+        serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    let stopped_snapshot: serde_json::Value = serde_json::from_str(&stopped).unwrap();
+    assert_eq!(restored_snapshot["run_id"], stopped_snapshot["run_id"]);
+    assert_eq!(
+        restored_snapshot["saved_candidates"],
+        stopped_snapshot["saved_candidates"]
+    );
+    // Starting another run preserves the stopped run and exports the new winner.
+    assert!(ui_activation::activate(&window, "training.new"));
+    window.set_training_recipe(0);
+    window.set_training_generations(1);
+    training_controls::publish_setup(&window);
+    assert!(ui_activation::activate(&window, "training.start"));
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
+    assert!(!window.get_training_active());
+    let completed: serde_json::Value =
+        serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    assert_eq!(completed["evaluated_candidates"], 8);
+    assert_eq!(completed["saved_candidates"], 8);
+    assert_eq!(completed["evaluated_episodes"], 32);
+    let id = completed["run_id"].as_str().unwrap();
+    assert_ne!(completed["run_id"], restored_snapshot["run_id"]);
+    let old_id = restored_snapshot["run_id"].as_str().unwrap();
+    assert!(
+        directory
+            .path()
+            .join(format!("training/{old_id}.json"))
+            .is_file()
+    );
+    let genome = serde_json::from_slice(
+        &std::fs::read(directory.path().join(format!("training/{id}.best.json"))).unwrap(),
+    )
+    .unwrap();
+    let model = spacewars_ai::model::DenseModel::new(genome).unwrap();
+    assert_eq!(model.id(), completed["best_id"].as_str().unwrap());
+    drop(restored);
+    let _completed_runtime =
+        training_controls::install(&window, directory.path().join("training")).unwrap();
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
+    let loaded: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    assert_eq!(loaded["run_id"], completed["run_id"]);
+    assert_eq!(loaded["best_id"], completed["best_id"]);
+    assert!(!ui_activation::activate(&window, "training.resume"));
+    key(&window, Key::Escape);
+    assert!(!window.get_training_visible());
+}
+#[test]
+fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("training");
+    let _training = training_controls::install(&window, root.clone()).unwrap();
+    let _browser = genome_controls::install(&window, root.clone()).unwrap();
+    install_ui_navigation(&window);
+    install_keyboard_navigation(
+        &window,
+        Rc::new(RefCell::new(input::ClientInput::default())),
+    );
+    window.set_launcher_visible(true);
+    window.show().unwrap();
+    pump_worker_until(&window, || window.get_training_status_code() == "ready");
+    window.set_launcher_focus_index(7);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_launcher_focus_index(), 8);
+    key(&window, Key::Return);
+    pump_worker_until(&window, || {
+        !window.get_genomes_busy() && window.get_genomes_count() >= 4
+    });
+    let selected = window.get_genomes_id();
+    let before = window.get_training_snapshot();
+    assert!(ui_activation::activate(&window, "genomes.try"));
+    assert!(window.get_genomes_busy());
+    key(&window, Key::Escape);
+    assert!(!window.get_genomes_visible());
+    pump_worker_until(&window, || !window.get_genomes_busy());
+    assert!(window.get_genomes_result().starts_with("Arrived"));
+    assert_eq!(window.get_training_snapshot(), before);
+    let receipt_path = window.get_genomes_receipt().to_string();
+    let receipt = std::fs::read(&receipt_path).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+    assert_eq!(value["brain"]["controller"], selected.as_str());
+    assert!(ui_activation::activate(&window, "launcher.genomes"));
+    pump_worker_until(&window, || !window.get_genomes_busy());
+    assert_eq!(window.get_genomes_id(), selected);
+    assert!(ui_activation::activate(&window, "genomes.practice.next"));
+    assert!(ui_activation::activate(&window, "genomes.try"));
+    pump_worker_until(&window, || !window.get_genomes_busy());
+    assert!(window.get_genomes_result().contains("moving_right"));
+    assert!(window.get_genomes_result().starts_with("Arrived"));
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(width as f32, height as f32));
+        slint::platform::update_timers_and_animations();
+        let pixels = window.window().take_snapshot().unwrap();
+        if let Some(path) = std::env::var_os("SPACEWARS_GENOME_ARTIFACTS") {
+            let path = std::path::PathBuf::from(path);
+            std::fs::create_dir_all(&path).unwrap();
+            let file =
+                std::fs::File::create(path.join(format!("genomes-{width}x{height}.png"))).unwrap();
+            let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder
+                .write_header()
+                .unwrap()
+                .write_image_data(pixels.as_bytes())
+                .unwrap();
+        }
+        let page_width = (width as f32 - 32.0).min(760.0);
+        let page_height = (height as f32 - 24.0).min(520.0);
+        let body = page_width - 48.0;
+        let x = |index: f32| {
+            (width as f32 - page_width) / 2.0
+                + 24.0
+                + index * (body + 10.0) / 4.0
+                + (body - 30.0) / 8.0
+        };
+        let y = (height as f32 - page_height) / 2.0 + page_height - 56.0;
+        click(&window, x(0.0), y);
+        pump_worker_until(&window, || !window.get_genomes_busy());
+        assert!(window.get_genomes_result().starts_with("Arrived"));
+        click(&window, x(2.0), y);
+        pump_worker_until(&window, || !window.get_genomes_busy());
+        click(&window, x(3.0), y);
+        assert!(!window.get_genomes_visible());
+        assert!(ui_activation::activate(&window, "launcher.genomes"));
+        pump_worker_until(&window, || !window.get_genomes_busy());
+        window.window().take_snapshot().unwrap();
+        click(&window, x(1.0), y);
+        assert!(!window.get_genomes_visible());
+        assert!(window.get_training_visible());
+        assert!(window.get_training_setup());
+        let genome = serde_json::from_str(&window.get_training_seed_genome()).unwrap();
+        assert_eq!(
+            spacewars_ai::model::DenseModel::new(genome).unwrap().id(),
+            selected.as_str()
+        );
+        key(&window, Key::Escape);
+        assert!(ui_activation::activate(&window, "launcher.genomes"));
+        pump_worker_until(&window, || !window.get_genomes_busy());
+    }
+    assert!(ui_activation::activate(&window, "genomes.seed"));
+    window.set_training_population(8);
+    window.set_training_generations(1);
+    training_controls::publish_setup(&window);
+    assert!(ui_activation::activate(&window, "training.start"));
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
+    let state: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
+    let seeded = serde_json::from_value(state["spec"]["initial_genomes"][0].clone()).unwrap();
+    assert_eq!(
+        spacewars_ai::model::DenseModel::new(seeded).unwrap().id(),
+        selected.as_str()
+    );
+    assert_eq!(state["evaluated_candidates"], 8);
+    assert!(root.join("genomes").read_dir().unwrap().count() > 0);
+    assert_eq!(std::fs::read(receipt_path).unwrap(), receipt);
+}
+
 impl Platform for TestPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
@@ -1089,6 +1511,23 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
             .is_some_and(|s| !s.paused && s.settings.show_date)
     });
     timer.stop();
+}
+
+// Candidate-boundary commands and complete practice/training runs step physics;
+// they need a separate budget from the two-second menu transitions below.
+#[track_caller]
+fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while !predicate() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "background UI work timed out: training={}, genomes_busy={}",
+            window.get_training_snapshot(),
+            window.get_genomes_busy()
+        );
+        std::thread::sleep(Duration::from_millis(1));
+        slint::platform::update_timers_and_animations();
+    }
 }
 
 fn pump_until(predicate: impl Fn() -> bool) {

@@ -18,6 +18,7 @@ mod crow_visual_tests;
 mod device_info;
 mod frame_trace;
 mod gamepad;
+mod genome_controls;
 mod gpu_scene;
 mod gpu_text;
 mod host;
@@ -43,6 +44,8 @@ mod settings_writer;
 mod sound_controls;
 #[cfg(test)]
 mod thruster_visual_tests;
+mod training_controls;
+mod training_preview;
 mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;
@@ -498,6 +501,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings_writer.clone(),
     );
     network_controls::install(&window);
+    let _training = training_controls::install(&window, config_directory.join("training"))?;
+    let _genomes = genome_controls::install(&window, config_directory.join("training"))?;
     device_info::install(
         &window,
         settings_path
@@ -1235,7 +1240,11 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_clock_fonts_visible() {
+    if window.get_genomes_visible() && window.get_launcher_visible() {
+        genome_controls::handle_action(window, action);
+    } else if window.get_training_visible() && window.get_launcher_visible() {
+        training_controls::handle_action(window, action);
+    } else if window.get_clock_fonts_visible() {
         clock_fonts::handle_action(window, action);
     } else if window.get_network_visible() && window.get_sound_visible() {
         network_controls::handle_action(window, action);
@@ -1358,6 +1367,8 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             3 => window.set_launcher_controls_visible(true),
             4 => window.invoke_launcher_quit(),
             5 => window.invoke_sound_open(),
+            7 => window.invoke_training_open(),
+            8 => window.invoke_genomes_open(),
             6 if window.get_launcher_scenario() == "spacewars" => {
                 window.invoke_launcher_new_match()
             }

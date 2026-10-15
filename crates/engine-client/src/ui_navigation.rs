@@ -10,6 +10,9 @@ pub(crate) fn moved_selection(current: i32, item_count: i32, delta: i32) -> i32 
 }
 
 pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
+    if let Some(next) = training_footer_selection(current, action) {
+        return next;
+    }
     // Scenario, Play, [Settings, Controls, App Settings], Quit footer.
     // Keep old control indices stable even though their layout has changed.
     let current = current.clamp(0, 5);
@@ -24,6 +27,9 @@ pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
 
 /// The same layout adds Play New World beside Play; Quit stays in the footer.
 pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> i32 {
+    if let Some(next) = training_footer_selection(current, action) {
+        return next;
+    }
     let current = current.clamp(0, 6) as usize;
     match action {
         UiAction::Up => [4, 0, 1, 1, 2, 6, 0][current],
@@ -31,6 +37,34 @@ pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> 
         UiAction::Left => [0, 6, 5, 2, 4, 3, 1][current],
         UiAction::Right => [0, 6, 3, 5, 4, 2, 1][current],
         _ => current as i32,
+    }
+}
+
+fn training_footer_selection(current: i32, action: UiAction) -> Option<i32> {
+    if current == 7 || current == 8 {
+        Some(match action {
+            UiAction::Up => 5,
+            UiAction::Down => 0,
+            UiAction::Left => {
+                if current == 7 {
+                    4
+                } else {
+                    7
+                }
+            }
+            UiAction::Right => {
+                if current == 7 {
+                    8
+                } else {
+                    4
+                }
+            }
+            _ => current,
+        })
+    } else if current == 4 && matches!(action, UiAction::Left | UiAction::Right) {
+        Some(if action == UiAction::Left { 8 } else { 7 })
+    } else {
+        None
     }
 }
 
@@ -135,6 +169,12 @@ mod tests {
 
     #[test]
     fn launcher_navigation_matches_the_visible_grid() {
+        for navigate in [moved_launcher_selection, moved_match_launcher_selection] {
+            assert_eq!(navigate(4, UiAction::Right), 7);
+            assert_eq!(navigate(7, UiAction::Left), 4);
+            assert_eq!(navigate(7, UiAction::Up), 5);
+            assert_eq!(navigate(7, UiAction::Down), 0);
+        }
         assert_eq!(moved_launcher_selection(0, UiAction::Down), 1);
         assert_eq!(moved_launcher_selection(1, UiAction::Down), 2);
         assert_eq!(moved_launcher_selection(2, UiAction::Right), 3);

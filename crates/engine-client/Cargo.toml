@@ -14,6 +14,7 @@ path = "src/main.rs"
 chrono = { workspace = true }
 engine-common = { workspace = true }
 engine-core = { workspace = true }
+engine-agent = { workspace = true }
 engine-terrain = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true, features = ["terrain-recovery"] }

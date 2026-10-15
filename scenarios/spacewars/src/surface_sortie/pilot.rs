@@ -531,7 +531,7 @@ impl SurfaceSortieState {
 
 /// Initial conditions for a material flight acceptance case. These only place
 /// the initial vehicle; all landing, transfers and claims use ordinary actions.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MaterialFlightStart {
     pub bearing: f32,
     pub altitude: f32,

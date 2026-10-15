@@ -1408,6 +1408,8 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         network: window.get_network_visible(),
         autostart: window.get_autostart_settings_visible(),
         launcher: window.get_launcher_visible(),
+        training: window.get_training_visible(),
+        genomes: window.get_genomes_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
         touch_test: window.get_touch_test_visible(),
@@ -1422,6 +1424,21 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            genome_controls: if window.get_genomes_visible() {
+                crate::genome_controls::inventory(window)
+            } else {
+                Vec::new()
+            },
+            genome_selected: crate::genome_controls::selected_id(window).into(),
+            genome_error: non_empty(window.get_genomes_error().as_str()),
+            training_controls: if window.get_training_visible() {
+                crate::training_controls::inventory(window)
+            } else {
+                Vec::new()
+            },
+            training_selected: crate::training_controls::selected_id(window).into(),
+            training_error: non_empty(window.get_training_error().as_str()),
+            training_launcher_label: window.get_training_launcher_label().to_string(),
             scoreboard_controls: crate::scoreboard::inventory(window),
             font_controls: if window.get_clock_fonts_visible() {
                 crate::clock_fonts::inventory(window)
@@ -2377,6 +2394,65 @@ mod tests {
 
         assert_eq!(value_changed.revision, first.revision + 1);
         assert_eq!(error_changed.revision, value_changed.revision + 1);
+    }
+
+    #[test]
+    fn launcher_revision_tracks_visible_training_state() {
+        use engine_agent::training_job::{JobSnapshot, JobState};
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+        use std::rc::Rc;
+
+        struct TestPlatform;
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+            }
+        }
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_visible(true);
+        let mut tracker = UiStateTracker::default();
+        let mut snapshot = JobSnapshot::default();
+        crate::training_controls::publish(&window, &snapshot);
+        let loading = ui_state(&window, &mut tracker).unwrap();
+        snapshot.state = JobState::Ready;
+        crate::training_controls::publish(&window, &snapshot);
+        assert_eq!(ui_state(&window, &mut tracker).unwrap(), loading);
+
+        snapshot.state = JobState::Running;
+        snapshot.run_id = Some("run-1-1".into());
+        crate::training_controls::publish(&window, &snapshot);
+        let active = ui_state(&window, &mut tracker).unwrap();
+        assert_eq!(active.revision, loading.revision + 1);
+        assert_eq!(
+            active
+                .controls
+                .iter()
+                .find(|c| c.id == "launcher.training")
+                .unwrap()
+                .label,
+            "Training · Active"
+        );
+        for state in [JobState::Saving, JobState::Validating, JobState::Running] {
+            snapshot.state = state;
+            crate::training_controls::publish(&window, &snapshot);
+            assert_eq!(ui_state(&window, &mut tracker).unwrap(), active);
+        }
+        snapshot.state = JobState::Paused;
+        snapshot.can_resume = true;
+        crate::training_controls::publish(&window, &snapshot);
+        let paused = ui_state(&window, &mut tracker).unwrap();
+        assert_eq!(paused.revision, active.revision + 1);
+        assert_eq!(
+            paused
+                .controls
+                .iter()
+                .find(|c| c.id == "launcher.training")
+                .unwrap()
+                .label,
+            "Training · Saved run"
+        );
     }
 
     #[test]

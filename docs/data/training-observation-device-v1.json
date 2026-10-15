@@ -1,0 +1,554 @@
+{
+  "version": 1,
+  "date": "2026-10-14",
+  "host": "spacewars.local",
+  "source_base_commit": "18d7d647e29b467f05fbbc3093fe4575139d2867",
+  "source_note": "Base plus the production source files identified below; this receipt is committed with those changes.",
+  "source_files_sha256": {
+    "crates/engine-agent/src/lib.rs": "c686043aacba79c7faeb2292c9b72febaf596a47add9e7675c6cdbf8f7db7bd2",
+    "crates/engine-agent/src/training_job.rs": "f0188e48fffac99242ebedd47b641a63e44b00d7da006ea2f68af2f83af7fb27",
+    "crates/engine-agent/src/training_validation.rs": "8663b18de728fe04a5af29fc45aac2330da22edaa19dc193fbc2e911f0ea53b8",
+    "crates/engine-client/src/main.rs": "eb2ff7d0109db89343e8d4a5610f175cb9f4e1f6eda3c707a51164c1ea43af67",
+    "crates/engine-client/src/training_controls.rs": "c0f5e1ce74e552646bf1441745431f97419ddceb3f3204117a600d08df72d4d8",
+    "crates/engine-client/src/training_preview.rs": "15358e6bb76b4269b341fc5bd4b6464ed7bb7b20bcd9cb562f2a9ff6589b12b4",
+    "crates/engine-client/ui/main.slint": "c935e74b3fa8217e646bb15c3d6186437fb25da34bd5f3819d611d82c9630b5c"
+  },
+  "bundle": {
+    "format": 1,
+    "machine": "raspberrypi-spacewars",
+    "target_arch": "aarch64",
+    "compatibility": "6ecc3217c275a5bc3f07471b0532b24fe6370e45063d9dc2077be1b3c6706c61",
+    "binaries": {
+      "engine-client": {
+        "sha256": "7367457da9eb356d389efd8116d8d5496bb2908be02a8eaaef7d57645eba5685",
+        "size": 24978040
+      },
+      "spacewars-cli": {
+        "sha256": "17c3fd038200cf3358528522bed2043cbcf5f75d6d7c75bd733255e37afdafc2",
+        "size": 1659872
+      }
+    }
+  },
+  "run_id": "run-1792034425933027580-12891",
+  "spec": {
+    "recipe": "mixed_arrival",
+    "seed": 1,
+    "population": 8,
+    "generations": 4,
+    "initial_genomes": [
+      {
+        "version": 1,
+        "contract": {
+          "organism": "material_ship_open_v1",
+          "role": "arrival_guidance_diagnostic_v1",
+          "observation": "arrival_local_9_v1",
+          "action": "turn_tanh_thrust_brake_v1",
+          "inputs": 9,
+          "outputs": 3,
+          "cadence_ticks": 1
+        },
+        "memory": "none",
+        "layers": [
+          {
+            "outputs": 8,
+            "activation": "tanh",
+            "weights": [
+              -0.5833407,
+              0.9209268,
+              1.2078159,
+              0.39271644,
+              -0.17851621,
+              0.8447072,
+              0.36054188,
+              -0.38858443,
+              0.44172466,
+              -0.03840048,
+              0.083771616,
+              0.6829608,
+              0.33620435,
+              -0.6624125,
+              0.21186972,
+              0.21293272,
+              -0.83448076,
+              -0.5221179,
+              0.75064147,
+              0.13001798,
+              1.1853502,
+              -0.12527442,
+              -0.37009314,
+              0.09741963,
+              0.4088809,
+              -0.54536974,
+              0.094257966,
+              0.6427765,
+              -0.418877,
+              0.48717967,
+              0.8101496,
+              0.17199424,
+              0.44449914,
+              0.5694387,
+              0.64740646,
+              -0.09582053,
+              0.5248072,
+              -0.6666228,
+              0.19080727,
+              0.3170862,
+              -0.43517482,
+              0.45566368,
+              -0.24629508,
+              -0.0468802,
+              0.11237077,
+              0.19346109,
+              -0.16622019,
+              0.6032754,
+              0.35281873,
+              0.21301949,
+              -0.830739,
+              -0.18910757,
+              -0.37240797,
+              0.28658465,
+              0.2462205,
+              1.0466512,
+              0.7921438,
+              -0.10402188,
+              0.11860764,
+              -0.5101785,
+              0.5875273,
+              -0.8199702,
+              0.090647414,
+              0.9787908,
+              0.8301602,
+              0.44847137,
+              -0.071904,
+              -0.44048917,
+              0.58224946,
+              -0.6756842,
+              0.19277301,
+              -0.36173937
+            ],
+            "biases": [
+              -0.04497268,
+              0.56200147,
+              0.02740401,
+              0.9166979,
+              -0.38092366,
+              0.28689075,
+              0.022931058,
+              0.08175919
+            ]
+          },
+          {
+            "outputs": 3,
+            "activation": "linear",
+            "weights": [
+              -0.941861,
+              0.40603516,
+              -0.8258815,
+              -0.7261064,
+              1.4198514,
+              -0.28902823,
+              0.23424867,
+              -0.45373115,
+              0.10601728,
+              -0.10654539,
+              0.5040295,
+              0.0552239,
+              -0.41969287,
+              0.6739905,
+              0.021011412,
+              0.6642778,
+              -0.22762844,
+              -0.4642407,
+              -0.34988523,
+              0.4209364,
+              -1.2333617,
+              0.19225356,
+              -0.5270341,
+              0.5196307
+            ],
+            "biases": [
+              -0.9812826,
+              -0.40991235,
+              -0.52415234
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "best_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+  "training_last_generation": {
+    "generation": 4,
+    "best_arrivals": 12,
+    "median_arrivals": 5,
+    "best_fitness": [
+      4,
+      12,
+      11927,
+      11914,
+      6226
+    ]
+  },
+  "evaluated_candidates": 32,
+  "saved_candidates": 32,
+  "evaluated_episodes": 384,
+  "validation": [
+    {
+      "suite": "arrival_monitor_v1",
+      "generation": 1,
+      "genome_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+      "cases": [
+        {
+          "case": {
+            "name": "mixed_fresh_stationary_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 85.0,
+              "radial_speed": 3.0,
+              "lateral_speed": 0.0,
+              "heading_offset": 0.2
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": 15.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 518,
+          "distance": 0.55664885,
+          "relative_speed": 0.01938582
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_stationary_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 85.0,
+              "radial_speed": 0.0,
+              "lateral_speed": -4.0,
+              "heading_offset": -0.4
+            },
+            "target_offset": {
+              "x": 24.0,
+              "y": 6.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 758,
+          "distance": 0.043877654,
+          "relative_speed": 0.21702303
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_moving_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 95.0,
+              "radial_speed": -2.0,
+              "lateral_speed": 0.0,
+              "heading_offset": 0.4
+            },
+            "target_offset": {
+              "x": 22.0,
+              "y": 9.0
+            },
+            "target_velocity": {
+              "x": 2.75,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 940,
+          "distance": 0.925162,
+          "relative_speed": 0.51933116
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_moving_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 95.0,
+              "radial_speed": 2.0,
+              "lateral_speed": 0.0,
+              "heading_offset": -0.4
+            },
+            "target_offset": {
+              "x": -22.0,
+              "y": 9.0
+            },
+            "target_velocity": {
+              "x": -2.75,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 488,
+          "distance": 0.70280135,
+          "relative_speed": 0.6229593
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_inward_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 68.0,
+              "radial_speed": 0.0,
+              "lateral_speed": 2.5,
+              "heading_offset": 1.3
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": -7.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": -0.8
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 700,
+          "distance": 0.6191008,
+          "relative_speed": 0.8874103
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_inward_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 74.0,
+              "radial_speed": 0.0,
+              "lateral_speed": -2.5,
+              "heading_offset": -1.3
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": -10.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": -0.8
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 1005,
+          "distance": 0.57239056,
+          "relative_speed": 0.8921915
+        }
+      ]
+    },
+    {
+      "suite": "arrival_monitor_v1",
+      "generation": 4,
+      "genome_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+      "cases": [
+        {
+          "case": {
+            "name": "mixed_fresh_stationary_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 85.0,
+              "radial_speed": 3.0,
+              "lateral_speed": 0.0,
+              "heading_offset": 0.2
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": 15.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 518,
+          "distance": 0.55664885,
+          "relative_speed": 0.01938582
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_stationary_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 85.0,
+              "radial_speed": 0.0,
+              "lateral_speed": -4.0,
+              "heading_offset": -0.4
+            },
+            "target_offset": {
+              "x": 24.0,
+              "y": 6.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 758,
+          "distance": 0.043877654,
+          "relative_speed": 0.21702303
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_moving_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 95.0,
+              "radial_speed": -2.0,
+              "lateral_speed": 0.0,
+              "heading_offset": 0.4
+            },
+            "target_offset": {
+              "x": 22.0,
+              "y": 9.0
+            },
+            "target_velocity": {
+              "x": 2.75,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 940,
+          "distance": 0.925162,
+          "relative_speed": 0.51933116
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_moving_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 95.0,
+              "radial_speed": 2.0,
+              "lateral_speed": 0.0,
+              "heading_offset": -0.4
+            },
+            "target_offset": {
+              "x": -22.0,
+              "y": 9.0
+            },
+            "target_velocity": {
+              "x": -2.75,
+              "y": 0.0
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 488,
+          "distance": 0.70280135,
+          "relative_speed": 0.6229593
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_inward_b0_p0",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 68.0,
+              "radial_speed": 0.0,
+              "lateral_speed": 2.5,
+              "heading_offset": 1.3
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": -7.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": -0.8
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 700,
+          "distance": 0.6191008,
+          "relative_speed": 0.8874103
+        },
+        {
+          "case": {
+            "name": "mixed_fresh_inward_b0_p1",
+            "seed": 42,
+            "start": {
+              "bearing": 0.5235988,
+              "altitude": 74.0,
+              "radial_speed": 0.0,
+              "lateral_speed": -2.5,
+              "heading_offset": -1.3
+            },
+            "target_offset": {
+              "x": 0.0,
+              "y": -10.0
+            },
+            "target_velocity": {
+              "x": 0.0,
+              "y": -0.8
+            },
+            "max_ticks": 1200
+          },
+          "outcome": "arrived",
+          "elapsed_ticks": 1005,
+          "distance": 0.57239056,
+          "relative_speed": 0.8921915
+        }
+      ]
+    }
+  ],
+  "checks": [
+    "moving-target practice of selected bundled genome",
+    "exact selected-genome seeding",
+    "pause and resume",
+    "Current and Best replays",
+    "pin and Still playback",
+    "leave and reopen Training",
+    "periodic validation saved at generations 1 and 4",
+    "automatic clock restored at 1x",
+    "settings byte-identical before and after",
+    "installed client and CLI hashes match bundle",
+    "service active with NRestarts=0"
+  ],
+  "limits": [
+    "Runtime UI controls, not a physical gamepad playtest",
+    "This seeded smoke run verifies the workflow; it is not evidence of new learning or a general pilot"
+  ],
+  "settings_sha256": "b262e763bc3642a0549599fe517466550ec54fbd4708a4fc0023a451c90e8215",
+  "job_sha256": "4b5cfca0dafd1b51987d7c5f5e11e62852ecb8a5259bdeac2c97627eb69fda15",
+  "local_evidence": "target/training-ui/device/",
+  "tests": {
+    "client_passed": 693,
+    "client_existing_ignored": 4,
+    "agent_passed": 84,
+    "cli_passed": 38,
+    "control_passed": 38
+  },
+  "screenshots": {
+    "docs/images/training/validated-progress-800x480.png": "9f6739dc366f7858ba3739195b301e17714f3dcda8744875eea575b89965d0ea",
+    "docs/images/training/best-replay-800x480.png": "50487e057bc4c7f355cdf03035009c306ec3f6d507e45789feb0a81b257a7d1d"
+  }
+}

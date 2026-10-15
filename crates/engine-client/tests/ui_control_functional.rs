@@ -82,6 +82,8 @@ fn launcher_navigation_uses_the_public_control_api() {
             UiAction::Left,
             UiAction::Left,
             UiAction::Down,
+            UiAction::Right,
+            UiAction::Right,
             UiAction::Down,
         ] {
             state = harness.press_guarded(action, &state);
@@ -97,6 +99,8 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.sound".into(),
                 "launcher.start".into(),
                 "launcher.new-match".into(),
+                "launcher.training".into(),
+                "launcher.genomes".into(),
             ])
         );
         assert_eq!(selected_control(&state), "launcher.scenario");
@@ -1263,6 +1267,8 @@ fn assert_launcher_main(state: &UiState) {
             "launcher.controls",
             "launcher.sound",
             "launcher.quit",
+            "launcher.genomes",
+            "launcher.training",
             "launcher.new-match",
         ]
     );

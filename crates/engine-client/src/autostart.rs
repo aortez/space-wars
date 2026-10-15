@@ -292,6 +292,8 @@ pub(crate) fn install(
         } else {
             let eligible = enabled_for_process && p.enabled && !runtime.borrow().failed
                 && window.get_launcher_visible() && !window.get_launcher_busy()
+                && !window.get_training_visible() && !window.get_training_active()
+                && !window.get_genomes_visible() && !window.get_genomes_busy()
                 && !window.get_sound_visible() && !window.get_launcher_settings_visible()
                 && !window.get_launcher_controls_visible() && !window.get_touch_test_visible()
                 && !window.get_settings_save_pending() && window.get_settings_save_error().is_empty()

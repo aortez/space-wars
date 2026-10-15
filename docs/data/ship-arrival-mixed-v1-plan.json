@@ -1,0 +1,3833 @@
+{
+  "version": 1,
+  "id": "material_arrival_mixed_learning_v1",
+  "runtime": "diagnostic_v1/linux/x86_64/423faedc2d2f58b29f6fa687132df5381eabf91e240223a9f4854601cf87430d",
+  "training": {
+    "id": "material_arrival_mixed_train_v1",
+    "contract": {
+      "organism": "material_ship_open_v1",
+      "role": "arrival_guidance_diagnostic_v1",
+      "observation": "arrival_local_9_v1",
+      "action": "turn_tanh_thrust_brake_v1",
+      "inputs": 9,
+      "outputs": 3,
+      "cadence_ticks": 1
+    },
+    "configuration": {
+      "build": "material_ship_open_v1",
+      "cases": [
+        {
+          "max_ticks": 1200,
+          "name": "stationary_radial",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 0.0,
+            "heading_offset": 0.0,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 20.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "stationary_right",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 0.0,
+            "heading_offset": 0.4000000059604645,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "stationary_left",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 0.0,
+            "heading_offset": -0.4000000059604645,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": -20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "stationary_rotated",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 1.5707963705062866,
+            "heading_offset": 0.0,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_target_motion_b0_p0",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 0.0,
+            "heading_offset": 0.30000001192092896,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_target_motion_b2_p1",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 3.1415927410125732,
+            "heading_offset": -0.30000001192092896,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_target_motion_b0_p4",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 0.0,
+            "heading_offset": 0.5,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_target_motion_b2_p5",
+          "seed": 42,
+          "start": {
+            "altitude": 90.0,
+            "bearing": 3.1415927410125732,
+            "heading_offset": -0.5,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_combined_a0_b0_p2",
+          "seed": 42,
+          "start": {
+            "altitude": 70.0,
+            "bearing": 0.7853981852531433,
+            "heading_offset": 1.5707963705062866,
+            "lateral_speed": 3.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "qualification_combined_a0_b1_p2",
+          "seed": 42,
+          "start": {
+            "altitude": 70.0,
+            "bearing": -2.356194496154785,
+            "heading_offset": 1.5707963705062866,
+            "lateral_speed": 3.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "mixed_train_inward_stationary",
+          "seed": 42,
+          "start": {
+            "altitude": 70.0,
+            "bearing": 0.0,
+            "heading_offset": 0.0,
+            "lateral_speed": 0.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        {
+          "max_ticks": 1200,
+          "name": "mixed_train_inward_mirrored",
+          "seed": 42,
+          "start": {
+            "altitude": 75.0,
+            "bearing": 1.5707963705062866,
+            "heading_offset": -1.5707963705062866,
+            "lateral_speed": -3.0,
+            "radial_speed": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          }
+        }
+      ],
+      "comparison": "stationary_arrivals_then_total_arrivals_position_velocity_spare_ticks_v1",
+      "dt_ns": 16666667,
+      "dwell_ticks": 30,
+      "limits": {
+        "brake_acceleration": 40.0,
+        "brake_gain": 4.0,
+        "cruise_speed": 70.0,
+        "thrust_acceleration": 45.0,
+        "turn_acceleration": 6.0,
+        "turn_speed": 1.7999999523162842
+      },
+      "parent_recipe": "material_arrival_fixed_v1",
+      "position_tolerance": 2.0,
+      "radial_altitude": [
+        40.0,
+        220.0
+      ],
+      "setup_deadline": 30,
+      "speed_tolerance": 1.0,
+      "stationary_retention_case_count": 4,
+      "world": "material_stationary_blocks_v1"
+    }
+  },
+  "runs": [
+    {
+      "seed": 1,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    },
+    {
+      "seed": 2,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    },
+    {
+      "seed": 3,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    }
+  ],
+  "seed_genome": {
+    "version": 1,
+    "contract": {
+      "organism": "material_ship_open_v1",
+      "role": "arrival_guidance_diagnostic_v1",
+      "observation": "arrival_local_9_v1",
+      "action": "turn_tanh_thrust_brake_v1",
+      "inputs": 9,
+      "outputs": 3,
+      "cadence_ticks": 1
+    },
+    "memory": "none",
+    "layers": [
+      {
+        "outputs": 8,
+        "activation": "tanh",
+        "weights": [
+          -0.5833407,
+          0.9209268,
+          1.2078159,
+          0.41195858,
+          -0.036040574,
+          0.8447072,
+          0.3199802,
+          -0.38858443,
+          0.48541802,
+          0.07291635,
+          0.083771616,
+          0.73672986,
+          0.32796937,
+          -0.6624125,
+          0.21186972,
+          0.21293272,
+          -0.83448076,
+          -0.45185453,
+          0.75064147,
+          0.01152385,
+          1.2467024,
+          -0.12527442,
+          -0.37009314,
+          0.09741963,
+          0.4088809,
+          -0.54536974,
+          0.093689516,
+          0.58098775,
+          -0.418877,
+          0.48717967,
+          1.0155355,
+          0.2843613,
+          0.44449914,
+          0.5694387,
+          0.64740646,
+          -0.09582053,
+          0.5248072,
+          -0.5471231,
+          0.32421145,
+          0.3170862,
+          -0.28939477,
+          0.45566368,
+          -0.24629508,
+          -0.0468802,
+          -0.008118734,
+          0.1915696,
+          -0.16622019,
+          0.58769757,
+          0.4239736,
+          0.08937359,
+          -0.8733261,
+          -0.30795947,
+          -0.4450789,
+          0.28658465,
+          0.2462205,
+          1.0784756,
+          0.6444789,
+          -0.24004863,
+          0.20950037,
+          -0.4552056,
+          0.5875273,
+          -0.7200872,
+          0.17262019,
+          0.9520846,
+          0.8301602,
+          0.44847137,
+          -0.071904,
+          -0.5405413,
+          0.58503413,
+          -0.58661664,
+          0.19277301,
+          -0.36173937
+        ],
+        "biases": [
+          -0.04497268,
+          0.56200147,
+          0.02740401,
+          0.91338515,
+          -0.38092366,
+          0.28689075,
+          0.022931058,
+          0.007884145
+        ]
+      },
+      {
+        "outputs": 3,
+        "activation": "linear",
+        "weights": [
+          -0.8187704,
+          0.40603516,
+          -0.7528373,
+          -0.7261064,
+          1.4198514,
+          -0.28902823,
+          0.23424867,
+          -0.3344383,
+          0.10601728,
+          -0.10654539,
+          0.5040295,
+          0.0552239,
+          -0.3931703,
+          0.6739905,
+          -0.0129645765,
+          0.6642778,
+          -0.2131077,
+          -0.49694753,
+          -0.34988523,
+          0.44233793,
+          -1.2333617,
+          0.19875683,
+          -0.5270341,
+          0.5196307
+        ],
+        "biases": [
+          -0.9619826,
+          -0.40991235,
+          -0.5233853
+        ]
+      }
+    ]
+  },
+  "seed_id": "6c0ef53fb27e190243c84903855544a2cb9b97f4f32c92499dd37e541bbc41fb",
+  "initialization": "one_unchanged_seed_then_31_independently_randomized_candidates_v1",
+  "operators": "sha256_counter_uniform_initialization_tournament_mutation_elitism_v1",
+  "finalist_selection": "best_training_fitness_in_last_generation_per_seed_v1",
+  "gate": "all_training_original_development_and_fresh_cases_arrived_no_exclusions_v1",
+  "partitions": [
+    {
+      "partition": "training",
+      "cases": [
+        {
+          "name": "stationary_radial",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 20.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_right",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_left",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_rotated",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.3
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.3
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 70.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 70.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_train_inward_stationary",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 70.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_train_inward_mirrored",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 75.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        }
+      ]
+    },
+    {
+      "partition": "original",
+      "cases": [
+        {
+          "name": "stationary_radial",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 20.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_right",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_left",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_rotated",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "validation_radial_close",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "validation_right_drift",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.0,
+            "heading_offset": -0.2
+          },
+          "target_offset": {
+            "x": 14.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "validation_left_rotated",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.0,
+            "heading_offset": 0.2
+          },
+          "target_offset": {
+            "x": -14.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "stationary_reversed",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 3.1415927
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 20.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "moving_right",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "moving_left",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "moving_rotated",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 20.0,
+            "y": 5.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        }
+      ]
+    },
+    {
+      "partition": "development",
+      "cases": [
+        {
+          "name": "qualification_geometry_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 35.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b0_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b0_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 3.1415927
+          },
+          "target_offset": {
+            "x": 10.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": -6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 6.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -6.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 4.0,
+            "lateral_speed": -4.0,
+            "heading_offset": 0.75
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b0_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": -4.0,
+            "lateral_speed": 4.0,
+            "heading_offset": -0.75
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.3
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.3
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b0_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 0.0,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 35.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b1_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 3.1415927
+          },
+          "target_offset": {
+            "x": 10.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": -6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 6.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -6.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 4.0,
+            "lateral_speed": -4.0,
+            "heading_offset": 0.75
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b1_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": -4.0,
+            "lateral_speed": 4.0,
+            "heading_offset": -0.75
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.3
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.3
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b1_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 35.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b2_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 3.1415927
+          },
+          "target_offset": {
+            "x": 10.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": -6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 6.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -6.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 4.0,
+            "lateral_speed": -4.0,
+            "heading_offset": 0.75
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b2_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": -4.0,
+            "lateral_speed": 4.0,
+            "heading_offset": -0.75
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.3
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.3
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p4",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b2_p5",
+          "seed": 42,
+          "start": {
+            "bearing": 3.1415927,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 35.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 30.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p4",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_geometry_b3_p5",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 3.1415927
+          },
+          "target_offset": {
+            "x": 10.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": -6.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 6.0,
+            "heading_offset": 0.25
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -6.0,
+            "heading_offset": -0.25
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p4",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 4.0,
+            "lateral_speed": -4.0,
+            "heading_offset": 0.75
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_initial_motion_b3_p5",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": -4.0,
+            "lateral_speed": 4.0,
+            "heading_offset": -0.75
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.3
+          },
+          "target_offset": {
+            "x": 18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.3
+          },
+          "target_offset": {
+            "x": -18.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -3.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 18.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.0
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.5
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p4",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": 2.0,
+            "y": 1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_target_motion_b3_p5",
+          "seed": 42,
+          "start": {
+            "bearing": -1.5707964,
+            "altitude": 90.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -15.0,
+            "y": 10.0
+          },
+          "target_velocity": {
+            "x": -2.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 70.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 70.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 70.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 70.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 70.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 70.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 70.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a0_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 70.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 100.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 100.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 100.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 100.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 100.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 100.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 100.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a1_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 100.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 125.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 125.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 125.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.7853982,
+            "altitude": 125.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 125.0,
+            "radial_speed": -3.0,
+            "lateral_speed": -3.0,
+            "heading_offset": -0.8
+          },
+          "target_offset": {
+            "x": 25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": 2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 125.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 0.8
+          },
+          "target_offset": {
+            "x": -25.0,
+            "y": 8.0
+          },
+          "target_velocity": {
+            "x": -2.5,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 125.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 3.0,
+            "heading_offset": 1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -8.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -1.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "qualification_combined_a2_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.3561945,
+            "altitude": 125.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -1.5707964
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 25.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 2.0
+          },
+          "max_ticks": 1200
+        }
+      ]
+    },
+    {
+      "partition": "fresh_stationary",
+      "cases": [
+        {
+          "name": "mixed_fresh_stationary_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 85.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.2
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 15.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -4.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": 24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 4.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": -24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 85.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 2.8
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": 22.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 85.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.2
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 15.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -4.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": 24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 4.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": -24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 85.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 2.8
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": 22.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 85.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.2
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 15.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -4.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": 24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 4.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": -24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 85.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 2.8
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": 22.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 85.0,
+            "radial_speed": 3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.2
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": 15.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -4.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": 24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 85.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 4.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": -24.0,
+            "y": 6.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_stationary_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 85.0,
+            "radial_speed": -3.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 2.8
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": 22.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        }
+      ]
+    },
+    {
+      "partition": "fresh_moving",
+      "cases": [
+        {
+          "name": "mixed_fresh_moving_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 95.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": 2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 95.0,
+            "radial_speed": 2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": -2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 1.75,
+            "y": 0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": -1.75,
+            "y": -0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 95.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": 2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 95.0,
+            "radial_speed": 2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": -2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 1.75,
+            "y": 0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": -1.75,
+            "y": -0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 95.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": 2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 95.0,
+            "radial_speed": 2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": -2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 1.75,
+            "y": 0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": -1.75,
+            "y": -0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 95.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.4
+          },
+          "target_offset": {
+            "x": 22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": 2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 95.0,
+            "radial_speed": 2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": -0.4
+          },
+          "target_offset": {
+            "x": -22.0,
+            "y": 9.0
+          },
+          "target_velocity": {
+            "x": -2.75,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.0,
+            "heading_offset": 0.6
+          },
+          "target_offset": {
+            "x": 12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": 1.75,
+            "y": 0.75
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_moving_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 95.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.6
+          },
+          "target_offset": {
+            "x": -12.0,
+            "y": 12.0
+          },
+          "target_velocity": {
+            "x": -1.75,
+            "y": -0.75
+          },
+          "max_ticks": 1200
+        }
+      ]
+    },
+    {
+      "partition": "fresh_inward",
+      "cases": [
+        {
+          "name": "mixed_fresh_inward_b0_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 68.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.5,
+            "heading_offset": 1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -7.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b0_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 74.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.5,
+            "heading_offset": -1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b0_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 82.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b0_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 0.5235988,
+            "altitude": 70.0,
+            "radial_speed": -1.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -8.0,
+            "y": -6.0
+          },
+          "target_velocity": {
+            "x": -0.5,
+            "y": -0.6
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b1_p0",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 68.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.5,
+            "heading_offset": 1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -7.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b1_p1",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 74.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.5,
+            "heading_offset": -1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b1_p2",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 82.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b1_p3",
+          "seed": 42,
+          "start": {
+            "bearing": 2.0943952,
+            "altitude": 70.0,
+            "radial_speed": -1.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -8.0,
+            "y": -6.0
+          },
+          "target_velocity": {
+            "x": -0.5,
+            "y": -0.6
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b2_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 68.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.5,
+            "heading_offset": 1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -7.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b2_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 74.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.5,
+            "heading_offset": -1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b2_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 82.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b2_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -1.0471976,
+            "altitude": 70.0,
+            "radial_speed": -1.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -8.0,
+            "y": -6.0
+          },
+          "target_velocity": {
+            "x": -0.5,
+            "y": -0.6
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b3_p0",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 68.0,
+            "radial_speed": 0.0,
+            "lateral_speed": 2.5,
+            "heading_offset": 1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -7.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b3_p1",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 74.0,
+            "radial_speed": 0.0,
+            "lateral_speed": -2.5,
+            "heading_offset": -1.3
+          },
+          "target_offset": {
+            "x": 0.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": -0.8
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b3_p2",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 82.0,
+            "radial_speed": -2.0,
+            "lateral_speed": 0.0,
+            "heading_offset": 0.5
+          },
+          "target_offset": {
+            "x": 8.0,
+            "y": -10.0
+          },
+          "target_velocity": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "max_ticks": 1200
+        },
+        {
+          "name": "mixed_fresh_inward_b3_p3",
+          "seed": 42,
+          "start": {
+            "bearing": -2.617994,
+            "altitude": 70.0,
+            "radial_speed": -1.0,
+            "lateral_speed": 2.0,
+            "heading_offset": -0.5
+          },
+          "target_offset": {
+            "x": -8.0,
+            "y": -6.0
+          },
+          "target_velocity": {
+            "x": -0.5,
+            "y": -0.6
+          },
+          "max_ticks": 1200
+        }
+      ]
+    }
+  ]
+}

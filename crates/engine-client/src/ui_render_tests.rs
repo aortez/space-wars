@@ -9,6 +9,143 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn training_setup_progress_and_errors_render_with_working_back_controls() {
+    use engine_agent::training_job::{GenerationProgress, JobSnapshot, JobSpec, JobState, Recipe};
+    use slint::platform::{PointerEventButton, WindowEvent};
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let clicked = Rc::new(RefCell::new(String::new()));
+    let next = clicked.clone();
+    ui.on_training_command(move |id| *next.borrow_mut() = id.to_string());
+    let output = std::env::var_os("SPACEWARS_TRAINING_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let saved = JobSnapshot {
+        state: JobState::Paused,
+        run_id: Some("run-123-456".into()),
+        spec: Some(JobSpec {
+            recipe: Recipe::MixedArrival,
+            population: 32,
+            generations: 32,
+            seed: 1,
+            initial_genomes: None,
+        }),
+        completed_generations: 12,
+        evaluated_candidates: 384,
+        saved_candidates: 384,
+        evaluated_episodes: 4608,
+        evaluation_millis: 75_000,
+        can_resume: true,
+        best_id: Some("693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb".into()),
+        history: (1..=12)
+            .map(|generation| GenerationProgress {
+                generation,
+                best_arrivals: (5 + generation as u32).min(12),
+                median_arrivals: generation as u32 / 2,
+                best_fitness: vec![4, 12, 11927, 11914, 6226],
+            })
+            .collect(),
+        ..JobSnapshot::default()
+    };
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        // ReusedBuffer requires retaining unchanged pixels across partial redraws.
+        let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+        for name in ["setup", "first-generation", "paused", "error"] {
+            reset_panels(&ui);
+            ui.set_launcher_visible(true);
+            ui.set_training_visible(true);
+            let mut snapshot = saved.clone();
+            if name == "setup" {
+                snapshot = JobSnapshot {
+                    state: JobState::Ready,
+                    ..JobSnapshot::default()
+                };
+            }
+            if name == "first-generation" {
+                snapshot.state = JobState::Running;
+                snapshot.completed_generations = 0;
+                snapshot.evaluated_candidates = 5;
+                snapshot.saved_candidates = 5;
+                snapshot.evaluated_episodes = 60;
+                snapshot.evaluation_millis = 1100;
+                snapshot.best_id = None;
+                snapshot.history.clear();
+                snapshot.can_resume = false;
+            }
+            if name == "error" {
+                snapshot.state = JobState::Failed;
+                snapshot.can_resume = false;
+                snapshot.error = Some("This saved run uses a different application build. Its checkpoint is preserved. Start a new run with compatible saved genomes to continue learning.".into());
+            }
+            crate::training_controls::publish(&ui, &snapshot);
+            crate::training_controls::publish_setup(&ui);
+            ui.set_training_setup(name == "setup");
+            slint::platform::update_timers_and_animations();
+            windows.borrow()[0].request_redraw();
+            windows.borrow()[0].draw_if_needed(|renderer| {
+                renderer.render(pixels.make_mut_slice(), width as usize);
+            });
+            if let Some(output) = &output {
+                crate::thruster_visual_tests::write_png(
+                    &output.join(format!("{name}-{width}x{height}.png")),
+                    &pixels,
+                );
+            }
+            let page_width = (width as f32 - 32.0).min(760.0);
+            let page_height = (height as f32 - 24.0).min(520.0);
+            let body_width = page_width - 48.0;
+            let buttons: Vec<(&str, bool)> = if name == "setup" {
+                vec![("training.start", true), ("training.back", true)]
+            } else {
+                vec![
+                    (
+                        if snapshot.can_resume {
+                            "training.resume"
+                        } else {
+                            "training.pause"
+                        },
+                        ui.get_training_can_pause() || ui.get_training_can_resume(),
+                    ),
+                    ("training.stop", ui.get_training_can_stop()),
+                    ("training.new", ui.get_training_can_start()),
+                    ("training.back", true),
+                ]
+            };
+            let columns = buttons.len() as f32;
+            for (index, (id, enabled)) in buttons.into_iter().enumerate() {
+                let x = (width as f32 - page_width) / 2.0
+                    + 24.0
+                    + index as f32 * (body_width + 10.0) / columns
+                    + (body_width - (columns - 1.0) * 10.0) / columns / 2.0;
+                let y = (height as f32 - page_height) / 2.0 + page_height - 56.0;
+                clicked.borrow_mut().clear();
+                for event in [
+                    WindowEvent::PointerPressed {
+                        position: slint::LogicalPosition::new(x, y),
+                        button: PointerEventButton::Left,
+                    },
+                    WindowEvent::PointerReleased {
+                        position: slint::LogicalPosition::new(x, y),
+                        button: PointerEventButton::Left,
+                    },
+                ] {
+                    ui.window().dispatch_event(event);
+                }
+                assert_eq!(
+                    *clicked.borrow(),
+                    if enabled { id } else { "" },
+                    "{name} {width}x{height} {id}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn scoreboard_renders_and_buttons_work_on_device_layouts() {
     use crate::scoreboard::{RoundResult, Scoreboard};
     use scenario_spacewars::{PlayerId, surface_sortie::match_rules::MatchOutcome};
@@ -871,6 +1008,8 @@ fn clock_fonts_picker_and_faces_render_and_select_across_device_layouts() {
 }
 
 fn reset_panels(ui: &MainWindow) {
+    ui.set_training_visible(false);
+    ui.set_genomes_visible(false);
     ui.set_launcher_visible(false);
     ui.set_launcher_settings_visible(false);
     ui.set_launcher_controls_visible(false);
@@ -984,6 +1123,42 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
         }),
         ("launcher", |ui| ui.set_launcher_visible(true)),
+        ("genome-browser", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_genomes_visible(true);
+            ui.set_genomes_label("1/4 · Mixed · seed 1".into());
+            ui.set_genomes_detail("Ship pilot · Guidance v1 · 107 parameters".into());
+            ui.set_genomes_count(4);
+            ui.set_genomes_compatible(true);
+        }),
+        ("training-setup", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_training_visible(true);
+            ui.set_training_setup(true);
+            crate::training_controls::publish_setup(ui);
+        }),
+        ("training-progress", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_training_visible(true);
+            ui.set_training_setup(false);
+            ui.set_training_status("Paused · checkpoint saved".into());
+            ui.set_training_can_resume(true);
+            ui.set_training_progress(0.5);
+            ui.set_training_best("Selected best: 4 / 4 arrivals · Generation 8".into());
+            ui.set_training_points(slint::ModelRc::new(slint::VecModel::from(vec![
+                crate::TrainingPoint {
+                    best: 0.5,
+                    median: 0.0,
+                },
+                crate::TrainingPoint {
+                    best: 1.0,
+                    median: 0.25,
+                },
+            ])));
+        }),
+        ("launcher-after-training", |ui| {
+            ui.set_launcher_visible(true)
+        }),
         ("launcher-confirmed", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_focus_index(1);

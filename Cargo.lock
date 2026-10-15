@@ -1461,11 +1461,13 @@ dependencies = [
  "clap",
  "engine-common",
  "engine-core",
+ "scenario-line-mover",
  "scenario-spacewars",
  "serde",
  "serde_json",
  "sha2",
  "spacewars-ai",
+ "tempfile",
 ]
 
 [[package]]
@@ -1481,6 +1483,7 @@ dependencies = [
  "cpal",
  "directories",
  "drm",
+ "engine-agent",
  "engine-common",
  "engine-core",
  "engine-nes",
@@ -4660,6 +4663,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scenario-line-mover"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "scenario-nes"
 version = "0.1.0"
 dependencies = [
@@ -5192,6 +5204,7 @@ dependencies = [
  "scenario-spacewars",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "experiment": "material_arrival_learning_v1",
+  "runtime": "diagnostic_v1/linux/x86_64/3daf5cfd8268c0dbdc35a6ba730b132f9468d0e2bdbfe00586010b81d4ae3b87",
+  "source_archive_sha256": "ce82c92a93d104466779bcbdffbc3eb51d96af100119d9c3512cc35bf30e1664",
+  "selection": "best_training_fitness_in_last_generation_per_seed_v1",
+  "runs": [
+    {
+      "seed": 1,
+      "genome_id": "eb1563c140e016b909a8df22ae496ab3234067cf93d616d4bac678392d028db4",
+      "config": {
+        "seed": 1,
+        "population": 32,
+        "generations": 48,
+        "elites": 2,
+        "tournament_size": 3,
+        "mutation_probability": 0.1,
+        "mutation_scale": 0.35,
+        "initial_scale": 0.5,
+        "parameter_limit": 8.0
+      },
+      "partition_results": [
+        {
+          "partition": "training",
+          "arrived": 1,
+          "cases": 4
+        },
+        {
+          "partition": "stationary_validation",
+          "arrived": 0,
+          "cases": 4
+        },
+        {
+          "partition": "moving_transfer",
+          "arrived": 1,
+          "cases": 3
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "genome_id": "72f7dad94eadb19ca19f8541bdd6a7d0697935f789c65e427da6a523118a3653",
+      "config": {
+        "seed": 2,
+        "population": 32,
+        "generations": 48,
+        "elites": 2,
+        "tournament_size": 3,
+        "mutation_probability": 0.1,
+        "mutation_scale": 0.35,
+        "initial_scale": 0.5,
+        "parameter_limit": 8.0
+      },
+      "partition_results": [
+        {
+          "partition": "training",
+          "arrived": 1,
+          "cases": 4
+        },
+        {
+          "partition": "stationary_validation",
+          "arrived": 0,
+          "cases": 4
+        },
+        {
+          "partition": "moving_transfer",
+          "arrived": 1,
+          "cases": 3
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "genome_id": "6c0ef53fb27e190243c84903855544a2cb9b97f4f32c92499dd37e541bbc41fb",
+      "config": {
+        "seed": 3,
+        "population": 32,
+        "generations": 48,
+        "elites": 2,
+        "tournament_size": 3,
+        "mutation_probability": 0.1,
+        "mutation_scale": 0.35,
+        "initial_scale": 0.5,
+        "parameter_limit": 8.0
+      },
+      "partition_results": [
+        {
+          "partition": "training",
+          "arrived": 4,
+          "cases": 4
+        },
+        {
+          "partition": "stationary_validation",
+          "arrived": 4,
+          "cases": 4
+        },
+        {
+          "partition": "moving_transfer",
+          "arrived": 3,
+          "cases": 3
+        }
+      ]
+    }
+  ]
+}

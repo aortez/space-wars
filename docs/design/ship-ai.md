@@ -5,6 +5,13 @@ This document records the first implementation slice for
 small enough to play-test while establishing the boundary that later rule,
 training, and autonomous logistics controllers share.
 
+The [evolutionary training and genome browser plan](evolutionary-training.md)
+describes the proposed training product, compatibility rules, saved runs, and
+initial material-flight experiment. It builds on these controller boundaries;
+the training features are not implemented by the historical slices below.
+The [organism perception proposal](organism-perception.md) develops the wider
+world representation for complete learned brains and their component views.
+
 ## Authority and data flow
 
 The Spacewars scenario remains authoritative for state, physics, damage,
