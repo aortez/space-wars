@@ -141,7 +141,7 @@ pub fn write_inactive(
     // Do not quarantine some other transaction for a stale/wrong caller.
     let (transaction, initial) = boot.authorize_write(store, image)?;
     let result = (|| {
-        report(progress(WriteStage::CheckingPayload, 0, image));
+        report(progress(WriteStage::CheckingPayload, 0, &image.expanded));
         payload.verify(image)?;
         let (_, current) = boot.authorize_write(store, image)?;
         if current.layout != initial.layout {
@@ -168,7 +168,11 @@ pub fn write_inactive(
                 &final_boot.observation,
             )
         })?;
-        report(progress(WriteStage::Prepared, image.expanded.bytes, image));
+        report(progress(
+            WriteStage::Prepared,
+            image.expanded.bytes,
+            &image.expanded,
+        ));
         Ok(action)
     })();
     if let Err(error) = &result {
@@ -186,7 +190,7 @@ pub fn write_inactive(
     result
 }
 
-trait Target: Read + Write + Seek {
+pub(crate) trait Target: Read + Write + Seek {
     fn capacity(&self) -> u64;
     fn flush_to_device(&mut self) -> Result<()>;
     fn file(&self) -> &File;
@@ -310,7 +314,33 @@ fn write_image(
     report: &mut impl FnMut(WriteProgress),
 ) -> Result<()> {
     image.validate()?;
-    if image.expanded.bytes < HEADER_BYTES as u64 || image.expanded.bytes > target.capacity() {
+    write_checked_ext4(
+        &image.compressed,
+        &image.expanded,
+        source,
+        target,
+        |file| inspect(file)?.matches_descriptor(image),
+        report,
+    )
+}
+
+/// Shared byte-writing mechanism, not installation authority. The caller must
+/// authorize and exclusively hold the target before entering, and its checker
+/// must validate the filesystem and actual embedded identity. Signed OTA uses
+/// matches_descriptor; supervised bootstrap can compare its exact ImageIdentity
+/// without inventing a release channel/generation or a VerifiedCandidate.
+pub(crate) fn write_checked_ext4(
+    compressed: &Blob,
+    expanded: &Blob,
+    source: &mut (impl Read + Seek),
+    target: &mut impl Target,
+    check_filesystem: impl FnOnce(&File) -> Result<()>,
+    report: &mut impl FnMut(WriteProgress),
+) -> Result<()> {
+    if compressed.bytes == 0 || compressed.bytes > crate::MAX_COMPRESSED_BYTES {
+        return Err(invalid("compressed image exceeds its size bound"));
+    }
+    if expanded.bytes < HEADER_BYTES as u64 || expanded.bytes > target.capacity() {
         return Err(invalid("expanded image does not fit the target"));
     }
     source.rewind()?;
@@ -320,7 +350,7 @@ fn write_image(
         source,
         hash: Hasher::new(),
         bytes: 0,
-        limit: image.compressed.bytes,
+        limit: compressed.bytes,
     };
     let mut input = BufReader::with_capacity(COPY_BYTES, counted);
     if !input.fill_buf()?.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
@@ -330,17 +360,17 @@ fn write_image(
     decoder.window_log_max(ZSTD_WINDOW_LOG)?;
     let mut header = [0u8; HEADER_BYTES];
     decoder.read_exact(&mut header)?;
-    check_ext4_header(&header, image.expanded.bytes)?;
+    check_ext4_header(&header, expanded.bytes)?;
     target.rewind()?;
-    report(progress(WriteStage::Writing, 0, image));
+    report(progress(WriteStage::Writing, 0, expanded));
     target.write_all(&header)?;
     let mut hash = Hasher::new();
     hash.update(header);
     let mut written = header.len() as u64;
     let mut last_report = Instant::now();
     let mut buffer = [0u8; COPY_BYTES];
-    while written < image.expanded.bytes {
-        let limit = (image.expanded.bytes - written).min(buffer.len() as u64) as usize;
+    while written < expanded.bytes {
+        let limit = (expanded.bytes - written).min(buffer.len() as u64) as usize;
         let count = decoder.read(&mut buffer[..limit])?;
         if count == 0 {
             return Err(Error::ImageMismatch);
@@ -348,13 +378,13 @@ fn write_image(
         target.write_all(&buffer[..count])?;
         hash.update(&buffer[..count]);
         written += count as u64;
-        if last_report.elapsed() >= Duration::from_millis(250) || written == image.expanded.bytes {
-            report(progress(WriteStage::Writing, written, image));
+        if last_report.elapsed() >= Duration::from_millis(250) || written == expanded.bytes {
+            report(progress(WriteStage::Writing, written, expanded));
             last_report = Instant::now();
         }
     }
     if decoder.read(&mut buffer[..1])? != 0
-        || hash.finalize().as_slice() != image.expanded.sha256.as_bytes()
+        || hash.finalize().as_slice() != expanded.sha256.as_bytes()
     {
         return Err(Error::ImageMismatch);
     }
@@ -363,37 +393,33 @@ fn write_image(
         return Err(invalid("trailing bytes or concatenated zstd frames"));
     }
     let counted = input.into_inner();
-    if counted.bytes != image.compressed.bytes
-        || counted.hash.finalize().as_slice() != image.compressed.sha256.as_bytes()
+    if counted.bytes != compressed.bytes
+        || counted.hash.finalize().as_slice() != compressed.sha256.as_bytes()
     {
         return Err(Error::ImageMismatch);
     }
-    report(progress(WriteStage::Flushing, written, image));
+    report(progress(WriteStage::Flushing, written, expanded));
     target.flush_to_device()?;
-    readback(target, image, report)?;
-    report(progress(WriteStage::CheckingFilesystem, written, image));
-    inspect(target.file())?.matches_descriptor(image)?;
+    readback(target, expanded, report)?;
+    report(progress(WriteStage::CheckingFilesystem, written, expanded));
+    check_filesystem(target.file())?;
     // The checker is read-only, but verify that promise before any selector is
     // eligible. The target can be larger than the filesystem; hash its extent.
-    readback(target, image, report)?;
+    readback(target, expanded, report)?;
     Ok(())
 }
 
 fn readback(
     target: &mut impl Target,
-    image: &ImageDescriptor,
+    expanded: &Blob,
     report: &mut impl FnMut(WriteProgress),
 ) -> Result<()> {
-    report(progress(WriteStage::ReadingBack, 0, image));
+    report(progress(WriteStage::ReadingBack, 0, expanded));
     target.rewind()?;
-    let mut limited = target.take(image.expanded.bytes);
-    // verify_blob checks EOF on Take, which is exactly the signed image extent.
-    verify_blob(&mut limited, &image.expanded)?;
-    report(progress(
-        WriteStage::ReadingBack,
-        image.expanded.bytes,
-        image,
-    ));
+    let mut limited = target.take(expanded.bytes);
+    // verify_blob checks EOF on Take, which is exactly the expected image extent.
+    verify_blob(&mut limited, expanded)?;
+    report(progress(WriteStage::ReadingBack, expanded.bytes, expanded));
     Ok(())
 }
 
@@ -412,7 +438,7 @@ impl<R: Read> Read for HashReader<R> {
         if remaining == 0 {
             if self.source.read(&mut [0])? != 0 {
                 return Err(std::io::Error::other(
-                    "compressed payload exceeds its signed length",
+                    "compressed payload exceeds its declared length",
                 ));
             }
             return Ok(0);
@@ -452,11 +478,11 @@ pub(crate) fn check_ext4_header(header: &[u8], expanded: u64) -> Result<()> {
     Ok(())
 }
 
-fn progress(stage: WriteStage, bytes: u64, image: &ImageDescriptor) -> WriteProgress {
+fn progress(stage: WriteStage, bytes: u64, expanded: &Blob) -> WriteProgress {
     WriteProgress {
         stage,
         bytes,
-        total: image.expanded.bytes,
+        total: expanded.bytes,
     }
 }
 fn invalid(message: &str) -> Error {

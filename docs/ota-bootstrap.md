@@ -138,6 +138,15 @@ only argument is the separately reviewed bundle hash; neither accepts a device,
 destination path, URL or arbitrary command. Do not reserve a live attempt until
 its remaining recovery and apply procedure is ready for supervised execution.
 
+The inactive-root writer now separates its checked byte-copy mechanism from
+signed OTA authorization. Both paths can use the same bounded zstd decode,
+compressed and expanded hashes, flush, readback, read-only filesystem check and
+second readback. OTA still requires its verified candidate, current boot evidence
+and durable writing transaction. The bootstrap path can compare the complete
+packaged image identity without constructing fictional release metadata. This
+internal refactoring does not add a bootstrap installation command or grant
+write authority to a preparation record.
+
 ## Why stage the OS boot assets separately
 
 The Pi 5's boot filesystem has 79,437,824 bytes available in the captured

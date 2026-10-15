@@ -168,6 +168,95 @@ fn real_ext4_round_trip_checks_readback_fsck_identity_and_preserves_unused_tail(
     }
 }
 
+#[test]
+fn shared_writer_accepts_only_the_checked_embedded_identity_without_release_metadata() {
+    let fixture = Fixture::new();
+    let compressed = blob(&fixture.compressed);
+    let expanded = blob(&fixture.bytes);
+    for case in ["matching", "different-image", "checker-mutated"] {
+        let mut expected = fixture.identity.clone();
+        if case == "different-image" {
+            expected.boot_identity = Sha256::digest(b"another boot set");
+        }
+        expected.validate().unwrap();
+        let mut target = FileTarget::new(expanded.bytes + 4096);
+        let mut tools = ImageTools::default();
+        let mut stages = Vec::new();
+        let result = write_checked_ext4(
+            &compressed,
+            &expanded,
+            &mut Cursor::new(&fixture.compressed),
+            &mut target,
+            |file| {
+                let actual = tools.check(file)?;
+                if actual != expected {
+                    return Err(invalid(
+                        "bootstrap filesystem identity differs from its package",
+                    ));
+                }
+                if case == "checker-mutated" {
+                    let mut file = file.try_clone()?;
+                    file.seek(SeekFrom::Start(9000))?;
+                    file.write_all(b"changed")?;
+                }
+                Ok(())
+            },
+            &mut |progress| {
+                assert_eq!(progress.total, expanded.bytes);
+                stages.push(progress.stage);
+            },
+        );
+        assert_eq!(result.is_ok(), case == "matching", "{case}: {result:?}");
+        assert!(stages.contains(&WriteStage::CheckingFilesystem));
+        // Success here is only a verified byte copy. No journal transition or
+        // externally visible Prepared status occurs in the shared mechanism.
+        assert!(!stages.contains(&WriteStage::Prepared));
+    }
+}
+
+#[test]
+fn shared_writer_rejects_unbounded_or_unfitting_inputs_before_writing() {
+    let fixture = Fixture::new();
+    for case in [
+        "empty-compressed",
+        "oversized-compressed",
+        "small-expanded",
+        "small-target",
+    ] {
+        let mut compressed = blob(&fixture.compressed);
+        let mut expanded = blob(&fixture.bytes);
+        match case {
+            "empty-compressed" => compressed.bytes = 0,
+            "oversized-compressed" => compressed.bytes = crate::MAX_COMPRESSED_BYTES + 1,
+            "small-expanded" => expanded.bytes = HEADER_BYTES as u64 - 1,
+            _ => (),
+        }
+        let mut target = FileTarget::new(if case == "small-target" {
+            4096
+        } else {
+            fixture.bytes.len() as u64
+        });
+        let mut checked = false;
+        assert!(
+            write_checked_ext4(
+                &compressed,
+                &expanded,
+                &mut Cursor::new(&fixture.compressed),
+                &mut target,
+                |_| {
+                    checked = true;
+                    Ok(())
+                },
+                &mut |_| {},
+            )
+            .is_err(),
+            "{case}"
+        );
+        assert_eq!(target.written, 0, "{case}");
+        assert!(!checked, "{case}");
+    }
+}
+
 fn round_trip(fixture: Fixture) {
     let mut target = FileTarget::new(fixture.image.expanded.bytes + 4096);
     target
