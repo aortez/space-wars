@@ -241,13 +241,33 @@ pub struct TraceTick {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PracticeBrain {
     pub version: u32,
     pub target_source: String,
     pub coordinator: String,
     pub contract: ModelContract,
     pub controller: String,
+}
+
+impl PracticeBrain {
+    pub fn guidance(controller: &str) -> Self {
+        Self {
+            version: 1,
+            target_source: "constant_world_velocity_v1".into(),
+            coordinator: "arrival_single_owner_v1".into(),
+            contract: guidance::contract(),
+            controller: controller.into(),
+        }
+    }
+
+    pub fn identity(&self) -> Result<String, EvolutionError> {
+        let mut identity = Sha256::new();
+        identity.update(b"spacewars.practice_brain.v1\0");
+        identity.update(serde_json::to_vec(self).map_err(error)?);
+        Ok(format!("{:x}", identity.finalize()))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -403,17 +423,8 @@ pub fn run_episode(
             .require_contract(&guidance::contract())
             .map_err(error)?;
     }
-    let brain = PracticeBrain {
-        version: 1,
-        target_source: "constant_world_velocity_v1".into(),
-        coordinator: "arrival_single_owner_v1".into(),
-        contract: guidance::contract(),
-        controller: policy.id().into(),
-    };
-    let mut identity = Sha256::new();
-    identity.update(b"spacewars.practice_brain.v1\0");
-    identity.update(serde_json::to_vec(&brain).map_err(error)?);
-    let brain_id = format!("{:x}", identity.finalize());
+    let brain = PracticeBrain::guidance(policy.id());
+    let brain_id = brain.identity()?;
     let (mut world, initial, initial_target, setup_ticks) = setup(&case)?;
     let binding = Binding {
         owner: initial.owner,

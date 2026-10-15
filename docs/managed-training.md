@@ -108,6 +108,10 @@ Storage is `training/` beside the app's settings file:
   each completed generation’s selected winner.
 - `trials/<id>/<receipt>.json`: compact practice results from the separate
   genome-browser worker.
+- `assemblies/<id>.json` and `assemblies/names/<id>.json`: saved practice-brain
+  definitions and separate display names, managed through the browser.
+- `assembly-trials/<id>/<receipt>.json`: practice results pinning a complete
+  saved assembly and its exact component, case and runtime.
 
 Each candidate batch is followed by an atomic checkpoint write. Checksums cover
 the job metadata and the inner checkpoint. An unsuccessful write does not
