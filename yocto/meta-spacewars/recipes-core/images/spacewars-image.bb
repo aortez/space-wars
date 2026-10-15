@@ -5,6 +5,7 @@ LICENSE = "MIT"
 inherit pi-base-image
 inherit extrausers
 require spacewars-boot-identity.inc
+require spacewars-image-identity.inc
 
 # The upstream pi-base image class asks for networkmanager-nmtui, but the
 # NetworkManager recipe in this layer set does not emit that split package.

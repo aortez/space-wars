@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health model, kiosk observer and early trial initramfs implemented; image/boot integration, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal, health model, kiosk observer, image identity and early trial initramfs implemented; boot/coordinator integration, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -147,8 +147,8 @@ distinguish fixture execution from installed service/RTC qualification.
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
 of [#263](https://github.com/aortez/space-wars/issues/263). They are not yet wired
 to a partition writer, boot-selector adapter or watchdog owner. The kiosk
-observer described below still needs the immutable image identity and trial
-coordinator integration. Production installation remains unavailable.
+observer described below now accepts the packaged image identity; trial
+coordinator integration remains. Production installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -250,8 +250,9 @@ The installed kiosk now uses `/run/spacewars-kiosk/control.sock`, mode 0660 in a
 service's private `/tmp`. The CLI discovers it unless an explicit socket was
 selected; desktop sockets retain their previous path and owner-only permissions.
 
-The observer is **not yet invoked by the time service**. Trial integration must
-provide the payload-bound image identity and its required privileges: read the
+The observer is **not yet invoked by the time service**. Its image adapter takes
+the expected revision, hash and length from the packaged record below. Trial
+integration must authenticate that record and provide the required privileges: read the
 kiosk's `/proc/PID/exe`, drop credentials for the fixed state helper, terminate
 that helper, and write the kiosk configuration directory under the service's
 filesystem sandbox. No arbitrary executable, path or expected identity is
@@ -266,6 +267,56 @@ this pass. These checks do not qualify installed sandbox permissions, physical
 display progress, rootfs trial boot or watchdog recovery.
 [Source identities and validation output](data/ota-health-20261015.json)
 retain the exact scope.
+
+### Packaged image identity
+
+Every newly built rootfs contains `/etc/spacewars/image.json`. It records the
+source commit and compiled revision, machine/architecture/layout, boot identity,
+updater/recovery protocol versions, persistent-data compatibility and the exact
+length/hash of the final stripped kiosk and device-service executables. The
+recipe supplies the same captured source revision to Cargo and the package;
+changing the Git commit or clean/dirty status during the build is an error.
+Development builds carry an explicit dirty flag and cannot match a signed-feed
+descriptor. Production publishing still requires a frozen clean checkout and
+recorded layer revisions.
+
+The `rootfs-...` build ID fingerprints the packaged filesystem tree's contents,
+names, modes, owners, extended attributes, link relationships and device nodes
+after image preprocessing. It excludes the identity file itself, timestamps and allocated
+inode numbers. This identifies the logical installed content without creating
+a self-referential whole-image hash. The signed descriptor's separate expanded
+and compressed hashes must still authenticate the complete payload bytes. A
+manifest on its own never grants installation or promotion permission.
+
+`ImageIdentity` checks its schema and size, source/revision agreement, executable
+bounds, and compatibility with the signed descriptor. Channel promotion leaves
+the record unchanged; generation allocation and monotonic history remain the
+publisher/verifier's responsibility. The Linux installed reader walks fixed
+root-owned directory handles and rejects symlinks, writable metadata, invalid
+owners, oversized input and changes during the read. It never reads an alternate
+path supplied by the kiosk. Runtime health hashes the actual running executable;
+it does not re-hash mutable operating-system state against the build-time tree.
+
+```sh
+# Inspect a local build artifact; without a path, inspect the installed record.
+cargo run --locked -p engine-ota --example image_identity_probe -- image.json
+```
+
+The full writer/coordinator and publisher still need to call the descriptor
+binding check on the verified image. Declaring recovery protocol 1 describes
+format support; it does not assert that the board's watchdog/tryboot behavior
+has been qualified.
+
+All 54 OTA and 33 device-service tests pass on the host, as do 38 Node and 57
+Python tooling tests, scoped Clippy, Rust 1.89 and AArch64 compilation. The four
+new identity tests also pass unprivileged on the Pi 5. The complete Yocto image
+build succeeds; inspection of the actual ext4 and WIC artifacts confirms that
+the record matches the final binary hashes, compiled revision and deploy
+sidecar, and that the boot partition contains the exact validated initramfs.
+The existing four-partition geometry is unchanged. The inspected image is
+explicitly marked as a dirty development build and has not been installed.
+[Source, build, artifact and Pi evidence](data/ota-image-identity-20261015.json)
+records these checks without claiming a successful trial boot.
 
 ### Boot capability inventory and bootstrap prerequisite
 

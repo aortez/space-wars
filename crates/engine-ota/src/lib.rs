@@ -4,6 +4,7 @@
 //! candidate is evidence to revalidate at installation, not permission to reboot.
 
 mod contract;
+mod image_identity;
 pub mod recovery;
 #[cfg(target_os = "linux")]
 pub mod recovery_linux;
@@ -12,6 +13,7 @@ mod repository;
 mod store;
 
 pub use contract::*;
+pub use image_identity::*;
 pub use recovery_store::RecoveryStore;
 pub use repository::*;
 pub use store::TrustStore;
@@ -28,6 +30,8 @@ pub enum Error {
     Timeout,
     #[error("invalid image descriptor: {0}")]
     Descriptor(String),
+    #[error("invalid image identity: {0}")]
+    ImageIdentity(String),
     #[error("unsupported feed: {0}")]
     Feed(String),
     #[error("invalid or uninitialized trust store: {0}")]

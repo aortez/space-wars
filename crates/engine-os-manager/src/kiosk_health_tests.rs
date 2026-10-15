@@ -73,12 +73,13 @@ fn expected() -> KioskExpectation {
     }
     file.unlock().unwrap();
     let bytes = fs::read(path).unwrap();
-    KioskExpectation {
-        build_id: "image-fixture".into(),
-        build_revision: "revision-fixture".into(),
-        executable_bytes: bytes.len() as u64,
-        executable_sha256: Sha256::digest(bytes).into(),
-    }
+    let mut image = engine_ota::ImageIdentity::parse(include_bytes!(
+        "../../engine-ota/tests/fixtures/image-identity-v1.json"
+    ))
+    .unwrap();
+    image.binaries.client.bytes = bytes.len() as u64;
+    image.binaries.client.sha256 = engine_ota::Sha256::digest(&bytes);
+    KioskExpectation::from_image(&image).unwrap()
 }
 
 fn server(
@@ -107,7 +108,7 @@ fn response(request: HealthRequest) -> HealthState {
         schema_version: 1,
         nonce: request.nonce,
         process_id: std::process::id(),
-        build_revision: "revision-fixture".into(),
+        build_revision: "aaaaaaaaaaaa".into(),
         ui_responses: 10,
         presented_frames: Some(100),
     }

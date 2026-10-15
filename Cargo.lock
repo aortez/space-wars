@@ -1647,6 +1647,7 @@ version = "0.1.0"
 dependencies = [
  "async-io",
  "clap",
+ "engine-ota",
  "futures-lite",
  "libc",
  "nix 0.30.1",

@@ -36,6 +36,22 @@ pub struct KioskExpectation {
 }
 
 impl KioskExpectation {
+    /// The caller must have authenticated the containing rootfs. A build record
+    /// alone does not establish trust in a candidate or authorize promotion.
+    pub fn from_image(image: &engine_ota::ImageIdentity) -> Result<Self> {
+        image
+            .validate()
+            .map_err(|error| Error::Invalid(error.to_string()))?;
+        let expected = Self {
+            build_id: image.build_id.clone(),
+            build_revision: image.source.revision.clone(),
+            executable_bytes: image.binaries.client.bytes,
+            executable_sha256: *image.binaries.client.sha256.as_bytes(),
+        };
+        expected.validate()?;
+        Ok(expected)
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.build_id.is_empty()
             || self.build_id.len() > 128

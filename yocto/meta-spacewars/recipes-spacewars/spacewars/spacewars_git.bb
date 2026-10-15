@@ -51,6 +51,41 @@ INSANE_SKIP:${PN}-dbg += "buildpaths"
 
 do_compile[network] = "1"
 
+# Resolve once at recipe parsing, then use the same identity for Cargo and the
+# package. externalsrc disables parse caching, including across Git commits.
+export SPACEWARS_BUILD_REVISION
+python () {
+    import json
+    from spacewars.image_identity import source_identity
+
+    identity = source_identity(d.getVar("SPACEWARS_SRCROOT"))
+    d.setVar("SPACEWARS_SOURCE_IDENTITY", json.dumps(identity, sort_keys=True))
+    d.setVar("SPACEWARS_BUILD_REVISION", identity["revision"])
+}
+do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
+
+python verify_spacewars_source_identity() {
+    import json
+    from spacewars.image_identity import source_identity
+
+    if source_identity(d.getVar("SPACEWARS_SRCROOT")) != json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")):
+        bb.fatal("Space-Wars source identity changed during the build; rebuild from a stable checkout")
+}
+do_compile[prefuncs] += "verify_spacewars_source_identity"
+do_compile[postfuncs] += "verify_spacewars_source_identity"
+
+python write_spacewars_source_identity() {
+    from pathlib import Path
+
+    bb.build.exec_func("verify_spacewars_source_identity", d)
+    path = Path(d.getVar("D")) / "usr/share/spacewars/source.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(d.getVar("SPACEWARS_SOURCE_IDENTITY") + "\n")
+    path.chmod(0o644)
+}
+do_install[postfuncs] += "write_spacewars_source_identity"
+
 python () {
     srcroot = d.getVar("SPACEWARS_SRCROOT")
     tracked = [
@@ -203,6 +238,7 @@ FILES:${PN} = " \
     ${sysconfdir}/sudoers.d/spacewars-renderer \
     ${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf \
     ${datadir}/spacewars/fast-update-compat \
+    ${datadir}/spacewars/source.json \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-rtc-capture.service \
