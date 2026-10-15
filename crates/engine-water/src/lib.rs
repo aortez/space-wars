@@ -18,6 +18,8 @@ mod splash;
 pub use moving_bed::PoolGeometry;
 pub use solids::{MAX_SOLID_BOXES, SolidBox};
 pub use splash::{SplashConfig, SplashVariation};
+#[cfg(test)]
+mod deep_drain_tests;
 mod spill;
 mod supports;
 use spill::{Section, Spill};
@@ -58,6 +60,10 @@ pub struct WaterConfig {
     /// Conservative local mixing between colliding, opposing automatic
     /// outfalls. Disable for an A/B control; not a general particle solver.
     pub mix_spills: bool,
+    /// Retain material footprints for uncovered strips and deep mixed outfalls.
+    /// Outlets keep their vertical wet face and mix on their convex pieces.
+    /// Off by default for the original shallow-stream representation.
+    pub retain_spill_shapes: bool,
     /// Positive downward acceleration; all pools share this gravity direction.
     pub gravity: f64,
     pub damping: f64,
@@ -87,6 +93,7 @@ impl Default for WaterConfig {
         Self {
             splash: None,
             mix_spills: true,
+            retain_spill_shapes: false,
             gravity: 400.0,
             damping: 0.8,
             impact_response: 0.0,
@@ -149,6 +156,10 @@ pub struct Pool {
     drip_config: Option<DripConfig>,
     outlet_credit: [drips::Credit; 2],
     outlet_channels: [Option<[f64; 2]>; 2],
+    /// Downward bed speed at the current sloped grid's endpoints. Used only by
+    /// explicitly actuated floors; ordinary quasi-static moves keep their limit.
+    bed_down_speed: Vec<[f64; 2]>,
+    bed_motion_tick: Option<u64>,
 }
 
 impl Pool {
@@ -513,6 +524,8 @@ impl WaterWorld {
                         drip_config: None,
                         outlet_credit: [drips::Credit::default(); 2],
                         outlet_channels: [config.spill_channel; 2],
+                        bed_down_speed: Vec::new(),
+                        bed_motion_tick: None,
                     }
                 })
                 .collect(),
@@ -539,8 +552,9 @@ impl WaterWorld {
         &self.parcels
     }
 
-    /// Connected outfall geometry for a parcel index, if a positive-area strip
-    /// is possible. Independent sources and sharply broken streams return None.
+    /// Material geometry for a parcel index, if positive-area pieces are
+    /// available. May contain disconnected pieces after mixing. Independent
+    /// sources and sharply broken streams return None.
     pub fn spill_ribbon(&self, index: usize) -> Option<SpillRibbon> {
         self.spills
             .get(index)?
@@ -642,6 +656,7 @@ impl WaterWorld {
                 self.config,
                 dt,
                 previous_tick,
+                mixing::Phase::InFlight,
             );
         }
         self.heads.fill([None; 2]);
@@ -748,11 +763,16 @@ impl WaterWorld {
                         position: Vec2::new(x as f32, (lip + depth * 0.5) as f32),
                         velocity,
                         flow: speed * depth,
+                        material_offset: self.config.retain_spill_shapes.then_some(Vec2::new(
+                            0.0,
+                            (depth * 0.5 * if edge == 0 { -1.0 } else { 1.0 }) as f32,
+                        )),
                     };
                     let mut head = tail;
                     head.advance(dt, self.config, bounds);
                     let head = self.heads[pool_index][edge].unwrap_or(head);
                     let spill = Spill {
+                        sheet: None,
                         upstream_end: None,
                         source: if emission.batched {
                             self.drip_parcels_emitted += 1;
@@ -781,6 +801,7 @@ impl WaterWorld {
                             self.config.max_speed,
                         ),
                         flow: emission.volume / dt,
+                        material_offset: None,
                     };
                     self.origins[pool_index][edge] = center.position;
                     center.advance(dt * 0.5, self.config, bounds);
@@ -795,26 +816,48 @@ impl WaterWorld {
                 }
             }
         }
+        // Resolve opposed newborn streams BEFORE either can cross a narrow gap
+        // into the opposite reservoir. Once deposited there, its local height
+        // surge cannot be undone by mixing on the following frame.
+        if self.config.mix_spills {
+            mixing::step(
+                &mut self.parcels,
+                &mut self.spills,
+                &mut self.mixing,
+                &mut self.mix_stats,
+                &mut self.splash,
+                &self.solids,
+                self.config,
+                dt,
+                self.tick,
+                mixing::Phase::Newborn {
+                    first: first_emitted,
+                },
+            );
+        }
         // The half-slice birth advance must use the same swept collection as
         // later motion, or a narrow/nearby collector could be skipped at birth.
         // Reverse order keeps swap_remove aligned with unprocessed new parcels.
         for i in (first_emitted..self.parcels.len()).rev() {
-            let mut spill = self.spills[i].expect("newly emitted outfall");
             let mut parcel = self.parcels[i];
-            let (source_pool, edge) = match spill.source {
-                SpillSource::Outlet { pool, edge } | SpillSource::Drip { pool, edge } => {
-                    (pool, edge)
+            let (leaving_pool, origin) = match self.spills[i].map(|spill| spill.source) {
+                Some(SpillSource::Outlet { pool, edge } | SpillSource::Drip { pool, edge }) => {
+                    (Some(pool), self.origins[pool][edge])
                 }
-                SpillSource::Junction { .. } => unreachable!(),
+                Some(SpillSource::Junction { .. } | SpillSource::Release { .. }) | None => {
+                    let half = dt as f32 * 0.5;
+                    (
+                        None,
+                        parcel.position
+                            - parcel.velocity * half
+                            - Vec2::new(
+                                0.0,
+                                (self.config.gravity * f64::from(half).powi(2) * 0.5) as f32,
+                            ),
+                    )
+                }
             };
-            let origin = self.origins[source_pool][edge];
-            let motion = self.collide(
-                origin,
-                parcel.position,
-                parcel.velocity,
-                Some(source_pool),
-                true,
-            );
+            let motion = self.collide(origin, parcel.position, parcel.velocity, leaving_pool, true);
             parcel.position = motion.position;
             parcel.velocity = motion.velocity;
             if let Some((pool, column)) = motion.caught {
@@ -832,16 +875,18 @@ impl WaterWorld {
                     continue;
                 }
                 self.parcels[i] = parcel;
-                let head = self.collide(
-                    spill.tail.position,
-                    spill.head.position,
-                    spill.head.velocity,
-                    None,
-                    false,
-                );
-                spill.head.position = head.position;
-                spill.head.velocity = head.velocity;
-                self.spills[i] = Some(spill);
+                if let Some(mut spill) = self.spills[i] {
+                    let head = self.collide(
+                        spill.tail.position,
+                        spill.head.position,
+                        spill.head.velocity,
+                        None,
+                        false,
+                    );
+                    spill.head.position = head.position;
+                    spill.head.velocity = head.velocity;
+                    self.spills[i] = Some(spill);
+                }
             }
         }
         // New spray starts at the contact, at most one frame after it. Keeping
@@ -967,6 +1012,11 @@ impl WaterWorld {
             if let Some(spill) = spill {
                 spill.tail.flow *= 1.0 - fraction;
                 spill.head.flow *= 1.0 - fraction;
+                for section in [&mut spill.tail, &mut spill.head] {
+                    if let Some(offset) = &mut section.material_offset {
+                        *offset *= (1.0 - fraction) as f32;
+                    }
+                }
             }
         }
         let mut i = 0;

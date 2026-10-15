@@ -15,6 +15,8 @@ mod impact;
 pub use impact::ImpactFixture;
 mod responsive;
 pub use responsive::ResponsiveFloorFixture;
+mod retained;
+pub use retained::{RETAINED_DEPTHS, RetainedDrainFixture};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Profile {

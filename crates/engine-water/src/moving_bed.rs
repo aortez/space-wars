@@ -2,6 +2,7 @@
 //! This is a quasi-static bed update, not pressure-driven rigid/fluid coupling.
 use crate::{
     Boundary, Column, MAX_STEP, Parcel, WaterError, WaterWorld, finite_coordinate, slopes,
+    spill::{Sheet, Spill},
 };
 
 #[derive(Clone, Copy)]
@@ -50,7 +51,7 @@ impl Column {
         ]
     }
 
-    fn release(self, left: f64, right: f64, volume: f64) -> Parcel {
+    fn release(self, left: f64, right: f64, volume: f64) -> (Parcel, Column) {
         let cut = Self {
             left,
             width: right - left,
@@ -58,13 +59,14 @@ impl Column {
             volume,
             ..self
         };
-        Parcel {
+        let parcel = Parcel {
             position: cut.water_centroid(),
             velocity: self.flow_velocity(),
             volume,
             duration: 1.0 / 60.0,
             horizontal_bounds: None,
-        }
+        };
+        (parcel, cut)
     }
 }
 
@@ -84,6 +86,30 @@ impl WaterWorld {
         changes: &[PoolGeometry<'_>],
         dt: f64,
     ) -> Result<(), WaterError> {
+        self.move_beds(changes, dt, false)
+    }
+
+    /// Prescribed, continuously actuated supports. Retained columns follow the
+    /// bed hydrostatically; this does not add rigid/fluid force coupling.
+    /// Downward acceleration cannot outrun gravity, including on the first move
+    /// or after a skipped step. Upward motion pushes the retained liquid. Both
+    /// directions remain subject to the world speed limit. Call once per step.
+    /// Uncovered strips and capacity failures use the same conservative transfer
+    /// as `move_sloped_pools`; the original quasi-static API is unchanged.
+    pub fn actuate_sloped_pools(
+        &mut self,
+        changes: &[PoolGeometry<'_>],
+        dt: f64,
+    ) -> Result<(), WaterError> {
+        self.move_beds(changes, dt, true)
+    }
+
+    fn move_beds(
+        &mut self,
+        changes: &[PoolGeometry<'_>],
+        dt: f64,
+        actuated: bool,
+    ) -> Result<(), WaterError> {
         if !dt.is_finite() || dt <= 0.0 || dt > MAX_STEP {
             return Err(WaterError::InvalidInput);
         }
@@ -94,6 +120,7 @@ impl WaterWorld {
                 || !pool.enabled
                 || pool.slopes.is_none()
                 || !pool.displacement.is_empty()
+                || (actuated && pool.bed_motion_tick == Some(self.tick))
             {
                 return Err(WaterError::InvalidInput);
             }
@@ -142,11 +169,25 @@ impl WaterWorld {
             // Piecewise linear differences attain their extremes at either
             // profile's vertices. Check BOTH grids, not only old endpoints.
             let max_drop = self.config.gravity * dt * dt * 0.5 + 1e-10;
+            let allowed = |x: f64, drop: f64| {
+                if !actuated {
+                    return drop.abs() <= max_drop;
+                }
+                let previous = if pool.bed_motion_tick == Some(self.tick.wrapping_sub(1)) {
+                    let local = ((x - pool.spec.left) / pool.spec.column_width)
+                        .clamp(0.0, pool.volume.len() as f64);
+                    let i = (local as usize).min(pool.volume.len() - 1);
+                    let t = local - i as f64;
+                    let [a, b] = pool.bed_down_speed[i];
+                    (a * (1.0 - t) + b * t).max(0.0)
+                } else {
+                    0.0
+                };
+                drop <= previous * dt + max_drop && drop.abs() <= self.config.max_speed * dt
+            };
             for c in pool.columns() {
                 for x in [c.left, c.left + c.width] {
-                    if x >= new.left
-                        && x <= new.right()
-                        && (c.bed_at(x) - new.bed_at(x)).abs() > max_drop
+                    if x >= new.left && x <= new.right() && !allowed(x, c.bed_at(x) - new.bed_at(x))
                     {
                         return Err(WaterError::InvalidInput);
                     }
@@ -159,7 +200,7 @@ impl WaterWorld {
                 for (edge, &height) in endpoints.iter().enumerate() {
                     let x = new.left + (i + edge) as f64 * new.column_width;
                     if let Some(old) = pool.index(x)
-                        && (pool.column(old).bed_at(x) - height).abs() > max_drop
+                        && !allowed(x, pool.column(old).bed_at(x) - height)
                     {
                         return Err(WaterError::InvalidInput);
                     }
@@ -172,6 +213,10 @@ impl WaterWorld {
         for &new in changes {
             let pool = &mut self.pools[new.pool];
             if new.unchanged(pool) {
+                if actuated {
+                    pool.bed_down_speed.fill([0.0; 2]);
+                    pool.bed_motion_tick = Some(self.tick);
+                }
                 continue;
             }
             pool.geometry_scratch.fill(0.0);
@@ -187,8 +232,11 @@ impl WaterWorld {
                     let volume = c.area_between(left, right);
                     if volume > 0.0 {
                         released += volume;
-                        self.parcels.push(c.release(left, right, volume));
-                        self.spills.push(None);
+                        let (parcel, cut) = c.release(left, right, volume);
+                        self.parcels.push(parcel);
+                        self.spills.push(self.config.retain_spill_shapes.then(|| {
+                            Spill::released(parcel, Sheet::column(cut), new.pool, self.tick)
+                        }));
                     }
                 }
                 let left = c.left.max(new.left);
@@ -226,6 +274,24 @@ impl WaterWorld {
             }
             std::mem::swap(&mut pool.volume, &mut pool.geometry_scratch);
             std::mem::swap(&mut pool.velocity, &mut pool.flux);
+            if actuated {
+                for (i, endpoints) in new.bed_edges.iter().enumerate() {
+                    for (edge, &height) in endpoints.iter().enumerate() {
+                        let x = new.left + (i + edge) as f64 * new.column_width;
+                        let local = (x - pool.spec.left) / pool.spec.column_width;
+                        pool.bed_down_speed[i][edge] =
+                            if (0.0..=pool.volume.len() as f64).contains(&local) {
+                                let old = (local as usize).min(pool.volume.len() - 1);
+                                (pool.column(old).bed_at(x) - height) / dt
+                            } else {
+                                0.0
+                            };
+                    }
+                }
+                pool.bed_motion_tick = Some(self.tick);
+            } else {
+                pool.bed_motion_tick = None;
+            }
             pool.spec.left = new.left;
             pool.spec.column_width = new.column_width;
             pool.spec.boundaries = new.boundaries;

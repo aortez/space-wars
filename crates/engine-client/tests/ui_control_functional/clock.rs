@@ -5,6 +5,79 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
+    run_functional_test("clock-aquarium", |harness| {
+        let page = harness.wait_until_ready();
+        let page = harness.activate_until_scenario("clock", page);
+        let page = harness.activate_guarded("launcher.settings", &page);
+        let page =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        let page = harness.activate_guarded("launcher.settings.clock.aquarium.previous", &page);
+        assert_eq!(
+            control_value(&page, "launcher.settings.clock.aquarium.next"),
+            Some("Off")
+        );
+        harness.capture_screenshot("aquarium-launcher-controls.png");
+        harness.activate_guarded("launcher.settings.start", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        for _ in 0..ClockEventKind::Aquarium as usize {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Aquarium")
+        );
+        harness.capture_screenshot("aquarium-pause-controls.png");
+        let initial = harness.clock_state();
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let swimming = harness.clock_wait(&initial, "swimming", 1, 60);
+        let aquarium = swimming.aquarium.unwrap();
+        assert_eq!(aquarium.admitted, 12);
+        assert_eq!(aquarium.live_by_species, [6, 4, 2]);
+        assert!(!swimming.settings.events.aquarium);
+        assert_eq!((swimming.body_count, swimming.collider_count), (0, 0));
+        harness.capture_screenshot("aquarium-swimming.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        let page = harness.change_clock_setting("pause.clock.aquarium", "On", &page);
+        let configured = harness.clock_state();
+        assert!(configured.settings.events.aquarium);
+        assert_eq!(configured.aquarium, paused.aquarium);
+        let page = harness.activate_guarded("pause.clock.back", &page);
+        harness.activate_guarded("pause.restart", &page);
+        harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert!(restarted.aquarium.is_none());
+        assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
+        assert_eq!(restarted.settings, configured.settings);
+        // Live settings are applied before the background writer completes.
+        // Restarting the scenario does not wait for that filesystem write.
+        let save_deadline = Instant::now() + TRANSITION_TIMEOUT;
+        loop {
+            let saved: engine_common::Settings = toml::from_str(
+                &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+            )
+            .unwrap();
+            if saved.clock == configured.settings {
+                break;
+            }
+            assert!(
+                Instant::now() < save_deadline,
+                "Aquarium settings were not saved"
+            );
+            thread::sleep(POLL_INTERVAL);
+        }
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn clock_fonts_save_live_choices_and_survive_restart() {
     use engine_common::ClockFont;
     run_functional_test("clock-fonts", |harness| {
@@ -361,6 +434,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.preview-event",
             "pause.clock.crow",
             "pause.clock.explosion",
+            "pause.clock.aquarium",
             "pause.clock.marquee",
         ] {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -369,6 +443,11 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!(
             page.selected_control.as_deref(),
             Some("pause.clock.marquee")
+        );
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.aquarium")
         );
         page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
@@ -689,6 +768,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             page = harness.change_clock_setting("pause.clock.crow", choice, &page);
         }
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1038,6 +1118,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.explosion.next",
+            "launcher.settings.clock.aquarium.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {

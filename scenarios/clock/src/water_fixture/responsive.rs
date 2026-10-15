@@ -240,13 +240,13 @@ mod tests {
                     .spill_ribbon(i)
                     .expect("continuous moving-floor mixed slice");
                 let min = ribbon
-                    .quads
+                    .quads()
                     .iter()
                     .flatten()
                     .map(|p| p.y)
                     .fold(f32::INFINITY, f32::min);
                 let max = ribbon
-                    .quads
+                    .quads()
                     .iter()
                     .flatten()
                     .map(|p| p.y)

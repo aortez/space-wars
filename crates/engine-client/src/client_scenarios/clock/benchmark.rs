@@ -15,11 +15,12 @@ pub enum ClockBenchmarkCase {
     Marquee,
     DigitSlide,
     Rain,
+    Aquarium,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -28,6 +29,7 @@ impl ClockBenchmarkCase {
         Self::Marquee,
         Self::DigitSlide,
         Self::Rain,
+        Self::Aquarium,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -44,6 +46,7 @@ impl ClockBenchmarkCase {
             Self::Marquee => ClockEventKind::Marquee,
             Self::DigitSlide => ClockEventKind::DigitSlide,
             Self::Rain => ClockEventKind::Rain,
+            Self::Aquarium => ClockEventKind::Aquarium,
         })
     }
 

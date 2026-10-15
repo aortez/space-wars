@@ -3,14 +3,223 @@ use crate::{Boundary, PoolSpec, WaterWorld};
 
 mod junction;
 
+fn has_boundary_edge(ribbon: &SpillRibbon, from: Vec2, to: Vec2) -> bool {
+    ribbon
+        .quads()
+        .iter()
+        .flat_map(|q| (0..4).map(move |i| (q[i], q[(i + 1) % 4])))
+        .filter(|&(a, b)| (a == from && b == to) || (a == to && b == from))
+        .count()
+        == 1
+}
+
+#[test]
+fn retained_sloping_outfalls_cover_the_vertical_lip_and_advect_the_same_face() {
+    for hz in [30, 60, 120] {
+        for edge in [0, 1] {
+            for height in [10.0, 177.5, 355.0] {
+                let mut w = ledge(0.0, 400.0, edge);
+                w.config.retain_spill_shapes = true;
+                let rise = 40.0 * 15.0_f64.to_radians().tan();
+                w.configure_sloped_bed(0, &[if edge == 1 { [rise, 0.0] } else { [0.0, rise] }])
+                    .unwrap();
+                let volume = w.pools[0].column(0).area_below(height);
+                w.add_to_pool(0, 0.0, volume).unwrap();
+                for _ in 0..8 {
+                    w.step(1.0 / hz as f64).unwrap();
+                    let s = w.spills.last().unwrap().unwrap();
+                    let p = w.parcels.last().unwrap();
+                    let ribbon = s.ribbon(p).expect("sloped outlet remains a sheet");
+                    let bottom = Vec2::new(if edge == 1 { 20.0 } else { -20.0 }, 0.0);
+                    let top = Vec2::new(bottom.x, w.pools[0].surface(0) as f32);
+                    assert!(has_boundary_edge(&ribbon, bottom, top));
+                    assert!(s.tail.velocity.y < 0.0);
+                    assert!(
+                        (ribbon.quads().iter().map(area).sum::<f64>() - p.volume).abs()
+                            < p.volume * 2e-4
+                    );
+                    let mut falling = s.tail;
+                    falling.advance(0.2, w.config, None);
+                    assert_eq!(
+                        falling.offset(),
+                        s.tail.offset(),
+                        "gravity moves, rather than rotates, the face"
+                    );
+                    assert!(falling.position.y < s.tail.position.y);
+                }
+                let original = w.spills.last().unwrap().unwrap().tail.offset();
+                w.reclaim_fraction(0.5).unwrap();
+                assert_eq!(
+                    w.spills.last().unwrap().unwrap().tail.offset(),
+                    original * 0.5
+                );
+                for (i, p) in w.parcels.iter().enumerate() {
+                    let rendered = w
+                        .spill_ribbon(i)
+                        .unwrap()
+                        .quads()
+                        .iter()
+                        .map(area)
+                        .sum::<f64>();
+                    assert!((rendered - p.volume).abs() < p.volume * 2e-4);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn concave_slices_split_without_highlighting_the_internal_diagonal() {
+    let concave = [
+        Vec2::ZERO,
+        Vec2::new(2.0, 0.0),
+        Vec2::new(0.5, 0.5),
+        Vec2::new(0.0, 2.0),
+    ];
+    for rotation in 0..4 {
+        let quad = std::array::from_fn(|i| concave[(i + rotation) % 4]);
+        for surface in [0, 1] {
+            let mut ribbon = SpillRibbon::new(surface);
+            ribbon.push_piece(quad).unwrap();
+            assert_eq!(ribbon.quads().len(), 2);
+            assert!(ribbon.quads().iter().all(convex));
+            assert!((ribbon.quads().iter().map(area).sum::<f64>() - area(&quad)).abs() < 1e-9);
+            assert_eq!((0..2).filter(|&i| ribbon.has_surface(i)).count(), 1);
+            let expected = if surface == 1 {
+                [quad[3], quad[2]]
+            } else {
+                [quad[0], quad[1]]
+            };
+            let piece = ribbon
+                .quads()
+                .iter()
+                .enumerate()
+                .find(|(i, _)| ribbon.has_surface(*i))
+                .unwrap()
+                .1;
+            let actual = if surface == 1 {
+                [piece[3], piece[2]]
+            } else {
+                [piece[0], piece[1]]
+            };
+            assert_eq!(actual, expected);
+        }
+    }
+    let crossing = [
+        Vec2::ZERO,
+        Vec2::new(2.0, 2.0),
+        Vec2::new(0.0, 2.0),
+        Vec2::new(2.0, 0.0),
+    ];
+    assert!(SpillRibbon::new(1).push_piece(crossing).is_none());
+}
+
+#[test]
+fn moving_outlet_slices_keep_the_exposed_surface_smooth_and_preserve_area() {
+    for edge in [0, 1] {
+        for volume in [200.0, 600.0, 800.0, 1000.0, 1400.0] {
+            let sign = if edge == 1 { 1.0 } else { -1.0 };
+            let tail = Section {
+                position: Vec2::ZERO,
+                velocity: Vec2::new(sign * 200.0, -10.0),
+                flow: 40_000.0,
+                material_offset: None,
+            };
+            let head = Section {
+                position: Vec2::new(sign * 5.0, -1.0),
+                velocity: Vec2::new(sign * 200.0, -12.0),
+                flow: 40_000.0,
+                material_offset: None,
+            };
+            let spill = Spill {
+                sheet: None,
+                source: SpillSource::Outlet { pool: 0, edge },
+                tick: 1,
+                upstream_end: None,
+                tail,
+                head,
+            };
+            let parcel = Parcel {
+                position: (tail.position + head.position) * 0.5,
+                velocity: (tail.velocity + head.velocity) * 0.5,
+                volume,
+                duration: 1.0 / 60.0,
+                horizontal_bounds: None,
+            };
+            let ribbon = spill.ribbon(&parcel).expect("a positive-area outfall");
+            assert!(ribbon.quads().len() <= 6);
+            assert!(ribbon.quads().iter().all(convex));
+            let rendered = ribbon.quads().iter().map(area).sum::<f64>();
+            assert!((rendered - volume).abs() < volume * 2e-4);
+            let quads = ribbon.quads();
+            let young = tail.position + tail.offset() * sign;
+            let old = head.position + head.offset() * sign;
+            let chord = old - young;
+            assert!((0..quads.len()).any(|i| ribbon.has_surface(i)));
+            for (_, q) in quads
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| ribbon.has_surface(*i))
+            {
+                for p in if edge == 1 {
+                    [q[3], q[2]]
+                } else {
+                    [q[0], q[1]]
+                } {
+                    let offset = p - young;
+                    assert!((offset.x * chord.y - offset.y * chord.x).abs() < 1e-3);
+                    assert!((0.0..=1.001).contains(&(offset.dot(chord) / chord.length_squared())));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn converging_outlet_faces_do_not_extrude_a_long_underside_spike() {
+    let tail = Section {
+        position: Vec2::ZERO,
+        velocity: Vec2::new(200.0, -10.0),
+        flow: 40_000.0,
+        material_offset: None,
+    };
+    let spill = Spill {
+        sheet: None,
+        source: SpillSource::Outlet { pool: 0, edge: 1 },
+        tick: 1,
+        upstream_end: None,
+        tail,
+        head: Section {
+            position: Vec2::new(5.0, -1.0),
+            velocity: Vec2::new(200.0, -20.0),
+            ..tail
+        },
+    };
+    let parcel = Parcel {
+        position: Vec2::new(2.5, -0.5),
+        velocity: tail.velocity,
+        volume: 1400.0,
+        duration: 1.0 / 60.0,
+        horizontal_bounds: None,
+    };
+    // The source is about 200 units deep. Its almost coincident lower corners
+    // must not turn the extra area into a multi-thousand-unit needle.
+    assert!(
+        spill.ribbon(&parcel).is_none(),
+        "use the compact, volume-preserving fallback for this collapsed strip"
+    );
+}
+
 #[test]
 fn compressed_junction_does_not_turn_into_a_wide_spike() {
     let tail = Section {
         position: Vec2::ZERO,
         velocity: Vec2::new(0.0, -60.0),
         flow: 120.0,
+        material_offset: None,
     };
     let spill = Spill {
+        sheet: None,
         upstream_end: None,
         source: SpillSource::Junction { outlets: [1, 2] },
         tick: 0,
@@ -79,7 +288,9 @@ fn ledge(depth: f64, gravity: f64, edge: usize) -> WaterWorld {
         }],
     )
     .unwrap();
-    water.add_to_pool(0, 0.0, depth * 40.0).unwrap();
+    if depth > 0.0 {
+        water.add_to_pool(0, 0.0, depth * 40.0).unwrap();
+    }
     water
 }
 
@@ -102,23 +313,32 @@ fn connected_slices_share_faces_preserve_area_and_reuse_storage() {
                     let ribbon = water
                         .spill_ribbon(i)
                         .expect("steady outfall stays connected");
-                    assert!(ribbon.quads.iter().all(convex));
-                    let rendered = ribbon.quads.iter().map(area).sum::<f64>();
+                    assert!(ribbon.quads().iter().all(convex));
+                    let rendered = ribbon.quads().iter().map(area).sum::<f64>();
                     let volume = water.parcels[i].volume;
                     assert!(
                         (rendered - volume).abs() < volume * 2e-4,
                         "{hz} {gravity} {edge}: {rendered} vs {volume}"
                     );
-                    assert_eq!(ribbon.quads[0][1], ribbon.quads[1][0]);
-                    assert_eq!(ribbon.quads[0][2], ribbon.quads[1][3]);
+                    let spill = water.spills[i].unwrap();
+                    for section in [spill.tail, spill.head] {
+                        assert!(has_boundary_edge(
+                            &ribbon,
+                            section.position - section.offset(),
+                            section.position + section.offset()
+                        ));
+                    }
                     if i > 0 {
                         let older = water.spill_ribbon(i - 1).unwrap();
-                        assert_eq!(ribbon.quads[1][1], older.quads[0][0]);
-                        assert_eq!(ribbon.quads[1][2], older.quads[0][3]);
+                        assert!(has_boundary_edge(
+                            &older,
+                            spill.head.position - spill.head.offset(),
+                            spill.head.position + spill.head.offset()
+                        ));
                     }
                 }
                 let newest = water.spill_ribbon(water.parcels.len() - 1).unwrap();
-                let face = [newest.quads[0][0], newest.quads[0][3]];
+                let face = [newest.quads()[0][0], newest.quads()[0][3]];
                 let surface = water.pools[0].surface(0) as f32;
                 assert!(
                     face.iter()
@@ -134,7 +354,7 @@ fn connected_slices_share_faces_preserve_area_and_reuse_storage() {
                     let rendered = water
                         .spill_ribbon(i)
                         .unwrap()
-                        .quads
+                        .quads()
                         .iter()
                         .map(area)
                         .sum::<f64>();

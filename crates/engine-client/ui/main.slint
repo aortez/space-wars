@@ -687,6 +687,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-crow-enabled: true;
     in-out property <string> launcher-clock-crow-water-tolerance: "Varied";
     in-out property <bool> launcher-clock-explosion-enabled: true;
+    in-out property <bool> launcher-clock-aquarium-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
@@ -1477,10 +1478,21 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(9, 1); }
                 }
-                ChoiceRow {
+                MenuButton {
                     x: 112px;
                     y: 224px;
-                    width: parent.width - 112px;
+                    width: 94px;
+                    height: 48px;
+                    text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
+                    text-padding: 6px;
+                    selected: root.ingame-clock-focus-index == 17;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(17, 1); }
+                }
+                ChoiceRow {
+                    x: 214px;
+                    y: 224px;
+                    width: parent.width - 214px;
                     height: 48px;
                     label: "Recipe";
                     label-fraction: 0.25;
@@ -2323,7 +2335,7 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 208px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 7;
@@ -2334,9 +2346,9 @@ export component MainWindow inherits Window {
                         }
 
                         MenuButton {
-                            x: (parent.width + 8px) / 4;
+                            x: (parent.width + 8px) / 5;
                             y: 208px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 8;
@@ -2347,23 +2359,34 @@ export component MainWindow inherits Window {
                         }
 
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 4;
+                            x: 2 * (parent.width + 8px) / 5;
                             y: 208px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Crow\n" + (root.launcher-clock-crow-enabled ? root.launcher-clock-crow-water-tolerance : "Off");
                             selected: root.launcher-settings-focus-index == 13;
                             activated => { root.launcher-settings-focus-index = 13; root.ui-action(3); }
                         }
                         MenuButton {
-                            x: 3 * (parent.width + 8px) / 4;
+                            x: 3 * (parent.width + 8px) / 5;
                             y: 208px;
-                            width: (parent.width - 24px) / 4;
+                            width: (parent.width - 32px) / 5;
                             height: 48px;
                             text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
                             text-padding: 6px;
                             selected: root.launcher-settings-focus-index == 14;
                             activated => { root.launcher-settings-focus-index = 14; root.ui-action(3); }
+                        }
+
+                        MenuButton {
+                            x: 4 * (parent.width + 8px) / 5;
+                            y: 208px;
+                            width: (parent.width - 32px) / 5;
+                            height: 48px;
+                            text: "Aquarium\n" + (root.launcher-clock-aquarium-enabled ? "On" : "Off");
+                            text-padding: 6px;
+                            selected: root.launcher-settings-focus-index == 16;
+                            activated => { root.launcher-settings-focus-index = 16; root.ui-action(3); }
                         }
 
                         ChoiceRow {
@@ -2485,7 +2508,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 16 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-material-match ? 10 : root.launcher-classic-spacewars ? 7 : root.launcher-scenario == "clock" ? 17 : root.launcher-material-combat ? 8 : root.launcher-material-travel ? 5 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain" || root.launcher-surface-comparison) ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

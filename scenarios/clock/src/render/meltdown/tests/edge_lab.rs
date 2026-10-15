@@ -77,7 +77,7 @@ fn water_edge_lab() {
                             let ribbon = water
                                 .spill_ribbon(i)
                                 .expect("steady outfall stays connected");
-                            let area: f64 = ribbon.quads.iter().map(|q| area(q)).sum();
+                            let area: f64 = ribbon.quads().iter().map(|q| area(q)).sum();
                             assert!((area - parcel.volume).abs() < parcel.volume * 2e-4);
                             area
                         })
@@ -131,7 +131,7 @@ fn opposed_outfalls_are_conservative_bounded_and_replayable() {
                     assert!(s.parcels <= 256);
                     for (i, p) in a.water.parcels().iter().enumerate() {
                         if let Some(ribbon) = a.water.spill_ribbon(i) {
-                            let rendered: f64 = ribbon.quads.iter().map(|q| area(q)).sum();
+                            let rendered: f64 = ribbon.quads().iter().map(|q| area(q)).sum();
                             assert!((rendered - p.volume).abs() < p.volume * 2e-3);
                         }
                     }

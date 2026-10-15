@@ -9,6 +9,7 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod aquarium;
 mod crow;
 mod digit_slide;
 mod duck;
@@ -88,6 +89,10 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     );
     frame::render(&mut frame, state, layout);
     render_canopy(&mut frame, layout);
+    if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
+        aquarium::water(&mut frame, event);
+        floor::responsive(&mut frame, &event.floor, layout, 1.0);
+    }
     if let Some(event) = shared_mechanics_arena(state) {
         let opacity = if state.duck_visit.is_some() {
             event.arena_opacity()
@@ -190,6 +195,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
+    if let Some(crate::events::ActiveEvent::Aquarium(event)) = &state.active_event {
+        aquarium::residents(&mut frame, event);
+    }
     render_player_and_course(&mut frame, state, layout);
     frame
 }

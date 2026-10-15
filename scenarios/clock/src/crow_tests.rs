@@ -207,6 +207,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
     settings.events = ClockEvents {
         crow: true,
         explosion: false,
+        aquarium: false,
         falling: false,
         color_cycle: false,
         meltdown: false,

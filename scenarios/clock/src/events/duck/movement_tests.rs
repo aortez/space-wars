@@ -181,50 +181,86 @@ fn holding_or_mashing_swim_is_cadence_limited_and_never_becomes_air_jumps() {
 }
 
 #[test]
-fn dive_is_shallow_and_release_restores_float_while_jump_overrides_down() {
-    let (mut duck, water) = floating();
-    let float_y = duck.position().unwrap().y;
-    duck.set_player_input(0, false, false, true);
-    let mut lowest = float_y;
-    for _ in 0..600 {
+fn held_dive_submerges_then_resurfaces_and_only_recharges_at_the_surface() {
+    for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
+        let mut duck = flat_player(aspect, 1.0);
+        let water = pool(&duck, duck.radius * 40.0);
+        for _ in 0..600 {
+            duck.step_with_water(Some(&water));
+        }
+        let float_y = duck.position().unwrap().y;
+        let ledger = water.stats();
+        duck.set_player_input(0, false, false, true);
+        let mut immersed_ticks = 0;
+        for _ in 0..120 {
+            duck.step_with_water(Some(&water));
+            immersed_ticks += usize::from(duck.water_report.submerged_fraction > 0.99);
+        }
+        assert!(immersed_ticks > 90, "a real sustained dive");
+        assert!(duck.position().unwrap().y < float_y - duck.radius * 5.0);
+        let left = duck.player.as_ref().unwrap().dive_ticks_left;
+        duck.set_player_input(0, false, false, false);
         duck.step_with_water(Some(&water));
-        lowest = lowest.min(duck.position().unwrap().y);
-    }
-    let diving = duck.player_diagnostics().unwrap();
-    assert!((730..=840).contains(&diving.submerged_milli), "{diving:?}");
-    assert!(
-        lowest > float_y - duck.radius * 1.25,
-        "no unlimited descent"
-    );
-    assert!(duck.position().unwrap().y < float_y - duck.radius * 0.3);
-    assert_eq!(diving.swim_strokes, 0);
-    assert!(
-        duck.feet_moving(),
-        "diving paddles without horizontal input"
-    );
-    duck.set_player_input(0, true, false, true);
-    duck.step_with_water(Some(&water));
-    assert_eq!(duck.player.as_ref().unwrap().swim_strokes, 1);
-    assert!(
-        duck.world
-            .as_ref()
-            .unwrap()
-            .motion(DUCK_BODY)
-            .unwrap()
-            .linear_velocity
-            .y
-            > 0.0
-    );
-    duck.set_player_input(0, false, false, false);
-    for _ in 0..480 {
+        assert_eq!(
+            duck.player.as_ref().unwrap().dive_ticks_left,
+            left,
+            "no underwater refill"
+        );
+        duck.set_player_input(0, false, false, true);
+        for _ in 0..600 {
+            duck.step_with_water(Some(&water));
+        }
+        let exhausted = duck.player_diagnostics().unwrap();
+        assert_eq!(exhausted.dive_ticks_left, 0);
+        assert!(exhausted.dive_recharging);
+        assert!(
+            (420..=480).contains(&exhausted.submerged_milli),
+            "{exhausted:?}"
+        );
+        assert!(!duck.feet_moving(), "exhausted Down cannot keep paddling");
+        duck.set_player_input(0, false, false, false);
+        for _ in 0..120 {
+            duck.step_with_water(Some(&water));
+        }
+        assert_eq!(
+            duck.player.as_ref().unwrap().dive_ticks_left,
+            player_control::DIVE_TICKS
+        );
+        assert!(!duck.player.as_ref().unwrap().dive_recharging);
+        duck.set_player_input(0, true, false, true);
         duck.step_with_water(Some(&water));
+        assert_eq!(
+            duck.player.as_ref().unwrap().swim_strokes,
+            1,
+            "Jump overrides Down"
+        );
+        assert_eq!(
+            duck.player.as_ref().unwrap().dive_ticks_left,
+            player_control::DIVE_TICKS
+        );
+        assert_eq!(water.stats(), ledger);
+        duck.set_player_input(0, false, false, false);
+        for _ in 0..240 {
+            duck.step_with_water(Some(&water));
+        }
+        duck.set_player_input(0, false, false, true);
+        for _ in 0..90 {
+            duck.step_with_water(Some(&water));
+        }
+        assert!(duck.water_report.submerged_fraction > 0.99);
+        duck.set_player_input(0, false, false, false);
+        for _ in 0..360 {
+            duck.step_with_water(Some(&water));
+        }
+        assert!(
+            (420..=480).contains(&duck.player_diagnostics().unwrap().submerged_milli),
+            "early release resurfaces too"
+        );
+        assert_eq!(
+            duck.player.as_ref().unwrap().dive_ticks_left,
+            player_control::DIVE_TICKS
+        );
     }
-    assert!((duck.position().unwrap().y - float_y).abs() < duck.radius * 0.03);
-    assert!((420..=480).contains(&duck.player_diagnostics().unwrap().submerged_milli));
-    assert!(
-        !duck.feet_moving(),
-        "releasing swim/dive returns to floating"
-    );
 }
 
 #[test]

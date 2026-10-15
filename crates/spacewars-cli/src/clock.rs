@@ -33,7 +33,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow or explosion.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain, crow, explosion or aquarium.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -53,7 +53,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving", "warning", "exploding", "filling", "swimming"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -373,11 +373,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 state.automatic_events_suspended,
             );
             println!(
-                "Player water: {:.1}% submerged, velocity={:?}, strokes={}, stroke cooldown={} ticks",
+                "Player water: {:.1}% submerged, velocity={:?}, strokes={}, stroke cooldown={} ticks, dive remaining={} ticks, dive recharging={}",
                 player.submerged_milli as f32 / 10.0,
                 world_vector(player.velocity_milli),
                 player.swim_strokes,
                 player.swim_cooldown_ticks,
+                player.dive_ticks_left,
+                player.dive_recharging,
             );
             if let Some(opening) = player.floor_open_milli {
                 println!(

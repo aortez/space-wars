@@ -599,10 +599,11 @@ pub enum ClockEventKind {
     Rain = 6,
     Crow = 7,
     Explosion = 8,
+    Aquarium = 9,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -612,6 +613,7 @@ impl ClockEventKind {
         Self::Rain,
         Self::Crow,
         Self::Explosion,
+        Self::Aquarium,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -625,6 +627,7 @@ impl ClockEventKind {
             Self::Rain => "rain",
             Self::Crow => "crow",
             Self::Explosion => "explosion",
+            Self::Aquarium => "aquarium",
         }
     }
 
@@ -639,6 +642,7 @@ impl ClockEventKind {
             Self::Rain => "Rain",
             Self::Crow => "Crow",
             Self::Explosion => "Explosion",
+            Self::Aquarium => "Aquarium",
         }
     }
 }
@@ -656,6 +660,7 @@ pub struct ClockEvents {
     pub rain: bool,
     pub crow: bool,
     pub explosion: bool,
+    pub aquarium: bool,
 }
 
 impl Default for ClockEvents {
@@ -670,6 +675,7 @@ impl Default for ClockEvents {
             rain: true,
             crow: true,
             explosion: true,
+            aquarium: true,
         }
     }
 }
@@ -686,8 +692,46 @@ impl ClockEvents {
             ClockEventKind::Rain => self.rain,
             ClockEventKind::Crow => self.crow,
             ClockEventKind::Explosion => self.explosion,
+            ClockEventKind::Aquarium => self.aquarium,
         }
     }
+}
+
+/// Aquarium actors are steering agents, not native physics bodies. Water uses
+/// the shared height-column solver; glyphs obstruct fish without displacing it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockAquariumState {
+    pub seed: u64,
+    pub admitted: u32,
+    /// Neon tetras, zebra danios, corydoras, in that order.
+    pub live_by_species: [u32; 3],
+    pub exited: u32,
+    /// Deadline cleanup is a failed departure, never counted as an exit.
+    pub failed_exits: u32,
+    pub scatter_events: u64,
+    pub regroup_events: u64,
+    pub geometry_revisions: u64,
+    pub clearance_corrections: u64,
+    #[serde(default)]
+    pub duck_clearance_corrections: u64,
+    pub navigation_searches: u64,
+    pub shared_arena: bool,
+    pub water_steps: u64,
+    pub native_steps: u64,
+    #[serde(default)]
+    pub water_parcels: usize,
+    /// Highest parcel count after a water step, before residual cleanup.
+    #[serde(default)]
+    pub peak_water_parcels: usize,
+    pub floor_open_milli: u32,
+    #[serde(default)]
+    pub floor_tilt_millidegrees: u32,
+    pub injected_microunits: u64,
+    pub pooled_microunits: u64,
+    pub in_flight_microunits: u64,
+    pub drained_microunits: u64,
+    pub reclaimed_microunits: u64,
+    pub water_limited_ticks: u64,
 }
 
 /// Bounded physical debris diagnostics; phase/timing live on the timed event.
@@ -1023,6 +1067,11 @@ pub struct ClockPlayerDuckState {
     pub swim_strokes: u32,
     #[serde(default)]
     pub swim_cooldown_ticks: u32,
+    /// Remaining downward-stroke allowance at the fixed 60 Hz simulation rate.
+    #[serde(default)]
+    pub dive_ticks_left: u32,
+    #[serde(default)]
+    pub dive_recharging: bool,
     pub facing_right: bool,
     /// Some(opening) for the moving Rain panels, None for a fixed course.
     #[serde(default)]

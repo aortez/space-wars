@@ -41,9 +41,10 @@ impl FloorManager {
         self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
             ClockEventKind::Falling | ClockEventKind::Explosion => ClockFloorMode::DrainOpen,
-            ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
-                ClockFloorMode::EventOwned
-            }
+            ClockEventKind::Meltdown
+            | ClockEventKind::Duck
+            | ClockEventKind::Rain
+            | ClockEventKind::Aquarium => ClockFloorMode::EventOwned,
             ClockEventKind::ColorCycle
             | ClockEventKind::Marquee
             | ClockEventKind::DigitSlide
@@ -69,7 +70,8 @@ impl FloorManager {
             kind @ (ClockEventKind::Rain
             | ClockEventKind::Falling
             | ClockEventKind::Meltdown
-            | ClockEventKind::Explosion),
+            | ClockEventKind::Explosion
+            | ClockEventKind::Aquarium),
         )) = self.owner
         {
             self.owner = Some(FloorOwner::VisitArena {
@@ -114,6 +116,7 @@ impl FloorManager {
                 | ClockEventKind::Falling
                 | ClockEventKind::Meltdown
                 | ClockEventKind::Explosion
+                | ClockEventKind::Aquarium
         ));
         let Some(FloorOwner::VisitArena { event, .. }) = &mut self.owner else {
             panic!("shared event requires a visit arena");

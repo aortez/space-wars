@@ -369,7 +369,7 @@ enum HostCommand {
     /// Run the existing deterministic Clock fixture visibly, without changing saved settings.
     /// Requires an active Clock; restarts the fixture at 08:08. Normal restart exits it.
     ClockBenchmark {
-        #[arg(value_parser = ["idle", "rain"])]
+        #[arg(value_parser = ["idle", "rain", "aquarium"])]
         fixture: String,
         #[arg(long, default_value = "3s", value_parser = parse_timeout)]
         timeout: Duration,
@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn parses_only_explicit_clock_benchmark_fixtures() {
-        for expected in ["idle", "rain"] {
+        for expected in ["idle", "rain", "aquarium"] {
             let args = Args::try_parse_from([
                 "spacewars-cli",
                 "host",
@@ -1394,6 +1394,7 @@ mod tests {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "duck"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "crow"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "explosion"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "aquarium"]).is_ok());
         for phase in ["warning", "exploding", "reforming"] {
             assert!(
                 Args::try_parse_from([

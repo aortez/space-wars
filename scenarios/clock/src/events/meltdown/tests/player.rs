@@ -217,6 +217,7 @@ fn scheduled_meltdown_starts_without_an_extra_player_tick() {
         rain: false,
         crow: false,
         explosion: false,
+        aquarium: false,
     };
     state.configure(settings);
     ticks(&mut state, crate::events::COOLDOWN_TICKS as usize);
@@ -263,7 +264,8 @@ fn impact_driven_course_outfalls_do_not_draw_compressed_water_as_long_spikes() {
         let water = &event(&state).water;
         for i in 0..water.parcels().len() {
             if let Some(ribbon) = water.spill_ribbon(i) {
-                let [a, b] = ribbon.quads;
+                let a = ribbon.quads().first().unwrap();
+                let b = ribbon.quads().last().unwrap();
                 let mid = (a[2] - a[1]).length();
                 let ends = (a[3] - a[0]).length().max((b[2] - b[1]).length());
                 assert!(

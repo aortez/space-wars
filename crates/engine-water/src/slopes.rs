@@ -65,6 +65,7 @@ impl WaterWorld {
         }
         pool.slopes = Some(edges.to_vec());
         pool.geometry_scratch.resize(edges.len(), 0.0);
+        pool.bed_down_speed.resize(edges.len(), [0.0; 2]);
         Ok(())
     }
 }

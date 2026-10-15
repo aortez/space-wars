@@ -7,10 +7,10 @@ use super::{
 
 pub(super) const SWIM_COOLDOWN_TICKS: u64 = 18;
 pub(super) const SWIM_MIN_IMMERSION: f64 = 0.2;
-// Extra downward acceleration shifts this 0.45-density hull's equilibrium
-// from 45% to about 79% immersed. Even fully submerged, buoyancy wins: holding
-// Dive cannot propel it indefinitely into the depths. Water drag damps the bob.
-const DIVE_GRAVITY_FRACTION: f32 = 0.75;
+pub(super) const DIVE_TICKS: u32 = 4 * 60;
+// A stroke must overcome the fully submerged hull's buoyancy. Its duration
+// and downward speed are bounded; releasing restores ordinary flotation.
+const DIVE_GRAVITY_FRACTION: f32 = 2.5;
 
 pub(super) struct PlayerControl {
     pub session_id: u64,
@@ -24,6 +24,9 @@ pub(super) struct PlayerControl {
     pub exit_at_tick: u64,
     pub swim_strokes: u32,
     pub next_swim_tick: u64,
+    pub dive_ticks_left: u32,
+    pub dive_recharging: bool,
+    pub diving: bool,
 }
 
 impl PlayerControl {
@@ -40,6 +43,9 @@ impl PlayerControl {
             exit_at_tick,
             swim_strokes: 0,
             next_swim_tick: 0,
+            dive_ticks_left: DIVE_TICKS,
+            dive_recharging: false,
+            diving: false,
         }
     }
 
@@ -51,6 +57,15 @@ impl PlayerControl {
         submerged: f64,
         tick: u64,
     ) -> f32 {
+        self.diving = false;
+        // Releasing Down underwater cannot refill the allowance. At the
+        // surface, two seconds of rest restores a completely spent dive.
+        if !self.dive_held && submerged <= 0.55 {
+            self.dive_ticks_left = (self.dive_ticks_left + 2).min(DIVE_TICKS);
+            if self.dive_ticks_left == DIVE_TICKS {
+                self.dive_recharging = false;
+            }
+        }
         if observed.grounded || submerged < SWIM_MIN_IMMERSION {
             return 0.0;
         }
@@ -66,8 +81,13 @@ impl PlayerControl {
                 self.swim_strokes += 1;
             }
             kick
-        } else if self.dive_held {
-            -movement.gravity * DIVE_GRAVITY_FRACTION * DT
+        } else if self.dive_held && !self.dive_recharging && self.dive_ticks_left > 0 {
+            self.diving = true;
+            self.dive_ticks_left -= 1;
+            self.dive_recharging = self.dive_ticks_left == 0;
+            (-movement.gravity * DIVE_GRAVITY_FRACTION * DT)
+                .max(-radius * 8.0 - observed.velocity.y)
+                .min(0.0)
         } else {
             0.0
         }

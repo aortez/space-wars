@@ -654,6 +654,167 @@ and strict scoped Clock/common/control/CLI lint passed. Full-client strict lint
 still reports existing warnings in unrelated host/raster/gamepad/mission code;
 those were left outside this change.
 
+### Aquarium (#177)
+
+Aquarium fills the Clock while leaving the current time readable. Six neon
+tetras share a loose school, four striped zebra danios make faster runs, and
+two corydoras pause over submerged floor and digit ledges. Fish enter and leave
+through the visible water-filled passage in the left rail.
+
+Aquarium is event ID **9**, available in the catalog, launcher enablement, live
+Clock controls, manual cycling and **Preview & Resume**. Older settings enable
+it by default and retain previous choices. An explicit preview works when its
+automatic switch or the event profile is Off. Automatic reuse has a 45-second
+per-event cooldown within the existing global scheduler.
+
+The 66-second sequence comprises **6 seconds filling, 40 swimming, 5 departure,
+12 draining, and 3 residual recovery**. The inlet finishes after 5.5 seconds;
+fish admission is staggered. Fish gather near the passage during the last eight
+seconds of swimming and count as exited only after their complete silhouette
+crosses offscreen. Deadline removals count as `failed_exits`, never as successful
+departures.
+
+The target water level is 85% of the floor-to-canopy height, raised if needed
+for a clear route above the digits and capped below the canopy. The floor
+stays closed through departure. Retained water volume then determines its
+target tilt: **15° at full load, 1° for a thin layer (0.05 glyph pitches), and
+0° when dry**, with interpolation between those levels. Airborne water no
+longer loads the floor. The maximum gap is 18% of the screen width. Speed and
+downward acceleration are bounded, and closing yields to an occupied duck hull.
+
+The floor can begin closing as water leaves; its peak angle need not reach the
+full-load target. In the 66-second, 800×480, seed-177 fixture, 95.08% of the water
+has physically drained after the 12-second drain (at 63 seconds). By the
+penultimate tick, 95.75% has drained, 4.23% has been reclaimed, and 0.02% remains.
+The final three seconds explicitly recover residual water, rather than treating
+all cleanup as drainage.
+
+#### Fish, digits and the duck
+
+There are at most 12 steering actors, with no native fish bodies. A bounded
+96×64 navigation grid routes around lit cells, colon, AM/PM and retained course
+geometry. Fish sample water current, scatter gently near the duck, and regroup.
+Time/format edits revalidate routes. A fish embedded or trapped by newly lit
+geometry moves to the nearest reachable clearance point without changing its
+identity; `clearance_corrections` counts these exceptional adjustments. Font
+changes defer until the event ends.
+
+Joining leases one native duck world, stepped once after the water. An existing
+visit retains its controller, session, position and course/panels; two visible
+lower liner bodies retain water beneath course gaps. New player visits use the
+Aquarium panels. Dismissal retains the vacant arena for rejoining. Completion,
+replacement and cancellation remove only event-owned resources, preserving a
+continuing duck. The crow's existing water sensors cause it to leave a wet perch.
+
+One event-owned fixed body provides cuboid colliders for every visible lit cell,
+including the dim/bright colon and visible AM/PM. The duck collides with sides,
+tops and undersides. Reading/format changes replace only this bounded cell list.
+If a newly lit cell overlaps the duck, a nearest-clear-side correction preserves
+its body/session and increments `duck_clearance_corrections`. Normal swimming
+uses native contacts. The digit body is removed when Aquarium releases the arena.
+
+**Hold Down to dive**, with up to four seconds of downward strokes. Releasing
+Down restores ordinary buoyancy. Two seconds resting at the surface refills an
+empty allowance; releasing underwater does not recharge it. A small blue meter
+shows remaining strokes and turns orange while an exhausted allowance recharges.
+**Jump** swims upward and takes precedence over diving. A solid underside can
+block ascent: paddle clear or swim around it. The shared controls also work in
+other water events; this allowance does not introduce drowning or damage.
+
+#### Water model and shared changes
+
+Two retained pools have 64 columns each, with at most 128 airborne parcels.
+This remains a height-column approximation: interior glyphs and courses obstruct
+actors without creating pressure cavities or displacing water. Fish do not
+displace water. No glyph consumes the pools' eight-displacer budget. Seaweed and
+predation remain deferred.
+
+Aquarium uses the continuously actuated bed API, which carries bed velocity
+between consecutive steps and bounds downward acceleration. Conservative
+remapping and atomic capacity deferral preserve the water ledger. Rain and
+Meltdown retain their existing quasi-static actuation path.
+
+Newborn opposing outfalls mix before their birth movement can collect them in
+the opposite pool. This prevents the narrow-gap recirculation that previously
+raised a full tank above its original level. Attached outfalls keep a continuous
+upper surface, correct their area on the underside, and split concave pieces
+into convex triangles without highlighting internal seams.
+
+Aquarium enables `WaterConfig::retain_spill_shapes`. Water uncovered by a
+retracting floor retains its wet trapezoid/triangle. Deep opposing outfalls
+retain their incoming material pieces, with vertical wet faces and swept convex
+contact, when mixing cancels horizontal motion. Fixed history holds up to twelve
+pieces and scales area during residual recovery. Geometry beyond that budget
+uses the existing fallback. Rain and Meltdown keep the default shallow-stream
+representation.
+
+These pieces follow gravity; they do not exert pressure on each other.
+Collection sweeps parcel centers. Thin strips can separate below the hatch or
+briefly extend above a falling surface. All transfers preserve the ledger:
+injected ≈ pooled + in-flight + drained + reclaimed, allowing independent
+rounding of diagnostic micro-units.
+
+`RetainedDrainFixture` isolates full (355-unit), half-full (177.5-unit), and
+shallow (10-unit) loads using the actual actuator, without fish or cleanup.
+Eight seconds at 60 Hz drains 91.49%, 84.63%, and 35.13%; 30 Hz controls are
+within 0.11 percentage points. Both avoid capacity stalls. At 120 Hz, the
+production 128-slot budget limits drainage to 77.00%, 74.96%, and 33.14%; the
+floor defers conservatively. A 256-slot diagnostic control at 120 Hz avoids
+stalls and drains 91.48%, 84.62%, and 35.11%. Production remains 60 Hz/128 slots.
+
+#### Diagnostics and reproduction
+
+`spacewars-cli clock state --json` reports Aquarium seed, species counts,
+exits/failures, scatter/regroup, geometry corrections, navigation searches,
+shared-world ownership, water/native steps, current and peak post-step parcel
+counts, floor opening/tilt, capacity pressure and the water ledger. The peak
+parcel count is recorded before residual cleanup. Aquarium state becomes null
+on completion; a continuing player remains independently observable.
+
+```sh
+RUST_MIN_STACK=16777216 cargo test --locked --profile ci \
+  -p engine-water -p scenario-clock -p engine-common \
+  -p spacewars-control -p spacewars-cli
+
+SPACEWARS_AQUARIUM_ARTIFACTS=/tmp/clock-aquarium \
+  RUST_MIN_STACK=16777216 cargo test --locked --profile ci \
+  -p engine-client --bin engine-client aquarium_visual_tests
+
+SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 cargo test --locked --profile ci \
+  -p engine-client --test ui_control_functional aquarium_preview \
+  -- --ignored --nocapture
+
+SPACEWARS_DRAIN_GEOMETRY=/tmp/aquarium-geometry RUST_MIN_STACK=16777216 \
+  cargo test --locked --profile ci -p scenario-clock \
+  retained_drain_geometry_diagnostic -- --ignored
+```
+
+The UI workflow requires a display and tests saved enablement, preview while
+disabled, swimming counts, pause and restart. It waits for the asynchronous
+settings write before checking persistence. Core tests cover all four fonts,
+three layouts (800×480, 1024×768, 480×800), both time formats, seeded replay,
+changing digits, real/failed exits, crow departure, duck contacts and dive
+recovery, scatter/regroup, existing courses, rejoin and cleanup. Renderer tests
+cover 66 full-event, 24 isolated-load and 30 duck-input moments in both adapters.
+
+For CPU-only full-cycle benchmarks:
+
+```sh
+./benchmark-clock.sh --client target/ci/engine-client \
+  --cases aquarium,rain,meltdown --seconds 69 --repeats 3 \
+  --scales 1 --renderer raster
+```
+
+These timings exclude display upload, drawing and vsync. The live command
+`spacewars-cli host clock-benchmark aquarium` starts a repeating fixed-reading
+fixture without saving settings, but disables injected controller input. Use a
+normal Clock and `spacewars-cli clock trigger aquarium` for playable duck review;
+a normal Restart exits the benchmark fixture.
+
+[Picade qualification](clock-aquarium-validation.md) records source/binary
+identities, full-cycle resource counts, CPU timings, actual page-flip intervals
+and device screenshots, including the software raster and screenshot limits.
+
 ### Digit Slide
 
 Digit Slide is triggered by a forward minute change, not the periodic lottery.
@@ -1030,7 +1191,8 @@ already on screen. Press it again to dismiss your duck.
 B (Run) and A (Jump) on the Nintendo-layout SN30 Pro, regardless of its USB name.
 Picade 2's **bottom-left pink** runs and **bottom-middle yellow** jumps/swims;
 use device remapping for a differently wired cabinet. **Down** on the keyboard,
-D-pad, or stick makes a shallow dive while floating. Keyboard belongs to
+D-pad, or stick dives for up to four seconds of downward strokes. Release at
+the surface for two seconds to fully recover. Keyboard belongs to
 P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
 cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
 Release movement, Run, Jump and Down after starting or resuming before taking control.
@@ -1105,14 +1267,20 @@ cannot reset that cooldown. Each stroke adds at most 12 body radii/second and
 never adds upward speed beyond 15 radii/second. Existing faster collision/flow
 motion is not clamped. A held stroke does not become a ground jump on landing.
 
-Down adds a small downward acceleration only while floating. With the existing
-0.45-density hull, its equilibrium moves from roughly 45% to 79% immersion,
-less than one radius deeper. Full submersion still has net upward buoyancy;
-this is a shallow bob, not unlimited diving. Releasing Down restores ordinary
-floating, and Jump takes priority over Down. Neither control adds wet movement
-on land/in dry air. Shallow water with solid footing retains fresh-press ground
-jumps. No bot strategy, pressure simulation, body, or per-tick allocation is added.
-Water can carry an
+Down supplies enough bounded downward acceleration to overcome the existing
+0.45-density hull's fully submerged buoyancy. A visit starts with 240 ticks
+(four seconds) of downward strokes; input does not accelerate downward beyond
+eight body radii/second. Releasing Down or exhausting the allowance restores
+ordinary buoyancy. Jump takes priority over Down. A small blue meter above the
+duck shows the remaining allowance; orange marks recovery after exhaustion.
+Release Down at the surface (at most 55% hull immersion) to recover two ticks
+per simulation tick, or two seconds from empty. Underwater releases do not
+refill it, and an exhausted dive must fully recover before restarting. This
+is a stroke allowance, not an oxygen/death mechanic; a solid ceiling can still
+block ascent, so paddle out from underneath it or use Jump/swim to assist.
+Neither control adds wet movement on land/in dry air. Shallow water with solid
+footing retains fresh-press ground jumps. No bot strategy, pressure simulation,
+body, or per-tick allocation is added by the dive control. Water can carry an
 unattended duck into a gap, producing the ordinary fall/exit lifecycle.
 
 Rain steps water once before the one player mechanics world applies its water
@@ -1279,7 +1447,8 @@ byte) and `PlayerDuckInput` (kind 8: player byte, little-endian u64 visit ID,
 little-endian i16 horizontal intent in -1000..=1000, and 0/1 Jump, Run and Dive
 bytes). Version 10 extends the player setpoint and rejects the old version-9
 payload instead of silently interpreting an incomplete command. Optional JSON
-diagnostics add `run_held`, `dive_held`, `swim_strokes`, and `swim_cooldown_ticks`;
+diagnostics include `run_held`, `dive_held`, `swim_strokes`,
+`swim_cooldown_ticks`, `dive_ticks_left`, and `dive_recharging`;
 `spacewars-cli clock state` prints them alongside immersion and velocity.
 
 Deterministic movement fixtures use production physics for flat-ground speed
@@ -1974,8 +2143,8 @@ are null. The optional `digit_slide` object reports old/new digits, changed slot
 eased progress in thousandths, and whether this is a manual preview; it is null
 after completion or cancellation. Use matching client/CLI builds: schema 19 and
 older requests are rejected. The internal Clock action payload is version 12;
-event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
-little-endian u16 switch mask (bits 0–8, reserved bits rejected),
+event ordinals 0–8 are unchanged and Aquarium is 9. Configure contains a
+little-endian u16 switch mask (bits 0–9, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
 byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message

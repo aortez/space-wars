@@ -149,6 +149,14 @@ impl DuckEvent {
         self.player.as_ref().map(|p| (p.session_id, p.seat))
     }
 
+    pub fn dive_meter(&self) -> Option<(f32, bool)> {
+        let player = self.player.as_ref()?;
+        (player.dive_ticks_left < player_control::DIVE_TICKS).then_some((
+            player.dive_ticks_left as f32 / player_control::DIVE_TICKS as f32,
+            player.dive_recharging,
+        ))
+    }
+
     pub fn adopt_course(&mut self, geometry: &arena::CourseGeometry) {
         assert_eq!(self.tick, 0);
         assert!(self.player.is_some());
@@ -197,6 +205,8 @@ impl DuckEvent {
             dive_held: player.dive_held,
             swim_strokes: player.swim_strokes,
             swim_cooldown_ticks: player.next_swim_tick.saturating_sub(self.tick) as u32,
+            dive_ticks_left: player.dive_ticks_left,
+            dive_recharging: player.dive_recharging,
             facing_right: player.facing * self.direction > 0.0,
             floor_open_milli: self
                 .responsive_floor
@@ -629,7 +639,7 @@ impl DuckEvent {
             // Keep the stroke animated between the held swim button's kicks.
             self.paddling |= !grounded
                 && self.water_report.submerged_fraction >= player_control::SWIM_MIN_IMMERSION
-                && (player.jump_held || player.dive_held);
+                && (player.jump_held || player.diving);
         }
         delta.x *= screen;
         if command.jump && grounded {
@@ -662,6 +672,7 @@ impl DuckEvent {
             player.jump_pending = false;
             player.run_held = false;
             player.dive_held = false;
+            player.diving = false;
         }
         self.enter(EventPhase::Resetting);
     }

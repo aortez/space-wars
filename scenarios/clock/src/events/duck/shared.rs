@@ -64,6 +64,10 @@ impl VisitArena {
 }
 
 impl DuckEvent {
+    pub fn actor_body(&self) -> Option<BodyId> {
+        self.buoyant.as_ref().map(BuoyantBody::body)
+    }
+
     pub fn claim_arena(&mut self) -> &mut PhysicsWorld {
         assert!(!self.arena_claimed);
         self.ensure_world();

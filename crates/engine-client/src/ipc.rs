@@ -597,9 +597,10 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
             let case = match lines.next() {
                 Some("idle") => crate::client_scenarios::ClockBenchmarkCase::Idle,
                 Some("rain") => crate::client_scenarios::ClockBenchmarkCase::Rain,
+                Some("aquarium") => crate::client_scenarios::ClockBenchmarkCase::Aquarium,
                 _ => {
                     return Err(invalid_mutation_request(
-                        "clock-benchmark requires idle or rain",
+                        "clock-benchmark requires idle, rain or aquarium",
                     ));
                 }
             };
@@ -1526,6 +1527,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
                 "Off".into()
             },
             clock_explosion_enabled: window.get_launcher_clock_explosion_enabled(),
+            clock_aquarium_enabled: window.get_launcher_clock_aquarium_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
@@ -1782,6 +1784,7 @@ mod tests {
         for (name, expected) in [
             ("idle", ClockBenchmarkCase::Idle),
             ("rain", ClockBenchmarkCase::Rain),
+            ("aquarium", ClockBenchmarkCase::Aquarium),
         ] {
             assert!(matches!(
                 parse_command(&format!("host clock-benchmark\n{name}\n")),

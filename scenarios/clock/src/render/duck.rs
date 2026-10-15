@@ -94,6 +94,32 @@ fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity
         return;
     };
     let pixel = radius * 0.33;
+    if let Some((remaining, recovering)) = event.dive_meter() {
+        let min = position + Vec2::new(-radius * 1.5, radius * 2.5);
+        let size = Vec2::new(radius * 3.0, pixel);
+        rect(
+            frame,
+            event,
+            min - Vec2::splat(pixel * 0.3),
+            min + size + Vec2::splat(pixel * 0.3),
+            RenderColor::rgb(0.05, 0.12, 0.18),
+            LABEL_LAYER,
+            opacity,
+        );
+        rect(
+            frame,
+            event,
+            min,
+            min + Vec2::new(size.x * remaining, size.y),
+            if recovering {
+                orange
+            } else {
+                RenderColor::rgb(0.25, 0.85, 1.0)
+            },
+            LABEL_LAYER,
+            opacity,
+        );
+    }
     let yellow = RenderColor::rgb(1.0, 0.88, 0.12);
     // Code-native pixel art renders identically through both presentation paths.
     let rows = [

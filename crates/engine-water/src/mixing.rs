@@ -3,10 +3,11 @@
 //! splashes and already mixed jets are deliberately outside this first model.
 use crate::{
     MAX_PARCELS, Parcel, SolidBox, WaterConfig,
-    spill::{Section, Spill, SpillSource},
+    spill::{Section, Sheet, Spill, SpillRibbon, SpillSource},
 };
 use engine_core::Vec2;
 
+mod geometry;
 #[cfg(test)]
 mod tests;
 
@@ -29,6 +30,8 @@ struct Candidate {
 }
 
 struct Group {
+    sheet: Option<Sheet>,
+    deep: bool,
     outlets: [usize; 2],
     contact_min: Vec2,
     contact_max: Vec2,
@@ -80,6 +83,29 @@ impl Group {
 pub(crate) struct Scratch {
     candidates: Vec<Candidate>,
     groups: Vec<Group>,
+    ribbons: Vec<Option<SpillRibbon>>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Phase {
+    InFlight,
+    /// These slices already carry their half-frame birth advance, but have not
+    /// been collected by another pool. Test the path from their emission too.
+    Newborn {
+        first: usize,
+    },
+}
+
+impl Phase {
+    fn start(self, mut p: Parcel, config: WaterConfig, dt: f64) -> Parcel {
+        if matches!(self, Self::Newborn { .. }) {
+            let half = dt as f32 * 0.5;
+            p.position -= p.velocity * half
+                + Vec2::new(0.0, (config.gravity * f64::from(half).powi(2) * 0.5) as f32);
+            p.velocity.y += config.gravity as f32 * half;
+        }
+        p
+    }
 }
 
 impl Scratch {
@@ -87,6 +113,7 @@ impl Scratch {
         Self {
             candidates: Vec::with_capacity(capacity),
             groups: Vec::with_capacity(capacity / 2),
+            ribbons: Vec::with_capacity(capacity),
         }
     }
 }
@@ -165,11 +192,18 @@ pub(crate) fn step(
     config: WaterConfig,
     dt: f64,
     tick: u64,
+    phase: Phase,
 ) {
     scratch.candidates.clear();
     scratch.groups.clear();
+    scratch.ribbons.clear();
+    scratch.ribbons.resize(parcels.len(), None);
     let mut directions = 0_u8;
-    for (index, (&p, s)) in parcels.iter().zip(spills.iter()).enumerate() {
+    let (first, sweep_dt) = match phase {
+        Phase::InFlight => (0, dt),
+        Phase::Newborn { first } => (first, dt * 0.5),
+    };
+    for (index, (&p, s)) in parcels.iter().zip(spills.iter()).enumerate().skip(first) {
         let Some(outlet) = s.and_then(|s| s.source.outlet_id()) else {
             continue;
         };
@@ -177,9 +211,18 @@ pub(crate) fn step(
             continue;
         }
         directions |= if p.velocity.x > 0.0 { 1 } else { 2 };
-        scratch
-            .candidates
-            .push(footprint(index, outlet, p, config, dt));
+        let start = phase.start(p, config, dt);
+        let mut candidate = footprint(index, outlet, start, config, sweep_dt);
+        if let Some(spill) = s.filter(|s| s.tail.material_offset.is_some())
+            && let Some(ribbon) = spill.ribbon(&p)
+        {
+            let ribbon = ribbon.translated(start.position - p.position);
+            let travel = start.velocity * sweep_dt as f32
+                + Vec2::new(0.0, (-0.5 * config.gravity * sweep_dt * sweep_dt) as f32);
+            (candidate.min, candidate.max) = geometry::bounds(&ribbon, travel);
+            scratch.ribbons[index] = Some(ribbon);
+        }
+        scratch.candidates.push(candidate);
     }
     if directions != 3 {
         return;
@@ -199,6 +242,7 @@ pub(crate) fn step(
             continue;
         }
         let pa = parcels[a.index];
+        let start_a = phase.start(pa, config, dt);
         for &b in &scratch.candidates[i + 1..] {
             if b.min.y > a.max.y {
                 break;
@@ -207,23 +251,40 @@ pub(crate) fn step(
                 continue;
             }
             let pb = parcels[b.index];
+            let start_b = phase.start(pb, config, dt);
             if pa.velocity.x * pb.velocity.x >= 0.0
-                || (pb.position.x - pa.position.x) * (pb.velocity.x - pa.velocity.x) > 0.0
+                || (start_b.position.x - start_a.position.x)
+                    * (start_b.velocity.x - start_a.velocity.x)
+                    > 0.0
                 || pa.horizontal_bounds != pb.horizontal_bounds
             {
                 continue;
             }
             stats.checks += 1;
-            if !swept_overlap(a, b, pa, pb, dt) {
+            let (contact, shape_time) = match (&scratch.ribbons[a.index], &scratch.ribbons[b.index])
+            {
+                (Some(ra), Some(rb)) => {
+                    let time =
+                        geometry::contact(ra, rb, start_b.velocity - start_a.velocity, sweep_dt);
+                    let elapsed = if matches!(phase, Phase::Newborn { .. }) {
+                        sweep_dt
+                    } else {
+                        0.0
+                    };
+                    (time.is_some(), time.map(|t| t - elapsed))
+                }
+                _ => (swept_overlap(a, b, start_a, start_b, sweep_dt), None),
+            };
+            if !contact {
                 continue;
             }
-            // Mixing replaces the two centers with their weighted mean before
-            // advection. Do not move that volume through intervening scenery;
+            // Mixing replaces the two centers with their weighted mean.
+            // Do not move that volume through intervening scenery;
             // the later wall sweep cannot recover each source's side of a wall.
-            if solids
-                .iter()
-                .any(|solid| solid.blocks_segment(pa.position, pb.position))
-            {
+            if solids.iter().any(|solid| {
+                solid.blocks_segment(pa.position, pb.position)
+                    || solid.blocks_segment(start_a.position, start_b.position)
+            }) {
                 continue;
             }
             consumed[a.index] = true;
@@ -255,6 +316,8 @@ pub(crate) fn step(
                 &mut scratch.groups[i]
             } else {
                 scratch.groups.push(Group {
+                    sheet: config.retain_spill_shapes.then(Sheet::new),
+                    deep: false,
                     outlets,
                     contact_min,
                     contact_max,
@@ -280,6 +343,23 @@ pub(crate) fn step(
                 group.contact_max.x.min(contact_max.x),
                 group.contact_max.y.min(contact_max.y),
             );
+            group.deep |= a.half_width > 2.0 * (pa.volume as f32).sqrt()
+                && b.half_width > 2.0 * (pb.volume as f32).sqrt();
+            let pair_velocity = (pa.velocity * pa.volume as f32 + pb.velocity * pb.volume as f32)
+                / (pa.volume + pb.volume) as f32;
+            for (p, index) in [(pa, a.index), (pb, b.index)] {
+                group.sheet = group.sheet.and_then(|mut sheet| {
+                    let mut ribbon = spills[index]?.ribbon(&p)?;
+                    if let Some(time) = shape_time {
+                        // Resolve the material at contact, not at the start of
+                        // the sweep. Relative motion before impact closes the
+                        // gap; subtracting the mean keeps the parcel's COM.
+                        ribbon = ribbon.translated((p.velocity - pair_velocity) * time as f32);
+                    }
+                    sheet.append(ribbon, p.volume)?;
+                    Some(sheet)
+                });
+            }
             group.add(
                 pa,
                 a.outlet,
@@ -349,8 +429,9 @@ pub(crate) fn step(
             continue;
         }
         // Inelastic center-of-mass replacement preserves volume and momentum,
-        // dissipating relative motion. The common ballistic step follows. A
-        // predicted contact may therefore be resolved up to one tick early.
+        // dissipating relative motion. In-flight water advances afterward;
+        // newborn water already carries its half-frame advance. A predicted
+        // contact may be resolved up to one sweep interval early.
         let source = SpillSource::Junction {
             outlets: group.outlets,
         };
@@ -358,6 +439,7 @@ pub(crate) fn step(
             position: position - velocity * (duration * 0.5) as f32,
             velocity,
             flow: group.volume / duration,
+            material_offset: None,
         };
         let previous = spills
             .iter()
@@ -406,12 +488,17 @@ pub(crate) fn step(
             }
         };
         parcels.push(parcel);
-        spills.push(Some(Spill {
+        let mut spill = Spill {
+            sheet: None,
             source,
             tick,
             upstream_end: group.contiguous().then_some(group.upstream_last),
             tail,
             head,
-        }));
+        };
+        if group.deep {
+            spill.sheet = group.sheet.map(|s| s.anchored(position));
+        }
+        spills.push(Some(spill));
     }
 }

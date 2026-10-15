@@ -9,8 +9,10 @@ fn compressed_junction_with_wide_shared_faces_uses_compact_fallback() {
         position: Vec2::ZERO,
         velocity: Vec2::new(100.0, -80.0),
         flow: 9000.0,
+        material_offset: None,
     };
     let spill = Spill {
+        sheet: None,
         upstream_end: None,
         source: SpillSource::Junction { outlets: [1, 2] },
         tick: 0,
