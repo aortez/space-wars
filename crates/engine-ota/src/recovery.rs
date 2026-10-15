@@ -163,6 +163,16 @@ pub struct Transaction {
     pub failure: Option<FailureReason>,
 }
 
+/// A successfully committed tryboot remains a tryboot in the running kernel
+/// until the next reset. Retain that exact good boot across a later transaction.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GoodBoot {
+    boot_id: String,
+    trial_id: Sha256,
+    payload: Sha256,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveryRecord {
@@ -170,6 +180,7 @@ pub struct RecoveryRecord {
     binding: BootBinding,
     good: SlotImage,
     retained_good: Option<SlotImage>,
+    good_boot: Option<GoodBoot>,
     highest_attempted_generation: u64,
     sequence: u64,
     failures: BTreeMap<Sha256, FailedImage>,
@@ -236,6 +247,7 @@ impl RecoveryRecord {
             highest_attempted_generation: good.generation,
             good,
             retained_good: None,
+            good_boot: None,
             sequence: 0,
             failures: BTreeMap::new(),
             transaction: None,
@@ -250,6 +262,12 @@ impl RecoveryRecord {
             || !self.good.valid()
             || self.highest_attempted_generation < self.good.generation
             || self.failures.len() > MAX_FAILURES
+            || self.good_boot.as_ref().is_some_and(|good| {
+                !boot_id(&good.boot_id)
+                    || good.payload != self.good.payload
+                    || self.sequence == 0
+                    || self.transaction.is_none()
+            })
         {
             return Err(invalid);
         }
@@ -267,6 +285,15 @@ impl RecoveryRecord {
             }
         }
         if let Some(tx) = &self.transaction {
+            if let Some(good) = &self.good_boot {
+                if tx.phase == Phase::Committed {
+                    if tx.trial_boot_id.as_ref() != Some(&good.boot_id) || good.trial_id != tx.id {
+                        return Err(invalid);
+                    }
+                } else if good.trial_id == tx.id {
+                    return Err(invalid);
+                }
+            }
             if self.sequence == 0
                 || !tx.previous_good.valid()
                 || !tx.candidate.valid()
@@ -414,7 +441,7 @@ impl RecoveryRecord {
         explicit_retry: bool,
     ) -> Result<Plan> {
         self.check_boot(boot)?;
-        if !boot.normal(&self.good) {
+        if !self.runs_good(boot) {
             return Err(RecoveryError::BootMismatch);
         }
         if capability.binding != self.binding
@@ -472,6 +499,15 @@ impl RecoveryRecord {
         // The writer will overwrite this slot. Never continue advertising its
         // former content as a retained good image after granting write access.
         next.retained_good = None;
+        next.good_boot = if boot.tryboot {
+            Some(GoodBoot {
+                boot_id: boot.boot_id.clone(),
+                trial_id: boot.trial_id.ok_or(RecoveryError::BootMismatch)?,
+                payload: self.good.payload,
+            })
+        } else {
+            None
+        };
         next.highest_attempted_generation = next.highest_attempted_generation.max(image.generation);
         next.transaction = Some(Transaction {
             id,
@@ -505,7 +541,7 @@ impl RecoveryRecord {
     ) -> Result<Plan> {
         self.check_boot(boot)?;
         let tx = self.command(id, Phase::Writing)?;
-        if !boot.normal(&self.good) || boot.boot_id != tx.origin_boot_id {
+        if !self.runs_good(boot) || boot.boot_id != tx.origin_boot_id {
             return Err(RecoveryError::BootMismatch);
         }
         if payload != tx.candidate.payload || expanded != tx.candidate.expanded {
@@ -528,7 +564,7 @@ impl RecoveryRecord {
     pub fn trial_prepared(&self, id: Sha256, boot: &BootObservation) -> Result<Plan> {
         self.check_boot(boot)?;
         let tx = self.command(id, Phase::Prepared)?;
-        if !boot.normal(&self.good) || boot.boot_id != tx.origin_boot_id {
+        if !self.runs_good(boot) || boot.boot_id != tx.origin_boot_id {
             return Err(RecoveryError::BootMismatch);
         }
         let mut next = self.clone();
@@ -541,25 +577,20 @@ impl RecoveryRecord {
     pub fn reconcile(&self, boot: &BootObservation) -> Result<Plan> {
         self.check_boot(boot)?;
         let Some(tx) = &self.transaction else {
-            return if boot.normal(&self.good) {
+            return if self.runs_good(boot) {
                 self.clone().plan(self, Action::None)
             } else {
                 Err(RecoveryError::BootMismatch)
             };
         };
         if tx.phase.terminal() {
-            let just_committed = tx.phase == Phase::Committed
-                && tx.trial_boot_id.as_ref() == Some(&boot.boot_id)
-                && self.is_trial(tx, boot)
-                && boot.runs(&self.good)
-                && boot.default_slot == Some(self.good.slot);
-            return if boot.normal(&self.good) || just_committed {
+            return if self.runs_good(boot) {
                 self.clone().plan(self, Action::None)
             } else {
                 Err(RecoveryError::BootMismatch)
             };
         }
-        if boot.normal(&tx.previous_good) {
+        if self.runs_good(boot) {
             let reason = tx.failure.unwrap_or(match tx.phase {
                 Phase::Writing | Phase::Prepared => FailureReason::InterruptedBeforeTrial,
                 Phase::TrialRequested if boot.boot_id == tx.origin_boot_id => {
@@ -661,6 +692,15 @@ impl RecoveryRecord {
         let mut next = self.clone();
         next.retained_good = Some(tx.previous_good.clone());
         next.good = tx.candidate.clone();
+        next.good_boot = if boot.tryboot {
+            Some(GoodBoot {
+                boot_id: boot.boot_id.clone(),
+                trial_id: tx.id,
+                payload: tx.candidate.payload,
+            })
+        } else {
+            None
+        };
         next.transaction.as_mut().unwrap().phase = Phase::Committed;
         next.plan(self, Action::None)
     }
@@ -674,7 +714,7 @@ impl RecoveryRecord {
         if tx.phase.terminal() {
             return Err(RecoveryError::StaleCommand);
         }
-        let on_good = boot.normal(&tx.previous_good);
+        let on_good = self.runs_good(boot);
         if !on_good
             && (!self.is_trial(tx, boot)
                 || !matches!(boot.default_slot, Some(slot) if slot == tx.previous_good.slot || slot == tx.candidate.slot))
@@ -730,7 +770,7 @@ impl RecoveryRecord {
             Action::PrepareTrial { slot, transaction } => {
                 let tx = self.command(transaction, Phase::Prepared)?;
                 if slot != tx.candidate.slot
-                    || !boot.normal(&tx.previous_good)
+                    || !self.runs_good(boot)
                     || boot.boot_id != tx.origin_boot_id
                 {
                     return Err(RecoveryError::BootMismatch);
@@ -781,6 +821,33 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         Ok(())
+    }
+
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn watchdog_completion(&self, boot: &BootObservation) -> Result<Sha256> {
+        self.check_boot(boot)?;
+        if !boot.tryboot || !self.runs_good(boot) {
+            return Err(RecoveryError::BootMismatch);
+        }
+        boot.trial_id.ok_or(RecoveryError::BootMismatch)
+    }
+
+    fn runs_good(&self, boot: &BootObservation) -> bool {
+        if boot.normal(&self.good) {
+            return true;
+        }
+        if !boot.tryboot || !boot.runs(&self.good) || boot.default_slot != Some(self.good.slot) {
+            return false;
+        }
+        self.good_boot.as_ref().is_some_and(|good| {
+            good.boot_id == boot.boot_id
+                && Some(good.trial_id) == boot.trial_id
+                && good.payload == self.good.payload
+        }) || self.transaction.as_ref().is_some_and(|tx| {
+            tx.phase == Phase::Committed
+                && tx.trial_boot_id.as_ref() == Some(&boot.boot_id)
+                && self.is_trial(tx, boot)
+        })
     }
 
     fn is_trial(&self, tx: &Transaction, boot: &BootObservation) -> bool {
@@ -968,4 +1035,4 @@ pub(crate) fn boot_id(value: &str) -> bool {
 
 #[cfg(test)]
 #[path = "recovery_tests.rs"]
-mod tests;
+pub(crate) mod tests;

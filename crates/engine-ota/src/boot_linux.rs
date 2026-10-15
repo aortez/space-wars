@@ -1,5 +1,6 @@
 //! Fixed-path Linux boot evidence and journal-gated selector changes.
-//! This module does not reboot, open a watchdog or write a root partition.
+//! Watchdog completion is allowed only after a durably committed good boot.
+//! This module does not reboot or write a root partition.
 use crate::boot::{SlotRoots, kernel_build_id};
 use crate::boot_files::BootFiles;
 use crate::install_lock::InstallLock;
@@ -206,20 +207,12 @@ impl Runtime {
                 "loaded hardware profile differs from the selected supported profile",
             ));
         }
-        let trial_id = if self.tryboot {
-            let trial = selection
-                .trial
-                .ok_or_else(|| invalid("firmware reports a trial without a prepared selector"))?;
-            if trial.slot != self.layout.active {
-                return Err(invalid("trial selector disagrees with actual root"));
-            }
-            Some(trial.transaction)
-        } else {
-            None
-        };
-        files
-            .template()
-            .check_running(&roots, self.layout.active, trial_id, &self.command_line)?;
+        let trial_id = files.template().running_trial(
+            &roots,
+            self.layout.active,
+            self.tryboot,
+            &self.command_line,
+        )?;
         let mut profile = format!("spacewars-profile-v1\n{}\0", self.profile).into_bytes();
         profile.extend(files.asset(
             &format!("spacewars-profiles/{}.txt", self.profile),
@@ -321,6 +314,16 @@ impl<'a> BootController<'a> {
         }
         self.lock.check()?;
         self.boot.observe()
+    }
+
+    /// Read-only early-stage evidence; never opens the watchdog during health checks.
+    pub fn trial_watchdog(&self) -> Result<crate::EarlyWatchdog> {
+        crate::watchdog_linux::inspect(&self.observe()?.observation)
+    }
+
+    /// Disarm only after the journal and normal selector identify this good boot.
+    pub fn complete_watchdog(&self, journal: &RecoveryStore) -> Result<crate::WatchdogCompletion> {
+        crate::watchdog_linux::complete(self.lock, journal, &self.observe()?.observation)
     }
 
     pub fn apply(&mut self, journal: &RecoveryStore, action: &Action) -> Result<BootEvidence> {

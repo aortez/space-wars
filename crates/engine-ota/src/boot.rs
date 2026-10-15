@@ -281,6 +281,35 @@ impl BootCommandLine {
     }
 }
 
+impl BootCommandLine {
+    /// The mutable trial file may already describe a subsequent update. The
+    /// running transaction comes from firmware mode and the loaded command line.
+    pub fn running_trial(
+        &self,
+        roots: &SlotRoots,
+        slot: Slot,
+        tryboot: bool,
+        actual: &str,
+    ) -> Result<Option<Sha256>> {
+        if actual.len() > 16 * 1024 || !actual.is_ascii() || actual.contains('\0') {
+            return invalid("invalid running kernel command line");
+        }
+        let tokens: Vec<_> = actual
+            .split_ascii_whitespace()
+            .filter_map(|arg| arg.strip_prefix("spacewars.trial="))
+            .collect();
+        if tokens.len() != usize::from(tryboot) {
+            return invalid("firmware trial mode and loaded transaction disagree");
+        }
+        let trial = tokens
+            .first()
+            .map(|token| (*token).to_owned().try_into().map_err(failure))
+            .transpose()?;
+        self.check_running(roots, slot, trial, actual)?;
+        Ok(trial)
+    }
+}
+
 fn forbidden_argument(argument: &str) -> bool {
     matches!(
         argument.split('=').next(),

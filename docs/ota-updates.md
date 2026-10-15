@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health/identity evidence, early trial initramfs and Linux boot-selector adapter implemented; coordinator/watchdog handoff, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal, health/identity evidence, early trial initramfs, Linux boot selectors and watchdog completion implemented; coordinator integration, bootstrap and physical recovery qualification remain |
 | #264 | Shared lock implemented; verified inactive-root writer, operator-helper integration and data preservation remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -147,7 +147,7 @@ distinguish fixture execution from installed service/RTC qualification.
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
 of [#263](https://github.com/aortez/space-wars/issues/263). The Linux adapter below
 now applies journal-authorized boot-selector changes. The partition writer,
-running coordinator and watchdog handoff remain unconnected. The kiosk observer
+running coordinator and watchdog completion remain unconnected. The kiosk observer
 accepts the packaged image identity. Production installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
@@ -502,6 +502,39 @@ unchanged. No Pi boot files were edited, reboot requested or watchdog opened.
 [Source, test and probe evidence](data/ota-boot-linux-20261015.json) records these
 results. The adapter has no installation/reboot socket command and is not yet
 invoked by the running device service.
+
+### Repeated updates and watchdog completion
+
+A committed trial retains the firmware tryboot flag and original command line
+until reset. The journal retains that exact successful boot so it can start a
+later update without an extra reboot. Running trial identity comes from the
+loaded command line; replacing the next trial selector cannot change it.
+Interruption during the later update still quarantines the new attempt.
+
+Layout inspection selects the mount ID of an actually opened directory, using
+`/proc/self/fdinfo`, rather than requiring one mount-table entry for its path.
+This supports systemd's stacked bind mounts while retaining device, filesystem,
+full-partition and inactive-root checks. All mount records, including covered
+ones, are checked for a mounted inactive slot.
+
+`BootController::trial_watchdog` only reads the private early record. It never
+opens the watchdog. `complete_watchdog` requires the durable journal and normal
+selector to identify the current good trial boot. It checks the early token,
+boot ID and 210-second allowance, then opens the fixed BCM2835 device and uses
+an explicit disable ioctl. Driver, timeout or disable errors do not record
+success. A private completion record makes repeated calls on the same boot
+idempotent, including service restart days after promotion. Failed or unproven
+trials cannot open, refresh or stop the watchdog through this adapter.
+
+The 60 unit and 22 integration tests pass on the host, and all 60 unit tests
+pass unprivileged on the Pi 5. A separately invoked host test creates real
+stacked mounts in a private user/mount namespace and verifies the visible
+mount selection. Scoped Clippy, Rust 1.89 and AArch64 compilation pass. The
+updated read-only layout probe recognizes the Pi 5's existing B root. These
+checks use temporary files and mocked watchdog calls; no physical watchdog was
+opened and the Pi boot ID is unchanged. The coordinator and supervised physical
+qualification remain outstanding.
+[Source and test evidence](data/ota-watchdog-completion-20261015.json)
 
 ## Signed feed contract
 

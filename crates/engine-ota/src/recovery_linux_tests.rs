@@ -22,7 +22,24 @@ fn mounts(root: u32) -> Vec<Mount> {
 }
 
 fn layout(partitions: [Partition; 4], mounts: &[Mount]) -> Result<DiskLayout> {
-    validate_layout("sda".into(), device(0), 100_000, partitions, mounts)
+    validate_layout(
+        "sda".into(),
+        device(0),
+        100_000,
+        partitions,
+        mounts,
+        views(mounts),
+    )
+}
+
+fn views(mounts: &[Mount]) -> [MountView; 3] {
+    [20, 21, 22].map(|id| MountView {
+        id,
+        device: mounts
+            .iter()
+            .find(|mount| mount.id == id)
+            .map_or(device(0), |mount| mount.device),
+    })
 }
 
 #[test]
@@ -102,6 +119,7 @@ fn layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid
         100_000,
         parts.clone(),
         &mounts,
+        views(&mounts),
     )
     .unwrap();
     assert_eq!(original, changed.layout_id);
@@ -116,7 +134,8 @@ fn layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid
             },
             100_000,
             parts.clone(),
-            &mounts
+            &mounts,
+            views(&mounts)
         )
         .unwrap()
         .layout_id
@@ -133,7 +152,8 @@ fn layout_identity_survives_device_enumeration_but_changes_with_geometry_or_uuid
             },
             100_000,
             parts,
-            &mounts
+            &mounts,
+            views(&mounts)
         )
         .unwrap()
         .layout_id
@@ -206,4 +226,182 @@ fn cloned_disk_uuid_cannot_hide_behind_the_single_udev_alias() {
     let mut wrong_device = records;
     wrong_device[1].0 = device(18);
     assert!(check_uuid_records(&parts, &wrong_device).is_err());
+}
+
+#[test]
+fn visible_mount_id_handles_service_bind_mounts_without_hiding_inactive_roots() {
+    let mut records = mounts(2);
+    let mut observed = views(&records);
+    let mut visible_boot = records[1].clone();
+    visible_boot.id = 23;
+    observed[1].id = 23;
+    records.push(visible_boot);
+    let good = validate_layout(
+        "sda".into(),
+        device(0),
+        100_000,
+        partitions("sda"),
+        &records,
+        observed,
+    )
+    .unwrap();
+    assert_eq!(good.active, Slot::A);
+    // Table order is not visibility evidence.
+    records.reverse();
+    validate_layout(
+        "sda".into(),
+        device(0),
+        100_000,
+        partitions("sda"),
+        &records,
+        observed,
+    )
+    .unwrap();
+    let mut absent = observed;
+    absent[1].id = 999;
+    assert!(
+        validate_layout(
+            "sda".into(),
+            device(0),
+            100_000,
+            partitions("sda"),
+            &records,
+            absent
+        )
+        .is_err()
+    );
+    // A covered mount still pins its block device and must prevent writing it.
+    records
+        .iter_mut()
+        .find(|mount| mount.id == 21)
+        .unwrap()
+        .device = device(3);
+    assert!(
+        validate_layout(
+            "sda".into(),
+            device(0),
+            100_000,
+            partitions("sda"),
+            &records,
+            observed
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn opened_directory_mount_id_is_kernel_evidence_and_rejects_malformed_records() {
+    let directory = tempfile::tempdir().unwrap();
+    let opened = OpenedMount::open(directory.path()).unwrap();
+    let records =
+        parse_mountinfo(&bounded_text(Path::new("/proc/self/mountinfo"), 1024 * 1024).unwrap())
+            .unwrap();
+    let matched: Vec<_> = records
+        .iter()
+        .filter(|mount| mount.id == opened.view.id)
+        .collect();
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0].device, opened.view.device);
+    for invalid in [
+        "",
+        "mnt_id: 0\n",
+        "mnt_id: -1\n",
+        "mnt_id: 20\nmnt_id: 21\n",
+        "mnt_id: 18446744073709551616\n",
+    ] {
+        assert!(fd_mount_id(invalid).is_err());
+    }
+    assert_eq!(
+        fd_mount_id("pos:\t0\nflags:\t02300000\nmnt_id:\t42\nino:\t99\n").unwrap(),
+        42
+    );
+}
+
+#[test]
+#[ignore = "requires unshare and mount with an unprivileged private user/mount namespace"]
+fn real_service_style_bind_mount_selects_the_opened_visible_mount() {
+    use std::process::Command;
+    const TEST: &str =
+        "recovery_linux::tests::real_service_style_bind_mount_selects_the_opened_visible_mount";
+    const PARENT_NS: &str = "SPACEWARS_OTA_MOUNT_FIXTURE_PARENT_NS";
+    let namespace = fs::read_link("/proc/self/ns/mnt").unwrap();
+    let Some(parent_namespace) = std::env::var_os(PARENT_NS) else {
+        let output = Command::new("unshare")
+            .args(["-Ur", "-m", "--"])
+            .arg(std::env::current_exe().unwrap())
+            .args(["--ignored", "--exact", TEST, "--nocapture"])
+            .env(PARENT_NS, namespace)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        return;
+    };
+    // Mounts are allowed only in the newly created namespace. This fixture
+    // never opens a block device or changes the caller's mount namespace.
+    assert_ne!(namespace.as_os_str(), parent_namespace);
+    assert!(
+        Command::new("mount")
+            .args(["--make-rprivate", "/"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let directory = tempfile::tempdir().unwrap();
+    struct Mounted<'a> {
+        path: &'a Path,
+        count: usize,
+    }
+    impl Drop for Mounted<'_> {
+        fn drop(&mut self) {
+            for _ in 0..self.count {
+                let _ = Command::new("umount").arg(self.path).status();
+            }
+        }
+    }
+    let mut mounted = Mounted {
+        path: directory.path(),
+        count: 0,
+    };
+    assert!(
+        Command::new("mount")
+            .args(["-t", "tmpfs", "-o", "mode=0700", "tmpfs"])
+            .arg(mounted.path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    mounted.count += 1;
+    assert!(
+        Command::new("mount")
+            .arg("--bind")
+            .arg(mounted.path)
+            .arg(mounted.path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    mounted.count += 1;
+    let opened = OpenedMount::open(mounted.path).unwrap();
+    let records =
+        parse_mountinfo(&bounded_text(Path::new("/proc/self/mountinfo"), 1024 * 1024).unwrap())
+            .unwrap();
+    let path = mounted.path.to_str().unwrap();
+    let same_path: Vec<_> = records
+        .iter()
+        .filter(|mount| mount.path == path)
+        .map(|mount| mount.id)
+        .collect();
+    assert_eq!(same_path.len(), 2);
+    let selected = visible_mount(&records, opened.view, path, "tmpfs").unwrap();
+    assert_eq!(selected.id, opened.view.id);
+    println!(
+        "{}",
+        serde_json::json!({"stacked_mount_ids":same_path,"opened_visible_mount_id":opened.view.id})
+    );
 }

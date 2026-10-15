@@ -4,9 +4,10 @@
 use crate::recovery::Slot;
 use crate::{Error, Result, Sha256};
 use serde::Serialize;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::Read;
-use std::os::unix::fs::{FileTypeExt, MetadataExt};
+use std::os::fd::AsRawFd;
+use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -85,10 +86,72 @@ impl DiskLayout {
 
 #[derive(Clone, Debug)]
 struct Mount {
+    id: u64,
     device: DeviceNumber,
     root: String,
     path: String,
     filesystem: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MountView {
+    id: u64,
+    device: DeviceNumber,
+}
+
+struct OpenedMount {
+    file: File,
+    view: MountView,
+}
+
+impl OpenedMount {
+    fn open(path: &Path) -> Result<Self> {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW)
+            .open(path)?;
+        let info = bounded_text(
+            &PathBuf::from(format!("/proc/self/fdinfo/{}", file.as_raw_fd())),
+            4096,
+        )?;
+        let id = fd_mount_id(&info)?;
+        let device = DeviceNumber::from_dev(file.metadata()?.dev());
+        Ok(Self {
+            file,
+            view: MountView { id, device },
+        })
+    }
+}
+
+fn required_mount_handles() -> Result<[OpenedMount; 3]> {
+    Ok([
+        OpenedMount::open(Path::new("/"))?,
+        OpenedMount::open(Path::new("/boot"))?,
+        OpenedMount::open(Path::new("/data"))?,
+    ])
+}
+
+fn fd_mount_id(info: &str) -> Result<u64> {
+    let mut ids = info.lines().filter_map(|line| line.strip_prefix("mnt_id:"));
+    let id = ids
+        .next()
+        .ok_or_else(|| invalid("kernel omitted the opened mount ID"))?
+        .trim();
+    if ids.next().is_some() {
+        return Err(invalid("ambiguous opened mount ID"));
+    }
+    mount_id(id)
+}
+
+fn mount_id(value: &str) -> Result<u64> {
+    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(invalid("invalid mount ID"));
+    }
+    value
+        .parse()
+        .ok()
+        .filter(|id| *id != 0)
+        .ok_or_else(|| invalid("invalid mount ID"))
 }
 
 /// Inspect /proc, sysfs and block-node metadata. Does not open a block device
@@ -96,14 +159,11 @@ struct Mount {
 pub fn inspect_layout() -> Result<DiskLayout> {
     let mountinfo = bounded_text(Path::new("/proc/self/mountinfo"), 1024 * 1024)?;
     let mounts = parse_mountinfo(&mountinfo)?;
-    let root_mount = exact_mount(&mounts, "/", "ext4")?;
-    let boot_mount = exact_mount(&mounts, "/boot", "vfat")?;
-    let data_mount = exact_mount(&mounts, "/data", "ext4")?;
-    for mount in [root_mount, boot_mount, data_mount] {
-        if DeviceNumber::from_dev(fs::metadata(&mount.path)?.dev()) != mount.device {
-            return Err(invalid("mount changed during root discovery"));
-        }
-    }
+    let opened = required_mount_handles()?;
+    let views = opened.each_ref().map(|mount| mount.view);
+    let root_mount = visible_mount(&mounts, views[0], "/", "ext4")?;
+    visible_mount(&mounts, views[1], "/boot", "vfat")?;
+    visible_mount(&mounts, views[2], "/data", "ext4")?;
     let root_argument = root_argument(&bounded_text(Path::new("/proc/cmdline"), 16 * 1024)?)?;
     let root_node = root_node(&root_argument)?;
     if block_number(&root_node)? != root_mount.device {
@@ -161,7 +221,21 @@ pub fn inspect_layout() -> Result<DiskLayout> {
     {
         return Err(invalid("mounts or root changed during inspection"));
     }
-    validate_layout(disk_name, disk_device, disk_sectors, partitions, &mounts)
+    for (before, after) in opened.iter().zip(required_mount_handles()?) {
+        if before.view != after.view
+            || before.file.metadata()?.ino() != after.file.metadata()?.ino()
+        {
+            return Err(invalid("visible mount changed during root discovery"));
+        }
+    }
+    validate_layout(
+        disk_name,
+        disk_device,
+        disk_sectors,
+        partitions,
+        &mounts,
+        views,
+    )
 }
 
 fn udev_partition_ids() -> Result<Vec<(DeviceNumber, String)>> {
@@ -220,10 +294,11 @@ fn validate_layout(
     disk_sectors: u64,
     partitions: [Partition; 4],
     mounts: &[Mount],
+    views: [MountView; 3],
 ) -> Result<DiskLayout> {
-    let root = exact_mount(mounts, "/", "ext4")?;
-    let boot = exact_mount(mounts, "/boot", "vfat")?;
-    let data = exact_mount(mounts, "/data", "ext4")?;
+    let root = visible_mount(mounts, views[0], "/", "ext4")?;
+    let boot = visible_mount(mounts, views[1], "/boot", "vfat")?;
+    let data = visible_mount(mounts, views[2], "/data", "ext4")?;
     let mut previous_end = 0;
     for (index, partition) in partitions.iter().enumerate() {
         let end = partition
@@ -284,14 +359,24 @@ fn validate_layout(
     })
 }
 
-fn exact_mount<'a>(mounts: &'a [Mount], path: &str, filesystem: &str) -> Result<&'a Mount> {
-    let mut matches = mounts.iter().filter(|mount| mount.path == path);
+fn visible_mount<'a>(
+    mounts: &'a [Mount],
+    view: MountView,
+    path: &str,
+    filesystem: &str,
+) -> Result<&'a Mount> {
+    let mut matches = mounts.iter().filter(|mount| mount.id == view.id);
     let mount = matches
         .next()
         .ok_or_else(|| invalid("required filesystem is not mounted"))?;
-    if matches.next().is_some() || mount.filesystem != filesystem || mount.root != "/" {
+    if matches.next().is_some()
+        || mount.path != path
+        || mount.device != view.device
+        || mount.filesystem != filesystem
+        || mount.root != "/"
+    {
         return Err(invalid(
-            "ambiguous, bind-mounted or unsupported required filesystem",
+            "ambiguous, partial, replaced or unsupported required filesystem",
         ));
     }
     Ok(mount)
@@ -312,6 +397,7 @@ fn parse_mountinfo(text: &str) -> Result<Vec<Mount>> {
             return Err(invalid("malformed mountinfo"));
         }
         mounts.push(Mount {
+            id: mount_id(fields[0])?,
             device: DeviceNumber::parse(fields[2])?,
             root: fields[3].into(),
             path: fields[4].into(),

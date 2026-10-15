@@ -149,7 +149,7 @@ fn healthy(record: &RecoveryRecord, boot: &mut BootObservation) -> HealthProof {
         .unwrap()
 }
 
-fn promoting() -> (RecoveryRecord, BootObservation) {
+pub(crate) fn promoting() -> (RecoveryRecord, BootObservation) {
     let (record, mut boot) = trial();
     let proof = healthy(&record, &mut boot);
     let plan = record.health_confirmed(proof, &boot).unwrap();
@@ -507,6 +507,105 @@ fn next_update_stops_advertising_retained_slot_before_overwriting_it() {
         plan.action,
         Action::WriteInactive { slot: Slot::A, .. }
     ));
+}
+
+#[test]
+fn subsequent_update_works_from_the_committed_trial_without_an_extra_normal_reboot() {
+    let (record, mut boot) = promoting();
+    boot.default_slot = Some(Slot::B);
+    let committed = record.finish_promotion(&boot).unwrap().record;
+    let original_trial = boot.trial_id;
+    boot.uptime_ms += 86_400_000;
+    let (_, _, cap) = baseline();
+    let next_image = descriptor(3);
+    let writing = reopen(&committed)
+        .begin_descriptor(&next_image, &boot, &cap, false)
+        .unwrap()
+        .record;
+    let id = writing.transaction().unwrap().id;
+    assert_ne!(Some(id), original_trial);
+    let prepared = reopen(&writing)
+        .written(
+            id,
+            next_image.compressed.sha256,
+            next_image.expanded.sha256,
+            &boot,
+        )
+        .unwrap();
+    assert_eq!(
+        prepared
+            .record
+            .selection_change(&prepared.action, &boot)
+            .unwrap(),
+        (Slot::A, Some(id))
+    );
+    let requested = prepared.record.trial_prepared(id, &boot).unwrap().record;
+    // A service restart while still on the previous good boot quarantines the
+    // interrupted attempt; it must not confuse the two distinct trial tokens.
+    let interrupted = reopen(&requested).reconcile(&boot).unwrap().record;
+    assert_eq!(interrupted.transaction().unwrap().phase, Phase::RolledBack);
+    assert_eq!(interrupted.good().slot, Slot::B);
+    interrupted.reconcile(&boot).unwrap();
+
+    boot.boot_id = NEXT_BOOT.into();
+    boot.uptime_ms = 20_000;
+    boot.actual_slot = Some(Slot::A);
+    boot.actual_build_id = Some("build-3".into());
+    boot.trial_id = Some(id);
+    let observing = reopen(&requested).reconcile(&boot).unwrap().record;
+    let mut health = HealthMonitor::new(&observing, &boot).unwrap();
+    let mut proof = None;
+    for ms in (boot.uptime_ms..=boot.uptime_ms + HEALTH_WINDOW_MS).step_by(2000) {
+        let mut reading = sample(ms);
+        reading.build_id = "build-3".into();
+        proof = health.observe(Some(reading)).unwrap();
+    }
+    boot.uptime_ms += HEALTH_WINDOW_MS;
+    let promoting = observing
+        .health_confirmed(proof.unwrap(), &boot)
+        .unwrap()
+        .record;
+    boot.default_slot = Some(Slot::A);
+    let committed = promoting.finish_promotion(&boot).unwrap().record;
+    assert_eq!(committed.good().slot, Slot::A);
+    assert_eq!(committed.retained_good().unwrap().slot, Slot::B);
+    let third = reopen(&committed)
+        .begin_descriptor(&descriptor(4), &boot, &cap, false)
+        .unwrap();
+    assert!(matches!(
+        third.action,
+        Action::WriteInactive { slot: Slot::B, .. }
+    ));
+}
+
+#[test]
+fn committed_trial_context_cannot_transfer_to_another_boot_token_or_payload() {
+    let (record, mut boot) = promoting();
+    boot.default_slot = Some(Slot::B);
+    let committed = record.finish_promotion(&boot).unwrap().record;
+    let (_, _, cap) = baseline();
+    for fault in 0..3 {
+        let mut changed = boot.clone();
+        match fault {
+            0 => changed.boot_id = NEXT_BOOT.into(),
+            1 => changed.trial_id = Some(digest("unrelated trial")),
+            _ => changed.actual_build_id = Some("another build".into()),
+        }
+        assert!(
+            committed
+                .begin_descriptor(&descriptor(3), &changed, &cap, false)
+                .is_err()
+        );
+    }
+    let mut corrupt = committed.clone();
+    corrupt.good_boot.as_mut().unwrap().payload = digest("unrelated payload");
+    assert!(corrupt.validate().is_err());
+    let mut corrupt = committed.clone();
+    corrupt.good_boot.as_mut().unwrap().trial_id = digest("unrelated trial");
+    assert!(corrupt.validate().is_err());
+    let mut corrupt = committed;
+    corrupt.transaction = None;
+    assert!(corrupt.validate().is_err());
 }
 
 #[test]

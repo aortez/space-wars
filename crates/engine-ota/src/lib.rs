@@ -15,6 +15,10 @@ mod image_identity;
 pub mod install_lock;
 #[cfg(target_os = "linux")]
 mod owned_fs;
+#[cfg(target_os = "linux")]
+mod watchdog_linux;
+#[cfg(target_os = "linux")]
+pub use watchdog_linux::{EarlyWatchdog, WatchdogCompletion};
 pub mod recovery;
 #[cfg(target_os = "linux")]
 pub mod recovery_linux;

@@ -140,6 +140,23 @@ fn disk_files_cannot_substitute_for_loaded_kernel_profile_or_firmware_trial_evid
     assert_eq!(trial.observation.actual_slot, Some(Slot::B));
     assert_eq!(trial.observation.default_slot, Some(Slot::A));
     assert_eq!(trial.observation.trial_id, Some(id));
+    let next_id = Sha256::digest(b"later update prepared while this boot is still running");
+    files
+        .select(&roots(), Slot::A, Some(next_id), |_| Ok(()))
+        .unwrap();
+    assert_eq!(
+        changed.evidence(&files).unwrap().observation.trial_id,
+        Some(id)
+    );
+    assert_eq!(
+        files
+            .selections(&roots())
+            .unwrap()
+            .trial
+            .unwrap()
+            .transaction,
+        next_id
+    );
     changed.tryboot = false;
     assert!(changed.evidence(&files).is_err());
     fs::write(
