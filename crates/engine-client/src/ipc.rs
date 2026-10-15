@@ -1408,6 +1408,8 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         network: window.get_network_visible(),
         autostart: window.get_autostart_settings_visible(),
         launcher: window.get_launcher_visible(),
+        training: window.get_training_visible(),
+        genomes: window.get_genomes_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
         touch_test: window.get_touch_test_visible(),
@@ -1422,6 +1424,21 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            genome_controls: if window.get_genomes_visible() {
+                crate::genome_controls::inventory(window)
+            } else {
+                Vec::new()
+            },
+            genome_selected: crate::genome_controls::selected_id(window).into(),
+            genome_error: non_empty(window.get_genomes_error().as_str()),
+            training_controls: if window.get_training_visible() {
+                crate::training_controls::inventory(window)
+            } else {
+                Vec::new()
+            },
+            training_selected: crate::training_controls::selected_id(window).into(),
+            training_error: non_empty(window.get_training_error().as_str()),
+            training_status: window.get_training_status().to_string(),
             scoreboard_controls: crate::scoreboard::inventory(window),
             font_controls: if window.get_clock_fonts_visible() {
                 crate::clock_fonts::inventory(window)

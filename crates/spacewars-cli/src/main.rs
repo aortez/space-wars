@@ -175,6 +175,10 @@ enum UiScreenArg {
     LauncherBusy,
     #[value(name = "launcher.main")]
     LauncherMain,
+    #[value(name = "launcher.genomes")]
+    LauncherGenomes,
+    #[value(name = "launcher.training")]
+    LauncherTraining,
     #[value(name = "launcher.sound")]
     LauncherSound,
     #[value(name = "launcher.info")]
@@ -222,6 +226,8 @@ impl From<UiScreenArg> for UiScreen {
         match screen {
             UiScreenArg::LauncherBusy => Self::LauncherBusy,
             UiScreenArg::LauncherMain => Self::LauncherMain,
+            UiScreenArg::LauncherGenomes => Self::LauncherGenomes,
+            UiScreenArg::LauncherTraining => Self::LauncherTraining,
             UiScreenArg::LauncherSound => Self::LauncherSound,
             UiScreenArg::LauncherInfo => Self::LauncherInfo,
             UiScreenArg::LauncherAutostart => Self::LauncherAutostart,

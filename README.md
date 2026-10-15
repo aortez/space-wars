@@ -500,6 +500,25 @@ successful response includes the new scenario revision.
 
 ## Run headless AI episodes
 
+The Training view, genome browser design, and evolutionary experiments
+are described in the [evolutionary training plan](docs/design/evolutionary-training.md).
+The [local diagnostic prototype](docs/evolution-diagnostic.md) provides a tiny
+line mover, loadable models, tick traces, seeded evolution, and checkpoint/resume
+commands. The [material ship-arrival fixture](docs/ship-arrival-diagnostic.md)
+adds real-physics stationary/moving cases and a reference controller through the
+same interfaces. The [first ship-training experiment](docs/ship-training-experiment.md)
+adds a fixed neural model recipe, three bounded runs, and separate evaluation
+cases. One retained genome passes the 11 declared cases and
+[85/96 fresh qualification cases](docs/ship-arrival-qualification.md). The
+[seeded mixed curriculum](docs/ship-mixed-training-experiment.md) produces three
+finalists that each retain all 107 previous cases and pass 48/48 new cases.
+The launcher now includes [local Training setup and progress](docs/managed-training.md),
+with one managed worker, automatic checkpoints, pause/stop/resume, and saved
+genome export. The [guidance genome browser](docs/genome-browser.md) adds saved
+components, stationary/moving practice trials with trajectory previews, and
+selection as a seed for a new training run. General match assignment remains planned.
+The commands below run the existing rule-bot evaluations.
+
 `engine-agent` embeds Spacewars directly and runs fixed-timestep controller
 episodes without a window, renderer, audio, or realtime pacing. Its defaults
 match the interactive AI setup: an idle Player 1 against the rule bot in the

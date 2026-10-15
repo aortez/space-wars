@@ -34,6 +34,10 @@ pub enum UiScreen {
     LauncherBusy,
     #[serde(rename = "launcher.main")]
     LauncherMain,
+    #[serde(rename = "launcher.genomes")]
+    LauncherGenomes,
+    #[serde(rename = "launcher.training")]
+    LauncherTraining,
     #[serde(rename = "launcher.sound")]
     LauncherSound,
     #[serde(rename = "launcher.info")]
@@ -81,6 +85,8 @@ impl UiScreen {
         match self {
             Self::LauncherBusy => "launcher.busy",
             Self::LauncherMain => "launcher.main",
+            Self::LauncherGenomes => "launcher.genomes",
+            Self::LauncherTraining => "launcher.training",
             Self::LauncherSound => "launcher.sound",
             Self::LauncherInfo => "launcher.info",
             Self::LauncherAutostart => "launcher.autostart",
@@ -109,6 +115,8 @@ impl UiScreen {
             self,
             Self::LauncherBusy
                 | Self::LauncherMain
+                | Self::LauncherGenomes
+                | Self::LauncherTraining
                 | Self::LauncherSound
                 | Self::LauncherInfo
                 | Self::LauncherAutostart
@@ -599,6 +607,8 @@ mod tests {
         let cases = [
             (UiScreen::LauncherBusy, "launcher.busy"),
             (UiScreen::LauncherMain, "launcher.main"),
+            (UiScreen::LauncherGenomes, "launcher.genomes"),
+            (UiScreen::LauncherTraining, "launcher.training"),
             (UiScreen::LauncherSound, "launcher.sound"),
             (UiScreen::LauncherInfo, "launcher.info"),
             (UiScreen::LauncherSettings, "launcher.settings"),

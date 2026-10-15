@@ -17,6 +17,7 @@ members = [
     "crates/engine-os-manager",
     "scenarios/clock",
     "scenarios/falling",
+    "scenarios/line-mover",
     "scenarios/nes",
     "scenarios/null",
     "scenarios/pizza",
@@ -74,6 +75,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Internal.
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
+engine-agent = { path = "crates/engine-agent" }
 engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
@@ -84,6 +86,7 @@ spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
 scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
+scenario-line-mover = { path = "scenarios/line-mover" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }

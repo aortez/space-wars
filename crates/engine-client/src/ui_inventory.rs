@@ -11,6 +11,8 @@ pub(crate) struct ScreenVisibility {
     pub(crate) controllers: bool,
     pub(crate) network: bool,
     pub(crate) launcher: bool,
+    pub(crate) training: bool,
+    pub(crate) genomes: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
     pub(crate) touch_test: bool,
@@ -27,7 +29,11 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.clock_fonts {
+        if visibility.genomes {
+            UiScreen::LauncherGenomes
+        } else if visibility.training {
+            UiScreen::LauncherTraining
+        } else if visibility.clock_fonts {
             UiScreen::LauncherClockFonts
         } else if visibility.sound && visibility.network {
             UiScreen::LauncherNetwork
@@ -73,6 +79,13 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) genome_controls: Vec<UiControl>,
+    pub(crate) genome_selected: String,
+    pub(crate) genome_error: Option<String>,
+    pub(crate) training_controls: Vec<UiControl>,
+    pub(crate) training_selected: String,
+    pub(crate) training_error: Option<String>,
+    pub(crate) training_status: String,
     pub(crate) scoreboard_controls: Vec<UiControl>,
     pub(crate) font_controls: Vec<UiControl>,
     pub(crate) font_focus: i32,
@@ -165,6 +178,32 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             error: None,
         },
         UiScreen::LauncherMain => launcher_main_inventory(context),
+        UiScreen::LauncherGenomes => UiInventory {
+            selected_control: Some(context.genome_selected.clone()),
+            controls: context.genome_controls.clone(),
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+                UiAction::Confirm,
+                UiAction::Back,
+            ],
+            error: context.genome_error.clone(),
+        },
+        UiScreen::LauncherTraining => UiInventory {
+            selected_control: Some(context.training_selected.clone()),
+            controls: context.training_controls.clone(),
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+                UiAction::Confirm,
+                UiAction::Back,
+            ],
+            error: context.training_error.clone(),
+        },
         UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
         UiScreen::LauncherNetwork | UiScreen::PauseNetwork => UiInventory {
             selected_control: context
@@ -378,6 +417,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.controls", "Controls", true),
             UiControl::new("launcher.sound", "App Settings", true),
             UiControl::new("launcher.quit", "Quit", true),
+            UiControl::new("launcher.genomes", "Genomes", true),
+            UiControl::new("launcher.training", "Training", true)
+                .with_value(context.training_status.clone()),
         ],
         actions: vec![
             UiAction::Up,
@@ -397,6 +439,12 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
         if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
+    }
+    if context.launcher_focus_index == 8 {
+        inventory.selected_control = Some("launcher.genomes".into());
+    }
+    if context.launcher_focus_index == 7 {
+        inventory.selected_control = Some("launcher.training".into());
     }
     inventory
 }
@@ -1166,6 +1214,22 @@ mod tests {
             (
                 ScreenVisibility {
                     launcher: true,
+                    genomes: true,
+                    ..Default::default()
+                },
+                UiScreen::LauncherGenomes,
+            ),
+            (
+                ScreenVisibility {
+                    launcher: true,
+                    training: true,
+                    ..Default::default()
+                },
+                UiScreen::LauncherTraining,
+            ),
+            (
+                ScreenVisibility {
+                    launcher: true,
                     ..Default::default()
                 },
                 UiScreen::LauncherMain,
@@ -1273,6 +1337,8 @@ mod tests {
                 game_over: true,
                 ingame_clock: true,
                 clock_fonts: false,
+                training: false,
+                genomes: false,
             }),
             UiScreen::LauncherTouchTest
         );
@@ -1336,6 +1402,8 @@ mod tests {
                 "launcher.controls",
                 "launcher.sound",
                 "launcher.quit",
+                "launcher.genomes",
+                "launcher.training",
             ]
         );
         assert!(!inventory.controls[2].enabled);

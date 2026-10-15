@@ -201,10 +201,12 @@ entry/exit context so Back has a meaningful destination. It need not become
 a fake physics scenario. The committed Device Info navigation was integrated before the overlapping
 menu edits; the other checkout remains untouched.
 
-Future training needs a different stop contract: returning to the launcher
-may detach a view or request a checkpoint rather than destroy a job. Define
-that contract when a training activity exists. A small extensible catalog now
-is sufficient; a general task scheduler is not part of this slice.
+The proposed [training job lifecycle](evolutionary-training.md#job-ownership-and-lifecycle)
+separates leaving the progress view from pausing or saving and stopping its job.
+The first [local Training implementation](../managed-training.md) suppresses
+idle automatic launch while its view is open or its worker is active. Leaving
+the view keeps the job running. Training is still not an automatic activity in
+the selector; a general task scheduler remains outside this slice.
 
 Saved shape:
 

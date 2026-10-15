@@ -5,6 +5,15 @@
 
 #![forbid(unsafe_code)]
 
+pub mod evolution;
+pub mod genome_library;
+pub mod line_diagnostic;
+pub mod ship_arrival;
+pub mod ship_curriculum;
+pub mod ship_qualification;
+pub mod ship_training;
+pub mod training_job;
+
 use std::{
     collections::BTreeMap,
     fmt,

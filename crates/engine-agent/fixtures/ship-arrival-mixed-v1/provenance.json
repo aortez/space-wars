@@ -1,0 +1,172 @@
+{
+  "experiment": "material_arrival_mixed_learning_v1",
+  "parent_genome_id": "6c0ef53fb27e190243c84903855544a2cb9b97f4f32c92499dd37e541bbc41fb",
+  "runtime": "diagnostic_v1/linux/x86_64/423faedc2d2f58b29f6fa687132df5381eabf91e240223a9f4854601cf87430d",
+  "source_archive_sha256": "9dfb502f609ced1c2bc1ceca012af5806bdd64e36433dfef8c92b8ccb63582be",
+  "manifest_sha256": "61af8a80534b6d906d7e7c14bcb485ad910c925a9adad2275b7cc0c187fd1063",
+  "runs": [
+    {
+      "seed": 1,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    },
+    {
+      "seed": 2,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    },
+    {
+      "seed": 3,
+      "population": 32,
+      "generations": 32,
+      "elites": 2,
+      "tournament_size": 3,
+      "mutation_probability": 0.05,
+      "mutation_scale": 0.15,
+      "initial_scale": 0.5,
+      "parameter_limit": 8.0
+    }
+  ],
+  "finalist_selection": "best_training_fitness_in_last_generation_per_seed_v1",
+  "fixtures": [
+    {
+      "file": "seed-1.json",
+      "seed": 1,
+      "genome_id": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+      "sha256": "a1d127eb9eb96f190616d5d3ee377490d5a06ac2023302c9eaeb27a971945199",
+      "training_fitness": {
+        "stationary_completed": 4,
+        "total": {
+          "completed": 12,
+          "position_points": 11927,
+          "velocity_points": 11914,
+          "spare_ticks": 6226
+        }
+      },
+      "partitions": {
+        "training": {
+          "arrived": 12,
+          "cases": 12
+        },
+        "original": {
+          "arrived": 11,
+          "cases": 11
+        },
+        "development": {
+          "arrived": 96,
+          "cases": 96
+        },
+        "fresh_stationary": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_moving": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_inward": {
+          "arrived": 16,
+          "cases": 16
+        }
+      },
+      "passed": true
+    },
+    {
+      "file": "seed-2.json",
+      "seed": 2,
+      "genome_id": "96124d0afeb69f7d5e61bc8c8b46e6b94260c0b1962197e1bde81e05ae3d9f9b",
+      "sha256": "f5e93bb69c2fc8514a4431e877bfa261879bba4b82fa2e4e0a99302e3930ce98",
+      "training_fitness": {
+        "stationary_completed": 4,
+        "total": {
+          "completed": 12,
+          "position_points": 11924,
+          "velocity_points": 11915,
+          "spare_ticks": 7370
+        }
+      },
+      "partitions": {
+        "training": {
+          "arrived": 12,
+          "cases": 12
+        },
+        "original": {
+          "arrived": 11,
+          "cases": 11
+        },
+        "development": {
+          "arrived": 96,
+          "cases": 96
+        },
+        "fresh_stationary": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_moving": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_inward": {
+          "arrived": 16,
+          "cases": 16
+        }
+      },
+      "passed": true
+    },
+    {
+      "file": "seed-3.json",
+      "seed": 3,
+      "genome_id": "7f878c6e0632673753a782d0ff251ad8635a317796b1d036a6862e6ac49c5b55",
+      "sha256": "647ea2c6c810d4288552c37f875632e10ad3648f53c6cc8d1f1ac595fdfc91af",
+      "training_fitness": {
+        "stationary_completed": 4,
+        "total": {
+          "completed": 12,
+          "position_points": 11902,
+          "velocity_points": 11925,
+          "spare_ticks": 8243
+        }
+      },
+      "partitions": {
+        "training": {
+          "arrived": 12,
+          "cases": 12
+        },
+        "original": {
+          "arrived": 11,
+          "cases": 11
+        },
+        "development": {
+          "arrived": 96,
+          "cases": 96
+        },
+        "fresh_stationary": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_moving": {
+          "arrived": 16,
+          "cases": 16
+        },
+        "fresh_inward": {
+          "arrived": 16,
+          "cases": 16
+        }
+      },
+      "passed": true
+    }
+  ],
+  "evidence_archive": "data/training-experiments/material-arrival-mixed-learning-v1-20261014.tar.gz"
+}

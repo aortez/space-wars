@@ -29,6 +29,22 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
+    if window.get_genomes_visible()
+        && crate::genome_controls::inventory(window)
+            .iter()
+            .any(|c| c.id == control_id && c.enabled)
+    {
+        window.invoke_genomes_command(control_id.into());
+        return true;
+    }
+    if window.get_training_visible()
+        && crate::training_controls::inventory(window)
+            .iter()
+            .any(|c| c.id == control_id && c.enabled)
+    {
+        window.invoke_training_command(control_id.into());
+        return true;
+    }
     if window.get_network_visible()
         && crate::network_controls::inventory(window)
             .iter()
@@ -130,6 +146,8 @@ fn activation_target(
         "launcher.controls" => launcher(3, UiAction::Confirm),
         "launcher.quit" => launcher(4, UiAction::Confirm),
         "launcher.sound" => launcher(5, UiAction::Confirm),
+        "launcher.training" => launcher(7, UiAction::Confirm),
+        "launcher.genomes" => launcher(8, UiAction::Confirm),
         "pause.sound" => ActivationTarget {
             focus: ActivationFocus::PauseSound,
             action: UiAction::Confirm,

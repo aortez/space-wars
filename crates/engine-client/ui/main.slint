@@ -4,6 +4,7 @@ export struct DeviceInfoRow { id: string, label: string, value: string }
 export struct ControllerRow { id: string, label: string }
 export struct NetworkRow { id: string, label: string, detail: string, badge: string, enabled: bool }
 export struct ScoreboardRow { player: string, controller: string, wins: string, losses: string, draws: string, won: bool }
+export struct TrainingPoint { best: float, median: float }
 
 component ScoreboardTable inherits Rectangle {
     in property <[ScoreboardRow]> rows;
@@ -474,6 +475,54 @@ export component MainWindow inherits Window {
     in property <string> scenario-error-text: "";
     in-out property <string> runtime-diagnostics: "No active scenario diagnostics.";
     in-out property <bool> launcher-visible: false;
+    in-out property <bool> genomes-visible: false;
+    in-out property <int> genomes-focus: 0;
+    in-out property <bool> genomes-moving: false;
+    in property <bool> genomes-busy: false;
+    in property <bool> genomes-compatible: false;
+    in property <bool> genomes-seedable: false;
+    in property <int> genomes-count: 0;
+    in property <string> genomes-label: "Reading library…";
+    in property <string> genomes-detail;
+    in property <string> genomes-id;
+    in property <string> genomes-error;
+    in property <string> genomes-warning;
+    in property <string> genomes-receipt;
+    in property <string> genomes-result: "Try this genome in a fixed arrival case. Each trial uses the named practice brain.";
+    in property <image> genomes-plot;
+    callback genomes-open();
+    callback genomes-command(string);
+    in-out property <string> training-seed-genome;
+    in-out property <string> training-seed-label: "Recipe default";
+    in-out property <bool> training-visible: false;
+    in property <bool> training-active: false;
+    in-out property <bool> training-setup: true;
+    in-out property <int> training-focus: 0;
+    in-out property <int> training-recipe: 0;
+    in-out property <int> training-population: 32;
+    in-out property <int> training-generations: 48;
+    in-out property <int> training-seed: 1;
+    in property <string> training-recipe-label: "Stationary";
+    in property <string> training-setup-detail;
+    in property <string> training-budget;
+    in property <string> training-status;
+    in property <string> training-status-code;
+    in property <string> training-snapshot;
+    in property <string> training-error;
+    in property <string> training-launcher-label: "Training";
+    in property <bool> training-has-job: false;
+    in property <bool> training-can-start: false;
+    in property <bool> training-can-pause: false;
+    in property <bool> training-can-resume: false;
+    in property <bool> training-can-stop: false;
+    in property <float> training-progress: 0;
+    in property <string> training-progress-label;
+    in property <string> training-run-label;
+    in property <string> training-best;
+    in property <string> training-saved;
+    in property <[TrainingPoint]> training-points;
+    callback training-open();
+    callback training-command(string);
     in property <bool> launcher-busy: false;
     in property <string> launcher-busy-title;
     in property <string> launcher-busy-stage;
@@ -726,8 +775,11 @@ export component MainWindow inherits Window {
     }
 
     changed launcher-visible => {
+        if (!root.launcher-visible) { root.training-visible = false; root.genomes-visible = false; }
         launcher-shortcuts.focus();
     }
+    changed genomes-visible => { launcher-shortcuts.focus(); }
+    changed training-visible => { launcher-shortcuts.focus(); }
 
     changed launcher-controls-visible => {
         if (root.launcher-visible) {
@@ -1703,7 +1755,7 @@ export component MainWindow inherits Window {
         }
 
 
-        if root.launcher-visible && !root.sound-visible: Rectangle {
+        if root.launcher-visible && !root.sound-visible && !root.training-visible && !root.genomes-visible: Rectangle {
             width: parent.width;
             height: parent.height;
             background: #050514;
@@ -1849,6 +1901,26 @@ export component MainWindow inherits Window {
                             root.launcher-focus-index = 4;
                             root.launcher-quit();
                         }
+                    }
+
+                    MenuButton {
+                        x: 112px;
+                        y: parent.height - 66px;
+                        width: (parent.width - 124px) / 2;
+                        height: 48px;
+                        text: root.training-launcher-label;
+                        selected: root.launcher-focus-index == 7;
+                        activated => { root.training-open(); }
+                    }
+
+                    MenuButton {
+                        x: 124px + (parent.width - 124px) / 2;
+                        y: parent.height - 66px;
+                        width: (parent.width - 124px) / 2;
+                        height: 48px;
+                        text: "Genomes";
+                        selected: root.launcher-focus-index == 8;
+                        activated => { root.genomes-open(); }
                     }
 
                     MenuButton {
@@ -2499,6 +2571,199 @@ export component MainWindow inherits Window {
                             root.launcher-start-game();
                         }
                     }
+                }
+            }
+        }
+    }
+
+    if root.genomes-visible && root.launcher-visible: Rectangle {
+        x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: "Genomes";
+            subtitle: "Ship pilot · Guidance components · Fixed practice brain";
+            hint: root.genomes-busy ? "Working in a separate world · Back leaves this view" : "Blue: ship path · Gold: target path · White: final ship position";
+            ChoiceRow {
+                x: 24px; y: 84px; width: parent.width - 48px; height: 44px;
+                label: "Genome"; label-fraction: 0.20; value: root.genomes-label;
+                enabled: !root.genomes-busy && root.genomes-count > 0; selected: root.genomes-focus == 0;
+                previous => { root.genomes-focus = 0; root.genomes-command("genomes.previous"); }
+                next => { root.genomes-focus = 0; root.genomes-command("genomes.next"); }
+            }
+            Text {
+                x: 24px; y: 136px; width: parent.width - 48px; height: 48px;
+                text: root.genomes-detail; color: #c7d0dc; font-size: 14px; wrap: word-wrap; overflow: elide;
+            }
+            ChoiceRow {
+                x: 24px; y: 192px; width: parent.width - 48px; height: 44px;
+                label: "Practice"; label-fraction: 0.25;
+                value: root.genomes-moving ? "Moving target" : "Stationary target";
+                enabled: !root.genomes-busy && root.genomes-compatible; selected: root.genomes-focus == 1;
+                previous => { root.genomes-focus = 1; root.genomes-command("genomes.practice.previous"); }
+                next => { root.genomes-focus = 1; root.genomes-command("genomes.practice.next"); }
+            }
+            Text {
+                x: 24px; y: 244px; width: parent.width - 48px; height: 44px;
+                text: root.genomes-error != "" ? root.genomes-error : !root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "" ? root.genomes-warning : root.genomes-result;
+                color: root.genomes-error != "" || (!root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "") ? #ffb0a0 : #80d8ff;
+                font-size: 14px; wrap: word-wrap; overflow: elide;
+            }
+            Image {
+                x: 24px; y: 292px; width: parent.width - 48px; height: 68px;
+                source: root.genomes-plot; image-fit: contain;
+            }
+            Rectangle {
+                x: 24px; y: parent.height - 80px; width: parent.width - 48px; height: 48px;
+                for label[index] in ["Try", "Use seed", "Refresh", "Back"]: MenuButton {
+                    x: index * (parent.width + 10px) / 4; y: 0px; width: (parent.width - 30px) / 4; height: parent.height;
+                    text: label; primary: index == 0; selected: root.genomes-focus == index + 2;
+                    enabled: index == 3 || (!root.genomes-busy && (index == 2 || (index == 0 ? root.genomes-compatible : root.genomes-seedable && root.training-can-start)));
+                    activated => { root.genomes-command(["genomes.try", "genomes.seed", "genomes.refresh", "genomes.back"][index]); }
+                }
+            }
+        }
+    }
+
+    if root.training-visible && root.launcher-visible: Rectangle {
+        x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: root.training-setup ? "Training · New run" : "Training";
+            subtitle: root.training-setup ? root.training-budget : root.training-run-label;
+            hint: root.training-setup ? "D-pad selects · Left / Right adjusts · A confirms" : "Back leaves this view · Job controls change the run";
+
+            if root.training-setup: Rectangle {
+                x: 24px; y: 84px; width: parent.width - 48px; height: parent.height - 180px;
+                for label[index] in ["Curriculum", "Population", "Generations", "Run seed"]: ChoiceRow {
+                    x: 0px; y: index * 52px; width: parent.width; height: 44px;
+                    label: label;
+                    value: index == 0 ? root.training-recipe-label : index == 1 ? root.training-population : index == 2 ? root.training-generations : root.training-seed;
+                    label-fraction: 0.30;
+                    enabled: root.training-can-start;
+                    selected: root.training-focus == index;
+                    previous => {
+                        root.training-focus = index;
+                        root.training-command("training." + ["recipe", "population", "generations", "seed"][index] + ".previous");
+                    }
+                    next => {
+                        root.training-focus = index;
+                        root.training-command("training." + ["recipe", "population", "generations", "seed"][index] + ".next");
+                    }
+                }
+                ChoiceRow {
+                    x: 0px; y: 208px; width: parent.width; height: 40px;
+                    label: "Initial genomes"; value: root.training-seed-label;
+                    label-fraction: 0.30; enabled: root.training-can-start;
+                    selected: root.training-focus == 4;
+                    previous => { root.training-focus = 4; root.training-command("training.initial.reset"); }
+                    next => { root.training-focus = 4; root.training-command("training.initial.reset"); }
+                }
+                Text {
+                    x: 0px; y: 252px; width: parent.width; height: 36px;
+                    text: root.training-error != "" ? root.training-error : root.training-setup-detail;
+                    color: root.training-error != "" ? #ffb0a0 : #c7d0dc;
+                    font-size: 14px; wrap: word-wrap; overflow: elide;
+                }
+            }
+
+            if !root.training-setup: Rectangle {
+                x: 24px; y: 84px; width: parent.width - 48px; height: parent.height - 180px;
+                Text {
+                    x: 0px; y: 0px; width: parent.width; height: 28px;
+                    text: root.training-status; color: root.training-error == "" ? #80d8ff : #ffb0a0;
+                    font-size: 20px; font-weight: 600; overflow: elide;
+                }
+                Text {
+                    x: 0px; y: 32px; width: parent.width; height: 24px;
+                    text: root.training-progress-label; color: #c7d0dc; font-size: 15px; overflow: elide;
+                }
+                Rectangle {
+                    x: 0px; y: 63px; width: parent.width; height: 10px; background: #26394d;
+                    Rectangle { x: 0px; y: 0px; width: parent.width * root.training-progress; height: parent.height; background: #80d8ff; }
+                }
+                Text {
+                    x: 0px; y: 84px; width: parent.width; height: root.training-error == "" ? 30px : 130px;
+                    text: root.training-error == "" ? root.training-best : root.training-error;
+                    color: root.training-error == "" ? #ffffff : #ffb0a0;
+                    font-size: root.training-error == "" ? 17px : 15px; wrap: word-wrap; overflow: elide;
+                }
+                if root.training-error == "": Rectangle {
+                    x: 0px; y: 126px; width: parent.width; height: 126px;
+                    Text {
+                        x: 0px; y: 0px; width: parent.width; height: 22px;
+                        text: "TRAINING ARRIVALS BY GENERATION"; color: #9fb4cc; font-size: 12px;
+                    }
+                    Rectangle {
+                        x: 0px; y: 26px; width: parent.width; height: 70px;
+                        background: #080f1c;
+                        for point[index] in root.training-points: Rectangle {
+                            y: 0px; x: index * parent.width / Math.max(1, root.training-points.length);
+                            width: parent.width / Math.max(1, root.training-points.length); height: parent.height;
+                            Rectangle {
+                                x: 0px; y: parent.height * (1 - point.best); width: Math.max(1px, parent.width * 0.5 - 1px);
+                                height: parent.height * point.best; background: #e9b65d;
+                            }
+                            Rectangle {
+                                x: parent.width * 0.5; y: parent.height * (1 - point.median);
+                                width: Math.max(1px, parent.width * 0.5 - 1px); height: parent.height * point.median; background: #80d8ff;
+                            }
+                        }
+                    }
+                    Text {
+                        x: 0px; y: 101px; width: parent.width; height: 22px;
+                        text: "Gold: selected best   Blue: median   ·   Training cases only";
+                        color: #9fb4cc; font-size: 12px; overflow: elide;
+                    }
+                }
+                Text {
+                    x: 0px; y: 256px; width: parent.width; height: 30px;
+                    text: root.training-saved; color: #c7d0dc; font-size: 13px; wrap: word-wrap; overflow: elide;
+                }
+            }
+
+            if root.training-setup: Rectangle {
+                x: 24px; y: parent.height - 80px; width: parent.width - 48px; height: 48px;
+                MenuButton {
+                    x: 0px; y: 0px; width: root.training-has-job ? (parent.width - 20px) / 3 : (parent.width - 10px) / 2; height: parent.height;
+                    text: "Start training"; primary: true; enabled: root.training-can-start;
+                    selected: root.training-focus == 5;
+                    activated => { root.training-command("training.start"); }
+                }
+                MenuButton {
+                    y: 0px; x: root.training-has-job ? (parent.width + 10px) / 3 : (parent.width + 10px) / 2;
+                    width: root.training-has-job ? (parent.width - 20px) / 3 : (parent.width - 10px) / 2; height: parent.height;
+                    text: "Back"; selected: root.training-focus == 6;
+                    activated => { root.training-command("training.back"); }
+                }
+                if root.training-has-job: MenuButton {
+                    y: 0px; x: 2 * (parent.width + 10px) / 3; width: (parent.width - 20px) / 3; height: parent.height;
+                    text: "View saved run"; selected: root.training-focus == 7;
+                    activated => { root.training-command("training.current"); }
+                }
+            }
+            if !root.training-setup: Rectangle {
+                x: 24px; y: parent.height - 80px; width: parent.width - 48px; height: 48px;
+                MenuButton {
+                    x: 0px; y: 0px; width: (parent.width - 30px) / 4; height: parent.height;
+                    text: root.training-can-resume ? "Resume" : "Pause";
+                    enabled: root.training-can-pause || root.training-can-resume;
+                    selected: root.training-focus == 0;
+                    activated => { root.training-command(root.training-can-resume ? "training.resume" : "training.pause"); }
+                }
+                MenuButton {
+                    y: 0px; x: (parent.width + 10px) / 4; width: (parent.width - 30px) / 4; height: parent.height;
+                    text: "Save and stop"; enabled: root.training-can-stop; selected: root.training-focus == 1;
+                    activated => { root.training-command("training.stop"); }
+                }
+                MenuButton {
+                    y: 0px; x: 2 * (parent.width + 10px) / 4; width: (parent.width - 30px) / 4; height: parent.height;
+                    text: "New run"; enabled: root.training-can-start; selected: root.training-focus == 2;
+                    activated => { root.training-command("training.new"); }
+                }
+                MenuButton {
+                    y: 0px; x: 3 * (parent.width + 10px) / 4; width: (parent.width - 30px) / 4; height: parent.height;
+                    text: "Back"; selected: root.training-focus == 3;
+                    activated => { root.training-command("training.back"); }
                 }
             }
         }

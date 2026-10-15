@@ -1,0 +1,7994 @@
+{
+  "suite": "material_arrival_qualification_v1",
+  "runtime": "diagnostic_v1/linux/x86_64/a35cfe1aab033ce196607c964875ccd63e593d3886a01bb09c13f89f91199a6a",
+  "candidate_id": "6c0ef53fb27e190243c84903855544a2cb9b97f4f32c92499dd37e541bbc41fb",
+  "passed": false,
+  "fresh": {
+    "cases": 96,
+    "both_arrived": 85,
+    "candidate_only": 0,
+    "reference_only": 11,
+    "neither": 0
+  },
+  "regressions": {
+    "cases": 11,
+    "both_arrived": 11,
+    "candidate_only": 0,
+    "reference_only": 0,
+    "neither": 0
+  },
+  "groups": [
+    {
+      "group": "geometry",
+      "counts": {
+        "cases": 24,
+        "both_arrived": 24,
+        "candidate_only": 0,
+        "reference_only": 0,
+        "neither": 0
+      }
+    },
+    {
+      "group": "initial_motion",
+      "counts": {
+        "cases": 24,
+        "both_arrived": 24,
+        "candidate_only": 0,
+        "reference_only": 0,
+        "neither": 0
+      }
+    },
+    {
+      "group": "target_motion",
+      "counts": {
+        "cases": 24,
+        "both_arrived": 18,
+        "candidate_only": 0,
+        "reference_only": 6,
+        "neither": 0
+      }
+    },
+    {
+      "group": "combined",
+      "counts": {
+        "cases": 24,
+        "both_arrived": 19,
+        "candidate_only": 0,
+        "reference_only": 5,
+        "neither": 0
+      }
+    },
+    {
+      "group": "regression",
+      "counts": {
+        "cases": 11,
+        "both_arrived": 11,
+        "candidate_only": 0,
+        "reference_only": 0,
+        "neither": 0
+      }
+    }
+  ],
+  "fresh_outcomes": {
+    "candidate": {
+      "arrived": 85,
+      "timeout": 9,
+      "outside_region": 2
+    },
+    "reference": {
+      "arrived": 96
+    }
+  },
+  "clipped_episodes": {
+    "candidate": 0,
+    "reference": 0
+  },
+  "all_trace_replays_match_scored_episodes": true,
+  "cases": [
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 718,
+        "measure": {
+          "distance": 1.6015776,
+          "relative_speed": 0.23646145,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 479,
+        "measure": {
+          "distance": 1.7929593,
+          "relative_speed": 0.33861437,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 35.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 745,
+        "measure": {
+          "distance": 0.8803209,
+          "relative_speed": 0.750331,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1079,
+        "measure": {
+          "distance": 1.7907333,
+          "relative_speed": 0.41946736,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.6
+        },
+        "target_offset": {
+          "x": -30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 469,
+        "measure": {
+          "distance": 1.5412692,
+          "relative_speed": 0.27189976,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 986,
+        "measure": {
+          "distance": 1.8059559,
+          "relative_speed": 0.49974084,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.6
+        },
+        "target_offset": {
+          "x": 30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 914,
+        "measure": {
+          "distance": 1.2249366,
+          "relative_speed": 0.5969405,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1128,
+        "measure": {
+          "distance": 1.8013335,
+          "relative_speed": 0.2533558,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 728,
+        "measure": {
+          "distance": 1.9373916,
+          "relative_speed": 0.63936996,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 651,
+        "measure": {
+          "distance": 1.8240538,
+          "relative_speed": 0.45814344,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b0_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 3.1415927
+        },
+        "target_offset": {
+          "x": 10.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 637,
+        "measure": {
+          "distance": 0.8508106,
+          "relative_speed": 0.71824497,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 884,
+        "measure": {
+          "distance": 1.7989244,
+          "relative_speed": 0.60121244,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 728,
+        "measure": {
+          "distance": 0.873259,
+          "relative_speed": 0.45947263,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 867,
+        "measure": {
+          "distance": 1.8126497,
+          "relative_speed": 0.22565107,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": -6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 552,
+        "measure": {
+          "distance": 0.9787586,
+          "relative_speed": 0.7679426,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 779,
+        "measure": {
+          "distance": 1.7901767,
+          "relative_speed": 0.51877385,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 6.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 433,
+        "measure": {
+          "distance": 1.033329,
+          "relative_speed": 0.6346491,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 782,
+        "measure": {
+          "distance": 1.7999082,
+          "relative_speed": 0.65968984,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": -6.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 962,
+        "measure": {
+          "distance": 0.9558453,
+          "relative_speed": 0.74495286,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 877,
+        "measure": {
+          "distance": 1.8061438,
+          "relative_speed": 0.12694985,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 4.0,
+          "lateral_speed": -4.0,
+          "heading_offset": 0.75
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 941,
+        "measure": {
+          "distance": 0.8758516,
+          "relative_speed": 0.7365391,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 922,
+        "measure": {
+          "distance": 1.7985201,
+          "relative_speed": 0.27507928,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b0_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": -4.0,
+          "lateral_speed": 4.0,
+          "heading_offset": -0.75
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 451,
+        "measure": {
+          "distance": 1.4067287,
+          "relative_speed": 0.17725019,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 803,
+        "measure": {
+          "distance": 1.799992,
+          "relative_speed": 0.354776,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.3
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.2731824,
+          "relative_speed": 0.6146992,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 929,
+        "measure": {
+          "distance": 1.8070209,
+          "relative_speed": 0.1442022,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.3
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 487,
+        "measure": {
+          "distance": 0.9950566,
+          "relative_speed": 0.46378794,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 823,
+        "measure": {
+          "distance": 1.8030137,
+          "relative_speed": 0.7269416,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 647,
+        "measure": {
+          "distance": 1.620885,
+          "relative_speed": 0.7859666,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 713,
+        "measure": {
+          "distance": 1.8195832,
+          "relative_speed": 0.28927606,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 754,
+        "measure": {
+          "distance": 1.487909,
+          "relative_speed": 0.6325015,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 632,
+        "measure": {
+          "distance": 1.8383064,
+          "relative_speed": 0.2668416,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.5
+        },
+        "target_offset": {
+          "x": 15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.2280686,
+          "relative_speed": 0.7115413,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 873,
+        "measure": {
+          "distance": 1.8102279,
+          "relative_speed": 0.2592219,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b0_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.5
+        },
+        "target_offset": {
+          "x": -15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": -2.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 335,
+        "measure": {
+          "distance": 1.4067607,
+          "relative_speed": 0.59941214,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 760,
+        "measure": {
+          "distance": 1.7804457,
+          "relative_speed": 0.5848188,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 717,
+        "measure": {
+          "distance": 1.5697112,
+          "relative_speed": 0.26226422,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 481,
+        "measure": {
+          "distance": 1.7913761,
+          "relative_speed": 0.66145927,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 35.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 753,
+        "measure": {
+          "distance": 1.0157955,
+          "relative_speed": 0.70939773,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1079,
+        "measure": {
+          "distance": 1.7961793,
+          "relative_speed": 0.625201,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.6
+        },
+        "target_offset": {
+          "x": -30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 608,
+        "measure": {
+          "distance": 1.4227788,
+          "relative_speed": 0.70831424,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 986,
+        "measure": {
+          "distance": 1.814571,
+          "relative_speed": 0.5338004,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.6
+        },
+        "target_offset": {
+          "x": 30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 944,
+        "measure": {
+          "distance": 1.0295092,
+          "relative_speed": 0.77596056,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1128,
+        "measure": {
+          "distance": 1.8106313,
+          "relative_speed": 0.06961083,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 727,
+        "measure": {
+          "distance": 1.2951223,
+          "relative_speed": 0.4793101,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 651,
+        "measure": {
+          "distance": 1.8233131,
+          "relative_speed": 0.37231314,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b1_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 3.1415927
+        },
+        "target_offset": {
+          "x": 10.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 647,
+        "measure": {
+          "distance": 0.8782535,
+          "relative_speed": 0.64501953,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 884,
+        "measure": {
+          "distance": 1.7964237,
+          "relative_speed": 0.4157327,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 735,
+        "measure": {
+          "distance": 0.8670827,
+          "relative_speed": 0.68775445,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 866,
+        "measure": {
+          "distance": 1.8057431,
+          "relative_speed": 0.65704286,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": -6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 552,
+        "measure": {
+          "distance": 0.99544525,
+          "relative_speed": 0.8419167,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 780,
+        "measure": {
+          "distance": 1.7953645,
+          "relative_speed": 0.495999,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 6.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 559,
+        "measure": {
+          "distance": 0.91847175,
+          "relative_speed": 0.29469758,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 784,
+        "measure": {
+          "distance": 1.7998571,
+          "relative_speed": 0.3326403,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": -6.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 957,
+        "measure": {
+          "distance": 0.85858226,
+          "relative_speed": 0.9330061,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 878,
+        "measure": {
+          "distance": 1.8086982,
+          "relative_speed": 0.2682256,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 4.0,
+          "lateral_speed": -4.0,
+          "heading_offset": 0.75
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 952,
+        "measure": {
+          "distance": 0.8310925,
+          "relative_speed": 0.463856,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 922,
+        "measure": {
+          "distance": 1.8094988,
+          "relative_speed": 0.6837884,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b1_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": -4.0,
+          "lateral_speed": 4.0,
+          "heading_offset": -0.75
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 592,
+        "measure": {
+          "distance": 0.93815947,
+          "relative_speed": 0.24884355,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 804,
+        "measure": {
+          "distance": 1.7951689,
+          "relative_speed": 0.35864782,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.3
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 990,
+        "measure": {
+          "distance": 1.6988741,
+          "relative_speed": 0.5463749,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 929,
+        "measure": {
+          "distance": 1.8117095,
+          "relative_speed": 0.40211,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.3
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 443,
+        "measure": {
+          "distance": 0.41377217,
+          "relative_speed": 0.2119575,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 824,
+        "measure": {
+          "distance": 1.8057352,
+          "relative_speed": 0.26370376,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 645,
+        "measure": {
+          "distance": 1.3987427,
+          "relative_speed": 0.31011742,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 716,
+        "measure": {
+          "distance": 1.7888592,
+          "relative_speed": 0.32367107,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 517,
+        "measure": {
+          "distance": 1.6132432,
+          "relative_speed": 0.6068619,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 633,
+        "measure": {
+          "distance": 1.8342135,
+          "relative_speed": 0.264112,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.5
+        },
+        "target_offset": {
+          "x": 15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.3969216,
+          "relative_speed": 0.6683389,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 874,
+        "measure": {
+          "distance": 1.8010736,
+          "relative_speed": 0.31171092,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b1_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.5
+        },
+        "target_offset": {
+          "x": -15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": -2.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 330,
+        "measure": {
+          "distance": 1.3130107,
+          "relative_speed": 0.11296962,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 760,
+        "measure": {
+          "distance": 1.8053131,
+          "relative_speed": 0.28109607,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 708,
+        "measure": {
+          "distance": 1.5203693,
+          "relative_speed": 0.6340819,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 480,
+        "measure": {
+          "distance": 1.7979488,
+          "relative_speed": 0.41861117,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 35.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 747,
+        "measure": {
+          "distance": 1.0975627,
+          "relative_speed": 0.8895986,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1080,
+        "measure": {
+          "distance": 1.7905719,
+          "relative_speed": 0.5535492,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.6
+        },
+        "target_offset": {
+          "x": -30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 464,
+        "measure": {
+          "distance": 1.7010373,
+          "relative_speed": 0.15306959,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 987,
+        "measure": {
+          "distance": 1.80839,
+          "relative_speed": 0.25693622,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.6
+        },
+        "target_offset": {
+          "x": 30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 694,
+        "measure": {
+          "distance": 1.7201413,
+          "relative_speed": 0.099135004,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1128,
+        "measure": {
+          "distance": 1.8043638,
+          "relative_speed": 0.22170505,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 730,
+        "measure": {
+          "distance": 1.4941057,
+          "relative_speed": 0.36374465,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 651,
+        "measure": {
+          "distance": 1.8224887,
+          "relative_speed": 0.4094927,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b2_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 3.1415927
+        },
+        "target_offset": {
+          "x": 10.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 641,
+        "measure": {
+          "distance": 0.78959334,
+          "relative_speed": 0.82721025,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 884,
+        "measure": {
+          "distance": 1.7959621,
+          "relative_speed": 0.36547542,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 722,
+        "measure": {
+          "distance": 0.67917037,
+          "relative_speed": 0.8209013,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 867,
+        "measure": {
+          "distance": 1.7992842,
+          "relative_speed": 0.27644494,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": -6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 543,
+        "measure": {
+          "distance": 0.7592029,
+          "relative_speed": 0.9760461,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 780,
+        "measure": {
+          "distance": 1.7975235,
+          "relative_speed": 0.3436626,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 6.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 559,
+        "measure": {
+          "distance": 0.922988,
+          "relative_speed": 0.25103727,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 785,
+        "measure": {
+          "distance": 1.7971909,
+          "relative_speed": 0.5795966,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": -6.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 755,
+        "measure": {
+          "distance": 1.9150773,
+          "relative_speed": 0.8004512,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 878,
+        "measure": {
+          "distance": 1.8140495,
+          "relative_speed": 0.13512996,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 4.0,
+          "lateral_speed": -4.0,
+          "heading_offset": 0.75
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 963,
+        "measure": {
+          "distance": 1.1064733,
+          "relative_speed": 0.21306868,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 923,
+        "measure": {
+          "distance": 1.8021055,
+          "relative_speed": 0.23816042,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b2_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": -4.0,
+          "lateral_speed": 4.0,
+          "heading_offset": -0.75
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 499,
+        "measure": {
+          "distance": 1.9160931,
+          "relative_speed": 0.5360223,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 804,
+        "measure": {
+          "distance": 1.8001894,
+          "relative_speed": 0.5202078,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.3
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.1249332,
+          "relative_speed": 0.6841447,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 929,
+        "measure": {
+          "distance": 1.8051296,
+          "relative_speed": 0.19585422,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.3
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 585,
+        "measure": {
+          "distance": 0.39957616,
+          "relative_speed": 0.16785541,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 822,
+        "measure": {
+          "distance": 1.7993588,
+          "relative_speed": 0.21636981,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 644,
+        "measure": {
+          "distance": 1.4537523,
+          "relative_speed": 0.3768497,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 717,
+        "measure": {
+          "distance": 1.8012086,
+          "relative_speed": 0.36096466,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 518,
+        "measure": {
+          "distance": 1.5687522,
+          "relative_speed": 0.63792235,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 632,
+        "measure": {
+          "distance": 1.8347498,
+          "relative_speed": 0.40323237,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p4",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.5
+        },
+        "target_offset": {
+          "x": 15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 1.9641215,
+          "relative_speed": 0.8213417,
+          "dwell": 7
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 873,
+        "measure": {
+          "distance": 1.8076838,
+          "relative_speed": 0.69646895,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b2_p5",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.5
+        },
+        "target_offset": {
+          "x": -15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": -2.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 326,
+        "measure": {
+          "distance": 1.1336576,
+          "relative_speed": 0.121818736,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 760,
+        "measure": {
+          "distance": 1.8046749,
+          "relative_speed": 0.29933834,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 717,
+        "measure": {
+          "distance": 1.6383643,
+          "relative_speed": 0.27216092,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 478,
+        "measure": {
+          "distance": 1.7994319,
+          "relative_speed": 0.55085313,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 35.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 755,
+        "measure": {
+          "distance": 1.1171337,
+          "relative_speed": 0.7532065,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1078,
+        "measure": {
+          "distance": 1.7994413,
+          "relative_speed": 0.62560356,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.6
+        },
+        "target_offset": {
+          "x": -30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 468,
+        "measure": {
+          "distance": 1.6128086,
+          "relative_speed": 0.51145595,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 987,
+        "measure": {
+          "distance": 1.803486,
+          "relative_speed": 0.27473116,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.6
+        },
+        "target_offset": {
+          "x": 30.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 694,
+        "measure": {
+          "distance": 1.7382491,
+          "relative_speed": 0.10095882,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1127,
+        "measure": {
+          "distance": 1.8109983,
+          "relative_speed": 0.6114227,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p4",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1158,
+        "measure": {
+          "distance": 1.5691888,
+          "relative_speed": 0.38219652,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 651,
+        "measure": {
+          "distance": 1.8243321,
+          "relative_speed": 0.417697,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "geometry",
+      "case": {
+        "name": "qualification_geometry_b3_p5",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 3.1415927
+        },
+        "target_offset": {
+          "x": 10.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 644,
+        "measure": {
+          "distance": 0.7040556,
+          "relative_speed": 0.76858157,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 883,
+        "measure": {
+          "distance": 1.7975225,
+          "relative_speed": 0.65104103,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 719,
+        "measure": {
+          "distance": 1.3906351,
+          "relative_speed": 0.2604151,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 867,
+        "measure": {
+          "distance": 1.8032767,
+          "relative_speed": 0.7012255,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": -6.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 451,
+        "measure": {
+          "distance": 0.96339506,
+          "relative_speed": 0.6625249,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 778,
+        "measure": {
+          "distance": 1.804175,
+          "relative_speed": 0.37048653,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 6.0,
+          "heading_offset": 0.25
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 572,
+        "measure": {
+          "distance": 0.825119,
+          "relative_speed": 0.46494177,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 784,
+        "measure": {
+          "distance": 1.7982067,
+          "relative_speed": 0.64402395,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": -6.0,
+          "heading_offset": -0.25
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 970,
+        "measure": {
+          "distance": 1.0296551,
+          "relative_speed": 0.69420195,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 879,
+        "measure": {
+          "distance": 1.8057286,
+          "relative_speed": 0.2323033,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p4",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 4.0,
+          "lateral_speed": -4.0,
+          "heading_offset": 0.75
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 956,
+        "measure": {
+          "distance": 1.1190156,
+          "relative_speed": 0.41274983,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 922,
+        "measure": {
+          "distance": 1.8216836,
+          "relative_speed": 0.11450708,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "initial_motion",
+      "case": {
+        "name": "qualification_initial_motion_b3_p5",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": -4.0,
+          "lateral_speed": 4.0,
+          "heading_offset": -0.75
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 464,
+        "measure": {
+          "distance": 0.9156195,
+          "relative_speed": 0.58899593,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 804,
+        "measure": {
+          "distance": 1.7967519,
+          "relative_speed": 0.36509874,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.3
+        },
+        "target_offset": {
+          "x": 18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.8082402,
+          "relative_speed": 0.5830664,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 928,
+        "measure": {
+          "distance": 1.8026309,
+          "relative_speed": 0.24218787,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.3
+        },
+        "target_offset": {
+          "x": -18.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -3.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 441,
+        "measure": {
+          "distance": 0.80708736,
+          "relative_speed": 0.339146,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 821,
+        "measure": {
+          "distance": 1.8132911,
+          "relative_speed": 0.1783063,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 18.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 649,
+        "measure": {
+          "distance": 0.873002,
+          "relative_speed": 0.5017773,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 718,
+        "measure": {
+          "distance": 1.7943226,
+          "relative_speed": 0.2908174,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.5
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 750,
+        "measure": {
+          "distance": 1.6259454,
+          "relative_speed": 0.22645058,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 630,
+        "measure": {
+          "distance": 1.8300012,
+          "relative_speed": 0.30872867,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p4",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.5
+        },
+        "target_offset": {
+          "x": 15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1051,
+        "measure": {
+          "distance": 1.7796842,
+          "relative_speed": 0.29413235,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 875,
+        "measure": {
+          "distance": 1.8002391,
+          "relative_speed": 0.30487213,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "target_motion",
+      "case": {
+        "name": "qualification_target_motion_b3_p5",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.5
+        },
+        "target_offset": {
+          "x": -15.0,
+          "y": 10.0
+        },
+        "target_velocity": {
+          "x": -2.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 336,
+        "measure": {
+          "distance": 1.8001958,
+          "relative_speed": 0.19633518,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 761,
+        "measure": {
+          "distance": 1.7761226,
+          "relative_speed": 0.62489045,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 70.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 979,
+        "measure": {
+          "distance": 1.6475537,
+          "relative_speed": 0.72549903,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 965,
+        "measure": {
+          "distance": 1.8065784,
+          "relative_speed": 0.6707321,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 70.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 512,
+        "measure": {
+          "distance": 0.6995383,
+          "relative_speed": 0.84569895,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 915,
+        "measure": {
+          "distance": 1.8027774,
+          "relative_speed": 0.52332246,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 70.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "outside_region",
+        "elapsed_ticks": 1188,
+        "measure": {
+          "distance": 7.868692,
+          "relative_speed": 6.4281983,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 593,
+        "measure": {
+          "distance": 1.830726,
+          "relative_speed": 0.40123662,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 70.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 802,
+        "measure": {
+          "distance": 1.1193244,
+          "relative_speed": 0.70100516,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 962,
+        "measure": {
+          "distance": 1.8013897,
+          "relative_speed": 0.33221856,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 70.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 976,
+        "measure": {
+          "distance": 1.8028071,
+          "relative_speed": 0.7474169,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 965,
+        "measure": {
+          "distance": 1.7977606,
+          "relative_speed": 0.33788162,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 70.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 535,
+        "measure": {
+          "distance": 0.83021575,
+          "relative_speed": 0.64750075,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 918,
+        "measure": {
+          "distance": 1.8055784,
+          "relative_speed": 0.20377365,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 70.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "outside_region",
+        "elapsed_ticks": 1192,
+        "measure": {
+          "distance": 7.8521385,
+          "relative_speed": 6.6817775,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 593,
+        "measure": {
+          "distance": 1.8266526,
+          "relative_speed": 0.30674306,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a0_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 70.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 807,
+        "measure": {
+          "distance": 1.1573887,
+          "relative_speed": 0.599878,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 962,
+        "measure": {
+          "distance": 1.7995894,
+          "relative_speed": 0.5866651,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 100.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.6994476,
+          "relative_speed": 0.8985169,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 981,
+        "measure": {
+          "distance": 1.8135,
+          "relative_speed": 0.20458475,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 100.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 547,
+        "measure": {
+          "distance": 0.115660064,
+          "relative_speed": 0.1398576,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 917,
+        "measure": {
+          "distance": 1.7983594,
+          "relative_speed": 0.2811591,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 100.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 465,
+        "measure": {
+          "distance": 1.7633048,
+          "relative_speed": 0.7630902,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 603,
+        "measure": {
+          "distance": 1.8281476,
+          "relative_speed": 0.34854287,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 100.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 571,
+        "measure": {
+          "distance": 1.7713245,
+          "relative_speed": 0.22923395,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 955,
+        "measure": {
+          "distance": 1.8062102,
+          "relative_speed": 0.32757777,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 100.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.89152,
+          "relative_speed": 1.0163648,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 982,
+        "measure": {
+          "distance": 1.8145338,
+          "relative_speed": 0.17577498,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 100.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 548,
+        "measure": {
+          "distance": 0.03951079,
+          "relative_speed": 0.10157056,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 916,
+        "measure": {
+          "distance": 1.8041813,
+          "relative_speed": 0.32602575,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 100.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 674,
+        "measure": {
+          "distance": 1.3413866,
+          "relative_speed": 0.43345976,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 604,
+        "measure": {
+          "distance": 1.8220066,
+          "relative_speed": 0.313615,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a1_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 100.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 800,
+        "measure": {
+          "distance": 1.4248523,
+          "relative_speed": 0.90162617,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 956,
+        "measure": {
+          "distance": 1.7942263,
+          "relative_speed": 0.35111025,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b0_p0",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 125.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 1094,
+        "measure": {
+          "distance": 1.8619244,
+          "relative_speed": 0.79175735,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 988,
+        "measure": {
+          "distance": 1.8136858,
+          "relative_speed": 0.28438842,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b0_p1",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 125.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 550,
+        "measure": {
+          "distance": 0.32052267,
+          "relative_speed": 0.42380226,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 913,
+        "measure": {
+          "distance": 1.8023834,
+          "relative_speed": 0.43192545,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b0_p2",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 125.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 641,
+        "measure": {
+          "distance": 1.2118235,
+          "relative_speed": 0.41939262,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 613,
+        "measure": {
+          "distance": 1.8283296,
+          "relative_speed": 0.38451234,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b0_p3",
+        "seed": 42,
+        "start": {
+          "bearing": 0.7853982,
+          "altitude": 125.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 557,
+        "measure": {
+          "distance": 1.4924921,
+          "relative_speed": 0.3232177,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 953,
+        "measure": {
+          "distance": 1.7953,
+          "relative_speed": 0.30730665,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b1_p0",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 125.0,
+          "radial_speed": -3.0,
+          "lateral_speed": -3.0,
+          "heading_offset": -0.8
+        },
+        "target_offset": {
+          "x": 25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "timeout",
+        "elapsed_ticks": 1200,
+        "measure": {
+          "distance": 2.75878,
+          "relative_speed": 0.9465323,
+          "dwell": 0
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 990,
+        "measure": {
+          "distance": 1.8035752,
+          "relative_speed": 0.14457062,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b1_p1",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 125.0,
+          "radial_speed": 3.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 0.8
+        },
+        "target_offset": {
+          "x": -25.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": -2.5,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 553,
+        "measure": {
+          "distance": 0.46372256,
+          "relative_speed": 0.19034569,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 914,
+        "measure": {
+          "distance": 1.798168,
+          "relative_speed": 0.506814,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b1_p2",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 125.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 3.0,
+          "heading_offset": 1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": -8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": -1.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 539,
+        "measure": {
+          "distance": 1.4017875,
+          "relative_speed": 0.8068205,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 615,
+        "measure": {
+          "distance": 1.8135229,
+          "relative_speed": 0.5516368,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "combined",
+      "case": {
+        "name": "qualification_combined_a2_b1_p3",
+        "seed": 42,
+        "start": {
+          "bearing": -2.3561945,
+          "altitude": 125.0,
+          "radial_speed": -3.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -1.5707964
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 25.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 558,
+        "measure": {
+          "distance": 1.453019,
+          "relative_speed": 0.33331808,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 950,
+        "measure": {
+          "distance": 1.7996134,
+          "relative_speed": 0.52889216,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "stationary_radial",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 20.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 504,
+        "measure": {
+          "distance": 1.588092,
+          "relative_speed": 0.25480717,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 752,
+        "measure": {
+          "distance": 1.7971351,
+          "relative_speed": 0.37651086,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "stationary_right",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.4
+        },
+        "target_offset": {
+          "x": 20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 937,
+        "measure": {
+          "distance": 1.0225352,
+          "relative_speed": 0.83094794,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 887,
+        "measure": {
+          "distance": 1.8023688,
+          "relative_speed": 0.11039721,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "stationary_left",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.4
+        },
+        "target_offset": {
+          "x": -20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 331,
+        "measure": {
+          "distance": 0.6040525,
+          "relative_speed": 0.5758916,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 757,
+        "measure": {
+          "distance": 1.8118689,
+          "relative_speed": 0.403552,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "stationary_rotated",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 955,
+        "measure": {
+          "distance": 0.8249061,
+          "relative_speed": 0.7463238,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 863,
+        "measure": {
+          "distance": 1.8133109,
+          "relative_speed": 0.43745852,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "validation_radial_close",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 2.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 12.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 720,
+        "measure": {
+          "distance": 1.8803189,
+          "relative_speed": 0.26332688,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 572,
+        "measure": {
+          "distance": 1.7907952,
+          "relative_speed": 0.5718653,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "validation_right_drift",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": -2.0,
+          "heading_offset": -0.2
+        },
+        "target_offset": {
+          "x": 14.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 725,
+        "measure": {
+          "distance": 1.6833196,
+          "relative_speed": 0.26363373,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 746,
+        "measure": {
+          "distance": 1.8140785,
+          "relative_speed": 0.19288896,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "validation_left_rotated",
+        "seed": 42,
+        "start": {
+          "bearing": -1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 2.0,
+          "heading_offset": 0.2
+        },
+        "target_offset": {
+          "x": -14.0,
+          "y": 8.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 299,
+        "measure": {
+          "distance": 1.0485412,
+          "relative_speed": 0.28706518,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 650,
+        "measure": {
+          "distance": 1.7954884,
+          "relative_speed": 0.3471127,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "stationary_reversed",
+        "seed": 42,
+        "start": {
+          "bearing": 3.1415927,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 3.1415927
+        },
+        "target_offset": {
+          "x": 0.0,
+          "y": 20.0
+        },
+        "target_velocity": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 416,
+        "measure": {
+          "distance": 1.9515401,
+          "relative_speed": 0.8948739,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 844,
+        "measure": {
+          "distance": 1.7962301,
+          "relative_speed": 0.36216715,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "moving_right",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.4
+        },
+        "target_offset": {
+          "x": 20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 935,
+        "measure": {
+          "distance": 1.7369198,
+          "relative_speed": 0.5783598,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 944,
+        "measure": {
+          "distance": 1.8038012,
+          "relative_speed": 0.68581986,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "moving_left",
+        "seed": 42,
+        "start": {
+          "bearing": 0.0,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": -0.4
+        },
+        "target_offset": {
+          "x": -20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": -2.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 440,
+        "measure": {
+          "distance": 0.53160155,
+          "relative_speed": 0.31682405,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 816,
+        "measure": {
+          "distance": 1.7927693,
+          "relative_speed": 0.43519253,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "group": "regression",
+      "case": {
+        "name": "moving_rotated",
+        "seed": 42,
+        "start": {
+          "bearing": 1.5707964,
+          "altitude": 90.0,
+          "radial_speed": 0.0,
+          "lateral_speed": 0.0,
+          "heading_offset": 0.0
+        },
+        "target_offset": {
+          "x": 20.0,
+          "y": 5.0
+        },
+        "target_velocity": {
+          "x": 2.0,
+          "y": 0.0
+        },
+        "max_ticks": 1200
+      },
+      "candidate": {
+        "outcome": "arrived",
+        "elapsed_ticks": 924,
+        "measure": {
+          "distance": 1.9301372,
+          "relative_speed": 0.6805059,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "reference": {
+        "outcome": "arrived",
+        "elapsed_ticks": 911,
+        "measure": {
+          "distance": 1.8058571,
+          "relative_speed": 0.17968501,
+          "dwell": 30
+        },
+        "saturated_ticks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "trace_diagnostics": [
+    {
+      "case": "qualification_target_motion_b0_p0",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.2731824,
+            "relative_speed": 0.6146992,
+            "dwell": 0
+          },
+          "closest_distance": 2.2731824,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 119.11585433132379,
+          "minimum_altitude": 93.56619228753317,
+          "thrust_ticks": 174,
+          "brake_ticks": 147,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.2731824,
+            "maximum_distance": 3.0574834,
+            "minimum_relative_speed": 0.09460462,
+            "maximum_relative_speed": 1.3031448
+          },
+          "trace_sha256": "0b93d5f8c69df46e220e6e8042d84d5fc8d290fec056162572f7eb8c659cdb43"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 929,
+          "final": {
+            "distance": 1.8070209,
+            "relative_speed": 0.1442022,
+            "dwell": 30
+          },
+          "closest_distance": 1.8070209,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 900,
+          "minimum_speed_within_position": 0.14200538,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 114.74540539126195,
+          "minimum_altitude": 94.6571339851208,
+          "thrust_ticks": 549,
+          "brake_ticks": 929,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8070209,
+            "maximum_distance": 2.7203655,
+            "minimum_relative_speed": 0.14200538,
+            "maximum_relative_speed": 0.8895207
+          },
+          "trace_sha256": "876ed41d711460da1c32bba5a51fafa1d52f4b08d984a4a5a914cda7593a3c9d"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b0_p4",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.2280686,
+            "relative_speed": 0.7115413,
+            "dwell": 0
+          },
+          "closest_distance": 1.9563563,
+          "ticks_within_position": 28,
+          "ticks_within_both": 28,
+          "first_tick_within_both": 853,
+          "minimum_speed_within_position": 0.19615489,
+          "maximum_dwell": 28,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 131.59852384433972,
+          "minimum_altitude": 95.45734018871934,
+          "thrust_ticks": 162,
+          "brake_ticks": 132,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.2280686,
+            "maximum_distance": 2.804597,
+            "minimum_relative_speed": 0.041969478,
+            "maximum_relative_speed": 1.1110256
+          },
+          "trace_sha256": "807f99dac71fd27c1332ef47db0f0fc55bb294f2b72bc7c4f154294407dc81aa"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 873,
+          "final": {
+            "distance": 1.8102279,
+            "relative_speed": 0.2592219,
+            "dwell": 30
+          },
+          "closest_distance": 1.8102279,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 844,
+          "minimum_speed_within_position": 0.120452866,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 124.24595941209074,
+          "minimum_altitude": 94.7277000968152,
+          "thrust_ticks": 455,
+          "brake_ticks": 873,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8102279,
+            "maximum_distance": 2.7263744,
+            "minimum_relative_speed": 0.120452866,
+            "maximum_relative_speed": 0.8588428
+          },
+          "trace_sha256": "04c7bb39bfad96b70647b9152652b000098776e8e085fa5ee601af905c459c54"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b1_p4",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.3969216,
+            "relative_speed": 0.6683389,
+            "dwell": 0
+          },
+          "closest_distance": 1.9189855,
+          "ticks_within_position": 26,
+          "ticks_within_both": 15,
+          "first_tick_within_both": 979,
+          "minimum_speed_within_position": 0.7086889,
+          "maximum_dwell": 15,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 131.5331837538185,
+          "minimum_altitude": 95.45782018871873,
+          "thrust_ticks": 164,
+          "brake_ticks": 135,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.2332718,
+            "maximum_distance": 2.6329887,
+            "minimum_relative_speed": 0.115300894,
+            "maximum_relative_speed": 1.2230293
+          },
+          "trace_sha256": "c68634cbc30ddba17f2fd0f60a2f70241273bd180c668511f7cdd82f9a4cb235"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 874,
+          "final": {
+            "distance": 1.8010736,
+            "relative_speed": 0.31171092,
+            "dwell": 30
+          },
+          "closest_distance": 1.8010736,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 845,
+          "minimum_speed_within_position": 0.12066013,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 124.27218632857347,
+          "minimum_altitude": 94.77002072908209,
+          "thrust_ticks": 454,
+          "brake_ticks": 874,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8010736,
+            "maximum_distance": 2.706953,
+            "minimum_relative_speed": 0.12066013,
+            "maximum_relative_speed": 0.89800775
+          },
+          "trace_sha256": "d70b57e488cc771f4a4a707036bb04e291af1f8d27441b4d00f3337b25098fcc"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b2_p0",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.1249332,
+            "relative_speed": 0.6841447,
+            "dwell": 0
+          },
+          "closest_distance": 2.1249332,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 119.46472290954566,
+          "minimum_altitude": 95.45917010086248,
+          "thrust_ticks": 168,
+          "brake_ticks": 144,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.1249332,
+            "maximum_distance": 2.901439,
+            "minimum_relative_speed": 0.08896886,
+            "maximum_relative_speed": 1.2226449
+          },
+          "trace_sha256": "76cd71a1f759f249e2e3eba31264a67add7a3658b8b6c0b2b9ed1c855b336e6b"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 929,
+          "final": {
+            "distance": 1.8051296,
+            "relative_speed": 0.19585422,
+            "dwell": 30
+          },
+          "closest_distance": 1.8051296,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 900,
+          "minimum_speed_within_position": 0.14214222,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 114.73964904718792,
+          "minimum_altitude": 94.70955621113032,
+          "thrust_ticks": 549,
+          "brake_ticks": 929,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8051296,
+            "maximum_distance": 2.720377,
+            "minimum_relative_speed": 0.14214222,
+            "maximum_relative_speed": 0.91405284
+          },
+          "trace_sha256": "caf91fae4b71e39b1084915303a433309518da9093bc9665f09a180d2ab6c716"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b2_p4",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 1.9641215,
+            "relative_speed": 0.8213417,
+            "dwell": 7
+          },
+          "closest_distance": 1.7985352,
+          "ticks_within_position": 46,
+          "ticks_within_both": 26,
+          "first_tick_within_both": 973,
+          "minimum_speed_within_position": 0.7118879,
+          "maximum_dwell": 19,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 131.99108904378244,
+          "minimum_altitude": 95.45782020072971,
+          "thrust_ticks": 161,
+          "brake_ticks": 135,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.9641215,
+            "maximum_distance": 2.5571616,
+            "minimum_relative_speed": 0.27704337,
+            "maximum_relative_speed": 1.0788212
+          },
+          "trace_sha256": "97f00f6b82eb56553a857c5e58285047e07a43680c072c7ceecd735d0e0d9fa2"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 873,
+          "final": {
+            "distance": 1.8076838,
+            "relative_speed": 0.69646895,
+            "dwell": 30
+          },
+          "closest_distance": 1.8076838,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 844,
+          "minimum_speed_within_position": 0.12365244,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 124.2412671850197,
+          "minimum_altitude": 94.77524743547627,
+          "thrust_ticks": 455,
+          "brake_ticks": 873,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8076838,
+            "maximum_distance": 2.71834,
+            "minimum_relative_speed": 0.12365244,
+            "maximum_relative_speed": 0.84449023
+          },
+          "trace_sha256": "68b8c8c715c995affe541de695cd6d091efdb0365dfe12f1e06bf9a881a7f4e0"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b3_p0",
+      "group": "target_motion",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.8082402,
+            "relative_speed": 0.5830664,
+            "dwell": 0
+          },
+          "closest_distance": 2.8076475,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 118.74706750322758,
+          "minimum_altitude": 94.23194518635688,
+          "thrust_ticks": 171,
+          "brake_ticks": 145,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.8076475,
+            "maximum_distance": 3.048332,
+            "minimum_relative_speed": 0.06308965,
+            "maximum_relative_speed": 1.0073879
+          },
+          "trace_sha256": "c8981f31c106f72a40268a18bbca9af1d84d21c70885025777c53538bc81e97f"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 928,
+          "final": {
+            "distance": 1.8026309,
+            "relative_speed": 0.24218787,
+            "dwell": 30
+          },
+          "closest_distance": 1.8026309,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 899,
+          "minimum_speed_within_position": 0.1477384,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44903999999997,
+          "final_altitude": 114.72156773567625,
+          "minimum_altitude": 94.66810685393423,
+          "thrust_ticks": 550,
+          "brake_ticks": 928,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8026309,
+            "maximum_distance": 2.7271779,
+            "minimum_relative_speed": 0.1477384,
+            "maximum_relative_speed": 0.8770412
+          },
+          "trace_sha256": "f4371e568520dd18dd7670108422c196a22e54790b8d1e3f1246fa1fce254832"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a0_b0_p2",
+      "group": "combined",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "outside_region",
+          "elapsed_ticks": 1188,
+          "final": {
+            "distance": 7.868692,
+            "relative_speed": 6.4281983,
+            "dwell": 0
+          },
+          "closest_distance": 3.4833367,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 75.44897189922708,
+          "final_altitude": 39.93698427494199,
+          "minimum_altitude": 39.93698427494199,
+          "thrust_ticks": 172,
+          "brake_ticks": 187,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 4.236719,
+            "maximum_distance": 7.868692,
+            "minimum_relative_speed": 0.5147939,
+            "maximum_relative_speed": 6.4281983
+          },
+          "trace_sha256": "b69ac0706a1356cc2e9c7f82ceb289508380cf69b82d515f7c217c85dca74bb0"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 593,
+          "final": {
+            "distance": 1.830726,
+            "relative_speed": 0.40123662,
+            "dwell": 30
+          },
+          "closest_distance": 1.830726,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 564,
+          "minimum_speed_within_position": 0.24444066,
+          "maximum_dwell": 30,
+          "initial_altitude": 75.44897189922708,
+          "final_altitude": 59.3208397071576,
+          "minimum_altitude": 59.3208397071576,
+          "thrust_ticks": 100,
+          "brake_ticks": 593,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.830726,
+            "maximum_distance": 2.6256175,
+            "minimum_relative_speed": 0.24444066,
+            "maximum_relative_speed": 0.7769613
+          },
+          "trace_sha256": "fb372f3d4075524a30cf6b85b7cd75037147c584f8969533cbbc1beaae95c9fb"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a0_b1_p2",
+      "group": "combined",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "outside_region",
+          "elapsed_ticks": 1192,
+          "final": {
+            "distance": 7.8521385,
+            "relative_speed": 6.6817775,
+            "dwell": 0
+          },
+          "closest_distance": 3.1879876,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 75.44897192013525,
+          "final_altitude": 39.88947054817386,
+          "minimum_altitude": 39.88947054817386,
+          "thrust_ticks": 168,
+          "brake_ticks": 184,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 4.141279,
+            "maximum_distance": 7.8521385,
+            "minimum_relative_speed": 0.23117793,
+            "maximum_relative_speed": 6.6817775
+          },
+          "trace_sha256": "16784bbcff93995955f2f721eabe0e031afcd0478d5b99f2a0bbb7902a68df4b"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 593,
+          "final": {
+            "distance": 1.8266526,
+            "relative_speed": 0.30674306,
+            "dwell": 30
+          },
+          "closest_distance": 1.8266526,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 564,
+          "minimum_speed_within_position": 0.24001235,
+          "maximum_dwell": 30,
+          "initial_altitude": 75.44897192013525,
+          "final_altitude": 59.32189154991639,
+          "minimum_altitude": 59.32189154991639,
+          "thrust_ticks": 104,
+          "brake_ticks": 593,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8266526,
+            "maximum_distance": 2.6267717,
+            "minimum_relative_speed": 0.24001235,
+            "maximum_relative_speed": 0.75585103
+          },
+          "trace_sha256": "e20c5e0d75244fdad0bdc23f0eac198c04da66264a857d1dcb5d68956b8e9744"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a1_b0_p0",
+      "group": "combined",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.6994476,
+            "relative_speed": 0.8985169,
+            "dwell": 0
+          },
+          "closest_distance": 2.020047,
+          "ticks_within_position": 0,
+          "ticks_within_both": 0,
+          "first_tick_within_both": null,
+          "minimum_speed_within_position": null,
+          "maximum_dwell": 0,
+          "initial_altitude": 105.39927697575496,
+          "final_altitude": 127.00734889188178,
+          "minimum_altitude": 105.28911594822455,
+          "thrust_ticks": 191,
+          "brake_ticks": 159,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.408229,
+            "maximum_distance": 2.7429914,
+            "minimum_relative_speed": 0.041856863,
+            "maximum_relative_speed": 1.0914235
+          },
+          "trace_sha256": "2f5dbd737b6f11edb1aab81e04a2e8ac9bf4aa01e547b920c96f94b411ec86f8"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 981,
+          "final": {
+            "distance": 1.8135,
+            "relative_speed": 0.20458475,
+            "dwell": 30
+          },
+          "closest_distance": 1.8135,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 952,
+          "minimum_speed_within_position": 0.20458475,
+          "maximum_dwell": 30,
+          "initial_altitude": 105.39927697575496,
+          "final_altitude": 124.64322622544833,
+          "minimum_altitude": 104.49501734417365,
+          "thrust_ticks": 583,
+          "brake_ticks": 981,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8135,
+            "maximum_distance": 2.6998808,
+            "minimum_relative_speed": 0.20458475,
+            "maximum_relative_speed": 0.97107804
+          },
+          "trace_sha256": "29462ce0b95adcd36a2f70f8c7a5cac12bf8fc98e565fed039d84cc727d2d4d5"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a1_b1_p0",
+      "group": "combined",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.89152,
+            "relative_speed": 1.0163648,
+            "dwell": 0
+          },
+          "closest_distance": 1.2298733,
+          "ticks_within_position": 145,
+          "ticks_within_both": 66,
+          "first_tick_within_both": 868,
+          "minimum_speed_within_position": 0.567128,
+          "maximum_dwell": 21,
+          "initial_altitude": 105.3992769885966,
+          "final_altitude": 127.03883845978515,
+          "minimum_altitude": 105.28892601542339,
+          "thrust_ticks": 182,
+          "brake_ticks": 159,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.7035792,
+            "maximum_distance": 3.0312343,
+            "minimum_relative_speed": 0.043952886,
+            "maximum_relative_speed": 1.0911927
+          },
+          "trace_sha256": "97ed10b99b1104d5f3cf676ccc8420771b557bf27fdd538107f709c88a95fd37"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 982,
+          "final": {
+            "distance": 1.8145338,
+            "relative_speed": 0.17577498,
+            "dwell": 30
+          },
+          "closest_distance": 1.8145338,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 953,
+          "minimum_speed_within_position": 0.16658017,
+          "maximum_dwell": 30,
+          "initial_altitude": 105.3992769885966,
+          "final_altitude": 124.65605534195191,
+          "minimum_altitude": 104.49609286403614,
+          "thrust_ticks": 585,
+          "brake_ticks": 982,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8145338,
+            "maximum_distance": 2.6832962,
+            "minimum_relative_speed": 0.16658017,
+            "maximum_relative_speed": 0.96184963
+          },
+          "trace_sha256": "679f8efafbf43de5ef553f2cefc618fd1eb44ef84b958b7ab9f58636f5f384f6"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a2_b1_p0",
+      "group": "combined",
+      "contrast": false,
+      "policies": {
+        "candidate": {
+          "outcome": "timeout",
+          "elapsed_ticks": 1200,
+          "final": {
+            "distance": 2.75878,
+            "relative_speed": 0.9465323,
+            "dwell": 0
+          },
+          "closest_distance": 1.8519206,
+          "ticks_within_position": 92,
+          "ticks_within_both": 62,
+          "first_tick_within_both": 867,
+          "minimum_speed_within_position": 0.35962626,
+          "maximum_dwell": 18,
+          "initial_altitude": 130.39940388161537,
+          "final_altitude": 150.46931724717123,
+          "minimum_altitude": 130.29214358979723,
+          "thrust_ticks": 181,
+          "brake_ticks": 149,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 2.3382723,
+            "maximum_distance": 2.8694434,
+            "minimum_relative_speed": 0.25861678,
+            "maximum_relative_speed": 1.2341583
+          },
+          "trace_sha256": "eca83cdb835ea65a6f0be3a818feaad080446615f3e2b712273d0f3d5aff8a25"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 990,
+          "final": {
+            "distance": 1.8035752,
+            "relative_speed": 0.14457062,
+            "dwell": 30
+          },
+          "closest_distance": 1.8035752,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 961,
+          "minimum_speed_within_position": 0.13543662,
+          "maximum_dwell": 30,
+          "initial_altitude": 130.39940388161537,
+          "final_altitude": 148.3691054035183,
+          "minimum_altitude": 129.49804749559718,
+          "thrust_ticks": 618,
+          "brake_ticks": 990,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8035752,
+            "maximum_distance": 2.698175,
+            "minimum_relative_speed": 0.13543662,
+            "maximum_relative_speed": 0.9140679
+          },
+          "trace_sha256": "1f5007749198e28ccf59a8afaf4a611650ab4eece9541862e8800c942362e735"
+        }
+      }
+    },
+    {
+      "case": "qualification_target_motion_b1_p0",
+      "group": "target_motion",
+      "contrast": true,
+      "policies": {
+        "candidate": {
+          "outcome": "arrived",
+          "elapsed_ticks": 990,
+          "final": {
+            "distance": 1.6988741,
+            "relative_speed": 0.5463749,
+            "dwell": 30
+          },
+          "closest_distance": 1.6988741,
+          "ticks_within_position": 145,
+          "ticks_within_both": 85,
+          "first_tick_within_both": 821,
+          "minimum_speed_within_position": 0.37134117,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 115.59929648631854,
+          "minimum_altitude": 95.00097760683187,
+          "thrust_ticks": 156,
+          "brake_ticks": 146,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.6988741,
+            "maximum_distance": 2.3486688,
+            "minimum_relative_speed": 0.44118458,
+            "maximum_relative_speed": 1.1220547
+          },
+          "trace_sha256": "08fd73188aba0059fe84c3af9e9d87d388a567e138159dac514dd4a96adf7499"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 929,
+          "final": {
+            "distance": 1.8117095,
+            "relative_speed": 0.40211,
+            "dwell": 30
+          },
+          "closest_distance": 1.8117095,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 900,
+          "minimum_speed_within_position": 0.13574061,
+          "maximum_dwell": 30,
+          "initial_altitude": 95.44927999999999,
+          "final_altitude": 114.74025414850723,
+          "minimum_altitude": 94.69757463659505,
+          "thrust_ticks": 548,
+          "brake_ticks": 929,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8117095,
+            "maximum_distance": 2.7188587,
+            "minimum_relative_speed": 0.13574061,
+            "maximum_relative_speed": 0.9060058
+          },
+          "trace_sha256": "82233d4d23b9b3542615b9403716d2e4f4bf5b50aaebf9900718d826ef253417"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a1_b0_p2",
+      "group": "combined",
+      "contrast": true,
+      "policies": {
+        "candidate": {
+          "outcome": "arrived",
+          "elapsed_ticks": 465,
+          "final": {
+            "distance": 1.7633048,
+            "relative_speed": 0.7630902,
+            "dwell": 30
+          },
+          "closest_distance": 1.7633048,
+          "ticks_within_position": 33,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 436,
+          "minimum_speed_within_position": 0.2904057,
+          "maximum_dwell": 30,
+          "initial_altitude": 105.44915624310354,
+          "final_altitude": 87.98781790905494,
+          "minimum_altitude": 87.20524563077771,
+          "thrust_ticks": 53,
+          "brake_ticks": 9,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.7633048,
+            "maximum_distance": 4.5413647,
+            "minimum_relative_speed": 0.2904057,
+            "maximum_relative_speed": 4.7695336
+          },
+          "trace_sha256": "3b3afd09d0fd942e748c80d01d4296fa90a3c9dd3619392731f0d3c147d8b7ce"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 603,
+          "final": {
+            "distance": 1.8281476,
+            "relative_speed": 0.34854287,
+            "dwell": 30
+          },
+          "closest_distance": 1.8281476,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 574,
+          "minimum_speed_within_position": 0.28237015,
+          "maximum_dwell": 30,
+          "initial_altitude": 105.44915624310354,
+          "final_altitude": 89.11564858416307,
+          "minimum_altitude": 89.11564858416307,
+          "thrust_ticks": 131,
+          "brake_ticks": 603,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8281476,
+            "maximum_distance": 2.6620252,
+            "minimum_relative_speed": 0.28237015,
+            "maximum_relative_speed": 0.7973179
+          },
+          "trace_sha256": "154860f4630ea06eceb54432dc276d468c26df15eb7499396f9f8c9210bfea30"
+        }
+      }
+    },
+    {
+      "case": "qualification_combined_a2_b0_p2",
+      "group": "combined",
+      "contrast": true,
+      "policies": {
+        "candidate": {
+          "outcome": "arrived",
+          "elapsed_ticks": 641,
+          "final": {
+            "distance": 1.2118235,
+            "relative_speed": 0.41939262,
+            "dwell": 30
+          },
+          "closest_distance": 1.0436263,
+          "ticks_within_position": 161,
+          "ticks_within_both": 96,
+          "first_tick_within_both": 522,
+          "minimum_speed_within_position": 0.37195364,
+          "maximum_dwell": 30,
+          "initial_altitude": 130.44962971721844,
+          "final_altitude": 111.38565514728151,
+          "minimum_altitude": 111.38565514728151,
+          "thrust_ticks": 54,
+          "brake_ticks": 9,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.0436263,
+            "maximum_distance": 1.5526662,
+            "minimum_relative_speed": 0.37195364,
+            "maximum_relative_speed": 2.3513775
+          },
+          "trace_sha256": "787e961d36a7a1f78b4654f10efd3d728a0b9da9fa016c62a45f2cc4ec40f976"
+        },
+        "reference": {
+          "outcome": "arrived",
+          "elapsed_ticks": 613,
+          "final": {
+            "distance": 1.8283296,
+            "relative_speed": 0.38451234,
+            "dwell": 30
+          },
+          "closest_distance": 1.8283296,
+          "ticks_within_position": 30,
+          "ticks_within_both": 30,
+          "first_tick_within_both": 584,
+          "minimum_speed_within_position": 0.2824326,
+          "maximum_dwell": 30,
+          "initial_altitude": 130.44962971721844,
+          "final_altitude": 113.90702465717854,
+          "minimum_altitude": 113.90702465717854,
+          "thrust_ticks": 155,
+          "brake_ticks": 613,
+          "saturated_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "last_120_ticks": {
+            "minimum_distance": 1.8283296,
+            "maximum_distance": 2.672618,
+            "minimum_relative_speed": 0.2824326,
+            "maximum_relative_speed": 0.81186557
+          },
+          "trace_sha256": "d6eeb2e7c8762839352ed97db30f41cdb405d0b05b77eac9077b787dfd950e7c"
+        }
+      }
+    }
+  ]
+}
