@@ -15,6 +15,11 @@ enum Command {
     /// Reconcile an existing recovery journal and observe a trial boot.
     /// Normally invoked by the separate spacewars-recovery service.
     Recover,
+    /// Separately authenticated root operator tools; not available on the device socket.
+    Maintenance {
+        #[command(subcommand)]
+        operation: MaintenanceCommand,
+    },
     /// Read a bounded JSON status snapshot independently of the game client.
     Status,
     /// Inspect the current time provider without changing clocks or state.
@@ -31,6 +36,17 @@ enum Command {
     /// Fixed temporary write using the kiosk account's permissions.
     #[command(hide = true)]
     KioskStateWorker,
+}
+
+#[derive(Subcommand)]
+enum MaintenanceCommand {
+    /// Install a compatible development client/CLI pair under the OTA lock.
+    Fast {
+        #[arg(allow_hyphen_values = true)]
+        arguments: Vec<String>,
+    },
+    /// Change the fixed experimental renderer under the OTA lock.
+    Renderer { renderer: String },
 }
 
 fn main() -> ExitCode {
@@ -77,6 +93,15 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
         Command::Recover => {
             daemon::require_root()?;
             engine_os_manager::recovery_service::run()?;
+        }
+        Command::Maintenance { operation } => {
+            daemon::require_root()?;
+            use engine_os_manager::maintenance::{Request, run};
+            let request = match operation {
+                MaintenanceCommand::Fast { arguments } => Request::fast(arguments)?,
+                MaintenanceCommand::Renderer { renderer } => Request::renderer(renderer)?,
+            };
+            run(request)?;
         }
         Command::CaptureRtc => {
             daemon::require_root()?;

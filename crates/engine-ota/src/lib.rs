@@ -60,7 +60,7 @@ pub enum Error {
     Feed(String),
     #[error("invalid or uninitialized trust store: {0}")]
     Store(String),
-    #[error("update verification is already in progress")]
+    #[error("another update or maintenance operation is already in progress")]
     Busy,
     #[error("no retained verified feed; refresh required")]
     RefreshRequired,

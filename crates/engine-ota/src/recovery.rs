@@ -851,6 +851,21 @@ impl RecoveryRecord {
     }
 
     #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn maintenance(&self, boot: &BootObservation) -> Result<()> {
+        self.check_boot(boot)?;
+        if self
+            .transaction
+            .as_ref()
+            .is_some_and(|tx| !tx.phase.terminal())
+            || !self.runs_good(boot)
+            || boot.default_slot != Some(self.good.slot)
+        {
+            return Err(RecoveryError::StaleCommand);
+        }
+        Ok(())
+    }
+
+    #[cfg(any(target_os = "linux", test))]
     pub(crate) fn inactive_write(
         &self,
         image: &ImageDescriptor,

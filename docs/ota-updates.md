@@ -26,7 +26,7 @@ Remaining work retains the full OTA scope:
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Trial coordinator, independent recovery service, health/identity evidence, early watchdog and journal-gated boot completion implemented; bootstrap and physical recovery qualification remain |
-| #264 | Shared lock and verified inactive-root writer implemented; final service/handoff, operator-helper integration and data preservation remain |
+| #264 | Shared lock, verified inactive-root writer and operator maintenance guard implemented; final service/handoff, maintenance holds and data preservation remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
@@ -191,7 +191,7 @@ Stale plans are rejected. A failed persistence operation poisons the handle
 until reopening and reconciliation, because an unsuccessful final flush can
 leave the rename outcome uncertain. Missing or corrupt recovery state never
 triggers automatic bootstrap. The writer and recovery controller share the
-installation lock described below; supervised update tools still need to adopt it.
+installation lock described below, also used by the operator maintenance guard.
 
 Twenty model/journal tests and 22 verifier/integration tests pass on the host
 and both Pis. They exercise private temporary files and injected observations;
@@ -657,6 +657,51 @@ maintenance holds, data preservation, legacy-helper restrictions and installed
 service/device qualification remain integration work.
 [Source, fixture and artifact evidence](data/ota-writer-20261015.json)
 records the exact scope.
+
+## Operator maintenance and the runtime privilege boundary
+
+New images no longer grant the runtime `spacewars` UID passwordless unsigned
+A/B installation, fast binary replacement or generic `systemctl reboot`.
+Their `ab-update` and `ab-update-with-key` commands reject all calls, and
+`ab-boot-manager switch` is disabled. The workstation legacy script detects the
+new manager and stops before transferring an image. Existing devices retain
+their old permissions until the supervised root bootstrap migrates both slots;
+no live Pi privilege has been changed by this source work.
+
+`./update.sh --fast --user root --target HOST` uses a separately provisioned
+root SSH identity and requires the v2 helper. The public fast-update and
+renderer wrappers enter fixed `engine-os-manager maintenance` operations. The
+manager clears inherited environment settings, validates arguments and holds
+`/run/spacewars-install/lock` across `exec` into a fixed private worker. It
+checks any existing recovery journal against the actual running good root and
+default, rejects every nonterminal transaction, and requires a completed
+watchdog record on a committed tryboot. It never disarms a watchdog to admit
+maintenance. Missing journal contents, corrupt state and a busy lock reject
+the operation. Fresh, unprovisioned development images retain operator tools.
+
+Fast staging must be private and root-owned, with regular single-link binary
+files. The existing copy/rollback/health behavior is retained, with bounded
+service-control calls. Compatibility now includes the device-service binary
+and entry wrappers, since fast mode does not update them. Renderer sudo remains
+limited to the two fixed modes and uses the same guard; the private workers
+are mode 0700 under a root-only directory. No maintenance operation is exposed
+through the kiosk's device-status socket.
+
+Host tests cover inherited lock lifetime, terminal-phase and current-root
+admission, missing watchdog completion, root-only CLI access, and the existing
+fast-update/renderer rollback fixtures. The real command wrappers run in a
+disposable root namespace with temporary files: a conflicting lock and corrupt
+journal reject both helpers before worker execution. Three changed OTA tests
+and the actual manager's unprivileged rejection paths also pass on the Pi 5.
+These checks do not yet qualify the installed sudo policy on the physical Pis.
+
+Reboot-capable maintenance/network holds, persistent operator-key provisioning,
+the verified workstation A/B service path, and preservation across real trials
+remain integration work. Fast changes deliberately alter the packaged client
+identity; automatic-install admission must account for that development state
+instead of treating the old image record as proof of the replacement binary.
+[Source and execution evidence](data/ota-maintenance-20261015.json) records
+this boundary without claiming completed bootstrap or automatic updates.
 
 ## Signed feed contract
 

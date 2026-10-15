@@ -14,7 +14,7 @@ const SSH_OPTIONS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'Ser
 const HASH = /^[a-f0-9]{64}$/;
 
 export function parseArgs(args) {
-  const options = { host: 'spacewars.local', user: 'spacewars', skipBuild: false, dryRun: false, prompt: false };
+  const options = { host: 'spacewars.local', user: 'root', skipBuild: false, dryRun: false, prompt: false };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (['--target', '--host', '--user'].includes(arg)) {
@@ -29,7 +29,7 @@ export function parseArgs(args) {
     }
   }
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(options.host)) throw new Error('Invalid target hostname or IPv4 address.');
-  if (options.user !== 'spacewars') throw new Error('Fast updates use the image’s restricted spacewars account.');
+  if (options.user !== 'root') throw new Error('Fast updates require separately provisioned root operator access (--user root). The kiosk account cannot install unsigned binaries.');
   return options;
 }
 
@@ -56,8 +56,8 @@ export function readBundle(directory) {
 }
 
 export function checkRemoteIdentity(reply, expected) {
-  if (reply.trim() !== `spacewars-fast-update-v1 ${expected}`) {
-    throw new Error('Fast-update helper/runtime does not match this build. Perform a normal full update first (without --fast).');
+  if (reply.trim() !== `spacewars-fast-update-v2 ${expected}`) {
+    throw new Error('Fast-update helper/runtime does not match this build. Use supervised root bootstrap to install the matching image and maintenance guard.');
   }
 }
 
@@ -76,7 +76,7 @@ export async function fastUpdate(options, { execute = run, bundleDir = join(defa
   console.log(`Fast update: ${target} (client + CLI, application restart, no reboot)`);
   if (options.dryRun) {
     console.log(`${options.skipBuild ? 'Use existing' : 'Build --target spacewars, then use'} bundle: ${bundleDir}`);
-    console.log('Check restricted helper/runtime compatibility; verify hashes; copy pair; restart and health-check; rollback on failure.');
+    console.log('Check root operator helper/runtime compatibility; verify hashes; copy pair; restart and health-check; rollback on failure.');
     console.log('Dry run: no build, SSH connection, files transferred, or remote changes.');
     return;
   }
@@ -84,10 +84,10 @@ export async function fastUpdate(options, { execute = run, bundleDir = join(defa
   const ssh = (command, capture = false) => execute('ssh', [...SSH_OPTIONS, target, command], { capture });
   // Fail before an expensive build if this image has not been bootstrapped.
   let identity;
-  try { identity = await ssh(`sudo -n ${HELPER} --check`, true); }
-  catch (error) { throw new Error(`Cannot use fast updates on ${target}: ${error.message}. Install the helper with one normal full update first.`); }
-  if (!/^spacewars-fast-update-v1 [a-f0-9]{64}$/.test(identity)) {
-    throw new Error('Missing/unsupported fast-update helper; perform a normal full update first.');
+  try { identity = await ssh(`${HELPER} --check`, true); }
+  catch (error) { throw new Error(`Cannot use fast updates on ${target}: ${error.message}. Provision root access and the matching maintenance guard through supervised bootstrap.`); }
+  if (!/^spacewars-fast-update-v2 [a-f0-9]{64}$/.test(identity)) {
+    throw new Error('Missing/unsupported operator helper; use supervised root bootstrap first.');
   }
   if (!options.skipBuild) {
     await execute(process.execPath, [join(YOCTO_DIR, 'scripts/build.mjs'), '--target', 'spacewars'], { cwd: YOCTO_DIR });
@@ -110,7 +110,7 @@ export async function fastUpdate(options, { execute = run, bundleDir = join(defa
     // No remote shell interpolation of local paths, and only a validated fixed
     // staging path on the remote side. The helper checks hashes again after copy.
     await execute('scp', [...SSH_OPTIONS, ...NAMES.map(name => join(bundleDir, name)), `${target}:${stage}/`]);
-    await ssh(`sudo -n ${HELPER} ${stage} ${manifest.compatibility} ${NAMES.map(name => manifest.binaries[name].sha256).join(' ')}`);
+    await ssh(`${HELPER} ${stage} ${manifest.compatibility} ${NAMES.map(name => manifest.binaries[name].sha256).join(' ')}`);
   } finally {
     try { await ssh(`rm -f -- ${stage}/engine-client ${stage}/spacewars-cli && rmdir -- ${stage}`); }
     catch (error) { console.warn(`Could not clean staging directory ${stage}: ${error.message}`); }

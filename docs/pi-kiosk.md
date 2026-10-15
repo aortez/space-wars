@@ -507,12 +507,12 @@ their own path. Desktop and CPU-only headless benchmarks are unchanged.
 
 ### Fast application updates
 
-After **one normal update** installs the fast-update helper and sudoers rule:
+After supervised bootstrap provisions root operator access and the v2 maintenance guard:
 
 ```sh
-./update.sh --fast --target picade.local
-./update.sh --fast --target picade.local --skip-build
-./update.sh --fast --target picade.local --dry-run
+./update.sh --fast --user root --target picade.local
+./update.sh --fast --user root --target picade.local --skip-build
+./update.sh --fast --user root --target picade.local --dry-run
 ```
 
 The default host is still `spacewars.local`; always specify `picade.local` for
@@ -526,21 +526,25 @@ application restart. Games in progress end when the application restarts.
 
 The installed runtime identity must match the bundle. It fingerprints the
 build target, shared libraries in the recipe sysroot, installed service files,
-data initialization and installer helper. Missing helpers, changed libraries
-or service setup fail before installation: run a normal update without
-`--fast`. Hardware/kernel/firmware changes still require the full-flash checks
+device-service executable, data initialization and installer helper. Missing
+helpers, changed libraries or service setup fail before installation and need
+a compatible rootfs update or supervised bootstrap. Hardware/kernel/firmware changes still require the full-flash checks
 described above. Fast mode does **not** update OS packages, units, boot files,
 `engine-agent`, `engine-os-manager`, or `falling-benchmark`, and does not sync
-user data/ROMs. Use normal updates for those changes and `sync-data.sh` for ROMs.
+user data/ROMs. Use the rootfs update/bootstrap path for those changes and `sync-data.sh` for ROMs.
 The fingerprint is a conservative guard, not a general OS/package upgrade tool.
 
-The fast-update sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
-a fixed pair of binaries from a validated staging directory, reads them as the
-kiosk user, verifies hashes again, and serializes installs with a lock. It keeps
+The runtime kiosk UID has no fast-update sudo permission. The separately
+authenticated root operator invokes `/usr/sbin/spacewars-fast-update`; its fixed
+device-manager entry point validates arguments, acquires the shared OTA/recovery
+lock, and rejects an unresolved trial or uncompleted trial watchdog. It then
+executes a fixed private worker with the lock inherited. The worker accepts a
+fixed pair of binaries from a private root-owned staging directory and verifies
+hashes again. It keeps
 backups before stopping the app and requires three control-API responses from
 the same new PID. A failed install/start/health check restores the previous pair
 and restarts it. No arbitrary copy command or generic service-control sudo is
-granted. The previous successful pair is retained, root-owned, under
+granted to the kiosk account. The previous successful pair is retained, root-owned, under
 `/usr/lib/spacewars-fast-update/` for manual recovery.
 
 Unlike A/B rootfs updates, this modifies the **current** root slot. File renames

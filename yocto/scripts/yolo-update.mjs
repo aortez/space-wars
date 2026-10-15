@@ -136,13 +136,15 @@ function findImage(utils, imageArg) {
 
 function checkRemoteOtaPrivilege(utils, remoteTarget) {
   const probe = [
-    'rm -f /tmp/spacewars-ota-sudo-check',
-    'sudo -n /usr/sbin/ab-update-with-key --spacewars-sudo-probe >/tmp/spacewars-ota-sudo-check 2>&1',
-    "if grep -Eqi 'password|not allowed|may not run sudo' /tmp/spacewars-ota-sudo-check; then echo blocked; else echo ok; fi",
-    'rm -f /tmp/spacewars-ota-sudo-check',
+    'if test -x /usr/bin/engine-os-manager; then echo managed',
+    'elif sudo -n -l /usr/sbin/ab-update-with-key >/dev/null 2>&1; then echo legacy',
+    'else echo blocked; fi',
   ].join('; ');
-
-  return utils.ssh(remoteTarget, probe) === 'ok';
+  const state = utils.ssh(remoteTarget, probe);
+  if (state === 'managed') {
+    throw new Error('This image uses the verified device updater. Legacy unsigned A/B installation is disabled; use supervised root bootstrap while installer integration is in progress.');
+  }
+  return state === 'legacy';
 }
 
 async function main() {
@@ -216,11 +218,9 @@ async function main() {
   if (!dryRun && !checkRemoteOtaPrivilege(utils, remoteTarget)) {
     throw new Error(
       [
-        'Remote image is not OTA-ready for the spacewars user.',
-        'The current Pi image needs a sudoers rule allowing:',
-        '  sudo /usr/sbin/ab-update-with-key ...',
-        '  sudo /usr/bin/systemctl reboot',
-        'Flash one OTA-capable image first, then future updates can use npm run update.',
+        'The remote account does not have legacy update permission.',
+        'Do not add unsigned installer privileges to the runtime kiosk account.',
+        'Use separately authenticated root access for supervised bootstrap.',
       ].join('\n')
     );
   }

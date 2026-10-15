@@ -154,6 +154,23 @@ pub(crate) fn inspect(boot: &BootObservation) -> Result<EarlyWatchdog> {
     Ok(record)
 }
 
+pub(crate) fn require_completed(journal: &RecoveryStore, boot: &BootObservation) -> Result<()> {
+    check_completed(journal, boot, &RuntimeDirectory::open()?)
+}
+
+fn check_completed(
+    journal: &RecoveryStore,
+    boot: &BootObservation,
+    runtime: &RuntimeDirectory,
+) -> Result<()> {
+    let token = journal.durable_record()?.watchdog_completion(boot)?;
+    runtime.early(boot)?;
+    if !runtime.completed(boot, token)? {
+        return Err(invalid("trial watchdog completion is still pending"));
+    }
+    Ok(())
+}
+
 pub(crate) fn complete(
     lock: &InstallLock,
     journal: &RecoveryStore,

@@ -34,10 +34,9 @@ ROOTFS_POSTPROCESS_COMMAND:append = " setup_spacewars_home;"
 setup_spacewars_ota_sudoers() {
     install -d -m 0750 ${IMAGE_ROOTFS}/etc/sudoers.d
     cat > ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota << 'EOF'
-# Allow the kiosk user to perform A/B OTA updates through yocto/scripts/yolo-update.mjs.
-spacewars ALL=(root) NOPASSWD: /usr/sbin/ab-update-with-key *, /usr/bin/systemctl reboot
-# Application-only updates install a fixed client/CLI pair and restart only the kiosk.
-spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-fast-update *
+# Runtime installation is authorized only through the verified device service.
+# Unsigned development maintenance requires separately provisioned root access.
+# Do not restore legacy installer or general reboot grants for the kiosk UID.
 EOF
     chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota
 }

@@ -123,45 +123,28 @@ access, and the hostname. A raw image defaults to HDMI, not HyperPixel.
 
 ## OTA Update
 
-After an OTA-capable image has been flashed once, later root filesystem updates
-can be pushed from the repository root over SSH to the inactive A/B slot:
+This branch is migrating to the [verified device updater](../docs/ota-updates.md).
+New images remove the kiosk account's unsigned-install and general reboot sudo
+grants. Their old `ab-update`, `ab-update-with-key` and direct slot-switch commands
+are disabled so they cannot bypass the signed-image/recovery contract. The
+production installation service is still being integrated; these images are
+not yet ready for automatic rollout.
 
-```sh
-./update.sh
-./update.sh --skip-build
-```
+The legacy `./update.sh`/`npm run yolo` A/B path remains for older images only.
+It stops on images containing the new device manager. Do not restore the old
+sudoers rules as a workaround. Existing devices need the supervised root
+bootstrap, which preserves `/data` and provisions recovery plus separately
+authenticated operator access. Kernel, firmware and shared boot changes remain
+outside ordinary rootfs updates. SSH host identity remains in `/data/ssh`.
 
-`./update.sh` follows the DirtSim model: it builds unless `--skip-build` is
-passed, transfers the latest
-`spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz`, verifies the checksum on the Pi,
-injects the configured SSH public key into the inactive slot, switches the boot
-slot, reboots, and verifies that `spacewars-kiosk.service` is active. The image
-grants the `spacewars` user passwordless sudo for the A/B helper, restricted
-application-update helper, and `systemctl reboot`. The lower-level command remains available as
-`npm run update` from this directory.
-
-For the cabinet, use `./update.sh --target picade.local`. Updates require the
-image's `.ext4.gz.boot-id` sidecar to match `/boot/spacewars-boot-id` on the
-device. This updater does not replace boot files: migration from the old Pi 5
-image, or any later kernel/firmware/profile-definition change, requires a full
-image flash. Hardware selection and boot overrides survive rootfs-only updates.
-See [the compatibility boundary](../docs/picade.md#updates-and-the-boot-compatibility-boundary).
-
-SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
-device identity.
-
-`npm run yolo` is the lower-level A/B update command and keeps the explicit
-confirmation prompt unless `--yes` or `--hold-my-mead` is passed.
-
-For client-only iteration after one normal update installs the helper, use
-`./update.sh --fast --target picade.local` from the repository root (or
-`npm run update -- --fast --target picade.local` here). This builds just the
+For client-only iteration after that bootstrap installs the maintenance guard,
+use `./update.sh --fast --user root --target picade.local` from the repository
+root (or `npm run update -- --fast --user root --target picade.local` here).
+Fast mode defaults to the separately provisioned `root` SSH identity; the
+runtime `spacewars` account remains available for diagnostics and data transfer.
+This builds just the
 application recipe and deploys the matching client/CLI pair, checks runtime
 compatibility, and restarts the app without flashing/rebooting. `--skip-build`
 reuses the exported bundle; `--dry-run` has no build/network side effects.
 See [fast application updates](../docs/pi-kiosk.md#fast-application-updates)
 for the exact scope and recovery limitations.
-
-The first image that enables this privilege still has to be installed through
-`npm run flash` or another root-capable path. A Pi already running an older
-image without the sudoers rule cannot self-update without root credentials.

@@ -103,9 +103,11 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update-wrapper.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sudoers:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer-wrapper.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.sudoers:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-renderer.conf:True",
     ]
@@ -133,7 +135,9 @@ do_install() {
     install -m 0755 ${WORKDIR}/spacewars-data-init.sh ${D}${bindir}/spacewars-data-init
 
     install -d ${D}${sbindir}
-    install -m 0755 ${WORKDIR}/spacewars-fast-update.sh ${D}${sbindir}/spacewars-fast-update
+    install -d -m 0700 ${D}${libexecdir}/spacewars
+    install -m 0700 ${WORKDIR}/spacewars-fast-update.sh ${D}${libexecdir}/spacewars/fast-update
+    install -m 0755 ${WORKDIR}/spacewars-fast-update-wrapper.sh ${D}${sbindir}/spacewars-fast-update
     install -m 0755 ${WORKDIR}/spacewars-logs.sh ${D}${sbindir}/spacewars-logs
     install -d -m 0750 ${D}${sysconfdir}/sudoers.d
     install -m 0440 ${WORKDIR}/spacewars-logs.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-logs
@@ -149,7 +153,8 @@ do_install() {
     install -m 0644 ${WORKDIR}/spacewars-seatd.service ${D}${systemd_system_unitdir}/spacewars-seatd.service
 
     if [ "${SPACEWARS_GPU}" = "1" ]; then
-        install -m 0755 ${WORKDIR}/spacewars-renderer.sh ${D}${sbindir}/spacewars-renderer
+        install -m 0700 ${WORKDIR}/spacewars-renderer.sh ${D}${libexecdir}/spacewars/renderer
+        install -m 0755 ${WORKDIR}/spacewars-renderer-wrapper.sh ${D}${sbindir}/spacewars-renderer
         install -m 0440 ${WORKDIR}/spacewars-renderer.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-renderer
         install -d ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d
         install -m 0644 ${WORKDIR}/spacewars-renderer.conf ${D}${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf
@@ -168,9 +173,11 @@ SRC_URI += " \
     file://spacewars-kiosk.service \
     file://spacewars-seatd.service \
     file://spacewars-fast-update.sh \
+    file://spacewars-fast-update-wrapper.sh \
     file://spacewars-logs.sh \
     file://spacewars-logs.sudoers \
     file://spacewars-renderer.sh \
+    file://spacewars-renderer-wrapper.sh \
     file://spacewars-renderer.sudoers \
     file://spacewars-renderer.conf \
 "
@@ -185,11 +192,15 @@ python write_spacewars_fast_compatibility() {
         "spacewars-system.service", "spacewars-rtc-capture.service",
         "spacewars-recovery.service", "spacewars-install.conf",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
+        "spacewars-fast-update-wrapper.sh",
         "spacewars-logs.sh", "spacewars-logs.sudoers",
     )]
+    # A fast client must not assume a newer maintenance/service contract than
+    # the installed root image. This binary is not replaced by the fast path.
+    assets.append(Path(d.getVar("D")) / "usr/bin/engine-os-manager")
     if d.getVar("SPACEWARS_GPU") == "1":
         assets.extend(Path(d.getVar("WORKDIR")) / name for name in (
-            "spacewars-renderer.sh", "spacewars-renderer.sudoers", "spacewars-renderer.conf",
+            "spacewars-renderer.sh", "spacewars-renderer-wrapper.sh", "spacewars-renderer.sudoers", "spacewars-renderer.conf",
         ))
     variables = {key: d.getVar(key) or "" for key in (
         "MACHINE", "TARGET_SYS", "TUNE_FEATURES", "DISTRO", "DISTRO_VERSION",
@@ -241,6 +252,7 @@ FILES:${PN} = " \
     ${bindir}/engine-os-manager \
     ${bindir}/falling-benchmark \
     ${bindir}/spacewars-data-init \
+    ${libexecdir}/spacewars \
     ${sbindir}/spacewars-fast-update \
     ${sbindir}/spacewars-logs \
     ${sysconfdir}/sudoers.d/spacewars-logs \

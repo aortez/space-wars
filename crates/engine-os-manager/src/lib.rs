@@ -6,6 +6,8 @@ pub mod kiosk_health;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "linux")]
+pub mod maintenance;
+#[cfg(target_os = "linux")]
 pub mod recovery_service;
 #[cfg(target_os = "linux")]
 pub mod recovery_status;

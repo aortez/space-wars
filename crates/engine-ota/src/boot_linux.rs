@@ -326,6 +326,17 @@ impl<'a> BootController<'a> {
         crate::watchdog_linux::complete(self.lock, journal, &self.observe()?.observation)
     }
 
+    /// Read-only admission for operator maintenance. It cannot complete a trial
+    /// or disarm its watchdog on behalf of an unfinished recovery service.
+    pub fn authorize_maintenance(&self, journal: &RecoveryStore) -> Result<()> {
+        let boot = self.observe()?.observation;
+        journal.durable_record()?.maintenance(&boot)?;
+        if boot.tryboot {
+            crate::watchdog_linux::require_completed(journal, &boot)?;
+        }
+        Ok(())
+    }
+
     /// Recheck immediately before requesting a normal systemd reboot. This
     /// operation cannot authorize another tryboot or select an arbitrary root.
     pub fn authorize_rollback_reboot(&self, journal: &RecoveryStore, id: Sha256) -> Result<()> {

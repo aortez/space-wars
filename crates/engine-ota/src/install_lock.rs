@@ -4,7 +4,9 @@ use crate::{Error, Result};
 use std::fs::File;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::MetadataExt;
+use std::os::unix::process::CommandExt;
 use std::path::Path;
+use std::process::Command;
 
 pub const INSTALL_LOCK_PATH: &str = "/run/spacewars-install/lock";
 
@@ -19,6 +21,30 @@ pub struct InstallLock {
 }
 
 impl InstallLock {
+    /// Replace a separately authenticated operator command with its fixed
+    /// helper, retaining the lock even if that helper's parent disappears.
+    /// This is not exposed through the kiosk/device API.
+    pub fn exec_maintenance(self, mut command: Command) -> Result<()> {
+        self.inherit(&mut command)?;
+        Err(command.exec().into())
+    }
+
+    fn inherit(&self, command: &mut Command) -> Result<()> {
+        self.check()?;
+        let fd = self.lock.as_raw_fd();
+        // SAFETY: only async-signal-safe fcntl runs between fork and exec; the
+        // live File retains the descriptor until exec has replaced this process.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::fcntl(fd, libc::F_SETFD, 0) < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        Ok(())
+    }
+
     pub fn acquire() -> Result<Self> {
         // SAFETY: geteuid has no preconditions or side effects.
         if unsafe { libc::geteuid() } != 0 {
@@ -127,6 +153,31 @@ mod tests {
         drop(held);
         let next = InstallLock::under(&run, owner).unwrap();
         next.check().unwrap();
+    }
+
+    #[test]
+    fn inherited_helper_retains_the_lock_after_the_parent_releases_its_copy() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::process::Stdio;
+        let (_path, run, owner) = setup();
+        let held = InstallLock::under(&run, owner).unwrap();
+        let mut command = Command::new("/bin/sh");
+        command
+            .args(["-c", "printf 'ready\\n'; read -r done"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped());
+        held.inherit(&mut command).unwrap();
+        let mut child = command.spawn().unwrap();
+        let mut ready = String::new();
+        BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut ready)
+            .unwrap();
+        assert_eq!(ready, "ready\n");
+        drop(held);
+        assert!(matches!(InstallLock::under(&run, owner), Err(Error::Busy)));
+        child.stdin.take().unwrap().write_all(b"done\n").unwrap();
+        assert!(child.wait().unwrap().success());
+        InstallLock::under(&run, owner).unwrap();
     }
 
     #[test]

@@ -119,6 +119,8 @@ impl Fixture {
 fn only_durable_success_can_open_and_disarm_and_repeat_calls_do_not_reopen() {
     let mut fixture = Fixture::new(true);
     let events = Events::default();
+    assert!(check_completed(&fixture.store, &fixture.boot, &fixture.runtime).is_err());
+    assert!(events.borrow().is_empty());
     assert_eq!(
         fixture.finish(&events, None).unwrap(),
         WatchdogCompletion::Stopped
@@ -128,6 +130,7 @@ fn only_durable_success_can_open_and_disarm_and_repeat_calls_do_not_reopen() {
         ["open", "support", "timeout", "disable", "close"]
     );
     events.borrow_mut().clear();
+    check_completed(&fixture.store, &fixture.boot, &fixture.runtime).unwrap();
     // After the early allowance has long elapsed, a retained completion in
     // this committed boot still prevents accidentally rearming the device.
     fixture.boot.uptime_ms += 86_400_000;
@@ -138,6 +141,7 @@ fn only_durable_success_can_open_and_disarm_and_repeat_calls_do_not_reopen() {
     assert!(events.borrow().is_empty());
 
     let pending = Fixture::new(false);
+    assert!(check_completed(&pending.store, &pending.boot, &pending.runtime).is_err());
     assert!(pending.finish(&events, None).is_err());
     assert!(events.borrow().is_empty());
 }

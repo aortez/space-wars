@@ -9,7 +9,7 @@ import { checkRemoteIdentity, fastUpdate, parseArgs, readBundle } from '../scrip
 import { MACHINE, YOCTO_DIR } from '../scripts/paths.mjs';
 
 const compat = 'a'.repeat(64);
-const identity = `spacewars-fast-update-v1 ${compat}`;
+const identity = `spacewars-fast-update-v2 ${compat}`;
 
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'spacewars-fast-test-'));
@@ -29,10 +29,10 @@ function fixture(t) {
 
 test('fast arguments are explicit and reject full-image flags/remote shell syntax', () => {
   assert.deepEqual(parseArgs(['--fast', '--target', 'picade.local', '--skip-build']), {
-    host: 'picade.local', user: 'spacewars', skipBuild: true, dryRun: false, prompt: false,
+    host: 'picade.local', user: 'root', skipBuild: true, dryRun: false, prompt: false,
   });
   assert.equal(parseArgs(['--host', '192.168.1.10']).host, '192.168.1.10');
-  for (const args of [['--image', 'image.gz'], ['--ssh-key', 'key.pub'], ['--remote-tmp', '/data'], ['--target'], ['--target', '--dry-run'], ['--target', 'host;reboot'], ['--target', '-oProxyCommand=x'], ['--user', 'root'], ['--typo']]) {
+  for (const args of [['--image', 'image.gz'], ['--ssh-key', 'key.pub'], ['--remote-tmp', '/data'], ['--target'], ['--target', '--dry-run'], ['--target', 'host;reboot'], ['--target', '-oProxyCommand=x'], ['--user', 'spacewars'], ['--typo']]) {
     assert.throws(() => parseArgs(args));
   }
 });
@@ -57,8 +57,8 @@ test('bundle requires matching identities, complete binary pair, architecture an
 
 test('missing/mismatched remote helper requires a full update', () => {
   checkRemoteIdentity(identity, compat);
-  for (const actual of ['', `spacewars-fast-update-v2 ${compat}`, `spacewars-fast-update-v1 ${'b'.repeat(64)}`]) {
-    assert.throws(() => checkRemoteIdentity(actual, compat), /normal full update/);
+  for (const actual of ['', `spacewars-fast-update-v1 ${compat}`, `spacewars-fast-update-v2 ${'b'.repeat(64)}`]) {
+    assert.throws(() => checkRemoteIdentity(actual, compat), /supervised root bootstrap/);
   }
 });
 
@@ -71,7 +71,7 @@ function executor(reply = identity, failInstall = false) {
       const remote = args.at(-1);
       if (remote.endsWith('--check')) return reply;
       if (remote.startsWith('mktemp')) return '/tmp/spacewars-fast.A123456789';
-      if (failInstall && remote.startsWith('sudo -n /usr/sbin/spacewars-fast-update /tmp/')) throw new Error('install failed');
+      if (failInstall && remote.startsWith('/usr/sbin/spacewars-fast-update /tmp/')) throw new Error('install failed');
       return '';
     },
   };
@@ -84,8 +84,8 @@ test('dry run has no build, network or artifact reads', async () => {
 
 test('runtime mismatch aborts before copying or stopping the app', async t => {
   const f = fixture(t);
-  const e = executor(`spacewars-fast-update-v1 ${'b'.repeat(64)}`);
-  await assert.rejects(fastUpdate(parseArgs(['--skip-build']), { ...e, bundleDir: f.directory }), /normal full update/);
+  const e = executor(`spacewars-fast-update-v2 ${'b'.repeat(64)}`);
+  await assert.rejects(fastUpdate(parseArgs(['--skip-build']), { ...e, bundleDir: f.directory }), /supervised root bootstrap/);
   assert.equal(e.calls.length, 1);
 });
 
@@ -97,7 +97,7 @@ test('fast update builds only the recipe, transfers a pair, calls fixed helper, 
   assert.deepEqual(e.calls[1][1].slice(-2), ['--target', 'spacewars']);
   assert.equal(e.calls[3][0], 'scp');
   assert.ok(e.calls[3][1].includes(join(f.directory, 'spacewars-cli')));
-  assert.match(e.calls[4][1].at(-1), /^sudo -n \/usr\/sbin\/spacewars-fast-update \/tmp\/spacewars-fast\.A123456789 /);
+  assert.match(e.calls[4][1].at(-1), /^\/usr\/sbin\/spacewars-fast-update \/tmp\/spacewars-fast\.A123456789 /);
   assert.match(e.calls[5][1].at(-1), /^rm -f -- .* && rmdir -- /);
   assert.doesNotMatch(JSON.stringify(e.calls), /reboot|ab-update|rootfs/);
 });

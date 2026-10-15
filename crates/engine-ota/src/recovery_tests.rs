@@ -177,6 +177,36 @@ fn reopen(record: &RecoveryRecord) -> RecoveryRecord {
 }
 
 #[test]
+fn maintenance_requires_a_terminal_transaction_and_the_current_good_default() {
+    let (record, mut boot, _) = baseline();
+    record.maintenance(&boot).unwrap();
+    boot.default_slot = Some(Slot::B);
+    assert!(record.maintenance(&boot).is_err());
+    for (record, boot) in [
+        writing(&descriptor(2)),
+        prepared(),
+        requested(),
+        trial(),
+        promoting(),
+    ] {
+        assert!(record.maintenance(&boot).is_err());
+    }
+    let (record, mut boot) = promoting();
+    boot.default_slot = Some(Slot::B);
+    let committed = record.finish_promotion(&boot).unwrap().record;
+    committed.maintenance(&boot).unwrap();
+    boot.actual_slot = Some(Slot::A);
+    assert!(committed.maintenance(&boot).is_err());
+    let (record, boot) = prepared();
+    let rolled_back = record
+        .fail(FailureReason::InstallationFailed, &boot)
+        .unwrap()
+        .record;
+    assert_eq!(rolled_back.transaction().unwrap().phase, Phase::RolledBack);
+    rolled_back.maintenance(&boot).unwrap();
+}
+
+#[test]
 fn default_changes_only_after_continuous_health_and_old_root_is_retained() {
     let (record, mut boot) = promoting();
     assert_eq!(record.good().slot, Slot::A);
