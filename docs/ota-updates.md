@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health model and kiosk observer implemented; image/boot integration, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal, health model, kiosk observer and early trial initramfs implemented; image/boot integration, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -286,9 +286,11 @@ reset path.
 The shared Pi 4 firmware bytes match the layer's April 2025 firmware; Pi 5 uses
 its March 2025 EEPROM firmware. These predate the
 [firmware change adding early watchdog enablement](https://github.com/raspberrypi/firmware/commit/3885768a3aad70f42a9d9a85b550046b6b9d83fe).
-The [documented kernel-watchdog handoff](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel_watchdog_timeout)
-therefore requires supervised boot preparation and exact-version qualification.
-The normal updater must not silently replace firmware/EEPROM to obtain it.
+The [documented firmware-to-kernel watchdog handoff](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel_watchdog_timeout)
+would therefore require supervised firmware preparation and exact-version
+qualification. The immutable initramfs below is an alternative being prepared
+for qualification with the existing firmware. The normal updater must not
+silently replace firmware/EEPROM to obtain either recovery path.
 Both boards have an owner-confirmed local or independent recovery path for
 subsequent controlled trials; no failure, reboot or firmware experiment has
 yet been performed.
@@ -305,6 +307,51 @@ recovery with Internet unavailable. It must also test interrupted promotion on
 the real USB media. State-machine fixtures do not prove FAT power-loss behavior;
 damage to the shared boot filesystem still needs manual recovery even when
 both root partitions remain intact.
+
+### Early trial watchdog
+
+`spacewars-recovery-initramfs` is a shared boot asset, loaded before the candidate
+root filesystem. Its first module runs before udev or root mounting. Normal
+boots leave the watchdog untouched. A firmware-reported tryboot arms the fixed
+BCM2835 watchdog, checks a 210-second timeout, and records the boot ID, trial
+token and boot-relative arm time in private volatile state. Invalid trial
+tokens fail after arming so that a malformed trial still has a reset path.
+Duplicate invocation cannot refresh an existing arm record.
+
+The helper closes without the magic disable byte or a disable ioctl, including
+error paths. In the
+[pinned kernel implementation](https://github.com/raspberrypi/linux/blob/e442e5c1ab6bff5b5460b4fc949beb72aaf77970/drivers/watchdog/watchdog_dev.c),
+this leaves the watchdog active. The BCM2835 driver's shorter hardware timer is
+fed by the kernel only until the last userspace ping plus the requested virtual
+timeout. The unlimited first-open grace period does not apply to that active
+state. This source-level conclusion still needs measured expiry and reopen
+tests on each board; the syscall fixtures cannot establish physical reset.
+
+The future coordinator must take ownership and enforce the existing 180-second
+boot-relative trial deadline, including across service restarts. It must not
+refresh the allowance from its own start time. The 210-second early timeout is
+a bounded fallback when that coordinator never runs, not an extra health
+window. The initramfs moves `/run` into the real root only after its udev
+shutdown hook, preserving the arm record without hiding udev's control socket.
+
+The initramfs contains no kiosk or updater binary and never needs candidate
+userspace to arm recovery. Its bytes are included in the boot compatibility
+identity, so rootfs-only OTA cannot replace it. Boot failures before this
+immutable stage runs and damage to the shared boot filesystem remain outside
+its coverage. It must be installed through the separately authorized,
+data-preserving bootstrap and qualified before automatic trials are enabled.
+
+The build checks the exact module order, required tools, shell interpreters,
+AArch64 ELF architecture, shared-library closure and immutable file permissions.
+This caught a successful package build which had omitted BusyBox and therefore
+could not run `mount`. The corrected archive is 7,980,209 compressed bytes and
+contains all required runtime dependencies. All 38 Node and 50 Python tooling
+tests pass, including 21 intercepted-syscall watchdog cases; those 21 cases also
+pass unprivileged on the Pi 5. No real watchdog was opened, reboot requested,
+boot file changed or data partition written during validation. The Picade was
+unavailable for this pass.
+[Archive, source and fixture evidence](data/ota-watchdog-20261015.json)
+records the exact scope.
 
 ## Signed feed contract
 

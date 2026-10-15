@@ -1,6 +1,7 @@
 # Rootfs-only OTA must not pair a new kernel's modules with an old boot kernel.
-# A different boot ID requires a full USB image flash, not an A/B rootfs update.
+# A different boot ID requires supervised boot preparation, not rootfs-only OTA.
 do_rootfs[depends] += "virtual/kernel:do_deploy rpi-config:do_deploy rpi-bootfiles:do_deploy picade-hat:do_deploy spacewars-hardware:do_deploy"
+do_rootfs[depends] += "spacewars-recovery-initramfs:do_image_complete"
 do_rootfs[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/boot_identity.py:True"
 
 python write_spacewars_boot_identity() {

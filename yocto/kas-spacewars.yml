@@ -111,7 +111,7 @@ local_conf_header:
 
   rpi: |
     DISABLE_SPLASH = "1"
-    CMDLINE:append = " console=tty1 fbcon=map:01"
+    CMDLINE:append = " console=tty1 fbcon=map:01 roottimeout=30"
 
     # The firmware selects the board's KMS driver. A separate file selects
     # cabinet/display hardware, and is preserved by rootfs-only A/B updates.
@@ -122,6 +122,7 @@ local_conf_header:
     dtoverlay=vc4-kms-v3d-pi5\n\
     [all]\n\
     arm_64bit=1\n\
+    initramfs spacewars-recovery.cpio.gz followkernel\n\
     include spacewars-device.txt\n\
     [all]\n\
     '

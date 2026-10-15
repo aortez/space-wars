@@ -38,6 +38,17 @@ class BootIdentityTest(unittest.TestCase):
         (self.deploy / "spacewars-profiles/picade.txt").write_text("dtoverlay=picade,noaudio\n")
         self.assertNotEqual(before, boot_identity(self.deploy, self.entries))
 
+    def test_early_recovery_stage_is_an_immutable_boot_dependency(self):
+        recovery = self.deploy / "recovery.cpio.gz"
+        recovery.write_bytes(b"first-initramfs")
+        entries = self.entries + " recovery.cpio.gz;spacewars-recovery.cpio.gz"
+        before = boot_identity(self.deploy, entries)
+        recovery.write_bytes(b"changed-initramfs")
+        self.assertNotEqual(before, boot_identity(self.deploy, entries))
+        recovery.unlink()
+        with self.assertRaises(ValueError):
+            boot_identity(self.deploy, entries)
+
     def test_globs_match_wic_basename_and_directory_rules(self):
         self.assertEqual(boot_identity(self.deploy, "spacewars-profiles/*"), boot_identity(self.deploy, "spacewars-profiles/picade.txt;picade.txt"))
         self.assertEqual(boot_identity(self.deploy, "spacewars-profiles/*;spacewars-profiles/"), boot_identity(self.deploy, "spacewars-profiles/picade.txt"))
