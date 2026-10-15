@@ -4,15 +4,20 @@
 //! candidate is evidence to revalidate at installation, not permission to reboot.
 
 mod contract;
+pub mod recovery;
+mod recovery_store;
 mod repository;
 mod store;
 
 pub use contract::*;
+pub use recovery_store::RecoveryStore;
 pub use repository::*;
 pub use store::TrustStore;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Recovery(#[from] recovery::RecoveryError),
     #[error("waiting for usable time")]
     WaitingForTime,
     #[error("usable time moved backwards behind the retained trusted-time floor")]

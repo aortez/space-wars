@@ -72,5 +72,54 @@
     "result": "3559 tasks succeeded; patch and compile logs verified",
     "poky_revision": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
     "deployed": false
+  },
+  "image_build": {
+    "command": "SPACEWARS_BUILD_CACHE=off node yocto/scripts/build.mjs --target spacewars-image",
+    "result": "6701 tasks succeeded; 4225 reused",
+    "service_commit": "f26d12c",
+    "deployed": false,
+    "qualification": "Development image assembly and static unit verification only; not a frozen release or installed service qualification.",
+    "images": {
+      "spacewars-image-raspberrypi-spacewars.rootfs-20261015051305.ext4.gz": {
+        "bytes": 133721726,
+        "sha256": "ac11e7fecb1c282af7f70a6383829780aff6ca90243c30336c90d1303e44bd86"
+      },
+      "spacewars-image-raspberrypi-spacewars.rootfs-20261015051305.wic.gz": {
+        "bytes": 175242077,
+        "sha256": "9d3f4066cd37b4cd09b049f4dfc51a395cf83fde4ca1d0f036f49bb0fb581237"
+      }
+    },
+    "packaged": {
+      "usr/bin/engine-os-manager": {
+        "bytes": 3093112,
+        "sha256": "318342fba18954175fa74a2ae34e1142fcf907e787f7cbd836df6a399b342d16"
+      },
+      "usr/lib/systemd/systemd-timesyncd": {
+        "bytes": 67632,
+        "sha256": "dfd1eeef025b58d3c671fed2b2ea747cec67a969fa654e56ca5311ab8196720f"
+      },
+      "usr/lib/systemd/system/spacewars-system.service": {
+        "bytes": 900,
+        "sha256": "4cde8a496d2ab52b52b885d140996ad00881efe75389caa27545d7b915487697"
+      },
+      "usr/lib/systemd/system/spacewars-rtc-capture.service": {
+        "bytes": 807,
+        "sha256": "939b2cc3891855db500c8159bebee7f61ba2c656a1b9ba6775f92e2dd7daf088"
+      }
+    },
+    "receipt_property_present": true,
+    "enabled_units": [
+      "multi-user.target.wants/spacewars-system.service",
+      "sysinit.target.wants/spacewars-rtc-capture.service"
+    ],
+    "unit_verification": {
+      "tool": "systemd-analyze 259.5",
+      "exit_code": 0,
+      "root": "unprivileged debugfs extraction of built ext4 image",
+      "notes": "Both new units and their dependencies passed. Host 259 warns about upstream systemd 255 !! ExecStart modifiers; supported by the packaged 255.22. debugfs ownership-restoration warnings are expected for unprivileged extraction; actual image executable inode is root:root 0755."
+    },
+    "boot_identity": "fd13cb5411d199f033d9adb1bdf2bf6f8c82b165234570b4042e8f15e2af5607",
+    "installed_boot_identity": "47461f7ded8dab54698a73e6530eb190a18f1fac33a14da9b7cd7581d604b77e",
+    "rootfs_only_deployment_compatible": false
   }
 }

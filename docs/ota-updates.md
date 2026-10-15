@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Qualified trial boot, health confirmation, watchdog and fallback |
+| #263 | Journal and health model implemented; Linux adapters, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -132,9 +132,104 @@ All 24 tests passed on the host, Pi 4 and Pi 5, including a private D-Bus provid
 restart races, metadata corruption, permission checks, socket exhaustion and
 worker/request deadlines. The physical kiosks' stock systemd 255.21 providers
 correctly report the missing receipt capability. The patched systemd 255.22
-package builds with the current Yocto configuration; it has not been installed
-on the kiosks. [Raw Pi output and binary/source identities](data/device-time-20261014.json)
+package and complete development image build with the current Yocto configuration.
+The image contains the provider receipt property and enabled service units;
+static verification of both units against the extracted image succeeds. This
+does not establish their runtime startup ordering. The rebuilt kernel has a
+different boot identity from both installed kiosks, so the normal rootfs-only
+compatibility guard correctly prevents using this image as an in-place OTA.
+It has not been installed on either kiosk.
+[Raw Pi output and binary/source identities](data/device-time-20261014.json)
 distinguish fixture execution from installed service/RTC qualification.
+
+## Trial recovery journal and health model
+
+`engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
+of [#263](https://github.com/aortez/space-wars/issues/263). They are not yet wired
+to a partition writer, boot-selector adapter, watchdog owner or live kiosk
+health probe. Production installation remains unavailable.
+
+The journal binds a provisioned board, layout, hardware profile and immutable
+boot assets to the good and candidate root images. Its phases distinguish
+writing, prepared, trial requested, observing, promoting, rollback pending,
+rolled back and committed. Only a verified candidate can enter the public
+installation API; the installer must still revalidate it against live time,
+current feed, staging bytes and admission state immediately before writing.
+
+The generation floor is stored before granting access to the inactive slot.
+Any retained image in that slot stops being advertised as a recovery option at
+that point. A trial request is recorded before the reboot operation; repeating
+the same command does not issue another trial. Restarting before a trial
+quarantines the interrupted attempt instead of automatically trying again.
+The known-good default is retained throughout the trial.
+
+Health requires 60 continuous seconds within 180 seconds of boot. Samples must
+identify the expected build and an independently verified executable, writable
+required state, the same PID/start time/systemd invocation, fresh control
+responses and advancing presented-frame counts. A failed request, observation
+gap over five seconds, process restart or stalled counter breaks continuity.
+Restarting the observer starts a new health window without extending the
+boot-relative deadline. Internet reachability and wall-clock time are not
+health inputs. The eventual adapter must derive these facts from actual
+processes, responses and rendering; booleans supplied by the kiosk are not
+sufficient evidence.
+
+Successful health is persisted before promoting the default selector. A
+restart between selector and journal commits reconciles either the old default
+or the health-proven new default. The old root remains retained after success.
+Failure preserves the attempted-generation floor and quarantines the payload
+across rollback. One explicit retry is allowed after fresh verification; the
+second failure exhausts the allowance. Channel promotion does not reset the
+payload's history, and a later attempted generation prevents retrying an older
+failure.
+
+The private journal uses exclusive ownership, strict schema/size checks, a
+checksum and flushed atomic replacement. Transition plans are opaque outside
+the crate: `RecoveryStore::advance` releases an action only after persistence.
+Stale plans are rejected. A failed persistence operation poisons the handle
+until reopening and reconciliation, because an unsuccessful final flush can
+leave the rename outcome uncertain. Missing or corrupt recovery state never
+triggers automatic bootstrap. The writer still needs a separate installation
+lock shared with supervised update tools.
+
+Twenty model/journal tests and 22 verifier/integration tests pass on the host
+and both Pis. They exercise private temporary files and injected observations;
+they do not qualify real boot, watchdog or power-loss behavior.
+[Exact binaries, sources and board output](data/ota-recovery-20261014.json)
+retain that distinction.
+
+### Boot capability inventory and bootstrap prerequisite
+
+The [read-only inventory](data/ota-boot-inventory-20261014.json) found:
+
+| Device | Current root | Bootloader revision | Watchdog open timeout |
+| --- | --- | --- | --- |
+| Pi 4 / Picade | USB slot A | `507b2360eb46af23c05844b289dc5ae4ecfc3cca` | 0 / unlimited |
+| Pi 5 / HyperPixel | USB slot B | `2bb2ae640058a2f3aa8dcbdc2da33302e509668d` | 0 / unlimited |
+
+Both use the built-in BCM2835 watchdog driver, with runtime watchdog ownership
+disabled. The kernel handles boot-enabled watchdogs but its default open
+deadline is unlimited. Its missing watchdog status attributes are explained by
+`CONFIG_WATCHDOG_SYSFS` being disabled, rather than a missing device. Neither
+board currently has prepared `tryboot.txt` selection or a qualified automatic
+reset path.
+
+The shared Pi 4 firmware bytes match the layer's April 2025 firmware; Pi 5 uses
+its March 2025 EEPROM firmware. These predate the
+[firmware change adding early watchdog enablement](https://github.com/raspberrypi/firmware/commit/3885768a3aad70f42a9d9a85b550046b6b9d83fe).
+The [documented kernel-watchdog handoff](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel_watchdog_timeout)
+therefore requires supervised boot preparation and exact-version qualification.
+The normal updater must not silently replace firmware/EEPROM to obtain it.
+Both boards have an owner-confirmed local or independent recovery path for
+subsequent controlled trials; no failure, reboot or firmware experiment has
+yet been performed.
+
+The physical procedure must establish selector durability, actual root-device
+discovery, watchdog ownership from boot through unhealthy userspace, and reset
+recovery with Internet unavailable. It must also test interrupted promotion on
+the real USB media. State-machine fixtures do not prove FAT power-loss behavior;
+damage to the shared boot filesystem still needs manual recovery even when
+both root partitions remain intact.
 
 ## Signed feed contract
 

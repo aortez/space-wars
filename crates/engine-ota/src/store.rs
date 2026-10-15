@@ -252,7 +252,7 @@ fn validate_trusted(trusted: &BTreeMap<String, String>) -> Result<()> {
     Ok(())
 }
 
-fn lock(path: &Path) -> Result<File> {
+pub(crate) fn lock(path: &Path) -> Result<File> {
     let file = private_open(&path.join("lock"), true)?;
     check_private(&path.join("lock"), false)?;
     file.try_lock().map_err(|error| match error {
@@ -262,18 +262,20 @@ fn lock(path: &Path) -> Result<File> {
     Ok(file)
 }
 
-fn private_open(path: &Path, create: bool) -> std::io::Result<File> {
+pub(crate) fn private_open(path: &Path, create: bool) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(create).create(create);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        options
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     options.open(path)
 }
 
-fn check_private(path: &Path, directory: bool) -> Result<()> {
+pub(crate) fn check_private(path: &Path, directory: bool) -> Result<()> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink()
         || if directory {

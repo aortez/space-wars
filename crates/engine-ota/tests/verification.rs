@@ -7,6 +7,138 @@ use std::sync::Arc;
 use support::*;
 
 #[tokio::test]
+async fn persisted_recovery_quarantine_allows_only_a_freshly_verified_bounded_retry() {
+    use engine_ota::recovery::{
+        Action, BootBinding, BootObservation, RecoveryCapability, RecoveryRecord, Slot, SlotImage,
+    };
+    let fixture = Fixture::new().await;
+    let directory = tempfile::tempdir().unwrap();
+    let trust_path = directory.path().join("trust");
+    let recovery_path = directory.path().join("recovery");
+    let mut trust = TrustStore::initialize(&trust_path, &fixture.root_bytes, location()).unwrap();
+    let old = descriptor(Channel::Release, 1);
+    let binding = BootBinding {
+        device_id: Sha256::digest(b"board"),
+        layout_id: Sha256::digest(b"layout"),
+        boot_identity: old.boot_identity,
+        hardware_profile: Sha256::digest(b"display"),
+    };
+    let boot = BootObservation {
+        binding: binding.clone(),
+        boot_id: "11111111-1111-1111-1111-111111111111".into(),
+        uptime_ms: 1_000_000,
+        actual_slot: Some(Slot::A),
+        actual_build_id: Some(old.build_id.clone()),
+        recovery_protocol: 1,
+        default_slot: Some(Slot::A),
+        tryboot: false,
+        trial_id: None,
+    };
+    let good = SlotImage {
+        slot: Slot::A,
+        build_id: old.build_id,
+        generation: old.generation,
+        payload: old.compressed.sha256,
+        expanded: old.expanded.sha256,
+        data: old.data,
+    };
+    let cap = RecoveryCapability {
+        binding: binding.clone(),
+        tryboot_qualified: true,
+        watchdog_qualified: true,
+    };
+    let record = RecoveryRecord::bootstrap(binding, good, &boot).unwrap();
+    let mut recovery = RecoveryStore::initialize(&recovery_path, record).unwrap();
+    let image = descriptor(Channel::Release, 2);
+    let feed = fixture
+        .publish(
+            1,
+            std::slice::from_ref(&image),
+            EXPIRES.parse().unwrap(),
+            Fault::None,
+        )
+        .await;
+    let verified = candidate(
+        trust
+            .refresh(
+                Arc::new(feed),
+                time(),
+                Channel::Release,
+                &device(),
+                &recovery.record().image_history(),
+            )
+            .await
+            .unwrap(),
+    );
+    assert!(matches!(
+        recovery
+            .advance(|state| state.begin(&verified, &boot, &cap))
+            .unwrap(),
+        Action::WriteInactive { slot: Slot::B, .. }
+    ));
+    drop(recovery);
+    drop(trust);
+    // Simulate service restart while still on the good root. The interrupted
+    // write is quarantined, and reopening either store cannot erase its floor.
+    let mut recovery = RecoveryStore::open(&recovery_path).unwrap();
+    recovery.advance(|state| state.reconcile(&boot)).unwrap();
+    let mut trust = TrustStore::open(&trust_path).unwrap();
+    assert!(matches!(
+        trust
+            .cached(
+                time(),
+                Channel::Release,
+                &device(),
+                &recovery.record().image_history()
+            )
+            .await
+            .unwrap(),
+        Selection::Ineligible {
+            reason: Eligibility::Quarantined,
+            ..
+        }
+    ));
+    let retry_history = recovery
+        .record()
+        .retry_verification_history(image.compressed.sha256)
+        .unwrap();
+    let retry = trust
+        .revalidate_image(
+            verified.id(),
+            &mut Cursor::new(payload(2)),
+            time(),
+            Channel::Release,
+            &device(),
+            &retry_history,
+        )
+        .await
+        .unwrap();
+    assert!(
+        recovery
+            .advance(|state| state.begin(&retry, &boot, &cap))
+            .is_err()
+    );
+    recovery
+        .advance(|state| state.begin_explicit_retry(&retry, &boot, &cap))
+        .unwrap();
+    assert_eq!(recovery.record().transaction().unwrap().attempt, 2);
+    assert_eq!(
+        recovery
+            .record()
+            .image_history()
+            .highest_attempted_generation,
+        2
+    );
+    recovery.advance(|state| state.reconcile(&boot)).unwrap();
+    assert!(
+        recovery
+            .record()
+            .retry_verification_history(image.compressed.sha256)
+            .is_err()
+    );
+}
+
+#[tokio::test]
 async fn signed_channels_and_offline_install_survive_reopening_the_store() {
     let fixture = Fixture::new().await;
     let directory = tempfile::tempdir().unwrap();
