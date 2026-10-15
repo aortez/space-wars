@@ -2644,8 +2644,14 @@ export component MainWindow inherits Window {
             }
             Text {
                 x: 24px; y: 280px; width: parent.width - 48px; height: 44px;
-                text: root.genomes-error != "" ? root.genomes-error : !root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "" ? root.genomes-warning : root.genomes-copying ? "The handwritten host, target source, and coordinator stay pinned to the original definition." : root.genomes-result;
-                color: root.genomes-error != "" || (!root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "") ? #ffb0a0 : #80d8ff;
+                text: root.genomes-error != "" ? root.genomes-error
+                    : root.genomes-brains && root.genomes-count > 0 && !root.genomes-compatible ? root.genomes-result
+                    : !root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "" ? root.genomes-warning
+                    : root.genomes-copying ? "The handwritten host, target source, and coordinator stay pinned to the original definition."
+                    : root.genomes-result;
+                color: root.genomes-error != ""
+                    || (root.genomes-brains && root.genomes-count > 0 && !root.genomes-compatible)
+                    || (!root.genomes-busy && root.genomes-receipt == "" && root.genomes-warning != "") ? #ffb0a0 : #80d8ff;
                 font-size: 14px; wrap: word-wrap; overflow: elide;
             }
             if !root.genomes-copying: Image {

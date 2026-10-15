@@ -214,11 +214,46 @@ fn browser_rechecks_dependencies_before_trials_and_clears_unavailable_selection(
     );
     assert!(window.get_genomes_receipt().is_empty());
     assert!(!root.join("assembly-trials").exists());
+    let unrelated = root.join("assemblies").join("unrelated.json");
+    std::fs::write(&unrelated, b"corrupt").unwrap();
     assert!(ui_activation::activate(&window, "genomes.refresh"));
     pump_worker_until(&window, || !window.get_genomes_busy());
     assert_eq!(window.get_genomes_id().as_str(), assembly.id);
     assert!(!window.get_genomes_compatible());
     assert!(!ui_activation::activate(&window, "genomes.try"));
+    assert!(window.get_genomes_warning().contains("unrelated.json"));
+    assert!(
+        window
+            .get_genomes_result()
+            .contains("Missing guidance genome")
+    );
+    let sizes = [(800, 480), (1024, 768), (480, 800)];
+    let unavailable_screens: Vec<_> = sizes
+        .iter()
+        .map(|&(width, height)| {
+            window
+                .window()
+                .set_size(slint::LogicalSize::new(width as f32, height as f32));
+            capture(&window, "unavailable-with-warning");
+            window.window().take_snapshot().unwrap()
+        })
+        .collect();
+    std::fs::remove_file(unrelated).unwrap();
+    assert!(ui_activation::activate(&window, "genomes.refresh"));
+    pump_worker_until(&window, || !window.get_genomes_busy());
+    assert!(window.get_genomes_warning().is_empty());
+    // Repairing an unrelated entry must not change the selected brain's visible
+    // failure. Its missing dependency takes priority in all supported layouts.
+    for ((width, height), with_warning) in sizes.into_iter().zip(unavailable_screens) {
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(width as f32, height as f32));
+        let without_warning = window.window().take_snapshot().unwrap();
+        assert!(
+            with_warning.as_bytes() == without_warning.as_bytes(),
+            "An unrelated warning hid the missing-dependency explanation at {width}×{height}"
+        );
+    }
     genome_library::save(&root.join("genomes"), &entry).unwrap();
     assert!(ui_activation::activate(&window, "genomes.refresh"));
     pump_worker_until(&window, || !window.get_genomes_busy());
