@@ -731,7 +731,10 @@ can read its public keys, as OpenSSH requires, but cannot change either role.
 Private SSH host identity remains separately stored under `/data/ssh`.
 
 `spacewars-access.service` runs `engine-os-manager initialize-access` under the
-shared installation lock before sshd and recovery. It checks that `/data` is
+shared installation lock before sshd and recovery. Drop-ins cover both the
+default socket-activated `sshd@.service` and the conventional `sshd.service`;
+the socket can listen while an accepted connection waits for initialization.
+It checks that `/data` is
 the visible, complete ext4 mount on a different filesystem from `/`, without
 depending on boot selectors, inactive-slot availability or recovery health.
 The service reads each account's fixed `~/.ssh/authorized_keys` only on initial

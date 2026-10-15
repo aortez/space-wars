@@ -113,5 +113,31 @@
     "Both old slots must be migrated and separate runtime/operator logins checked before the supervised trial",
     "Atomic rename/fsync semantics are implemented; actual power-loss/media qualification remains pending",
     "ssh-keygen recognizes public key material; its counts do not prove login eligibility under every authorized_keys option"
-  ]
+  ],
+  "service_wiring_followup": {
+    "finding": "Pinned image uses sshd.socket Accept=yes with sshd@.service, requiring the access initializer drop-in on the template as well as the conventional daemon.",
+    "offline_service_fixture": {
+      "fixture_root": "/home/data/workspace/space-wars-ota/target/ota-access-service-vyjkl_ac",
+      "base": "b400523 clean image",
+      "overlay": "access unit and proposed drop-in on both sshd.service and sshd@.service; unused sudo replaced by empty executable placeholder for copying",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "/home/data/workspace/space-wars-ota/target/ota-access-service-vyjkl_ac/usr/lib/systemd/system/systemd-timesyncd.service:29: The !! modifier for ExecStart= lines is no longer supported and is now ignored. Please update your unit files and remove the modifier.\n/home/data/workspace/space-wars-ota/target/ota-access-service-vyjkl_ac/usr/lib/systemd/system/systemd-resolved.service:27: The !! modifier for ExecStart= lines is no longer supported and is now ignored. Please update your unit files and remove the modifier.\n",
+      "scope": "Host systemd offline syntax/dependency check, not an installed service execution"
+    },
+    "initial_image_build": {
+      "source": "7a7c5bd",
+      "log": "target/ota-access-yocto-build.log",
+      "exit_code": 0,
+      "sha256": "16941d36866740c3539de2a9c5e3fd78df0c088373ec0c9e52fe646337fa2207",
+      "tasks": 6768,
+      "reused": 6736,
+      "qualification": "Build succeeded; socket template wiring corrected afterward. No image installed."
+    },
+    "updated_source_sha256": {
+      "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "6b481ff6b6bcb6181707ae4a5d5a689def96a6f72fd90ec44f928ffc88671342",
+      "docs/ota-updates.md": "1fd468adea8e2a3f2265a70ec0d7ff5e55a81b29e30a4a99d2cb861a3321a9b7",
+      "docs/pi-kiosk.md": "b25800bcccd3d4116ae9b976faa4f60bc194728443aac825012560737153cc7f"
+    }
+  }
 }

@@ -441,8 +441,8 @@ injects the selected SSH public key, writes `/boot/hostname.txt`, grows the
 `/data` partition, can back up and restore existing `/data`, and can inject
 Wi-Fi credentials.
 
-After the first OTA-capable image is flashed, root filesystem updates can use
-the project-root A/B updater over SSH:
+Existing images without `engine-os-manager` can use the legacy project-root
+A/B updater over SSH:
 
 ```sh
 ./update.sh
@@ -453,11 +453,17 @@ Run these from the repository root. The OTA path builds unless `--skip-build`
 is passed, transfers the latest
 `spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz` to the Pi, verifies its checksum,
 flashes it to the inactive slot with SSH key injection, switches boot slots,
-reboots, and verifies that `spacewars-kiosk.service` is active. The image
-includes a narrow sudoers entry for the `spacewars` user so the node script can
+reboots, and verifies that `spacewars-kiosk.service` is active. Those legacy
+images include a sudoers entry for the `spacewars` user so the node script can
 run `sudo /usr/sbin/ab-update-with-key ...` and `sudo systemctl reboot`, matching
 DirtSim's no-local-sudo update model. The lower-level command remains available
 as `cd yocto && npm run update`.
+
+Images containing `engine-os-manager` disable these unsigned rootfs helpers
+and their runtime sudo grants. The workstation script detects that boundary
+and stops before transfer. Their signed installation service and supervised
+bootstrap are being integrated; see [OTA status](ota-updates.md). Compatible
+development client/CLI updates use the root operator fast path below.
 
 The `.ext4.gz.boot-id` sidecar must match the device's `/boot/spacewars-boot-id`
 before transfer. The updater cannot replace boot files. An old Pi 5 image
@@ -466,7 +472,11 @@ changes also require a full flash. Profile selection and boot overrides persist
 across rootfs-only A/B updates. See [the compatibility boundary](picade.md#updates-and-the-boot-compatibility-boundary).
 
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
-device identity.
+device identity. New device-manager images also preserve login keys separately
+at `/data/spacewars-access/root` and `/data/spacewars-access/spacewars`. First
+boot imports each account's home key file once. Runtime keys do not grant root
+access; later key changes belong in these root-owned persistent files. See
+[operator provisioning and rollback behavior](ota-updates.md#persistent-ssh-login-keys).
 
 ### Read-only application logs
 

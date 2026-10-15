@@ -151,6 +151,9 @@ do_install() {
     install -m 0644 ${WORKDIR}/spacewars-access.service ${D}${systemd_system_unitdir}/spacewars-access.service
     install -d ${D}${systemd_system_unitdir}/sshd.service.d
     install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf
+    # The default image uses Accept=yes socket activation and sshd@.service.
+    install -d ${D}${systemd_system_unitdir}/sshd@.service.d
+    install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf
     install -d ${D}${sysconfdir}/ssh/sshd_config.d
     install -m 0644 ${WORKDIR}/spacewars-sshd-access.conf ${D}${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf
     install -m 0644 ${WORKDIR}/spacewars-system.service ${D}${systemd_system_unitdir}/spacewars-system.service
@@ -277,6 +280,7 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-access.service \
     ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \
+    ${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf \
     ${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-recovery.service \
