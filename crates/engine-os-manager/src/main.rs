@@ -18,6 +18,9 @@ enum Command {
     /// Prepare persistent SSH login keys before sshd, without changing boot state.
     #[command(hide = true)]
     InitializeAccess,
+    /// Preserve seeded network profiles once, before the persistent bind mount.
+    #[command(hide = true)]
+    InitializeNetwork,
     /// Separately authenticated root operator tools; not available on the device socket.
     Maintenance {
         #[command(subcommand)]
@@ -104,6 +107,13 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             println!(
                 "{}",
                 serde_json::to_string(&engine_ota::access_linux::initialize()?)?
+            );
+        }
+        Command::InitializeNetwork => {
+            daemon::require_root()?;
+            println!(
+                "{}",
+                serde_json::to_string(&engine_ota::network_linux::initialize()?)?
             );
         }
         Command::Maintenance { operation } => {

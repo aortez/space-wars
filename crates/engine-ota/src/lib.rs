@@ -27,6 +27,8 @@ pub mod install_linux;
 #[cfg(target_os = "linux")]
 pub mod install_lock;
 #[cfg(target_os = "linux")]
+pub mod network_linux;
+#[cfg(target_os = "linux")]
 mod owned_fs;
 #[cfg(target_os = "linux")]
 mod watchdog_linux;
@@ -63,6 +65,8 @@ pub enum Error {
     Boot(String),
     #[error("persistent SSH access: {0}")]
     Access(String),
+    #[error("persistent network profiles: {0}")]
+    Network(String),
     #[error("image installation failed: {0}")]
     Install(String),
     #[error("unsupported feed: {0}")]

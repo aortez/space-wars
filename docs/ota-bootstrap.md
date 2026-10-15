@@ -107,7 +107,8 @@ requirement. No root partition, boot selector or persistent journal is written
 by the check. Its report always says `ready_for_write: false`.
 
 `bootstrap_prepare` uses the same check and additionally requires both root and
-runtime login keys already preserved in `/data/spacewars-access`. Establish
+runtime login keys already preserved in `/data/spacewars-access`, plus an existing
+valid `/data/NetworkManager/system-connections` directory. Establish
 those separate roles with the root manager's `initialize-access` and, if needed,
 `import-root-keys` operations while the old home files remain available. A
 runtime key is never automatically promoted to root. Key presence is not proof
@@ -209,6 +210,37 @@ cargo build --locked -p engine-ota --example bootstrap_backup \
   --target aarch64-unknown-linux-gnu
 ```
 
+## Persistent network profiles
+
+The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`
+already bind to their corresponding `/data` directories. Read-only inode/device
+checks establish that placement without reading credentials. Current data
+backups must include these persistent copies, SSH state and application settings;
+the raw root/boot recovery copies alone are insufficient.
+
+New images run `engine-os-manager initialize-network` under the shared install
+lock before binding the persistent NetworkManager directory. On a fresh device
+it imports a bounded set of private, root-owned seed files from the root image,
+retains their bytes and publishes the complete parent/child directory together
+with fsync and a no-replace rename. Existing persistent directories are always
+authoritative, including an empty directory after all profiles were deleted.
+Missing children, unsafe paths or missing stores during bootstrap/after recovery
+provisioning fail without recreating directories or reimporting credentials.
+The command accepts no paths and does not change radio or connection state.
+
+The Space-Wars layer replaces the base layer's every-boot profile merge and
+automatic `mkdir`/`chmod` in the bind service. NetworkManager requires a successful
+validated bind; it cannot silently use the root image's profiles after a failure.
+The bind, SSH-key initialization and recovery services are ordered so their
+shared lock does not race during startup. SSH and recovery wait for the bind
+attempt, but do not require its success. Startup does not require Internet access.
+
+This source change does not modify either installed legacy root. Before the
+first trial, the supervised migration must also replace the legacy profile-merge
+behavior on the original root, so returning to it cannot resurrect deleted
+credentials. Live migration, private data/configuration backup and independent
+export remain pending.
+
 ## Why stage the OS boot assets separately
 
 The Pi 5's boot filesystem has 79,437,824 bytes available in the captured
@@ -241,7 +273,9 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    independently available recovery copy. Existing journals/trust records must
    never be overwritten as if the device were fresh.
 2. Preserve root and kiosk login keys as separate roles while the old home
-   files still exist; retain SSH host keys. Verify both intended logins. Disable
+   files still exist; retain SSH host keys. Verify both intended logins. Replace
+   the legacy every-boot network-profile merge with the one-time preservation
+   behavior, including on the fallback root. Disable
    the old kiosk-accessible unsigned install/reboot paths before a trial; the
    old default root must remain controlled if rollback returns to it.
 3. Recheck firmware, inactive-slot identity/capacity and free space for the

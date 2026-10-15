@@ -81,6 +81,7 @@ fn prepare_or_check(expected: Sha256, reserve: bool) -> Result<super::Preparatio
     let lock = InstallLock::acquire()?;
     let inspected = Installed::open(expected, &lock, true)?;
     let preserved_access = if reserve {
+        crate::network_linux::preserved_for_bootstrap(&lock)?;
         Some(crate::access_linux::preserved_for_bootstrap(&lock)?)
     } else {
         None
@@ -126,6 +127,7 @@ pub fn backup_installed_package(
         .as_ref()
         .ok_or_else(|| invalid("bootstrap must be prepared before taking recovery copies"))?;
     crate::access_linux::preserved_for_bootstrap(&lock)?;
+    crate::network_linux::preserved_for_bootstrap(&lock)?;
     let result = super::backup::create(
         &inspected.parent,
         &inspected.data,

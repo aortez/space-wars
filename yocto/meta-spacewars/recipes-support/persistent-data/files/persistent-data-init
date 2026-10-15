@@ -1,0 +1,24 @@
+#!/bin/sh
+# General data directories only. Network profiles are initialized atomically by
+# engine-os-manager before the bind mount, never merged on subsequent boots.
+set -e
+
+DATA_DIR="/data"
+APP_DIR="@PERSISTENT_DATA_APP_DIR@"
+APP_USER="@PERSISTENT_DATA_APP_USER@"
+APP_GROUP="@PERSISTENT_DATA_APP_GROUP@"
+APP_MODE="@PERSISTENT_DATA_APP_MODE@"
+
+mkdir -p "$DATA_DIR/logs"
+mkdir -p "$DATA_DIR/config"
+if [ -n "$APP_DIR" ]; then
+    mkdir -p "$DATA_DIR/$APP_DIR"
+    if [ -n "$APP_GROUP" ]; then
+        chown "$APP_USER:$APP_GROUP" "$DATA_DIR/$APP_DIR"
+    else
+        chown "$APP_USER:$APP_USER" "$DATA_DIR/$APP_DIR"
+    fi
+    chmod "$APP_MODE" "$DATA_DIR/$APP_DIR"
+fi
+
+echo "Persistent data initialized"

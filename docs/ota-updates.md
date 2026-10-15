@@ -730,6 +730,17 @@ still required before bootstrap and rollout.
 [Clean image, writer and packaged-command evidence](data/ota-clean-image-20261015.json)
 retains the exact artifacts and checks.
 
+### Persistent network profiles
+
+NetworkManager profiles also use persistent data. The Space-Wars image overrides
+the base layer's every-boot credential merge with a root-only, bounded one-time
+import before the bind mount. Existing stores, including deliberately empty
+ones, are authoritative across updates and rollback. NetworkManager requires the
+validated bind to succeed; SSH initialization and recovery follow its attempt
+without depending on network connectivity. The supervised bootstrap still needs
+to apply this behavior to the legacy fallback root and independently preserve
+data/configuration. See [network preservation](ota-bootstrap.md#persistent-network-profiles).
+
 ### Persistent SSH login keys
 
 New images use `AuthorizedKeysFile /data/spacewars-access/%u`, with root login
