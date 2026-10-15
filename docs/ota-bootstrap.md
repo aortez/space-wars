@@ -325,6 +325,16 @@ the complete writer, filesystem check and readback on the workstation using an
 anonymous temporary target file. This did not exercise any live root partition
 or authorize a bootstrap install.
 
+The raw-copy implementation at `3108cea` passed all 134 OTA tests and 38 manager
+tests, Clippy, Rust 1.89 checks and AArch64 builds. Its 29 bootstrap fixture tests
+passed on the Pi 5 as UID 1000; the actual backup entry point rejected that user.
+The 157,286,400-byte boot artifact and 520,093,696-byte clean root artifact also
+passed copy, readback, source comparison and export verification on the
+workstation, using temporary regular files and an explicitly synthetic device
+binding. The Pi 5 retained its boot ID, layout, hardware profile and all 101 boot
+files. [Raw recovery-copy validation evidence](data/ota-bootstrap-backup-20261015.json)
+keeps these fixture results separate from the still-unperformed live backups.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
