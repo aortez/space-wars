@@ -85,7 +85,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) training_controls: Vec<UiControl>,
     pub(crate) training_selected: String,
     pub(crate) training_error: Option<String>,
-    pub(crate) training_status: String,
+    pub(crate) training_launcher_label: String,
     pub(crate) scoreboard_controls: Vec<UiControl>,
     pub(crate) font_controls: Vec<UiControl>,
     pub(crate) font_focus: i32,
@@ -418,8 +418,15 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.sound", "App Settings", true),
             UiControl::new("launcher.quit", "Quit", true),
             UiControl::new("launcher.genomes", "Genomes", true),
-            UiControl::new("launcher.training", "Training", true)
-                .with_value(context.training_status.clone()),
+            UiControl::new(
+                "launcher.training",
+                if context.training_launcher_label.is_empty() {
+                    "Training"
+                } else {
+                    context.training_launcher_label.as_str()
+                },
+                true,
+            ),
         ],
         actions: vec![
             UiAction::Up,

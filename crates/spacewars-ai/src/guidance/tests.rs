@@ -84,7 +84,7 @@ fn local_features_preserve_position_velocity_gravity_and_braking_frame_distincti
 fn decoder_is_neutral_at_zero_allows_both_buttons_and_emits_only_owned_controls() {
     assert_eq!(Movement::decode(&[0.0; 3]).unwrap(), Movement::default());
     let movement = Movement::decode(&[0.5, 1.0, 1.0]).unwrap();
-    assert_eq!(movement.turn, 0.5_f32.tanh());
+    assert!((movement.turn - 0.5_f32.tanh()).abs() <= f32::EPSILON);
     assert!(movement.thrust && movement.brake);
     let actions = movement.encode(PlayerId::PLAYER_1);
     let controls = SurfaceSortieAction::decode(&actions[0]).unwrap().1;

@@ -3,7 +3,6 @@ use super::*;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Key, Platform, PlatformError, WindowAdapter, WindowEvent};
 use std::cell::Cell;
-#[cfg(unix)]
 use std::time::Duration;
 
 struct TestPlatform;
@@ -220,7 +219,7 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     );
     window.set_launcher_visible(true);
     window.show().unwrap();
-    pump_until(|| window.get_training_status_code() == "ready");
+    pump_worker_until(&window, || window.get_training_status_code() == "ready");
     window.set_launcher_focus_index(4);
     key(&window, Key::RightArrow);
     assert_eq!(window.get_launcher_focus_index(), 7);
@@ -242,13 +241,13 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     assert_eq!(window.get_training_population(), 8);
     assert_eq!(window.get_training_generations(), 8);
     assert!(ui_activation::activate(&window, "training.start"));
-    pump_until(|| window.get_training_can_pause());
+    pump_worker_until(&window, || window.get_training_can_pause());
     assert!(window.get_training_active());
     assert!(!window.get_training_setup());
     assert!(!ui_activation::activate(&window, "training.start"));
     window.set_training_focus(0);
     key(&window, Key::Return);
-    pump_until(|| window.get_training_status_code() == "paused");
+    pump_worker_until(&window, || window.get_training_status_code() == "paused");
     assert!(!window.get_training_active());
     let before: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
     assert_eq!(before["evaluated_candidates"], before["saved_candidates"]);
@@ -256,7 +255,7 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     key(&window, Key::Escape);
     assert!(!window.get_training_visible());
     assert!(window.get_training_active());
-    pump_until(|| {
+    pump_worker_until(&window, || {
         let after: serde_json::Value =
             serde_json::from_str(&window.get_training_snapshot()).unwrap();
         after["evaluated_candidates"].as_u64() > before["evaluated_candidates"].as_u64()
@@ -264,11 +263,11 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     assert!(ui_activation::activate(&window, "launcher.training"));
     assert!(!window.get_training_setup());
     assert!(ui_activation::activate(&window, "training.stop"));
-    pump_until(|| window.get_training_status_code() == "stopped");
+    pump_worker_until(&window, || window.get_training_status_code() == "stopped");
     let stopped = window.get_training_snapshot();
     drop(runtime);
     let restored = training_controls::install(&window, directory.path().join("training")).unwrap();
-    pump_until(|| window.get_training_status_code() == "paused");
+    pump_worker_until(&window, || window.get_training_status_code() == "paused");
     let restored_snapshot: serde_json::Value =
         serde_json::from_str(&window.get_training_snapshot()).unwrap();
     let stopped_snapshot: serde_json::Value = serde_json::from_str(&stopped).unwrap();
@@ -283,7 +282,7 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     window.set_training_generations(1);
     training_controls::publish_setup(&window);
     assert!(ui_activation::activate(&window, "training.start"));
-    pump_until(|| window.get_training_status_code() == "completed");
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
     assert!(!window.get_training_active());
     let completed: serde_json::Value =
         serde_json::from_str(&window.get_training_snapshot()).unwrap();
@@ -308,7 +307,7 @@ fn training_keyboard_touch_and_control_ids_manage_a_job_independently_of_navigat
     drop(restored);
     let _completed_runtime =
         training_controls::install(&window, directory.path().join("training")).unwrap();
-    pump_until(|| window.get_training_status_code() == "completed");
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
     let loaded: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
     assert_eq!(loaded["run_id"], completed["run_id"]);
     assert_eq!(loaded["best_id"], completed["best_id"]);
@@ -331,19 +330,21 @@ fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
     );
     window.set_launcher_visible(true);
     window.show().unwrap();
-    pump_until(|| window.get_training_status_code() == "ready");
+    pump_worker_until(&window, || window.get_training_status_code() == "ready");
     window.set_launcher_focus_index(7);
     key(&window, Key::RightArrow);
     assert_eq!(window.get_launcher_focus_index(), 8);
     key(&window, Key::Return);
-    pump_until(|| !window.get_genomes_busy() && window.get_genomes_count() >= 4);
+    pump_worker_until(&window, || {
+        !window.get_genomes_busy() && window.get_genomes_count() >= 4
+    });
     let selected = window.get_genomes_id();
     let before = window.get_training_snapshot();
     assert!(ui_activation::activate(&window, "genomes.try"));
     assert!(window.get_genomes_busy());
     key(&window, Key::Escape);
     assert!(!window.get_genomes_visible());
-    pump_until(|| !window.get_genomes_busy());
+    pump_worker_until(&window, || !window.get_genomes_busy());
     assert!(window.get_genomes_result().starts_with("Arrived"));
     assert_eq!(window.get_training_snapshot(), before);
     let receipt_path = window.get_genomes_receipt().to_string();
@@ -351,11 +352,11 @@ fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
     let value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
     assert_eq!(value["brain"]["controller"], selected.as_str());
     assert!(ui_activation::activate(&window, "launcher.genomes"));
-    pump_until(|| !window.get_genomes_busy());
+    pump_worker_until(&window, || !window.get_genomes_busy());
     assert_eq!(window.get_genomes_id(), selected);
     assert!(ui_activation::activate(&window, "genomes.practice.next"));
     assert!(ui_activation::activate(&window, "genomes.try"));
-    pump_until(|| !window.get_genomes_busy());
+    pump_worker_until(&window, || !window.get_genomes_busy());
     assert!(window.get_genomes_result().contains("moving_right"));
     assert!(window.get_genomes_result().starts_with("Arrived"));
     for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
@@ -389,14 +390,14 @@ fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
         };
         let y = (height as f32 - page_height) / 2.0 + page_height - 56.0;
         click(&window, x(0.0), y);
-        pump_until(|| !window.get_genomes_busy());
+        pump_worker_until(&window, || !window.get_genomes_busy());
         assert!(window.get_genomes_result().starts_with("Arrived"));
         click(&window, x(2.0), y);
-        pump_until(|| !window.get_genomes_busy());
+        pump_worker_until(&window, || !window.get_genomes_busy());
         click(&window, x(3.0), y);
         assert!(!window.get_genomes_visible());
         assert!(ui_activation::activate(&window, "launcher.genomes"));
-        pump_until(|| !window.get_genomes_busy());
+        pump_worker_until(&window, || !window.get_genomes_busy());
         window.window().take_snapshot().unwrap();
         click(&window, x(1.0), y);
         assert!(!window.get_genomes_visible());
@@ -409,14 +410,14 @@ fn genome_browser_trials_and_seed_selection_preserve_identity_and_navigation() {
         );
         key(&window, Key::Escape);
         assert!(ui_activation::activate(&window, "launcher.genomes"));
-        pump_until(|| !window.get_genomes_busy());
+        pump_worker_until(&window, || !window.get_genomes_busy());
     }
     assert!(ui_activation::activate(&window, "genomes.seed"));
     window.set_training_population(8);
     window.set_training_generations(1);
     training_controls::publish_setup(&window);
     assert!(ui_activation::activate(&window, "training.start"));
-    pump_until(|| window.get_training_status_code() == "completed");
+    pump_worker_until(&window, || window.get_training_status_code() == "completed");
     let state: serde_json::Value = serde_json::from_str(&window.get_training_snapshot()).unwrap();
     let seeded = serde_json::from_value(state["spec"]["initial_genomes"][0].clone()).unwrap();
     assert_eq!(
@@ -1510,6 +1511,23 @@ fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
             .is_some_and(|s| !s.paused && s.settings.show_date)
     });
     timer.stop();
+}
+
+// Candidate-boundary commands and complete practice/training runs step physics;
+// they need a separate budget from the two-second menu transitions below.
+#[track_caller]
+fn pump_worker_until(window: &MainWindow, predicate: impl Fn() -> bool) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while !predicate() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "background UI work timed out: training={}, genomes_busy={}",
+            window.get_training_snapshot(),
+            window.get_genomes_busy()
+        );
+        std::thread::sleep(Duration::from_millis(1));
+        slint::platform::update_timers_and_animations();
+    }
 }
 
 fn pump_until(predicate: impl Fn() -> bool) {

@@ -32,14 +32,25 @@ fn genome() -> DenseGenome {
 
 #[test]
 fn row_major_layers_biases_and_activation_match_manual_arithmetic() {
+    let mut linear = genome();
+    linear.layers[1].activation = Activation::Linear;
+    let linear = DenseModel::new(linear).unwrap();
+    // [1, 0.5] -> [1.75, 1.5] -> 0.625, all exactly representable.
+    assert_eq!(linear.infer(&[1.0, 0.5]).unwrap(), vec![0.625]);
+
     let model = DenseModel::new(genome()).unwrap();
-    // [1, 0.5] -> [1.75, 1.5] -> tanh(0.625).
-    assert_eq!(model.infer(&[1.0, 0.5]).unwrap(), vec![0.625_f32.tanh()]);
-    model.infer(&[-1.0, 1.0]).unwrap();
-    assert_eq!(
-        model.clone().infer(&[1.0, 0.5]).unwrap(),
-        vec![0.625_f32.tanh()]
+    let actual = model.infer(&[1.0, 0.5]).unwrap();
+    let expected = 0.625_f32.tanh();
+    assert_eq!(actual.len(), 1);
+    // Allow last-bit rounding in the transcendental reference comparison.
+    assert!(
+        (actual[0] - expected).abs() <= f32::EPSILON,
+        "expected tanh(0.625) near {expected}, got {}",
+        actual[0]
     );
+    model.infer(&[-1.0, 1.0]).unwrap();
+    // Same-model inference must still repeat exactly after other inputs/cloning.
+    assert_eq!(model.clone().infer(&[1.0, 0.5]).unwrap(), actual);
 }
 
 #[test]
