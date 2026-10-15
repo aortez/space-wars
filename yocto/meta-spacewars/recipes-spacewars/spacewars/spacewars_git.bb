@@ -38,6 +38,7 @@ RDEPENDS:${PN} += " \
     seatd \
     libudev \
     sudo \
+    systemd \
     util-linux-flock \
     util-linux-setpriv \
     xkeyboard-config \
@@ -58,6 +59,8 @@ python () {
         f"{srcroot}/crates/engine-client/ui/main.slint:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-rtc-capture.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh:True",
@@ -98,6 +101,8 @@ do_install() {
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/spacewars-data-init.service ${D}${systemd_system_unitdir}/spacewars-data-init.service
+    install -m 0644 ${WORKDIR}/spacewars-system.service ${D}${systemd_system_unitdir}/spacewars-system.service
+    install -m 0644 ${WORKDIR}/spacewars-rtc-capture.service ${D}${systemd_system_unitdir}/spacewars-rtc-capture.service
     install -m 0644 ${WORKDIR}/spacewars-kiosk.service ${D}${systemd_system_unitdir}/spacewars-kiosk.service
     install -m 0644 ${WORKDIR}/spacewars-seatd.service ${D}${systemd_system_unitdir}/spacewars-seatd.service
 
@@ -114,6 +119,8 @@ do_install() {
 SRC_URI += " \
     file://spacewars-data-init.sh \
     file://spacewars-data-init.service \
+    file://spacewars-system.service \
+    file://spacewars-rtc-capture.service \
     file://spacewars-kiosk.service \
     file://spacewars-seatd.service \
     file://spacewars-fast-update.sh \
@@ -131,6 +138,7 @@ python write_spacewars_fast_compatibility() {
 
     assets = [Path(d.getVar("WORKDIR")) / name for name in (
         "spacewars-data-init.sh", "spacewars-data-init.service",
+        "spacewars-system.service", "spacewars-rtc-capture.service",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
         "spacewars-logs.sh", "spacewars-logs.sudoers",
     )]
@@ -178,7 +186,7 @@ python do_deploy() {
 }
 addtask deploy after do_package before do_build
 
-SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service"
+SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service spacewars-system.service spacewars-rtc-capture.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
 FILES:${PN} = " \
@@ -196,6 +204,8 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf \
     ${datadir}/spacewars/fast-update-compat \
     ${systemd_system_unitdir}/spacewars-data-init.service \
+    ${systemd_system_unitdir}/spacewars-system.service \
+    ${systemd_system_unitdir}/spacewars-rtc-capture.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \
     ${systemd_system_unitdir}/spacewars-seatd.service \
     /var/lib \

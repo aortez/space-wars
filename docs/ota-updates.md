@@ -13,11 +13,16 @@ library, not an enabled device updater. No production feed, signing keys,
 root-partition installation, automatic reboot, or Pi failure qualification is
 provided by this first step.
 
+`engine-os-manager` now also contains the independent time/status service for
+[#256](https://github.com/aortez/space-wars/issues/256), described below. The
+service has no installation, reboot, network-policy or arbitrary-command socket
+operation. It has not yet been enabled on either physical kiosk.
+
 Remaining work retains the full OTA scope:
 
 | Issue | Integration required |
 | --- | --- |
-| #256 | Independent device service and usable-time/RTC evidence |
+| #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Qualified trial boot, health confirmation, watchdog and fallback |
@@ -31,6 +36,105 @@ in both modes. Automatic installation is opt-in, initially 03:00–05:00 local,
 after ten minutes idle in Clock or the launcher, with a sixty-second countdown.
 Input postpones until the next overnight window. Running and paused games stay
 protected.
+
+## Independent device service and usable time
+
+The kiosk recipe installs `spacewars-system.service`, running independently of
+the client as root with the kiosk group for its local socket. Persistent time
+metadata lives in `/data/spacewars-system/time`, outside the recursively
+kiosk-owned application subtree. Files are private, size-bounded, checksummed,
+exclusively locked and atomically replaced with file and directory flushes.
+Missing/corrupt metadata supplies unknown time until new verified evidence is
+available. It does not reset the separate TUF trust store.
+
+`engine-os-manager status` reads `/run/spacewars-system/status.sock` and returns
+one versioned JSON snapshot, including boot identity, service/provider/storage
+health, time source, last confirmed sync UTC, boot-relative sync age and success
+generation. Only root and the image's kiosk UID 1000 are admitted using Unix
+peer credentials. Requests are newline-delimited JSON, limited to 1 KiB and a
+five-second absolute deadline. There are at most eight concurrent connections;
+subscriptions last at most sixty seconds and emit at most once per second.
+Responses are limited to 16 KiB, with two-second write deadlines. A socket
+request cannot supply a filesystem path, service name or executable.
+
+The provider remains systemd-timesyncd; the app does not implement NTP. The
+[systemd 255 implementation](https://raw.githubusercontent.com/systemd/systemd/v255/src/timesync/timesyncd-manager.c)
+touches its runtime successful-sync marker even if `clock_adjtime` fails. The
+Yocto layer therefore applies a small provider patch which records an accepted
+non-spike correction only after that syscall succeeds. The read-only D-Bus
+property `SpacewarsLastSuccessfulSync`, signature `(tttt)`, contains packet count,
+actual post-correction realtime, monotonic time and boot time, in microseconds.
+It remains unchanged on rejection/failure. The runtime marker and initial-sync
+announcement are likewise restricted to accepted corrections.
+
+Each service observation has one five-second overall deadline. It correlates
+the unique bus owner, owning PID/UID, systemd invocation ID, current NTP packet,
+successful receipt, same-owner runtime marker, kernel clock status and actual
+clocks. It rereads provider identity and packet evidence after the OS reads to
+reject a restart or new packet during observation. Unpatched providers report
+the missing capability and cannot create a fresh time success. Link state,
+`NTPSynchronized`, a plausible date, the saved checkpoint, and marker existence
+alone never establish usable time.
+
+Accepted samples retain their provider boot-relative timestamp. Service/client
+restarts do not reset age or count an already observed receipt again. Wi-Fi loss
+and a check older than 48 hours leave the running clock usable, with a separate
+overdue diagnostic. Cross-boot age is unknown rather than inferred from a saved
+wall timestamp. Accepted forward/backward corrections count once and do not
+alter elapsed-time accounting. An unexplained clock step revokes usable status;
+that revocation persists through service restart until new accepted evidence.
+
+### RTC fallback and remaining qualification
+
+`spacewars-rtc-capture.service` reads the actual RTC before timesyncd starts and
+retains the boot-specific reading under `/run`, without recapturing it later in
+the same boot. This avoids mistaking restored system time for retained RTC time.
+After a confirmed network correction, a separate five-second worker writes the
+supported Pi 5 RTC through the normal RTC ioctl interface and checks readback.
+It rechecks the running clock against the accepted receipt before and after
+the write, so an intervening clock change cannot create a retained-time record.
+Its old association is invalidated durably before the write. A failed or stuck
+worker does not invalidate usable network time or block status observation; at
+most one RTC worker remains in flight. No charging or alarm configuration is
+changed.
+
+The [supported rpi-rtc driver](https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.6.y/drivers/rtc/rtc-rpi.c)
+does not expose a voltage-loss/reset ioctl. The actual Pi 5 reports its name as
+`rpi-rtc soc:rpi_rtc`; the adapter normalizes the device suffix. **Production
+retention remains unqualified:** a present RTC, battery reading, `hctosys` flag,
+or plausible date does not enable retained-RTC time. Fixtures exercise the
+qualified path, but the hardware adapter deliberately reports
+`rtc-retention-unqualified` until the physical procedure establishes sufficient
+retention/reset evidence. A Pi 4 without an RTC uses fresh network evidence.
+
+The remaining #256/#260 procedure must capture the raw early RTC reading,
+previous verified initialization, kernel/firmware identities and reset evidence
+across warm reboot, power-maintained reboot and complete power loss (with and
+without a battery). Test invalid/backwards/read-failed records and network
+recovery separately. Do not infer powerless duration from persistent timestamps.
+Qualify the installed patched provider's actual accepted and failed adjustment
+paths and the systemd service's startup ordering before enabling production
+retained-RTC recovery. The current read-only Pi checks do not establish these.
+
+Reproduce the service tests without changing the test host's time or network:
+
+```sh
+# dbus-daemon is needed for private-provider fixtures.
+cargo test --locked -p engine-os-manager
+cargo clippy --locked -p engine-os-manager --all-targets --no-deps -- -D warnings
+cargo +1.89.0 check --locked -p engine-os-manager
+cargo test --locked -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run
+# Read-only capability inspection; does not start the service or set the RTC.
+cargo run --locked -p engine-os-manager -- probe
+```
+
+All 24 tests passed on the host, Pi 4 and Pi 5, including a private D-Bus provider,
+restart races, metadata corruption, permission checks, socket exhaustion and
+worker/request deadlines. The physical kiosks' stock systemd 255.21 providers
+correctly report the missing receipt capability. The patched systemd 255.22
+package builds with the current Yocto configuration; it has not been installed
+on the kiosks. [Raw Pi output and binary/source identities](data/device-time-20261014.json)
+distinguish fixture execution from installed service/RTC qualification.
 
 ## Signed feed contract
 

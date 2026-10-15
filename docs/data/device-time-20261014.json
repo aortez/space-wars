@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "date": "2026-10-14",
+  "base_commit": "e23ae101ba34bd86659647770a67b9c42a0a49be",
+  "scope": "Unprivileged test binaries, private D-Bus fixtures and read-only stock provider probes. No kiosk service, clock, RTC, network, rootfs or boot changes.",
+  "test_counts": {
+    "private_provider": 3,
+    "worker_deadline": 1,
+    "socket_and_store": 6,
+    "time_model": 14
+  },
+  "binaries": {
+    "run.sh": {
+      "bytes": 191,
+      "sha256": "c5d6506f63d65d6441463899e127406f64cf45543c92e97d28455e9a32ffd94e"
+    },
+    "engine-os-manager": {
+      "bytes": 14761296,
+      "sha256": "5d09496cf586b91c39c454be581ac64778755e623b23d1128930e51a3474b0e0"
+    },
+    "time-tests": {
+      "bytes": 1589192,
+      "sha256": "6550caa2595f76514c6cbbb9f82dda90b42077648720b94edce4e1cb779238e2"
+    },
+    "socket-tests": {
+      "bytes": 3013864,
+      "sha256": "27812e3fbd174bb8639912e124c90292dfcb9947e09d3d6a5abc4c11de2bc3f3"
+    },
+    "worker-tests": {
+      "bytes": 1259968,
+      "sha256": "5fc28061c38a725753c9144aecdd82989307448fa6d61e3f87a3163e3b5f7255"
+    },
+    "provider-tests": {
+      "bytes": 8461552,
+      "sha256": "b95db4d0a2b1d4450348a859f1a03ad6abf294022c73ecad8c5f5946e343fd73"
+    }
+  },
+  "sources": {
+    "Cargo.lock": "28d28725586d0faefa62f7c106bf8ec4708069e672898a14e4996544ae4b9231",
+    "crates/engine-os-manager/Cargo.toml": "9982be61045703b74b9e0f13ea100e55f5d3f395036b87d4fd3c11e795dc9f12",
+    "crates/engine-os-manager/src/lib.rs": "f6b9ae5c876ae3ecc9abe2e71df8dc9de1b3296b4f5d5f11dd57326750dd5332",
+    "crates/engine-os-manager/src/linux.rs": "b1fe676e54f62d8d11181525fb865a6fc278d46a7aebf117955e28490c77e066",
+    "crates/engine-os-manager/src/linux_tests.rs": "c59ca88891d5af706e4cec85e9fe39982a47b4d8452b4dc220e60b447d19dc45",
+    "crates/engine-os-manager/src/main.rs": "040f64560df9fa2bebbd57f5d36037a4c5ef5e47ba05f347b82a004c19c9b277",
+    "crates/engine-os-manager/src/service.rs": "2d50ac1dc4f9a96be9b426e278e8e1a7e92b5c0eb79986969669167fa673025d",
+    "crates/engine-os-manager/src/store.rs": "eaf30ac7ebc245417fbb4108c74eb3997d11343ce37a133fa921c55ef30c773a",
+    "crates/engine-os-manager/src/time.rs": "1ded1621edce19e6853e94819b39b5768759c3f457fc68c29c91e26e939cac63",
+    "crates/engine-os-manager/tests/local_service.rs": "e31956f75e8091294046472e1d85946a83435ae03246eae5b5d42de8b1f318f1",
+    "crates/engine-os-manager/tests/time_validity.rs": "9311e281ec55076c955f0ea0e1f268179d6378e8161f09a01ac42880e8d4c10e",
+    "yocto/meta-spacewars/recipes-core/systemd/files/0001-timesync-successful-correction-receipt.patch": "971bef95cc838229f4b12a3b479ed0517b605da3130e4d67770f78264ceb8e1e",
+    "yocto/meta-spacewars/recipes-core/systemd/systemd_255.%.bbappend": "265bba8c62b095ae6cf872a026081e1b1ef817e3fd78575d0b297d3bf1c45c55",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.service": "287276f7037552fda5363e074a2908bfad9c15aa89c92a1ceab4743a17981344",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.sh": "3281e0600b6ef9cf26bf7c006ffc825e363263e1eee7a139848f723cc1a3bb24",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service": "d5b2298891f5995cf9dd2880d1f7313c2083b30f4c2f5d2a980405cc901513d6",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-rtc-capture.service": "939b2cc3891855db500c8159bebee7f61ba2c656a1b9ba6775f92e2dd7daf088",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service": "fe602466e639fac3f3015cdefa83d422a6c14b3ec377b0c5aac3106a0a4aea84",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service": "4cde8a496d2ab52b52b885d140996ad00881efe75389caa27545d7b915487697",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "7a0b3ce387b36cb28086f4ac98a99ca2dd0e01067faf0ca8e453d78383f5de8c"
+  },
+  "pi4": {
+    "host": "sw-picade.local",
+    "exit_code": 0,
+    "output": "\nrunning 3 tests\ntest linux::tests::private_provider_decodes_the_real_dbus_signatures_and_correlates_identity ... ok\ntest linux::tests::private_provider_failed_adjustment_and_spike_cannot_confirm_sync ... ok\ntest linux::tests::private_provider_restart_or_new_packet_during_read_is_retried ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s\n\n\nrunning 1 test\ntest daemon::tests::rtc_deadline_kills_its_worker_even_when_observation_is_busy ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s\n\n\nrunning 6 tests\ntest connection_capacity_is_bounded_without_an_unbounded_queue_of_workers ... ok\ntest peer_authorization_uses_credentials_not_request_fields ... ok\ntest private_state_is_atomic_exclusive_and_detects_corruption ... ok\ntest state_rejects_public_permissions_symlinks_and_oversized_files ... ok\ntest status_and_bounded_subscription_use_typed_versioned_requests ... ok\ntest incomplete_requests_have_an_absolute_deadline ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.17s\n\n\nrunning 14 tests\ntest accepted_forward_and_backward_steps_use_boot_elapsed_time ... ok\ntest absent_uninitialized_unqualified_reset_and_unreadable_rtc_stay_unknown ... ok\ntest failed_rtc_persistence_does_not_revoke_network_time ... ok\ntest fresh_applied_non_spike_completion_is_usable_and_deduplicated ... ok\ntest future_receipt_and_generation_overflow_are_rejected ... ok\ntest loss_of_wifi_and_overdue_sync_do_not_make_running_time_unknown ... ok\ntest marker_checkpoint_link_and_sticky_kernel_state_are_not_completion ... ok\ntest new_boot_does_not_reuse_previous_network_success_as_current_time ... ok\ntest provider_restart_needs_its_own_success_and_keeps_prior_running_time ... ok\ntest qualified_retained_rtc_is_usable_but_does_not_invent_cross_boot_sync_age ... ok\ntest same_boot_rtc_service_restart_reuses_the_confirmed_boot_decision ... ok\ntest service_restart_preserves_age_and_does_not_recount_cached_packet ... ok\ntest suspend_age_uses_boottime_and_does_not_treat_sleep_as_a_clock_step ... ok\ntest unexplained_clock_change_stays_invalid_after_restart_until_a_new_receipt ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n{\n  \"boot_id\": \"388e995f-5838-433f-8e17-91c453b8df28\",\n  \"observation\": null,\n  \"provider_error\": \"time provider lacks the successful-correction receipt (systemd image patch required)\",\n  \"schema\": 1\n}\n"
+  },
+  "pi5": {
+    "host": "spacewars.local",
+    "exit_code": 0,
+    "output": "\nrunning 3 tests\ntest linux::tests::private_provider_decodes_the_real_dbus_signatures_and_correlates_identity ... ok\ntest linux::tests::private_provider_failed_adjustment_and_spike_cannot_confirm_sync ... ok\ntest linux::tests::private_provider_restart_or_new_packet_during_read_is_retried ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s\n\n\nrunning 1 test\ntest daemon::tests::rtc_deadline_kills_its_worker_even_when_observation_is_busy ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s\n\n\nrunning 6 tests\ntest connection_capacity_is_bounded_without_an_unbounded_queue_of_workers ... ok\ntest peer_authorization_uses_credentials_not_request_fields ... ok\ntest private_state_is_atomic_exclusive_and_detects_corruption ... ok\ntest state_rejects_public_permissions_symlinks_and_oversized_files ... ok\ntest status_and_bounded_subscription_use_typed_versioned_requests ... ok\ntest incomplete_requests_have_an_absolute_deadline ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.08s\n\n\nrunning 14 tests\ntest absent_uninitialized_unqualified_reset_and_unreadable_rtc_stay_unknown ... ok\ntest accepted_forward_and_backward_steps_use_boot_elapsed_time ... ok\ntest failed_rtc_persistence_does_not_revoke_network_time ... ok\ntest fresh_applied_non_spike_completion_is_usable_and_deduplicated ... ok\ntest future_receipt_and_generation_overflow_are_rejected ... ok\ntest loss_of_wifi_and_overdue_sync_do_not_make_running_time_unknown ... ok\ntest new_boot_does_not_reuse_previous_network_success_as_current_time ... ok\ntest marker_checkpoint_link_and_sticky_kernel_state_are_not_completion ... ok\ntest provider_restart_needs_its_own_success_and_keeps_prior_running_time ... ok\ntest qualified_retained_rtc_is_usable_but_does_not_invent_cross_boot_sync_age ... ok\ntest same_boot_rtc_service_restart_reuses_the_confirmed_boot_decision ... ok\ntest suspend_age_uses_boottime_and_does_not_treat_sleep_as_a_clock_step ... ok\ntest unexplained_clock_change_stays_invalid_after_restart_until_a_new_receipt ... ok\ntest service_restart_preserves_age_and_does_not_recount_cached_packet ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n{\n  \"boot_id\": \"de606400-dc75-446e-b26b-385592b0f562\",\n  \"observation\": null,\n  \"provider_error\": \"time provider lacks the successful-correction receipt (systemd image patch required)\",\n  \"schema\": 1\n}\n"
+  },
+  "systemd_build": {
+    "version": "255.22",
+    "result": "3559 tasks succeeded; patch and compile logs verified",
+    "poky_revision": "4fb7016a07507683359ebd620f1951fd5ea44bfa",
+    "deployed": false
+  }
+}
