@@ -11,6 +11,8 @@ use spacewars_ai::{
     ground_task::{GroundDestination, GroundGoal, GroundNavigationTask},
 };
 use std::time::Duration;
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 
 #[test]
@@ -462,7 +464,7 @@ fn prospective_flag_plan_exits_flies_captures_and_boards_using_ordinary_actions(
                     .sites
                     .retain(|s| s.id.bearing == (seat * 32) as u8);
                 o.cover.retain(|s| s.site.bearing == (seat * 32) as u8);
-                o.combat.target = None; // The other pilot remains aboard and idle.
+                o.combat.target = None; // Isolate navigation; the other pilot departs during capture.
                 planner.observe_with_planning(
                     &state,
                     seat,
@@ -487,7 +489,7 @@ fn prospective_flag_plan_exits_flies_captures_and_boards_using_ordinary_actions(
                 if boarded {
                     break;
                 }
-                SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+                capture_fixture::step(&mut state, owner, &intent.encode(owner), DT);
             }
             assert!(
                 flown && captured && boarded,

@@ -68,11 +68,28 @@ A completed lowering stays completed: the planet remains neutral if the
 attacker subsequently leaves. Partial progress never transfers to another
 claimant.
 
-Opposing eligible spacelings near an existing flag pause progress. A distant
-defender, or an airborne/knocked-down defender, cannot block it. A contest
-preserves partial time only while its claimant still qualifies. Before a
-neutral planet has any flag, simultaneous eligible claimants contest rather
-than winning by seat iteration order; one must yield before raising begins.
+Any live opposing surface force on the planet prevents starting or advancing
+lowering/raising, including the final ownership step. This includes distant or
+knocked-down pilots, occupied or empty landed ships, and registered government
+ground units. Friendly units, unowned units, wrecks and nearby flying ships do
+not block. Boarding represents the pilot by the vehicle and does not change
+the vehicle's allegiance. Government allegiance is independent of player seats.
+
+Opposition preserves partial time only while the same claimant still qualifies.
+Losing footing, balance or flag range cancels normally; clearing the opposition
+then resumes only a still-valid attempt. Simultaneous claimants do not win by
+seat iteration order. An arriving defender does not revoke completed ownership.
+Destroying the flag footing neutralizes ownership without retiring its defenders,
+so the replacement flag remains gated.
+
+Membership requires actual native terrain support. Pilots and registered ground
+units retain their last association across a brief hop/contact gap for less than
+one second and at most eight world units from their last supported body position,
+measured in the planet's moving frame. Only new support refreshes that interval.
+Foreign support, clear departure, death, retirement or allegiance reassignment
+ends continuity. Ships require current landing-foot contact; applying thrust
+clears membership immediately. Approach frames and gravity selection never
+establish surface membership.
 
 The HUD shows ownership, lowering/raising progress and why progress is blocked.
 Minimap planet colors show completed ownership; triangles locate flags, even
@@ -209,11 +226,12 @@ is not a prerequisite for ownership and can be added independently later.
 A flag stores the actual support point and normal in the completed planet
 body's local frame. Rendering transforms those back to world space; it does
 not reproject onto a nominal radius. A flag adds **no body or collider**.
-This attachment contract leaves room for noncircular terrain; handling terrain
-removal or migrating support between fragments remains future work.
+Material revisions invalidate flags whose footing was removed or detached;
+flags do not migrate onto loose fragments.
 
-Each completed tick samples each pilot's real support once, then updates the
-small planet list. Scratch space is bounded to two seats. Approach selection
+Each completed tick builds one surface-force snapshot, then gates every claim
+from it. Work is bounded to two pilot/vehicle seats and 32 registered ground
+actors, each with at most four native colliders. Approach selection
 is allocation-free; the landing feet query their local Rapier contacts. There
 are no all-object scans, extra physics steps or extra gravity solves. An
 outside pilot adds one capsule; boarding removes only that capsule. Healthy
@@ -222,9 +240,16 @@ assembly, and rebuilding reuses the assigned slot with a fresh full assembly.
 Recovery adds bounded per-seat checks, not another physics step or gravity
 solve. Expedition no longer spawns physical outpost terminals.
 
+Future ground actors use `register_ground_surface_force` with their native
+body/colliders and player or government allegiance. Repeated registration does
+not renew contact history. Owners must call `unregister_ground_surface_force`
+on destruction/retirement if a physical wreck remains; missing native bodies
+are pruned automatically. This hook does not implement tanks, their AI or their
+physics. Reset starts with an empty registry; cloning preserves its state.
+
 ## Observations and verification
 
-Scenario observations are version **10**, with a top-level `version` and
+Claim-enabled scenario observations are version **12**, with a top-level `version` and
 `players` array in seat order. Each view retains stable pilot/owner/vehicle IDs,
 input/transfer gates, landing and motion metrics, `travel_enabled`,
 `ship_support_planet` and `pilot_support_planet`.
@@ -232,8 +257,12 @@ input/transfer gates, landing and motion metrics, `travel_enabled`,
 `planet_claim` is the active actor's focused planet view; `planet_claims` is
 the complete inventory. Each reports owner, claimant, phase, progress, required
 seconds/range, eligibility status, flag world position/normal/raised fraction
-and capture/neutralization counters. `outpost` is now optional: null in
-Expedition, populated in pinned fixtures. Expedition's `outposts` list is
+and capture/neutralization counters. Nonempty claimant-relative `opposition`
+reports pilot, ship and ground-unit counts; `opposing_surface_forces` explains
+a blocked eligible attempt. The session's `surface_forces` list exposes stable
+IDs, allegiance, planet and elapsed contact gap, in stable ID order. Polling
+observations does not update membership or grant progress. `outpost` is optional:
+null in Expedition, populated in pinned fixtures. Expedition's `outposts` list is
 empty; those older fixtures retain their inventory and repair telemetry.
 
 `landing.planet` is the ship's approach/contact frame; `motion.planet` is the
@@ -257,6 +286,9 @@ cargo test --locked --release -p scenario-spacewars travel_tests -- --nocapture
 cargo test --locked --release -p scenario-spacewars multiplayer_tests
 cargo test --locked --release -p scenario-spacewars recovery_tests
 
+# Real landed opponent -> blocked flag -> takeoff -> capture, both dirt shapes
+cargo run --locked --release -p scenario-spacewars --example surface_opposition -- --replay
+
 # Retained comparison: unchanged criteria and pinned outpost fixtures
 cargo run --locked --release -p scenario-spacewars --example surface_compatibility -- \
   --profile both --seeds 4
@@ -273,6 +305,43 @@ exact attachment through translation/rotation, and real physical land/exit/
 claim/reboard cycles at twelve motion/bearing combinations. A second pilot
 landing on the far side cannot lower the flag until physically supported
 near it.
+
+Surface-opposition regressions cover both flag stages at their completion
+boundary, normal cancellation while opposed, a distant landed defender,
+unbalanced and dead pilots, empty ships and boarding, actual hops and takeoff,
+government forces without another player seat, friendly/unowned allegiance,
+retirement with a retained wreck, bounded contact continuity, registration
+limits, and clone/replay equality. Destroying the flag footing in both dirt
+shapes neutralizes ownership while retaining the hostile force and conserving
+material. The workflow example uses the main match host on a controlled
+one-planet start; it never writes ownership or fabricates contacts.
+
+Positive AI flight/capture fixtures now let their otherwise idle opponent
+depart through real controls only when its landing feet support it on the
+planet being claimed, releasing thrust as soon as that contact clears.
+Captures elsewhere leave it idle, preserving the target for later combat.
+Their subject controllers and physics remain unchanged. A separate tactical
+test holds the defender in place for three seconds, requires no reported
+capture, then verifies completion after departure. Recovery retains its
+existing timeout and identifies surface opposition without extending its
+clock or treating the changing reason as progress. Destination selection and
+attacking defenders remain separate AI work.
+
+The [#234 validation receipt](data/surface-opposition-234.json) records the local
+source identities, 599 scenario tests, 589 AI tests, 41 client tests and both
+workflow replay hashes. The AI CI Clippy command passes. Strict Clippy across
+the entire scenario still reports existing lints outside this change. Native
+test/build logs and the local UI captures are retained in the receipt's artifact
+directory. The HUD workflow renders at 800×480, 1024×768 and 480×800; it is a
+desktop check, not a new Pi deployment or a performance benchmark.
+
+The receipt also records the CI follow-up on Ubuntu 24.04: repeated thrust
+in the original fixture destroyed the seed-7 opponent at tick 6,246 before
+combat began. Restricting thrust to blocking contact preserves the native
+target; the capture-then-combat test now diagnoses premature target loss
+directly. The failure was reproduced with the original source and runtime
+before validating the corrected fixture. All 589 AI tests pass on both the
+development host and Ubuntu 24.04 after the correction.
 
 A controlled two-planet journey uses only player actions after fixture setup:
 claim A, board, launch, coast, brake/turn, land on B, claim, reboard and depart.

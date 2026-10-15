@@ -255,17 +255,27 @@ fn isolated_trip_physically_reaches_its_site_captures_returns_and_records_depart
     let prefix = bot.intent(&o);
     // Only the prior handoff history is supplied by this isolated fixture.
     // Sites come from real queries; all subsequent flight, surface actions and
-    // milestones run in the unchanged world, with an idle physical opponent.
+    // milestones use real physics. The opponent takes off through ordinary
+    // controls so its parked ship does not defend the test's capture site.
     bot.end_disengagement(
         o.local.combat.recovery.flight.pilot.tick,
         "separation established",
     );
     let mut trial = SuccessorContinuation::for_capture_trip(&bot, &o, site.id).unwrap();
-    SurfaceSortieScenario::step(&mut state, &prefix.encode(PlayerId::PLAYER_1), dt);
+    let departure = scenario_spacewars::surface_sortie::SurfaceSortieAction {
+        primary_held: true,
+        ..Default::default()
+    }
+    .encode(PlayerId::PLAYER_2);
+    let mut actions = prefix.encode(PlayerId::PLAYER_1).to_vec();
+    actions.push(departure.clone());
+    SurfaceSortieScenario::step(&mut state, &actions, dt);
     for _ in 0..SuccessorContinuation::MAX_SORTIE_TICKS {
         let o = state.mission_observation_with_cadence(0, bot.sensor_request(), Default::default());
         let intent = trial.intent(&mut bot, &o);
-        SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), dt);
+        let mut actions = intent.encode(PlayerId::PLAYER_1).to_vec();
+        actions.push(departure.clone());
+        SurfaceSortieScenario::step(&mut state, &actions, dt);
         if trial.report.stopped_tick.is_some() {
             break;
         }

@@ -1,6 +1,7 @@
 //! Planet ownership without infrastructure. Flags are visual, surface-local markers.
 
 use super::*;
+use surface_forces::SurfaceOpposition;
 
 const FLAG_STAGE_TIME: Duration = Duration::from_secs(3);
 const FLAG_INTERACTION_RANGE: f32 = 3.0;
@@ -28,6 +29,7 @@ pub enum PlanetClaimStatus {
     Lowering,
     Raising,
     Contested,
+    OpposingSurfaceForces,
     Secured,
 }
 
@@ -43,6 +45,7 @@ impl PlanetClaimStatus {
             Self::Lowering => "lowering enemy flag; stay nearby",
             Self::Raising => "raising your flag; stand still",
             Self::Contested => "contested; flag progress paused",
+            Self::OpposingSurfaceForces => "clear opposing surface forces to claim",
             Self::Secured => "your planet",
         }
     }
@@ -92,6 +95,7 @@ pub(super) struct SurfacePlanetClaim {
     flag: Option<PlanetFlag>,
     progress: Option<ClaimProgress>,
     statuses: [PlanetClaimStatus; SPACEWARS_PLAYER_COUNT],
+    opposition: [SurfaceOpposition; SPACEWARS_PLAYER_COUNT],
     captures: u64,
     neutralizations: u64,
 }
@@ -114,6 +118,8 @@ pub struct PlanetClaimObservation {
     pub stage_required_seconds: f32,
     pub flag_interaction_range: f32,
     pub status: PlanetClaimStatus,
+    #[serde(skip_serializing_if = "SurfaceOpposition::is_empty")]
+    pub opposition: SurfaceOpposition,
     pub flag: Option<PlanetFlagObservation>,
     pub captures: u64,
     pub neutralizations: u64,
@@ -126,6 +132,7 @@ impl SurfacePlanetClaim {
             flag: None,
             progress: None,
             statuses: [PlanetClaimStatus::Aboard; SPACEWARS_PLAYER_COUNT],
+            opposition: [SurfaceOpposition::default(); SPACEWARS_PLAYER_COUNT],
             captures: 0,
             neutralizations: 0,
         }
@@ -150,6 +157,7 @@ impl SurfacePlanetClaim {
             stage_required_seconds: FLAG_STAGE_TIME.as_secs_f32(),
             flag_interaction_range: FLAG_INTERACTION_RANGE,
             status: self.statuses[player],
+            opposition: self.opposition[player],
             flag: self.flag.map(|flag| PlanetFlagObservation {
                 player: flag.player,
                 position: flag.anchor.world_position(frame),
@@ -182,8 +190,10 @@ impl SurfacePlanetClaim {
         owner: &mut Option<usize>,
         frame: motion::SurfaceFrame,
         claimants: &[Claimant],
+        opposition: [SurfaceOpposition; SPACEWARS_PLAYER_COUNT],
         dt: Duration,
     ) {
+        self.opposition = opposition;
         let mut eligible = [None; SPACEWARS_PLAYER_COUNT];
         let mut count = 0;
         for candidate in claimants {
@@ -222,7 +232,12 @@ impl SurfacePlanetClaim {
                 self.cancel_progress();
             }
             for candidate in eligible.into_iter().flatten() {
-                self.statuses[candidate.player.index()] = PlanetClaimStatus::Contested;
+                self.statuses[candidate.player.index()] =
+                    if opposition[candidate.player.index()].is_empty() {
+                        PlanetClaimStatus::Contested
+                    } else {
+                        PlanetClaimStatus::OpposingSurfaceForces
+                    };
             }
             return;
         }
@@ -232,6 +247,15 @@ impl SurfacePlanetClaim {
         };
         if *owner == Some(candidate.player.index()) {
             self.cancel_progress();
+            return;
+        }
+        // Opposition only pauses a still-valid attempt by the same claimant.
+        // Contact, balance, range and claimant changes retain normal cancellation.
+        if self.progress.is_some_and(|p| p.player != candidate.player) {
+            self.cancel_progress();
+        }
+        if !opposition[candidate.player.index()].is_empty() {
+            self.statuses[candidate.player.index()] = PlanetClaimStatus::OpposingSurfaceForces;
             return;
         }
         if self.progress.is_none_or(|p| p.player != candidate.player) {
@@ -352,6 +376,9 @@ impl SurfaceSortieState {
             status: PlanetClaimStatus::Aboard,
             anchor: None,
         };
+        if self.pilots[player].vitals.is_some_and(|v| !v.alive()) {
+            return candidate;
+        }
         let Some(snapshot) = self.spaceling_snapshot(player) else {
             return candidate;
         };
@@ -413,6 +440,9 @@ impl SurfaceSortieState {
         if self.claims.is_empty() {
             return;
         }
+        // The same completed-step snapshot gates starting, advancing, and
+        // committing every planet's claim. No actor mutation occurs in this loop.
+        self.update_surface_forces(dt);
         // Sample each pilot once from the completed step, not once per planet.
         let candidates: [_; SPACEWARS_PLAYER_COUNT] = std::array::from_fn(|player| {
             if player < self.player_count() {
@@ -433,6 +463,12 @@ impl SurfaceSortieState {
                 &mut self.world.planets[claim.planet].owner_id,
                 frame,
                 &candidates[..count],
+                std::array::from_fn(|player| {
+                    self.surface_forces.opposition(
+                        claim.planet,
+                        PlayerId::from_index(player).expect("bounded player seat"),
+                    )
+                }),
                 dt,
             );
         }
@@ -452,6 +488,7 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn enable_planet_claims(&mut self) {
+        self.surface_forces = Default::default();
         self.claims = (0..self.world.planets.len())
             .map(SurfacePlanetClaim::new)
             .collect();

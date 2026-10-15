@@ -15,6 +15,8 @@ use spacewars_ai::{
 };
 use std::time::Duration;
 
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 
 #[test]
@@ -163,7 +165,7 @@ fn sustained_walking_boards_sooner_through_real_transfers() {
                     && p.transfer == TransferResult::Ready,
                 ..Default::default()
             };
-            SurfaceSortieScenario::step(&mut source, &[action.encode(owner)], DT);
+            capture_fixture::step(&mut source, owner, &[action.encode(owner)], DT);
         }
         assert!(ready, "seat={seat}: initial physical claim and landing");
 
@@ -222,7 +224,7 @@ fn sustained_walking_boards_sooner_through_real_transfers() {
                 "{:?}",
                 outbound.telemetry()
             );
-            SurfaceSortieScenario::step(&mut source, &[action.encode(owner)], DT);
+            capture_fixture::step(&mut source, owner, &[action.encode(owner)], DT);
         }
         assert!(arrived, "seat={seat}: physical outbound walk");
 

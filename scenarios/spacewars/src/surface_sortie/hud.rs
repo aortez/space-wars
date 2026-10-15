@@ -317,13 +317,17 @@ fn claim_prompt(claim: &PlanetClaimObservation) -> Option<HudPrompt> {
         Lowering => "Lowering enemy flag",
         Raising => "Raising your flag",
         Contested => "Planet contested",
+        OpposingSurfaceForces => "Opposing surface forces",
         ApproachFlag => "Lower the enemy flag",
         NeedSupport | NeedBalance | NeedSettle | Ready => "Claim this planet",
         Aboard | Elsewhere | Secured => return None,
     };
     let mut prompt = HudPrompt::new(title, claim.status.label());
-    prompt.warning = claim.status == Contested;
-    if matches!(claim.status, Lowering | Raising | Contested) {
+    prompt.warning = matches!(claim.status, Contested | OpposingSurfaceForces);
+    if matches!(
+        claim.status,
+        Lowering | Raising | Contested | OpposingSurfaceForces
+    ) {
         prompt = prompt.progress(claim.progress);
     }
     Some(prompt)

@@ -1538,18 +1538,37 @@ mod tests {
         let mut pilot =
             TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
                 .requiring_site(site);
+        let mut opposed_ticks = 0;
         for _ in 0..60 * 60 {
             let o = state.tactical_sortie_observation(0, pilot.site_request());
             let intent = pilot.intent(&o);
+            if o.combat.recovery.flight.pilot.planet.claim.as_ref().is_some_and(|c|
+                c.status == scenario_spacewars::surface_sortie::PlanetClaimStatus::OpposingSurfaceForces)
+            {
+                opposed_ticks += 1;
+                assert!(pilot.telemetry.landing.claimed_tick.is_none());
+                assert_eq!(o.combat.recovery.flight.pilot.planet.claim.as_ref().unwrap().owner, None);
+            }
             if let Some(selected) = pilot.telemetry.site {
                 assert_eq!(selected, site);
             }
-            SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), DT);
+            // The idle opponent genuinely defends this planet. After proving
+            // that the bot cannot claim, let it depart through normal controls.
+            let mut actions = intent.encode(PlayerId::PLAYER_1).to_vec();
+            actions.push(
+                scenario_spacewars::surface_sortie::SurfaceSortieAction {
+                    primary_held: opposed_ticks >= 180,
+                    ..Default::default()
+                }
+                .encode(PlayerId::PLAYER_2),
+            );
+            SurfaceSortieScenario::step(&mut state, &actions, DT);
             if pilot.telemetry.completed_tick.is_some() || pilot.telemetry.failed_tick.is_some() {
                 break;
             }
         }
         let t = pilot.telemetry();
+        assert!(opposed_ticks >= 180);
         assert!(
             t.completed_tick.is_some() && t.failed_tick.is_none(),
             "{t:?}"

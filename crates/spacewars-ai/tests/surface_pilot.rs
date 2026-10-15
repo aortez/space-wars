@@ -8,6 +8,8 @@ use spacewars_ai::{
     pilot::{PilotBrain, PilotGoal, RulePilotV1},
 };
 use std::time::Duration;
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 #[path = "support/surface_cases.rs"]
 mod cases;
 const DT: Duration = Duration::from_nanos(16_666_667);
@@ -59,7 +61,7 @@ fn sortie(case: usize) {
                     break;
                 }
             }
-            SurfaceSortieScenario::step(&mut state, &[action.encode(owner)], DT);
+            capture_fixture::step(&mut state, owner, &[action.encode(owner)], DT);
         }
         assert!(
             completion.is_some(),

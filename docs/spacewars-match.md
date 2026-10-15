@@ -39,6 +39,29 @@ stand still on surviving ground for three seconds to raise a flag where you
 stand. An enemy flag must first be approached and lowered. Destroying or
 detaching its footing removes the flag and makes the planet neutral.
 
+Clear **opposing surface forces anywhere on the planet** before capturing it.
+Live enemy pilots, occupied or empty landed ships, and registered government
+ground units block flag work. Friendly units, wrecks and nearby flying ships
+do not. Defenders need not stand still, balance or approach the flag.
+The HUD shows **Opposing surface forces** when this prevents a claim.
+
+Opposition pauses an eligible claimant's unfinished lowering or raising stage.
+It resumes from that point once opposition clears, provided the claimant keeps
+valid footing, balance and flag range. Losing that eligibility still cancels
+the stage. An arriving defender does not undo completed ownership. Destroying
+flag footing still neutralizes the planet, and surviving defenders continue
+blocking a new claim. These rules use the main planet-claim host, including its
+terrain labs; Classic's spaceport and pinned outpost rules are unchanged.
+
+![Capture blocked by a landed opponent](screenshots/spacewars/surface-opposition-blocked.png)
+
+![The flag is raised after the opponent takes off](screenshots/spacewars/surface-opposition-cleared.png)
+
+These are production HUD captures from a controlled match-host workflow using
+ordinary transfer and takeoff controls. The
+[surface-force contract and replay command](surface-expedition.md#flag-and-contest-rules)
+describe continuity, retirement and future ground-unit registration.
+
 A ship's destruction leaves its living pilot in an escape pod or on foot.
 Land the pod, exit, claim ground if necessary, then stand still on an owned
 planet for eight seconds to rebuild. Board the replacement after it settles.

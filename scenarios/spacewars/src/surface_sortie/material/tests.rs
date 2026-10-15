@@ -120,6 +120,22 @@ fn material_ships_land_without_berths_and_only_the_spaceling_claims() {
         state.observation(0)
     );
     assert_eq!(state.location(1), PilotLocation::Aboard(VehicleId(1)));
+    idle(&mut state, 240);
+    assert_eq!(
+        state.observation(0).planet_claim.unwrap().status,
+        PlanetClaimStatus::OpposingSurfaceForces
+    );
+    // The real second ship takes off; a nearby flying opponent is not a blocker.
+    for _ in 0..30 {
+        step(
+            &mut state,
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2)],
+        );
+    }
     for _ in 0..120 {
         if state.observation(0).planet_claim.unwrap().flag.is_some() {
             break;
@@ -382,7 +398,16 @@ fn match_expiry_scores_a_flag_destroyed_on_the_final_step_as_neutral() {
     state.world.planets[0].wrapper_omega = 0.0;
     idle(&mut state, 240);
     transfer(&mut state, 0);
-    idle(&mut state, 240);
+    for _ in 0..240 {
+        step(
+            &mut state,
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2)],
+        );
+    }
     assert_eq!(state.world.planets[0].owner_id, Some(0));
     let cell = flag_cell(&state);
     let remaining = Duration::from_secs(600) - DT * state.world.tick as u32;
@@ -928,12 +953,26 @@ fn two_material_claimants_contest_without_seat_order_ownership() {
         assert_eq!(state.location(p), PilotLocation::OnFoot);
         assert_eq!(
             state.observation(p).planet_claim.unwrap().status,
-            PlanetClaimStatus::Contested
+            PlanetClaimStatus::OpposingSurfaceForces
         );
     }
     assert_eq!(state.world.planets[0].owner_id, None);
     transfer(&mut state, 1);
     idle(&mut state, 240);
+    assert_eq!(
+        state.world.planets[0].owner_id, None,
+        "boarding leaves the opposing ship landed"
+    );
+    for _ in 0..240 {
+        step(
+            &mut state,
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2)],
+        );
+    }
     assert_eq!(state.world.planets[0].owner_id, Some(0));
 }
 

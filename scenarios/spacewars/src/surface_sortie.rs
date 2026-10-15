@@ -46,6 +46,7 @@ pub mod return_trial;
 #[cfg(feature = "sensor-profile")]
 pub mod sensor_profile;
 pub(crate) mod solar;
+pub mod surface_forces;
 pub mod transfer_environment;
 mod travel;
 pub use claim::{
@@ -180,6 +181,7 @@ pub struct SurfaceSortieState {
     pilots: Vec<SurfacePilot>,
     outposts: Vec<outpost::SurfaceOutpost>,
     claims: Vec<claim::SurfacePlanetClaim>,
+    surface_forces: surface_forces::SurfaceForces,
     mining: Option<material::SurfaceMining>,
     damage: impact::SurfaceDamageState,
     asteroids: asteroids::AsteroidPressure,
@@ -309,6 +311,8 @@ pub struct SurfaceSessionObservation {
     pub terrain: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub round: Option<match_rules::MatchObservation>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub surface_forces: Vec<surface_forces::SurfaceForceObservation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -356,6 +360,15 @@ pub struct SurfaceSortieObservation {
 }
 
 impl SurfaceSortieState {
+    fn observation_version(&self) -> u32 {
+        if !self.claims.is_empty() {
+            12
+        } else if self.has_material_ground() {
+            11
+        } else {
+            10
+        }
+    }
     /// Current shared simulation tick, without issuing any physical queries.
     pub fn tick(&self) -> u64 {
         self.world.tick
@@ -408,7 +421,7 @@ impl SurfaceSortieState {
                 engine_terrain::TerrainSurface::Contour => "contour-v1",
                 engine_terrain::TerrainSurface::Interpolated => "interpolated-v1",
             }),
-            version: if self.has_material_ground() { 11 } else { 10 },
+            version: self.observation_version(),
             generated_case: self.generated_case,
             travel_enabled: self.travel_enabled(),
             ship_support_planet: self.ship_support_planet(player),
@@ -908,12 +921,13 @@ impl Scenario for SurfaceSortieScenario {
     fn observe(state: &SurfaceSortieState) -> Observation {
         Observation {
             payload: serde_json::to_vec(&SurfaceSessionObservation {
-                version: if state.has_material_ground() { 11 } else { 10 },
+                version: state.observation_version(),
                 players: (0..state.player_count())
                     .map(|player| state.observation(player))
                     .collect(),
                 terrain: terrain::observation(&state.world).payload,
                 round: state.match_observation(),
+                surface_forces: state.surface_force_observations(),
             })
             .expect("finite sortie observation"),
         }
@@ -978,6 +992,7 @@ impl SurfaceSortieScenario {
             pilots: vec![SurfacePilot::new(PlayerId::PLAYER_1, planet_index, false)],
             outposts,
             claims: Vec::new(),
+            surface_forces: Default::default(),
             mining: None,
             damage: impact::SurfaceDamageState::default(),
             asteroids: asteroids::AsteroidPressure::default(),

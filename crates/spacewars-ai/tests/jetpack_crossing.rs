@@ -10,6 +10,8 @@ use spacewars_ai::{
 };
 use std::time::Duration;
 
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 #[test]
 fn crossing_replay_clone_reset_and_identity_are_bounded() {
     let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);
@@ -147,8 +149,9 @@ fn physical_trial_crosses_both_directions_and_preserves_remaining_charge_on_boar
                 before_boarding = o.charge.unwrap();
             }
             let a = bot.step(&o);
-            SurfaceSortieScenario::step(
+            capture_fixture::step(
                 &mut state,
+                owner,
                 &[a.encode(owner)],
                 Duration::from_nanos(16_666_667),
             );

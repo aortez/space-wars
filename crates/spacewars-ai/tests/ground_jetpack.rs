@@ -11,6 +11,8 @@ use spacewars_ai::{
     ground_task::{GroundDestination, GroundGoal, GroundNavigationTask},
 };
 use std::time::Duration;
+#[path = "support/unopposed_capture.rs"]
+mod capture_fixture;
 const DT: Duration = Duration::from_nanos(16_666_667);
 
 #[test]
@@ -214,7 +216,7 @@ fn ordinary_navigator_crosses_claims_and_boards_opposite_entrance_without_return
                         action.interact_held = true;
                     }
                 }
-                SurfaceSortieScenario::step(&mut state, &[action.encode(owner)], DT);
+                capture_fixture::step(&mut state, owner, &[action.encode(owner)], DT);
                 if returning && state.location(seat) != PilotLocation::OnFoot {
                     crossings += task.telemetry().jetpack_crossings;
                     complete = true;
