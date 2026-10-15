@@ -103,7 +103,7 @@ fn requested() -> (RecoveryRecord, BootObservation) {
     (plan.record, boot)
 }
 
-fn trial() -> (RecoveryRecord, BootObservation) {
+pub(crate) fn trial() -> (RecoveryRecord, BootObservation) {
     let (record, mut boot) = requested();
     boot.boot_id = TRIAL_BOOT.into();
     boot.uptime_ms = 20_000;

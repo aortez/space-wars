@@ -8,10 +8,10 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 ## Current implementation
 
 `crates/engine-ota` implements the shared verification and image eligibility
-contract for [#261](https://github.com/aortez/space-wars/issues/261). It is a
-library, not an enabled device updater. No production feed, signing keys,
-root-partition installation, automatic reboot, or Pi failure qualification is
-provided by this first step.
+contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
+recovery journal and Linux boot adapters. It is not an enabled end-to-end
+updater. Production feed/signing, root-partition installation and Pi failure
+qualification remain outstanding.
 
 `engine-os-manager` now also contains the independent time/status service for
 [#256](https://github.com/aortez/space-wars/issues/256), described below. The
@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health/identity evidence, early trial initramfs, Linux boot selectors and watchdog completion implemented; coordinator integration, bootstrap and physical recovery qualification remain |
+| #263 | Trial coordinator, independent recovery service, health/identity evidence, early watchdog and journal-gated boot completion implemented; bootstrap and physical recovery qualification remain |
 | #264 | Shared lock implemented; verified inactive-root writer, operator-helper integration and data preservation remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -146,9 +146,9 @@ distinguish fixture execution from installed service/RTC qualification.
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
 of [#263](https://github.com/aortez/space-wars/issues/263). The Linux adapter below
-now applies journal-authorized boot-selector changes. The partition writer,
-running coordinator and watchdog completion remain unconnected. The kiosk observer
-accepts the packaged image identity. Production installation remains unavailable.
+now applies journal-authorized boot-selector changes. The separate recovery
+service below connects reconciliation, kiosk observation and watchdog completion.
+The partition writer and production installation remain unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -250,12 +250,13 @@ The installed kiosk now uses `/run/spacewars-kiosk/control.sock`, mode 0660 in a
 service's private `/tmp`. The CLI discovers it unless an explicit socket was
 selected; desktop sockets retain their previous path and owner-only permissions.
 
-The observer is **not yet invoked by the time service**. Its image adapter takes
-the expected revision, hash and length from the packaged record below. Trial
-integration must authenticate that record and provide the required privileges: read the
-kiosk's `/proc/PID/exe`, drop credentials for the fixed state helper, terminate
-that helper, and write the kiosk configuration directory under the service's
-filesystem sandbox. No arbitrary executable, path or expected identity is
+The observer runs in the separate recovery service. Its image adapter takes
+the expected revision, hash and length from the packaged record below. The
+containing rootfs must be authenticated at installation. The recovery unit
+permits reading the kiosk's `/proc/PID/exe`, dropping credentials for the fixed
+state helper, terminating that helper, and writing the kiosk configuration
+directory under the service's filesystem sandbox. No arbitrary executable,
+path or expected identity is
 accepted through the public device-status socket.
 
 All 33 device-service tests pass on the host. Nine health-specific tests also
@@ -378,9 +379,9 @@ timeout. The unlimited first-open grace period does not apply to that active
 state. This source-level conclusion still needs measured expiry and reopen
 tests on each board; the syscall fixtures cannot establish physical reset.
 
-The future coordinator must take ownership and enforce the existing 180-second
-boot-relative trial deadline, including across service restarts. It must not
-refresh the allowance from its own start time. The 210-second early timeout is
+The coordinator enforces the existing 180-second boot-relative trial deadline,
+including across service restarts, without refreshing the allowance from its
+own start time. The 210-second early timeout is
 a bounded fallback when that coordinator never runs, not an extra health
 window. The initramfs moves `/run` into the real root only after its udev
 shutdown hook, preserving the arm record without hiding udev's control socket.
@@ -500,8 +501,8 @@ device-service library tests pass. The live probe rejects the Pi 5's existing
 unprovisioned image instead of inventing recovery state, and its boot ID remains
 unchanged. No Pi boot files were edited, reboot requested or watchdog opened.
 [Source, test and probe evidence](data/ota-boot-linux-20261015.json) records these
-results. The adapter has no installation/reboot socket command and is not yet
-invoked by the running device service.
+results. The adapter has no installation/reboot socket command. The recovery service below
+uses this adapter only to reconcile an existing transaction.
 
 ### Repeated updates and watchdog completion
 
@@ -533,8 +534,70 @@ mount selection. Scoped Clippy, Rust 1.89 and AArch64 compilation pass. The
 updated read-only layout probe recognizes the Pi 5's existing B root. These
 checks use temporary files and mocked watchdog calls; no physical watchdog was
 opened and the Pi boot ID is unchanged. The coordinator and supervised physical
-qualification remain outstanding.
+qualification were still outstanding at this checkpoint; service integration
+is described below.
 [Source and test evidence](data/ota-watchdog-completion-20261015.json)
+
+### Independent recovery service
+
+`spacewars-recovery.service` runs `engine-os-manager recover` separately from
+the time/status process. It opens an existing private recovery journal under
+the shared installation lock, reconciles actual boot state, and observes the
+kiosk for the required continuous health window. It persists promotion proof,
+applies the default selector, commits the good image, and only then stops the
+early watchdog. A failed trial is quarantined before a normal reboot request.
+If filesystem or process work stalls, the original watchdog remains active.
+
+The service never initializes missing state or starts an installation. An absent
+recovery directory reports `unprovisioned`; an existing but invalid journal
+reports `blocked`. Restarting cannot repeat a trial request or extend its
+boot-relative allowance. Normal boots of the known-good image reconcile without
+opening the watchdog. A committed trial can complete after an interrupted
+selector/journal transition using the retained proof.
+
+Rollback explicitly clears systemd's retained reboot parameter, reads it back,
+rechecks journal and boot authorization, then requests only `reboot.target`
+with `replace-irreversibly`. The DBus operation has a five-second outer bound.
+This follows the pinned systemd 255.22
+[reboot-parameter implementation](https://github.com/systemd/systemd-stable/blob/v255.22/src/shared/reboot-util.c)
+and [logind method](https://github.com/systemd/systemd-stable/blob/v255.22/src/login/logind-dbus.c).
+The unit includes that method's required `CAP_SYS_ADMIN`, prohibits mount and
+namespace operations, and restricts device access to the fixed watchdog plus
+systemd's standard pseudo-devices. Health probes retain the narrowly required
+process inspection, UID/GID switching and worker termination capabilities.
+
+The existing status socket includes a bounded, boot-bound recovery snapshot
+from `/run/spacewars-updater/status.json`. Reporting never authorizes a state
+transition. In-progress snapshots become stale after 15 seconds; malformed or
+missing recovery reports do not make time queries fail. The lock directory is
+created by tmpfiles, not removed with a service runtime directory on restart.
+
+This implementation is not yet deployed. Legacy privileged update helpers must
+be constrained before provisioning, and real boot/watchdog/power-loss trials
+remain prerequisites for enabling installation. Fixture tests and image build
+checks do not establish physical recovery qualification.
+
+All 88 OTA and 36 device-service tests pass on the host, with scoped Clippy,
+Rust 1.89 and AArch64 compilation. The 66 OTA and 15 device-service unit tests
+also pass unprivileged on the Pi 5. Reboot tests use a private DBus server, never
+the machine's real manager. A separate command fixture runs the actual binary
+in a disposable user/mount/PID namespace and chroot: an unprovisioned root
+creates no recovery journal or installation lock, and a failed inspection
+preserves existing journal bytes while reporting `blocked`.
+
+```sh
+cargo build --locked -p engine-os-manager
+python3 crates/engine-os-manager/tests/recovery_command_fixture.py
+```
+
+The full Yocto image builds, with 38 Node and 61 Python tooling tests passing.
+Inspection of its extracted root confirms the enabled recovery unit, unchanged
+immutable boot identity, shared-lock tmpfiles rule, and the service executable's
+recorded size/hash. The real packaged command runs on the Pi 5 and rejects
+`recover` from its unprivileged kiosk account. No physical watchdog, reboot or
+boot-file change was performed. The image remains a development build.
+[Source, artifact and execution evidence](data/ota-coordinator-20261015.json)
+records the exact scope and limitations.
 
 ## Signed feed contract
 

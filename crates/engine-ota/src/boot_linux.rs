@@ -326,6 +326,15 @@ impl<'a> BootController<'a> {
         crate::watchdog_linux::complete(self.lock, journal, &self.observe()?.observation)
     }
 
+    /// Recheck immediately before requesting a normal systemd reboot. This
+    /// operation cannot authorize another tryboot or select an arbitrary root.
+    pub fn authorize_rollback_reboot(&self, journal: &RecoveryStore, id: Sha256) -> Result<()> {
+        journal
+            .durable_record()?
+            .rollback_reboot(id, &self.observe()?.observation)?;
+        Ok(())
+    }
+
     pub fn apply(&mut self, journal: &RecoveryStore, action: &Action) -> Result<BootEvidence> {
         let before = self.observe()?;
         let record = journal.durable_record()?;

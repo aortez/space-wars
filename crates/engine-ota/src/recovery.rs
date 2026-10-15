@@ -138,6 +138,7 @@ pub enum FailureReason {
     PersistentStateUnavailable,
     PromotionInterrupted,
     InstallationFailed,
+    WatchdogUnavailable,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -830,6 +831,23 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         boot.trial_id.ok_or(RecoveryError::BootMismatch)
+    }
+
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn rollback_reboot(&self, id: Sha256, boot: &BootObservation) -> Result<()> {
+        self.check_boot(boot)?;
+        let tx = self.command(id, Phase::RollbackPending)?;
+        if !self.is_trial(tx, boot)
+            || boot.boot_id == tx.origin_boot_id
+            || boot.default_slot != Some(tx.previous_good.slot)
+            || tx
+                .trial_boot_id
+                .as_ref()
+                .is_some_and(|id| id != &boot.boot_id)
+        {
+            return Err(RecoveryError::BootMismatch);
+        }
+        Ok(())
     }
 
     fn runs_good(&self, boot: &BootObservation) -> bool {

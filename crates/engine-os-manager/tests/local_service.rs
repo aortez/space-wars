@@ -17,6 +17,7 @@ fn snapshot() -> DeviceStatus {
         provider_error: None,
         persistence_error: None,
         rtc_error: None,
+        recovery: Default::default(),
         time: TimeStatus {
             usable: false,
             source: None,

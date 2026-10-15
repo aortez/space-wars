@@ -27,6 +27,8 @@ pub struct DeviceStatus {
     pub persistence_error: Option<String>,
     pub rtc_error: Option<String>,
     pub time: TimeStatus,
+    #[serde(default)]
+    pub recovery: crate::recovery_status::RecoveryStatus,
 }
 
 pub struct ObservedState {
@@ -52,6 +54,7 @@ impl ObservedState {
             persistence_error: self.persistence_error.clone(),
             rtc_error: self.rtc_error.clone(),
             time: tracker.status(now),
+            recovery: crate::recovery_status::read(&self.boot_id, now.boottime_us / 1000),
         })
     }
 }

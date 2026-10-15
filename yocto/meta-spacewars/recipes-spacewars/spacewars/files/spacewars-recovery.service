@@ -1,0 +1,43 @@
+[Unit]
+Description=Space-Wars rootfs trial recovery
+After=spacewars-data-init.service systemd-tmpfiles-setup.service dbus.service
+Requires=spacewars-data-init.service
+Wants=spacewars-kiosk.service systemd-logind.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/engine-os-manager recover
+User=root
+Group=spacewars
+UMask=0077
+RuntimeDirectory=spacewars-updater
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+RemainAfterExit=yes
+# The decision deadline is boot-relative (180 seconds), not service-relative.
+# This bound handles stalled userspace; the immutable early watchdog is final.
+TimeoutStartSec=195
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/boot /data/spacewars-system /data/spacewars/config /run/spacewars-updater /run/spacewars-install -/run/spacewars-recovery
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+# Pinned logind authorizes SetRebootParameter with CAP_SYS_ADMIN. Reboot itself
+# is a fixed PID 1 job; this process does not call the reboot syscall.
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_KILL CAP_SYS_ADMIN
+RestrictNamespaces=yes
+SystemCallFilter=~@mount
+DevicePolicy=closed
+DeviceAllow=/dev/watchdog0 w
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

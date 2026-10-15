@@ -12,6 +12,9 @@ struct Args {
 enum Command {
     /// Run the root-owned device service (normally started by systemd).
     Serve,
+    /// Reconcile an existing recovery journal and observe a trial boot.
+    /// Normally invoked by the separate spacewars-recovery service.
+    Recover,
     /// Read a bounded JSON status snapshot independently of the game client.
     Status,
     /// Inspect the current time provider without changing clocks or state.
@@ -71,6 +74,10 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             );
         }
         Command::Serve => daemon::serve()?,
+        Command::Recover => {
+            daemon::require_root()?;
+            engine_os_manager::recovery_service::run()?;
+        }
         Command::CaptureRtc => {
             daemon::require_root()?;
             let path = std::path::Path::new(RTC_BOOT_PATH);
