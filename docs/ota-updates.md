@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Journal and health model implemented; Linux adapters, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal and health model implemented; boot/health adapters, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -197,6 +197,27 @@ and both Pis. They exercise private temporary files and injected observations;
 they do not qualify real boot, watchdog or power-loss behavior.
 [Exact binaries, sources and board output](data/ota-recovery-20261014.json)
 retain that distinction.
+
+The Linux root-layout reader correlates mount device numbers, block-node
+metadata, sysfs parent/partition geometry, the kernel root argument and udev's
+partition UUID records. It rejects ambiguous roots, mismatched boot/data disks,
+overlapping or unequal root slots, duplicate UUIDs on another attached disk,
+and a mounted inactive root. It rereads mount state before returning. Its
+layout fingerprint survives device-name changes; it does not prove the physical
+medium's identity or durability. The eventual writer must repeat admission
+under the shared lock and check exclusive, opened device handles, including
+mounts outside the service's namespace.
+
+```sh
+# Read-only, no root/device opens or reboot. Normal desktop layouts fail closed.
+cargo run --locked -p engine-ota --example recovery_probe
+```
+
+Eight additional layout tests passed on both Pis; the real probe independently
+identified A on the Picade and B on the Pi 5, each with equal 3 GiB root slots
+and boot/data on the same USB disk.
+[Probe output and source/binary identities](data/ota-layout-20261014.json)
+record this separately from trial qualification.
 
 ### Boot capability inventory and bootstrap prerequisite
 

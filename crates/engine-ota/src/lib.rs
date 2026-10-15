@@ -5,6 +5,8 @@
 
 mod contract;
 pub mod recovery;
+#[cfg(target_os = "linux")]
+pub mod recovery_linux;
 mod recovery_store;
 mod repository;
 mod store;
