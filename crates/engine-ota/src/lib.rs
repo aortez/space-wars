@@ -3,6 +3,7 @@
 //! This crate never writes a root partition or changes boot selection. A verified
 //! candidate is evidence to revalidate at installation, not permission to reboot.
 
+pub mod boot;
 mod contract;
 mod image_identity;
 pub mod recovery;
@@ -32,6 +33,8 @@ pub enum Error {
     Descriptor(String),
     #[error("invalid image identity: {0}")]
     ImageIdentity(String),
+    #[error("invalid boot evidence: {0}")]
+    Boot(String),
     #[error("unsupported feed: {0}")]
     Feed(String),
     #[error("invalid or uninitialized trust store: {0}")]

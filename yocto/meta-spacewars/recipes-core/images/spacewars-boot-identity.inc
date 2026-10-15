@@ -6,17 +6,19 @@ do_rootfs[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/boot_identity.
 
 python write_spacewars_boot_identity() {
     from pathlib import Path
-    from spacewars.boot_identity import boot_identity
+    from spacewars.boot_identity import prepare_recovery_boot
 
     deploy = Path(d.getVar("DEPLOY_DIR_IMAGE"))
     try:
-        identity = boot_identity(deploy, d.getVar("IMAGE_BOOT_FILES")) + "\n"
-    except ValueError as error:
+        manifest, identity = prepare_recovery_boot(deploy, d.getVar("IMAGE_BOOT_FILES"))
+        identity += "\n"
+    except (KeyError, OSError, ValueError) as error:
         bb.fatal(str(error))
     (deploy / "spacewars-boot-id").write_text(identity)
     config = Path(d.getVar("IMAGE_ROOTFS")) / "etc/spacewars"
     config.mkdir(parents=True, exist_ok=True)
     (config / "boot-id").write_text(identity)
+    (config / "boot-manifest.json").write_bytes((deploy / "spacewars-boot-manifest.json").read_bytes())
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " write_spacewars_boot_identity;"
 

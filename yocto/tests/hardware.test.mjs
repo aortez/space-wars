@@ -143,7 +143,7 @@ test('profile files keep HAT and HyperPixel GPIO overlays mutually exclusive', (
   assert.doesNotMatch(picade, /dtoverlay=vc4-kms-dpi/);
   assert.match(hyperpixel, /dtoverlay=vc4-kms-dpi-hyperpixel4/);
   assert.doesNotMatch(hyperpixel, /dtoverlay=picade/);
-  assert.doesNotMatch(hdmi, /dtoverlay=/);
+  assert.deepEqual(hdmi.match(/^dtoverlay=.*$/gm), ['dtoverlay=spacewars-profile-hdmi']);
   for (const [name, code] of Object.entries({ button1: 304, button2: 305, button3: 308, button4: 307, button5: 310, button6: 311, coin: 314, start: 315 })) {
     assert.ok(picade.includes(`dtparam=${name}=${code}\n`));
   }

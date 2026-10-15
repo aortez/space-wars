@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health model, kiosk observer, image identity and early trial initramfs implemented; boot/coordinator integration, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal, health model, kiosk observer, image identity, early trial initramfs and constrained boot assets implemented; device adapter/coordinator, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -403,6 +403,52 @@ boot file changed or data partition written during validation. The Picade was
 unavailable for this pass.
 [Archive, source and fixture evidence](data/ota-watchdog-20261015.json)
 records the exact scope.
+
+### Immutable boot assets and root selection
+
+Recovery images use a v2 boot manifest. It hashes every packaged kernel,
+firmware, device tree, profile and early recovery asset, including an immutable
+kernel-command-line template. The mutable normal and trial root selectors,
+hardware selection and manifest/identity records are excluded from that hash;
+each has its own checked grammar or expected identity. This lets a successful
+root promotion preserve the boot compatibility identity. Older v1 images still
+require supervised preparation before using this recovery path.
+
+`config.txt` remains the normal configuration. `tryboot.txt` contains its full
+contents with only a final command-line override, so firmware settings which
+cannot be supplied through an include remain identical. `cmdline.txt` selects
+the normal root, while `spacewars-trial.txt` selects one provisioned root
+PARTUUID and one journal transaction token. The default remains unchanged when
+preparing a trial. The initial trial file is deliberately unprepared; trying
+it cannot provide a valid recovery token. A new disk image retains its existing
+normal `/dev/sda2` command line and is not automatically recovery-provisioned.
+The supervised bootstrap must establish the actual PARTUUID pair first.
+
+`engine_ota::boot` accepts only canonical selectors rendered from the immutable
+template. Duplicate roots/tokens and arguments which bypass early recovery
+such as `init=/bin/sh` are rejected. The running command line may contain the
+Pi firmware's normal prefix, but its configured suffix and every recovery
+argument must agree with the selected root and transaction.
+
+The build exports the common kernel's GNU build ID. The reader can compare it
+with the running kernel's `/sys/kernel/notes`, rather than assuming that equal
+`uname` versions or matching files on disk prove which kernel booted. Each
+hardware profile also loads a small metadata-only device-tree overlay exposing
+`/chosen/spacewars,profile`; those overlay bytes are part of the boot identity.
+The later device adapter must compare the loaded marker with the selected
+profile before granting recovery eligibility.
+
+All 61 OTA tests, 38 Node and 61 Python tooling tests pass, along with scoped
+Clippy, Rust 1.89 and AArch64 compilation. The seven new boot-parser tests also
+pass unprivileged on the Pi 5. Offline overlay application checks pass against
+the actual Pi 4 and Pi 5 device trees for their supported profiles. The full
+Yocto image builds successfully, and the extracted FAT/rootfs artifacts agree
+on the manifest and identity; every immutable FAT file matches its recorded
+hash. The image remains a dirty development build and has not been installed.
+These checks do not qualify firmware tryboot or physical watchdog recovery.
+[Build, artifact, source and fixture evidence](data/ota-boot-assets-20261015.json)
+records the exact scope. The filesystem adapter, durable selector writes and
+coordinator are still separate integration work.
 
 ## Signed feed contract
 
