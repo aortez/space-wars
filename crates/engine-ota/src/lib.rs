@@ -1,0 +1,50 @@
+//! Shared verification and eligibility rules for device-managed rootfs updates.
+//!
+//! This crate never writes a root partition or changes boot selection. A verified
+//! candidate is evidence to revalidate at installation, not permission to reboot.
+
+mod contract;
+mod repository;
+mod store;
+
+pub use contract::*;
+pub use repository::*;
+pub use store::TrustStore;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("waiting for usable time")]
+    WaitingForTime,
+    #[error("usable time moved backwards behind the retained trusted-time floor")]
+    TimeMovedBackwards,
+    #[error("metadata check exceeded its time limit")]
+    Timeout,
+    #[error("invalid image descriptor: {0}")]
+    Descriptor(String),
+    #[error("unsupported feed: {0}")]
+    Feed(String),
+    #[error("invalid or uninitialized trust store: {0}")]
+    Store(String),
+    #[error("update verification is already in progress")]
+    Busy,
+    #[error("no retained verified feed; refresh required")]
+    RefreshRequired,
+    #[error("candidate changed or is no longer eligible")]
+    CandidateChanged,
+    #[error("image length or SHA-256 does not match signed metadata")]
+    ImageMismatch,
+    #[error("TUF verification failed: {0}")]
+    Tuf(#[source] Box<tough::error::Error>),
+    #[error("storage failure: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("invalid JSON: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<tough::error::Error> for Error {
+    fn from(error: tough::error::Error) -> Self {
+        Self::Tuf(Box::new(error))
+    }
+}

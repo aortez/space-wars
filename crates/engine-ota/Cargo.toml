@@ -1,0 +1,26 @@
+[package]
+name = "engine-ota"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+bytes = "1"
+futures = "0.3"
+jiff = { version = "0.2", features = ["serde"] }
+libc = "0.2"
+olpc-cjson = "0.1"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+thiserror = "2"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "rt", "time"] }
+tough = "=0.24.0"
+url = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+aws-lc-rs = "1"
