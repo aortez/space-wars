@@ -33,6 +33,7 @@ RDEPENDS:${PN} += " \
     coreutils \
     e2fsprogs \
     e2fsprogs-e2fsck \
+    openssh-keygen \
     fontconfig \
     libdrm \
     libinput \
@@ -96,6 +97,9 @@ python () {
         f"{srcroot}/crates/engine-client/ui/main.slint:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.sh:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-data-init.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-access.service:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-sshd-access.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-access.conf:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-recovery.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-install.conf:True",
@@ -144,6 +148,11 @@ do_install() {
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/spacewars-data-init.service ${D}${systemd_system_unitdir}/spacewars-data-init.service
+    install -m 0644 ${WORKDIR}/spacewars-access.service ${D}${systemd_system_unitdir}/spacewars-access.service
+    install -d ${D}${systemd_system_unitdir}/sshd.service.d
+    install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf
+    install -d ${D}${sysconfdir}/ssh/sshd_config.d
+    install -m 0644 ${WORKDIR}/spacewars-sshd-access.conf ${D}${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf
     install -m 0644 ${WORKDIR}/spacewars-system.service ${D}${systemd_system_unitdir}/spacewars-system.service
     install -m 0644 ${WORKDIR}/spacewars-recovery.service ${D}${systemd_system_unitdir}/spacewars-recovery.service
     install -d ${D}${nonarch_libdir}/tmpfiles.d
@@ -166,6 +175,9 @@ do_install() {
 SRC_URI += " \
     file://spacewars-data-init.sh \
     file://spacewars-data-init.service \
+    file://spacewars-access.service \
+    file://spacewars-sshd-access.conf \
+    file://sshd-spacewars-access.conf \
     file://spacewars-system.service \
     file://spacewars-recovery.service \
     file://spacewars-install.conf \
@@ -189,6 +201,7 @@ python write_spacewars_fast_compatibility() {
 
     assets = [Path(d.getVar("WORKDIR")) / name for name in (
         "spacewars-data-init.sh", "spacewars-data-init.service",
+        "spacewars-access.service", "spacewars-sshd-access.conf", "sshd-spacewars-access.conf",
         "spacewars-system.service", "spacewars-rtc-capture.service",
         "spacewars-recovery.service", "spacewars-install.conf",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
@@ -242,7 +255,7 @@ python do_deploy() {
 }
 addtask deploy after do_package before do_build
 
-SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service spacewars-system.service spacewars-rtc-capture.service spacewars-recovery.service"
+SYSTEMD_SERVICE:${PN} = "spacewars-seatd.service spacewars-data-init.service spacewars-kiosk.service spacewars-system.service spacewars-rtc-capture.service spacewars-recovery.service spacewars-access.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
 FILES:${PN} = " \
@@ -262,6 +275,9 @@ FILES:${PN} = " \
     ${datadir}/spacewars/fast-update-compat \
     ${datadir}/spacewars/source.json \
     ${systemd_system_unitdir}/spacewars-data-init.service \
+    ${systemd_system_unitdir}/spacewars-access.service \
+    ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \
+    ${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-recovery.service \
     ${nonarch_libdir}/tmpfiles.d/spacewars-install.conf \

@@ -131,6 +131,30 @@ fn required_mount_handles() -> Result<[OpenedMount; 3]> {
     ])
 }
 
+/// SSH access must remain usable even when recovery/boot evidence is broken.
+/// Require the real persistent mount, without depending on an inactive slot,
+/// boot selector, image identity or a writable recovery journal.
+pub(crate) fn open_data_mount() -> Result<File> {
+    let file = crate::owned_fs::open_directory(Path::new("/data"), 0)?;
+    let view = MountView {
+        id: fd_mount_id(&bounded_text(
+            &PathBuf::from(format!("/proc/self/fdinfo/{}", file.as_raw_fd())),
+            4096,
+        )?)?,
+        device: DeviceNumber::from_dev(file.metadata()?.dev()),
+    };
+    let mounts = parse_mountinfo(&bounded_text(
+        Path::new("/proc/self/mountinfo"),
+        1024 * 1024,
+    )?)?;
+    visible_mount(&mounts, view, "/data", "ext4")?;
+    let root = OpenedMount::open(Path::new("/"))?;
+    if root.view.device == view.device {
+        return Err(invalid("persistent data is on the root filesystem"));
+    }
+    Ok(file)
+}
+
 fn fd_mount_id(info: &str) -> Result<u64> {
     let mut ids = info.lines().filter_map(|line| line.strip_prefix("mnt_id:"));
     let id = ids

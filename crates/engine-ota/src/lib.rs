@@ -1,9 +1,12 @@
 //! Shared verification and eligibility rules for device-managed rootfs updates.
 //!
 //! Linux boot-selector changes require the shared installation lock and a
-//! durable recovery journal. This crate does not write a root partition or
-//! reboot. A verified candidate still needs revalidation at installation.
+//! durable recovery journal. The inactive-root writer requires that same live
+//! authority; reboot belongs to the device service. A verified candidate still
+//! needs revalidation at installation.
 
+#[cfg(target_os = "linux")]
+pub mod access_linux;
 pub mod boot;
 #[cfg(target_os = "linux")]
 mod boot_files;
@@ -12,6 +15,8 @@ pub mod boot_linux;
 mod contract;
 #[cfg(target_os = "linux")]
 pub mod coordinator;
+#[cfg(target_os = "linux")]
+mod file_command;
 mod image_identity;
 #[cfg(target_os = "linux")]
 mod image_tools;
@@ -54,6 +59,8 @@ pub enum Error {
     ImageIdentity(String),
     #[error("invalid boot evidence: {0}")]
     Boot(String),
+    #[error("persistent SSH access: {0}")]
+    Access(String),
     #[error("image installation failed: {0}")]
     Install(String),
     #[error("unsupported feed: {0}")]

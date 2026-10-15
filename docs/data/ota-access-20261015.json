@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-15",
+  "source_base": "1e35e20afcb3981eedbe2e92e6fa33e15c41787a",
+  "scope": "Persistent, separate root and runtime authorized keys; one-time boot import; explicit root-only later provisioning; no device installation, boot or SSH configuration changes.",
+  "source_files_sha256": {
+    ".github/workflows/ci.yml": "df9c443c9553bdb90ccc5a954c8b84be7a9ec49d452e38963f7bd5ba90d79fd2",
+    "crates/engine-os-manager/src/main.rs": "e29f9ff33c568930312dc0acc95cbcabea1f7747703b32de43bc34506ec10cb2",
+    "crates/engine-os-manager/src/maintenance.rs": "0483bbe3db0826268b57532a97605505bff5834bc53d2264681e6ffc47936b19",
+    "crates/engine-os-manager/tests/maintenance_cli.rs": "14800dcdb209303c6624cee128da8317cfd9b08287dc926fc896d677fc8d122c",
+    "crates/engine-os-manager/tests/recovery_command_fixture.py": "2b109251f8b0add128cb56206edc7618df5d0c21e8682ba477cf7ddf4d80cf24",
+    "crates/engine-ota/src/access_linux.rs": "112020618df56764c613d581dcfe7d42244a2c6b08027fc4e278a9cc28e44a15",
+    "crates/engine-ota/src/access_linux_tests.rs": "9034793f3a936c4bfba3802a08389354b50a0a3ad115150775a8cbce02153f33",
+    "crates/engine-ota/src/file_command.rs": "164283c21e14f088c41390ad39d39e3542ee7da6ea88bc39d06bde72ab0fe4ad",
+    "crates/engine-ota/src/image_tools.rs": "0f721b3ebad33550e993b8d0e9bd95ba02c8dc432aa36b2163cec64ddc4d1832",
+    "crates/engine-ota/src/lib.rs": "b94a0f846eb4f0f036f64b5fa62441cbe6186aaac991096acd9c5c3d6b118890",
+    "crates/engine-ota/src/recovery_linux.rs": "614b2956d1bad7ab8af317a22a4dafb58161107a904fcdb87f053db7f46953f8",
+    "docs/ota-updates.md": "5f46f5e836b733d25052d2041d8b3557a400704421c3f31d2ef2a630dc04fb8b",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-access.service": "a4ad4f4daaae90113156583a7df66d70e3f51745d29de6f8734f46d6aaf27f5e",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-sshd-access.conf": "d8b1276b04ff97ac9296b7c869aedf386a8cd6af6e6ff3d5595959f36a20ef9e",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-access.conf": "46622cb97aa42b258dc5fa27758d0af32b9dae1f83813582dcd27d47860b49eb",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "a417c578968214c60a0f719fa673709abc5424f40c9319174df77ab961c6c1a1"
+  },
+  "checks": {
+    "host_serial": {
+      "log": "target/ota-access-host-tests-serial.log",
+      "sha256": "8a14d7a1571667bd40457d0c66027b5e8dd6b9c1de606b596d66621f57892870",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.65s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.48s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 81 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.06s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "cli_final": {
+      "log": "target/ota-access-cli-final.log",
+      "sha256": "8d4b478025bc97a95fbcfc4c137d5857279eb61d29ccc77391a66d4b94934d8f",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.82s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "log": "target/ota-access-clippy.log",
+      "sha256": "ff791d0c62d8d9830b96d97fd57986665138a4e02b942360957856489dd2cfa0",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.24s"
+      ]
+    },
+    "rust189": {
+      "log": "target/ota-access-msrv.log",
+      "sha256": "0ce224c2ee2d4768e8c019db4927e488479772bfa5ca98347828dc9f30900c8e",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.64s"
+      ]
+    },
+    "aarch64": {
+      "log": "target/ota-access-aarch64.log",
+      "sha256": "72db98bfbf8188e7d834280ec2464ae1840d584d14314d66c8a211ec1cc5c606",
+      "exit_code": 0,
+      "summary": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.98s",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.97s",
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.45s",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.82s"
+      ]
+    },
+    "host_sshd_config": {
+      "log": "target/ota-access-sshd-config.log",
+      "sha256": "3b3180e4cbe7fef240b18c1da0c046714fedebb41a76e942cfcc9c5090911de6",
+      "exit_code": 0,
+      "summary": [
+        "root ['permitrootlogin prohibit-password', 'strictmodes yes', 'authorizedkeysfile /data/spacewars-access/%u']",
+        "spacewars ['permitrootlogin prohibit-password', 'strictmodes yes', 'authorizedkeysfile /data/spacewars-access/%u']"
+      ]
+    }
+  },
+  "command_fixture": {
+    "fixture_root": "/home/data/workspace/space-wars-ota/target/ota-recover-command-evtxk8lo",
+    "exit_code": 0,
+    "stdout": "{\n  \"uid\": 0,\n  \"pid\": 1,\n  \"unprovisioned\": {\n    \"schema\": 1,\n    \"boot_id\": \"046d9f1b-06c1-44e6-a302-da0c967fc2a5\",\n    \"uptime_ms\": 17393545,\n    \"progress\": {\n      \"stage\": \"unprovisioned\",\n      \"phase\": null,\n      \"transaction\": null,\n      \"good_build_id\": null,\n      \"candidate_build_id\": null,\n      \"detail\": null\n    }\n  },\n  \"existing_state\": {\n    \"schema\": 1,\n    \"boot_id\": \"046d9f1b-06c1-44e6-a302-da0c967fc2a5\",\n    \"uptime_ms\": 17393580,\n    \"progress\": {\n      \"stage\": \"blocked\",\n      \"phase\": null,\n      \"transaction\": null,\n      \"good_build_id\": null,\n      \"candidate_build_id\": null,\n      \"detail\": \"invalid boot evidence: installed recovery image record is unavailable or invalid: storage failure: No such file or directory (os error 2)\"\n    }\n  },\n  \"existing_state_preserved\": true,\n  \"production_device_nodes_present\": false,\n  \"maintenance_wrappers_hold_shared_lock\": true,\n  \"busy_lock_and_corrupt_journal_reject_both_helpers\": true,\n  \"access_commands_share_lock_and_require_real_data_mount\": true,\n  \"corrupt_journal_blocks_operator_key_import\": true\n}\n",
+    "stderr": ""
+  },
+  "pi5_output": "uid=1000(spacewars) gid=1000(spacewars) groups=1000(spacewars),19(input),29(audio),44(video)\nboot_before=de606400-dc75-446e-b26b-385592b0f562\n\nrunning 6 tests\ntest access_linux::tests::first_boot_preserves_roles_verbatim_and_never_resurrects_revoked_keys ... ok\ntest access_linux::tests::invalid_or_incomplete_persistent_store_never_falls_back_to_image_keys ... ok\ntest access_linux::tests::public_key_validation_rejects_skipped_lines_secrets_and_unbounded_input ... ok\ntest access_linux::tests::runtime_only_flash_never_creates_root_authority_and_operator_import_is_explicit ... ok\ntest access_linux::tests::snapshot_detects_named_replacement_and_in_place_changes ... ok\ntest access_linux::tests::unsafe_sources_and_destinations_reject_before_publication ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 0.63s\n\n\nrunning 1 test\ntest file_command::tests::checker_deadline_output_exit_status_and_inherited_file_are_enforced ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.16s\n\ndevice mutations require the root-owned service\ndevice mutations require the root-owned service\npermitrootlogin without-password\nstrictmodes yes\nauthorizedkeysfile /data/spacewars-access/%u\nboot_after=de606400-dc75-446e-b26b-385592b0f562\n",
+  "pi5_binaries": {
+    "ota-access-pi-tests": {
+      "bytes": 4789224,
+      "sha256": "928b53cb51604bfe1dfb2464aed611cf0047e09042652298bdde6f002b08e32f"
+    },
+    "ota-access-pi-manager": {
+      "bytes": 10757264,
+      "sha256": "3660781adb7c2f3478cedaabb363254d70656519d8d6e1a3025fce5ed9615e31"
+    }
+  },
+  "initial_parallel_host_run": {
+    "log": "target/ota-access-host-tests.log",
+    "sha256": "19af3b6ddf5bdb3be59b31cc008c8aa38fd47a685d363e2548874c7b22d91aa2",
+    "result": "80 OTA unit tests passed, one existing immediate journal reopen returned Busy while other test threads were spawning processes. All 103 OTA and 38 manager tests passed with one test thread. Normal CI uses nextest process isolation; no recovery locking behavior changed."
+  },
+  "limitations": [
+    "Image packaging/service enablement not yet verified for this change",
+    "Root initialization and real login under the installed service sandbox remain unqualified",
+    "Pi tests used ordinary UID 1000 and temporary files only; no installed SSH keys/config or boot state modified",
+    "Both old slots must be migrated and separate runtime/operator logins checked before the supervised trial",
+    "Atomic rename/fsync semantics are implemented; actual power-loss/media qualification remains pending",
+    "ssh-keygen recognizes public key material; its counts do not prove login eligibility under every authorized_keys option"
+  ]
+}

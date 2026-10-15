@@ -26,7 +26,7 @@ Remaining work retains the full OTA scope:
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Trial coordinator, independent recovery service, health/identity evidence, early watchdog and journal-gated boot completion implemented; bootstrap and physical recovery qualification remain |
-| #264 | Shared lock, verified inactive-root writer and operator maintenance guard implemented; final service/handoff, maintenance holds and data preservation remain |
+| #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
@@ -695,7 +695,7 @@ journal reject both helpers before worker execution. Three changed OTA tests
 and the actual manager's unprivileged rejection paths also pass on the Pi 5.
 These checks do not yet qualify the installed sudo policy on the physical Pis.
 
-Reboot-capable maintenance/network holds, persistent operator-key provisioning,
+Reboot-capable maintenance/network holds, provisioning operator keys on the devices,
 the verified workstation A/B service path, and preservation across real trials
 remain integration work. Fast changes deliberately alter the packaged client
 identity; automatic-install admission must account for that development state
@@ -721,6 +721,62 @@ Persistent operator-key migration and the remaining service integration are
 still required before bootstrap and rollout.
 [Clean image, writer and packaged-command evidence](data/ota-clean-image-20261015.json)
 retains the exact artifacts and checks.
+
+### Persistent SSH login keys
+
+New images use `AuthorizedKeysFile /data/spacewars-access/%u`, with root login
+limited to public keys. The directory is root-owned mode 0755; its `root` file
+is 0600 and its `spacewars` file is 0644, both root-owned. The runtime account
+can read its public keys, as OpenSSH requires, but cannot change either role.
+Private SSH host identity remains separately stored under `/data/ssh`.
+
+`spacewars-access.service` runs `engine-os-manager initialize-access` under the
+shared installation lock before sshd and recovery. It checks that `/data` is
+the visible, complete ext4 mount on a different filesystem from `/`, without
+depending on boot selectors, inactive-slot availability or recovery health.
+The service reads each account's fixed `~/.ssh/authorized_keys` only on initial
+creation, validates a bounded snapshot with the installed `ssh-keygen`, and
+publishes both files together using a no-replace directory rename and fsync.
+It rejects symlinks, hardlinks, unsafe ownership/permissions, changed files,
+oversized input and unrecognized public-key lines. Options and comments remain
+verbatim; no shell or key-specified command is executed during import, and key
+contents are not logged. The fingerprint count is not proof that login works.
+
+A fresh flash's injected runtime key remains a runtime key. If no root key has
+been separately provisioned, the persistent root file is deliberately empty.
+Subsequent boots use only the persistent files, including empty files after
+revocation. They never fall back to home files in an older root image. A
+missing/corrupt file is an error, and a missing whole store on a device with a
+recovery journal is not treated as another first boot. sshd wants the initializer
+but does not require its success, allowing an existing valid role to remain
+accessible when initialization or another role fails.
+
+For later operator provisioning, the root-only command
+`engine-os-manager maintenance import-root-keys` copies only
+`/root/.ssh/authorized_keys` into an existing empty persistent root file. It
+uses the same maintenance admission and installation lock as fast updates,
+retains nonempty root keys and never alters the runtime file. This explicit
+operation may intentionally restore an operator key; automatic boot import
+cannot. Key rotation is a separate root maintenance action on the persistent
+files. Editing the old home files after initialization does not change access.
+
+Six new tests cover separate roles, fresh runtime-only flashes, explicit root
+provisioning, revocation across repeated boots, corrupt/missing stores, unsafe
+sources and file replacement. The full host suite passes with isolated test
+execution (103 OTA and 38 manager tests); Clippy, Rust 1.89 and AArch64 builds
+pass. Root namespace fixtures check the shared lock, missing data mount and
+corrupt-journal rejection. The six new tests and bounded tool runner also pass
+on the Pi 5 using its OpenSSH 9.6 package, and the runtime UID cannot invoke
+either privileged command. `sshd -T` confirms the effective key path, strict
+mode checks and public-key-only root access on the host and Pi 5.
+
+This has not changed either Pi's installed SSH configuration or keys. The
+supervised bootstrap must initialize the store while the old homes still
+exist, migrate the SSH configuration in both slots, and verify separate live
+runtime and operator logins before any trial. Full A/B login preservation,
+service sandbox behavior and physical interruption tests remain required.
+[Key-preservation source and execution evidence](data/ota-access-20261015.json)
+records this checkpoint.
 
 ## Signed feed contract
 

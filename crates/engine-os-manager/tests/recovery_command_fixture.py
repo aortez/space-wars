@@ -49,6 +49,19 @@ def inside(root, parent_namespace):
             assert blocked_helper.returncode == 1, blocked_helper
             assert "already in progress" in blocked_helper.stderr, blocked_helper.stderr
 
+    access = ["/usr/bin/engine-os-manager", "initialize-access"]
+    import_keys = ["/usr/bin/engine-os-manager", "maintenance", "import-root-keys"]
+    for entry in [access, import_keys]:
+        with open("/run/spacewars-install/lock", "r+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            rejected = subprocess.run(entry, capture_output=True, text=True)
+            assert rejected.returncode == 1 and "already in progress" in rejected.stderr, rejected
+    # /data here is deliberately just a directory. Neither entry may create a
+    # replacement key store on the root filesystem when the real mount is absent.
+    rejected = subprocess.run(access, capture_output=True, text=True)
+    assert rejected.returncode == 1, rejected
+    assert not Path("/data/spacewars-access").exists()
+
     # An existing directory must not be interpreted as permission to bootstrap.
     # This root has no installed image identity, so inspection must fail closed.
     journal.mkdir(mode=0o700)
@@ -60,7 +73,7 @@ def inside(root, parent_namespace):
     assert blocked["progress"]["stage"] == "blocked", blocked
     assert state.read_bytes() == b"corrupt fixture"
     state.chmod(0o600)
-    for helper in [fast, renderer]:
+    for helper in [fast, renderer, import_keys]:
         rejected = subprocess.run(helper, capture_output=True, text=True)
         assert rejected.returncode == 1 and not rejected.stdout, rejected
         assert state.read_bytes() == b"corrupt fixture"
@@ -70,6 +83,8 @@ def inside(root, parent_namespace):
         "existing_state_preserved": True, "production_device_nodes_present": False,
         "maintenance_wrappers_hold_shared_lock": True,
         "busy_lock_and_corrupt_journal_reject_both_helpers": True,
+        "access_commands_share_lock_and_require_real_data_mount": True,
+        "corrupt_journal_blocks_operator_key_import": True,
     }, indent=2))
 
 

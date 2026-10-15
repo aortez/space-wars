@@ -15,6 +15,9 @@ enum Command {
     /// Reconcile an existing recovery journal and observe a trial boot.
     /// Normally invoked by the separate spacewars-recovery service.
     Recover,
+    /// Prepare persistent SSH login keys before sshd, without changing boot state.
+    #[command(hide = true)]
+    InitializeAccess,
     /// Separately authenticated root operator tools; not available on the device socket.
     Maintenance {
         #[command(subcommand)]
@@ -40,6 +43,8 @@ enum Command {
 
 #[derive(Subcommand)]
 enum MaintenanceCommand {
+    /// Explicitly import /root/.ssh/authorized_keys into an empty persistent root key file.
+    ImportRootKeys,
     /// Install a compatible development client/CLI pair under the OTA lock.
     Fast {
         #[arg(allow_hyphen_values = true)]
@@ -94,14 +99,24 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             daemon::require_root()?;
             engine_os_manager::recovery_service::run()?;
         }
+        Command::InitializeAccess => {
+            daemon::require_root()?;
+            println!(
+                "{}",
+                serde_json::to_string(&engine_ota::access_linux::initialize()?)?
+            );
+        }
         Command::Maintenance { operation } => {
             daemon::require_root()?;
             use engine_os_manager::maintenance::{Request, run};
-            let request = match operation {
-                MaintenanceCommand::Fast { arguments } => Request::fast(arguments)?,
-                MaintenanceCommand::Renderer { renderer } => Request::renderer(renderer)?,
-            };
-            run(request)?;
+            match operation {
+                MaintenanceCommand::ImportRootKeys => println!(
+                    "{}",
+                    serde_json::to_string(&engine_os_manager::maintenance::import_root_keys()?)?
+                ),
+                MaintenanceCommand::Fast { arguments } => run(Request::fast(arguments)?)?,
+                MaintenanceCommand::Renderer { renderer } => run(Request::renderer(renderer)?)?,
+            }
         }
         Command::CaptureRtc => {
             daemon::require_root()?;

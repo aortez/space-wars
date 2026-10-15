@@ -1,0 +1,35 @@
+[Unit]
+Description=Preserve Space-Wars SSH login keys across rootfs updates
+Requires=spacewars-data-init.service
+After=spacewars-data-init.service systemd-tmpfiles-setup.service
+Before=sshd.service spacewars-recovery.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/engine-os-manager initialize-access
+User=root
+Group=root
+UMask=0077
+RemainAfterExit=yes
+TimeoutStartSec=30
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/data /run/spacewars-install
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+RestrictNamespaces=yes
+SystemCallFilter=~@mount
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

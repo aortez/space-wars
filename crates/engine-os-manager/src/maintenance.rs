@@ -63,6 +63,19 @@ pub fn run(request: Request) -> Result<()> {
         return Err(command.exec().into());
     }
     let lock = InstallLock::acquire()?;
+    authorize(&lock)?;
+    // exec keeps the lock in the worker, including through kiosk stop/start.
+    lock.exec_maintenance(command)?;
+    Ok(())
+}
+
+pub fn import_root_keys() -> Result<engine_ota::access_linux::AccessStatus> {
+    let lock = InstallLock::acquire()?;
+    authorize(&lock)?;
+    Ok(engine_ota::access_linux::import_root_key(&lock)?)
+}
+
+fn authorize(lock: &InstallLock) -> Result<()> {
     // New, unprovisioned development images may use the operator tools. Once
     // recovery exists, missing/corrupt state must never masquerade as that case.
     let mut provisioned = false;
@@ -82,10 +95,8 @@ pub fn run(request: Request) -> Result<()> {
     }
     if provisioned {
         let journal = RecoveryStore::open(Path::new(RECOVERY))?;
-        BootController::open(&lock)?.authorize_maintenance(&journal)?;
+        BootController::open(lock)?.authorize_maintenance(&journal)?;
     }
-    // exec keeps the lock in the worker, including through kiosk stop/start.
-    lock.exec_maintenance(command)?;
     Ok(())
 }
 

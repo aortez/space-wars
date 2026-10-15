@@ -8,6 +8,8 @@ fn runtime_identity_cannot_invoke_root_maintenance() {
         return;
     }
     for args in [
+        vec!["initialize-access"],
+        vec!["maintenance", "import-root-keys"],
         vec!["maintenance", "fast", "--check"],
         vec!["maintenance", "renderer", "gpu"],
     ] {
