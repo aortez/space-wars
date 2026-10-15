@@ -4,6 +4,8 @@
 //! Lab, Spaceling Lab, Terrain Lab, and Spacewars, with Null retained as a hidden test
 //! scenario.
 
+#[cfg(test)]
+mod aquarium_visual_tests;
 mod autostart;
 mod bluetooth;
 mod camera_probe;
@@ -817,6 +819,7 @@ fn show_launcher(
         settings.clock.crow_water_tolerance.label().into(),
     );
     window.set_launcher_clock_explosion_enabled(settings.clock.events.explosion);
+    window.set_launcher_clock_aquarium_enabled(settings.clock.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
@@ -1489,7 +1492,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 6,
-        "clock" => 17,
+        "clock" => 18,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1774,6 +1777,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
     if focus == 15 {
         window.invoke_clock_fonts_open();
+        return;
+    }
+    if focus == 16 {
+        window.set_launcher_clock_aquarium_enabled(!window.get_launcher_clock_aquarium_enabled());
         return;
     }
     if focus == 14 {
@@ -2415,6 +2422,7 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             duck: window.get_launcher_clock_duck_enabled(),
             crow: window.get_launcher_clock_crow_enabled(),
             explosion: window.get_launcher_clock_explosion_enabled(),
+            aquarium: window.get_launcher_clock_aquarium_enabled(),
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
             rain: window.get_launcher_clock_rain_enabled(),
@@ -4196,6 +4204,7 @@ mod tests {
                     rain: false,
                     crow: false,
                     explosion: false,
+                    aquarium: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),

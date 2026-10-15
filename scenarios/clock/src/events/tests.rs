@@ -15,6 +15,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
             ClockEventKind::Duck => 35 * 60,
             ClockEventKind::Crow => 22 * 60,
             ClockEventKind::Rain => 42 * 60,
+            ClockEventKind::Aquarium => 50 * 60,
             _ => 12 * 60,
         };
         assert!(definition.duration_ticks > 0 && definition.duration_ticks <= max_duration);
@@ -61,6 +62,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             rain: kind == ClockEventKind::Rain,
             crow: kind == ClockEventKind::Crow,
             explosion: kind == ClockEventKind::Explosion,
+            aquarium: kind == ClockEventKind::Aquarium,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -99,6 +101,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 rain: false,
                 crow: false,
                 explosion: false,
+                aquarium: false,
             },
         ),
     ] {
@@ -145,6 +148,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         rain: false,
         crow: false,
         explosion: false,
+        aquarium: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);

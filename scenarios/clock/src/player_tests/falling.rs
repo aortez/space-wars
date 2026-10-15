@@ -303,6 +303,7 @@ fn automatic_falling_is_available_and_its_first_frame_matches_shared_physics() {
         rain: false,
         crow: false,
         explosion: false,
+        aquarium: false,
     };
     state.configure(settings);
     assert!(!state.automatic_events_suspended());

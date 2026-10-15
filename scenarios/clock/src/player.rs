@@ -95,6 +95,7 @@ impl ClockState {
             rain: enabled(ClockEventKind::Rain),
             crow: enabled(ClockEventKind::Crow),
             explosion: enabled(ClockEventKind::Explosion),
+            aquarium: enabled(ClockEventKind::Aquarium),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

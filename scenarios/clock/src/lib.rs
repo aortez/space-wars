@@ -233,7 +233,7 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 1 && payload[8] <= 1 && payload[10] <= 1 =>
+                if payload[5] <= 3 && payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -262,6 +262,7 @@ impl ClockAction {
                         rain: payload[4] & 64 != 0,
                         crow: payload[4] & 128 != 0,
                         explosion: payload[5] & 1 != 0,
+                        aquarium: payload[5] & 2 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -670,6 +671,13 @@ impl ClockState {
         }
     }
 
+    pub fn aquarium_state(&self) -> Option<engine_common::ClockAquariumState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Aquarium(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+
     fn trigger_event(&mut self, kind: ClockEventKind) {
         if self.can_trigger_event() && !self.event_blocked(kind) {
             self.start_event(kind);
@@ -794,7 +802,10 @@ impl ClockState {
         }
         if matches!(
             kind,
-            ClockEventKind::Falling | ClockEventKind::Meltdown | ClockEventKind::Explosion
+            ClockEventKind::Falling
+                | ClockEventKind::Meltdown
+                | ClockEventKind::Explosion
+                | ClockEventKind::Aquarium
         ) && let Some(duck) = &mut self.duck_visit
         {
             self.floor.acquire_visit_event(kind);
@@ -805,6 +816,9 @@ impl ClockState {
                 floor: self.floor.geometry(layout),
             };
             self.active_event = Some(match kind {
+                ClockEventKind::Aquarium => ActiveEvent::Aquarium(Box::new(
+                    events::aquarium::AquariumEvent::with_visit(context, seed, duck),
+                )),
                 ClockEventKind::Falling => ActiveEvent::Falling(
                     events::falling::FallingEvent::with_visit(context, seed, duck),
                 ),
@@ -916,6 +930,7 @@ impl ClockState {
         let kind = self.event_kind();
         let environment = crow::Environment {
             panels: match &self.active_event {
+                Some(ActiveEvent::Aquarium(event)) => Some(&event.floor),
                 Some(ActiveEvent::Rain(rain)) => rain.responsive_floor(),
                 Some(ActiveEvent::Meltdown(melt)) => melt.floor.as_ref(),
                 _ => self
@@ -924,6 +939,7 @@ impl ClockState {
                     .and_then(|duck| duck.responsive_floor()),
             },
             water: match &self.active_event {
+                Some(ActiveEvent::Aquarium(event)) => Some(&event.water),
                 Some(ActiveEvent::Rain(rain)) => Some(&rain.water),
                 Some(ActiveEvent::Meltdown(melt)) => Some(&melt.water),
                 _ => None,
@@ -932,6 +948,7 @@ impl ClockState {
             // crow yields immediately instead of standing on imaginary support.
             ground_available: self.duck_visit.is_none()
                 && (self.floor.mode() == engine_common::ClockFloorMode::Closed
+                    || matches!(&self.active_event, Some(ActiveEvent::Aquarium(event)) if event.floor.opening <= 1e-6)
                     || matches!(&self.active_event, Some(ActiveEvent::Rain(rain))
                         if rain.responsive_floor().is_some_and(|floor| floor.opening <= 1e-6))),
         };
@@ -958,6 +975,7 @@ impl ClockState {
             floor: self.floor.geometry(layout),
         };
         let finished = match event {
+            ActiveEvent::Aquarium(event) => event.step(context, self.duck_visit.as_deref_mut()),
             ActiveEvent::Falling(falling) => falling.step(context, self.duck_visit.as_deref_mut()),
             ActiveEvent::Explosion(explosion) => {
                 explosion.step(context, self.duck_visit.as_deref_mut())
@@ -1015,6 +1033,9 @@ impl ClockState {
         }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
+        }
+        if let Some(ActiveEvent::Aquarium(event)) = &mut self.active_event {
+            event.synchronize(self.display, &mut self.segments);
         }
         if let Some(ActiveEvent::Rain(event)) = &mut self.active_event {
             // A control-only update may transfer wet support into free water,

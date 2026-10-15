@@ -1,4 +1,4 @@
-//! Slow, volume-driven floor actuator shared by Rain, Meltdown and the water test bed.
+//! Volume-driven floor actuators shared by Clock water events and the test bed.
 //! This is kinematic scenery, not a simulated pressure/hinge mechanism.
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -11,6 +11,8 @@ use engine_water::{
 };
 
 use crate::layout::Layout;
+
+mod retained;
 
 pub(crate) const MAX_COLUMNS: usize = 64;
 
@@ -164,29 +166,41 @@ impl FloorShape {
         opening: f64,
         dt: f64,
     ) -> Result<(), WaterError> {
+        self.move_water(water, opening, dt, false)
+    }
+
+    fn move_water(
+        self,
+        water: &mut WaterWorld,
+        opening: f64,
+        dt: f64,
+        actuated: bool,
+    ) -> Result<(), WaterError> {
         let gap = opening * self.max_gap;
         let left = self.bed_edges(0, opening);
         let right = self.bed_edges(1, opening);
         let outlet = self.outlet(opening);
-        water.move_sloped_pools(
-            &[
-                PoolGeometry {
-                    pool: 0,
-                    left: -self.half_width,
-                    column_width: (self.half_width - gap) / self.columns as f64,
-                    bed_edges: &left[..self.columns],
-                    boundaries: [Boundary::Closed, outlet],
-                },
-                PoolGeometry {
-                    pool: 1,
-                    left: gap,
-                    column_width: (self.half_width - gap) / self.columns as f64,
-                    bed_edges: &right[..self.columns],
-                    boundaries: [outlet, Boundary::Closed],
-                },
-            ],
-            dt,
-        )?;
+        let changes = [
+            PoolGeometry {
+                pool: 0,
+                left: -self.half_width,
+                column_width: (self.half_width - gap) / self.columns as f64,
+                bed_edges: &left[..self.columns],
+                boundaries: [Boundary::Closed, outlet],
+            },
+            PoolGeometry {
+                pool: 1,
+                left: gap,
+                column_width: (self.half_width - gap) / self.columns as f64,
+                bed_edges: &right[..self.columns],
+                boundaries: [outlet, Boundary::Closed],
+            },
+        ];
+        if actuated {
+            water.actuate_sloped_pools(&changes, dt)?;
+        } else {
+            water.move_sloped_pools(&changes, dt)?;
+        }
         // A capacity deferral must retain both the old pools and old solids.
         self.configure_solids(water, opening);
         Ok(())
@@ -202,6 +216,7 @@ pub(crate) struct ResponsiveFloor {
     pub clearance_holds: u64,
     filtered_load: f64,
     hold: f64,
+    opening_speed: f64,
 }
 
 impl ResponsiveFloor {
@@ -214,6 +229,7 @@ impl ResponsiveFloor {
             clearance_holds: 0,
             filtered_load: initial_depth,
             hold: 0.0,
+            opening_speed: 0.0,
         }
     }
 
@@ -306,8 +322,12 @@ impl ResponsiveFloor {
 
     /// The passive and player duck use identical panel poses and persistent IDs.
     pub fn insert_panels(&self, world: &mut PhysicsWorld) {
+        self.insert_panels_at(world, 1001);
+    }
+
+    pub fn insert_panels_at(&self, world: &mut PhysicsWorld, first_id: u64) {
         for side in 0..2 {
-            let id = PhysicsId::new(1001 + side as u64);
+            let id = PhysicsId::new(first_id + side as u64);
             let (position, angle) = self.shape.panel_pose(side, self.opening);
             let half = self.shape.panel_half_extents();
             assert!(world.insert_body(
@@ -328,10 +348,14 @@ impl ResponsiveFloor {
     }
 
     pub fn move_panels(&self, world: &mut PhysicsWorld) {
+        self.move_panels_at(world, 1001);
+    }
+
+    pub fn move_panels_at(&self, world: &mut PhysicsWorld, first_id: u64) {
         for side in 0..2 {
             let (position, angle) = self.shape.panel_pose(side, self.opening);
             assert!(world.set_next_kinematic_pose(
-                BodyId::new(PhysicsId::new(1001 + side as u64), BodyRole::PRIMARY),
+                BodyId::new(PhysicsId::new(first_id + side as u64), BodyRole::PRIMARY),
                 position,
                 angle
             ));

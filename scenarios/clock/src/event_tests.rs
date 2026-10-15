@@ -16,6 +16,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 rain: false,
                 crow: false,
                 explosion: false,
+                aquarium: false,
             },
             ..ClockConfig::default()
         },

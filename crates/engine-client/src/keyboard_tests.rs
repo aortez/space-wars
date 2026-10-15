@@ -648,20 +648,24 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(window.get_launcher_settings_focus_index(), 8);
     assert!(window.get_launcher_clock_crow_enabled());
     for expected in ["Shy", "Hardy"] {
-        click(&window, 480.0, 324.0);
+        click(&window, 400.0, 324.0);
         assert!(window.get_launcher_clock_crow_enabled());
         assert_eq!(
             window.get_launcher_clock_crow_water_tolerance().as_str(),
             expected
         );
     }
-    click(&window, 480.0, 324.0);
+    click(&window, 400.0, 324.0);
     assert!(!window.get_launcher_clock_crow_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 13);
     assert!(window.get_launcher_clock_explosion_enabled());
-    click(&window, 649.0, 324.0);
+    click(&window, 525.0, 324.0);
     assert!(!window.get_launcher_clock_explosion_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 14);
+    assert!(window.get_launcher_clock_aquarium_enabled());
+    click(&window, 649.0, 324.0);
+    assert!(!window.get_launcher_clock_aquarium_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 16);
     click(&window, 372.0, 376.0);
     assert!(!window.get_launcher_clock_marquee_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 9);

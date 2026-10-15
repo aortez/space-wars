@@ -63,6 +63,8 @@ pub struct ClockState {
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
     #[serde(default)]
     pub rain: Option<engine_common::ClockRainState>,
+    #[serde(default)]
+    pub aquarium: Option<engine_common::ClockAquariumState>,
     pub reading: Option<[u8; 3]>,
     /// Host-supplied local civil date, [year, month, day].
     pub date: Option<[u16; 3]>,
@@ -418,6 +420,7 @@ mod tests {
             marquee: None,
             digit_slide: None,
             rain: None,
+            aquarium: None,
             reading: Some([12, 34, 56]),
             date: Some([2026, 9, 25]),
             date_label: Some("FRIDAY · SEPTEMBER 25".into()),
@@ -462,6 +465,8 @@ mod tests {
             dive_held: false,
             swim_strokes: 3,
             swim_cooldown_ticks: 12,
+            dive_ticks_left: 120,
+            dive_recharging: false,
             facing_right: false,
             floor_open_milli: Some(650),
             submerged_milli: 450,

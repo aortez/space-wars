@@ -1,3 +1,4 @@
+pub(crate) mod aquarium;
 mod color_cycle;
 pub(crate) mod digit_slide;
 pub(crate) mod duck;
@@ -59,6 +60,8 @@ pub enum EventPhase {
     Clearing,
     Warning,
     Exploding,
+    Filling,
+    Swimming,
 }
 
 impl EventPhase {
@@ -79,6 +82,8 @@ impl EventPhase {
             Self::Clearing => "clearing",
             Self::Warning => "warning",
             Self::Exploding => "exploding",
+            Self::Filling => "filling",
+            Self::Swimming => "swimming",
         }
     }
 }
@@ -122,6 +127,7 @@ impl EventDefinition {
                 | ClockEventKind::Duck
                 | ClockEventKind::Rain
                 | ClockEventKind::Explosion
+                | ClockEventKind::Aquarium
         )
     }
 }
@@ -190,6 +196,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: explosion::EXPLOSION_TICKS,
         cooldown_ticks: 45 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Aquarium,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: aquarium::AQUARIUM_TICKS,
+        cooldown_ticks: 45 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -209,6 +222,7 @@ pub(super) enum ActiveEvent {
     DigitSlide(DigitSlideEvent),
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
+    Aquarium(Box<aquarium::AquariumEvent>),
 }
 
 // Use the admission seed locally so recipe selection cannot advance the scheduler RNG.
@@ -234,6 +248,9 @@ impl ActiveEvent {
         previous_display: Option<DisplaySnapshot>,
     ) -> Self {
         match kind {
+            ClockEventKind::Aquarium => {
+                Self::Aquarium(Box::new(aquarium::AquariumEvent::new(context, seed)))
+            }
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::Explosion => Self::Explosion(ExplosionEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
@@ -263,6 +280,7 @@ impl ActiveEvent {
 
     pub fn kind(&self) -> ClockEventKind {
         match self {
+            Self::Aquarium(_) => ClockEventKind::Aquarium,
             Self::Falling(_) => ClockEventKind::Falling,
             Self::Explosion(_) => ClockEventKind::Explosion,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
@@ -275,6 +293,7 @@ impl ActiveEvent {
 
     pub fn shares_visit_arena(&self) -> bool {
         match self {
+            Self::Aquarium(event) => event.shares_visit_arena(),
             Self::Falling(event) => event.shares_visit_arena(),
             Self::Explosion(event) => event.shares_visit_arena(),
             Self::Meltdown(event) => event.shares_visit_arena(),
@@ -284,6 +303,7 @@ impl ActiveEvent {
 
     pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
         match self {
+            Self::Aquarium(event) => event.vacant_arena(),
             Self::Falling(event) => event.vacant_arena(),
             Self::Explosion(event) => event.vacant_arena(),
             Self::Meltdown(event) => event.vacant_arena(),
@@ -308,6 +328,9 @@ impl ActiveEvent {
         seat: u8,
     ) -> Option<Box<duck::DuckEvent>> {
         match self {
+            Self::Aquarium(event) => event
+                .rejoin(session, seat)
+                .or_else(|| event.join_player(seed, session, seat)),
             Self::Falling(event) => event
                 .rejoin(session, seat)
                 .or_else(|| event.join_player(seed, session, seat)),
@@ -323,6 +346,7 @@ impl ActiveEvent {
 
     pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
         match self {
+            Self::Aquarium(event) => event.retain_arena(duck),
             Self::Falling(event) => event.retain_arena(duck),
             Self::Explosion(event) => event.retain_arena(duck),
             Self::Meltdown(event) => event.retain_arena(duck),
@@ -332,6 +356,7 @@ impl ActiveEvent {
 
     pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
         match self {
+            Self::Aquarium(event) => event.release(player),
             Self::Falling(event) => event.release(player),
             Self::Explosion(event) => event.release(player),
             Self::Meltdown(event) => event.release(player),
@@ -342,6 +367,7 @@ impl ActiveEvent {
     /// Returns true when the event has finished.
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
         match self {
+            Self::Aquarium(event) => event.step(context, None),
             Self::Falling(event) => event.step(context, None),
             Self::Explosion(event) => event.step(context, None),
             Self::ColorCycle(event) => event.step(),
@@ -357,6 +383,7 @@ impl ActiveEvent {
 
     pub fn phase(&self) -> EventPhase {
         match self {
+            Self::Aquarium(event) => event.phase(),
             Self::Falling(event) => event.phase(),
             Self::Explosion(event) => event.phase(),
             Self::ColorCycle(_) => EventPhase::Cycling,
@@ -369,6 +396,7 @@ impl ActiveEvent {
 
     pub fn phase_tick(&self) -> u64 {
         match self {
+            Self::Aquarium(event) => event.phase_tick(),
             Self::Falling(event) => event.phase_tick(),
             Self::Explosion(event) => event.phase_tick(),
             Self::ColorCycle(event) => event.tick,
@@ -381,6 +409,7 @@ impl ActiveEvent {
 
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
+            Self::Aquarium(event) => event.physics_counts(),
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
@@ -397,7 +426,7 @@ impl ActiveEvent {
     }
 
     pub fn holds_lit_segments(&self) -> bool {
-        matches!(self, Self::Rain(_))
+        matches!(self, Self::Rain(_) | Self::Aquarium(_))
             || matches!(
                 self.phase(),
                 EventPhase::Falling

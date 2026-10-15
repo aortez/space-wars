@@ -183,6 +183,15 @@ pub(super) fn render_water(
         a: opacity,
         ..WATER_EDGE
     };
+    render_water_colors(frame, water, layer, [color, edge_color]);
+}
+
+pub(super) fn render_water_colors(
+    frame: &mut RenderFrame,
+    water: &engine_water::WaterWorld,
+    layer: i32,
+    [color, edge_color]: [RenderColor; 2],
+) {
     for pool in water.pools() {
         let mut columns = pool.columns().peekable();
         let mut previous = None;
@@ -229,9 +238,12 @@ pub(super) fn render_water(
     // pool-height rectangle down the entire cliff.
     for (index, parcel) in water.parcels().iter().enumerate() {
         if let Some(spill) = water.spill_ribbon(index) {
-            for quad in spill.quads {
+            for (piece, &quad) in spill.quads().iter().enumerate() {
                 let points = clip_channel(quad, parcel.horizontal_bounds);
                 solids::render(frame, points, water.solid_boxes(), layer, color);
+                if !spill.has_surface(piece) {
+                    continue;
+                }
                 // Continue the pool's bright surface down the same shared
                 // faces; keep the highlight inside the represented water.
                 let (a, b, c, d) = if spill.surface_side == 1 {

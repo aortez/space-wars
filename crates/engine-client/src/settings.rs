@@ -575,6 +575,7 @@ enabled = true
                 rain: false,
                 crow: false,
                 explosion: false,
+                aquarium: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -698,7 +699,9 @@ enabled = true
                 settings.clock.events.enabled(event),
                 matches!(
                     event,
-                    engine_common::ClockEventKind::Crow | engine_common::ClockEventKind::Explosion
+                    engine_common::ClockEventKind::Crow
+                        | engine_common::ClockEventKind::Explosion
+                        | engine_common::ClockEventKind::Aquarium
                 )
             );
         }
@@ -709,7 +712,7 @@ enabled = true
     }
 
     #[test]
-    fn pre_explosion_settings_preserve_old_choices_and_default_only_the_new_switch() {
+    fn pre_explosion_settings_preserve_old_choices_and_default_new_switches() {
         let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\ncrow = false\n").unwrap();
         assert_eq!(
             settings.clock.event_profile,
@@ -719,13 +722,37 @@ enabled = true
         for kind in engine_common::ClockEventKind::ALL {
             assert_eq!(
                 settings.clock.events.enabled(kind),
-                kind == engine_common::ClockEventKind::Explosion
+                matches!(
+                    kind,
+                    engine_common::ClockEventKind::Explosion
+                        | engine_common::ClockEventKind::Aquarium
+                )
             );
         }
         let mut settings = settings;
         settings.clock.events.explosion = false;
         let loaded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
         assert_eq!(loaded.clock, settings.clock);
+    }
+
+    #[test]
+    fn pre_aquarium_settings_default_the_new_event_and_preserve_a_saved_opt_out() {
+        let mut value = toml::Value::try_from(Settings::default()).unwrap();
+        let events = value["clock"]["events"].as_table_mut().unwrap();
+        events.remove("aquarium");
+        for (_, enabled) in events.iter_mut() {
+            *enabled = toml::Value::Boolean(false);
+        }
+        let mut settings: Settings = value.try_into().unwrap();
+        for kind in engine_common::ClockEventKind::ALL {
+            assert_eq!(
+                settings.clock.events.enabled(kind),
+                kind == engine_common::ClockEventKind::Aquarium
+            );
+        }
+        settings.clock.events.aquarium = false;
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.clock, settings.clock);
     }
 
     #[test]

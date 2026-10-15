@@ -183,7 +183,7 @@ fn outfall_leaves_along_the_slope_and_raised_lips_retain_water() {
         let ribbon = w.spill_ribbon(0).unwrap();
         assert!(
             ribbon
-                .quads
+                .quads()
                 .iter()
                 .flatten()
                 .all(|p| p.x.is_finite() && p.y.is_finite())

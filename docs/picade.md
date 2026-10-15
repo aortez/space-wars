@@ -95,8 +95,9 @@ apply without a userspace input translator. Scenario-specific mappings remain
 those shown by the application's Controls menu. In Clock, HAT Button 3 / West starts
 the next enabled event. Button 4 / North starts or dismisses a player duck;
 the joystick moves it, Button 2 / East jumps/swims, and Button 1 / South runs.
-Hold joystick Down for a shallow dive in water. Physical
-positions differ between cabinets; see the verified layouts below. Use Escape
+Hold joystick Down to dive for up to four seconds; release at the surface
+to recover. Physical positions differ between cabinets; see the verified
+layouts below. Use Escape
 or Start to pause, then choose Clock
 Controls or Launcher. Enter confirms menu selections;
 Coin/Select opens controls help. Use **App Settings → Controllers** to compensate
@@ -174,13 +175,14 @@ Use the logical inputs in the tables: North starts/dismisses a player duck,
 the joystick moves it, East jumps/swims, and South runs/paddles faster. On the
 default Picade 2 layout, hold bottom-left pink to Run and tap bottom-middle
 yellow to Jump. In water, holding Jump repeats strokes and holding Down dives
-a little deeper; releasing Down restores floating. Jump takes priority over
-Down. Ground jumps still need a fresh press. If the
+for up to four seconds; releasing Down restores floating. The allowance
+recharges at the surface over two seconds, shown by the small meter. Jump takes
+priority over Down. Ground jumps still need a fresh press. If the
 automatic obstacle-course duck is already on screen, North takes control of it
 in place, even mid-jump: no new course, teleport or velocity reset. Release the
 joystick/Run/Jump controls before steering; press North again to dismiss, not return
 to AI. Only the controller that joined the duck supplies its movement and jump.
-West cycles compatible visual events, Rain, Falling and Meltdown without
+West cycles compatible visual events, Rain, Falling, Meltdown and Aquarium without
 ending the visit. This Clock-only binding does not change menus, NES, or other
 scenarios; ordinary gamepads use right shoulder. In water, the joystick paddles;
 neutral floats/drifts with the current. Rain shares the fixed course; joining a

@@ -1,0 +1,15 @@
+# Match the dependency revisions that produced sw-picade's 6ecc3217 runtime.
+# Source: the compatible build's retained console log and fast-update manifest.
+header:
+  version: 14
+repos:
+  poky:
+    commit: 44dcf08572ce391d7c0df4f8c7510af5e096baca
+  meta-raspberrypi:
+    commit: 2c646d29912dcc873469a57b1c207e1549c5094d
+  meta-openembedded:
+    commit: ae7dfb12245c7f9b9a353499e2688015bd4e6413
+  meta-rust-bin:
+    commit: 4aac047a58d0e58d6ff9293d93fc3dba226f299f
+  meta-pi-base:
+    commit: d4f3a9a87b2727462ba39347508b34fa29f33fd5
