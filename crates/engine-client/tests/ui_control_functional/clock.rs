@@ -434,6 +434,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.preview-event",
             "pause.clock.crow",
             "pause.clock.explosion",
+            "pause.clock.aquarium",
             "pause.clock.marquee",
         ] {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -442,6 +443,11 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!(
             page.selected_control.as_deref(),
             Some("pause.clock.marquee")
+        );
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.aquarium")
         );
         page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
@@ -762,6 +768,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             page = harness.change_clock_setting("pause.clock.crow", choice, &page);
         }
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1111,6 +1118,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.explosion.next",
+            "launcher.settings.clock.aquarium.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {
