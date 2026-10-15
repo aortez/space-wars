@@ -2,6 +2,8 @@
 pub mod time;
 
 #[cfg(target_os = "linux")]
+pub mod kiosk_health;
+#[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "linux")]
 pub mod service;

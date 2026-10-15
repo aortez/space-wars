@@ -69,6 +69,35 @@ mod spacewars_match;
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn kiosk_health_challenges_run_on_the_live_ui_thread() {
+    run_functional_test("kiosk-health", |harness| {
+        let before = harness.wait_until_ready();
+        let mut previous = 0;
+        for nonce in [17, 18, 19] {
+            let response = harness
+                .client
+                .request_before(
+                    &format!("health\n{{\"schema_version\":1,\"nonce\":{nonce}}}\n"),
+                    Instant::now() + Duration::from_secs(2),
+                )
+                .unwrap();
+            let health = spacewars_control::HealthState::from_json(&response, nonce).unwrap();
+            assert_eq!(health.process_id, harness.child.0.id());
+            assert!(health.ui_responses > previous);
+            // Xvfb exercises the UI responder, not physical DRM presentation.
+            assert_eq!(health.presented_frames, None);
+            previous = health.ui_responses;
+        }
+        let after = harness.client.ui_state().unwrap();
+        assert_eq!(
+            before, after,
+            "health checks must not navigate or act as input"
+        );
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
     run_functional_test("launcher-navigation", |harness| {
         let mut state = harness.wait_until_ready();

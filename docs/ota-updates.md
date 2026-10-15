@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal and health model implemented; boot/health adapters, bootstrap and physical recovery qualification remain |
+| #263 | Root discovery, journal, health model and kiosk observer implemented; image/boot integration, bootstrap and physical recovery qualification remain |
 | #264 | Verified inactive-root writer, shared install lock and data preservation |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -146,8 +146,9 @@ distinguish fixture execution from installed service/RTC qualification.
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
 of [#263](https://github.com/aortez/space-wars/issues/263). They are not yet wired
-to a partition writer, boot-selector adapter, watchdog owner or live kiosk
-health probe. Production installation remains unavailable.
+to a partition writer, boot-selector adapter or watchdog owner. The kiosk
+observer described below still needs the immutable image identity and trial
+coordinator integration. Production installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -219,6 +220,53 @@ and boot/data on the same USB disk.
 [Probe output and source/binary identities](data/ota-layout-20261014.json)
 record this separately from trial qualification.
 
+### Live kiosk health evidence
+
+The client implements a versioned `health` challenge on its UI thread. Each
+reply echoes a fresh nonce and includes its compiled revision, PID, response
+counter and completed DRM page-flip counter. Display completion is counted with
+optional profiling disabled; submissions and UI ticks do not advance it. The
+request schedules a redraw so a static launcher can demonstrate progress without
+simulating input. Desktop backends explicitly return unavailable presentation
+evidence and cannot satisfy Pi trial health.
+
+`engine-os-manager::kiosk_health` checks systemd's uncached main PID and invocation
+ID, kernel socket peer credentials, process UID/start time, and the running
+executable's inode, ownership, permissions, length and hash. It repeats identity
+and executable checks after the challenge and state probe. Expectations must
+come from the verified image; a kiosk-provided revision is not sufficient.
+Persistent-state testing runs a fixed temporary write/readback/flush/removal as
+UID/GID 1000, with no supplementary groups. It does not modify settings or ROMs.
+
+An isolated worker bounds the complete observation to five seconds, including
+D-Bus, socket, hashing and state I/O. Replies are limited to 4 KiB. Timeout kills
+the worker's process group, and another worker cannot start until the previous
+one is reaped. Group cleanup precedes reaping to avoid signaling a reused PID.
+Uninterruptible kernel I/O remains subject to the eventual hardware watchdog;
+the coordinator does not accumulate additional workers while it is pending.
+
+The installed kiosk now uses `/run/spacewars-kiosk/control.sock`, mode 0660 in a
+0750 systemd runtime directory. This remains visible across the independent
+service's private `/tmp`. The CLI discovers it unless an explicit socket was
+selected; desktop sockets retain their previous path and owner-only permissions.
+
+The observer is **not yet invoked by the time service**. Trial integration must
+provide the payload-bound image identity and its required privileges: read the
+kiosk's `/proc/PID/exe`, drop credentials for the fixed state helper, terminate
+that helper, and write the kiosk configuration directory under the service's
+filesystem sandbox. No arbitrary executable, path or expected identity is
+accepted through the public device-status socket.
+
+All 33 device-service tests pass on the host. Nine health-specific tests also
+pass on the Pi 5; they use temporary files, the test executable and a private
+D-Bus fixture, rather than replacing or certifying the installed kiosk. A real
+local Xvfb client passes the UI challenge test, both kiosk renderer configurations
+compile, and the DRM counter regression passes. The Picade was unreachable for
+this pass. These checks do not qualify installed sandbox permissions, physical
+display progress, rootfs trial boot or watchdog recovery.
+[Source identities and validation output](data/ota-health-20261015.json)
+retain the exact scope.
+
 ### Boot capability inventory and bootstrap prerequisite
 
 The [read-only inventory](data/ota-boot-inventory-20261014.json) found:
@@ -244,6 +292,12 @@ The normal updater must not silently replace firmware/EEPROM to obtain it.
 Both boards have an owner-confirmed local or independent recovery path for
 subsequent controlled trials; no failure, reboot or firmware experiment has
 yet been performed.
+
+The owner selected root-shell bootstrap access on both boards, preserving the
+existing data partitions. That access has not yet been established: a read-only
+root SSH check on the Pi 5 was rejected, and the Picade was unreachable. The
+existing kiosk account's restricted update helpers are not a substitute for
+separately authorized root/operator access.
 
 The physical procedure must establish selector durability, actual root-device
 discovery, watchdog ownership from boot through unhealthy userspace, and reset

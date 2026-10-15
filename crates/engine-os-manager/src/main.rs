@@ -22,6 +22,12 @@ enum Command {
     /// Isolated, bounded RTC operation used only by the device service.
     #[command(hide = true)]
     RtcWriteWorker { receipt: String },
+    /// Isolated health observation, invoked only by the device coordinator.
+    #[command(hide = true)]
+    KioskHealthWorker { expectation: String },
+    /// Fixed temporary write using the kiosk account's permissions.
+    #[command(hide = true)]
+    KioskStateWorker,
 }
 
 fn main() -> ExitCode {
@@ -87,6 +93,14 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             let receipt = serde_json::from_str(&receipt)?;
             println!("{}", serde_json::to_string(&linux::write_rtc(receipt)?)?);
         }
+        Command::KioskHealthWorker { expectation } => {
+            daemon::require_root()?;
+            let expected = serde_json::from_str(&expectation)?;
+            let result = engine_os_manager::kiosk_health::observe_worker(&expected)
+                .map_err(|error| error.to_string().chars().take(1024).collect::<String>());
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        Command::KioskStateWorker => engine_os_manager::kiosk_health::state_worker()?,
     }
     Ok(())
 }

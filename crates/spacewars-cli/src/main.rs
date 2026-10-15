@@ -392,12 +392,25 @@ fn main() -> ExitCode {
     }
 }
 
+fn default_socket() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let kiosk = PathBuf::from(spacewars_control::KIOSK_CONTROL_SOCKET);
+        if std::fs::symlink_metadata(&kiosk).is_ok_and(|metadata| metadata.file_type().is_socket())
+        {
+            return kiosk;
+        }
+    }
+    PathBuf::from(DEFAULT_CONTROL_SOCKET)
+}
+
 fn run() -> Result<(), CliError> {
     let args = Args::parse();
     let socket = args
         .socket
         .or_else(|| std::env::var_os("SPACEWARS_CONTROL_SOCKET").map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_CONTROL_SOCKET));
+        .unwrap_or_else(default_socket);
     let client = ControlClient::new(socket);
 
     match args.command {

@@ -6,7 +6,11 @@ use serde::{Deserialize, Serialize};
 
 mod client;
 mod clock;
+mod health;
 mod input;
+pub use health::{
+    HEALTH_COMMAND, HEALTH_SCHEMA_VERSION, HealthRequest, HealthState, KIOSK_CONTROL_SOCKET,
+};
 #[cfg(unix)]
 pub mod workflows;
 pub use clock::{
