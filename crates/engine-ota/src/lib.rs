@@ -14,6 +14,10 @@ mod contract;
 pub mod coordinator;
 mod image_identity;
 #[cfg(target_os = "linux")]
+mod image_tools;
+#[cfg(target_os = "linux")]
+pub mod install_linux;
+#[cfg(target_os = "linux")]
 pub mod install_lock;
 #[cfg(target_os = "linux")]
 mod owned_fs;
@@ -50,6 +54,8 @@ pub enum Error {
     ImageIdentity(String),
     #[error("invalid boot evidence: {0}")]
     Boot(String),
+    #[error("image installation failed: {0}")]
+    Install(String),
     #[error("unsupported feed: {0}")]
     Feed(String),
     #[error("invalid or uninitialized trust store: {0}")]

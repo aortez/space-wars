@@ -95,6 +95,12 @@ fn prepared() -> (RecoveryRecord, BootObservation) {
     (plan.record, boot)
 }
 
+pub(crate) fn writing(image: &ImageDescriptor) -> (RecoveryRecord, BootObservation) {
+    let (record, boot, cap) = baseline();
+    let plan = record.begin_descriptor(image, &boot, &cap, false).unwrap();
+    (plan.record, boot)
+}
+
 fn requested() -> (RecoveryRecord, BootObservation) {
     let (record, boot) = prepared();
     let id = record.transaction().unwrap().id;

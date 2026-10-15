@@ -850,6 +850,29 @@ impl RecoveryRecord {
         Ok(())
     }
 
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn inactive_write(
+        &self,
+        image: &ImageDescriptor,
+        boot: &BootObservation,
+    ) -> Result<Sha256> {
+        self.check_boot(boot)?;
+        let tx = self
+            .transaction
+            .as_ref()
+            .ok_or(RecoveryError::StaleCommand)?;
+        if tx.phase != Phase::Writing
+            || image.validate().is_err()
+            || image.candidate_id() != tx.candidate_id
+            || SlotImage::from_descriptor(tx.candidate.slot, image) != tx.candidate
+            || !self.runs_good(boot)
+            || boot.boot_id != tx.origin_boot_id
+        {
+            return Err(RecoveryError::StaleCommand);
+        }
+        Ok(tx.id)
+    }
+
     fn runs_good(&self, boot: &BootObservation) -> bool {
         if boot.normal(&self.good) {
             return true;

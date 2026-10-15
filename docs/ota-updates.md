@@ -9,9 +9,9 @@ outside this update path; incompatible boot assets require a supervised upgrade.
 
 `crates/engine-ota` implements the shared verification and image eligibility
 contract for [#261](https://github.com/aortez/space-wars/issues/261), plus the
-recovery journal and Linux boot adapters. It is not an enabled end-to-end
-updater. Production feed/signing, root-partition installation and Pi failure
-qualification remain outstanding.
+recovery journal, Linux boot adapters and verified inactive-root writer. It is
+not an enabled end-to-end updater. Production feed/signing, installation-service
+integration and Pi failure qualification remain outstanding.
 
 `engine-os-manager` now also contains the independent time/status service for
 [#256](https://github.com/aortez/space-wars/issues/256), described below. The
@@ -26,7 +26,7 @@ Remaining work retains the full OTA scope:
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Trial coordinator, independent recovery service, health/identity evidence, early watchdog and journal-gated boot completion implemented; bootstrap and physical recovery qualification remain |
-| #264 | Shared lock implemented; verified inactive-root writer, operator-helper integration and data preservation remain |
+| #264 | Shared lock and verified inactive-root writer implemented; final service/handoff, operator-helper integration and data preservation remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
@@ -148,7 +148,7 @@ distinguish fixture execution from installed service/RTC qualification.
 of [#263](https://github.com/aortez/space-wars/issues/263). The Linux adapter below
 now applies journal-authorized boot-selector changes. The separate recovery
 service below connects reconciliation, kiosk observation and watchdog completion.
-The partition writer and production installation remain unavailable.
+The partition writer is described below; production installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -190,8 +190,8 @@ the crate: `RecoveryStore::advance` releases an action only after persistence.
 Stale plans are rejected. A failed persistence operation poisons the handle
 until reopening and reconciliation, because an unsuccessful final flush can
 leave the rename outcome uncertain. Missing or corrupt recovery state never
-triggers automatic bootstrap. The shared installation lock is implemented
-below; the eventual writer and supervised update tools still need to adopt it.
+triggers automatic bootstrap. The writer and recovery controller share the
+installation lock described below; supervised update tools still need to adopt it.
 
 Twenty model/journal tests and 22 verifier/integration tests pass on the host
 and both Pis. They exercise private temporary files and injected observations;
@@ -205,8 +205,8 @@ partition UUID records. It rejects ambiguous roots, mismatched boot/data disks,
 overlapping or unequal root slots, duplicate UUIDs on another attached disk,
 and a mounted inactive root. It rereads mount state before returning. Its
 layout fingerprint survives device-name changes; it does not prove the physical
-medium's identity or durability. The eventual writer must repeat admission
-under the shared lock and check exclusive, opened device handles, including
+medium's identity or durability. The writer repeats these checks under the
+shared lock and claims the inactive block device with `O_EXCL`, including
 mounts outside the service's namespace.
 
 ```sh
@@ -303,8 +303,8 @@ it does not re-hash mutable operating-system state against the build-time tree.
 cargo run --locked -p engine-ota --example image_identity_probe -- image.json
 ```
 
-The full writer/coordinator and publisher still need to call the descriptor
-binding check on the verified image. Declaring recovery protocol 1 describes
+The writer calls the descriptor binding check on the verified image; publisher
+integration remains outstanding. Declaring recovery protocol 1 describes
 format support; it does not assert that the board's watchdog/tryboot behavior
 has been qualified.
 
@@ -598,6 +598,65 @@ recorded size/hash. The real packaged command runs on the Pi 5 and rejects
 boot-file change was performed. The image remains a development build.
 [Source, artifact and execution evidence](data/ota-coordinator-20261015.json)
 records the exact scope and limitations.
+
+## Verified inactive-root writer
+
+`engine_ota::install_linux::write_inactive` accepts an opaque verified candidate,
+the open recovery journal and its boot controller. It requires the current
+durable `Writing` transaction, the matching candidate and original running
+good root. The controller retains the shared installation lock throughout.
+The only production target comes from the validated inactive partition; there
+is no caller-supplied device, pathname, command or install hook.
+
+Staging is fixed at `/data/spacewars-system/staging/<compressed-sha256>.ext4.zst`.
+Descriptor-relative opens reject symlinks, hardlinks, wrong owners, public
+permissions, a different data filesystem and replacement of the opened file.
+The compressed payload is hashed before opening the target and again while
+decoding. Actual block-device ownership, identity, capacity and writable state
+are checked on the exclusively held device handle.
+
+The decoder permits one standard zstd frame with at most a 64 MiB window.
+Truncation, trailing bytes, concatenated frames and output beyond the signed
+expanded length are errors. Before the first write, the filesystem header must
+describe a clean ext4 filesystem of the exact expanded size, with no external
+journal or pending journal replay. It accepts 1, 2 and 4 KiB blocks; the actual
+Yocto artifact currently uses 1 KiB. The extent calculation follows the
+[kernel's ext4 superblock layout](https://www.kernel.org/doc/html/latest/filesystems/ext4/super.html).
+
+After writing, the worker flushes and invalidates the target's block cache,
+hashes the installed extent, runs fixed read-only `e2fsck -f -n`, reads the
+embedded image identity with `debugfs`, checks it against the descriptor and
+hashes the extent again. Checker failures are never ignored and no repair is
+performed. Checker subprocesses have bounded output and deadlines, retain the
+exclusive target handle, and have their process group killed before reaping.
+The journal may enter `Prepared` only after all checks and a final boot/device
+revalidation. This function does not change boot selection or request a reboot.
+A failed write is quarantined when live evidence still permits recording the
+failure; an uncertain persistence outcome requires reconciliation.
+
+The host suite passes 95 OTA and 36 device-service tests; 73 OTA unit tests also
+pass unprivileged on the Pi 5. Writer fixtures use real temporary ext4 files at
+all three block sizes and inject compressed/output size errors, failed writes
+and flushes, corrupted readback, failed fsck, mismatched/dirty image identities,
+checker mutation, unsafe staging and stale transaction state. Scoped Clippy,
+Rust 1.89 and AArch64 compilation pass. An optional artifact test streams the
+complete built rootfs into a temporary regular file through the same writer:
+
+```sh
+SPACEWARS_OTA_TEST_EXT4=/absolute/path/to/rootfs.ext4 \
+  cargo test --locked -p engine-ota yocto_artifact_checks_actual_format \
+  -- --ignored --nocapture
+```
+
+The current development artifact passes format, byte readback and filesystem
+checks, then is correctly rejected because its source record is dirty. That
+test does not authenticate a release or make the artifact installable. No real
+block-device write, boot change, watchdog operation or reboot has been tested
+in this pass. Final signature/time/channel revalidation, one-use UI handoff,
+maintenance holds, data preservation, legacy-helper restrictions and installed
+service/device qualification remain integration work.
+[Source, fixture and artifact evidence](data/ota-writer-20261015.json)
+records the exact scope.
 
 ## Signed feed contract
 

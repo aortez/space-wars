@@ -24,6 +24,7 @@ url = { version = "2", features = ["serde"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.30.1", default-features = false, features = ["ioctl"] }
+zstd = { version = "=0.13.3", default-features = false }
 
 [dev-dependencies]
 aws-lc-rs = "1"

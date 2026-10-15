@@ -31,6 +31,8 @@ RDEPENDS:${PN} += " \
     alsa-lib \
     bash \
     coreutils \
+    e2fsprogs \
+    e2fsprogs-e2fsck \
     fontconfig \
     libdrm \
     libinput \
