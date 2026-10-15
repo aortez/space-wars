@@ -38,7 +38,7 @@ impl DeviceNumber {
         format!("{}:{}", self.major, self.minor)
     }
 
-    fn from_dev(dev: u64) -> Self {
+    pub(crate) fn from_dev(dev: u64) -> Self {
         Self {
             major: libc::major(dev),
             minor: libc::minor(dev),
@@ -56,7 +56,7 @@ pub struct Partition {
     pub partuuid: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct DiskLayout {
     pub disk_name: String,
     pub disk_device: DeviceNumber,

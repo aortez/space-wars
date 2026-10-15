@@ -76,6 +76,16 @@ impl RecoveryStore {
         &self.record
     }
 
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn durable_record(&self) -> Result<&RecoveryRecord> {
+        if self.uncertain {
+            return Err(Error::Store(
+                "recovery persistence is uncertain; reopen required".into(),
+            ));
+        }
+        Ok(&self.record)
+    }
+
     /// A plan is opaque outside this crate. No action escapes before its record
     /// is durably stored. A failed flush poisons this handle because a rename
     /// may already have occurred; reopen and reconcile actual boot state.

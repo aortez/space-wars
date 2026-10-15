@@ -1,11 +1,20 @@
 //! Shared verification and eligibility rules for device-managed rootfs updates.
 //!
-//! This crate never writes a root partition or changes boot selection. A verified
-//! candidate is evidence to revalidate at installation, not permission to reboot.
+//! Linux boot-selector changes require the shared installation lock and a
+//! durable recovery journal. This crate does not write a root partition or
+//! reboot. A verified candidate still needs revalidation at installation.
 
 pub mod boot;
+#[cfg(target_os = "linux")]
+mod boot_files;
+#[cfg(target_os = "linux")]
+pub mod boot_linux;
 mod contract;
 mod image_identity;
+#[cfg(target_os = "linux")]
+pub mod install_lock;
+#[cfg(target_os = "linux")]
+mod owned_fs;
 pub mod recovery;
 #[cfg(target_os = "linux")]
 pub mod recovery_linux;

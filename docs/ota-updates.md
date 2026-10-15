@@ -25,8 +25,8 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Root discovery, journal, health model, kiosk observer, image identity, early trial initramfs and constrained boot assets implemented; device adapter/coordinator, bootstrap and physical recovery qualification remain |
-| #264 | Verified inactive-root writer, shared install lock and data preservation |
+| #263 | Root discovery, journal, health/identity evidence, early trial initramfs and Linux boot-selector adapter implemented; coordinator/watchdog handoff, bootstrap and physical recovery qualification remain |
+| #264 | Shared lock implemented; verified inactive-root writer, operator-helper integration and data preservation remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
@@ -145,10 +145,10 @@ distinguish fixture execution from installed service/RTC qualification.
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
-of [#263](https://github.com/aortez/space-wars/issues/263). They are not yet wired
-to a partition writer, boot-selector adapter or watchdog owner. The kiosk
-observer described below now accepts the packaged image identity; trial
-coordinator integration remains. Production installation remains unavailable.
+of [#263](https://github.com/aortez/space-wars/issues/263). The Linux adapter below
+now applies journal-authorized boot-selector changes. The partition writer,
+running coordinator and watchdog handoff remain unconnected. The kiosk observer
+accepts the packaged image identity. Production installation remains unavailable.
 
 The journal binds a provisioned board, layout, hardware profile and immutable
 boot assets to the good and candidate root images. Its phases distinguish
@@ -190,8 +190,8 @@ the crate: `RecoveryStore::advance` releases an action only after persistence.
 Stale plans are rejected. A failed persistence operation poisons the handle
 until reopening and reconciliation, because an unsuccessful final flush can
 leave the rename outcome uncertain. Missing or corrupt recovery state never
-triggers automatic bootstrap. The writer still needs a separate installation
-lock shared with supervised update tools.
+triggers automatic bootstrap. The shared installation lock is implemented
+below; the eventual writer and supervised update tools still need to adopt it.
 
 Twenty model/journal tests and 22 verifier/integration tests pass on the host
 and both Pis. They exercise private temporary files and injected observations;
@@ -447,8 +447,61 @@ on the manifest and identity; every immutable FAT file matches its recorded
 hash. The image remains a dirty development build and has not been installed.
 These checks do not qualify firmware tryboot or physical watchdog recovery.
 [Build, artifact, source and fixture evidence](data/ota-boot-assets-20261015.json)
-records the exact scope. The filesystem adapter, durable selector writes and
-coordinator are still separate integration work.
+records the exact scope. The filesystem adapter and selector writes are
+described below; the running coordinator remains integration work.
+
+### Linux boot adapter and shared installation lock
+
+`boot_linux::inspect_boot` reads the installed image record, actual disk layout,
+loaded kernel notes, device-tree profile/tryboot properties and running command
+line. It checks the root-owned FAT manifest and every immutable file, rejecting
+unknown boot files, links, unsafe permissions, changed contents and nested
+filesystems. Hardware selection must agree with the loaded profile, and the
+actual root, firmware tryboot flag and transaction token must agree. A stale
+prepared trial file has no authority during a normal boot.
+
+The device binding includes board model/serial, EEPROM code revision, USB medium
+identity/revision and capacity. Together with the layout, immutable boot set and
+loaded profile, it prevents a qualification record from silently transferring
+to a different observed combination. USB-reported identity is not cryptographic
+attestation, and this reader does not qualify EEPROM configuration or media
+durability. Those remain part of supervised physical qualification.
+
+`InstallLock` owns `/run/spacewars-install/lock` through private directory/file
+handles. It excludes separately opened installers and ordinary `flock` clients,
+and checks that neither its directory nor lock name was replaced. Its directory
+must not be a service `RuntimeDirectory` removed on restart. Existing legacy
+operator helpers do not yet participate; they must be integrated or disabled
+before enabling the coordinator.
+
+`BootController` holds that lock and accepts only a durable `RecoveryStore`
+plus its corresponding selector action. Preparing a trial preserves the old
+default; promotion requires the stored health proof, matching candidate and
+trial boot, and an unexpired boot deadline; rollback can select only the recorded
+previous good root. It rechecks live context and health freshness after hashing
+USB contents, immediately before creating the temporary selector.
+
+Each selector write flushes a temporary file, renames it over the fixed target,
+flushes the directory and filesystem, then reads it back. Once a write starts,
+an error blocks further changes through that handle until reopening and
+reconciliation. A bounded set of recognizable interrupted temporary files is
+inert. These operations provide explicit ordering and error handling; only the
+later power-interruption tests can establish the actual FAT/USB durability.
+
+```sh
+# Read-only inspection; no lock creation, device opens, writes or reboot.
+cargo run --locked -p engine-ota --example boot_probe
+```
+
+All 74 OTA tests pass on the host. The 52 unit tests also pass unprivileged on
+the Pi 5, using temporary fixtures for selector writes and injected failures at
+six persistence stages. Scoped Clippy, Rust 1.89, AArch64 compilation and the 12
+device-service library tests pass. The live probe rejects the Pi 5's existing
+unprovisioned image instead of inventing recovery state, and its boot ID remains
+unchanged. No Pi boot files were edited, reboot requested or watchdog opened.
+[Source, test and probe evidence](data/ota-boot-linux-20261015.json) records these
+results. The adapter has no installation/reboot socket command and is not yet
+invoked by the running device service.
 
 ## Signed feed contract
 

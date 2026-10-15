@@ -610,8 +610,110 @@ fn failed_journal_replace_releases_no_action_and_requires_reopen() {
             .is_err()
     );
     assert_eq!(store.record(), &record);
+    assert!(store.durable_record().is_err());
     // Even a no-op is denied once the on-disk outcome is uncertain.
     assert!(store.advance(|record| record.reconcile(&boot)).is_err());
+}
+
+#[test]
+fn selector_writes_require_the_corresponding_durable_phase_and_live_context() {
+    let (prepared, boot) = prepared();
+    let id = prepared.transaction().unwrap().id;
+    let prepare = Action::PrepareTrial {
+        slot: Slot::B,
+        transaction: id,
+    };
+    assert_eq!(
+        prepared.selection_change(&prepare, &boot).unwrap(),
+        (Slot::B, Some(id))
+    );
+    for action in [
+        Action::PrepareTrial {
+            slot: Slot::A,
+            transaction: id,
+        },
+        Action::PromoteDefault {
+            slot: Slot::B,
+            transaction: id,
+        },
+        Action::RestoreDefault {
+            slot: Slot::A,
+            transaction: id,
+        },
+        Action::RebootTrial { transaction: id },
+    ] {
+        assert!(prepared.selection_change(&action, &boot).is_err());
+    }
+    let mut changed = boot.clone();
+    changed.binding.device_id = digest("other physical combination");
+    assert!(prepared.selection_change(&prepare, &changed).is_err());
+    let requested = prepared.trial_prepared(id, &boot).unwrap().record;
+    assert!(requested.selection_change(&prepare, &boot).is_err());
+
+    let (promoting, boot) = promoting();
+    let id = promoting.transaction().unwrap().id;
+    let promote = Action::PromoteDefault {
+        slot: Slot::B,
+        transaction: id,
+    };
+    assert_eq!(
+        promoting.selection_change(&promote, &boot).unwrap(),
+        (Slot::B, None)
+    );
+    let mut delayed = boot.clone();
+    delayed.uptime_ms += MAX_HEALTH_GAP_MS + 1;
+    assert_eq!(
+        promoting.selection_change(&promote, &delayed).unwrap_err(),
+        RecoveryError::Unhealthy
+    );
+    let mut too_late = boot.clone();
+    too_late.uptime_ms = TRIAL_DEADLINE_MS;
+    assert!(promoting.selection_change(&promote, &too_late).is_err());
+    let mut already_selected = boot.clone();
+    already_selected.default_slot = Some(Slot::B);
+    assert!(
+        promoting
+            .selection_change(&promote, &already_selected)
+            .is_err()
+    );
+    let committed = promoting
+        .finish_promotion(&already_selected)
+        .unwrap()
+        .record;
+    assert!(
+        committed
+            .selection_change(&promote, &already_selected)
+            .is_err()
+    );
+
+    let failed = promoting
+        .fail(FailureReason::PersistentStateUnavailable, &already_selected)
+        .unwrap();
+    assert_eq!(
+        failed
+            .record
+            .selection_change(&failed.action, &already_selected)
+            .unwrap(),
+        (Slot::A, None)
+    );
+    assert!(
+        failed
+            .record
+            .selection_change(
+                &Action::RestoreDefault {
+                    slot: Slot::B,
+                    transaction: id
+                },
+                &already_selected
+            )
+            .is_err()
+    );
+    assert!(
+        failed
+            .record
+            .selection_change(&promote, &already_selected)
+            .is_err()
+    );
 }
 
 #[test]

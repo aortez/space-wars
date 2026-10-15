@@ -71,7 +71,7 @@ impl SlotImage {
 }
 
 /// Read-only facts from this boot, never a UI-supplied slot or build string.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct BootObservation {
     pub binding: BootBinding,
     pub boot_id: String,
@@ -716,6 +716,61 @@ impl RecoveryRecord {
         Sha256::digest(&serde_json::to_vec(self).expect("recovery state serializes"))
     }
 
+    /// The Linux adapter may change only the selector corresponding to a
+    /// durably stored phase. Replaying a completed promotion is reconciled by
+    /// finish_promotion(), rather than writing the default a second time.
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn selection_change(
+        &self,
+        action: &Action,
+        boot: &BootObservation,
+    ) -> Result<(Slot, Option<Sha256>)> {
+        self.check_boot(boot)?;
+        match *action {
+            Action::PrepareTrial { slot, transaction } => {
+                let tx = self.command(transaction, Phase::Prepared)?;
+                if slot != tx.candidate.slot
+                    || !boot.normal(&tx.previous_good)
+                    || boot.boot_id != tx.origin_boot_id
+                {
+                    return Err(RecoveryError::BootMismatch);
+                }
+                Ok((slot, Some(transaction)))
+            }
+            Action::PromoteDefault { slot, transaction } => {
+                let tx = self.command(transaction, Phase::Promoting)?;
+                if slot != tx.candidate.slot
+                    || !self.is_trial(tx, boot)
+                    || !boot.runs(&tx.candidate)
+                    || tx.trial_boot_id.as_ref() != Some(&boot.boot_id)
+                    || boot.default_slot != Some(tx.previous_good.slot)
+                {
+                    return Err(RecoveryError::BootMismatch);
+                }
+                let proof = tx.health.as_ref().ok_or(RecoveryError::Unhealthy)?;
+                if proof.finished_ms > boot.uptime_ms
+                    || boot.uptime_ms - proof.finished_ms > MAX_HEALTH_GAP_MS
+                    || boot.uptime_ms >= TRIAL_DEADLINE_MS
+                {
+                    return Err(RecoveryError::Unhealthy);
+                }
+                Ok((slot, None))
+            }
+            Action::RestoreDefault { slot, transaction } => {
+                let tx = self.command(transaction, Phase::RollbackPending)?;
+                if slot != tx.previous_good.slot
+                    || !self.is_trial(tx, boot)
+                    || boot.boot_id == tx.origin_boot_id
+                    || !matches!(boot.default_slot, Some(value) if value == tx.previous_good.slot || value == tx.candidate.slot)
+                {
+                    return Err(RecoveryError::BootMismatch);
+                }
+                Ok((slot, None))
+            }
+            _ => Err(RecoveryError::StaleCommand),
+        }
+    }
+
     fn check_boot(&self, boot: &BootObservation) -> Result<()> {
         self.validate()?;
         if boot.binding != self.binding
@@ -900,7 +955,7 @@ fn invocation_id(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-fn boot_id(value: &str) -> bool {
+pub(crate) fn boot_id(value: &str) -> bool {
     value.len() == 36
         && value.bytes().enumerate().all(|(i, b)| {
             if [8, 13, 18, 23].contains(&i) {
