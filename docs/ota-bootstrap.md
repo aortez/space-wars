@@ -561,6 +561,18 @@ and sudo grants remain in place. Root SSH still rejected the current key and
 the Picade did not resolve. [Fallback-root asset evidence](data/ota-legacy-assets-20261015.json)
 records the package identities and separates these checks from live migration.
 
+Original-file preservation at `437369c` passed all 162 OTA and 38 manager tests,
+Clippy, Rust 1.89 checks and the AArch64 build. Ten selected workstation tests
+covered immutable originals, source conflicts, interrupted preservation,
+independent export verification and same-filesystem bind mounts. The latter
+used only temporary paths in a private namespace. All 19 selected preservation
+and mount/layout tests passed as UID 1000 on the Pi 5; the actual preparation
+command rejected that account. Its boot ID remained unchanged. These are
+fixture results, not live migration or physical power-loss qualification.
+[Original-file preservation evidence](data/ota-legacy-preservation-20261015.json)
+records the exact scope and binaries. The runtime image and schema 2 kits have
+not been rebuilt or installed by this step.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
