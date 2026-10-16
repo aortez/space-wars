@@ -236,6 +236,16 @@ unchanged. [Policy and radio-probe evidence](data/ota-network-policy-20261016.js
 records artifact/log identities and separates these checks from the pending
 runtime integration and physical session/radio qualification.
 
+The controller and corrected per-connection revision probe at `3255f30` passed
+all 70 manager tests on host ext4, Clippy, Rust 1.89, formatting and AArch64
+compilation. All 30 network fixtures passed on Pi 5 as UID 1000 in 2.83 seconds,
+including private D-Bus writes and the late-command timeout case. Read-only probes
+on both installed Pis reported three saved profiles, enabled Wi-Fi and no pending
+checkpoints; each target's boot ID remained unchanged during its run.
+[Controller and device evidence](data/ota-network-controller-20261016.json)
+also records the initial top-level `VersionId` failure and the corrected runtime
+API. These checks do not enable radio policy or qualify physical SSH protection.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
