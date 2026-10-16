@@ -128,7 +128,7 @@ pub fn install_bootstrap_root(
         &mut payload,
         || BlockTarget::open(&inspected.legacy.layout, package.expanded.bytes),
         guard,
-        |file| tools.check(file),
+        |file| tools.check_bootstrap(file),
         &mut |event| {
             report(event);
             Ok(())

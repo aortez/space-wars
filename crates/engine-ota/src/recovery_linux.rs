@@ -155,6 +155,65 @@ pub(crate) fn opened_mount_id(file: &File) -> Result<u64> {
     )?)
 }
 
+/// Permit the recovery service's writable bind of this exact private subtree,
+/// while rejecting a different directory/filesystem mounted over its name.
+/// The caller has already verified the complete persistent /data mount.
+pub(crate) fn check_data_subtree(directory: &File, data: &File, relative: &str) -> Result<()> {
+    let view = MountView {
+        id: opened_mount_id(directory)?,
+        device: DeviceNumber::from_dev(directory.metadata()?.dev()),
+    };
+    let source = MountView {
+        id: opened_mount_id(data)?,
+        device: DeviceNumber::from_dev(data.metadata()?.dev()),
+    };
+    if view.device != source.device {
+        return Err(invalid("private state is on a different filesystem"));
+    }
+    if view.id == source.id {
+        return Ok(());
+    }
+    let mounts = parse_mountinfo(&bounded_text(
+        Path::new("/proc/self/mountinfo"),
+        1024 * 1024,
+    )?)?;
+    data_subtree(&mounts, source, view, relative)
+}
+
+fn data_subtree(
+    mounts: &[Mount],
+    source: MountView,
+    target: MountView,
+    relative: &str,
+) -> Result<()> {
+    let find = |id| -> Result<&Mount> {
+        let mut found = mounts.iter().filter(|mount| mount.id == id);
+        let mount = found
+            .next()
+            .ok_or_else(|| invalid("missing private-state mount"))?;
+        if found.next().is_some() {
+            return Err(invalid("ambiguous private-state mount"));
+        }
+        Ok(mount)
+    };
+    let (data, bound) = (find(source.id)?, find(target.id)?);
+    if data.path != "/data"
+        || data.root != "/"
+        || data.filesystem != "ext4"
+        || data.device != source.device
+        || bound.device != source.device
+        || target.device != source.device
+        || bound.filesystem != "ext4"
+        || bound.root != format!("/{relative}")
+        || bound.path != format!("/data/{relative}")
+    {
+        return Err(invalid(
+            "private-state bind does not identify its persistent subtree",
+        ));
+    }
+    Ok(())
+}
+
 fn fd_mount_id(info: &str) -> Result<u64> {
     let mut ids = info.lines().filter_map(|line| line.strip_prefix("mnt_id:"));
     let id = ids

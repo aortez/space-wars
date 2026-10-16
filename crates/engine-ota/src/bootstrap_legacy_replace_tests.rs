@@ -130,7 +130,7 @@ fn replacement_preserves_original_inodes_attributes_and_empty_files() {
     let fixture = Prepared::new();
     let report = fixture.run(&mut |_, _| Ok(())).unwrap();
     assert!(!report.ready_for_trial);
-    assert_eq!(report.files_replaced, 18);
+    assert_eq!(report.files_replaced, 21);
     fixture.assert_finished();
     let before = legacy_files::inspect(&fixture.fixture.root, fixture.fixture.owner).unwrap();
     let repeated = fixture

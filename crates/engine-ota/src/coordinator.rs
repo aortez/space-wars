@@ -18,6 +18,7 @@ pub enum RecoveryStage {
     Promoting,
     RollingBack,
     Healthy,
+    BootstrapConfirmed,
     RebootRequested,
     Blocked,
 }
@@ -26,7 +27,11 @@ impl RecoveryStage {
     pub fn finished(self) -> bool {
         matches!(
             self,
-            Self::Unprovisioned | Self::Healthy | Self::RebootRequested | Self::Blocked
+            Self::Unprovisioned
+                | Self::Healthy
+                | Self::BootstrapConfirmed
+                | Self::RebootRequested
+                | Self::Blocked
         )
     }
 }

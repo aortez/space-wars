@@ -964,7 +964,11 @@ impl HealthProof {
     fn valid(&self, tx: &Transaction) -> bool {
         self.transaction == tx.id
             && tx.trial_boot_id.as_ref() == Some(&self.boot_id)
-            && self.finished_ms < TRIAL_DEADLINE_MS
+            && self.valid_window()
+    }
+
+    fn valid_window(&self) -> bool {
+        self.finished_ms < TRIAL_DEADLINE_MS
             && self
                 .finished_ms
                 .checked_sub(self.started_ms)
@@ -972,6 +976,21 @@ impl HealthProof {
             && self.instance.pid > 1
             && self.instance.start_ticks > 0
             && invocation_id(&self.instance.invocation_id)
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn matches_bootstrap(&self, context: Sha256, boot: &str) -> bool {
+        self.transaction == bootstrap_health_id(context)
+            && self.boot_id == boot
+            && self.valid_window()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn fresh_at(&self, uptime_ms: u64) -> bool {
+        uptime_ms < TRIAL_DEADLINE_MS
+            && uptime_ms
+                .checked_sub(self.finished_ms)
+                .is_some_and(|age| age <= MAX_HEALTH_GAP_MS)
     }
 }
 
@@ -1001,6 +1020,27 @@ impl HealthMonitor {
             transaction: tx.id,
             boot_id: boot.boot_id.clone(),
             build_id: tx.candidate.build_id.clone(),
+            started_ms: None,
+            last: None,
+        })
+    }
+
+    /// Reuse continuity checks without manufacturing an OTA recovery record.
+    /// The bootstrap state machine supplies its immutable context and boot.
+    /// Domain separation prevents its proof from naming the raw trial token.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn bootstrap(context: Sha256, boot: &BootObservation) -> Result<Self> {
+        let build_id = boot
+            .actual_build_id
+            .as_ref()
+            .ok_or(RecoveryError::BootMismatch)?;
+        if !boot_id(&boot.boot_id) || !identifier(build_id) {
+            return Err(RecoveryError::BootMismatch);
+        }
+        Ok(Self {
+            transaction: bootstrap_health_id(context),
+            boot_id: boot.boot_id.clone(),
+            build_id: build_id.clone(),
             started_ms: None,
             last: None,
         })
@@ -1054,6 +1094,13 @@ impl HealthMonitor {
         self.last = Some(sample);
         Ok(proof)
     }
+}
+
+#[cfg(target_os = "linux")]
+fn bootstrap_health_id(context: Sha256) -> Sha256 {
+    let mut bytes = b"spacewars-supervised-bootstrap-health-v1\0".to_vec();
+    bytes.extend_from_slice(context.as_bytes());
+    Sha256::digest(&bytes)
 }
 
 fn identifier(value: &str) -> bool {

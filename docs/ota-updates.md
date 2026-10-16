@@ -390,11 +390,14 @@ root SSH check on the Pi 5 was rejected, and the Picade was unreachable. The
 existing kiosk account's restricted update helpers are not a substitute for
 separately authorized root/operator access.
 
-Workstation bootstrap packaging and an unprivileged legacy-device preflight
-are now available. They preserve a separate staged kernel/DTB/initramfs and
-explicit boot paths, check the actual ext4 and packaged executables, and retain
-the original default for the planned first trial. They do not install the
-package, initialize recovery state or enable automatic updates. The
+Workstation bootstrap packaging, legacy-device preflight, preservation tools
+and a supervised inactive-root installer are available. The first-boot runtime
+now uses a separate journal to gate local health, staged-default selection and
+watchdog completion, followed by a separate normal-boot health check. Package
+schema 3 requires that runtime capability and the updated fallback-root helpers.
+The initial boot-staging/trial activation and canonical migration tools remain
+pending, and neither Pi has undergone this migration. These tools do not
+initialize a production recovery baseline or enable automatic updates. The
 [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
 describe the package layout, reproduction commands and supervised boundary.
 

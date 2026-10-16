@@ -125,20 +125,20 @@ pub struct BootEvidence {
 }
 
 #[derive(Clone, Debug)]
-struct Runtime {
-    physical: PhysicalIdentity,
-    image: ImageIdentity,
-    layout: DiskLayout,
-    kernel: String,
-    profile: String,
-    command_line: String,
-    boot_id: String,
-    uptime_ms: u64,
-    tryboot: bool,
+pub(crate) struct Runtime {
+    pub(crate) physical: PhysicalIdentity,
+    pub(crate) image: ImageIdentity,
+    pub(crate) layout: DiskLayout,
+    pub(crate) kernel: String,
+    pub(crate) profile: String,
+    pub(crate) command_line: String,
+    pub(crate) boot_id: String,
+    pub(crate) uptime_ms: u64,
+    pub(crate) tryboot: bool,
 }
 
 impl Runtime {
-    fn inspect() -> Result<Self> {
+    pub(crate) fn inspect() -> Result<Self> {
         let image = ImageIdentity::read_installed().map_err(|error| {
             invalid(format!(
                 "installed recovery image record is unavailable or invalid: {error}"
@@ -171,14 +171,14 @@ impl Runtime {
         })
     }
 
-    fn roots(&self) -> Result<SlotRoots> {
+    pub(crate) fn roots(&self) -> Result<SlotRoots> {
         SlotRoots::new(
             self.layout.partitions[1].partuuid.clone(),
             self.layout.partitions[2].partuuid.clone(),
         )
     }
 
-    fn same_boot(&self, other: &Self) -> bool {
+    pub(crate) fn same_boot(&self, other: &Self) -> bool {
         self.physical == other.physical
             && self.image == other.image
             && self.layout == other.layout

@@ -1,5 +1,39 @@
 use super::*;
 
+#[test]
+fn service_writable_subtree_requires_the_same_data_partition_and_exact_bind_root() {
+    let source = MountView {
+        id: 22,
+        device: DeviceNumber { major: 8, minor: 4 },
+    };
+    let target = MountView {
+        id: 23,
+        device: source.device,
+    };
+    let relative = "spacewars-bootstrap/active/boot-trial";
+    let base = format!(
+        "22 20 8:4 / /data ro - ext4 /dev/sda4 rw\n23 22 8:4 /{relative} /data/{relative} rw - ext4 /dev/sda4 rw\n"
+    );
+    data_subtree(&parse_mountinfo(&base).unwrap(), source, target, relative).unwrap();
+    for changed in [
+        base.replace(&format!(" /{relative} "), " /another-directory "),
+        base.replace(&format!(" /data/{relative} "), " /another-mount "),
+        base.replace("23 22 8:4", "23 22 8:2"),
+        base.replace("- ext4", "- tmpfs"),
+        format!("{base}23 22 8:4 /{relative} /data/{relative} rw - ext4 /dev/sda4 rw\n"),
+    ] {
+        assert!(
+            data_subtree(
+                &parse_mountinfo(&changed).unwrap(),
+                source,
+                target,
+                relative
+            )
+            .is_err()
+        );
+    }
+}
+
 fn device(minor: u32) -> DeviceNumber {
     DeviceNumber { major: 8, minor }
 }

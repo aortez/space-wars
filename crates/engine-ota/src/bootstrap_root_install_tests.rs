@@ -89,7 +89,7 @@ impl Fixture {
             &mut Cursor::new(&image().compressed),
             || FileTarget::open(&self.target, Failure::None),
             |_| Ok(()),
-            |file| tools.check(file),
+            |file| tools.check_bootstrap(file),
             report,
         )
     }
@@ -219,7 +219,7 @@ fn real_ext4_install_retains_unused_tail_and_rechecks_completed_image_without_wr
         &mut Cursor::new(&image().compressed),
         || FileTarget::open(&f.target, Failure::Write),
         |_| Ok(()),
-        |file| tools.check(file),
+        |file| tools.check_bootstrap(file),
         &mut |_| Ok(()),
     )
     .unwrap();
@@ -297,7 +297,7 @@ fn write_flush_readback_and_image_check_failures_cannot_publish_written() {
                 &mut Cursor::new(&image().compressed),
                 || FileTarget::open(&f.target, failure),
                 |_| Ok(()),
-                |file| tools.check(file),
+                |file| tools.check_bootstrap(file),
                 &mut |_| Ok(())
             )
             .is_err()
@@ -451,7 +451,7 @@ fn abrupt_process_exit_after_intent_flush_and_completion_is_restartable() {
             &mut source,
             || FileTarget::open(&path.join("inactive.bin"), Failure::None),
             |_| Ok(()),
-            |file| tools.check(file),
+            |file| tools.check_bootstrap(file),
             &mut |event| {
                 let stop = match event {
                     RootInstallProgress::WritingRecorded => cut == "intent",

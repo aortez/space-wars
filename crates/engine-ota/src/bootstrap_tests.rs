@@ -1,10 +1,10 @@
 use super::*;
 
 const CONFIG: &str = "# firmware configuration\n[pi4]\ndtoverlay=vc4-kms-v3d-pi4\n[pi5]\ndtoverlay=vc4-kms-v3d-pi5\n[all]\narm_64bit=1\ninitramfs spacewars-recovery.cpio.gz followkernel\ninclude spacewars-device.txt\n[all]\n";
-const TEMPLATE: &[u8] =
+pub(super) const TEMPLATE: &[u8] =
     b"root=@SPACEWARS_ROOT@ rootfstype=ext4 rootwait roottimeout=30 console=tty1\n";
 
-fn request(board: Board, profile: &str, target: Slot) -> PlanRequest {
+pub(super) fn request(board: Board, profile: &str, target: Slot) -> PlanRequest {
     PlanRequest {
         board,
         profile: profile.into(),
@@ -14,14 +14,14 @@ fn request(board: Board, profile: &str, target: Slot) -> PlanRequest {
     }
 }
 
-struct Assets {
-    image: ImageIdentity,
+pub(super) struct Assets {
+    pub(super) image: ImageIdentity,
     manifest: BootManifest,
-    contents: BTreeMap<String, Vec<u8>>,
+    pub(super) contents: BTreeMap<String, Vec<u8>>,
 }
 
 impl Assets {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let names: BootManifest =
             serde_json::from_slice(include_bytes!("../tests/fixtures/boot-manifest-v2.json"))
                 .unwrap();
@@ -72,7 +72,7 @@ impl Assets {
         }
     }
 
-    fn plan(&self, request: &PlanRequest) -> Result<BootPlan> {
+    pub(super) fn plan(&self, request: &PlanRequest) -> Result<BootPlan> {
         BootPlan::create(
             &self.image,
             &self.manifest,
@@ -351,6 +351,11 @@ pub(crate) mod linux {
                 serde_json::to_vec(&assets.image).unwrap(),
             )
             .unwrap();
+            fs::write(
+                source.join("etc/spacewars/bootstrap-runtime.json"),
+                include_bytes!("../../../yocto/meta-spacewars/recipes-spacewars/spacewars/files/bootstrap-runtime.json"),
+            )
+            .unwrap();
             let mut legacy_paths = std::collections::BTreeSet::new();
             legacy_paths.insert("/".to_owned());
             for &(path, mode) in super::super::legacy_assets::FILES {
@@ -443,7 +448,8 @@ pub(crate) mod linux {
         let fixture = Fixture::new();
         let original = fs::read(&fixture.root).unwrap();
         let package = fixture.build().unwrap();
-        assert_eq!(package.schema, 2);
+        assert_eq!(package.schema, 3);
+        assert_eq!(package.bootstrap_protocol, BOOTSTRAP_PROTOCOL);
         assert_eq!(package.purpose, "supervised-bootstrap");
         assert_eq!(package.image, fixture.assets.image);
         assert_eq!(package.expanded.sha256, Sha256::digest(&original));
@@ -571,6 +577,45 @@ pub(crate) mod linux {
         assert!(result.status.success());
         assert!(fixture.build().is_err());
         assert!(!fixture.output().exists());
+    }
+
+    #[test]
+    fn bootstrap_requires_the_supported_runtime_in_the_actual_ext4() {
+        for marker in [
+            None,
+            Some(r#"{"schema":1,"protocol":0}"#),
+            Some(r#"{"schema":2,"protocol":1}"#),
+            Some(r#"{"schema":1,"protocol":1,"bypass":true}"#),
+            Some("not a runtime record"),
+        ] {
+            let fixture = Fixture::new();
+            let mut commands = "rm /etc/spacewars/bootstrap-runtime.json\n".to_string();
+            if let Some(contents) = marker {
+                let path = fixture.directory.path().join("marker");
+                fs::write(&path, contents).unwrap();
+                commands.push_str(&format!(
+                    "write {} /etc/spacewars/bootstrap-runtime.json\n",
+                    path.display()
+                ));
+            }
+            let script = fixture.directory.path().join("mutate-runtime");
+            fs::write(&script, commands).unwrap();
+            let result = Command::new("/usr/sbin/debugfs")
+                .args(["-w", "-f"])
+                .arg(&script)
+                .arg(&fixture.root)
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+            // A valid production identity alone does not qualify this runtime
+            // for the first-image path, either during packaging or readback.
+            let root = fs::File::open(&fixture.root).unwrap();
+            let mut tools = crate::image_tools::ImageTools::default();
+            tools.check(&root).unwrap();
+            assert!(tools.check_bootstrap(&root).is_err(), "{marker:?}");
+            assert!(fixture.build().is_err(), "{marker:?}");
+            assert!(!fixture.output().exists());
+        }
     }
 
     #[test]

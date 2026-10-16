@@ -6,6 +6,67 @@ use std::rc::Rc;
 
 type Events = Rc<RefCell<Vec<&'static str>>>;
 
+#[test]
+fn bootstrap_requires_its_durable_promoted_health_and_retains_the_same_watchdog_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let owner = unsafe { libc::geteuid() };
+    let runtime =
+        RuntimeDirectory::from_directory(open_directory(directory.path(), owner).unwrap(), owner)
+            .unwrap();
+    let events = Events::default();
+    let open = || {
+        events.borrow_mut().push("open");
+        Ok(FakeDevice {
+            events: events.clone(),
+            fault: None,
+        })
+    };
+    let requested = crate::bootstrap::TrialFixture::new();
+    let requested_store = requested.open();
+    assert!(finish_bootstrap_with(&requested_store, &requested.boot(), &runtime, open).is_err());
+    assert!(events.borrow().is_empty());
+    let promoting = crate::bootstrap::TrialFixture::new();
+    let (promoting_store, mut boot) = promoting.promoting();
+    boot.default_slot = Some(Slot::A);
+    assert!(finish_bootstrap_with(&promoting_store, &boot, &runtime, open).is_err());
+    assert!(events.borrow().is_empty());
+    let committed = crate::bootstrap::TrialFixture::new();
+    let (store, mut boot) = committed.promoted();
+    let path = directory.path().join("early-watchdog.json");
+    fs::write(
+        &path,
+        serde_json::to_vec(&EarlyWatchdog {
+            schema: 1,
+            boot_id: boot.boot_id.clone(),
+            trial_id: boot.trial_id.unwrap(),
+            armed_boottime_ms: 2_000,
+            timeout_seconds: 210,
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(
+        finish_bootstrap_with(&store, &boot, &runtime, open).unwrap(),
+        WatchdogCompletion::Stopped
+    );
+    assert_eq!(
+        *events.borrow(),
+        ["open", "support", "timeout", "disable", "close"]
+    );
+    events.borrow_mut().clear();
+    boot.uptime_ms = 300_000;
+    assert_eq!(
+        finish_bootstrap_with(&store, &boot, &runtime, open).unwrap(),
+        WatchdogCompletion::AlreadyStopped
+    );
+    assert!(events.borrow().is_empty());
+    boot.boot_id = "bb606400-dc75-446e-b26b-385592b0f562".into();
+    assert!(finish_bootstrap_with(&store, &boot, &runtime, open).is_err());
+    assert!(events.borrow().is_empty());
+}
+
 struct FakeDevice {
     events: Events,
     fault: Option<&'static str>,

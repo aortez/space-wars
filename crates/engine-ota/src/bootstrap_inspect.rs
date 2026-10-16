@@ -66,7 +66,7 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
     let data = open_data_mount()?;
     let kernel = kernel_build_id(&read("/sys/kernel/notes", 64 * 1024)?)?;
     let mut files = BTreeMap::new();
-    inventory(&boot, "", boot.metadata()?.dev(), &mut files, &mut 0)?;
+    inventory(&boot, "", boot.metadata()?.dev(), 0, &mut files, &mut 0)?;
     if files.keys().any(|path| {
         matches!(
             path.as_str(),
@@ -136,7 +136,7 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
     let (boot_free_bytes, boot_allocation_bytes) = space(&boot)?;
     let (data_free_bytes, _) = space(&data)?;
     let mut after = BTreeMap::new();
-    inventory(&boot, "", boot.metadata()?.dev(), &mut after, &mut 0)?;
+    inventory(&boot, "", boot.metadata()?.dev(), 0, &mut after, &mut 0)?;
     let current = inspect_layout()?;
     let named = open_at(&root, "boot", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     if after != files
@@ -203,15 +203,16 @@ fn legacy_selection(config: &str, default: &[u8], running: &str, active: &str) -
     Ok(())
 }
 
-fn inventory(
+pub(super) fn inventory(
     directory: &File,
     prefix: &str,
     device: u64,
+    owner: u32,
     files: &mut BTreeMap<String, Blob>,
     total: &mut u64,
 ) -> Result<()> {
     let before = directory.metadata()?;
-    owned(&before, true, 0, false)?;
+    owned(&before, true, owner, false)?;
     if before.dev() != device || prefix.matches('/').count() > 2 {
         return Err(invalid("unexpected nested boot filesystem"));
     }
@@ -232,11 +233,11 @@ fn inventory(
         }
         if entry.file_type()?.is_dir() {
             let child = open_at(directory, &component, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-            inventory(&child, &format!("{path}/"), device, files, total)?;
+            inventory(&child, &format!("{path}/"), device, owner, files, total)?;
         } else {
             let mut file = open_at(directory, &component, libc::O_RDONLY, 0)?;
             let metadata = file.metadata()?;
-            owned(&metadata, false, 0, false)?;
+            owned(&metadata, false, owner, false)?;
             if metadata.dev() != device || metadata.len() > MAX_BOOT_ASSET_BYTES {
                 return Err(invalid("oversized or foreign boot file"));
             }

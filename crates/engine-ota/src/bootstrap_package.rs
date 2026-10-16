@@ -33,6 +33,7 @@ See docs/ota-updates.md for the remaining supervised migration procedure.\n";
 #[serde(deny_unknown_fields)]
 pub struct BootstrapPackage {
     pub schema: u32,
+    pub bootstrap_protocol: u32,
     pub purpose: String,
     pub image: ImageIdentity,
     pub format: ImageFormat,
@@ -70,7 +71,7 @@ pub fn build_package(
     crate::install_linux::check_ext4_header(&header, before.len())?;
     root.rewind()?;
     let expanded = transfer(&mut root, &mut std::io::sink(), before.len())?;
-    let image = ImageTools::default().check(&root)?;
+    let image = ImageTools::default().check_bootstrap(&root)?;
     if image.source.dirty
         || image.machine != "raspberrypi-spacewars"
         || image.architecture != "aarch64"
@@ -271,7 +272,8 @@ pub fn build_package(
     let compressed = transfer(&mut compressed_file, &mut std::io::sink(), length)?;
     files.insert("rootfs.ext4.zst".into(), compressed.clone());
     let package = BootstrapPackage {
-        schema: 2,
+        schema: 3,
+        bootstrap_protocol: super::BOOTSTRAP_PROTOCOL,
         purpose: "supervised-bootstrap".into(),
         image,
         format: ImageFormat::RootfsExt4Zstd,

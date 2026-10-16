@@ -1,7 +1,9 @@
 //! Supervised bootstrap planning, separate from signed rootfs OTA authority.
 //! Preparation may reserve a root-private attempt on /data. It never writes
 //! a root partition, enables OTA, changes selectors or reboots. The explicit
-//! root-operator replacement phase changes only fixed legacy-root files.
+//! root-operator phases preserve/replace fixed legacy files and install the
+//! inactive image. First-boot recovery uses its own durable journal; it cannot
+//! provision production recovery authority or initialize a trial itself.
 use crate::boot::{BootCommandLine, BootManifest, SlotRoots};
 use crate::recovery::Slot;
 use crate::{Blob, Error, ImageIdentity, Result, Sha256};
@@ -53,6 +55,21 @@ mod legacy_state;
 mod quiesce;
 #[path = "bootstrap_root_install.rs"]
 mod root_install;
+#[path = "bootstrap_trial.rs"]
+mod trial;
+pub use trial::{TrialFailure, TrialPhase};
+#[path = "bootstrap_trial_store.rs"]
+mod trial_store;
+pub use trial_store::TrialStore;
+#[cfg(test)]
+pub(crate) use trial_store::tests::Fixture as TrialFixture;
+#[path = "bootstrap_trial_coordinator.rs"]
+mod trial_coordinator;
+pub use trial_coordinator::{BootstrapBackend, BootstrapOutcome, recover_bootstrap};
+#[path = "bootstrap_trial_files.rs"]
+mod trial_files;
+#[path = "bootstrap_trial_linux.rs"]
+mod trial_linux;
 pub use access_check::{LegacyAccessCheck, SshCheckConnection};
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
@@ -71,8 +88,11 @@ pub use legacy_state::{
     verify_legacy_export,
 };
 pub use root_install::{RootInstallProgress, RootInstallReport};
+pub use trial_linux::BootstrapBoot;
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
+/// First-image health, persistent-store checks and separate normal confirmation.
+pub const BOOTSTRAP_PROTOCOL: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

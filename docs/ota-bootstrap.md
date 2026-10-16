@@ -9,9 +9,11 @@ installed boot assets.
 root-only package validation, a durable preparation reservation, raw boot/inactive
 root recovery copies, a data/configuration archive, original-file preservation,
 restartable fixed-file replacement, effective access checks, a restartable
-inactive-root installer and independent-export verifiers.
+inactive-root installer, independent-export verifiers, and a first-boot recovery
+coordinator with a separate staged normal-boot health check.
 **Remaining:** live preservation and independent exports, effective legacy
-privilege/access/service qualification, live root installation, boot apply with recovery, supervised boot verification,
+privilege/access/service qualification, live root installation, boot staging and
+trial activation, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -64,7 +66,8 @@ must derive them again from live evidence under the installation lock.
 
 The builder pins regular input files, rejects links in asset paths, checks a
 clean complete ext4 header, runs read-only `e2fsck`, and reads the actual image
-identity and both executable hashes with bounded `debugfs` calls. It validates
+identity, supported bootstrap runtime marker and both executable hashes with
+bounded `debugfs` calls. It validates
 every copied boot asset against that image's immutable manifest. It hashes the
 expanded root before inspection and again while compressing it, with unchanged
 file metadata required throughout. The output is real, checksummed zstd with a
@@ -92,29 +95,38 @@ The canonical trial command line remains unprepared. The separate temporary
 trial receives a random attempt identity; that identity grants no production
 installation or watchdog-completion authority.
 
-Package schema 2 additionally carries 17 fixed fallback-root files: disabled
+Package schema 3 carries 20 fixed fallback-root files: disabled
 legacy A/B helpers, guarded maintenance wrappers/backends, the restricted OTA
 sudoers file, persistent access configuration, and network initialization/bind
-units. The packager reads their bytes from the selected ext4 artifact, checks
+units, SSH host-key and Bluetooth preservation helpers, and the host-key
+generation dependency. The manager is a separate 21st replacement. The packager
+reads their bytes from the selected ext4 artifact, checks
 root ownership, exact destination modes, single regular-file links and safe
 directory ancestors, and includes every file in the package inventory and
-checksums. All transferred files remain private mode 0600; the future migration
+checksums. All transferred files remain private mode 0600; the migration
 applies the fixed destination modes. Nothing under `legacy-root/` is executed
 by the packager or interpreted as an arbitrary installation hook.
 
-The device package checker requires the complete fixed list. Schema 1 packages
-are rejected because they lack these replacements; previous local packages
-must be rebuilt, never relabeled. This packaging step does not close any live
-privileges. The migration still needs a durable per-file record of original
+The device package checker requires the complete fixed list and bootstrap
+protocol 1. The builder and inactive-root readback check require
+`/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
+and protocol 1. This marker is installed by the image recipe and is part of the
+rootfs identity. It identifies first-image recovery with persistent-store health
+checks; the production recovery protocol alone cannot establish that capability.
+Schema 1/2 packages are rejected; previous local packages must be rebuilt,
+never relabeled. This packaging step does not close any live privileges. The
+migration needs the separately implemented durable per-file record of original
 contents/absence, restartable replacements, a check for running legacy helpers,
 and validation of effective sudo/SSH/systemd configuration before a trial.
 The data archive is a recovery copy, not that per-file migration journal.
 
-The current schema 2 workstation kits are
+The older schema 2 workstation kits are
 `target/ota-bootstrap-c14c53f-pi5-v2` (Pi 5/HyperPixel, target A) and
 `target/ota-bootstrap-c14c53f-pi4-v2` (Pi 4/Picade, target B). Both contain the
 clean `c14c53f` rootfs and its exact replacement assets. Their board, profile and
-slot choices still require a fresh live preflight on the intended device.
+slot choices still require a fresh live preflight on the intended device. They
+predate the bootstrap runtime and preservation checks and are rejected by the
+current package checker. No schema 3 runtime image or kits have been built yet.
 
 ## Root package check and preparation reservation
 
@@ -510,6 +522,49 @@ Independent logins, the full privilege audit, boot staging/handoff and physical
 qualification remain separate requirements. No installed Pi partition has been
 written during the fixture validation of this command.
 
+## First-boot recovery runtime
+
+`engine-os-manager recover` now dispatches an explicitly staged bootstrap through
+its own root-private journal at
+`/data/spacewars-bootstrap/active/boot-trial/record.json`. Opening this journal
+never creates a missing attempt, reuses unpublished temporary state or resets a
+failed attempt. Bootstrap and production recovery journals cannot coexist.
+The production staging/activation command that creates the initial record is
+still pending; this runtime alone does not make a device ready for trial.
+
+The immutable record binds the preparation/package, completed root-install
+digest, image identity, original boot configuration, staged plan and originating
+boot. The Linux adapter checks the loaded root, actual kernel build ID, hardware
+profile, board/USB/layout identity, command line, firmware tryboot flag and trial
+token. The boot-file adapter checks the retained and staged inventory and only
+replaces `config.txt` with one of the two recorded configurations.
+
+The trial reuses the bounded kiosk health worker, including persistent network,
+Bluetooth, SSH-store and application-settings checks. It requires 60 seconds of
+continuous local health inside the original 180-second boot-relative deadline.
+A restarted observer starts a new continuous window without extending that
+deadline. Internet connectivity is not part of this decision.
+
+Health is persisted before selecting the staged normal configuration. The
+selector replacement uses file/directory/filesystem flushes and is reconciled
+against the journal after interruptions. Only persisted health plus the selected
+staged default authorizes the shared watchdog-completion operation; it retains
+the existing early-evidence, driver and timeout checks. The coordinator then
+requests the fixed normal reboot operation.
+
+The next normal boot must pass a separate health window and has the distinct
+`bootstrap-confirmed` status. Trial health cannot stand in for that observation.
+An unhealthy trial keeps the original default; an unhealthy staged normal boot
+restores it and requests a normal reboot. Neither path retries automatically or
+qualifies the legacy root as a previous-good OTA image. A corrupt journal or
+unexpected boot state stops the coordinator and requires operator recovery.
+
+The service may write only the bootstrap journal subtree, alongside its existing
+boot/status/settings paths. The store accepts systemd's exact writable bind of
+that subtree while rejecting a different mount source. These source and fixture
+checks do not establish physical watchdog, reboot, FAT power-loss or canonical
+migration behavior on either Pi.
+
 ## Persistent network profiles
 
 The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`
@@ -600,9 +655,8 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    Internet connectivity must remain independent of that health decision.
    The shared kiosk health worker now checks persistent network/Bluetooth binds
    and SSH-store structure as well as settings writes. The separate bootstrap
-   coordinator still has to use that worker: the current recovery service only
-   handles an existing production journal. Bootstrap must not fabricate that
-   journal or disable the watchdog through an exception.
+   coordinator uses that worker and its own persisted health authorization for
+   watchdog completion. Initial staging and trial activation remain pending.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.
@@ -622,14 +676,11 @@ replacements do not remove the need for independent recovery during bootstrap.
 No physical recovery qualification follows from passing the workstation tests.
 
 The current `c14c53f` runtime image and schema-2 packages predate the added
-persistence health checks and missing-store guards. They have not been rebuilt
-or made ready for trial by this source change. Before adding trial activation,
-the next bootstrap package must identify a runtime that actually implements
-bootstrap health/watchdog handling and include the new SSH host-key helper,
-key-generation dependency and Bluetooth helper in its fixed fallback-root
-replacements. The old root must retain the same missing-store behavior on
-rollback. Change the package version and reject older inventories rather than
-relabeling an existing package or reservation.
+persistence health checks, missing-store guards and bootstrap coordinator. They
+have not been rebuilt or made ready for trial by these source changes. The new
+schema-3 gate requires the runtime marker and expanded fallback-root inventory;
+the next clean image and kits must be rebuilt before trial activation. Existing
+packages and reservations must never be relabeled to bypass that gate.
 
 ## Validation
 

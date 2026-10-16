@@ -193,6 +193,52 @@ fn finish_with<D: WatchdogDevice>(
     open: impl FnOnce() -> Result<D>,
 ) -> Result<WatchdogCompletion> {
     let token = journal.durable_record()?.watchdog_completion(boot)?;
+    finish_authorized(token, boot, runtime, open)
+}
+
+pub(crate) fn complete_bootstrap(
+    lock: &InstallLock,
+    journal: &crate::bootstrap::TrialStore,
+    boot: &BootObservation,
+) -> Result<WatchdogCompletion> {
+    lock.check()?;
+    // The independent bootstrap record must already contain continuous health
+    // and a durably promoted staged default. No production journal is invented.
+    journal.watchdog_token(boot)?;
+    finish_bootstrap_with(journal, boot, &RuntimeDirectory::open()?, || {
+        lock.check()?;
+        LinuxWatchdog::open()
+    })
+}
+
+fn finish_bootstrap_with<D: WatchdogDevice>(
+    journal: &crate::bootstrap::TrialStore,
+    boot: &BootObservation,
+    runtime: &RuntimeDirectory,
+    open: impl FnOnce() -> Result<D>,
+) -> Result<WatchdogCompletion> {
+    finish_authorized(journal.watchdog_token(boot)?, boot, runtime, open)
+}
+
+pub(crate) fn require_bootstrap_completed(
+    journal: &crate::bootstrap::TrialStore,
+    boot: &BootObservation,
+) -> Result<()> {
+    let token = journal.watchdog_token(boot)?;
+    let runtime = RuntimeDirectory::open()?;
+    runtime.early(boot)?;
+    if !runtime.completed(boot, token)? {
+        return Err(invalid("bootstrap watchdog completion is pending"));
+    }
+    Ok(())
+}
+
+fn finish_authorized<D: WatchdogDevice>(
+    token: Sha256,
+    boot: &BootObservation,
+    runtime: &RuntimeDirectory,
+    open: impl FnOnce() -> Result<D>,
+) -> Result<WatchdogCompletion> {
     let early = runtime.early(boot)?;
     if runtime.completed(boot, token)? {
         return Ok(WatchdogCompletion::AlreadyStopped);

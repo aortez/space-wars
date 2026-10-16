@@ -33,6 +33,10 @@ fn run_with(reporter: &Reporter) -> Result<()> {
             "recovery requires private root-owned system data".into(),
         ));
     }
+    let lock = InstallLock::acquire()?;
+    if let Some(mut store) = engine_ota::bootstrap::TrialStore::open(&lock)? {
+        return crate::bootstrap_recovery::run(&lock, &mut store, reporter);
+    }
     match fs::symlink_metadata(RECOVERY_DIRECTORY) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             reporter.publish(RecoveryProgress::new(RecoveryStage::Unprovisioned))?;
@@ -42,7 +46,6 @@ fn run_with(reporter: &Reporter) -> Result<()> {
         Ok(_) => {}
     }
     // Missing or damaged journal contents are an error, never bootstrap input.
-    let lock = InstallLock::acquire()?;
     let boot = BootController::open(&lock)?;
     let image = boot.observe()?.image;
     let mut store = RecoveryStore::open(Path::new(RECOVERY_DIRECTORY))?;
@@ -74,24 +77,7 @@ impl RecoveryBackend for LinuxBackend<'_> {
         self.boot.trial_watchdog().map(|_| ())
     }
     fn health(&mut self, boot: &BootObservation) -> engine_ota::Result<HealthSample> {
-        let sample = self.observer.observe(&self.expected).map_err(ota_error)?;
-        if sample.boot_id != boot.boot_id || Some(&sample.build_id) != boot.actual_build_id.as_ref()
-        {
-            return Err(ota_error("health worker described another boot or image"));
-        }
-        Ok(HealthSample {
-            uptime_ms: sample.uptime_ms,
-            instance: AppInstance {
-                pid: sample.process_id,
-                start_ticks: sample.start_ticks,
-                invocation_id: sample.invocation_id,
-            },
-            build_id: sample.build_id,
-            executable_verified: true,
-            state_writable: true,
-            control_response: sample.control_response,
-            presented_frames: sample.presented_frames,
-        })
+        kiosk_health(&mut self.observer, &self.expected, boot)
     }
     fn apply(
         &mut self,
@@ -124,7 +110,7 @@ impl RecoveryBackend for LinuxBackend<'_> {
     }
 }
 
-async fn normal_reboot(
+pub(crate) async fn normal_reboot(
     authorize: impl FnOnce() -> engine_ota::Result<()>,
 ) -> engine_ota::Result<()> {
     let connection = zbus::connection::Builder::system()
@@ -134,6 +120,30 @@ async fn normal_reboot(
         .await
         .map_err(ota_error)?;
     normal_reboot_on(&connection, authorize).await
+}
+
+pub(crate) fn kiosk_health(
+    observer: &mut KioskObserver,
+    expected: &KioskExpectation,
+    boot: &BootObservation,
+) -> engine_ota::Result<HealthSample> {
+    let sample = observer.observe(expected).map_err(ota_error)?;
+    if sample.boot_id != boot.boot_id || Some(&sample.build_id) != boot.actual_build_id.as_ref() {
+        return Err(ota_error("health worker described another boot or image"));
+    }
+    Ok(HealthSample {
+        uptime_ms: sample.uptime_ms,
+        instance: AppInstance {
+            pid: sample.process_id,
+            start_ticks: sample.start_ticks,
+            invocation_id: sample.invocation_id,
+        },
+        build_id: sample.build_id,
+        executable_verified: true,
+        state_writable: true,
+        control_response: sample.control_response,
+        presented_frames: sample.presented_frames,
+    })
 }
 
 async fn normal_reboot_on(

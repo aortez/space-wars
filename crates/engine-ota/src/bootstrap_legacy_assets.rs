@@ -23,6 +23,8 @@ pub(super) const FILES: &[(&str, u32)] = &[
     ("usr/sbin/spacewars-fast-update", 0o755),
     ("usr/sbin/spacewars-renderer", 0o755),
     ("usr/sbin/persistent-data-init", 0o755),
+    ("usr/sbin/spacewars-ssh-host-keys", 0o755),
+    ("usr/sbin/spacewars-bluetooth-data-init", 0o755),
     ("usr/libexec/spacewars/fast-update", 0o700),
     ("usr/libexec/spacewars/renderer", 0o700),
     ("usr/lib/tmpfiles.d/spacewars-install.conf", 0o644),
@@ -33,6 +35,10 @@ pub(super) const FILES: &[(&str, u32)] = &[
         0o644,
     ),
     ("usr/lib/systemd/system/spacewars-access.service", 0o644),
+    (
+        "usr/lib/systemd/system/sshdgenkeys.service.d/spacewars-host-keys.conf",
+        0o644,
+    ),
     (
         "usr/lib/systemd/system/sshd.service.d/spacewars-access.conf",
         0o644,

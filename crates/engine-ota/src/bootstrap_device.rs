@@ -659,7 +659,8 @@ impl OperatorPackage {
         }
         let record: BootstrapPackage = serde_json::from_slice(&bytes)?;
         record.image.validate()?;
-        if record.schema != 2
+        if record.schema != 3
+            || record.bootstrap_protocol != super::BOOTSTRAP_PROTOCOL
             || record.purpose != "supervised-bootstrap"
             || record.image.source.dirty
             || record.image.machine != "raspberrypi-spacewars"

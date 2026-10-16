@@ -79,7 +79,7 @@ impl BootstrapBinding {
         Ok(binding)
     }
 
-    fn validate(&self) -> Result<()> {
+    pub(super) fn validate(&self) -> Result<()> {
         if self.schema != 1
             || !crate::recovery::boot_id(&self.original_boot_id)
             || self.original_slot.other() != self.target
@@ -176,6 +176,7 @@ pub(super) fn read_binding(active: &File, owner: u32) -> Result<BootstrapBinding
             && name != super::legacy_state::PENDING
             && name != super::legacy_replace::DIRECTORY
             && name != super::root_install::DIRECTORY
+            && name != super::trial_store::DIRECTORY
         {
             return Err(invalid(
                 "unexpected bootstrap preparation state; reconciliation required",

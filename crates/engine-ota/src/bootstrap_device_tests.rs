@@ -178,6 +178,13 @@ fn legacy_replacements_require_the_complete_fixed_inventory_and_new_schema() {
     rewrite_record(&fixture, |package| package.schema = 1);
     assert!(open(&fixture).is_err());
     rewrite_record(&fixture, |package| package.schema = 2);
+    assert!(open(&fixture).is_err());
+    rewrite_record(&fixture, |package| package.schema = 3);
+    rewrite_record(&fixture, |package| package.bootstrap_protocol = 0);
+    assert!(open(&fixture).is_err());
+    rewrite_record(&fixture, |package| {
+        package.bootstrap_protocol = crate::bootstrap::BOOTSTRAP_PROTOCOL
+    });
     open(&fixture).unwrap();
     let name = "legacy-root/usr/sbin/ab-update";
     let contents = fs::read(fixture.output().join(name)).unwrap();
