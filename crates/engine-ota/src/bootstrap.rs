@@ -71,6 +71,13 @@ pub use canonical_linux::CanonicalBoot;
 #[path = "bootstrap_canonical_coordinator.rs"]
 mod canonical_coordinator;
 pub use canonical_coordinator::{CanonicalBackend, CanonicalOutcome, recover_canonical};
+#[path = "bootstrap_finish.rs"]
+mod finish;
+pub use finish::FinishPhase;
+#[path = "bootstrap_finish_files.rs"]
+mod finish_files;
+#[path = "bootstrap_handoff.rs"]
+mod handoff;
 #[path = "bootstrap_trial.rs"]
 mod trial;
 pub use trial::{TrialFailure, TrialPhase};
@@ -99,7 +106,8 @@ pub use device::prepare_installed_legacy;
 pub use device::replace_installed_legacy;
 pub use device::{BootStageProgress, BootStageReport, stage_bootstrap_boot};
 pub use device::{
-    CanonicalReboot, CanonicalReport, activate_canonical_boot, prepare_canonical_boot,
+    CanonicalReboot, CanonicalReport, activate_canonical_boot, complete_canonical_boot,
+    prepare_canonical_boot,
 };
 pub use legacy_replace::{
     LegacyReplacementProgress, LegacyReplacementReport, LegacyReplacementStage,
@@ -112,8 +120,8 @@ pub use root_install::{RootInstallProgress, RootInstallReport};
 pub use trial_linux::BootstrapBoot;
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
-/// Boot-bound activation, persistent-store health and staged/canonical confirmation.
-pub const BOOTSTRAP_PROTOCOL: u32 = 3;
+/// Boot-bound activation, canonical health and explicit retirement/recovery handoff.
+pub const BOOTSTRAP_PROTOCOL: u32 = 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

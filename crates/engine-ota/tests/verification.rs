@@ -29,7 +29,7 @@ async fn persisted_recovery_quarantine_allows_only_a_freshly_verified_bounded_re
         uptime_ms: 1_000_000,
         actual_slot: Some(Slot::A),
         actual_build_id: Some(old.build_id.clone()),
-        recovery_protocol: 1,
+        recovery_protocol: engine_ota::recovery::RECOVERY_PROTOCOL,
         default_slot: Some(Slot::A),
         tryboot: false,
         trial_id: None,

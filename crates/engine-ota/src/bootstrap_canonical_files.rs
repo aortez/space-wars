@@ -121,7 +121,31 @@ impl CanonicalFiles {
             if contents.bytes > 16 * 1024 {
                 return Err(invalid("oversized retained selector temporary"));
             }
-            bounds.insert(path, contents);
+            bounds.insert(path.clone(), contents.clone());
+            if state.finish.is_some() {
+                actual.insert(path, contents);
+            }
+        }
+        if let Some(finish) = &state.finish {
+            if selected != CanonicalDefault::Canonical {
+                return Err(invalid(
+                    "retiring bootstrap files requires the canonical default",
+                ));
+            }
+            for (path, contents) in &finish.files {
+                if trial_files::temporary(path) {
+                    expected.insert(path.clone(), contents.clone());
+                    bounds.insert(path.clone(), contents.clone());
+                }
+                if finish.removed.contains(path)
+                    || (finish.pending.as_ref() == Some(path) && !actual.contains_key(path))
+                {
+                    expected.remove(path);
+                }
+            }
+            if finish.phase >= super::FinishPhase::Ready {
+                bounds = expected.clone();
+            }
         }
         if actual != expected {
             return Err(invalid(
@@ -260,6 +284,9 @@ impl CanonicalFiles {
         mut checkpoint: impl FnMut(&str) -> Result<()>,
     ) -> Result<()> {
         let state = store.canonical()?;
+        if state.finish.is_some() {
+            return Err(invalid("bootstrap retirement cannot change boot selection"));
+        }
         if if canonical {
             state.phase != CanonicalPhase::Selecting
         } else {

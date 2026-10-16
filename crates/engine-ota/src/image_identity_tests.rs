@@ -24,7 +24,7 @@ fn descriptor(identity: &ImageIdentity) -> ImageDescriptor {
         },
         boot_identity: identity.boot_identity,
         min_updater_protocol: 1,
-        min_recovery_protocol: 1,
+        min_recovery_protocol: crate::recovery::RECOVERY_PROTOCOL,
         data: identity.data,
     }
 }

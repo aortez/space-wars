@@ -5,7 +5,7 @@ use crate::{DataCompatibility, ImageDescriptor, ImageHistory, Sha256, VerifiedCa
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub const RECOVERY_PROTOCOL: u32 = 1;
+pub const RECOVERY_PROTOCOL: u32 = 2;
 pub const TRIAL_DEADLINE_MS: u64 = 180_000;
 pub const HEALTH_WINDOW_MS: u64 = 60_000;
 pub const MAX_HEALTH_GAP_MS: u64 = 5_000;
@@ -44,6 +44,8 @@ pub struct BootBinding {
 pub struct SlotImage {
     pub slot: Slot,
     pub build_id: String,
+    /// Zero identifies an unpublished image confirmed by supervised bootstrap.
+    /// Signed OTA candidates always have a positive release generation.
     pub generation: u64,
     pub payload: Sha256,
     pub expanded: Sha256,
@@ -63,8 +65,7 @@ impl SlotImage {
     }
 
     fn valid(&self) -> bool {
-        self.generation > 0
-            && identifier(&self.build_id)
+        identifier(&self.build_id)
             && self.data.reads.min <= self.data.reads.max
             && self.data.reads.contains(self.data.writes)
     }
@@ -243,7 +244,7 @@ impl RecoveryRecord {
             return Err(RecoveryError::BootMismatch);
         }
         let record = Self {
-            schema: 1,
+            schema: 2,
             binding,
             highest_attempted_generation: good.generation,
             good,
@@ -259,7 +260,7 @@ impl RecoveryRecord {
 
     pub fn validate(&self) -> Result<()> {
         let invalid = RecoveryError::InvalidState;
-        if self.schema != 1
+        if self.schema != 2
             || !self.good.valid()
             || self.highest_attempted_generation < self.good.generation
             || self.failures.len() > MAX_FAILURES
@@ -298,6 +299,7 @@ impl RecoveryRecord {
             if self.sequence == 0
                 || !tx.previous_good.valid()
                 || !tx.candidate.valid()
+                || tx.candidate.generation == 0
                 || tx.previous_good.slot == tx.candidate.slot
                 || tx.candidate.generation <= tx.previous_good.generation
                 || tx.candidate.generation != self.highest_attempted_generation
@@ -460,7 +462,7 @@ impl RecoveryRecord {
         }
         if image.validate().is_err()
             || image.boot_identity != self.binding.boot_identity
-            || image.min_recovery_protocol > RECOVERY_PROTOCOL
+            || image.min_recovery_protocol != RECOVERY_PROTOCOL
             || image.compressed.sha256 == self.good.payload
             || !self.good.data.reads.contains(image.data.writes)
             || !image.data.reads.contains(self.good.data.writes)

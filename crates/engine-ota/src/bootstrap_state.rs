@@ -13,6 +13,7 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::MetadataExt;
 
 pub(super) const ACTIVE: &str = "active";
+pub(super) const COMPLETED: &str = "completed";
 const RECORD: &str = "binding.json";
 const MAX_BYTES: u64 = 256 * 1024;
 
@@ -143,7 +144,20 @@ pub(crate) fn require_no_active_under(data: &File, owner: u32) -> Result<()> {
         return Ok(());
     };
     match open_at(&parent, ACTIVE, libc::O_PATH, 0) {
-        Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+            if !super::finish_files::absent(&parent, COMPLETED)? {
+                let system =
+                    optional_directory(data, "spacewars-system", owner)?.ok_or_else(|| {
+                        invalid("completed bootstrap lost its production recovery journal")
+                    })?;
+                if optional_directory(&system, "recovery", owner)?.is_none() {
+                    return Err(invalid(
+                        "completed bootstrap lost its production recovery journal",
+                    ));
+                }
+            }
+            Ok(())
+        }
         Err(error) => Err(error),
         Ok(_) => Err(invalid(
             "supervised bootstrap is active; resume/reconcile it before maintenance",
@@ -178,6 +192,7 @@ pub(super) fn read_binding(active: &File, owner: u32) -> Result<BootstrapBinding
             && name != super::root_install::DIRECTORY
             && name != super::trial_store::DIRECTORY
             && name != super::trial_store::PREPARING
+            && name != super::finish_files::DIRECTORY
         {
             return Err(invalid(
                 "unexpected bootstrap preparation state; reconciliation required",

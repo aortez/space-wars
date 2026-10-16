@@ -16,6 +16,10 @@ pub fn prepare(package: Sha256, written_root: Sha256, trial: Sha256) -> Result<C
     bootstrap::prepare_canonical_boot(package, written_root, trial, |point| eprintln!("{point}"))
 }
 
+pub fn finish(package: Sha256, written_root: Sha256, trial: Sha256) -> Result<CanonicalReport> {
+    bootstrap::complete_canonical_boot(package, written_root, trial, |point| eprintln!("{point}"))
+}
+
 pub fn activate(package: Sha256, written_root: Sha256, trial: Sha256) -> Result<CanonicalReport> {
     bootstrap::activate_canonical_boot(
         package,
@@ -78,11 +82,11 @@ pub(crate) fn recover(
         ),
         CanonicalOutcome::Confirmed => (
             RecoveryStage::BootstrapConfirmed,
-            "Separate canonical normal boot confirmed; staged-tree cleanup and OTA provisioning remain pending",
+            "Separate canonical normal boot confirmed; root-operator bootstrap finalization remains pending",
         ),
         CanonicalOutcome::NeedsOperator => (
             RecoveryStage::Blocked,
-            "Canonical migration failed; staged default retained and operator reconciliation required",
+            "Canonical bootstrap failed; operator reconciliation required (retirement disables staged fallback)",
         ),
         CanonicalOutcome::StagedRebootRequested => (
             RecoveryStage::RebootRequested,

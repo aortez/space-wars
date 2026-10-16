@@ -37,7 +37,8 @@ pub use stage_device::{BootStageProgress, BootStageReport, stage_bootstrap_boot}
 #[path = "bootstrap_canonical_device.rs"]
 mod canonical_device;
 pub use canonical_device::{
-    CanonicalReboot, CanonicalReport, activate_canonical_boot, prepare_canonical_boot,
+    CanonicalReboot, CanonicalReport, activate_canonical_boot, complete_canonical_boot,
+    prepare_canonical_boot,
 };
 
 #[derive(Debug, Serialize)]

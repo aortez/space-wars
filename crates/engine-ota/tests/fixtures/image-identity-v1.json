@@ -21,7 +21,7 @@
   },
   "layout": "spacewars-ab-v1",
   "machine": "raspberrypi-spacewars",
-  "recovery_protocol": 1,
+  "recovery_protocol": 2,
   "rootfs_tree": "3bce6a26d91af3d8d35eb55ed2962a3f9bb4d84035f7f5307ce27aca430c325c",
   "schema": 1,
   "source": {

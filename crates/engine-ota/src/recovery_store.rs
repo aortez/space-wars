@@ -6,13 +6,25 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-const MAX_BYTES: u64 = 128 * 1024;
+pub(crate) const MAX_BYTES: u64 = 128 * 1024;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Envelope {
     record: RecoveryRecord,
     checksum: Sha256,
+}
+
+pub(crate) fn initial_bytes(record: &RecoveryRecord) -> Result<Vec<u8>> {
+    record.validate()?;
+    let bytes = serde_json::to_vec(&Envelope {
+        record: record.clone(),
+        checksum: record.fingerprint(),
+    })?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err(Error::Store("recovery record exceeds size limit".into()));
+    }
+    Ok(bytes)
 }
 
 /// Fixed root-owned /data directory in production, opened by the service only.
@@ -114,13 +126,7 @@ impl RecoveryStore {
     }
 
     fn persist(&self, record: &RecoveryRecord) -> Result<()> {
-        let bytes = serde_json::to_vec(&Envelope {
-            record: record.clone(),
-            checksum: record.fingerprint(),
-        })?;
-        if bytes.len() as u64 > MAX_BYTES {
-            return Err(Error::Store("recovery record exceeds size limit".into()));
-        }
+        let bytes = initial_bytes(record)?;
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)?;
         file.write_all(&bytes)?;
         file.as_file().sync_all()?;

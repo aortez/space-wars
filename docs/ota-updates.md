@@ -25,7 +25,7 @@ Remaining work retains the full OTA scope:
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
 | #258–#260 | Maintenance holds, bounded connectivity and offline controls |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
-| #263 | Trial coordinator, independent recovery service, health/identity evidence, early watchdog and journal-gated boot completion implemented; bootstrap and physical recovery qualification remain |
+| #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
@@ -158,6 +158,10 @@ installation API; the installer must still revalidate it against live time,
 current feed, staging bytes and admission state immediately before writing.
 
 The generation floor is stored before granting access to the inactive slot.
+Production recovery protocol 2 / journal schema 2 reserves generation zero for
+an unpublished, explicitly confirmed bootstrap baseline. Signed candidates must
+have a positive generation and declare this recovery protocol. The bootstrap
+command cannot allocate a signed release generation or qualify watchdog recovery.
 Any retained image in that slot stops being advertised as a recovery option at
 that point. A trial request is recorded before the reboot operation; repeating
 the same command does not issue another trial. Restarting before a trial
@@ -341,7 +345,7 @@ cargo run --locked -p engine-ota --example image_identity_probe -- image.json
 ```
 
 The writer calls the descriptor binding check on the verified image; publisher
-integration remains outstanding. Declaring recovery protocol 1 describes
+integration remains outstanding. Declaring recovery protocol 2 describes
 format support; it does not assert that the board's watchdog/tryboot behavior
 has been qualified.
 
@@ -401,12 +405,13 @@ file while retaining the normal default. The root-only activation command now
 revalidates that ready stage, durably consumes the attempt, then requests the
 fixed one-shot reboot through systemd. Request failures never reset the attempt;
 lost replies and interrupted cleanup require operator reconciliation. Bootstrap
-protocol 3 also supports canonical migration: separate root commands copy the
+protocol 4 also supports canonical migration and completion: separate root commands copy the
 permanent assets with per-file durable intent, retain the staged fallback and
 publish the permanent configuration last. A different normal boot must pass its
 own health window; failure returns to the staged default without an automatic
-retry. Staged-tree cleanup and explicit production baseline provisioning remain
-pending, and neither Pi has undergone this migration. These tools do not enable
+retry. An explicit finalization command archives retired files before removal,
+publishes the initial recovery baseline, then archives the bootstrap reservation.
+Neither Pi has undergone this migration. These tools do not enable
 automatic updates. The [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
 describe the package layout, reproduction commands and supervised boundary.
 

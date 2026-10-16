@@ -85,6 +85,7 @@ enum MaintenanceCommand {
 enum CanonicalCommand {
     Prepare,
     Activate,
+    Finish,
 }
 
 fn main() -> ExitCode {
@@ -131,6 +132,9 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
                 }
                 CanonicalCommand::Activate => {
                     engine_os_manager::bootstrap_canonical::activate(package, written_root, trial)?
+                }
+                CanonicalCommand::Finish => {
+                    engine_os_manager::bootstrap_canonical::finish(package, written_root, trial)?
                 }
             };
             println!("{}", serde_json::to_string(&report)?);

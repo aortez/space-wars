@@ -12,12 +12,12 @@ restartable fixed-file replacement, effective access checks, a restartable
 inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
-normal-boot health checks.
+normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
 **Remaining:** live preservation and independent exports, effective legacy
 privilege/access/service qualification, live root installation and staging,
 live one-shot trial activation, supervised staged/canonical boot verification,
-staged-tree cleanup, recovery-journal provisioning and physical failure
-qualification. A package is not a signed OTA candidate or an enabled updater.
+live finalization and physical failure qualification. A package is not a signed
+OTA candidate or an enabled updater.
 
 ## Read the existing device
 
@@ -110,14 +110,15 @@ applies the fixed destination modes. Nothing under `legacy-root/` is executed
 by the packager or interpreted as an arbitrary installation hook.
 
 The device package checker requires the complete fixed list and bootstrap
-protocol 3. The builder and inactive-root readback check require
+protocol 4. The builder and inactive-root readback check require
 `/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
-and protocol 3. This marker is installed by the image recipe and is part of the
+and protocol 4. This marker is installed by the image recipe and is part of the
 rootfs identity. It identifies first-image recovery with persistent-store health
 checks, an activation boot ID and durable canonical migration with a staged
-fallback; the production recovery protocol alone cannot establish that
-capability. The trial journal is schema 3. Schema 1/2 packages, bootstrap
-protocol 1/2 images and schema 1/2 trial journals are rejected;
+fallback followed by explicit retirement and initial recovery publication;
+the production recovery protocol alone cannot establish that capability.
+The trial journal is schema 4. Schema 1/2 packages, bootstrap protocol 1/2/3
+images and schema 1/2/3 trial journals are rejected;
 previous local packages must be rebuilt,
 never relabeled. This packaging step does not close any live privileges. The
 migration needs the separately implemented durable per-file record of original
@@ -644,7 +645,9 @@ on either Pi yet.
 its own root-private journal at
 `/data/spacewars-bootstrap/active/boot-trial/record.json`. Opening this journal
 never creates a missing attempt, reuses unpublished temporary state or resets a
-failed attempt. Bootstrap and production recovery journals cannot coexist.
+failed attempt. Bootstrap and production recovery journals can coexist only
+during the exact initial handoff described below; the active reservation still
+blocks installations during that interval.
 The staging command creates the initial record; the separate root-operator
 activation command consumes it before requesting the one-shot reboot. These
 source implementations alone do not qualify a device for a supervised trial.
@@ -748,11 +751,68 @@ recovery service starts requires the independently supervised recovery path.
 Atomic replacements do not qualify shared-FAT behavior under physical power loss.
 
 Success still reports `automatic_updates_enabled: false`. Canonical confirmation
-does not delete the staged tree, archive/remove `boot_slot`, remove obsolete
-assets, or initialize production recovery. Those later operations remain to be
-implemented and verified before declaring a good OTA baseline. No live canonical
-migration has run on either Pi, and a clean protocol-3 runtime image and new kits
+does not itself delete the staged tree or initialize production recovery. The
+separate finalization operation below performs that handoff. No live canonical
+migration has run on either Pi, and a clean protocol-4 runtime image and new kits
 are still required.
+
+## Archive bootstrap assets and establish the initial recovery baseline
+
+From the independently confirmed canonical normal boot, use the same three
+reviewed identities:
+
+```sh
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  finish
+```
+
+The command repeats the package, device, retained-backup and persistent-store
+checks. It records the exact retirement inventory before creating the archive.
+That durable intent ends automatic staged rollback: the staged tree may now
+be dismantled, so any later unhealthy boot requires operator recovery instead
+of selecting partly removed assets.
+
+All retired files are copied, hashed, read back and flushed to the private
+`retired-boot` directory inside the active bootstrap reservation **before any
+boot file is removed**. Files are stored by SHA-256; the journal's
+`canonical.finish.files` map preserves each original path, length and hash.
+This includes `boot_slot`, the staged tree, obsolete original assets and retained
+bootstrap selector temporaries. Equal content shares one archive copy.
+Canonical assets and `hostname.txt` retain their bytes and files in place.
+Each removal has durable intent and a flushed completion record. Resume accepts
+an absent file only when its removal was already recorded or pending; missing,
+changed or linked archive copies stop further removal without repairs once
+archive completion is recorded. Empty
+retired directories are removed only after their files, and the ordinary boot
+verifier must accept the resulting canonical tree.
+
+The command then derives the production binding from the actual canonical
+boot, records one initial good image using the completed root receipt, and
+publishes the exact journal at `/data/spacewars-system/recovery`. The initial
+unpublished image uses generation **zero**; signed OTA releases still require
+positive generations. The legacy root is not recorded as a retained-good image.
+Production recovery protocol 2 and journal schema 2 support this distinction;
+older journals are rejected, and candidate metadata must declare recovery
+protocol 2. No signed generation or hardware qualification is invented by
+finalization.
+
+Publication uses a private `.bootstrap-recovery` directory and flushed atomic
+rename. Only the exact initial record named by the bootstrap handoff may coexist
+with the active reservation. While both exist, that reservation still blocks
+ordinary installs and maintenance. After durable publication, the entire
+reservation is renamed from `/data/spacewars-bootstrap/active` to `completed`,
+retaining original files, raw/data recovery copies, retired boot bytes and all
+journals. Repeating an interrupted handoff verifies the existing record; it
+does not replace it. A completed reservation with a missing production journal
+is lost state, not a fresh unprovisioned device.
+
+The command requests no reboot and leaves `automatic_updates_enabled: false`.
+The ordinary recovery service can now open the baseline, but actual tryboot and
+watchdog qualification, feed/trust setup and the update service/policy remain
+separate requirements. Finalization has not run against either Pi's installed
+state. Do not relabel older runtime images, kits or journals to bypass the new
+protocol checks.
 
 ## Persistent network profiles
 
@@ -856,10 +916,10 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    canonical set, its largest temporary replacement and a reserve. Preserve
    `hostname.txt`, and verify a canonical normal boot before archiving/removing
    the legacy breadcrumb, obsolete assets and temporary stage. Canonical
-   preparation, activation and health observation are implemented; this cleanup
-   and all live verification remain pending.
-7. Only then explicitly establish the good recovery baseline from the observed
-   normal boot. Do not advertise the overwritten/legacy root as a qualified
+   preparation, activation, health observation and explicit archive/cleanup are
+   implemented; all live verification remains pending.
+7. The root-only finalization command then explicitly establishes the initial
+   good recovery baseline from the observed normal boot. Do not advertise the overwritten/legacy root as a qualified
    retained image. Complete Pi 4/5 failure qualification and the remaining feed,
    service and UI integration before enabling automatic installation.
 
@@ -870,7 +930,7 @@ No physical recovery qualification follows from passing the workstation tests.
 The current `c14c53f` runtime image and schema-2 packages predate the added
 persistence health checks, missing-store guards and bootstrap coordinator. They
 have not been rebuilt or made ready for trial by these source changes. The new
-schema-3 gate requires the protocol-3 runtime marker and expanded fallback-root
+schema-3 gate requires the protocol-4 runtime marker and expanded fallback-root
 inventory; the next clean image and kits must be rebuilt before trial activation. Existing
 packages and reservations must never be relabeled to bypass that gate.
 

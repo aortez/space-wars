@@ -81,7 +81,7 @@ fn descriptor(identity: &ImageIdentity, compressed: Blob, expanded: Blob) -> Ima
         expanded,
         boot_identity: identity.boot_identity,
         min_updater_protocol: 1,
-        min_recovery_protocol: 1,
+        min_recovery_protocol: crate::recovery::RECOVERY_PROTOCOL,
         data: identity.data,
     }
 }

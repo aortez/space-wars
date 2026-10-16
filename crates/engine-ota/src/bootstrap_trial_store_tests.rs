@@ -129,7 +129,7 @@ impl Fixture {
     pub(crate) fn open(&self) -> TrialStore {
         self.try_open().unwrap().unwrap()
     }
-    fn try_open(&self) -> Result<Option<TrialStore>> {
+    pub(in crate::bootstrap) fn try_open(&self) -> Result<Option<TrialStore>> {
         TrialStore::under(
             File::open(self.temp.path())?,
             File::open(self.temp.path().join("data"))?,

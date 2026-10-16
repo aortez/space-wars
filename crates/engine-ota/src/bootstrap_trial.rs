@@ -131,7 +131,7 @@ pub(super) enum TrialAction {
 impl TrialRecord {
     pub(super) fn staging(inputs: TrialInputs) -> Result<Self> {
         let record = Self {
-            schema: 3,
+            schema: 4,
             inputs,
             phase: TrialPhase::Staging,
             request_boot_id: None,
@@ -188,7 +188,7 @@ impl TrialRecord {
             TrialPhase::NormalConfirmed => started && healthy && normal && confirmed,
             TrialPhase::Failed => !confirmed,
         };
-        if self.schema != 3
+        if self.schema != 4
             || !shape
             || (!matches!(self.phase, TrialPhase::Staging | TrialPhase::TrialReady) && !requested)
             || self

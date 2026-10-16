@@ -54,7 +54,7 @@ pub fn descriptor(channel: Channel, generation: u64) -> ImageDescriptor {
         },
         boot_identity: Sha256::digest(b"fixture boot assets"),
         min_updater_protocol: 1,
-        min_recovery_protocol: 1,
+        min_recovery_protocol: engine_ota::recovery::RECOVERY_PROTOCOL,
         data: DataCompatibility {
             reads: SchemaRange { min: 1, max: 2 },
             writes: 1,
@@ -74,7 +74,7 @@ pub fn device() -> DeviceIdentity {
         layout: image.layout,
         boot_identity: image.boot_identity,
         updater_protocol: 1,
-        recovery_protocol: 1,
+        recovery_protocol: engine_ota::recovery::RECOVERY_PROTOCOL,
         inactive_slot_bytes: 2048,
         persistent_schema: 1,
         rollback_reads: SchemaRange { min: 1, max: 1 },

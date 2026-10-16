@@ -33,6 +33,16 @@ fn runtime_identity_cannot_invoke_root_maintenance() {
             "activate",
         ],
         vec![
+            "bootstrap-canonical",
+            "--package",
+            "invalid",
+            "--written-root",
+            "invalid",
+            "--trial",
+            "invalid",
+            "finish",
+        ],
+        vec![
             "bootstrap-activate",
             "--package",
             "invalid",

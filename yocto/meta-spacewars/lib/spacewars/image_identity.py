@@ -134,7 +134,7 @@ def create_image_identity(root, machine, architecture):
         "schema": 1, "build_id": "rootfs-" + tree, "rootfs_tree": tree,
         "source": source, "machine": machine, "architecture": architecture,
         "layout": "spacewars-ab-v1", "boot_identity": boot,
-        "updater_protocol": 1, "recovery_protocol": 1,
+        "updater_protocol": 1, "recovery_protocol": 2,
         "data": {"reads": {"min": 1, "max": 1}, "writes": 1}, "binaries": binaries,
     }
 

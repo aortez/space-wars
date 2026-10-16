@@ -34,6 +34,7 @@ pub struct TrialStore {
     active: File,
     directory: File,
     owner: u32,
+    location: &'static str,
     bytes: Vec<u8>,
     record: TrialRecord,
     uncertain: bool,
@@ -42,6 +43,39 @@ pub struct TrialStore {
 }
 
 impl TrialStore {
+    pub(super) fn for_completion(lock: &InstallLock) -> Result<Option<Self>> {
+        lock.check()?;
+        Self::completion_under(
+            open_directory(Path::new("/"), 0)?,
+            crate::recovery_linux::open_data_mount()?,
+            0,
+        )
+    }
+
+    pub(super) fn completion_under(root: File, data: File, owner: u32) -> Result<Option<Self>> {
+        let Some(parent) = state::optional_directory(&data, device::DIRECTORY, owner)? else {
+            return Ok(None);
+        };
+        let active = state::optional_directory(&parent, state::ACTIVE, owner)?.is_some();
+        let completed = state::optional_directory(&parent, state::COMPLETED, owner)?.is_some();
+        if active && completed {
+            return Err(invalid(
+                "active and completed bootstrap reservations conflict",
+            ));
+        }
+        Self::under_at(
+            root,
+            data,
+            owner,
+            false,
+            if completed {
+                state::COMPLETED
+            } else {
+                state::ACTIVE
+            },
+        )
+    }
+
     pub fn open(lock: &InstallLock) -> Result<Option<Self>> {
         lock.check()?;
         Self::under(
@@ -68,10 +102,23 @@ impl TrialStore {
     }
 
     fn under_mode(root: File, data: File, owner: u32, preparing: bool) -> Result<Option<Self>> {
+        Self::under_at(root, data, owner, preparing, state::ACTIVE)
+    }
+
+    fn under_at(
+        root: File,
+        data: File,
+        owner: u32,
+        preparing: bool,
+        location: &'static str,
+    ) -> Result<Option<Self>> {
         let Some(parent) = state::optional_directory(&data, device::DIRECTORY, owner)? else {
             return Ok(None);
         };
-        let Some(active) = state::optional_directory(&parent, state::ACTIVE, owner)? else {
+        let Some(active) = state::optional_directory(&parent, location, owner)? else {
+            if location == state::ACTIVE {
+                state::require_no_active_under(&data, owner)?;
+            }
             return Ok(None);
         };
         let binding = state::read_binding(&active, owner)?;
@@ -107,6 +154,7 @@ impl TrialStore {
             active,
             directory,
             owner,
+            location,
             bytes,
             record: envelope.record,
             uncertain: false,
@@ -132,6 +180,27 @@ impl TrialStore {
 
     pub fn canonical_phase(&self) -> Option<super::CanonicalPhase> {
         self.record.canonical.as_ref().map(|c| c.phase)
+    }
+
+    pub fn finish_phase(&self) -> Option<super::FinishPhase> {
+        self.record
+            .canonical
+            .as_ref()
+            .and_then(|c| c.finish.as_ref())
+            .map(|f| f.phase)
+    }
+
+    pub(super) fn advance_finish<T>(
+        &mut self,
+        transition: impl FnOnce(&mut super::finish::FinishState) -> Result<T>,
+    ) -> Result<T> {
+        self.advance_canonical(|c, _| {
+            transition(
+                c.finish
+                    .as_mut()
+                    .ok_or_else(|| invalid("bootstrap retirement is not initialized"))?,
+            )
+        })
     }
 
     pub(super) fn canonical(&self) -> Result<&super::canonical::CanonicalState> {
@@ -181,7 +250,7 @@ impl TrialStore {
             return Err(invalid("bootstrap data mount changed"));
         }
         backup::check_named_directory(&self.data, device::DIRECTORY, &self.parent, self.owner)?;
-        backup::check_named_directory(&self.parent, state::ACTIVE, &self.active, self.owner)?;
+        backup::check_named_directory(&self.parent, self.location, &self.active, self.owner)?;
         backup::check_named_directory(&self.active, DIRECTORY, &self.directory, self.owner)?;
         let mount = crate::recovery_linux::opened_mount_id(&self.data)?;
         for directory in [&self.parent, &self.active] {
@@ -192,7 +261,7 @@ impl TrialStore {
         crate::recovery_linux::check_data_subtree(
             &self.directory,
             &self.data,
-            "spacewars-bootstrap/active/boot-trial",
+            &format!("spacewars-bootstrap/{}/boot-trial", self.location),
         )?;
         if state::optional_directory(&self.active, PREPARING, self.owner)?.is_some() {
             return Err(invalid(
@@ -202,18 +271,24 @@ impl TrialStore {
         if state::read_binding(&self.active, self.owner)? != self.record.inputs.binding {
             return Err(invalid("bootstrap preparation changed during trial"));
         }
-        // A bootstrap attempt and production recovery authority cannot coexist.
+        // Coexistence is allowed only during the exact persisted initial handoff.
+        // The active reservation still blocks ordinary maintenance/install.
         if let Some(system) = state::optional_directory(&self.data, "spacewars-system", self.owner)?
         {
-            match open_at(&system, "recovery", libc::O_PATH, 0) {
-                Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error),
-                Ok(_) => {
-                    return Err(invalid(
-                        "bootstrap conflicts with production recovery state",
-                    ));
-                }
-            }
+            super::finish_files::same_mount(&system, &self.data)?;
+            super::handoff::check_coexistence(
+                &system,
+                self.owner,
+                self.record
+                    .canonical
+                    .as_ref()
+                    .and_then(|c| c.finish.as_ref()),
+                self.is_completed(),
+            )?;
+        } else if self.is_completed() {
+            return Err(invalid(
+                "completed bootstrap has no production recovery journal",
+            ));
         }
         backup::inventory(&self.directory, &[RECORD, PENDING])?;
         if read(&self.directory, RECORD, self.owner)? != self.bytes {
@@ -236,6 +311,47 @@ impl TrialStore {
     pub(super) fn active_directory(&self) -> Result<&File> {
         self.check()?;
         Ok(&self.active)
+    }
+
+    pub(super) fn data_directory(&self) -> Result<&File> {
+        self.check()?;
+        Ok(&self.data)
+    }
+
+    pub(super) fn is_completed(&self) -> bool {
+        self.location == state::COMPLETED
+    }
+
+    pub(super) fn reservation_path(&self) -> std::path::PathBuf {
+        Path::new("/data/spacewars-bootstrap").join(self.location)
+    }
+
+    pub(super) fn archive_completed(
+        &mut self,
+        mut checkpoint: impl FnMut(&str) -> Result<()>,
+    ) -> Result<()> {
+        self.check()?;
+        if self.finish_phase() != Some(super::FinishPhase::Complete) {
+            return Err(invalid("bootstrap handoff is not complete"));
+        }
+        self.uncertain = true;
+        if !self.is_completed() {
+            super::finish_files::rename(
+                &self.parent,
+                state::ACTIVE,
+                &self.parent,
+                state::COMPLETED,
+            )?;
+            self.location = state::COMPLETED;
+            checkpoint("handoff-reservation-renamed")?;
+        }
+        self.parent.sync_all()?;
+        self.data.sync_all()?;
+        super::finish_files::flush(&self.data)?;
+        checkpoint("handoff-reservation-synced")?;
+        self.check_storage()?;
+        self.uncertain = false;
+        Ok(())
     }
 
     pub(super) fn advance<T>(

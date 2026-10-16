@@ -30,7 +30,7 @@ fn descriptor(generation: u64) -> ImageDescriptor {
         },
         boot_identity: digest("boot"),
         min_updater_protocol: 1,
-        min_recovery_protocol: 1,
+        min_recovery_protocol: crate::recovery::RECOVERY_PROTOCOL,
         data: DataCompatibility {
             reads: SchemaRange { min: 1, max: 1 },
             writes: 1,
@@ -52,7 +52,7 @@ fn baseline() -> (RecoveryRecord, BootObservation, RecoveryCapability) {
         uptime_ms: 1_000_000,
         actual_slot: Some(Slot::A),
         actual_build_id: Some(image.build_id.clone()),
-        recovery_protocol: 1,
+        recovery_protocol: crate::recovery::RECOVERY_PROTOCOL,
         default_slot: Some(Slot::A),
         tryboot: false,
         trial_id: None,
@@ -67,6 +67,60 @@ fn baseline() -> (RecoveryRecord, BootObservation, RecoveryCapability) {
         boot,
         cap,
     )
+}
+
+#[test]
+fn unpublished_bootstrap_baseline_allows_the_first_signed_generation_without_qualification_bypass()
+{
+    let (existing, mut boot, mut capability) = baseline();
+    let mut good = existing.good().clone();
+    good.generation = 0;
+    good.payload = digest("unpublished bootstrap payload");
+    good.expanded = digest("unpublished bootstrap expanded");
+    good.build_id = "unpublished-bootstrap".into();
+    boot.actual_build_id = Some(good.build_id.clone());
+    let record = RecoveryRecord::bootstrap(boot.binding.clone(), good, &boot).unwrap();
+    assert_eq!(record.image_history().highest_attempted_generation, 0);
+    assert!(record.retained_good().is_none());
+    capability.watchdog_qualified = false;
+    assert_eq!(
+        record
+            .begin_descriptor(&descriptor(1), &boot, &capability, false)
+            .unwrap_err(),
+        RecoveryError::Unqualified
+    );
+    capability.watchdog_qualified = true;
+    let first = record
+        .begin_descriptor(&descriptor(1), &boot, &capability, false)
+        .unwrap();
+    first.record.validate().unwrap();
+    assert_eq!(first.record.image_history().highest_attempted_generation, 1);
+    assert_eq!(
+        first.record.transaction().unwrap().previous_good.generation,
+        0
+    );
+    assert_eq!(first.record.transaction().unwrap().candidate.generation, 1);
+    assert!(
+        record
+            .begin_descriptor(&descriptor(0), &boot, &capability, false)
+            .is_err()
+    );
+    let mut old = descriptor(1);
+    old.min_recovery_protocol = 1;
+    assert_eq!(
+        record
+            .begin_descriptor(&old, &boot, &capability, false)
+            .unwrap_err(),
+        RecoveryError::Ineligible
+    );
+    let mut old_record = serde_json::to_value(&record).unwrap();
+    old_record["schema"] = 1.into();
+    assert!(
+        serde_json::from_value::<RecoveryRecord>(old_record)
+            .unwrap()
+            .validate()
+            .is_err()
+    );
 }
 
 fn prepared() -> (RecoveryRecord, BootObservation) {

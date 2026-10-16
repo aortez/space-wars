@@ -586,8 +586,9 @@ pub(crate) mod linux {
             Some(r#"{"schema":1,"protocol":0}"#),
             Some(r#"{"schema":1,"protocol":1}"#),
             Some(r#"{"schema":1,"protocol":2}"#),
-            Some(r#"{"schema":2,"protocol":3}"#),
-            Some(r#"{"schema":1,"protocol":3,"bypass":true}"#),
+            Some(r#"{"schema":1,"protocol":3}"#),
+            Some(r#"{"schema":2,"protocol":4}"#),
+            Some(r#"{"schema":1,"protocol":4,"bypass":true}"#),
             Some("not a runtime record"),
         ] {
             let fixture = Fixture::new();

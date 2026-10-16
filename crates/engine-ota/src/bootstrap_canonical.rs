@@ -53,6 +53,7 @@ impl CanonicalPlan {
             expected.insert(name.into(), value);
         }
         if expected != self.files
+            || self.files.len() > 1024
             || self.config.is_empty()
             || self.config.len() > 16 * 1024
             || self.config == inputs.plan.normal_config
@@ -155,6 +156,7 @@ pub(super) struct CanonicalState {
     canonical_health: Option<HealthProof>,
     return_boot_id: Option<String>,
     pub failure: Option<CanonicalFailure>,
+    pub finish: Option<super::finish::FinishState>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -188,6 +190,7 @@ impl CanonicalState {
             canonical_health: None,
             return_boot_id: None,
             failure: None,
+            finish: None,
         };
         state.validate(inputs)?;
         Ok(state)
@@ -259,6 +262,17 @@ impl CanonicalState {
         {
             return Err(invalid("invalid canonical migration state"));
         }
+        if let Some(finish) = &self.finish {
+            if !matches!(
+                self.phase,
+                CanonicalPhase::Observing | CanonicalPhase::Confirmed | CanonicalPhase::Failed
+            ) {
+                return Err(invalid(
+                    "bootstrap retirement requires canonical normal confirmation",
+                ));
+            }
+            finish.validate(inputs, &self.plan)?;
+        }
         Ok(())
     }
 
@@ -274,7 +288,51 @@ impl CanonicalState {
                 "canonical migration changed immutable intent or restored consumed authority",
             ));
         }
+        if let Some(previous) = &previous.finish {
+            self.finish
+                .as_ref()
+                .ok_or_else(|| invalid("bootstrap retirement cannot restore staged fallback"))?
+                .check_successor(previous)?;
+        }
         Ok(())
+    }
+
+    pub fn authorize_finish(
+        &self,
+        inputs: &TrialInputs,
+        boot: &CanonicalObservation,
+    ) -> Result<()> {
+        self.check_boot(inputs, boot)?;
+        if self.phase != CanonicalPhase::Confirmed
+            || self.canonical_boot_id.as_ref() != Some(&boot.boot.boot_id)
+            || self.canonical_health.is_none()
+            || boot.default != CanonicalDefault::Canonical
+        {
+            return Err(invalid(
+                "bootstrap retirement requires this confirmed canonical normal boot",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn begin_finish(
+        &mut self,
+        inputs: &TrialInputs,
+        boot: &CanonicalObservation,
+        files: BTreeMap<String, Blob>,
+    ) -> Result<()> {
+        self.authorize_finish(inputs, boot)?;
+        if self.finish.is_some() {
+            return Err(invalid("bootstrap retirement was already initialized"));
+        }
+        self.finish = Some(super::finish::FinishState::new(files, inputs, &self.plan)?);
+        Ok(())
+    }
+
+    pub fn finish(&self) -> Result<&super::finish::FinishState> {
+        self.finish
+            .as_ref()
+            .ok_or_else(|| invalid("bootstrap retirement is not initialized"))
     }
 
     pub fn check_boot(&self, inputs: &TrialInputs, boot: &CanonicalObservation) -> Result<()> {
@@ -431,6 +489,16 @@ impl CanonicalState {
         boot: &CanonicalObservation,
     ) -> Result<CanonicalAction> {
         self.check_boot(inputs, boot)?;
+        if self.finish.is_some() {
+            if boot.default != CanonicalDefault::Canonical {
+                return Err(invalid(
+                    "bootstrap retirement cannot return to a staged default",
+                ));
+            }
+            if self.phase == CanonicalPhase::Failed {
+                return Ok(CanonicalAction::NeedsOperator);
+            }
+        }
         if self.phase == CanonicalPhase::Failed {
             if boot.default == CanonicalDefault::Canonical {
                 if self.selection_boot_id.as_ref() != Some(&boot.boot.boot_id) {

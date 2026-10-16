@@ -1,9 +1,9 @@
-//! Separate root-operator prepare and activation commands for the permanent
-//! boot layout. Neither operation writes a root partition or provisions OTA.
+//! Root-operator preparation, activation and completion of the permanent boot
+//! layout. Completion records an initial good image; hardware qualification and
+//! unattended-update permission remain separate.
 use super::*;
 use crate::bootstrap::canonical::CanonicalPlan;
-use crate::bootstrap::{self, CanonicalBoot, CanonicalPhase, TrialStore};
-use std::path::Path;
+use crate::bootstrap::{self, CanonicalBoot, CanonicalPhase, FinishPhase, TrialStore};
 
 #[derive(Debug, Serialize)]
 pub struct CanonicalReport {
@@ -13,6 +13,8 @@ pub struct CanonicalReport {
     pub root_install_sha256: Sha256,
     pub trial_id: Sha256,
     pub phase: CanonicalPhase,
+    pub finish_phase: Option<FinishPhase>,
+    pub bootstrap_completed: bool,
     pub reboot_job_accepted: bool,
     pub automatic_updates_enabled: bool,
 }
@@ -48,7 +50,14 @@ pub fn prepare_canonical_boot(
     trial: Sha256,
     report: impl FnMut(&str),
 ) -> Result<CanonicalReport> {
-    operate(package, written_root, trial, false, report, |_| Ok(()))
+    operate(
+        package,
+        written_root,
+        trial,
+        Operation::Prepare,
+        report,
+        |_| Ok(()),
+    )
 }
 
 pub fn activate_canonical_boot(
@@ -58,21 +67,55 @@ pub fn activate_canonical_boot(
     report: impl FnMut(&str),
     request: impl FnOnce(&mut CanonicalReboot<'_>) -> Result<()>,
 ) -> Result<CanonicalReport> {
-    operate(package, written_root, trial, true, report, request)
+    operate(
+        package,
+        written_root,
+        trial,
+        Operation::Activate,
+        report,
+        request,
+    )
+}
+
+pub fn complete_canonical_boot(
+    package: Sha256,
+    written_root: Sha256,
+    trial: Sha256,
+    report: impl FnMut(&str),
+) -> Result<CanonicalReport> {
+    operate(
+        package,
+        written_root,
+        trial,
+        Operation::Finish,
+        report,
+        |_| Ok(()),
+    )
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Operation {
+    Prepare,
+    Activate,
+    Finish,
 }
 
 fn operate(
     expected: Sha256,
     written_root: Sha256,
     trial: Sha256,
-    activate: bool,
+    operation: Operation,
     mut report: impl FnMut(&str),
     request: impl FnOnce(&mut CanonicalReboot<'_>) -> Result<()>,
 ) -> Result<CanonicalReport> {
     let lock = InstallLock::acquire()?;
     report("canonical-checking-prerequisites");
-    let mut store = TrialStore::open(&lock)?
-        .ok_or_else(|| invalid("canonical migration requires the existing bootstrap journal"))?;
+    let mut store = if operation == Operation::Finish {
+        TrialStore::for_completion(&lock)?
+    } else {
+        TrialStore::open(&lock)?
+    }
+    .ok_or_else(|| invalid("canonical migration requires the existing bootstrap journal"))?;
     let inputs = store.durable()?.inputs.clone();
     if inputs.binding.package_sha256 != expected
         || inputs.root_install_sha256 != written_root
@@ -160,7 +203,7 @@ fn operate(
     }
     report("canonical-checking-recovery-copies");
     let raw = bootstrap::backup::verify_backup_export(
-        Path::new("/data/spacewars-bootstrap/active"),
+        &store.reservation_path(),
         installed.raw_copies_sha256,
     )?;
     if raw.device_id != inputs.binding.device_id
@@ -210,7 +253,7 @@ fn operate(
     };
     guard(&store)?;
     if store.canonical_phase().is_none() {
-        if activate {
+        if operation != Operation::Prepare {
             return Err(invalid(
                 "canonical activation cannot initialize preparation",
             ));
@@ -230,10 +273,20 @@ fn operate(
         root_install_sha256: written_root,
         trial_id: trial,
         phase: store.canonical()?.phase,
+        finish_phase: store.finish_phase(),
+        bootstrap_completed: false,
         reboot_job_accepted: false,
         automatic_updates_enabled: false,
     };
-    if !activate {
+    if operation == Operation::Finish {
+        finish(&lock, &mut store, &boot, &installed, &guard, &mut report)?;
+        result.phase = store.canonical()?.phase;
+        result.finish_phase = store.finish_phase();
+        result.bootstrap_completed = store.is_completed();
+        result.scope = "canonical bootstrap completed; original/staged files archived and initial unpublished good image recorded; hardware qualification and automatic-update rollout remain separate";
+        return Ok(result);
+    }
+    if operation == Operation::Prepare {
         boot.files.prepare(
             &mut store,
             |path| {
@@ -318,4 +371,75 @@ fn operate(
     }
     result.reboot_job_accepted = true;
     Ok(result)
+}
+
+fn finish(
+    lock: &InstallLock,
+    store: &mut TrialStore,
+    boot: &CanonicalBoot<'_>,
+    installed: &bootstrap::root_install::Inputs,
+    guard: &impl Fn(&TrialStore) -> Result<()>,
+    report: &mut impl FnMut(&str),
+) -> Result<()> {
+    let inputs = store.durable()?.inputs.clone();
+    let authorize = |store: &TrialStore| {
+        guard(store)?;
+        boot.guard(store)?;
+        if !store.is_completed() {
+            store
+                .canonical()?
+                .authorize_finish(&inputs, &boot.observe(store)?)?;
+        }
+        Ok(())
+    };
+    authorize(store)?;
+    if store.canonical()?.finish.is_none() {
+        let mut files = bootstrap::stage_files::inventory(&boot.files.directory, 0)?;
+        let canonical = &store.canonical()?.plan.files;
+        files.retain(|path, _| !canonical.contains_key(path) && path != "hostname.txt");
+        let current = boot.observe(store)?;
+        store.advance_canonical(|c, inputs| c.begin_finish(inputs, &current, files))?;
+        report("retirement-intent");
+    }
+    bootstrap::finish_files::retire(&boot.files, store, 0, &authorize, |point| {
+        report(point);
+        Ok(())
+    })?;
+    let production = crate::boot_linux::BootController::open(lock)?;
+    let current = production.observe()?;
+    let baseline = crate::recovery::RecoveryRecord::bootstrap(
+        current.observation.binding.clone(),
+        crate::recovery::SlotImage {
+            slot: inputs.plan.target,
+            build_id: inputs.image.build_id.clone(),
+            generation: 0,
+            payload: installed.compressed.sha256,
+            expanded: installed.expanded.sha256,
+            data: inputs.image.data,
+        },
+        &current.observation,
+    )?;
+    authorize(store)?;
+    if store.finish_phase() == Some(FinishPhase::Ready) {
+        store.advance_finish(|f| f.handoff(baseline.clone()))?;
+        report("handoff-intent");
+    }
+    if store.canonical()?.finish()?.baseline.as_ref() != Some(&baseline) {
+        return Err(invalid(
+            "initial recovery plan differs from this canonical image and device",
+        ));
+    }
+    bootstrap::handoff::publish(
+        store,
+        0,
+        |store| {
+            authorize(store)?;
+            baseline.maintenance(&production.observe()?.observation)?;
+            Ok(())
+        },
+        |point| {
+            report(point);
+            Ok(())
+        },
+    )
 }
