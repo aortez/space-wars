@@ -116,6 +116,7 @@ pub(crate) fn install(window: &MainWindow, control: JobControl) -> std::io::Resu
         }
         if !w.get_training_visible()
             || w.get_training_setup()
+            || w.get_training_history()
             || !w.get_launcher_visible()
             || w.get_training_preview_mode() == 0
         {

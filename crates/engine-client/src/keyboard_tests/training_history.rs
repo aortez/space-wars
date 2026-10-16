@@ -59,7 +59,7 @@ fn history_browses_run_a_and_trials_its_winner_while_b_keeps_its_results() {
     first_control
         .start(JobSpec {
             recipe: Recipe::StationaryArrival,
-            seed: 9,
+            seed: 21,
             population: 4,
             generations: 1,
             initial_genomes: Some(vec![
@@ -97,6 +97,24 @@ fn history_browses_run_a_and_trials_its_winner_while_b_keeps_its_results() {
     while w.get_history_id().as_str() != a.run_id.as_deref().unwrap() {
         activate(&w, "next");
     }
+    // Recipe and seed match, so the active run needs its own exact identity.
+    assert_eq!(
+        w.get_training_run_id().as_str(),
+        b_before["run_id"].as_str().unwrap()
+    );
+    assert!(
+        w.get_history_current_label()
+            .contains(w.get_training_run_id().as_str())
+    );
+    assert!(!w.get_history_is_current());
+    let current = training_controls::inventory(&w)
+        .into_iter()
+        .find(|c| c.id == "training.snapshot")
+        .unwrap();
+    assert!(!current.enabled);
+    let current: serde_json::Value =
+        serde_json::from_str(current.value.as_deref().unwrap()).unwrap();
+    assert_eq!(current["run_id"], b_before["run_id"]);
     assert!(!ui_activation::activate(&w, "training.pause"));
     assert!(!ui_activation::activate(&w, "training.stop"));
     assert!(!ui_activation::activate(&w, "training.start"));
@@ -161,6 +179,7 @@ fn history_browses_run_a_and_trials_its_winner_while_b_keeps_its_results() {
     activate(&w, "next");
     activate(&w, "detail.previous");
     assert_eq!(w.get_history_id().as_str(), b["run_id"].as_str().unwrap());
+    assert!(w.get_history_is_current());
     assert!(w.get_history_comparison().starts_with("Same protocol"));
     activate(&w, "validation");
     activate(&w, "detail.next");
@@ -213,6 +232,51 @@ fn history_browses_run_a_and_trials_its_winner_while_b_keeps_its_results() {
             .len(),
         1
     );
+}
+
+#[test]
+fn history_suspends_hidden_replays_and_retains_playback_on_return() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let w = MainWindow::new().unwrap();
+    w.window().set_size(slint::LogicalSize::new(800.0, 480.0));
+    let dir = tempfile::tempdir().unwrap();
+    let _training = training_controls::install(&w, dir.path().into()).unwrap();
+    install_ui_navigation(&w);
+    w.set_launcher_visible(true);
+    w.show().unwrap();
+    wait(&w, || w.get_training_status_code() == "ready");
+    assert!(ui_activation::activate(&w, "launcher.training"));
+    w.set_training_population(4);
+    w.set_training_generations(1);
+    training_controls::publish_setup(&w);
+    assert!(ui_activation::activate(&w, "training.start"));
+    wait(&w, || w.get_training_status_code() == "completed");
+
+    // Hide the preview before its first timer tick: no replay should start.
+    assert!(ui_activation::activate(&w, "training.preview.best"));
+    activate(&w, "open");
+    let until = std::time::Instant::now() + Duration::from_millis(300);
+    wait(&w, || std::time::Instant::now() >= until);
+    assert!(w.get_training_preview_id().is_empty());
+
+    activate(&w, "current");
+    wait(&w, || w.get_training_preview_tick() >= 4);
+    assert!(ui_activation::activate(&w, "training.preview.follow"));
+    assert!(!w.get_training_preview_follow());
+    activate(&w, "open");
+    let frozen = w.get_training_preview_tick();
+    let selected = w.get_training_preview_id();
+    let until = std::time::Instant::now() + Duration::from_millis(300);
+    wait(&w, || std::time::Instant::now() >= until);
+    assert_eq!(w.get_training_preview_tick(), frozen);
+    assert_eq!(w.get_training_preview_id(), selected);
+    assert!(!ui_activation::activate(&w, "training.preview.best"));
+
+    activate(&w, "current");
+    wait(&w, || w.get_training_preview_tick() > frozen);
+    assert_eq!(w.get_training_preview_id(), selected);
+    assert_eq!(w.get_training_preview_mode(), 2);
+    assert!(!w.get_training_preview_follow());
 }
 
 #[test]

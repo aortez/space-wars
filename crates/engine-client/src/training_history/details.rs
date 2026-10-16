@@ -1,4 +1,6 @@
 use engine_agent::{
+    brain_assembly::Definition,
+    ship_arrival,
     training_history::{Protocol, Record},
     training_job::Recipe,
 };
@@ -214,6 +216,16 @@ pub(super) fn pages(record: &Record, validation: bool) -> Vec<Page> {
             // behavior, cases, scoring version and runtime remain pinned.
             let mut host = t.brain.clone();
             host.controller.clear();
+            // Version-one component receipts used this implicit arrival host.
+            // Normalize it to the saved assembly's execution metadata, without
+            // guessing a host for receipts from an unrecognized recipe.
+            let implicit = (t.version == 1 && t.recipe == ship_arrival::RECIPE)
+                .then(|| Definition::arrival(&t.brain.controller));
+            let execution = t
+                .assembly
+                .as_ref()
+                .map(|a| &a.definition)
+                .or(implicit.as_ref());
             vec![
                 Page {
                     title: t.case.name.clone(),
@@ -237,12 +249,8 @@ pub(super) fn pages(record: &Record, validation: bool) -> Vec<Page> {
                             &t.recipe,
                             &t.case,
                             &host,
-                            t.assembly.as_ref().map(|a| {
-                                (
-                                    &a.definition.host,
-                                    &a.definition.organism,
-                                    &a.definition.required_capabilities,
-                                )
+                            execution.map(|d| {
+                                (d.version, &d.host, &d.organism, &d.required_capabilities)
                             }),
                         ),
                         t.brain.controller.clone(),
@@ -270,3 +278,6 @@ pub(super) fn pages(record: &Record, validation: bool) -> Vec<Page> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -363,6 +363,10 @@ pub(crate) fn selected_id(w: &MainWindow) -> &'static str {
 pub(crate) fn inventory(w: &MainWindow) -> Vec<UiControl> {
     let ready = !w.get_history_busy();
     let mut controls = vec![
+        UiControl::new("training.snapshot", "Current training job", false)
+            .with_value(w.get_training_snapshot().to_string()),
+        UiControl::new("training.status", "Current job state", false)
+            .with_value(w.get_training_status_code().to_string()),
         UiControl::new(
             "training.history.snapshot",
             "Selected historical evidence",

@@ -528,6 +528,7 @@ export component MainWindow inherits Window {
     in property <float> training-progress: 0;
     in property <string> training-progress-label;
     in property <string> training-run-label;
+    in property <string> training-run-id;
     in property <string> training-best;
     in property <string> training-saved;
     in property <string> training-validation;
@@ -557,6 +558,8 @@ export component MainWindow inherits Window {
     in property <bool> history-error: false;
     in property <string> history-label;
     in property <string> history-id;
+    out property <bool> history-is-current: root.training-run-id != "" && root.history-id == root.training-run-id;
+    out property <string> history-current-label: root.training-run-id == "" ? "No current job" : "Current: " + root.training-run-id;
     in property <string> history-title;
     in property <string> history-body;
     in property <string> history-warning;
@@ -2909,8 +2912,17 @@ export component MainWindow inherits Window {
         MenuPage {
             available-width: parent.width; available-height: parent.height;
             heading: "Training · History";
-            subtitle: "Current job: " + root.training-status + " · " + root.training-run-label;
             hint: "D-pad selects · Left / Right browses · Back returns to current job";
+            Text {
+                x: 24px; y: 52px; width: parent.width - 48px; height: 16px;
+                text: root.history-current-label; color: #9fb4cc;
+                font-size: 12px; overflow: elide;
+            }
+            Text {
+                x: 24px; y: 68px; width: parent.width - 48px; height: 14px;
+                text: root.training-status; color: #9fb4cc;
+                font-size: 11px; overflow: elide;
+            }
             for title[index] in ["Runs", "Validation", "Practice"]: MenuButton {
                 x: 24px + index * (parent.width - 36px) / 3; y: 84px;
                 width: (parent.width - 72px) / 3; height: 36px;
@@ -2922,7 +2934,7 @@ export component MainWindow inherits Window {
             }
             ChoiceRow {
                 x: 24px; y: 126px; width: parent.width - 48px; height: 40px;
-                label: "Record"; value: root.history-label; label-fraction: 0.18;
+                label: root.history-is-current ? "Current" : "Record"; value: root.history-label; label-fraction: 0.18;
                 selected: root.history-focus == 1; enabled: !root.history-busy && root.history-count > 1;
                 previous => { root.history-focus = 1; root.training-command("training.history.previous"); }
                 next => { root.history-focus = 1; root.training-command("training.history.next"); }

@@ -250,6 +250,7 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
         window.set_training_setup(false);
     }
     window.set_training_has_job(snapshot.run_id.is_some());
+    window.set_training_run_id(snapshot.run_id.as_deref().unwrap_or("").into());
     window.set_training_active(snapshot.state.busy());
     window.set_training_status(state_label(snapshot.state).into());
     window.set_training_status_code(

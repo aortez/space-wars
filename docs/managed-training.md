@@ -56,9 +56,9 @@ and applied turn/thrust/brake. They do not display the evaluator's live world.
 Playback cycles through **1×**, **2×**, **4×**, and **Still** independently of
 training. **Follow** samples a new candidate and cycles training cases after
 each replay; **Pinned** repeats the same retained candidate and case. Pinning
-also discards an already-running replacement replay. Leaving the view stops
-playback and new preview requests; reopening retains the selection. Starting
-a different run clears the previous replay, including stale worker replies.
+also discards an already-running replacement replay. Opening History or leaving
+the view stops playback and new preview requests; reopening retains the selection.
+Starting a different run clears the previous replay, including stale worker replies.
 
 One independent preview worker retains at most two 1,200-tick traces, with one
 evaluation in flight and at most one new replay per second. Rendering is capped
@@ -140,10 +140,12 @@ one evaluation worker, and at most 64 generation summaries. The UI polls every
 ### Saved history
 
 **History** opens retained evidence without changing the current job. The header
-continues to identify the current job; the **Record** arrows select historical
-runs or receipts, and **Detail** pages through their configuration, identities
-and measurements. **Current** or Back returns to the current job's controls.
+shows the current job's exact run ID and state; the **Record** arrows select
+historical runs or receipts, and **Detail** pages through their configuration,
+identities and measurements. **Current** or Back returns to the current job's controls.
 Pause, Resume and Stop are only offered there, never against a historical selection.
+The record selector is labelled **Current** when it matches that job, including
+when several retained runs share the same recipe and seed.
 
 - **Runs** shows the recorded recipe and evolution settings, seed and initial
   genome IDs, saved candidate/generation progress, and each completed generation's
@@ -161,6 +163,8 @@ alongside the pin only when their result type, executable/platform identity,
 case/recipe and scoring/host protocol match. Different protocols are explicitly
 separated. Values are never pooled, ranked across curricula, or counted as
 independent evidence when their cases overlap. **Unpin** restores ordinary details.
+Component and saved-assembly receipts use the same comparison protocol when they
+describe the same arrival host and physical case; the receipt wrapper is provenance.
 
 **Open** follows the exact selected genome or saved brain into the
 [Genomes browser](genome-browser.md), where compatible artifacts can be tried or
@@ -193,6 +197,8 @@ The shared UI controls are `training.history.open`,
 `training.history.` prefix. Read-only `snapshot`, `detail` and `comparison`
 controls expose the full selected identities, recorded configuration and protocol
 results through the same CLI surface. The screen remains `launcher.training`.
+The read-only `training.snapshot` and `training.status` controls continue to
+describe the current job while a different historical record is selected.
 
 Automated real Slint tests cover 800×480, 1024×768 and 480×800 at **1×**, keyboard,
 touch and shared controller-menu actions. The retained workflow starts run B,
