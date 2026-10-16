@@ -1326,8 +1326,12 @@ Run the OTA suite serially. The existing bootstrap fixtures reproduce lock-busy
 and elapsed-progress assertion failures under the default parallel test runner
 on this host, including on unchanged revision `c779d0d`. Do not rebuild into the
 same target directory while tests are running: crash/restart fixtures reexecute
-their own test binary. Those harness limitations remain separate from image
-staging and physical-device qualification.
+their own test binary. Use separate target directories for baseline worktrees;
+shared artifacts also reused the baseline executable in a subsequent run here.
+The staging validation therefore forced a rebuild, checked its complete test
+inventory and ran revision-named copies of the unit and integration executables.
+Those harness limitations remain separate from image staging and physical-device
+qualification.
 
 The fixture builder in `crates/engine-ota/tests/support` creates ephemeral
 Ed25519 keys and signed feeds using `tough`'s publisher API. Its transport is an
