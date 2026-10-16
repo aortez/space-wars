@@ -488,6 +488,17 @@ no installed credentials were captured and no live recovery archive was made.
 the exact binaries and scopes. The latest clean runtime image remains
 `c14c53f`; these operator examples were built separately.
 
+Schema 2 packaging at `9833758` passed all 153 OTA and 38 manager tests,
+Clippy, Rust 1.89 checks and AArch64 builds. Both new kits passed all 210 listed
+checksums, private-mode checks, comparison of the 17 replacement assets with
+the original ext4 image, and their identical compressed-root round trip.
+The Pi 5 kit also passed the device reader with synthetic device inputs.
+All 43 bootstrap-related fixture tests passed as UID 1000 on the Pi 5 in
+60.11 seconds; its boot ID remained unchanged. The installed legacy helpers
+and sudo grants remain in place. Root SSH still rejected the current key and
+the Picade did not resolve. [Fallback-root asset evidence](data/ota-legacy-assets-20261015.json)
+records the package identities and separates these checks from live migration.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
