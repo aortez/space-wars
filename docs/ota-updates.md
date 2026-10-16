@@ -264,6 +264,15 @@ checkpoints; each target's boot ID remained unchanged during its run.
 also records the initial top-level `VersionId` failure and the corrected runtime
 API. These checks do not enable radio policy or qualify physical SSH protection.
 
+The control server at `3b85c38` passed all 77 manager tests on host ext4,
+Clippy, Rust 1.89, formatting and AArch64 compilation. Its seven selected tests
+passed on Pi 5 in 5.86 seconds and Pi 4 in 5.95 seconds as UID 1000. Six parent
+cases make the behavioral assertions; the seventh is the subprocess fixture
+entry point used for real process-ownership checks. These use actual Unix IPC and
+process credentials with a fake radio backend, not installed service or SSH
+admission. [Control-server evidence](data/ota-network-service-20261016.json)
+records source/artifact identities, bounds and those qualification limits.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
