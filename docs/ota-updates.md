@@ -287,6 +287,15 @@ requires successful host-store preparation, preventing a failed preservation
 check from being followed by automatic key generation. Actual boot/service
 behavior still needs qualification on the Pis.
 
+The persistence checkpoint passed 202 OTA tests, 38 device-service tests and
+71 Yocto tests, including required sandbox tests of the startup helpers. A
+separate test used actual private-namespace bind mounts, replacement/detach and
+read-only views. Three metadata/object fixture tests passed as UID 1000 on the
+Pi 5. Clippy, Rust 1.89 checks and AArch64 builds passed. These tests did not run
+the privileged health worker against installed Pi stores or certify the live
+service sandbox. [Persistence validation evidence](data/ota-persistence-health-20261015.json)
+records source identities, artifact hashes and those limits.
+
 All 33 device-service tests pass on the host. Nine health-specific tests also
 pass on the Pi 5; they use temporary files, the test executable and a private
 D-Bus fixture, rather than replacing or certifying the installed kiosk. A real
