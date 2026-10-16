@@ -8,9 +8,10 @@ installed boot assets.
 **Implemented:** read-only legacy inventory, workstation package creation,
 root-only package validation, a durable preparation reservation, raw boot/inactive
 root recovery copies, a data/configuration archive, original-file preservation,
-restartable fixed-file replacement and independent-export verifiers.
+restartable fixed-file replacement, effective access checks, a restartable
+inactive-root installer and independent-export verifiers.
 **Remaining:** live preservation and independent exports, effective legacy
-privilege/access/service checks, root-partition and boot apply with recovery, supervised boot verification,
+privilege/access/service qualification, live root installation, boot apply with recovery, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -154,8 +155,8 @@ New-image SSH initialization retains an existing access store and refuses to
 reimport keys if that store has disappeared during bootstrap. These guards do
 not change the legacy tools already installed on the Pis; their unsigned write
 and reboot paths still must be closed before trial. Preparation and raw recovery
-copies can resume today; installation and booting phases are not implemented by
-these examples.
+copies can resume today. Root installation uses its separate operator example
+below; boot staging and trial activation are not yet implemented.
 
 ```sh
 cargo build --locked -p engine-ota --example bootstrap_check \
@@ -173,8 +174,9 @@ compressed and expanded hashes, flush, readback, read-only filesystem check and
 second readback. OTA still requires its verified candidate, current boot evidence
 and durable writing transaction. The bootstrap path can compare the complete
 packaged image identity without constructing fictional release metadata. This
-internal refactoring does not add a bootstrap installation command or grant
-write authority to a preparation record.
+shared mechanism does not itself grant write authority to a preparation record.
+The separate root-install operation adds the admission checks and durable state
+described below.
 
 ## Raw recovery copies and independent export
 
@@ -455,6 +457,58 @@ independently, exercise the denial cases as the actual runtime UID, and review
 equivalent D-Bus, Polkit and service-control permissions. Loaded dependencies
 alone do not establish that services have run successfully or that an existing
 SSH daemon has adopted new settings. Pi 4 and Pi 5 need their own results.
+
+## Install the inactive root
+
+`bootstrap_install_root` is a separate root-operator operation. It requires the
+completed fallback-root replacement, effective access checks, preserved key and
+network stores, stopped/masked runtime services and no runtime-account processes.
+Close the runtime test login after verifying it, retaining the independent root
+session. The command takes the shared installation and legacy fast-update locks.
+It verifies the selected package and rehashes the raw, data and original-file
+recovery copies on each explicit invocation. Independently exported and verified
+copies must already be available to the supervising operator.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_install_root \
+  --target aarch64-unknown-linux-gnu
+# On the Pi, through the authenticated root operator connection:
+./bootstrap_install_root BUNDLE_SHA256 RAW_COPIES_SHA256 DATA_RECEIPT_SHA256 \
+  ORIGINALS_RECEIPT_SHA256 "$SSH_CONNECTION"
+```
+
+The command derives the inactive block device from the live mount/layout
+evidence, checks its owner/device number/capacity/writeability and holds an
+exclusive kernel claim through verification and journal commit. It accepts no
+device or payload path. Before the first write, the entire inactive partition
+must still match its preserved raw copy. An unrecorded operator change stops the
+operation rather than being overwritten.
+
+The private journal is `active/root-install/record.json`, bound to the preparation,
+package, backup digests, completed replacement journal and exact image identity.
+It durably records `writing` before changing any image bytes, then `written`
+only after bounded zstd decoding, both content hashes, device flush, readback,
+read-only filesystem/image checks and a second readback. Journal publication uses
+a flushed private temporary file, atomic rename and parent-directory flush.
+Corrupt/conflicting records, replaced paths and unsafe temporary files stop
+progress; an unpublished temporary record cannot override the published one.
+
+An explicit retry of `writing` verifies admission again and rewrites the same
+inactive image from its beginning. It does not restore an older data archive.
+A repeated `written` operation only flushes and rechecks that image; it never
+repairs or overwrites changed bytes. Bytes beyond the image extent are retained.
+Package, boot/layout, fallback replacements and runtime quiescence are checked
+again at IO-stage boundaries. The process check allows only the installer's
+own retained target descriptors; it still rejects other writers and runtime
+threads. This complements the supervised quiet window and shared lock, rather
+than excluding deliberate concurrent root intervention.
+
+The result always says `ready_for_trial: false`. This operation does not write
+boot assets/selectors, change services/radio state, open the watchdog, reboot,
+create a production recovery baseline or mark an automatic update successful.
+Independent logins, the full privilege audit, boot staging/handoff and physical
+qualification remain separate requirements. No installed Pi partition has been
+written during the fixture validation of this command.
 
 ## Persistent network profiles
 

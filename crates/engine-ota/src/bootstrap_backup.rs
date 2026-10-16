@@ -88,6 +88,7 @@ pub struct BackupExportCheck {
     pub layout_id: Sha256,
     pub boot_bytes: u64,
     pub inactive_root_bytes: u64,
+    pub inactive_root_sha256: Sha256,
 }
 
 /// Workstation-only verification of an independently copied active directory.
@@ -139,6 +140,7 @@ pub fn verify_backup_export(path: &Path, expected: Sha256) -> Result<BackupExpor
         layout_id: binding.layout_id,
         boot_bytes: boot.image.bytes,
         inactive_root_bytes: inactive.image.bytes,
+        inactive_root_sha256: inactive.image.sha256,
     })
 }
 

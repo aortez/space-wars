@@ -1,6 +1,6 @@
 //! Root-operator package validation. This is deliberately separate from TUF
-//! VerifiedCandidate authority. The explicit legacy replacement operation
-//! changes fixed root files, never a partition image or boot selector.
+//! VerifiedCandidate authority. Operator phases replace fixed legacy files and
+//! the checked inactive root. They never select a boot slot or authorize a trial.
 use super::{
     Board, BootPlan, BootstrapPackage, LegacyBootEvidence, PlanRequest, STAGE_DIRECTORY,
     active_lines, inspect_legacy_boot, invalid,
@@ -24,6 +24,10 @@ use std::os::unix::fs::MetadataExt;
 const MAX_RECORD_BYTES: u64 = 256 * 1024;
 pub(super) const DIRECTORY: &str = "spacewars-bootstrap";
 const PACKAGE: &str = "package";
+
+#[path = "bootstrap_root_device.rs"]
+mod root_device;
+pub use root_device::install_bootstrap_root;
 
 #[derive(Debug, Serialize)]
 pub struct PackageCheck {

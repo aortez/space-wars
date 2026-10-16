@@ -62,6 +62,12 @@ impl QuietRuntime {
     }
 
     pub(super) fn check(&self) -> Result<()> {
+        self.check_with_target(None)
+    }
+
+    /// Only a descriptor already obtained by the exclusive inactive-root open.
+    /// Other processes, other devices and runtime-UID threads remain disallowed.
+    pub(super) fn check_with_target(&self, target: Option<&File>) -> Result<()> {
         let named_directory = lock_directory()?;
         let named = open_at(&named_directory, FAST_LOCK, libc::O_RDONLY, 0)?;
         owned(&named.metadata()?, false, 0, false)?;
@@ -69,7 +75,39 @@ impl QuietRuntime {
             return Err(invalid("legacy helper lock changed"));
         }
         let proc = File::open("/proc")?;
-        inspect(&proc)
+        let allowed = target.map(OwnedTarget::from_file).transpose()?;
+        inspect(&proc, allowed.as_ref())
+    }
+}
+
+struct OwnedTarget {
+    pid: u32,
+    device: u64,
+    inode: u64,
+    raw_device: u64,
+}
+
+impl OwnedTarget {
+    fn from_file(file: &File) -> Result<Self> {
+        let metadata = file.metadata()?;
+        if !metadata.file_type().is_block_device() {
+            return Err(invalid(
+                "quiescence exception is not an opened block target",
+            ));
+        }
+        Ok(Self {
+            pid: std::process::id(),
+            device: metadata.dev(),
+            inode: metadata.ino(),
+            raw_device: metadata.rdev(),
+        })
+    }
+    fn matches(&self, pid: u32, metadata: &fs::Metadata) -> bool {
+        self.pid == pid
+            && self.device == metadata.dev()
+            && self.inode == metadata.ino()
+            && self.raw_device == metadata.rdev()
+            && metadata.file_type().is_block_device()
     }
 }
 
@@ -125,7 +163,7 @@ fn same_inode(a: &File, b: &File) -> Result<bool> {
     Ok(a.metadata()?.dev() == b.metadata()?.dev() && a.metadata()?.ino() == b.metadata()?.ino())
 }
 
-fn inspect(proc: &File) -> Result<()> {
+fn inspect(proc: &File, allowed: Option<&OwnedTarget>) -> Result<()> {
     let mut count = 0;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", proc.as_raw_fd()))? {
         let name = entry?.file_name();
@@ -144,7 +182,8 @@ fn inspect(proc: &File) -> Result<()> {
             Err(Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => return Err(e),
         };
-        match inspect_process(&process) {
+        let pid = pid.parse().map_err(|_| invalid("invalid process number"))?;
+        match inspect_process(&process, pid, allowed) {
             Ok(()) => (),
             // A process exiting during inspection is no longer a writer.
             Err(Error::Io(e))
@@ -156,7 +195,7 @@ fn inspect(proc: &File) -> Result<()> {
     Ok(())
 }
 
-fn inspect_process(process: &File) -> Result<()> {
+fn inspect_process(process: &File, pid: u32, allowed: Option<&OwnedTarget>) -> Result<()> {
     let tasks = open_at(process, "task", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     let mut count = 0;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", tasks.as_raw_fd()))? {
@@ -228,7 +267,8 @@ fn inspect_process(process: &File) -> Result<()> {
             }
             Err(e) => return Err(e),
         };
-        if writable_flags(&flags)? {
+        if writable_flags(&flags)? && !allowed.is_some_and(|target| target.matches(pid, &metadata))
+        {
             return Err(invalid("a process still holds a block device for writing"));
         }
     }
@@ -366,19 +406,30 @@ mod tests {
         }
         fs::write(process.join("cmdline"), b"sshd\0root@pts/1\0").unwrap();
         let proc = File::open(temp.path()).unwrap();
-        inspect(&proc).unwrap();
+        // A claimed target never exempts the owning process's runtime threads
+        // or maintenance-helper command. A regular file cannot be a target.
+        assert!(OwnedTarget::from_file(&File::open(process.join("cmdline")).unwrap()).is_err());
+        let claimed = OwnedTarget {
+            pid: 123,
+            device: 0,
+            inode: 0,
+            raw_device: 0,
+        };
+        inspect(&proc, None).unwrap();
         for helper in HELPERS {
             fs::write(
                 process.join("cmdline"),
                 [b"/bin/bash\0/usr/sbin/".as_slice(), helper, b"\0"].concat(),
             )
             .unwrap();
-            assert!(inspect(&proc).is_err());
+            assert!(inspect(&proc, None).is_err());
+            assert!(inspect(&proc, Some(&claimed)).is_err());
         }
         fs::write(process.join("cmdline"), b"sshd\0root@pts/1\0").unwrap();
         fs::write(process.join("task/456/status"), b"Uid: 0 0 1000 0\n").unwrap();
-        assert!(inspect(&proc).is_err());
+        assert!(inspect(&proc, None).is_err());
+        assert!(inspect(&proc, Some(&claimed)).is_err());
         fs::remove_dir_all(process.join("task/456")).unwrap();
-        inspect(&proc).unwrap();
+        inspect(&proc, None).unwrap();
     }
 }

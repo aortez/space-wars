@@ -196,7 +196,7 @@ pub(crate) trait Target: Read + Write + Seek {
     fn file(&self) -> &File;
 }
 
-struct BlockTarget {
+pub(crate) struct BlockTarget {
     file: File,
     partition: Partition,
     capacity: u64,
@@ -210,7 +210,7 @@ nix::ioctl_read_bad!(
 nix::ioctl_none!(flush_block_cache, 0x12, 97);
 
 impl BlockTarget {
-    fn open(layout: &DiskLayout, expanded: u64) -> Result<Self> {
+    pub(crate) fn open(layout: &DiskLayout, expanded: u64) -> Result<Self> {
         let partition = layout.inactive_partition().clone();
         let capacity = partition
             .sectors
@@ -258,15 +258,24 @@ impl BlockTarget {
         if &self.partition != layout.inactive_partition() {
             return Err(invalid("inactive device changed"));
         }
-        Self::node(&self.file.metadata()?, &self.partition)?;
+        Self::check_opened(&self.file, layout)
+    }
+
+    /// Recheck a descriptor retained from the exclusive open, never a caller path.
+    pub(crate) fn check_opened(file: &File, layout: &DiskLayout) -> Result<()> {
+        let partition = layout.inactive_partition();
+        Self::node(&file.metadata()?, partition)?;
+        let capacity = partition
+            .sectors
+            .checked_mul(512)
+            .ok_or_else(|| invalid("capacity overflow"))?;
         let (mut bytes, mut read_only) = (0u64, 1);
         // SAFETY: these live block-device ioctls fill correctly sized UAPI values.
         unsafe {
-            block_size(self.file.as_raw_fd(), &mut bytes).map_err(|e| Error::Io(e.into()))?;
-            block_read_only(self.file.as_raw_fd(), &mut read_only)
-                .map_err(|e| Error::Io(e.into()))?;
+            block_size(file.as_raw_fd(), &mut bytes).map_err(|e| Error::Io(e.into()))?;
+            block_read_only(file.as_raw_fd(), &mut read_only).map_err(|e| Error::Io(e.into()))?;
         }
-        if bytes != self.capacity || read_only != 0 {
+        if bytes != capacity || read_only != 0 {
             return Err(invalid("inactive device size or writeability changed"));
         }
         Ok(())
@@ -337,6 +346,29 @@ pub(crate) fn write_checked_ext4(
     check_filesystem: impl FnOnce(&File) -> Result<()>,
     report: &mut impl FnMut(WriteProgress),
 ) -> Result<()> {
+    write_checked_ext4_guarded(
+        compressed,
+        expanded,
+        source,
+        target,
+        check_filesystem,
+        &mut |event| {
+            report(event);
+            Ok(())
+        },
+    )
+}
+
+/// The bootstrap guard may reject a changed reservation at a progress boundary.
+/// A rejected boundary stops before the next IO stage and never grants boot authority.
+pub(crate) fn write_checked_ext4_guarded(
+    compressed: &Blob,
+    expanded: &Blob,
+    source: &mut (impl Read + Seek),
+    target: &mut impl Target,
+    check_filesystem: impl FnOnce(&File) -> Result<()>,
+    report: &mut impl FnMut(WriteProgress) -> Result<()>,
+) -> Result<()> {
     if compressed.bytes == 0 || compressed.bytes > crate::MAX_COMPRESSED_BYTES {
         return Err(invalid("compressed image exceeds its size bound"));
     }
@@ -362,7 +394,7 @@ pub(crate) fn write_checked_ext4(
     decoder.read_exact(&mut header)?;
     check_ext4_header(&header, expanded.bytes)?;
     target.rewind()?;
-    report(progress(WriteStage::Writing, 0, expanded));
+    report(progress(WriteStage::Writing, 0, expanded))?;
     target.write_all(&header)?;
     let mut hash = Hasher::new();
     hash.update(header);
@@ -379,7 +411,7 @@ pub(crate) fn write_checked_ext4(
         hash.update(&buffer[..count]);
         written += count as u64;
         if last_report.elapsed() >= Duration::from_millis(250) || written == expanded.bytes {
-            report(progress(WriteStage::Writing, written, expanded));
+            report(progress(WriteStage::Writing, written, expanded))?;
             last_report = Instant::now();
         }
     }
@@ -398,10 +430,27 @@ pub(crate) fn write_checked_ext4(
     {
         return Err(Error::ImageMismatch);
     }
-    report(progress(WriteStage::Flushing, written, expanded));
+    report(progress(WriteStage::Flushing, written, expanded))?;
     target.flush_to_device()?;
+    check_written_ext4(expanded, target, check_filesystem, report)
+}
+
+/// Read-only revalidation of a completed write. No repair or byte replacement.
+pub(crate) fn check_written_ext4(
+    expanded: &Blob,
+    target: &mut impl Target,
+    check_filesystem: impl FnOnce(&File) -> Result<()>,
+    report: &mut impl FnMut(WriteProgress) -> Result<()>,
+) -> Result<()> {
+    if expanded.bytes < HEADER_BYTES as u64 || expanded.bytes > target.capacity() {
+        return Err(invalid("expanded image does not fit the target"));
+    }
     readback(target, expanded, report)?;
-    report(progress(WriteStage::CheckingFilesystem, written, expanded));
+    report(progress(
+        WriteStage::CheckingFilesystem,
+        expanded.bytes,
+        expanded,
+    ))?;
     check_filesystem(target.file())?;
     // The checker is read-only, but verify that promise before any selector is
     // eligible. The target can be larger than the filesystem; hash its extent.
@@ -412,14 +461,14 @@ pub(crate) fn write_checked_ext4(
 fn readback(
     target: &mut impl Target,
     expanded: &Blob,
-    report: &mut impl FnMut(WriteProgress),
+    report: &mut impl FnMut(WriteProgress) -> Result<()>,
 ) -> Result<()> {
-    report(progress(WriteStage::ReadingBack, 0, expanded));
+    report(progress(WriteStage::ReadingBack, 0, expanded))?;
     target.rewind()?;
     let mut limited = target.take(expanded.bytes);
     // verify_blob checks EOF on Take, which is exactly the expected image extent.
     verify_blob(&mut limited, expanded)?;
-    report(progress(WriteStage::ReadingBack, expanded.bytes, expanded));
+    report(progress(WriteStage::ReadingBack, expanded.bytes, expanded))?;
     Ok(())
 }
 
