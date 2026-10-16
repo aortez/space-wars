@@ -349,6 +349,16 @@ write. Static systemd verification accepts the new drop-in and its dependencies.
 runs, exact artifact identities, native probe results and the pending physical
 qualification. No installed service, radio setting or boot identity changed.
 
+The native coordinator at `7fa708d` passed a 93-test manager suite before the
+startup supervisor was added, then all three final lifecycle cases passed,
+including contention recovery and restart with saved policy. Clippy, Rust 1.89,
+formatting, canonical install-lock tests and static unit checks passed. All 55
+final network cases passed on Pi 5 in 8.34 seconds and Pi 4 in 12.30 seconds as
+UID 1000. Read-only continuous probes observed stable NetworkManager state on
+both boards. [Native runtime evidence](data/ota-network-runtime-20261016.json)
+records exact source, artifacts and logs. These fixture and read-only checks do
+not qualify a live root service, SSH idle shutdown or an end-to-end OTA update.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
