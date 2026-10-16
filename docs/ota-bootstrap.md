@@ -744,6 +744,19 @@ binaries, captures and the remaining live checks. It also records intermittent
 can temporarily retain flock descriptors. Local qualification uses serial tests;
 CI uses nextest's separate processes. No production locking behavior was changed.
 
+The inactive-root installer at `25aa0c4` passed 199 OTA and 38 manager tests,
+Clippy, Rust 1.89 and AArch64 compilation. Twenty selected writer, restart and
+quiescence tests passed on host ext4 and on Pi 5 as UID 1000; one optional Yocto
+artifact test was ignored in each selected run. The Pi run took 432.96 seconds,
+which measures the debug fixture suite, not an installation. Tests include
+actual process exits after writing intent, flushing the temporary target and
+publishing completion. They do not establish physical power-loss behavior.
+The real operator command rejected UID 1000 before opening installed paths, and
+the boot ID stayed unchanged. The privileged admission path, raw block-device
+operations and boot/hardware qualification remain unexecuted.
+[Root-install evidence](data/ota-bootstrap-root-install-20261015.json) records
+the exact artifacts, command outputs and remaining live gates.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
