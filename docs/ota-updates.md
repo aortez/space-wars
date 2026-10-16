@@ -389,10 +389,11 @@ subsequent controlled trials; no failure, reboot or firmware experiment has
 yet been performed.
 
 The owner selected root-shell bootstrap access on both boards, preserving the
-existing data partitions. That access has not yet been established: a read-only
-root SSH check on the Pi 5 was rejected, and the Picade was unreachable. The
-existing kiosk account's restricted update helpers are not a substitute for
-separately authorized root/operator access.
+existing data partitions. Root connection details remain pending; an earlier
+read-only root SSH check on the Pi 5 was rejected. Both ordinary accounts are
+now reachable, and fresh read-only inventories confirm Pi 5 slot B and Picade
+slot A. Their restricted update helpers are not a substitute for separately
+authorized root/operator access.
 
 Workstation bootstrap packaging, legacy-device preflight, preservation tools
 and a supervised inactive-root installer are available. The first-boot runtime
@@ -408,11 +409,14 @@ lost replies and interrupted cleanup require operator reconciliation. Bootstrap
 protocol 4 also supports canonical migration and completion: separate root commands copy the
 permanent assets with per-file durable intent, retain the staged fallback and
 publish the permanent configuration last. A different normal boot must pass its
-own health window; failure returns to the staged default without an automatic
-retry. An explicit finalization command archives retired files before removal,
+own health window. Before finalization starts, failure returns to the staged
+default without an automatic retry. An explicit finalization command archives retired files before removal,
 publishes the initial recovery baseline, then archives the bootstrap reservation.
-Neither Pi has undergone this migration. These tools do not enable
-automatic updates. The [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
+The clean `cd66877` image and both schema-3 device kits now contain this path;
+[image and package evidence](data/ota-bootstrap-image-20261015.json) records actual
+filesystem checks, current inventories and packaged command rejection as UID
+1000 on both Pis. Neither Pi has undergone this migration. These tools do not
+enable automatic updates. The [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
 describe the package layout, reproduction commands and supervised boundary.
 
 The physical procedure must establish selector durability, actual root-device

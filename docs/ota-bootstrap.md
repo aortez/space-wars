@@ -753,8 +753,8 @@ Atomic replacements do not qualify shared-FAT behavior under physical power loss
 Success still reports `automatic_updates_enabled: false`. Canonical confirmation
 does not itself delete the staged tree or initialize production recovery. The
 separate finalization operation below performs that handoff. No live canonical
-migration has run on either Pi, and a clean protocol-4 runtime image and new kits
-are still required.
+migration has run on either Pi. The clean `cd66877` protocol-4 runtime and
+schema-3 kits below are available for supervised preparation.
 
 ## Archive bootstrap assets and establish the initial recovery baseline
 
@@ -927,12 +927,11 @@ Power loss can damage the shared FAT boot filesystem. Staging and atomic
 replacements do not remove the need for independent recovery during bootstrap.
 No physical recovery qualification follows from passing the workstation tests.
 
-The current `c14c53f` runtime image and schema-2 packages predate the added
-persistence health checks, missing-store guards and bootstrap coordinator. They
-have not been rebuilt or made ready for trial by these source changes. The new
-schema-3 gate requires the protocol-4 runtime marker and expanded fallback-root
-inventory; the next clean image and kits must be rebuilt before trial activation. Existing
-packages and reservations must never be relabeled to bypass that gate.
+The earlier `c14c53f` runtime image and schema-2 packages predate the added
+persistence health checks, missing-store guards and bootstrap coordinator. Use
+the clean `cd66877` image and schema-3 kits below for a new preparation. They
+contain the protocol-4 runtime marker and expanded fallback-root inventory;
+existing packages and reservations must never be relabeled to bypass that gate.
 
 ## Validation
 
@@ -943,6 +942,36 @@ zstd round-trip, file checksums, private output and refusal to replace a kit.
 The hostname regression covers normal/trial selection and invalid naming files.
 The unprivileged Pi probe and full clean-image package checks are recorded
 separately from later device migration evidence.
+
+The current clean runtime is built from `cd668771d523917d210f6c460c4bc0956b2bb54e`.
+All 6,768 Yocto tasks succeeded, with 6,703 reused. The actual ext4 image contains
+bootstrap protocol 4 and recovery protocol 2; its boot identity remains
+`fafef554470de0f37256a0e46447f0ab2cfae9639e4aaea4f908da39d2692238`.
+Image inspection checked executable identities, root-owned helpers, restricted
+sudo rules, persistent SSH/network service wiring and absence of shipped keys
+or profiles. A full temporary-file writer round trip passed, as did the actual
+schema-3 package checker with a synthetic device context.
+
+| Device | Local package directory | Planned inactive root |
+| --- | --- | --- |
+| Pi 5 / HyperPixel | `target/ota-bootstrap-cd66877-pi5` | A |
+| Pi 4 / Picade | `target/ota-bootstrap-cd66877-pi4` | B |
+
+Each kit passed 213 file checksums, complete zstd expansion/hash verification,
+canonical selector/profile checks and the 20-file fallback-root inventory check.
+Fresh ordinary-user inventories on both devices matched all 18 retained firmware
+files and the planned root UUIDs. Estimated peak additional boot usage, including
+the reserves, is 75,493,376 bytes on Pi 5 and 75,468,800 on Picade, against
+79,437,824 bytes available on each. These remain planning estimates until root
+admission rechecks the actual filesystems.
+
+The exact packaged manager loaded on both Pis and rejected `prepare`, `activate`
+and `finish` as UID 1000 before installed-path access. Both boot IDs stayed
+unchanged. No package was installed, and no live boot/data/credential changes,
+watchdog operation or reboot occurred. [Clean runtime and kit evidence](data/ota-bootstrap-image-20261015.json)
+records source/layer revisions, artifact and bundle hashes, device observations,
+audit commands and remaining live gates. Root connection details, independent
+backup/restore checks and supervised migration remain pending.
 
 The previously validated clean `514264c9723d` image built successfully. Its build ID is
 `rootfs-608f6aa46f59d26e484b65fbb974c364fecd9d6fa32dcb4ed712703784412ad3`;
