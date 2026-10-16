@@ -375,6 +375,7 @@ async fn observe_connection(
 /// also covers filesystem I/O and the unprivileged state probe.
 #[doc(hidden)]
 pub fn observe_worker(expected: &KioskExpectation) -> Result<KioskHealth> {
+    let stores = engine_ota::persistence_linux::PersistentStores::open()?;
     futures_lite::future::block_on(async {
         let connection = zbus::connection::Builder::system()
             .map_err(dbus_error)?
@@ -411,6 +412,7 @@ pub fn observe_worker(expected: &KioskExpectation) -> Result<KioskHealth> {
                 if !status.success() {
                     return invalid("kiosk required state write failed");
                 }
+                stores.check()?;
                 Ok(())
             },
         )

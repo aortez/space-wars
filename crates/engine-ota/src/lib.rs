@@ -31,6 +31,8 @@ pub mod network_linux;
 #[cfg(target_os = "linux")]
 mod owned_fs;
 #[cfg(target_os = "linux")]
+pub mod persistence_linux;
+#[cfg(target_os = "linux")]
 mod watchdog_linux;
 #[cfg(target_os = "linux")]
 pub use watchdog_linux::{EarlyWatchdog, WatchdogCompletion};
@@ -67,6 +69,8 @@ pub enum Error {
     Access(String),
     #[error("persistent network profiles: {0}")]
     Network(String),
+    #[error("persistent runtime stores: {0}")]
+    Persistence(String),
     #[error("image installation failed: {0}")]
     Install(String),
     #[error("unsupported feed: {0}")]

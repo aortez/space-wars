@@ -92,6 +92,40 @@ class BluetoothDataTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("symlink", result.stderr)
 
+    def test_missing_store_is_not_recreated_during_migration_or_after_provisioning(self):
+        for marker in ("spacewars-bootstrap/active", "spacewars-system/recovery"):
+            with self.subTest(marker=marker):
+                record = self.data / marker
+                record.parent.mkdir()
+                # An incomplete/corrupt reservation blocks importing as well.
+                record.symlink_to("missing-record")
+                result = self.run_helper()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Missing Bluetooth store", result.stderr)
+                self.assertFalse((self.data / "bluetooth").exists())
+                self.assertEqual(self.key.read_text(), "test pairing key")
+                record.unlink()
+                record.parent.rmdir()
+
+    def test_existing_empty_store_remains_empty_with_migration_active(self):
+        (self.data / "spacewars-bootstrap/active").mkdir(parents=True)
+        destination = self.data / "bluetooth"
+        destination.mkdir(mode=0o700)
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list(destination.iterdir()), [])
+
+    def test_ambiguous_migration_parent_is_not_followed(self):
+        for kind in ("file", "symlink"):
+            state = self.data / "spacewars-bootstrap"
+            if kind == "file":
+                state.write_text("corrupt")
+            else:
+                state.symlink_to("missing")
+            self.assertNotEqual(self.run_helper().returncode, 0)
+            self.assertFalse((self.data / "bluetooth").exists())
+            state.unlink()
+
 
 class BluetoothPackagingTest(unittest.TestCase):
     def test_persistence_is_required_before_bluez_and_installed_in_image(self):

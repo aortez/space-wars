@@ -238,6 +238,26 @@ come from the verified image; a kiosk-provided revision is not sufficient.
 Persistent-state testing runs a fixed temporary write/readback/flush/removal as
 UID/GID 1000, with no supplementary groups. It does not modify settings or ROMs.
 
+The bounded worker now also checks local persistent stores before the app probe
+and rechecks them after its state write. It requires the actual `/data` mount,
+root-owned network and Bluetooth stores with their expected permissions, both
+service paths bound to those same directories, the three configured SSH host-key
+files, and the separate root/kiosk login-key files. It pins the opened objects
+and compares device/inode and mount identities; missing mounts, a directory copy
+in place of a bind, links, unsafe modes, over-mounted sources or a replacement
+during the sample reject that sample. Empty profile/pairing stores and empty
+login files remain valid. Profile and pairing changes by their daemons do not
+invalidate the directory merely by changing its timestamp.
+
+This is structural persistence evidence. It reads no credential contents,
+does not prove that SSH logins succeed or that every saved byte is intact, and
+does not test Internet access, Wi-Fi association or a connected controller.
+Read-only views of private stores in the recovery service's sandbox are allowed;
+the separate kiosk-user write still proves settings are writable. The checker
+uses the kernel's descriptor mount IDs as well as file identities, rather than
+assuming a matching pathname is a mounted store.
+[Linux proc documentation](https://docs.kernel.org/filesystems/proc.html#proc-pid-mountinfo-information-about-mounts)
+
 An isolated worker bounds the complete observation to five seconds, including
 D-Bus, socket, hashing and state I/O. Replies are limited to 4 KiB. Timeout kills
 the worker's process group, and another worker cannot start until the previous
@@ -258,6 +278,14 @@ state helper, terminating that helper, and writing the kiosk configuration
 directory under the service's filesystem sandbox. No arbitrary executable,
 path or expected identity is
 accepted through the public device-status socket.
+
+Recovery now waits for the network/BlueZ binds and host-key preparation to finish.
+It still runs if one fails, so it can observe the failure and roll back. New-image
+Bluetooth and SSH host-key startup helpers refuse to reimport a missing store
+while bootstrap is active or a recovery journal exists. The host-key generator
+requires successful host-store preparation, preventing a failed preservation
+check from being followed by automatic key generation. Actual boot/service
+behavior still needs qualification on the Pis.
 
 All 33 device-service tests pass on the host. Nine health-specific tests also
 pass on the Pi 5; they use temporary files, the test executable and a private

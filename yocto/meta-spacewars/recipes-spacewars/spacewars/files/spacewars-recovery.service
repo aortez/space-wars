@@ -1,8 +1,8 @@
 [Unit]
 Description=Space-Wars rootfs trial recovery
-After=spacewars-data-init.service spacewars-access.service systemd-tmpfiles-setup.service dbus.service
+After=spacewars-data-init.service spacewars-access.service persistent-data-bind.service spacewars-bluetooth-data.service spacewars-ssh-host-keys.service systemd-tmpfiles-setup.service dbus.service
 Requires=spacewars-data-init.service
-Wants=spacewars-kiosk.service systemd-logind.service spacewars-access.service
+Wants=spacewars-kiosk.service systemd-logind.service spacewars-access.service persistent-data-bind.service spacewars-bluetooth-data.service spacewars-ssh-host-keys.service
 
 [Service]
 Type=oneshot

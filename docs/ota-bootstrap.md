@@ -598,9 +598,11 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    actual root/kernel/profile, data/access and kiosk health within the existing
    boot deadline. Local persistent-store or bind failures must prevent promotion;
    Internet connectivity must remain independent of that health decision.
-   These persistence health checks are still to be integrated. A separate
-   bootstrap health path must not fabricate a production recovery journal or
-   disable the watchdog through an exception.
+   The shared kiosk health worker now checks persistent network/Bluetooth binds
+   and SSH-store structure as well as settings writes. The separate bootstrap
+   coordinator still has to use that worker: the current recovery service only
+   handles an existing production journal. Bootstrap must not fabricate that
+   journal or disable the watchdog through an exception.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.
@@ -618,6 +620,16 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
 Power loss can damage the shared FAT boot filesystem. Staging and atomic
 replacements do not remove the need for independent recovery during bootstrap.
 No physical recovery qualification follows from passing the workstation tests.
+
+The current `c14c53f` runtime image and schema-2 packages predate the added
+persistence health checks and missing-store guards. They have not been rebuilt
+or made ready for trial by this source change. Before adding trial activation,
+the next bootstrap package must identify a runtime that actually implements
+bootstrap health/watchdog handling and include the new SSH host-key helper,
+key-generation dependency and Bluetooth helper in its fixed fallback-root
+replacements. The old root must retain the same missing-store behavior on
+rollback. Change the package version and reject older inventories rather than
+relabeling an existing package or reservation.
 
 ## Validation
 
