@@ -336,8 +336,24 @@ fn off_is_inert_and_only_policy_owned_shutdown_is_restored() {
                 },
             )
             .unwrap();
-        let result = controller.admit(&token(), caller(), HoldKind::Setup);
-        assert_eq!(result.is_ok(), initially_enabled);
+        let expected = if initially_enabled {
+            Availability::WirelessReady
+        } else {
+            Availability::SetupProtected
+        };
+        let result = controller
+            .admit(&token(), caller(), HoldKind::Setup)
+            .unwrap();
+        assert_eq!(result.availability, expected);
+        assert_eq!(
+            result.status.actual.unwrap().wireless_enabled,
+            initially_enabled
+        );
+        assert_eq!(
+            controller.renew(&token(), caller()).unwrap().availability,
+            expected
+        );
+        controller.release(&token(), caller()).unwrap();
         assert!(fake.calls().is_empty());
     }
     let temp = tempfile::tempdir().unwrap();
@@ -754,4 +770,41 @@ fn a_known_unsent_command_can_retry_without_reboot_or_false_admission() {
         .admit(&token(), caller(), HoldKind::Setup)
         .unwrap();
     assert_eq!(fake.calls(), [false, true, true]);
+}
+
+#[test]
+fn setup_can_repair_a_profile_conflict_without_resuming_automatic_radio_control() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    enable(&mut controller);
+    fake.edit(|w| w.radio.profile_revision = engine_ota::Sha256::digest(b"changed-profile"));
+    let admission = controller
+        .admit(&token(), caller(), HoldKind::Setup)
+        .unwrap();
+    assert_eq!(admission.availability, Availability::WirelessReady);
+    assert!(admission.status.suspended.is_some());
+    assert!(
+        controller
+            .renew(&token(), caller())
+            .unwrap()
+            .status
+            .suspended
+            .is_some()
+    );
+    assert!(
+        controller
+            .release(&token(), caller())
+            .unwrap()
+            .suspended
+            .is_some()
+    );
+    assert!(fake.calls().is_empty());
+    fake.edit(|w| w.radio.wireless_enabled = false);
+    assert!(
+        controller
+            .admit(&token(), caller(), HoldKind::Setup)
+            .is_err()
+    );
+    assert!(fake.calls().is_empty());
 }

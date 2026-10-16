@@ -83,6 +83,9 @@ pub struct Status {
 pub enum Availability {
     WirelessReady,
     EthernetReady,
+    /// Mode Off preserves OS radio state, including a disabled/blocked radio.
+    /// The setup worker can still inspect and manage saved profiles normally.
+    SetupProtected,
     /// The root SSH helper may continue an already accepted TCP connection.
     /// This does not assert Wi-Fi readiness or change an independently off radio.
     SessionProtected,
@@ -161,7 +164,15 @@ impl<B: Backend> Controller<B> {
                 status,
             });
         }
-        if status.pending.is_some() || status.suspended.is_some() || status.deferred.is_some() {
+        // Setup must remain usable to repair a profile conflict. A live hold
+        // protects it while automatic toggles remain suspended; this does not
+        // accept the changed baseline or forgive an uncertain radio command.
+        let setup_conflict = kind == HoldKind::Setup
+            && status.suspended == Some(Suspension::ProfilesChanged)
+            && status.deferred == Some(Deferred::Suspended);
+        if status.pending.is_some()
+            || (!setup_conflict && (status.suspended.is_some() || status.deferred.is_some()))
+        {
             return Err(invalid(
                 "network hold reserved but availability is not confirmed",
             ));
@@ -170,13 +181,19 @@ impl<B: Backend> Controller<B> {
             .actual
             .as_ref()
             .ok_or_else(|| invalid("network state unavailable"))?;
-        let availability = if any_network(kind) && radio.ethernet_available {
-            Availability::EthernetReady
-        } else if radio.networking_enabled
+        let wireless_ready = radio.networking_enabled
             && radio.wireless_enabled
             && radio.wireless_hardware_enabled
-            && !radio.startup
+            && !radio.startup;
+        let availability = if kind == HoldKind::Setup
+            && !status.policy.policy.partial_offline
+            && !status.owned_off
+            && !wireless_ready
         {
+            Availability::SetupProtected
+        } else if any_network(kind) && radio.ethernet_available {
+            Availability::EthernetReady
+        } else if wireless_ready {
             Availability::WirelessReady
         } else {
             return Err(invalid(

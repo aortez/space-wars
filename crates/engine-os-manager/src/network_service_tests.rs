@@ -143,6 +143,48 @@ fn native_off_write_without_a_live_install_guard_is_never_submitted() {
 }
 
 #[test]
+#[ignore = "run explicitly as root inside a user namespace; uses only private state and a fake radio"]
+fn shared_setup_client_interoperates_with_the_root_coordinator() {
+    assert_eq!(uid(), 0);
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let state = temp.path().join("state");
+    let fake = Fake::new();
+    let server = crate::network_runtime::start_with(&state, &path, uid(), fake.clone()).unwrap();
+    let hold = spacewars_control::network::SetupHold::at(&path).unwrap();
+    futures_lite::future::block_on(async {
+        hold.admit().await.unwrap();
+        assert_eq!(
+            status(&path)["status"]["policy"]["holds"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        fake.0.lock().unwrap().radio.profile_revision =
+            engine_ota::Sha256::digest(b"setup profile");
+        hold.renew().await.unwrap();
+        assert_eq!(status(&path)["status"]["suspended"], "profiles-changed");
+        hold.release().await.unwrap();
+        assert!(
+            status(&path)["status"]["policy"]["holds"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(status(&path)["status"]["suspended"], "profiles-changed");
+        hold.admit().await.unwrap();
+    });
+    drop(server);
+    let _server = crate::network_runtime::start_with(&state, &path, uid(), fake).unwrap();
+    futures_lite::future::block_on(async {
+        assert!(hold.renew().await.is_err()); // A restart loses temporary ownership.
+        hold.admit().await.unwrap();
+        hold.release().await.unwrap();
+    });
+}
+
+#[test]
 fn runtime_retries_initial_owner_contention_without_initializing_over_the_owner() {
     use crate::network_runtime::{spawn_with, start_with};
     let temp = tempfile::tempdir().unwrap();

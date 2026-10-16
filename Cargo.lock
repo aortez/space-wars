@@ -5521,9 +5521,13 @@ dependencies = [
 name = "spacewars-control"
 version = "0.1.0"
 dependencies = [
+ "async-io",
  "engine-common",
+ "futures-lite",
+ "libc",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

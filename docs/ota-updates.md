@@ -24,7 +24,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion and SSH admission implemented; setup/deployment hooks, SSH idle qualification and offline scheduling remain |
+| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion, setup holds and SSH admission implemented; expected setup profile changes, deployment hooks, SSH idle qualification and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
@@ -262,6 +262,24 @@ and `network resume --generation N`. Obtain the generation from status before
 changing policy; stale generations are rejected. `network-watch-probe --seconds N`
 observes for one to thirty seconds without changing radio state.
 
+Kiosk builds acquire one setup hold before the existing worker's automatic scan
+or connection work. The worker renews it every thirty seconds while the panel or
+cleanup is live, and rechecks admission before each new mutation. Back closes
+the command channel but retains the hold through checkpoint rollback and cleanup.
+A failed renewal stops new commands and lets that same worker finish recovery;
+only then does it attempt release. Lost responses retain the same capability,
+and no capability reaches UI status or diagnostics. The shared client authenticates
+the root socket peer before sending it, bounds responses and uses boot-relative
+elapsed time to reject replies spanning a long sleep.
+
+In mode Off, `setup-protected` permits ordinary saved-profile management while
+an independently disabled or blocked radio remains untouched; it does not claim
+radio readiness. A profile conflict may likewise retain setup protection when
+Wi-Fi is confirmed available, but cannot clear the saved suspension or permit
+automatic toggles. An uncertain/rejected radio command still blocks admission.
+Desktop builds retain their existing direct NetworkManager workflow. Kiosk builds
+require the device service and show a retryable setup error if it is unavailable.
+
 `engine-os-manager network-session-probe` now reads kernel TCP tables and the
 loaded systemd SSH socket/template, with a five-second observation deadline.
 It counts active, authenticating and closing connections, including non-interactive
@@ -297,13 +315,16 @@ change the radio. Corrupt/missing records inside an existing state directory and
 an active coordinator prevent the fallback. An uninitialized image keeps ordinary
 SSH startup behavior.
 
-**Integration remains incomplete:** setup lifecycle and deployment hooks remain
-required. The native observer currently defers idle
+**Integration remains incomplete:** deployment hooks remain required. The native
+observer currently defers idle
 qualification for other TCP listeners; both installed images have additional
 listeners on ports 53 and 111 that still need classification. Namespace confirmation
 must also work under the installed service's capability restrictions, without
 granting broad tracing access.
 Expected profile changes from the setup worker need coordination with the observer.
+For now, even a profile edit made by setup conservatively leaves automatic policy
+suspended until explicit resume; completing setup does not silently accept a new
+profile baseline.
 The controller tests use fake radios and temporary state. The native coordinator
 and SSH hook have not been installed or physically qualified on either Pi.
 Partial offline remains disabled by default; neither board's installed policy
