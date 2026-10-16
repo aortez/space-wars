@@ -187,6 +187,15 @@ setup lifecycle and deployment hooks remain required. The library's intent is
 not a radio-write capability, and reserving a lease does not acknowledge actual
 availability. No automatic radio change is enabled by these additions.
 
+The implementation at `7dde8ca` passed all 53 manager tests with temporary files
+on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new
+policy/probe fixtures also passed on Pi 5 as UID 1000 in 0.14 seconds. The real
+probe read both Pis' root-owned NetworkManager instances: software and hardware
+Wi-Fi were enabled, with no pending checkpoints, and both boot IDs stayed
+unchanged. [Policy and radio-probe evidence](data/ota-network-policy-20261016.json)
+records artifact/log identities and separates these checks from the pending
+runtime integration and physical session/radio qualification.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
