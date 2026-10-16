@@ -820,6 +820,17 @@ operations and boot/hardware qualification remain unexecuted.
 [Root-install evidence](data/ota-bootstrap-root-install-20261015.json) records
 the exact artifacts, command outputs and remaining live gates.
 
+The first-boot runtime at `6b5a098` passed 219 OTA and 38 manager tests, 71 Yocto
+helper/tooling tests with required sandbox support, Clippy, Rust 1.89 and AArch64
+test compilation. Seven journal/selector fixtures also passed on host ext4.
+All 17 new fixtures passed on Pi 5 as UID 1000 in 11.62 seconds, using temporary
+files, synthetic health/boot evidence and a fake watchdog. Its boot ID stayed
+unchanged. The new mount-source test uses synthetic mountinfo; it does not prove
+the prepared device's systemd namespace. No new image or schema-3 kits were
+built, and no live boot staging, trial activation or recovery qualification
+occurred. [Runtime evidence](data/ota-bootstrap-runtime-20261015.json) records the
+exact artifact/log hashes and the remaining migration/integration work.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
