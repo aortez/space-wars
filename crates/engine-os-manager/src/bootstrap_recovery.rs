@@ -14,6 +14,9 @@ use engine_ota::recovery::{BootObservation, HealthSample};
 use std::time::Duration;
 
 pub(crate) fn run(lock: &InstallLock, store: &mut TrialStore, reporter: &Reporter) -> Result<()> {
+    if store.canonical_phase().is_some() {
+        return crate::bootstrap_canonical::recover(lock, store, reporter);
+    }
     let mut backend = LinuxBackend {
         boot: BootstrapBoot::open(lock, store)?,
         expected: KioskExpectation::from_image(store.image())?,

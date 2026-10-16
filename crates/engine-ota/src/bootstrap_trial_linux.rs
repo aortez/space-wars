@@ -104,7 +104,7 @@ fn observe(
     Ok(boot)
 }
 
-fn observation(
+pub(super) fn observation(
     current: &Runtime,
     inputs: &super::trial::TrialInputs,
     staged: bool,

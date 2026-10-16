@@ -401,10 +401,13 @@ file while retaining the normal default. The root-only activation command now
 revalidates that ready stage, durably consumes the attempt, then requests the
 fixed one-shot reboot through systemd. Request failures never reset the attempt;
 lost replies and interrupted cleanup require operator reconciliation. Bootstrap
-protocol 2 binds the requesting boot separately from staging and trial boots.
-Canonical migration remains pending, and neither Pi has undergone this migration. These tools do not
-initialize a production recovery baseline or enable automatic updates. The
-[bootstrap preparation and remaining migration steps](ota-bootstrap.md)
+protocol 3 also supports canonical migration: separate root commands copy the
+permanent assets with per-file durable intent, retain the staged fallback and
+publish the permanent configuration last. A different normal boot must pass its
+own health window; failure returns to the staged default without an automatic
+retry. Staged-tree cleanup and explicit production baseline provisioning remain
+pending, and neither Pi has undergone this migration. These tools do not enable
+automatic updates. The [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
 describe the package layout, reproduction commands and supervised boundary.
 
 The physical procedure must establish selector durability, actual root-device

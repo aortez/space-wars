@@ -122,6 +122,62 @@ pub(crate) async fn normal_reboot(
     normal_reboot_on(&connection, authorize).await
 }
 
+pub(crate) async fn canonical_reboot(
+    authorize: impl FnOnce() -> engine_ota::Result<()>,
+) -> engine_ota::Result<()> {
+    let connection = zbus::connection::Builder::system()
+        .map_err(ota_error)?
+        .method_timeout(Duration::from_secs(2))
+        .build()
+        .await
+        .map_err(ota_error)?;
+    canonical_reboot_on(&connection, authorize).await
+}
+
+async fn canonical_reboot_on(
+    connection: &zbus::Connection,
+    authorize: impl FnOnce() -> engine_ota::Result<()>,
+) -> engine_ota::Result<()> {
+    let properties = zbus::Proxy::new(
+        connection,
+        "org.freedesktop.login1",
+        "/org/freedesktop/login1",
+        "org.freedesktop.DBus.Properties",
+    )
+    .await
+    .map_err(ota_error)?;
+    let value: zbus::zvariant::OwnedValue = properties
+        .call(
+            "Get",
+            &("org.freedesktop.login1.Manager", "RebootParameter"),
+        )
+        .await
+        .map_err(ota_error)?;
+    let parameter: String = value.try_into().map_err(ota_error)?;
+    if !parameter.is_empty() {
+        return Err(ota_error(
+            "canonical activation requires an empty reboot parameter; left unchanged",
+        ));
+    }
+    // Canonical activation starts with no reboot argument and has none to
+    // clear. Do not overwrite a request that arrives while authority is checked.
+    authorize()?;
+    let value: zbus::zvariant::OwnedValue = properties
+        .call(
+            "Get",
+            &("org.freedesktop.login1.Manager", "RebootParameter"),
+        )
+        .await
+        .map_err(ota_error)?;
+    let parameter: String = value.try_into().map_err(ota_error)?;
+    if !parameter.is_empty() {
+        return Err(ota_error(
+            "canonical reboot parameter changed; left unchanged",
+        ));
+    }
+    start_normal_job(connection).await
+}
+
 pub(crate) fn kiosk_health(
     observer: &mut KioskObserver,
     expected: &KioskExpectation,
@@ -184,6 +240,10 @@ async fn normal_reboot_on(
         return Err(ota_error("normal reboot parameter did not clear"));
     }
     authorize()?;
+    start_normal_job(connection).await
+}
+
+async fn start_normal_job(connection: &zbus::Connection) -> engine_ota::Result<()> {
     let manager = zbus::Proxy::new(
         connection,
         "org.freedesktop.systemd1",

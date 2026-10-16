@@ -74,7 +74,7 @@ impl TrialInputs {
         }
     }
 
-    fn context(&self, normal: bool) -> Sha256 {
+    pub(super) fn context(&self, normal: bool) -> Sha256 {
         Sha256::digest(&serde_json::to_vec(&(self, normal)).expect("bootstrap context serializes"))
     }
 }
@@ -114,6 +114,7 @@ pub(super) struct TrialRecord {
     normal_boot_id: Option<String>,
     normal_health: Option<HealthProof>,
     pub failure: Option<TrialFailure>,
+    pub canonical: Option<super::canonical::CanonicalState>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -130,7 +131,7 @@ pub(super) enum TrialAction {
 impl TrialRecord {
     pub(super) fn staging(inputs: TrialInputs) -> Result<Self> {
         let record = Self {
-            schema: 2,
+            schema: 3,
             inputs,
             phase: TrialPhase::Staging,
             request_boot_id: None,
@@ -139,6 +140,7 @@ impl TrialRecord {
             normal_boot_id: None,
             normal_health: None,
             failure: None,
+            canonical: None,
         };
         record.validate()?;
         Ok(record)
@@ -186,7 +188,7 @@ impl TrialRecord {
             TrialPhase::NormalConfirmed => started && healthy && normal && confirmed,
             TrialPhase::Failed => !confirmed,
         };
-        if self.schema != 2
+        if self.schema != 3
             || !shape
             || (!matches!(self.phase, TrialPhase::Staging | TrialPhase::TrialReady) && !requested)
             || self
@@ -204,7 +206,42 @@ impl TrialRecord {
         {
             return Err(invalid("invalid bootstrap trial state"));
         }
+        if let Some(canonical) = &self.canonical {
+            if self.phase != TrialPhase::NormalConfirmed {
+                return Err(invalid(
+                    "canonical migration has no confirmed staged normal boot",
+                ));
+            }
+            canonical.validate(&self.inputs)?;
+        }
         Ok(())
+    }
+
+    pub(super) fn start_canonical(
+        &mut self,
+        plan: super::canonical::CanonicalPlan,
+        boot: &BootObservation,
+    ) -> Result<()> {
+        self.check_boot(boot)?;
+        if self.canonical.is_some()
+            || self.phase != TrialPhase::NormalConfirmed
+            || self.normal_boot_id.as_ref() != Some(&boot.boot_id)
+            || boot.tryboot
+            || boot.default_slot != Some(self.inputs.plan.target)
+        {
+            return Err(invalid(
+                "canonical migration requires this separately confirmed staged normal boot",
+            ));
+        }
+        self.canonical = Some(super::canonical::CanonicalState::new(
+            plan,
+            &self.inputs,
+            boot.boot_id.clone(),
+            self.normal_health
+                .clone()
+                .ok_or_else(|| invalid("missing normal health"))?,
+        )?);
+        self.validate()
     }
 
     pub(super) fn request(&mut self, boot_id: &str) -> Result<()> {
@@ -270,6 +307,11 @@ impl TrialRecord {
     }
 
     pub(super) fn reconcile(&mut self, boot: &BootObservation) -> Result<TrialAction> {
+        if self.canonical.is_some() {
+            return Err(invalid(
+                "canonical migration owns recovery; legacy rollback is no longer permitted",
+            ));
+        }
         self.check_boot(boot)?;
         let legacy = boot.default_slot == Some(self.inputs.binding.original_slot);
         if self.phase == TrialPhase::Failed {

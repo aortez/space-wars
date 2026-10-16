@@ -10,12 +10,13 @@ root-only package validation, a durable preparation reservation, raw boot/inacti
 root recovery copies, a data/configuration archive, original-file preservation,
 restartable fixed-file replacement, effective access checks, a restartable
 inactive-root installer, independent-export verifiers, restartable boot staging,
-and a first-boot recovery
-coordinator with a separate staged normal-boot health check.
+consumed one-shot activation, a first-boot recovery coordinator, and restartable
+canonical asset preparation/activation with separate staged and canonical
+normal-boot health checks.
 **Remaining:** live preservation and independent exports, effective legacy
 privilege/access/service qualification, live root installation and staging,
-one-shot trial activation, supervised boot verification,
-canonical boot migration, recovery-journal provisioning and physical failure
+live one-shot trial activation, supervised staged/canonical boot verification,
+staged-tree cleanup, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
 ## Read the existing device
@@ -46,7 +47,7 @@ The Pi 5 currently runs slot B with HyperPixel. Its hostname file is
 `hostname.txt`, which the new boot verifier now accepts as an optional, bounded
 DNS host label. It is excluded from the immutable boot identity and preserved
 through selector changes. The old `boot_slot` file is only a legacy breadcrumb;
-it must be archived and removed during canonical migration, never used to choose
+it must be archived and removed after canonical confirmation, never used to choose
 the writable partition. Reobserve both devices before preparing an attempt.
 
 ## Build the workstation package
@@ -109,13 +110,14 @@ applies the fixed destination modes. Nothing under `legacy-root/` is executed
 by the packager or interpreted as an arbitrary installation hook.
 
 The device package checker requires the complete fixed list and bootstrap
-protocol 2. The builder and inactive-root readback check require
+protocol 3. The builder and inactive-root readback check require
 `/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
-and protocol 2. This marker is installed by the image recipe and is part of the
+and protocol 3. This marker is installed by the image recipe and is part of the
 rootfs identity. It identifies first-image recovery with persistent-store health
-checks and an activation boot ID; the production recovery protocol alone cannot
-establish that capability. The trial journal is schema 2. Schema 1/2 packages,
-bootstrap protocol 1 images and schema 1 trial journals are rejected;
+checks, an activation boot ID and durable canonical migration with a staged
+fallback; the production recovery protocol alone cannot establish that
+capability. The trial journal is schema 3. Schema 1/2 packages, bootstrap
+protocol 1/2 images and schema 1/2 trial journals are rejected;
 previous local packages must be rebuilt,
 never relabeled. This packaging step does not close any live privileges. The
 migration needs the separately implemented durable per-file record of original
@@ -171,7 +173,7 @@ reimport keys if that store has disappeared during bootstrap. These guards do
 not change the legacy tools already installed on the Pis; their unsigned write
 and reboot paths still must be closed before trial. Preparation and raw recovery
 copies can resume today. Root installation uses its separate operator example
-below; one-shot trial activation is not yet implemented.
+below; staging and one-shot activation use their separate manager commands.
 
 ```sh
 cargo build --locked -p engine-ota --example bootstrap_check \
@@ -669,8 +671,9 @@ requests the fixed normal reboot operation.
 
 The next normal boot must pass a separate health window and has the distinct
 `bootstrap-confirmed` status. Trial health cannot stand in for that observation.
-An unhealthy trial keeps the original default; an unhealthy staged normal boot
-restores it and requests a normal reboot. Neither path retries automatically or
+Before canonical migration begins, an unhealthy trial keeps the original
+default; an unhealthy staged normal boot restores it and requests a normal
+reboot. Neither path retries automatically or
 qualifies the legacy root as a previous-good OTA image. A corrupt journal or
 unexpected boot state stops the coordinator and requires operator recovery.
 
@@ -679,6 +682,77 @@ boot/status/settings paths. The store accepts systemd's exact writable bind of
 that subtree while rejecting a different mount source. These source and fixture
 checks do not establish physical watchdog, reboot, FAT power-loss or canonical
 migration behavior on either Pi.
+
+## Canonical boot preparation and activation
+
+Only a confirmed staged **normal** boot can start this migration. The trial
+boot's health proof is insufficient. The same selected package, completed root
+receipt and trial identity are required by two separate root commands:
+
+```sh
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  prepare
+
+engine-os-manager bootstrap-canonical \
+  --package BUNDLE_SHA256 --written-root ROOT_INSTALL_SHA256 --trial TRIAL_ID \
+  activate
+```
+
+`prepare` pins and checks the package, actual board/profile/root pair, root
+receipt, raw recovery copies, data archive, preserved originals and persistent
+access/network stores under the shared install lock. It reconstructs the plan
+from the package and actual device. Case-folded path or directory collisions
+with retained files are rejected before copying.
+
+Before the first canonical replacement, the journal durably transfers recovery
+to the complete, already-confirmed staged tree. **Legacy rollback is no longer
+permitted after that transition:** the original canonical kernel and other
+assets may now be replaced. The raw legacy recovery copies remain available for
+independent operator recovery.
+
+Each file has durable copy intent before an atomic replacement and a completion
+record after file, directory and filesystem flushes. Resume accepts only exact
+old or new contents for the pending destination; completed files cannot be
+repaired or rewritten. Unchanged firmware is verified and retained in place.
+The complete `sw-bootstrap` tree, staged normal `config.txt`, `hostname.txt`,
+legacy `boot_slot` and other original extras remain present. Capacity includes
+remaining growth, the largest temporary replacement and a reserve; a full
+second canonical tree is unnecessary. Preparation never selects the canonical
+configuration or requests a reboot.
+
+`activate` requires complete preparation and does not copy missing assets. It
+records selection intent, publishes the canonical `config.txt` last, flushes
+and verifies it, then durably consumes one normal reboot request. The manager
+requires an empty reboot parameter before and after final authorization and
+leaves parameters untouched. It requests only `reboot.target` in
+`replace-irreversibly` mode. Bus methods use two-second timeouts and the bus
+handoff has a five-second timer; synchronous disk validation has no overall
+deadline. A timeout cannot cancel a delivered request. Accepted jobs prove
+neither a reboot nor health. Failures or lost replies never restore the consumed
+allowance and require operator reconciliation.
+
+The next boot must have a different boot ID and complete its own 60-second local
+health window within 180 seconds of boot. The staged health proof cannot confirm
+canonical success, and changing `config.txt` in the running staged boot is not
+confirmation. Restarting the observer does not extend the boot deadline. A new
+staged boot during interrupted preparation also repeats health before allowing
+the copy to resume, without clearing its completed-file record.
+
+An unhealthy canonical boot that reaches the recovery service durably fails,
+restores the staged default and requests a normal reboot. The next staged boot
+stops for the operator; it never retries canonical activation. Damaged files,
+unknown inventory or an uncertain journal stop recovery for manual inspection.
+Normal boots do not arm the one-shot trial watchdog: a failure before the
+recovery service starts requires the independently supervised recovery path.
+Atomic replacements do not qualify shared-FAT behavior under physical power loss.
+
+Success still reports `automatic_updates_enabled: false`. Canonical confirmation
+does not delete the staged tree, archive/remove `boot_slot`, remove obsolete
+assets, or initialize production recovery. Those later operations remain to be
+implemented and verified before declaring a good OTA baseline. No live canonical
+migration has run on either Pi, and a clean protocol-3 runtime image and new kits
+are still required.
 
 ## Persistent network profiles
 
@@ -780,8 +854,10 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    flushed replacements and publish the canonical default last. A full second
    tree is not needed: capacity must cover the staged set, growth of the
    canonical set, its largest temporary replacement and a reserve. Preserve
-   `hostname.txt`, archive the legacy breadcrumb, and verify a canonical normal
-   boot before removing the temporary stage.
+   `hostname.txt`, and verify a canonical normal boot before archiving/removing
+   the legacy breadcrumb, obsolete assets and temporary stage. Canonical
+   preparation, activation and health observation are implemented; this cleanup
+   and all live verification remain pending.
 7. Only then explicitly establish the good recovery baseline from the observed
    normal boot. Do not advertise the overwritten/legacy root as a qualified
    retained image. Complete Pi 4/5 failure qualification and the remaining feed,
@@ -794,8 +870,8 @@ No physical recovery qualification follows from passing the workstation tests.
 The current `c14c53f` runtime image and schema-2 packages predate the added
 persistence health checks, missing-store guards and bootstrap coordinator. They
 have not been rebuilt or made ready for trial by these source changes. The new
-schema-3 gate requires the runtime marker and expanded fallback-root inventory;
-the next clean image and kits must be rebuilt before trial activation. Existing
+schema-3 gate requires the protocol-3 runtime marker and expanded fallback-root
+inventory; the next clean image and kits must be rebuilt before trial activation. Existing
 packages and reservations must never be relabeled to bypass that gate.
 
 ## Validation

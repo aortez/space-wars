@@ -1,7 +1,8 @@
 //! Root-operator package validation. This is deliberately separate from TUF
 //! VerifiedCandidate authority. Operator phases replace fixed legacy files and
-//! the checked inactive root, and prepare separate temporary boot assets. They
-//! never change the normal boot selection or request a reboot.
+//! the checked inactive root, and prepare separate temporary boot assets.
+//! Explicit activation consumes a one-shot reboot; after confirmed staged
+//! health, separate canonical commands publish and activate the permanent layout.
 use super::{
     Board, BootPlan, BootstrapPackage, LegacyBootEvidence, PlanRequest, STAGE_DIRECTORY,
     active_lines, inspect_legacy_boot, invalid,
@@ -33,6 +34,11 @@ pub use root_device::install_bootstrap_root;
 mod stage_device;
 pub use stage_device::activate_bootstrap_boot;
 pub use stage_device::{BootStageProgress, BootStageReport, stage_bootstrap_boot};
+#[path = "bootstrap_canonical_device.rs"]
+mod canonical_device;
+pub use canonical_device::{
+    CanonicalReboot, CanonicalReport, activate_canonical_boot, prepare_canonical_boot,
+};
 
 #[derive(Debug, Serialize)]
 pub struct PackageCheck {

@@ -131,3 +131,77 @@ fn normal_reboot_clears_and_checks_the_argument_and_reauthorizes_before_fixed_jo
         }
     });
 }
+
+#[test]
+fn canonical_reboot_preserves_existing_requests_and_rechecks_authority_before_normal_job() {
+    futures_lite::future::block_on(async {
+        for case in [
+            "good",
+            "trial",
+            "foreign",
+            "changed-boot",
+            "changed-parameter",
+        ] {
+            let bus = PrivateBus::new();
+            let initial = match case {
+                "trial" => "0 tryboot",
+                "foreign" => "foreign",
+                _ => "",
+            };
+            let state = Arc::new(Mutex::new(State {
+                parameter: initial.into(),
+                reject: false,
+                retain: false,
+                calls: vec![],
+            }));
+            let _server = zbus::connection::Builder::address(bus.1.as_str())
+                .unwrap()
+                .name("org.freedesktop.login1")
+                .unwrap()
+                .name("org.freedesktop.systemd1")
+                .unwrap()
+                .serve_at("/org/freedesktop/login1", Login(state.clone()))
+                .unwrap()
+                .serve_at("/org/freedesktop/systemd1", Manager(state.clone()))
+                .unwrap()
+                .build()
+                .await
+                .unwrap();
+            let client = zbus::connection::Builder::address(bus.1.as_str())
+                .unwrap()
+                .method_timeout(Duration::from_secs(2))
+                .build()
+                .await
+                .unwrap();
+            let result = canonical_reboot_on(&client, || {
+                let mut state = state.lock().unwrap();
+                state.calls.push("authorize".into());
+                if case == "changed-parameter" {
+                    state.parameter = "foreign".into();
+                }
+                if case == "changed-boot" {
+                    Err(ota_error("boot changed"))
+                } else {
+                    Ok(())
+                }
+            })
+            .await;
+            assert_eq!(result.is_ok(), case == "good");
+            let state = state.lock().unwrap();
+            if matches!(case, "trial" | "foreign") {
+                assert!(state.calls.is_empty());
+                assert_eq!(state.parameter, initial);
+            } else if case == "good" {
+                assert_eq!(
+                    state.calls,
+                    ["authorize", "start:reboot.target:replace-irreversibly"]
+                );
+            } else {
+                assert_eq!(state.calls, ["authorize"]);
+                if case == "changed-parameter" {
+                    assert_eq!(state.parameter, "foreign");
+                }
+            }
+        }
+    });
+}

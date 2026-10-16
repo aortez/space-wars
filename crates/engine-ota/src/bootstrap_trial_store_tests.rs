@@ -42,6 +42,8 @@ impl Fixture {
             "kernel8.img".into(),
             b"old kernel; must remain available".to_vec(),
         );
+        original.insert("hostname.txt".into(), b"spacewars-fixture\n".to_vec());
+        original.insert("boot_slot".into(), b"B\n".to_vec());
         let origin = "de606400-dc75-446e-b26b-385592b0f562".to_string();
         let binding = BootstrapBinding {
             schema: 1,

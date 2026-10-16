@@ -52,28 +52,7 @@ impl TrialBootFiles {
     }
 
     pub fn verify(&self) -> Result<()> {
-        let mut expected = self.inputs.binding.original_boot_files.clone();
-        if self.staged_default()? {
-            expected.insert(
-                "config.txt".into(),
-                blob(self.inputs.plan.normal_config.as_bytes()),
-            );
-        }
-        expected.insert(
-            "tryboot.txt".into(),
-            blob(self.inputs.plan.trial_config.as_bytes()),
-        );
-        for (path, contents) in &self.inputs.plan.staged_assets {
-            expected.insert(format!("{STAGE_DIRECTORY}/{path}"), contents.clone());
-        }
-        expected.insert(
-            format!("{STAGE_DIRECTORY}/trial-cmdline.txt"),
-            blob(self.inputs.plan.trial_cmdline.as_bytes()),
-        );
-        expected.insert(
-            format!("{STAGE_DIRECTORY}/normal-cmdline.txt"),
-            blob(self.inputs.plan.normal_cmdline.as_bytes()),
-        );
+        let expected = expected(&self.inputs, self.staged_default()?);
         let mut actual = BTreeMap::new();
         inspect::inventory(
             &self.directory,
@@ -153,13 +132,39 @@ impl TrialBootFiles {
     }
 }
 
+pub(super) fn expected(inputs: &TrialInputs, staged: bool) -> BTreeMap<String, Blob> {
+    let mut expected = inputs.binding.original_boot_files.clone();
+    if staged {
+        expected.insert(
+            "config.txt".into(),
+            blob(inputs.plan.normal_config.as_bytes()),
+        );
+    }
+    expected.insert(
+        "tryboot.txt".into(),
+        blob(inputs.plan.trial_config.as_bytes()),
+    );
+    for (path, contents) in &inputs.plan.staged_assets {
+        expected.insert(format!("{STAGE_DIRECTORY}/{path}"), contents.clone());
+    }
+    expected.insert(
+        format!("{STAGE_DIRECTORY}/trial-cmdline.txt"),
+        blob(inputs.plan.trial_cmdline.as_bytes()),
+    );
+    expected.insert(
+        format!("{STAGE_DIRECTORY}/normal-cmdline.txt"),
+        blob(inputs.plan.normal_cmdline.as_bytes()),
+    );
+    expected
+}
+
 fn blob(bytes: &[u8]) -> Blob {
     Blob {
         bytes: bytes.len() as u64,
         sha256: Sha256::digest(bytes),
     }
 }
-fn temporary(path: &str) -> bool {
+pub(super) fn temporary(path: &str) -> bool {
     path.strip_prefix(".spacewars-bootstrap-")
         .and_then(|name| name.strip_suffix(".tmp"))
         .is_some_and(|random| {

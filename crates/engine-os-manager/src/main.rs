@@ -10,6 +10,17 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Prepare or activate the permanent boot layout after staged normal health.
+    BootstrapCanonical {
+        #[arg(long)]
+        package: String,
+        #[arg(long)]
+        written_root: String,
+        #[arg(long)]
+        trial: String,
+        #[command(subcommand)]
+        operation: CanonicalCommand,
+    },
     /// Request one supervised tryboot of an already staged bootstrap image.
     /// Root operator only; consumes the attempt even if the reboot reply is lost.
     BootstrapActivate {
@@ -70,6 +81,12 @@ enum MaintenanceCommand {
     Renderer { renderer: String },
 }
 
+#[derive(Subcommand)]
+enum CanonicalCommand {
+    Prepare,
+    Activate,
+}
+
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
@@ -95,6 +112,29 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::BootstrapCanonical {
+            package,
+            written_root,
+            trial,
+            operation,
+        } => {
+            daemon::require_root()?;
+            let digest = |value: String| {
+                engine_ota::Sha256::try_from(value)
+                    .map_err(|cause| engine_os_manager::Error::Invalid(cause.into()))
+            };
+            let (package, written_root, trial) =
+                (digest(package)?, digest(written_root)?, digest(trial)?);
+            let report = match operation {
+                CanonicalCommand::Prepare => {
+                    engine_os_manager::bootstrap_canonical::prepare(package, written_root, trial)?
+                }
+                CanonicalCommand::Activate => {
+                    engine_os_manager::bootstrap_canonical::activate(package, written_root, trial)?
+                }
+            };
+            println!("{}", serde_json::to_string(&report)?);
+        }
         Command::BootstrapActivate {
             package,
             written_root,

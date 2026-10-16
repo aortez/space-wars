@@ -130,6 +130,33 @@ impl TrialStore {
         self.record.failure
     }
 
+    pub fn canonical_phase(&self) -> Option<super::CanonicalPhase> {
+        self.record.canonical.as_ref().map(|c| c.phase)
+    }
+
+    pub(super) fn canonical(&self) -> Result<&super::canonical::CanonicalState> {
+        self.durable()?
+            .canonical
+            .as_ref()
+            .ok_or_else(|| invalid("canonical migration is not initialized"))
+    }
+
+    pub(super) fn advance_canonical<T>(
+        &mut self,
+        transition: impl FnOnce(
+            &mut super::canonical::CanonicalState,
+            &super::trial::TrialInputs,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        self.advance(|record| {
+            let canonical = record
+                .canonical
+                .as_mut()
+                .ok_or_else(|| invalid("canonical migration is not initialized"))?;
+            transition(canonical, &record.inputs)
+        })
+    }
+
     pub(crate) fn watchdog_token(&self, boot: &crate::recovery::BootObservation) -> Result<Sha256> {
         self.durable()?.watchdog_completion(boot)
     }
@@ -221,6 +248,14 @@ impl TrialStore {
         next.validate()?;
         if next.inputs != self.record.inputs {
             return Err(invalid("bootstrap transition changed its immutable inputs"));
+        }
+        if let Some(previous) = &self.record.canonical {
+            let Some(current) = &next.canonical else {
+                return Err(invalid(
+                    "canonical migration cannot return to legacy recovery",
+                ));
+            };
+            current.check_successor(previous)?;
         }
         if next != self.record {
             self.persist(&next)?;

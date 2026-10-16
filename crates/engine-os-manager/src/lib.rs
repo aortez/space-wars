@@ -2,6 +2,8 @@
 #[cfg(target_os = "linux")]
 pub mod bootstrap_activation;
 #[cfg(target_os = "linux")]
+pub mod bootstrap_canonical;
+#[cfg(target_os = "linux")]
 mod bootstrap_recovery;
 pub mod time;
 

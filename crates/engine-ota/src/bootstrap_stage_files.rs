@@ -219,7 +219,12 @@ fn same_mount(file: &File, boot: &File) -> Result<()> {
     Ok(())
 }
 
-fn directory(parent: &File, component: &str, owner: u32, create: bool) -> Result<Option<File>> {
+pub(super) fn directory(
+    parent: &File,
+    component: &str,
+    owner: u32,
+    create: bool,
+) -> Result<Option<File>> {
     let file = match open_at(parent, component, libc::O_RDONLY | libc::O_DIRECTORY, 0) {
         Ok(file) => file,
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound && create => {
@@ -248,7 +253,12 @@ fn same_directory(parent: &File, component: &str, held: &File, owner: u32) -> Re
     Ok(())
 }
 
-fn parent<'a>(stage: &File, boot: &File, path: &'a str, owner: u32) -> Result<(File, &'a str)> {
+pub(super) fn parent<'a>(
+    stage: &File,
+    boot: &File,
+    path: &'a str,
+    owner: u32,
+) -> Result<(File, &'a str)> {
     let mut parts = path.split('/').peekable();
     let mut parent = stage.try_clone()?;
     while let Some(part) = parts.next() {
@@ -261,7 +271,13 @@ fn parent<'a>(stage: &File, boot: &File, path: &'a str, owner: u32) -> Result<(F
     Err(invalid("empty staging path"))
 }
 
-fn writable(parent: &File, boot: &File, component: &str, owner: u32, limit: u64) -> Result<File> {
+pub(super) fn writable(
+    parent: &File,
+    boot: &File,
+    component: &str,
+    owner: u32,
+    limit: u64,
+) -> Result<File> {
     let file = open_at(parent, component, libc::O_RDWR | libc::O_CREAT, 0o644)?;
     owned(&file.metadata()?, false, owner, false)?;
     same_mount(&file, boot)?;
@@ -271,7 +287,7 @@ fn writable(parent: &File, boot: &File, component: &str, owner: u32, limit: u64)
     Ok(file)
 }
 
-fn verify_tree(
+pub(super) fn verify_tree(
     directory: &File,
     boot: &File,
     owner: u32,
