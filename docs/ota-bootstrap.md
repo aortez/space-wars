@@ -677,6 +677,19 @@ or reboot occurred. [Replacement evidence](data/ota-legacy-replacement-20261015.
 records the exact scope and binaries. The runtime image and schema 2 kits have
 not been rebuilt or installed by this step.
 
+The access checker at `113033d` passed 191 OTA and 38 manager tests using the
+documented serial command, plus Clippy, Rust 1.89 and AArch64 builds. Fourteen
+selected tests passed on Pi 5 as UID 1000 in 0.50 seconds; the actual operator
+entry point rejected that UID before inspecting installed paths. The Pi's SSH
+parser accepted a temporary configuration pointing at the persistent key roles.
+Its original loaded services and sudo grants remain unchanged. This is parser
+and fixture evidence, not successful migration, host-key validation or login.
+[Access-check evidence](data/ota-legacy-access-check-20261015.json) records exact
+binaries, captures and the remaining live checks. It also records intermittent
+`Busy` failures from the multithreaded `cargo test` runner: unrelated test forks
+can temporarily retain flock descriptors. Local qualification uses serial tests;
+CI uses nextest's separate processes. No production locking behavior was changed.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
