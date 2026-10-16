@@ -957,6 +957,17 @@ its boot ID stayed unchanged. No root staging operation, clean image build,
 one-shot activation or physical failure test occurred. [Staging evidence](data/ota-bootstrap-stage-20261015.json)
 records the exact artifacts, logs and remaining hardware/integration limits.
 
+One-shot activation at `1aed0da` passed 233 OTA and 39 manager tests, 71 Yocto
+helper/tooling tests, Clippy, Rust 1.89, formatting and AArch64 compilation.
+Eleven selected journal, process-gate, receipt and runtime-marker fixtures passed
+on host ext4 in 5.99 seconds and Pi 5 in 27.64 seconds. The private D-Bus request
+fixture also passed on Pi 5 in 0.80 seconds, covering the successful sequence and
+13 failure cases. The real activation command rejected UID 1000 before parsing
+digests or accessing installed paths; the boot ID stayed unchanged. This was
+temporary-file/private-bus testing, not live system-bus or reboot qualification.
+[Activation evidence](data/ota-bootstrap-activation-20261015.json) records exact
+artifacts/logs and the remaining root-access, migration and integration work.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
