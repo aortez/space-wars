@@ -618,6 +618,19 @@ and mount/layout tests passed as UID 1000 on the Pi 5; the actual preparation
 command rejected that account. Its boot ID remained unchanged. These are
 fixture results, not live migration or physical power-loss qualification.
 [Original-file preservation evidence](data/ota-legacy-preservation-20261015.json)
+
+Restartable file replacement at `643930b` passed all 181 OTA and 38 manager
+host tests, Clippy with warnings denied, Rust 1.89 and AArch64 builds. The final
+source passed 22 selected original-file/replacement tests on ext4 and the
+optional same-filesystem bind rejection test. The complete checkpoint sweep
+ran on host tmpfs and on Pi 5; it includes errors before and after every reported
+publication step. Separate subprocess tests exit after link and exchange
+without running destructors. These are not physical power-loss tests.
+On Pi 5, 27 selected fixture tests passed as UID 1000, with one optional namespace
+test ignored, in 79.90 seconds. The actual replacement command refused that
+unprivileged account before installed paths were touched. Its boot ID remained
+unchanged. No live migration, service change, watchdog open, partition write
+or reboot occurred. [Replacement evidence](data/ota-legacy-replacement-20261015.json)
 records the exact scope and binaries. The runtime image and schema 2 kits have
 not been rebuilt or installed by this step.
 
