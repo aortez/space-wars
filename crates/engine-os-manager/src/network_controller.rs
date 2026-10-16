@@ -15,6 +15,8 @@ pub struct Snapshot {
     pub clock: Clock,
     pub radio: Observation,
     pub activity: Activity,
+    /// Latched continuous-monitor evidence, even if the current values match.
+    pub change: Option<Suspension>,
 }
 
 /// A successful D-Bus reply fences the request, but still requires readback.
@@ -41,6 +43,10 @@ pub trait Backend {
     /// Must target only WirelessEnabled on the observed unique bus owner, with
     /// a bounded deadline and a last comparison against expected before sending.
     fn set_wireless(&mut self, expected: &Observation, enabled: bool) -> Result<WriteResult>;
+    /// Explicit user resume establishes a new continuous observation baseline.
+    fn reconcile(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -63,6 +69,7 @@ pub struct Transition {
 pub struct Status {
     pub policy: network_policy::Status,
     pub actual: Option<Observation>,
+    pub activity: Option<Activity>,
     pub owned_off: bool,
     pub pending: Option<Transition>,
     pub suspended: Option<Suspension>,
@@ -91,6 +98,7 @@ pub struct Controller<B: Backend> {
     policy: NetworkPolicy,
     backend: B,
     actual: Option<Observation>,
+    activity: Option<Activity>,
     deferred: Option<Deferred>,
 }
 
@@ -101,6 +109,7 @@ impl<B: Backend> Controller<B> {
             policy,
             backend,
             actual: None,
+            activity: None,
             deferred: None,
         })
     }
@@ -194,16 +203,20 @@ impl<B: Backend> Controller<B> {
         if self.policy.status(&clock)?.generation != generation {
             return Err(invalid("stale network policy generation"));
         }
-        let Some(snapshot) = self.snapshot()? else {
-            return self.report();
-        };
-        let mut state = self.policy.radio(&snapshot.clock)?;
+        let mut state = self.policy.radio(&clock)?;
         if state.pending.as_ref().is_some_and(|pending| {
-            pending.phase == Phase::Requested && pending.before.boot_id == snapshot.clock.boot_id
+            pending.phase == Phase::Requested && pending.before.boot_id == clock.boot_id
         }) {
             return Err(invalid(
                 "uncertain radio command requires a new boot before reconciliation",
             ));
+        }
+        self.backend.reconcile()?;
+        let Some(snapshot) = self.snapshot()? else {
+            return self.report();
+        };
+        if snapshot.change.is_some() {
+            return Err(invalid("radio changed during reconciliation"));
         }
         // Keep responsibility for a policy-owned off state. Otherwise accepting
         // an externally disabled radio does not silently make it our off state.
@@ -302,6 +315,7 @@ impl<B: Backend> Controller<B> {
 
     fn snapshot(&mut self) -> Result<Option<Snapshot>> {
         self.actual = None;
+        self.activity = None;
         self.deferred = None;
         let mut snapshot = match self.backend.snapshot() {
             Ok(snapshot) => snapshot,
@@ -316,6 +330,7 @@ impl<B: Backend> Controller<B> {
         snapshot.activity.checkpoints = Some(snapshot.radio.checkpoint_count != 0);
         self.policy.observe(snapshot.activity, &snapshot.clock)?;
         self.actual = Some(snapshot.radio.clone());
+        self.activity = Some(snapshot.activity);
         Ok(Some(snapshot))
     }
 
@@ -325,6 +340,9 @@ impl<B: Backend> Controller<B> {
         };
         let mut state = self.policy.radio(&snapshot.clock)?;
         let observed = Witness::new(&snapshot.clock, &snapshot.radio);
+        if state.suspended.is_none() {
+            state.suspended = snapshot.change;
+        }
         if let Some(pending) = &state.pending {
             if pending.phase == Phase::Requested {
                 state.suspended = Some(Suspension::CommandUncertain);
@@ -388,6 +406,7 @@ impl<B: Backend> Controller<B> {
         Ok(Status {
             policy: self.policy.status(&clock)?,
             actual: self.actual.clone(),
+            activity: self.activity,
             owned_off: state.owned_off,
             pending: state.pending.map(|p| Transition {
                 target_enabled: p.enabled,

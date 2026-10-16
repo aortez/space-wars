@@ -47,6 +47,7 @@ impl Backend for Fake {
     }
     fn snapshot(&mut self) -> Result<Snapshot> {
         Ok(Snapshot {
+            change: None,
             clock: self.clock()?,
             radio: self.0.lock().unwrap().radio.clone(),
             activity: Activity {
@@ -81,6 +82,131 @@ fn request(path: &Path, operation: &Request) -> Result<serde_json::Value> {
 }
 fn status(path: &Path) -> serde_json::Value {
     request(path, &Request::Status { schema: 1 }).unwrap()
+}
+
+#[test]
+fn runtime_start_owns_policy_before_replacing_a_stale_socket_and_preserves_saved_policy() {
+    use crate::network_runtime::start_with;
+    use std::os::unix::fs::MetadataExt;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let state = temp.path().join("state");
+    let server = start_with(&state, &path, uid(), Fake::new()).unwrap();
+    let original = fs::metadata(&path).unwrap().ino();
+    assert!(start_with(&state, &path, uid(), Fake::new()).is_err());
+    assert_eq!(fs::metadata(&path).unwrap().ino(), original);
+    let before = status(&path);
+    let reply = request(
+        &path,
+        &Request::SetPolicy {
+            schema: 1,
+            generation: before["status"]["policy"]["generation"].as_u64().unwrap(),
+            policy: Policy {
+                partial_offline: false,
+                stay_connected: true,
+            },
+        },
+    )
+    .unwrap();
+    assert!(reply["error"].is_null());
+    drop(server);
+    let _server = start_with(&state, &path, uid(), Fake::new()).unwrap();
+    assert_eq!(
+        status(&path)["status"]["policy"]["policy"]["stay_connected"],
+        true
+    );
+
+    let regular = temp.path().join("regular");
+    fs::write(&regular, b"keep this file").unwrap();
+    assert!(
+        start_with(
+            &temp.path().join("other-state"),
+            &regular,
+            uid(),
+            Fake::new()
+        )
+        .is_err()
+    );
+    assert_eq!(fs::read(&regular).unwrap(), b"keep this file");
+}
+
+#[test]
+fn native_off_write_without_a_live_install_guard_is_never_submitted() {
+    use crate::network_runtime::Native;
+    let expected = Fake::new().0.lock().unwrap().radio.clone();
+    // No host bus or install path is touched: the guard check precedes both.
+    let mut backend = Native::default();
+    assert_eq!(
+        backend.set_wireless(&expected, false).unwrap(),
+        WriteResult::NotSubmitted
+    );
+}
+
+#[test]
+fn runtime_retries_initial_owner_contention_without_initializing_over_the_owner() {
+    use crate::network_runtime::{spawn_with, start_with};
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let path = temp.path().join("network.sock");
+    let held = Controller::open(&state, Fake::new()).unwrap();
+    let (attempt_tx, attempt_rx) = mpsc::sync_channel(1);
+    let service_path = path.clone();
+    let _runtime = spawn_with(move || {
+        let result = start_with(&state, &service_path, uid(), Fake::new());
+        let _ = attempt_tx.try_send(result.is_ok());
+        result
+    });
+    assert!(!attempt_rx.recv_timeout(Duration::from_secs(2)).unwrap());
+    assert!(!path.exists());
+    drop(held);
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if attempt_rx
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .unwrap()
+        {
+            break;
+        }
+    }
+    assert!(status(&path)["error"].is_null());
+}
+
+#[test]
+fn runtime_restarts_a_stopped_coordinator_after_releasing_its_store() {
+    use crate::network_runtime::{spawn_with, start_with};
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let path = temp.path().join("network.sock");
+    let service_path = path.clone();
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let _runtime = spawn_with(move || {
+        let server = start_with(&state, &service_path, uid(), Fake::new())?;
+        started_tx.try_send(server.stop.clone()).unwrap();
+        Ok(server)
+    });
+    let first = started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let before = status(&path);
+    let reply = request(
+        &path,
+        &Request::SetPolicy {
+            schema: 1,
+            generation: before["status"]["policy"]["generation"].as_u64().unwrap(),
+            policy: Policy {
+                partial_offline: false,
+                stay_connected: true,
+            },
+        },
+    )
+    .unwrap();
+    assert!(reply["error"].is_null());
+    first.store(true, Ordering::Relaxed);
+    let _second = started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let after = status(&path);
+    assert_eq!(after["status"]["policy"]["policy"]["stay_connected"], true);
+    assert!(
+        after["status"]["policy"]["generation"].as_u64().unwrap()
+            > reply["status"]["policy"]["generation"].as_u64().unwrap()
+    );
 }
 fn raw(path: &Path, bytes: &[u8]) -> serde_json::Value {
     let mut stream = UnixStream::connect(path).unwrap();

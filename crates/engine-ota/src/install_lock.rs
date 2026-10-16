@@ -90,7 +90,7 @@ impl InstallLock {
 
     /// Recheck the lock name before each privileged mutation. Cooperative
     /// callers must never unlink or replace the lock file to clear a busy lock.
-    pub(crate) fn check(&self) -> Result<()> {
+    pub fn check(&self) -> Result<()> {
         let named_directory = open_at(
             &self.run,
             "spacewars-install",

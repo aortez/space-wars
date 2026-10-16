@@ -19,6 +19,8 @@ struct World {
     clock: Clock,
     radio: Observation,
     activity: Activity,
+    change: Option<Suspension>,
+    reject_reconcile: bool,
     guard: bool,
     guard_active: bool,
     busy_on_guard: bool,
@@ -66,6 +68,8 @@ impl Fake {
                 install_lock: Some(false),
                 operations: Some(false),
             },
+            change: None,
+            reject_reconcile: false,
             guard: true,
             guard_active: false,
             busy_on_guard: false,
@@ -100,6 +104,7 @@ impl Backend for Fake {
             clock: world.clock.clone(),
             radio: world.radio.clone(),
             activity: world.activity,
+            change: world.change,
         })
     }
     fn shutdown_guard(&mut self) -> Result<Option<Guard>> {
@@ -113,6 +118,14 @@ impl Backend for Fake {
         assert!(!world.guard_active);
         world.guard_active = true;
         Ok(Some(Guard(self.0.clone())))
+    }
+    fn reconcile(&mut self) -> Result<()> {
+        let mut world = self.0.lock().unwrap();
+        if world.reject_reconcile {
+            return Err(invalid("monitor unavailable"));
+        }
+        world.change = None;
+        Ok(())
     }
     fn set_wireless(&mut self, expected: &Observation, enabled: bool) -> Result<WriteResult> {
         let barrier = {
@@ -175,6 +188,38 @@ fn ready(controller: &mut Controller<Fake>, fake: &Fake) {
 
 fn ssh_caller() -> Caller {
     Caller { uid: 0, ..caller() }
+}
+
+#[test]
+fn transient_external_changes_persist_until_an_explicit_successful_monitor_resume() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let fake = Fake::new();
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    let before = fake.0.lock().unwrap().radio.clone();
+    fake.edit(|w| w.change = Some(Suspension::ExternalRadioChange));
+    let status = controller.tick().unwrap();
+    assert_eq!(status.actual.as_ref(), Some(&before));
+    assert_eq!(status.suspended, Some(Suspension::ExternalRadioChange));
+    assert!(fake.calls().is_empty());
+    drop(controller);
+    fake.edit(|w| {
+        w.change = None;
+        w.reject_reconcile = true;
+    });
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    let status = controller.tick().unwrap();
+    assert_eq!(status.suspended, Some(Suspension::ExternalRadioChange));
+    assert!(controller.resume(status.policy.generation).is_err());
+    assert_eq!(
+        controller.status().unwrap().suspended,
+        Some(Suspension::ExternalRadioChange)
+    );
+    fake.edit(|w| w.reject_reconcile = false);
+    let generation = controller.status().unwrap().policy.generation;
+    assert!(controller.resume(generation).unwrap().suspended.is_none());
+    assert!(fake.calls().is_empty());
 }
 
 #[test]

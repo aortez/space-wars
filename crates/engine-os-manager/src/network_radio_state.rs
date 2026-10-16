@@ -11,6 +11,7 @@ pub enum Suspension {
     ExternalRadioChange,
     ProfilesChanged,
     ManagerChanged,
+    ObservationLost,
     CommandRejected,
     CommandUncertain,
     ReadbackMismatch,

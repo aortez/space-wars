@@ -179,7 +179,7 @@ struct Temporary {
 }
 
 /// None means the observer is incomplete, not that no activity exists.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct Activity {
     pub ssh_sessions: Option<bool>,
     pub checkpoints: Option<bool>,

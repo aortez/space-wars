@@ -13,17 +13,18 @@ recovery journal, Linux boot adapters and verified inactive-root writer. It is
 not an enabled end-to-end updater. Production feed/signing, installation-service
 integration and Pi failure qualification remain outstanding.
 
-`engine-os-manager` now also contains the independent time/status service for
-[#256](https://github.com/aortez/space-wars/issues/256), described below. The
-service has no installation, reboot, network-policy or arbitrary-command socket
-operation. It has not yet been enabled on either physical kiosk.
+`engine-os-manager` contains the independent time/status service for
+[#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
+coordinator and policy socket, described below. Neither socket exposes an
+installation, reboot or arbitrary-command operation. The service has not yet
+been enabled on either physical kiosk.
 
 Remaining work retains the full OTA scope:
 
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Policy/holds, radio controller, Wi-Fi-only adapter and bounded control server implemented; session protection, runtime/setup/deployment integration and offline scheduling remain |
+| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion and SSH admission implemented; setup/deployment hooks, SSH idle qualification and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
@@ -236,6 +237,31 @@ reply does not undo a reservation; retry with the same capability. Status failur
 and a stopped coordinator report unavailability, while queue pressure is distinct.
 The network coordinator does not share the time/status service's work loop.
 
+`serve` starts this coordinator with the native radio, SSH and install-lock
+adapters. Its supervisor retries initialization after transient policy-lock
+contention and restarts a stopped coordinator, with backoff from 250 milliseconds
+to five seconds. Store ownership precedes replacement of a stale socket, so a
+second process cannot unlink an active owner's endpoint. Network initialization
+and observation failures do not stop time/status work. Radio shutdown holds the
+canonical installation lock across its final observation, write and readback;
+lock contention or an unverified lock defers shutdown. Status includes the
+activity evidence used by the decision.
+
+The native monitor retains authenticated D-Bus subscriptions for NetworkManager
+owner and radio-property changes. An external change reversed between snapshots
+still suspends automatic toggles. One matching notification can be attributed to
+a prepared write; extra notifications, invalidated properties, lost observation
+or owner replacement cannot erase a conflict. The saved suspension survives
+restart. Explicit resume establishes a new monitor baseline only after checking
+that there is no unresolved command from the current boot. Profile revisions
+continue to come from the bounded per-connection inventory.
+
+The CLI exposes `engine-os-manager network status`,
+`network policy --generation N --partial-offline true|false --stay-connected true|false`,
+and `network resume --generation N`. Obtain the generation from status before
+changing policy; stale generations are rejected. `network-watch-probe --seconds N`
+observes for one to thirty seconds without changing radio state.
+
 `engine-os-manager network-session-probe` now reads kernel TCP tables and the
 loaded systemd SSH socket/template, with a five-second observation deadline.
 It counts active, authenticating and closing connections, including non-interactive
@@ -271,17 +297,17 @@ change the radio. Corrupt/missing records inside an existing state directory and
 an active coordinator prevent the fallback. An uninitialized image keeps ordinary
 SSH startup behavior.
 
-**Integration remains incomplete:** `serve` does not yet load the controller or
-bind this network socket. Native install guards, continuous radio-change monitoring
-(including changes reversed between polls), runtime/CLI binding, setup lifecycle
-and deployment hooks remain required. The native observer currently defers idle
+**Integration remains incomplete:** setup lifecycle and deployment hooks remain
+required. The native observer currently defers idle
 qualification for other TCP listeners; both installed images have additional
-listeners on ports 53 and 111 that still need classification. Namespace confirmation must also work under the
-installed service's capability restrictions, without granting broad tracing access.
+listeners on ports 53 and 111 that still need classification. Namespace confirmation
+must also work under the installed service's capability restrictions, without
+granting broad tracing access.
 Expected profile changes from the setup worker need coordination with the observer.
-The controller tests supply activity and guards from fixtures. The new SSH hook has
-not been installed or physically qualified on either Pi, and these changes do not
-enable automatic radio changes in the runtime service.
+The controller tests use fake radios and temporary state. The native coordinator
+and SSH hook have not been installed or physically qualified on either Pi.
+Partial offline remains disabled by default; neither board's installed policy
+or radio settings have changed.
 
 The implementation at `7dde8ca` passed all 53 manager tests with temporary files
 on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new

@@ -118,6 +118,18 @@ pub struct NetworkServer {
 }
 
 impl NetworkServer {
+    pub(crate) fn running(&self) -> bool {
+        !self.stop.load(Ordering::Relaxed)
+            && self
+                .accept
+                .as_ref()
+                .is_some_and(|thread| !thread.is_finished())
+            && self
+                .coordinator
+                .as_ref()
+                .is_some_and(|thread| !thread.is_finished())
+    }
+
     /// The root-owned parent and exclusive policy store are prepared by the
     /// device service. This never unlinks an existing socket or initializes state.
     pub fn bind<B: Backend + Send + 'static>(

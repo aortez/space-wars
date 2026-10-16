@@ -56,8 +56,18 @@ enum Command {
     Probe,
     /// Read NetworkManager radio/checkpoint state without changing connectivity.
     NetworkProbe,
+    /// Observe NetworkManager changes for a bounded interval without writing radio state.
+    NetworkWatchProbe {
+        #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u16).range(1..=30))]
+        seconds: u16,
+    },
     /// Inspect SSH/TCP protection evidence without changing radio state.
     NetworkSessionProbe,
+    /// Control saved Wi-Fi policy through the independent device service.
+    Network {
+        #[command(subcommand)]
+        operation: NetworkCommand,
+    },
     /// Admit an accepted SSH connection before socket-activated sshd starts.
     #[command(hide = true)]
     SshNetworkAdmit,
@@ -86,6 +96,23 @@ enum MaintenanceCommand {
     },
     /// Change the fixed experimental renderer under the OTA lock.
     Renderer { renderer: String },
+}
+
+#[derive(Subcommand)]
+enum NetworkCommand {
+    Status,
+    Policy {
+        #[arg(long)]
+        generation: u64,
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
+        partial_offline: bool,
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
+        stay_connected: bool,
+    },
+    Resume {
+        #[arg(long)]
+        generation: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -185,10 +212,62 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             "{}",
             serde_json::to_string_pretty(&engine_os_manager::network_observation::observe()?)?
         ),
+        Command::NetworkWatchProbe { seconds } => {
+            use std::time::{Duration, Instant};
+            let mut monitor = engine_os_manager::network_monitor::Monitor::system()?;
+            let deadline = Instant::now() + Duration::from_secs(seconds.into());
+            let mut samples = 0_u32;
+            let (actual, change) = loop {
+                let observation = monitor.snapshot()?;
+                samples += 1;
+                let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                    break observation;
+                };
+                std::thread::sleep(remaining.min(Duration::from_millis(250)));
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schema":1, "samples":samples, "actual":actual, "change":change,
+                }))?
+            );
+        }
         Command::NetworkSessionProbe => println!(
             "{}",
             serde_json::to_string_pretty(&engine_os_manager::network_sessions::observe()?)?
         ),
+        Command::Network { operation } => {
+            use engine_os_manager::{
+                network_policy::Policy,
+                network_service::{self, Request},
+            };
+            let request = match operation {
+                NetworkCommand::Status => Request::Status { schema: 1 },
+                NetworkCommand::Policy {
+                    generation,
+                    partial_offline,
+                    stay_connected,
+                } => Request::SetPolicy {
+                    schema: 1,
+                    generation,
+                    policy: Policy {
+                        partial_offline,
+                        stay_connected,
+                    },
+                },
+                NetworkCommand::Resume { generation } => Request::Resume {
+                    schema: 1,
+                    generation,
+                },
+            };
+            let reply = network_service::request(network_service::SOCKET_PATH.as_ref(), &request)?;
+            println!("{}", serde_json::to_string_pretty(&reply)?);
+            if !reply.get("error").is_some_and(serde_json::Value::is_null) {
+                return Err(engine_os_manager::Error::Invalid(
+                    "network request was not accepted".into(),
+                ));
+            }
+        }
         Command::SshNetworkAdmit => {
             daemon::require_root()?;
             engine_os_manager::network_ssh::admit()?;
@@ -388,6 +467,9 @@ mod daemon {
                     .status()
             }),
         )?;
+        // Radio observations and commands run on their own coordinator thread.
+        // A corrupt network store must not stop independent time observation.
+        let _network = engine_os_manager::network_runtime::spawn();
         let mut rtc_worker: Option<RtcWorker> = None;
         let mut save_retry = Instant::now();
         let mut save_delay = Duration::from_secs(15);
