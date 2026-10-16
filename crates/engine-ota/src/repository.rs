@@ -239,7 +239,7 @@ impl TrustStore {
         Ok(())
     }
 
-    fn admit_time(&mut self, time: UsableTime) -> Result<()> {
+    pub(crate) fn admit_time(&mut self, time: UsableTime) -> Result<()> {
         if let Some(previous) = self.state.trusted.get("latest_known_time.json") {
             let previous: Timestamp = serde_json::from_str(previous)?;
             if time.0 < previous {

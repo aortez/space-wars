@@ -6,6 +6,7 @@ use crate::image_tools::ImageTools;
 use crate::owned_fs::{open_at, open_directory, owned, unchanged};
 use crate::recovery::{Action, FailureReason};
 use crate::recovery_linux::{DeviceNumber, DiskLayout, Partition};
+use crate::staging_linux::{staging_directory, staging_lock};
 use crate::{
     Blob, Error, ImageDescriptor, ImageIdentity, RecoveryStore, Result, VerifiedCandidate,
     verify_blob,
@@ -45,6 +46,7 @@ pub struct WriteProgress {
 /// staging name, so a caller cannot redirect installation with a pathname.
 pub struct StagedPayload {
     directory: File,
+    _lock: File,
     file: File,
     original: Metadata,
     expected: Blob,
@@ -54,28 +56,16 @@ pub struct StagedPayload {
 
 impl StagedPayload {
     pub fn open(candidate: &VerifiedCandidate, layout: &DiskLayout) -> Result<Self> {
-        let root = open_directory(Path::new("/"), 0)?;
-        let data = open_at(&root, "data", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-        owned(&data.metadata()?, true, 0, false)?;
-        if DeviceNumber::from_dev(data.metadata()?.dev()) != layout.partitions[3].device {
-            return Err(invalid("staging is not on the validated data partition"));
-        }
-        let system = open_at(
-            &data,
-            "spacewars-system",
-            libc::O_RDONLY | libc::O_DIRECTORY,
+        Self::under(
+            staging_directory(layout)?,
             0,
-        )?;
-        owned(&system.metadata()?, true, 0, true)?;
-        let staging = open_at(&system, "staging", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-        if staging.metadata()?.dev() != data.metadata()?.dev() {
-            return Err(invalid("staging filesystem differs from persistent data"));
-        }
-        Self::under(staging, 0, candidate.image().compressed.clone())
+            candidate.image().compressed.clone(),
+        )
     }
 
     fn under(directory: File, owner: u32, expected: Blob) -> Result<Self> {
         owned(&directory.metadata()?, true, owner, true)?;
+        let lock = staging_lock(&directory, owner)?;
         let name = format!("{}.ext4.zst", expected.sha256);
         let file = open_at(&directory, &name, libc::O_RDONLY, 0)?;
         let original = file.metadata()?;
@@ -85,6 +75,7 @@ impl StagedPayload {
         }
         let staged = Self {
             directory,
+            _lock: lock,
             file,
             original,
             expected,

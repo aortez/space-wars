@@ -5,6 +5,9 @@
 //! authority; reboot belongs to the device service. A verified candidate still
 //! needs revalidation at installation.
 
+#[cfg(test)]
+extern crate self as engine_ota;
+
 #[cfg(target_os = "linux")]
 pub mod access_linux;
 pub mod boot;
@@ -41,6 +44,8 @@ pub mod recovery;
 pub mod recovery_linux;
 mod recovery_store;
 mod repository;
+#[cfg(target_os = "linux")]
+pub mod staging_linux;
 mod store;
 
 pub use contract::*;
@@ -85,6 +90,10 @@ pub enum Error {
     CandidateChanged,
     #[error("image length or SHA-256 does not match signed metadata")]
     ImageMismatch,
+    #[error("update staging: {0}")]
+    Staging(&'static str),
+    #[error("insufficient staging space; 256 MiB must remain free")]
+    StagingSpace,
     #[error("TUF verification failed: {0}")]
     Tuf(#[source] Box<tough::error::Error>),
     #[error("storage failure: {0}")]

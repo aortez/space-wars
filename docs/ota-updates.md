@@ -28,7 +28,7 @@ Remaining work retains the full OTA scope:
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | HTTPS download worker, staging/resume and bounded connection ownership |
+| #265 | Private staging, resume validation and verified publication implemented; HTTPS worker, scheduling and bounded connection ownership remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -958,6 +958,8 @@ is no caller-supplied device, pathname, command or install hook.
 Staging is fixed at `/data/spacewars-system/staging/<compressed-sha256>.ext4.zst`.
 Descriptor-relative opens reject symlinks, hardlinks, wrong owners, public
 permissions, a different data filesystem and replacement of the opened file.
+The installer holds the same exclusive staging lock as the download writer;
+the service must close its staging store before opening the installer payload.
 The compressed payload is hashed before opening the target and again while
 decoding. Actual block-device ownership, identity, capacity and writable state
 are checked on the exclusively held device handle.
@@ -1191,8 +1193,9 @@ refresh, with at most 32 root updates and a two-minute total deadline. The
 transport also applies these limits when a signed snapshot declares a larger
 length. Only the fixed top-level and channel-role paths are admitted. Image
 compressed length must be positive and below 2 GiB; expanded length must fit the
-actual inactive slot. The downloader still needs its separate staging quota,
-progress timeout, redirect policy and bandwidth limits under #265.
+actual inactive slot. Persistent staging now applies its separate space quota,
+described below. The HTTPS worker still needs progress timeouts, redirect policy,
+bandwidth limits and network-hold integration under #265.
 
 ## Persistent verification and installation evidence
 
@@ -1236,14 +1239,95 @@ actual devices and recovery capability at the final handoff, verify expanded
 bytes while writing, and preserve fallback data readability. Blocking image
 hashing belongs on the service's worker, never the client/render loop.
 
+## Persistent image staging (#265)
+
+`engine_ota::staging_linux::StagingStore` manages one candidate in the fixed
+root-owned `/data/spacewars-system/staging` directory on the validated data
+partition. A private, single-link lock also excludes `StagedPayload`, preventing
+cleanup or a new download while the installer has an image open. Opening the
+production store requires that its private directory has already been provisioned;
+it does not create a fallback location when `/data` or setup is missing.
+
+The store keeps a bounded, checksummed candidate record and `payload.partial`.
+The record binds the entire signed descriptor, including generation and channel;
+it contains no install approval. Candidate changes remove only the previously
+recorded update files. Unknown files, symlinks, hardlinks, executable files,
+wrong owners or public permissions require repair rather than a directory sweep.
+Record publication uses file flush, atomic rename and directory flush. Interrupted
+record writes leave the prior record authoritative. Restarting uses the actual
+partial file length; it never trusts a saved byte counter or a persisted Ready bit.
+
+Transfer admission checks the signed compressed length against available space,
+including allocation rounding, and requires at least 256 MiB to remain free.
+That check repeats while appending and before publication. No ROMs, settings,
+partitions or unrelated files are removed to make room. The expanded image must
+fit the supplied inactive-slot identity. Transfers and verification use at most
+64 KiB application IO buffers; expanded bytes are hashed without storing a second
+image. The decoder accepts one standard zstd frame with a maximum 64 MiB window.
+
+Resume requires the identical signed descriptor, a retained strong HTTP ETag,
+and an exact `206` response covering the remaining suffix, with matching length,
+total size and validator. A full `200` response replaces an existing prefix.
+Missing or weak validators restart an incomplete file from zero. Unexpected
+encoding, changed validators, inconsistent ranges, truncated data and excess
+bytes cannot publish a candidate. An invalid response or failed append ends that
+transfer until explicitly restarted. Validators are private and never appear in
+serialized status or error messages.
+
+Publication hashes the entire compressed file, then validates the expanded
+length and hash, rejects trailing bytes/concatenated frames, and reruns cached
+TUF selection against current time, device identity and history. A service guard
+runs between bounded reads, including decoder input reads, and before publication;
+it must reject cancellation, changed selection or an expired session. Unknown,
+expired or backwards time cannot publish. Time observed at final publication is
+persisted even if expiry rejects the candidate, preventing clock rollback from
+reviving it after restart. File identity is rechecked after the final guard.
+Only then is the partial atomically renamed to `<compressed-sha256>.ext4.zst`.
+The installer still independently verifies metadata, opened bytes and live
+installation authority before any root write.
+
+Retained status always says **Unverified**, even for a complete file from a
+previous process. A caller receives a new opaque `VerifiedCandidate` only after
+successful publication. Merely possessing the filename, record or status does
+not authorize installation. No install mode is changed by this component.
+
+The signed-feed and filesystem fixtures exercise resume/restart, channel and
+generation changes, malformed responses, compressed and expanded corruption,
+low-space admission, every verification cancellation boundary, late replacement,
+expiry/clock rollback and installer exclusion. They do not contact an HTTP
+server or install an image. The production HTTPS transport, automatic daily
+scheduling, Check now coalescing, time/network-hold lifecycle, rate limiting,
+worker-priority policy and UI status integration remain unfinished. In particular,
+the two-minute preparation, thirty-minute session and sixty-second no-progress
+limits must still be enforced by that worker; the staging guard is only their
+integration point. No physical updater has been enabled by this change.
+
+Validation on 2026-10-16 passed 256 OTA unit tests and 22 signed-feed verification
+tests serially on the host; eight preexisting environment/artifact tests remain
+ignored in that run. All 21 staging fixtures also passed as UID 1000 on both Pis
+(Pi 5: 8.19 s; Pi 4: 15.85 s), using private temporary files on `/data` and
+unchanged boot IDs. Scoped Clippy, Rust 1.89 all-target checks, AArch64 test
+compilation and formatting passed. These runs exercise ordinary filesystem
+operations on the boards, not the production root-owned staging opener, a live
+download, actual disk exhaustion or installation. The default parallel harness
+limitations and the isolated rerun are retained in the
+[source and validation evidence](data/ota-staging-20261016.json).
+
 ## Reproducible verification
 
 ```sh
-cargo test --locked -p engine-ota
+cargo test --locked -p engine-ota -- --test-threads=1
 cargo clippy --locked -p engine-ota --all-targets --no-deps -- -D warnings
 cargo +1.89.0 check --locked -p engine-ota
 cargo check --locked -p engine-ota --target aarch64-unknown-linux-gnu
 ```
+
+Run the OTA suite serially. The existing bootstrap fixtures reproduce lock-busy
+and elapsed-progress assertion failures under the default parallel test runner
+on this host, including on unchanged revision `c779d0d`. Do not rebuild into the
+same target directory while tests are running: crash/restart fixtures reexecute
+their own test binary. Those harness limitations remain separate from image
+staging and physical-device qualification.
 
 The fixture builder in `crates/engine-ota/tests/support` creates ephemeral
 Ed25519 keys and signed feeds using `tough`'s publisher API. Its transport is an

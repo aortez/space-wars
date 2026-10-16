@@ -549,10 +549,12 @@ fn staging_is_private_named_by_hash_and_rechecks_the_open_file_and_name() {
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     let mut staged = open().unwrap();
     staged.verify(&fixture.image).unwrap();
+    assert!(matches!(open(), Err(Error::Busy)));
     fs::rename(&path, directory.path().join("old")).unwrap();
     fs::write(&path, &fixture.compressed).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     assert!(staged.reader().is_err());
+    drop(staged);
     let mut staged = open().unwrap();
     fs::OpenOptions::new()
         .write(true)
@@ -561,6 +563,7 @@ fn staging_is_private_named_by_hash_and_rechecks_the_open_file_and_name() {
         .write_all(b"nope")
         .unwrap();
     assert!(staged.verify(&fixture.image).is_err());
+    drop(staged);
     assert!(open().unwrap().verify(&fixture.image).is_err());
     fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(open().is_err());
