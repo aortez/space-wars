@@ -54,6 +54,8 @@ enum Command {
     Status,
     /// Inspect the current time provider without changing clocks or state.
     Probe,
+    /// Read NetworkManager radio/checkpoint state without changing connectivity.
+    NetworkProbe,
     /// Capture the actual RTC before the time provider starts.
     #[command(hide = true)]
     CaptureRtc,
@@ -174,6 +176,10 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             );
         }
         Command::Serve => daemon::serve()?,
+        Command::NetworkProbe => println!(
+            "{}",
+            serde_json::to_string_pretty(&engine_os_manager::network_observation::observe()?)?
+        ),
         Command::Recover => {
             daemon::require_root()?;
             engine_os_manager::recovery_service::run()?;

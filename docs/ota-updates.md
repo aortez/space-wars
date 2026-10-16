@@ -23,7 +23,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Maintenance holds, bounded connectivity and offline controls |
+| #258–#260 | Policy/hold persistence and read-only radio probing implemented; serialized radio control, setup/deployment integration and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
@@ -141,6 +141,51 @@ compatibility guard correctly prevents using this image as an in-place OTA.
 It has not been installed on either kiosk.
 [Raw Pi output and binary/source identities](data/device-time-20261014.json)
 distinguish fixture execution from installed service/RTC qualification.
+
+## Wi-Fi policy and connection ownership
+
+`engine_os_manager::network_policy` supplies the saved policy and lease state
+for [#258](https://github.com/aortez/space-wars/issues/258). Partial offline and
+Stay connected default to Off and remain separate saved controls. Mode Off
+produces unmanaged intent even when a hold or saved override exists; it cannot
+authorize overriding an independently disabled radio. Policy changes use the
+current generation, so a stale caller cannot replace newer intent.
+
+Setup leases last 120 seconds and can be renewed. Time checks have a two-minute
+absolute limit; download leases renew within a thirty-minute absolute limit.
+Temporary holds bind to the authenticated process identity and are not persisted.
+Deployment holds bind to an account and caller-retained capability, survive
+command/process gaps, and renew for two hours. A new boot grants one fifteen-minute
+reconnect allowance per explicit renewal. Restarting the service cannot extend
+that deadline, and another reboot cannot replenish an already-used allowance.
+Status and durable records omit the secret capability. Repeated reservation or
+release requests do not allocate another lease or restart a completed grace.
+
+The private store is exclusively locked and uses bounded, checksummed records,
+atomic replacement and file/directory flushes. Existing missing/corrupt state,
+changed paths, unsafe permissions and uncertain flushes cannot reset saved
+policy or deployment ownership. Only a new directory receives default state.
+The service-start grace covers the existing 100-second setup checkpoint and
+ten-second quiet period. Expired setup holds retain an additional checkpoint
+allowance. Reaping requires fresh, continuous idle observations of SSH sessions,
+NetworkManager checkpoints, the install lock and live operations. Unknown,
+busy or stale observations prevent shutdown intent.
+
+`engine-os-manager network-probe` reads NetworkManager's
+[radio and checkpoint properties](https://networkmanager.dev/docs/api/1.46.0/gdbus-org.freedesktop.NetworkManager.html)
+without scanning, activating connections or changing settings. It pins the
+root-owned unique bus name, compares two uncached snapshots and rechecks the
+owner, with one five-second overall deadline. Replies, property counts and
+checkpoint inventories are bounded. Output distinguishes global networking,
+software radio enablement and hardware enablement; these are not evidence of
+a usable Wi-Fi connection.
+
+**Integration remains incomplete:** `serve` does not yet load this policy or
+admit holds. The serialized radio adapter, persistent ownership of radio changes,
+external-change reconciliation, complete SSH/session observer, socket controls,
+setup lifecycle and deployment hooks remain required. The library's intent is
+not a radio-write capability, and reserving a lease does not acknowledge actual
+availability. No automatic radio change is enabled by these additions.
 
 ## Trial recovery journal and health model
 
