@@ -56,6 +56,11 @@ enum Command {
     Probe,
     /// Read NetworkManager radio/checkpoint state without changing connectivity.
     NetworkProbe,
+    /// Inspect SSH/TCP protection evidence without changing radio state.
+    NetworkSessionProbe,
+    /// Admit an accepted SSH connection before socket-activated sshd starts.
+    #[command(hide = true)]
+    SshNetworkAdmit,
     /// Capture the actual RTC before the time provider starts.
     #[command(hide = true)]
     CaptureRtc,
@@ -180,6 +185,14 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             "{}",
             serde_json::to_string_pretty(&engine_os_manager::network_observation::observe()?)?
         ),
+        Command::NetworkSessionProbe => println!(
+            "{}",
+            serde_json::to_string_pretty(&engine_os_manager::network_sessions::observe()?)?
+        ),
+        Command::SshNetworkAdmit => {
+            daemon::require_root()?;
+            engine_os_manager::network_ssh::admit()?;
+        }
         Command::Recover => {
             daemon::require_root()?;
             engine_os_manager::recovery_service::run()?;

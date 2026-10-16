@@ -310,14 +310,36 @@ pub fn request(path: &Path, request: &Request) -> Result<serde_json::Value> {
 }
 
 fn request_from(path: &Path, request: &Request, server_uid: u32) -> Result<serde_json::Value> {
+    request_before(
+        path,
+        request,
+        server_uid,
+        Instant::now() + OPERATION_DEADLINE + 2 * FRAME_DEADLINE + Duration::from_secs(2),
+    )
+}
+
+pub(crate) fn request_before(
+    path: &Path,
+    request: &Request,
+    server_uid: u32,
+    deadline: Instant,
+) -> Result<serde_json::Value> {
+    let remaining = |limit: Duration| {
+        deadline
+            .checked_duration_since(Instant::now())
+            .filter(|time| !time.is_zero())
+            .map(|time| time.min(limit))
+            .ok_or_else(|| Error::Invalid("network request deadline exceeded".into()))
+    };
     let mut bytes = serde_json::to_vec(request)?;
     if !request.supported() || bytes.len() > FRAME_LIMIT {
         return Err(Error::Invalid("invalid network request".into()));
     }
+    let connection_deadline = remaining(FRAME_DEADLINE)?;
     let mut stream = futures_lite::future::block_on(futures_lite::future::or(
         async { async_io::Async::<UnixStream>::connect(path).await },
         async {
-            async_io::Timer::after(FRAME_DEADLINE).await;
+            async_io::Timer::after(connection_deadline).await;
             Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "network socket connection timed out",
@@ -329,10 +351,14 @@ fn request_from(path: &Path, request: &Request, server_uid: u32) -> Result<serde
     if service::peer_credentials(&stream)?.uid != server_uid {
         return Err(Error::Invalid("unexpected network service owner".into()));
     }
-    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+    stream.set_write_timeout(Some(remaining(Duration::from_secs(2))?))?;
     bytes.push(b'\n');
     stream.write_all(&bytes)?;
-    let reply = service::read_frame(&mut stream, 16 * 1024, OPERATION_DEADLINE + FRAME_DEADLINE)?;
+    let reply = service::read_frame(
+        &mut stream,
+        16 * 1024,
+        remaining(OPERATION_DEADLINE + FRAME_DEADLINE)?,
+    )?;
     let value: serde_json::Value = serde_json::from_slice(&reply)?;
     if value.get("schema") != Some(&serde_json::json!(1)) {
         return Err(Error::Invalid("unsupported network reply".into()));

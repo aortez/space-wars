@@ -236,14 +236,52 @@ reply does not undo a reservation; retry with the same capability. Status failur
 and a stopped coordinator report unavailability, while queue pressure is distinct.
 The network coordinator does not share the time/status service's work loop.
 
+`engine-os-manager network-session-probe` now reads kernel TCP tables and the
+loaded systemd SSH socket/template, with a five-second observation deadline.
+It counts active, authenticating and closing connections, including non-interactive
+SSH, and independently counts active SSH service instances. It publishes counts
+and qualification flags, without endpoint addresses or instance names. Missing,
+malformed, oversized or changing observations cannot report idle. The expected
+socket configuration, admission helper, host network namespace and listener
+inventory must all be confirmed before an empty snapshot is considered idle.
+The parser follows the kernel's [TCP table format](https://www.kernel.org/doc/Documentation/networking/proc_net_tcp.txt).
+
+The root-only `ssh-network-admit` helper verifies that its input is an accepted
+TCP socket on port 22, without reading connection bytes. The image recipe adds it
+as a non-ignorable `ExecStartPre` on `sshd@.service`. Systemd 255's
+[service spawn path](https://github.com/systemd/systemd/blob/v255/src/core/service.c#L1496)
+passes the accepted socket to these commands when `StandardInput=socket` is set.
+The bootstrap access checker permits this exact helper for the per-connection
+service, while continuing to accept the legacy configuration without it.
+
+SSH admission reserves a root-only 120-second hold through the same coordinator
+queue as radio transitions. `session-protected` permits the accepted connection
+to continue; it does not claim Wi-Fi or Internet readiness. An independently off
+radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
+must be restored first, and an uncertain prior command cannot produce a successful
+admission. Expired holds remain protective while live sessions or unknown activity
+remain; a quiet, complete observation is required before reaping.
+
+The helper has a 45-second socket/retry budget and reuses one capability. Its unit
+wants and follows the device service without requiring successful startup. If the
+service is absent or stopped, the helper can instead acquire its exclusive policy
+lock and verify that no pending command or policy-owned off state exists. This
+fallback does not create policy state, advance generations, clear uncertainty or
+change the radio. Corrupt/missing records inside an existing state directory and
+an active coordinator prevent the fallback. An uninitialized image keeps ordinary
+SSH startup behavior.
+
 **Integration remains incomplete:** `serve` does not yet load the controller or
-bind this network socket. The native complete SSH/session observer and admission barrier,
-install guards, continuous radio-change monitoring (including changes reversed
-between polls), runtime/CLI binding, setup lifecycle and deployment hooks remain
-required. The controller tests supply activity and guards from fixtures; these
-do not qualify physical SSH admission. Expected profile changes from the setup
-worker still need coordination with the observer. No automatic radio change is
-enabled in the runtime service by these additions.
+bind this network socket. Native install guards, continuous radio-change monitoring
+(including changes reversed between polls), runtime/CLI binding, setup lifecycle
+and deployment hooks remain required. The native observer currently defers idle
+qualification for other TCP listeners; both installed images have additional
+listeners on ports 53 and 111 that still need classification. Namespace confirmation must also work under the
+installed service's capability restrictions, without granting broad tracing access.
+Expected profile changes from the setup worker need coordination with the observer.
+The controller tests supply activity and guards from fixtures. The new SSH hook has
+not been installed or physically qualified on either Pi, and these changes do not
+enable automatic radio changes in the runtime service.
 
 The implementation at `7dde8ca` passed all 53 manager tests with temporary files
 on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new

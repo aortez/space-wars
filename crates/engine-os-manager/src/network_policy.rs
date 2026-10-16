@@ -33,6 +33,8 @@ pub struct Policy {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum HoldKind {
+    /// Reserved by the root-owned, socket-activated SSH admission helper.
+    Ssh,
     Setup,
     TimeCheck,
     Download,
@@ -250,6 +252,25 @@ pub struct NetworkPolicy {
     activity_seen_ms: Option<u64>,
 }
 
+/// Kept until the SSH helper returns. A new coordinator cannot acquire policy
+/// ownership until then, and subsequently observes the activating SSH unit.
+pub(crate) struct OfflineSshGuard {
+    _store: Option<store::Store>,
+}
+
+pub(crate) fn protect_ssh_without_service(directory: &Path) -> Result<OfflineSshGuard> {
+    let store = match store::Store::existing(directory)? {
+        Some((store, record)) => {
+            if record.radio.pending.is_some() || record.radio.owned_off {
+                return Err(invalid("SSH protection requires the radio coordinator"));
+            }
+            Some(store)
+        }
+        None => None,
+    };
+    Ok(OfflineSshGuard { _store: store })
+}
+
 impl NetworkPolicy {
     pub fn open(directory: &Path, clock: Clock) -> Result<Self> {
         if !clock.valid() {
@@ -372,6 +393,9 @@ impl NetworkPolicy {
         clock: &Clock,
     ) -> Result<()> {
         self.check(clock)?;
+        if kind == HoldKind::Ssh && caller.uid != 0 {
+            return Err(invalid("SSH admission requires the root helper"));
+        }
         let id = token.id();
         if let Some(old) = self.temporary.get(&id) {
             if old.caller != caller || old.kind != kind {

@@ -47,6 +47,8 @@ struct Fixture {
     radio_off: AtomicBool,
     deny_write: AtomicBool,
     slow_write: AtomicBool,
+    write_received: AtomicBool,
+    release_write: AtomicBool,
     omit_second_profile: AtomicBool,
 }
 struct Manager(Arc<Fixture>);
@@ -103,7 +105,15 @@ impl Manager {
             ));
         }
         if self.0.slow_write.load(Ordering::SeqCst) {
-            async_io::Timer::after(Duration::from_secs(2)).await;
+            self.0.write_received.store(true, Ordering::SeqCst);
+            bounded(Duration::from_secs(5), async {
+                while !self.0.release_write.load(Ordering::SeqCst) {
+                    async_io::Timer::after(Duration::from_millis(1)).await;
+                }
+                Ok(())
+            })
+            .await
+            .map_err(|_| zbus::fdo::Error::Failed("fixture release deadline".into()))?;
         }
         self.0.mutations.fetch_add(1, Ordering::SeqCst);
         self.0.radio_off.store(!enabled, Ordering::SeqCst);
@@ -221,16 +231,28 @@ fn timed_out_dbus_write_can_still_execute_and_is_not_a_rejection() {
         let uid = unsafe { libc::geteuid() };
         let before = connection_observation(&client, uid).await.unwrap();
         fixture.slow_write.store(true, Ordering::SeqCst);
-        let started = std::time::Instant::now();
-        assert!(
-            bounded(
-                Duration::from_millis(30),
-                write(&client, uid, &before, false)
-            )
-            .await
-            .is_err()
-        );
-        assert!(started.elapsed() < Duration::from_secs(1));
+        // Establish dispatch explicitly: a short deadline around the whole
+        // preflight can expire before Set reaches a slower target's provider.
+        // Dropping the losing future uses the same cancellation as bounded().
+        let timed_out = bounded(
+            Duration::from_secs(5),
+            futures_lite::future::or(
+                async { write(&client, uid, &before, false).await.map(|_| false) },
+                async {
+                    while !fixture.write_received.load(Ordering::SeqCst) {
+                        async_io::Timer::after(Duration::from_millis(1)).await;
+                    }
+                    async_io::Timer::after(Duration::from_millis(30)).await;
+                    Ok(true)
+                },
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(timed_out);
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
+        assert!(!fixture.radio_off.load(Ordering::SeqCst));
+        fixture.release_write.store(true, Ordering::SeqCst);
         let after = bounded(Duration::from_secs(3), connection_observation(&client, uid))
             .await
             .unwrap();

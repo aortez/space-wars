@@ -207,6 +207,38 @@ fn narrow_protocol_rejects_spoofed_identity_arbitrary_operations_and_stale_polic
     let fake = Fake::new();
     let controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
     let _server = NetworkServer::bind(&path, uid(), controller).unwrap();
+    if uid() != 0 {
+        let before = status(&path);
+        assert_eq!(
+            request(
+                &path,
+                &Request::Admit {
+                    schema: 1,
+                    token: HoldToken::generate().unwrap().expose().into(),
+                    kind: HoldKind::Ssh,
+                }
+            )
+            .unwrap()["error"],
+            "rejected"
+        );
+        assert_eq!(
+            status(&path)["status"]["policy"],
+            before["status"]["policy"]
+        );
+    } else {
+        let reply = request(
+            &path,
+            &Request::Admit {
+                schema: 1,
+                token: HoldToken::generate().unwrap().expose().into(),
+                kind: HoldKind::Ssh,
+            },
+        )
+        .unwrap();
+        assert!(reply["error"].is_null());
+        assert_eq!(reply["availability"], "session-protected");
+        assert_eq!(reply["status"]["policy"]["holds"][0]["kind"], "ssh");
+    }
     for bytes in [
         b"{\"schema\":2,\"command\":\"status\"}\n".as_slice(),
         b"{\"schema\":1,\"command\":\"status\",\"uid\":0}\n",
@@ -254,6 +286,29 @@ fn narrow_protocol_rejects_spoofed_identity_arbitrary_operations_and_stale_polic
     assert_eq!(status(&path)["error"], "unavailable");
     assert_eq!(request(&path, &change).unwrap()["error"], "rejected");
     assert!(fake.0.lock().unwrap().writes.is_empty());
+}
+
+#[test]
+fn client_deadline_includes_a_stalled_reply() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let worker = thread::spawn(move || {
+        let (_stream, _) = listener.accept().unwrap();
+        thread::sleep(Duration::from_millis(200));
+    });
+    let start = Instant::now();
+    assert!(
+        request_before(
+            &path,
+            &Request::Status { schema: 1 },
+            uid(),
+            start + Duration::from_millis(30)
+        )
+        .is_err()
+    );
+    assert!(start.elapsed() < Duration::from_millis(150));
+    worker.join().unwrap();
 }
 
 #[test]

@@ -173,6 +173,107 @@ fn ready(controller: &mut Controller<Fake>, fake: &Fake) {
     fake.edit(|w| w.clock.ms = 110_000);
 }
 
+fn ssh_caller() -> Caller {
+    Caller { uid: 0, ..caller() }
+}
+
+#[test]
+fn ssh_admission_is_root_only_and_does_not_claim_or_force_wifi_availability() {
+    for unknown in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        fake.edit(|w| {
+            w.radio.wireless_enabled = false;
+            w.radio.ethernet_available = true;
+        });
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        let before = controller.status().unwrap().policy;
+        assert!(controller.admit(&token(), caller(), HoldKind::Ssh).is_err());
+        assert_eq!(controller.status().unwrap().policy, before);
+        fake.edit(|w| w.unknown = unknown);
+        let admitted = controller
+            .admit(&token(), ssh_caller(), HoldKind::Ssh)
+            .unwrap();
+        assert_eq!(admitted.availability, Availability::SessionProtected);
+        assert!(fake.calls().is_empty());
+        assert_eq!(admitted.status.actual.is_none(), unknown);
+        assert!(controller.renew(&token(), caller()).is_err());
+        assert!(controller.release(&token(), caller()).is_err());
+    }
+}
+
+#[test]
+fn ssh_admission_restores_owned_off_and_never_accepts_a_late_or_failed_off_command() {
+    for behavior in [
+        Behavior::Apply,
+        Behavior::Reject,
+        Behavior::Timeout,
+        Behavior::LoseReadback,
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        assert!(controller.tick().unwrap().owned_off);
+        fake.edit(|w| w.behavior = behavior);
+        let admitted = controller.admit(&token(), ssh_caller(), HoldKind::Ssh);
+        assert_eq!(admitted.is_ok(), matches!(behavior, Behavior::Apply));
+        assert_eq!(fake.calls(), [false, true]);
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let fake = Fake::new();
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    fake.edit(|w| w.behavior = Behavior::Timeout);
+    assert!(controller.tick().unwrap().pending.is_some());
+    drop(controller);
+    let mut controller = Controller::open(&path, fake.clone()).unwrap();
+    assert!(
+        controller
+            .admit(&token(), ssh_caller(), HoldKind::Ssh)
+            .is_err()
+    );
+    fake.edit(|w| w.radio.wireless_enabled = false);
+    assert!(
+        controller
+            .admit(&token(), ssh_caller(), HoldKind::Ssh)
+            .is_err()
+    );
+    assert_eq!(fake.calls(), [false]);
+    drop(controller);
+    assert!(network_policy::protect_ssh_without_service(&path).is_err());
+}
+
+#[test]
+fn expired_ssh_admission_is_kept_until_live_sessions_end_and_quiet_is_observed() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    controller
+        .admit(&token(), ssh_caller(), HoldKind::Ssh)
+        .unwrap();
+    fake.edit(|w| {
+        w.clock.ms += 120_001;
+        w.activity.ssh_sessions = Some(true);
+    });
+    let busy = controller.tick().unwrap();
+    assert_eq!(busy.policy.holds.len(), 1);
+    assert_eq!(busy.policy.holds[0].expires_in_ms, 0);
+    fake.edit(|w| w.activity.ssh_sessions = Some(false));
+    for _ in 0..10 {
+        fake.edit(|w| w.clock.ms += 1000);
+        assert_eq!(controller.tick().unwrap().policy.holds.len(), 1);
+    }
+    assert!(fake.calls().is_empty());
+    fake.edit(|w| w.clock.ms += 1000);
+    let idle = controller.tick().unwrap();
+    assert!(idle.policy.holds.is_empty());
+    assert!(idle.owned_off);
+    assert_eq!(fake.calls(), [false]);
+}
+
 #[test]
 fn off_is_inert_and_only_policy_owned_shutdown_is_restored() {
     for initially_enabled in [false, true] {
@@ -203,6 +304,7 @@ fn off_is_inert_and_only_policy_owned_shutdown_is_restored() {
     assert!(status.owned_off);
     assert_eq!(fake.calls(), [false]);
     drop(controller);
+    assert!(network_policy::protect_ssh_without_service(&path).is_err());
     let mut controller = Controller::open(&path, fake.clone()).unwrap();
     let generation = controller.status().unwrap().policy.generation;
     let status = controller
@@ -415,47 +517,49 @@ fn returned_commands_require_matching_readback_and_survive_lost_observation() {
 
 #[test]
 fn hold_arriving_during_shutdown_waits_for_restoration_before_acknowledgment() {
-    let temp = tempfile::tempdir().unwrap();
-    let fake = Fake::new();
-    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
-    ready(&mut controller, &fake);
-    let (entered_tx, entered_rx) = mpsc::channel();
-    let (resume_tx, resume_rx) = mpsc::channel();
-    fake.edit(|w| w.barrier = Some((entered_tx, resume_rx)));
-    let controller = Arc::new(Mutex::new(controller));
-    let off = {
-        let controller = controller.clone();
-        std::thread::spawn(move || controller.lock().unwrap().tick().unwrap())
-    };
-    entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-    let (queued_tx, queued_rx) = mpsc::channel();
-    let (ack_tx, ack_rx) = mpsc::channel();
-    let admit = {
-        let controller = controller.clone();
-        std::thread::spawn(move || {
-            queued_tx.send(()).unwrap();
-            let result = controller
-                .lock()
-                .unwrap()
-                .admit(&token(), caller(), HoldKind::Setup);
-            ack_tx.send(result).unwrap();
-        })
-    };
-    queued_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-    assert!(matches!(
-        ack_rx.recv_timeout(Duration::from_millis(50)),
-        Err(mpsc::RecvTimeoutError::Timeout)
-    ));
-    resume_tx.send(()).unwrap();
-    off.join().unwrap();
-    let admission = ack_rx
-        .recv_timeout(Duration::from_secs(2))
-        .unwrap()
-        .unwrap();
-    assert_eq!(admission.availability, Availability::WirelessReady);
-    assert!(admission.status.actual.unwrap().wireless_enabled);
-    assert_eq!(fake.calls(), [false, true]);
-    admit.join().unwrap();
+    for (kind, owner, availability) in [
+        (HoldKind::Setup, caller(), Availability::WirelessReady),
+        (HoldKind::Ssh, ssh_caller(), Availability::SessionProtected),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        fake.edit(|w| w.barrier = Some((entered_tx, resume_rx)));
+        let controller = Arc::new(Mutex::new(controller));
+        let off = {
+            let controller = controller.clone();
+            std::thread::spawn(move || controller.lock().unwrap().tick().unwrap())
+        };
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let (queued_tx, queued_rx) = mpsc::channel();
+        let (ack_tx, ack_rx) = mpsc::channel();
+        let admit = {
+            let controller = controller.clone();
+            std::thread::spawn(move || {
+                queued_tx.send(()).unwrap();
+                let result = controller.lock().unwrap().admit(&token(), owner, kind);
+                ack_tx.send(result).unwrap();
+            })
+        };
+        queued_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(matches!(
+            ack_rx.recv_timeout(Duration::from_millis(50)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        ));
+        resume_tx.send(()).unwrap();
+        off.join().unwrap();
+        let admission = ack_rx
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        assert_eq!(admission.availability, availability);
+        assert!(admission.status.actual.unwrap().wireless_enabled);
+        assert_eq!(fake.calls(), [false, true]);
+        admit.join().unwrap();
+    }
 }
 
 #[test]

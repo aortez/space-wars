@@ -29,15 +29,36 @@ pub(super) struct Store {
 
 impl Store {
     pub fn open(path: &Path) -> Result<(Self, Record)> {
-        let created = match fs::DirBuilder::new().mode(0o700).create(path) {
-            Ok(()) => true,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
-            Err(error) => return Err(error.into()),
+        Ok(Self::open_inner(path, true)?.expect("initializing open returns a store"))
+    }
+
+    /// Inspect under the same exclusive owner lock without creating state or
+    /// advancing its generation. Only an absent directory means uninitialized.
+    pub fn existing(path: &Path) -> Result<Option<(Self, Record)>> {
+        Self::open_inner(path, false)
+    }
+
+    fn open_inner(path: &Path, initialize: bool) -> Result<Option<(Self, Record)>> {
+        let created = if initialize {
+            match fs::DirBuilder::new().mode(0o700).create(path) {
+                Ok(()) => true,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
+                Err(error) => return Err(error.into()),
+            }
+        } else {
+            false
         };
         let directory = OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW | libc::O_DIRECTORY)
-            .open(path)?;
+            .open(path);
+        let directory = match directory {
+            Ok(directory) => directory,
+            Err(error) if !initialize && error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(None);
+            }
+            Err(error) => return Err(error.into()),
+        };
         let metadata = directory.metadata()?;
         if !metadata.is_dir() || !private(&metadata) {
             return Err(invalid("unsafe network policy directory"));
@@ -92,7 +113,7 @@ impl Store {
             envelope.record
         };
         store.check()?;
-        Ok((store, record))
+        Ok(Some((store, record)))
     }
 
     pub fn check(&self) -> Result<()> {

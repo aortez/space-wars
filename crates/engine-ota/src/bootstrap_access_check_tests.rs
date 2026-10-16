@@ -183,6 +183,30 @@ fn loaded_service_checks_reject_stale_configuration_redirects_and_alternate_ssh_
 }
 
 #[test]
+fn ssh_admission_hook_must_be_exact_and_cannot_ignore_a_failure() {
+    let hook = "{ path=/usr/bin/engine-os-manager ; argv[]=/usr/bin/engine-os-manager ssh-network-admit ; ignore_errors=no ; pid=0 }";
+    let mut fields = unit();
+    fields.insert("ExecStartPre".into(), hook.into());
+    ssh_service(&fields, "-i").unwrap();
+    for value in [
+        hook.replace("ignore_errors=no", "ignore_errors=yes"),
+        hook.replace("ssh-network-admit ;", "ssh-network-admit --skip ;"),
+        format!("{hook} {hook}"),
+        "{ path=/bin/true ; argv[]=/bin/true ; ignore_errors=no ; pid=0 }".into(),
+    ] {
+        fields.insert("ExecStartPre".into(), value);
+        assert!(ssh_service(&fields, "-i").is_err());
+    }
+    fields = unit();
+    fields.insert(
+        "ExecStart".into(),
+        fields["ExecStart"].replace(" -i ", " -D "),
+    );
+    fields.insert("ExecStartPre".into(), hook.into());
+    assert!(ssh_service(&fields, "-D").is_err());
+}
+
+#[test]
 fn configuration_parser_never_returns_unexpected_input_bytes_as_diagnostics() {
     let marker = "DO-NOT-LOG-THIS";
     for error in [

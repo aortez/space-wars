@@ -26,6 +26,10 @@ mod network_radio_state;
 #[cfg(target_os = "linux")]
 pub mod network_service;
 #[cfg(target_os = "linux")]
+pub mod network_sessions;
+#[cfg(target_os = "linux")]
+pub mod network_ssh;
+#[cfg(target_os = "linux")]
 pub mod recovery_service;
 #[cfg(target_os = "linux")]
 pub mod recovery_status;

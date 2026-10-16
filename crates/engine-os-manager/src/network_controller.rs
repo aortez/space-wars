@@ -69,13 +69,16 @@ pub struct Status {
     pub deferred: Option<Deferred>,
 }
 
-/// Availability permits an operation to start. Neither value asserts Internet
-/// access or a successful association with a particular access point.
+/// Admission permits an operation to start, without asserting Internet access
+/// or a successful association with a particular access point.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Availability {
     WirelessReady,
     EthernetReady,
+    /// The root SSH helper may continue an already accepted TCP connection.
+    /// This does not assert Wi-Fi readiness or change an independently off radio.
+    SessionProtected,
 }
 
 #[derive(Debug, Serialize)]
@@ -135,6 +138,20 @@ impl<B: Backend> Controller<B> {
         let status = self.tick()?;
         let clock = self.backend.clock()?;
         let kind = self.policy.held_kind(token, caller, &clock)?;
+        if kind == HoldKind::Ssh {
+            // The queued hold excludes future off decisions. An old off request
+            // may still arrive after a timeout, and a completed policy-owned off
+            // must be restored before the admission helper allows authentication.
+            // With neither present, a suspended/unavailable provider is safe for
+            // this existing TCP connection and must not disable Ethernet recovery.
+            if status.pending.is_some() || status.owned_off {
+                return Err(invalid("SSH protection awaits radio reconciliation"));
+            }
+            return Ok(Admission {
+                availability: Availability::SessionProtected,
+                status,
+            });
+        }
         if status.pending.is_some() || status.suspended.is_some() || status.deferred.is_some() {
             return Err(invalid(
                 "network hold reserved but availability is not confirmed",

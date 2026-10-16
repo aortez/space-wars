@@ -480,8 +480,20 @@ fn ssh_service(fields: &Service, mode: &str) -> Result<()> {
         "/usr/sbin/sshd",
         &format!(" {mode} $SSHD_OPTS"),
     )?;
-    if !value(fields, "ExecStartPre").is_empty()
-        || !value(fields, "PassEnvironment").is_empty()
+    if !value(fields, "ExecStartPre").is_empty() {
+        executable(
+            fields,
+            "ExecStartPre",
+            "/usr/bin/engine-os-manager",
+            " ssh-network-admit",
+        )?;
+        if mode != "-i" || !value(fields, "ExecStartPre").starts_with(
+            "{ path=/usr/bin/engine-os-manager ; argv[]=/usr/bin/engine-os-manager ssh-network-admit ; ignore_errors=no ;",
+        ) {
+            return Err(invalid("unreviewed SSH admission helper"));
+        }
+    }
+    if !value(fields, "PassEnvironment").is_empty()
         || !value(fields, "UnsetEnvironment").is_empty()
         || !matches!(value(fields, "Environment"), "" | "SSHD_OPTS=")
         || !matches!(

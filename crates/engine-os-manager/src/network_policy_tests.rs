@@ -47,6 +47,32 @@ fn observe_through(policy: &mut NetworkPolicy, begin: u64, end: u64, activity: A
 }
 
 #[test]
+fn ssh_fallback_preserves_saved_bytes_and_excludes_an_active_coordinator() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    protect_ssh_without_service(&path).unwrap();
+    assert!(!path.exists());
+    let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
+    enable(&mut policy);
+    policy
+        .reserve(&token(1), caller(1), HoldKind::Deployment, &clock(0))
+        .unwrap();
+    assert!(protect_ssh_without_service(&path).is_err());
+    let bytes = fs::read(path.join("state.json")).unwrap();
+    drop(policy);
+    let guard = protect_ssh_without_service(&path).unwrap();
+    assert!(NetworkPolicy::open(&path, clock(0)).is_err());
+    assert_eq!(fs::read(path.join("state.json")).unwrap(), bytes);
+    drop(guard);
+    NetworkPolicy::open(&path, clock(0)).unwrap();
+    fs::write(path.join("state.json"), b"damaged").unwrap();
+    assert!(protect_ssh_without_service(&path).is_err());
+    fs::remove_file(path.join("state.json")).unwrap();
+    assert!(protect_ssh_without_service(&path).is_err());
+    assert!(!path.join("state.json").exists());
+}
+
+#[test]
 fn defaults_leave_networking_alone_and_saved_override_remains_separate() {
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("network");

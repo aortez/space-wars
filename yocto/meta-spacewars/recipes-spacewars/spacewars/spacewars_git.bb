@@ -100,6 +100,7 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-access.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-sshd-access.conf:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-access.conf:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/sshd-spacewars-network.conf:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-system.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-recovery.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/bootstrap-runtime.json:True",
@@ -155,6 +156,7 @@ do_install() {
     # The default image uses Accept=yes socket activation and sshd@.service.
     install -d ${D}${systemd_system_unitdir}/sshd@.service.d
     install -m 0644 ${WORKDIR}/sshd-spacewars-access.conf ${D}${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf
+    install -m 0644 ${WORKDIR}/sshd-spacewars-network.conf ${D}${systemd_system_unitdir}/sshd@.service.d/spacewars-network.conf
     install -d ${D}${sysconfdir}/ssh/sshd_config.d
     install -m 0644 ${WORKDIR}/spacewars-sshd-access.conf ${D}${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf
     install -m 0644 ${WORKDIR}/spacewars-system.service ${D}${systemd_system_unitdir}/spacewars-system.service
@@ -184,6 +186,7 @@ SRC_URI += " \
     file://spacewars-access.service \
     file://spacewars-sshd-access.conf \
     file://sshd-spacewars-access.conf \
+    file://sshd-spacewars-network.conf \
     file://spacewars-system.service \
     file://spacewars-recovery.service \
     file://bootstrap-runtime.json \
@@ -209,6 +212,7 @@ python write_spacewars_fast_compatibility() {
     assets = [Path(d.getVar("WORKDIR")) / name for name in (
         "spacewars-data-init.sh", "spacewars-data-init.service",
         "spacewars-access.service", "spacewars-sshd-access.conf", "sshd-spacewars-access.conf",
+        "sshd-spacewars-network.conf",
         "spacewars-system.service", "spacewars-rtc-capture.service",
         "spacewars-recovery.service", "bootstrap-runtime.json", "spacewars-install.conf",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
@@ -285,6 +289,7 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-access.service \
     ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \
     ${systemd_system_unitdir}/sshd@.service.d/spacewars-access.conf \
+    ${systemd_system_unitdir}/sshd@.service.d/spacewars-network.conf \
     ${sysconfdir}/ssh/sshd_config.d/10-spacewars-access.conf \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-recovery.service \
