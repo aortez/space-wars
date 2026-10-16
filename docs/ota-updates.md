@@ -28,7 +28,7 @@ Remaining work retains the full OTA scope:
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Private staging, resume validation and verified publication implemented; HTTPS worker, scheduling and bounded connection ownership remain |
+| #265 | Private staging and bounded HTTPS check/download sessions implemented; device-service integration, scheduling and connection ownership remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -1193,9 +1193,9 @@ refresh, with at most 32 root updates and a two-minute total deadline. The
 transport also applies these limits when a signed snapshot declares a larger
 length. Only the fixed top-level and channel-role paths are admitted. Image
 compressed length must be positive and below 2 GiB; expanded length must fit the
-actual inactive slot. Persistent staging now applies its separate space quota,
-described below. The HTTPS worker still needs progress timeouts, redirect policy,
-bandwidth limits and network-hold integration under #265.
+actual inactive slot. Persistent staging applies its separate space quota. The
+HTTPS session adds redirect/request bounds, progress deadlines and transfer
+throttling, described below; service-owned network-hold integration remains.
 
 ## Persistent verification and installation evidence
 
@@ -1295,12 +1295,11 @@ The signed-feed and filesystem fixtures exercise resume/restart, channel and
 generation changes, malformed responses, compressed and expanded corruption,
 low-space admission, every verification cancellation boundary, late replacement,
 expiry/clock rollback and installer exclusion. They do not contact an HTTP
-server or install an image. The production HTTPS transport, automatic daily
-scheduling, Check now coalescing, time/network-hold lifecycle, rate limiting,
-worker-priority policy and UI status integration remain unfinished. In particular,
-the two-minute preparation, thirty-minute session and sixty-second no-progress
-limits must still be enforced by that worker; the staging guard is only their
-integration point. No physical updater has been enabled by this change.
+server or install an image. The HTTPS session below now supplies the transport,
+elapsed-time guards and transfer throttling. Automatic daily scheduling, Check
+now coalescing, live time/network-hold lifecycle, worker-priority policy and UI
+status integration remain unfinished. No physical updater has been enabled by
+this component.
 
 Validation on 2026-10-16 passed 256 OTA unit tests and 22 signed-feed verification
 tests serially on the host; eight preexisting environment/artifact tests remain
@@ -1312,6 +1311,90 @@ operations on the boards, not the production root-owned staging opener, a live
 download, actual disk exhaustion or installation. The default parallel harness
 limitations and the isolated rerun are retained in the
 [source and validation evidence](data/ota-staging-20261016.json).
+
+## Bounded HTTPS check and download session (#265)
+
+`engine_ota::download::DownloadSession` checks the configured signed feed and
+stages its selected candidate using the same verifier and private store. One
+session is consumed by `run`; it cannot be reused to reset its budgets. Creation
+starts the boot-clock deadline before HTTPS client construction. The service must
+create it before admitting the network connection, then run it on a dedicated
+IO thread/runtime. Installation mode is not an input, and this code cannot
+install, select a boot slot or reboot.
+
+The session enforces two minutes for preparation, thirty minutes overall and
+sixty seconds without image-payload progress, using `CLOCK_BOOTTIME` so suspend
+time counts. Header waits, redirects, body reads and throttling share those
+deadlines. The guard is checked at least every 250 ms while awaiting network
+work, and between bounded filesystem/decoder operations during verification.
+OS filesystem calls still have their ordinary kernel blocking behavior; this is
+not a guarantee that a failed storage device can be interrupted mid-syscall.
+Payload writes are capped at 64 KiB per chunk and paced at at most 4 MiB/s without
+accumulated burst credit. Hardware frame-time and throughput qualification remain
+part of #267.
+
+The HTTPS client is pinned to `reqwest` 0.13.5 with Rustls and platform certificate
+verification. The image explicitly depends on `ca-certificates`. Certificate
+trust, hostname and validity checks remain enabled. HTTP/1 is selected, with
+automatic redirects/retries, proxies, response decompression, cookies, referrers
+and idle connection pooling disabled or unconfigured. Requests ask for the
+identity content encoding. The worker follows at most five redirects per logical
+request, admits only credential-free HTTPS URLs and rejects fragments, oversized
+URLs and duplicate relevant headers. Signed CDN query parameters may be followed
+but are never copied into status or diagnostic errors. All requests and redirects
+share a 256-request ceiling; the stricter 40-request/8-MiB TUF metadata budget
+still applies to logical metadata fetches.
+
+Images use the exact consistent-snapshot target name from the signed descriptor.
+An inconsistent resumed response permits one full restart inside the original
+session and no-progress deadlines. A full `200` response can replace a prefix
+directly. Refusals, rate limiting and server errors preserve the existing prefix
+and do not trigger another request. Unknown/expired time, malformed metadata,
+incorrect hashes and incompatible images cannot produce Ready or select an older
+image as a fallback. A no-candidate/ineligible selection clears the obsolete
+staging candidate. Complete retained bytes are reverified without downloading
+the image again.
+
+The service implements a fast local `Control` guard from its current time,
+selection, device/history generation, cancellation and owned-hold state. It
+must renew the hold independently of the HTTP request. Controlled cancellation
+uses this guard and awaits the session's return before releasing the hold; the
+worker checkpoints its prefix and persists the latest usable time observed even
+on a failed request. A later clock rollback therefore cannot revive metadata
+after such a cancellation. Abrupt process death still leaves the last committed
+trust state authoritative. Progress contains phase, candidate ID and byte counts,
+with no URLs, validators or credentials. Ready is reported only after complete
+image verification, fresh cached metadata selection and the final durable time
+update. TUF's URL-bearing internal diagnostics are reduced to safe transport or
+verification reasons at this boundary.
+
+Local TCP and TLS fixtures exercise signed Release/Nightly feeds, both complete
+and resumed staging, ignored/inconsistent ranges, server interruption/refusal,
+rate limiting, malformed responses, corruption, unknown/expired/changing time,
+redirects and request ceilings, stalled-body cancellation, boot-clock deadline
+advancement and redaction. The TLS fixture trusts a test-only localhost
+certificate and separately proves that an unknown CA and wrong hostname fail
+before any HTTP metadata is read. Its certificate/key files are public test data
+and are not loaded by the production constructor.
+
+Validation on 2026-10-16 passed 275 OTA unit tests and 22 signed-feed verification
+tests with the serial host runner (eight hardware/fixture entry points ignored).
+All 19 download cases passed on each Pi: 13.74 seconds on Pi 5 and 29.28 seconds
+on Pi 4. These are fixture-suite durations, not download benchmarks. The runs used
+local TCP/TLS servers and private UID-1000 directories on `/data`; they did not
+open production staging, change the installed service, write a root partition or
+reboot. All 71 Yocto helper tests, Clippy, the Rust 1.89 compatibility check,
+AArch64 test compilation and formatting also passed. Exact source/artifact
+identities and outputs are recorded in the
+[download validation evidence](data/ota-download-20261016.json).
+
+Remaining integration includes the persistent boot/daily scheduler, 30-second
+Check now admission and request coalescing, ownership of the network hold before
+NTP releases its hold, Ethernet/offline-policy coordination, dedicated worker
+priority and outbound-IP sandbox permissions, production staging provisioning,
+authoritative device/history refresh, update status/API and installation-policy
+handoff. This library session has not been connected to the running kiosk service
+or a production release feed, and it does not establish an enabled auto updater.
 
 ## Reproducible verification
 

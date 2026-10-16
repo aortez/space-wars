@@ -8,6 +8,11 @@
 #[cfg(test)]
 extern crate self as engine_ota;
 
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../tests/support/mod.rs"]
+mod test_support;
+
 #[cfg(target_os = "linux")]
 pub mod access_linux;
 pub mod boot;
@@ -20,6 +25,8 @@ pub mod bootstrap;
 mod contract;
 #[cfg(target_os = "linux")]
 pub mod coordinator;
+#[cfg(target_os = "linux")]
+pub mod download;
 #[cfg(target_os = "linux")]
 mod file_command;
 mod image_identity;
@@ -94,6 +101,10 @@ pub enum Error {
     Staging(&'static str),
     #[error("insufficient staging space; 256 MiB must remain free")]
     StagingSpace,
+    #[error("invalid image HTTP length, range, encoding or validator")]
+    DownloadResponse,
+    #[error("update download: {0}")]
+    Download(&'static str),
     #[error("TUF verification failed: {0}")]
     Tuf(#[source] Box<tough::error::Error>),
     #[error("storage failure: {0}")]

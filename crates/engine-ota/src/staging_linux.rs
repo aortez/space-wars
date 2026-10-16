@@ -96,7 +96,7 @@ impl StagingStore {
         Self::under(staging_directory(layout)?, 0)
     }
 
-    fn under(directory: File, owner: u32) -> Result<Self> {
+    pub(crate) fn under(directory: File, owner: u32) -> Result<Self> {
         owned(&directory.metadata()?, true, owner, true)?;
         let lock = staging_lock(&directory, owner)?;
         let record = match optional(&directory, RECORD, libc::O_RDONLY)? {
@@ -363,7 +363,7 @@ impl Transfer<'_> {
         self.accepting = false;
         self.failed = true;
         if headers.encoding.is_some_and(|value| value != "identity") {
-            return Err(Error::Staging("unexpected content encoding"));
+            return Err(Error::DownloadResponse);
         }
         match headers.status {
             200 if headers.range.is_none() && headers.length == Some(self.total()) => {
@@ -380,9 +380,7 @@ impl Transfer<'_> {
                 && self.etag().is_some()
                 && headers.etag == self.etag() => {}
             _ => {
-                return Err(Error::Staging(
-                    "inconsistent HTTP length, range or validator",
-                ));
+                return Err(Error::DownloadResponse);
             }
         }
         self.failed = true;

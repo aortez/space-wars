@@ -30,6 +30,7 @@ DEPENDS:append = "${@' virtual/egl virtual/libgles2 virtual/libgbm' if d.getVar(
 RDEPENDS:${PN} += " \
     alsa-lib \
     bash \
+    ca-certificates \
     coreutils \
     e2fsprogs \
     e2fsprogs-e2fsck \

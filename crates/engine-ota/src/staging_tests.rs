@@ -2,10 +2,7 @@ use super::*;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::sync::Arc;
 
-#[allow(dead_code)]
-#[path = "../tests/support/mod.rs"]
-mod support;
-use support::{EXPIRES, Fault, Fixture, candidate, descriptor, device, location, time};
+use crate::test_support::{EXPIRES, Fault, Fixture, candidate, descriptor, device, location, time};
 
 struct Case {
     directory: tempfile::TempDir,
