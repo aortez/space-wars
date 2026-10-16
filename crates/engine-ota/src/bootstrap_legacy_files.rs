@@ -26,7 +26,7 @@ pub(super) fn limit(index: usize) -> u64 {
     }
 }
 
-fn parents() -> Vec<String> {
+pub(super) fn parents() -> Vec<String> {
     let mut paths = BTreeSet::new();
     for (path, _) in targets() {
         let mut parent = path;
@@ -41,15 +41,15 @@ fn parents() -> Vec<String> {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Identity {
-    device: u64,
-    inode: u64,
-    uid: u32,
-    gid: u32,
-    mode: u32,
+    pub(super) device: u64,
+    pub(super) inode: u64,
+    pub(super) uid: u32,
+    pub(super) gid: u32,
+    pub(super) mode: u32,
 }
 
 impl Identity {
-    fn from(metadata: &Metadata) -> Self {
+    pub(super) fn from(metadata: &Metadata) -> Self {
         Self {
             device: metadata.dev(),
             inode: metadata.ino(),
@@ -63,31 +63,43 @@ impl Identity {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Original {
-    identity: Identity,
+    pub(super) identity: Identity,
     modified_seconds: i64,
     modified_nanoseconds: i64,
     changed_seconds: i64,
     changed_nanoseconds: i64,
-    attributes: BTreeMap<String, Vec<u8>>,
+    pub(super) attributes: BTreeMap<String, Vec<u8>>,
     pub(super) contents: Blob,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct DirectoryEntry {
-    path: String,
-    original: Option<Identity>,
+pub(super) struct DirectoryEntry {
+    pub(super) path: String,
+    pub(super) original: Option<Identity>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Snapshot {
-    root: Identity,
+    pub(super) root: Identity,
     /// The fixed parent list is ordered; None records an absent directory.
-    directories: Vec<DirectoryEntry>,
+    pub(super) directories: Vec<DirectoryEntry>,
     /// The target list is versioned by the containing record; None is absence,
     /// distinct from a present empty file, with its metadata and empty hash.
     pub(super) files: Vec<Option<Original>>,
+}
+
+impl Original {
+    /// Renaming/linking changes ctime. The inode, contents, permissions,
+    /// attributes and original mtime must still be exactly the recorded ones.
+    pub(super) fn after_rename(&self, other: &Self) -> bool {
+        self.identity == other.identity
+            && self.modified_seconds == other.modified_seconds
+            && self.modified_nanoseconds == other.modified_nanoseconds
+            && self.attributes == other.attributes
+            && self.contents == other.contents
+    }
 }
 
 impl Snapshot {
@@ -152,7 +164,6 @@ pub(super) fn capture<W: Write>(
         return Err(invalid("unsafe legacy source root mode"));
     }
     let identity = Identity::from(&metadata);
-    let mount = crate::recovery_linux::opened_mount_id(root)?;
     let directories = inspect_directories(root, owner)?;
     let mut files = Vec::new();
     for (index, (path, _)) in targets().into_iter().enumerate() {
@@ -162,65 +173,14 @@ pub(super) fn capture<W: Write>(
             files.push(None);
             continue;
         };
-        let file = match open_at(&parent, component, libc::O_PATH, 0) {
-            Ok(file) => file,
-            Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-                files.push(None);
-                continue;
-            }
-            Err(error) => return Err(error),
-        };
-        let before = file.metadata()?;
-        owned(&before, false, owner, false)?;
-        if before.dev() != identity.device
-            || crate::recovery_linux::opened_mount_id(&file)? != mount
-            || before.mode() & 0o7000 != 0
-            || before.len() > limit(index)
-        {
-            return Err(invalid("unsafe or oversized legacy source file"));
-        }
-        let mut reader = File::open(format!("/proc/self/fd/{}", file.as_raw_fd()))?;
-        if !unchanged(&before, &reader.metadata()?) {
-            return Err(invalid("legacy source changed while opening"));
-        }
-        let attributes = super::archive::attributes(&reader)?;
-        let mut hash = Hasher::new();
-        let mut bytes = 0;
-        let mut buffer = [0; 64 * 1024];
-        loop {
-            let count = reader.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            bytes += count as u64;
-            if bytes > before.len() {
-                return Err(invalid("legacy source grew during capture"));
-            }
-            output.write_all(&buffer[..count])?;
-            hash.update(&buffer[..count]);
-        }
-        output.flush()?;
-        let named = open_at(&parent, component, libc::O_PATH, 0)?;
-        if bytes != before.len()
-            || !unchanged(&before, &reader.metadata()?)
-            || !unchanged(&before, &named.metadata()?)
-        {
-            return Err(invalid("legacy source changed during capture"));
-        }
-        files.push(Some(Original {
-            identity: Identity::from(&before),
-            modified_seconds: before.mtime(),
-            modified_nanoseconds: before.mtime_nsec(),
-            changed_seconds: before.ctime(),
-            changed_nanoseconds: before.ctime_nsec(),
-            attributes,
-            contents: Blob {
-                bytes,
-                sha256: format!("{:x}", hash.finalize())
-                    .try_into()
-                    .expect("SHA-256 hex"),
-            },
-        }));
+        files.push(file_at(
+            root,
+            &parent,
+            component,
+            owner,
+            limit(index),
+            &mut output,
+        )?);
     }
     if identity != Identity::from(&root.metadata()?)
         || directories != inspect_directories(root, owner)?
@@ -234,6 +194,89 @@ pub(super) fn capture<W: Write>(
     };
     snapshot.validate()?;
     Ok(snapshot)
+}
+
+pub(super) fn file_at(
+    root: &File,
+    parent: &File,
+    component: &str,
+    owner: u32,
+    limit: u64,
+    output: &mut impl Write,
+) -> Result<Option<Original>> {
+    let file = match open_at(parent, component, libc::O_PATH, 0) {
+        Ok(file) => file,
+        Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let before = file.metadata()?;
+    let result = opened_file(root, &file, owner, limit, false, output)?;
+    let named = open_at(parent, component, libc::O_PATH, 0)?;
+    if !unchanged(&before, &named.metadata()?) {
+        return Err(invalid("legacy source name changed during capture"));
+    }
+    Ok(Some(result))
+}
+
+/// `anonymous` is only for a freshly allocated O_TMPFILE owned by the caller.
+pub(super) fn opened_file(
+    root: &File,
+    file: &File,
+    owner: u32,
+    limit: u64,
+    anonymous: bool,
+    output: &mut impl Write,
+) -> Result<Original> {
+    let before = file.metadata()?;
+    if before.uid() != owner
+        || !before.is_file()
+        || before.nlink() != u64::from(!anonymous)
+        || before.dev() != root.metadata()?.dev()
+        || crate::recovery_linux::opened_mount_id(file)?
+            != crate::recovery_linux::opened_mount_id(root)?
+        || before.mode() & 0o7022 != 0
+        || before.len() > limit
+    {
+        return Err(invalid("unsafe or oversized legacy source file"));
+    }
+    let mut reader = File::open(format!("/proc/self/fd/{}", file.as_raw_fd()))?;
+    if !unchanged(&before, &reader.metadata()?) {
+        return Err(invalid("legacy source changed while opening"));
+    }
+    let attributes = super::archive::attributes(&reader)?;
+    let mut hash = Hasher::new();
+    let mut bytes = 0;
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        bytes += count as u64;
+        if bytes > before.len() {
+            return Err(invalid("legacy source grew during capture"));
+        }
+        output.write_all(&buffer[..count])?;
+        hash.update(&buffer[..count]);
+    }
+    output.flush()?;
+    if bytes != before.len() || !unchanged(&before, &reader.metadata()?) {
+        return Err(invalid("legacy source changed during capture"));
+    }
+    Ok(Original {
+        identity: Identity::from(&before),
+        modified_seconds: before.mtime(),
+        modified_nanoseconds: before.mtime_nsec(),
+        changed_seconds: before.ctime(),
+        changed_nanoseconds: before.ctime_nsec(),
+        attributes,
+        contents: Blob {
+            bytes,
+            sha256: format!("{:x}", hash.finalize())
+                .try_into()
+                .expect("SHA-256 hex"),
+        },
+    })
 }
 
 fn inspect_directories(root: &File, owner: u32) -> Result<Vec<DirectoryEntry>> {
@@ -251,8 +294,11 @@ fn inspect_directories(root: &File, owner: u32) -> Result<Vec<DirectoryEntry>> {
         .collect()
 }
 
-fn directory(root: &File, path: &str, owner: u32) -> Result<Option<File>> {
+pub(super) fn directory(root: &File, path: &str, owner: u32) -> Result<Option<File>> {
     let mut parent = root.try_clone()?;
+    if path.is_empty() {
+        return Ok(Some(parent));
+    }
     let mount = crate::recovery_linux::opened_mount_id(root)?;
     for component in path.split('/') {
         let child = match open_at(&parent, component, libc::O_RDONLY | libc::O_DIRECTORY, 0) {

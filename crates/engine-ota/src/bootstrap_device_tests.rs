@@ -1,6 +1,23 @@
 use super::*;
 
 #[test]
+fn replacement_requires_masked_writers_and_not_just_a_momentarily_stopped_unit() {
+    require_masked_snapshot("LoadState=masked\nActiveState=inactive\nMainPID=0\n", false).unwrap();
+    require_masked_snapshot(
+        "LoadState=not-found\nActiveState=inactive\nMainPID=0\n",
+        true,
+    )
+    .unwrap();
+    for text in [
+        "LoadState=loaded\nActiveState=inactive\nMainPID=0\n",
+        "LoadState=masked\nActiveState=active\nMainPID=44\n",
+        "LoadState=not-found\nActiveState=inactive\nMainPID=0\n",
+    ] {
+        assert!(require_masked_snapshot(text, false).is_err());
+    }
+}
+
+#[test]
 fn preservation_requires_a_loaded_stopped_kiosk_and_no_running_state_writer() {
     for state in ["inactive", "failed"] {
         require_stopped_snapshot(

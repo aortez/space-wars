@@ -1,5 +1,6 @@
 //! Root-operator package validation. This is deliberately separate from TUF
-//! VerifiedCandidate authority and never writes a root or boot selector.
+//! VerifiedCandidate authority. The explicit legacy replacement operation
+//! changes fixed root files, never a partition image or boot selector.
 use super::{
     Board, BootPlan, BootstrapPackage, LegacyBootEvidence, PlanRequest, STAGE_DIRECTORY,
     active_lines, inspect_legacy_boot, invalid,
@@ -223,35 +224,7 @@ pub fn prepare_installed_legacy(
     }
     let receipt = super::data_backup::verified_receipt(&active, 0, binding, data_copy)?;
     let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
-    let inputs = super::legacy_state::Inputs {
-        binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
-        raw_copies_sha256: raw_copies,
-        data_copy_sha256: data_copy,
-        replacements: super::legacy_files::targets()
-            .iter()
-            .map(|(path, mode)| {
-                let source = if *path == super::legacy_files::MANAGER {
-                    "engine-os-manager".to_owned()
-                } else {
-                    format!("{}{path}", super::legacy_assets::PREFIX)
-                };
-                let contents = inspected
-                    .package
-                    .record
-                    .files
-                    .get(&source)
-                    .cloned()
-                    .ok_or_else(|| {
-                        invalid("required legacy replacement is missing from package")
-                    })?;
-                Ok(super::legacy_state::Replacement {
-                    path: (*path).into(),
-                    mode: *mode,
-                    contents,
-                })
-            })
-            .collect::<Result<_>>()?,
-    };
+    let inputs = legacy_inputs(&inspected.package, binding, raw_copies, data_copy)?;
     let check = |initial: bool| -> Result<()> {
         inspected.check(&lock)?;
         super::backup::check_named_directory(&inspected.parent, super::state::ACTIVE, &active, 0)?;
@@ -289,7 +262,145 @@ pub fn prepare_installed_legacy(
     Ok(result)
 }
 
+/// Explicit supervised root-file phase. The runtime account must have no live
+/// processes (including SSH sessions); invoke from its separate root connection.
+/// This does not reload services, reboot, or authorize a boot trial.
+pub fn replace_installed_legacy(
+    expected: Sha256,
+    raw_copies: Sha256,
+    data_copy: Sha256,
+    originals: Sha256,
+    mut progress: impl FnMut(super::LegacyReplacementProgress),
+) -> Result<super::LegacyReplacementReport> {
+    let lock = InstallLock::acquire()?;
+    let quiet = super::quiesce::QuietRuntime::acquire()?;
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before legacy replacement"))?;
+    crate::access_linux::preserved_for_bootstrap(&lock)?;
+    crate::network_linux::preserved_for_bootstrap(&lock)?;
+    require_masked_writers(&inspected.data)?;
+    let active = super::state::optional_directory(&inspected.parent, super::state::ACTIVE, 0)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    let raw = super::backup::verify_backup_export(
+        std::path::Path::new("/data/spacewars-bootstrap/active"),
+        raw_copies,
+    )?;
+    if raw.package_sha256 != expected
+        || raw.device_id != binding.device_id
+        || raw.layout_id != binding.layout_id
+    {
+        return Err(invalid(
+            "raw backups belong to another bootstrap preparation",
+        ));
+    }
+    let data_receipt = super::data_backup::verified_receipt(&active, 0, binding, data_copy)?;
+    let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
+    let inputs = legacy_inputs(&inspected.package, binding, raw_copies, data_copy)?;
+    let sources = super::legacy_files::targets()
+        .iter()
+        .map(|(path, _)| {
+            inspected
+                .package
+                .files
+                .get(&legacy_package_path(path))
+                .ok_or_else(|| invalid("missing legacy package source"))?
+                .file
+                .try_clone()
+                .map_err(Error::from)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    // Before the first journal, the full backup must still describe the live
+    // configuration. Retries compare each destination with its journal instead;
+    // migration never restores the older archive over later user data.
+    let started = super::legacy_replace::started(&active, 0)?;
+    if !started
+        && super::archive::inspect(&root, &inspected.data)?.source_sha256
+            != data_receipt.source_sha256
+    {
+        return Err(invalid(
+            "data/configuration changed since its recovery copy; reconcile before legacy replacement",
+        ));
+    }
+    let check = || -> Result<()> {
+        inspected.check(&lock)?;
+        super::backup::check_named_directory(&inspected.parent, super::state::ACTIVE, &active, 0)?;
+        require_masked_writers(&inspected.data)?;
+        quiet.check()
+    };
+    let result = super::legacy_replace::apply(
+        &root,
+        &active,
+        0,
+        binding,
+        &inputs,
+        originals,
+        sources,
+        check,
+        &mut |action, stage| {
+            progress(super::LegacyReplacementProgress { action, stage });
+            Ok(())
+        },
+    )?;
+    let after = inspect_legacy_boot()?;
+    let current =
+        super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
+    super::state::existing(&inspected.parent, 0, &current)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    quiet.check()?;
+    inspected.check(&lock)?;
+    Ok(result)
+}
+
+fn legacy_package_path(path: &str) -> String {
+    if path == super::legacy_files::MANAGER {
+        "engine-os-manager".into()
+    } else {
+        format!("{}{path}", super::legacy_assets::PREFIX)
+    }
+}
+
+fn legacy_inputs(
+    package: &OperatorPackage,
+    binding: &super::BootstrapBinding,
+    raw: Sha256,
+    data: Sha256,
+) -> Result<super::legacy_state::Inputs> {
+    Ok(super::legacy_state::Inputs {
+        binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
+        raw_copies_sha256: raw,
+        data_copy_sha256: data,
+        replacements: super::legacy_files::targets()
+            .iter()
+            .map(|(path, mode)| {
+                Ok(super::legacy_state::Replacement {
+                    path: (*path).into(),
+                    mode: *mode,
+                    contents: package
+                        .record
+                        .files
+                        .get(&legacy_package_path(path))
+                        .cloned()
+                        .ok_or_else(|| {
+                            invalid("required legacy replacement is missing from package")
+                        })?,
+                })
+            })
+            .collect::<Result<_>>()?,
+    })
+}
+
 fn require_stopped_writers(data: &File) -> Result<()> {
+    require_writers(data, false)
+}
+
+fn require_masked_writers(data: &File) -> Result<()> {
+    require_writers(data, true)
+}
+
+fn require_writers(data: &File, masked: bool) -> Result<()> {
     for (unit, optional) in [
         ("spacewars-kiosk.service", false),
         ("spacewars-system.service", true),
@@ -312,6 +423,22 @@ fn require_stopped_writers(data: &File) -> Result<()> {
         let text = std::str::from_utf8(&output)
             .map_err(|_| invalid("invalid service state during preservation"))?;
         require_stopped_snapshot(text, optional)?;
+        if masked {
+            require_masked_snapshot(text, optional)?;
+        }
+    }
+    Ok(())
+}
+
+fn require_masked_snapshot(text: &str, optional: bool) -> Result<()> {
+    require_stopped_snapshot(text, optional)?;
+    if !text
+        .lines()
+        .any(|line| line == "LoadState=masked" || optional && line == "LoadState=not-found")
+    {
+        return Err(invalid(
+            "runtime-mask the kiosk and installed device-state service before legacy replacement",
+        ));
     }
     Ok(())
 }

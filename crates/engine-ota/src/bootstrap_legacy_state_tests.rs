@@ -4,18 +4,18 @@ use std::fs;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use xattr::FileExt;
 
-struct Fixture {
-    temp: tempfile::TempDir,
-    root: File,
-    data: File,
-    parent: File,
-    owner: u32,
-    binding: BootstrapBinding,
-    inputs: Inputs,
+pub(crate) struct Fixture {
+    pub(crate) temp: tempfile::TempDir,
+    pub(crate) root: File,
+    pub(crate) data: File,
+    pub(crate) parent: File,
+    pub(crate) owner: u32,
+    pub(crate) binding: BootstrapBinding,
+    pub(crate) inputs: Inputs,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let temp = tempfile::tempdir().unwrap();
         let root_path = temp.path().join("root");
         let data_path = temp.path().join("data");
@@ -115,13 +115,13 @@ impl Fixture {
         }
     }
 
-    fn active(&self) -> std::path::PathBuf {
+    pub(crate) fn active(&self) -> std::path::PathBuf {
         self.temp.path().join("data/spacewars-bootstrap/active")
     }
-    fn manager(&self) -> std::path::PathBuf {
+    pub(crate) fn manager(&self) -> std::path::PathBuf {
         self.temp.path().join("root").join(legacy_files::MANAGER)
     }
-    fn run(&self) -> Result<LegacyPreparationReport> {
+    pub(crate) fn run(&self) -> Result<LegacyPreparationReport> {
         prepare(
             &self.root,
             &self.data,

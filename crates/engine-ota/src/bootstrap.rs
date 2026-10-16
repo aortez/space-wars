@@ -1,6 +1,7 @@
 //! Supervised bootstrap planning, separate from signed rootfs OTA authority.
 //! Preparation may reserve a root-private attempt on /data. It never writes
-//! a root partition, enables OTA, changes selectors or reboots.
+//! a root partition, enables OTA, changes selectors or reboots. The explicit
+//! root-operator replacement phase changes only fixed legacy-root files.
 use crate::boot::{BootCommandLine, BootManifest, SlotRoots};
 use crate::recovery::Slot;
 use crate::{Blob, Error, ImageIdentity, Result, Sha256};
@@ -42,14 +43,22 @@ mod data_backup;
 mod legacy_assets;
 #[path = "bootstrap_legacy_files.rs"]
 mod legacy_files;
+#[path = "bootstrap_legacy_replace.rs"]
+mod legacy_replace;
 #[path = "bootstrap_legacy_state.rs"]
 mod legacy_state;
+#[path = "bootstrap_quiesce.rs"]
+mod quiesce;
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,
 };
 pub use device::backup_installed_data;
 pub use device::prepare_installed_legacy;
+pub use device::replace_installed_legacy;
+pub use legacy_replace::{
+    LegacyReplacementProgress, LegacyReplacementReport, LegacyReplacementStage,
+};
 pub use legacy_state::{
     LegacyExportCheck, LegacyPreparationProgress, LegacyPreparationReport, LegacyPreparationStage,
     verify_legacy_export,

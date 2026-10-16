@@ -102,10 +102,10 @@ impl Inputs {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Receipt {
+pub(super) struct Receipt {
     schema: u32,
-    inputs: Inputs,
-    source: Snapshot,
+    pub(super) inputs: Inputs,
+    pub(super) source: Snapshot,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -361,6 +361,23 @@ fn verify(saved: &File, owner: u32, binding: &BootstrapBinding) -> Result<Receip
     Ok(receipt)
 }
 
+pub(super) fn verified_receipt(
+    active: &File,
+    owner: u32,
+    binding: &BootstrapBinding,
+    expected: Sha256,
+) -> Result<Receipt> {
+    reject_pending(active, owner)?;
+    let saved = super::state::optional_directory(active, DIRECTORY, owner)?
+        .ok_or_else(|| invalid("missing preserved legacy originals"))?;
+    let receipt = read_receipt(&saved, owner, binding)?;
+    if digest(&receipt)? != expected || verify(&saved, owner, binding)? != receipt {
+        return Err(invalid("legacy originals differ from the selected receipt"));
+    }
+    check_named_directory(active, DIRECTORY, &saved, owner)?;
+    Ok(receipt)
+}
+
 fn report(receipt: Receipt, reused: bool, matches: bool) -> Result<LegacyPreparationReport> {
     Ok(LegacyPreparationReport {
         schema: 1,
@@ -376,4 +393,4 @@ fn report(receipt: Receipt, reused: bool, matches: bool) -> Result<LegacyPrepara
 
 #[cfg(test)]
 #[path = "bootstrap_legacy_state_tests.rs"]
-mod tests;
+pub(crate) mod tests;

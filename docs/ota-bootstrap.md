@@ -7,10 +7,10 @@ installed boot assets.
 
 **Implemented:** read-only legacy inventory, workstation package creation,
 root-only package validation, a durable preparation reservation, raw boot/inactive
-root recovery copies, a data/configuration archive, original-file preservation
-for the fallback-root migration and independent-export verifiers.
-**Remaining:** live preservation and independent exports, legacy privilege closure,
-root/boot apply and recovery of those operations, supervised boot verification,
+root recovery copies, a data/configuration archive, original-file preservation,
+restartable fixed-file replacement and independent-export verifiers.
+**Remaining:** live preservation and independent exports, effective legacy
+privilege/access/service checks, root-partition and boot apply with recovery, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -360,10 +360,58 @@ cargo run --locked -p engine-ota --example bootstrap_verify_legacy -- \
   /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
 ```
 
-The next phase still needs a durable replacement journal, safe handling of
-existing legacy helpers, effective sudo/SSH/service validation and verified
-operator logins. These original copies do not implement that phase or restore
-files onto a live device. No installed Pi original-file preparation has run yet.
+These original copies do not restore files onto a live device. No installed Pi
+original-file preparation has run yet.
+
+## Replace fixed fallback-root files
+
+`bootstrap_replace_legacy` is a separate root-operator phase. It takes four
+independently selected digests: bundle, raw copies, data archive receipt and
+original-file receipt. It verifies all copies and exact package sources before
+replacing any root files. Initial execution requires the data archive's source
+metadata still to match; a resume instead checks each recorded replacement.
+The preserved archive is never restored over later user data by this operation.
+
+The operator must runtime-mask and stop the kiosk and any installed device-state
+service, close runtime-account sessions, and drain the old update helpers first.
+The command does none of those operations automatically. It checks all thread
+UIDs, known helper command arguments and open writable block-device descriptors,
+and holds both the shared installation lock and the old fast-update lock.
+Yocto's root-owned sticky `/run/lock` directory is supported; foreign lock files
+and non-sticky writable directories are rejected. These checks complement the
+supervised quiet window; they do not exclude another root operator deliberately
+changing files or launching commands concurrently.
+
+The fixed 18 destinations and their modes come from the checked preservation
+receipt. Missing parent directories are created in parent order. An additional
+root-filesystem capacity check allows space to retain old inodes. The journal is
+private `/data/spacewars-bootstrap/active/legacy-migration/record.json`, bound to
+the selected original-file receipt. Every action records intent and its prepared
+inode before publication, flushes the destination directory, and records completion.
+Journal replacement is atomic and flushed; incomplete unpublished records cannot
+supersede the previous published record.
+
+New file bytes are written to anonymous `O_TMPFILE` inodes, checked and flushed
+before receiving a name. Existing destinations are published with
+`RENAME_EXCHANGE`, retaining the exact old inode at a dot-prefixed `.pending`
+name in the same directory. New destinations use `RENAME_NOREPLACE`. Temporary
+names are excluded from sudoers snippets and SSH/systemd `*.conf` includes.
+The Linux [open](https://man7.org/linux/man-pages/man2/open.2.html) and
+[rename](https://man7.org/linux/man-pages/man2/rename.2.html) interfaces define
+those filesystem operations; physical power-loss qualification is still required.
+
+Retries distinguish unpublished candidates from already completed swaps using
+inode, mode, ownership, contents, attributes and modification time. They tolerate
+the ctime change caused by link/rename. A lost anonymous candidate can be rebuilt;
+an unfinished directory can be adopted only while empty and safely owned.
+Changed files, replaced parents, links, special files, corrupt journals and
+unknown temporary objects stop progress and retain the evidence. Original copies
+and exchanged old inodes are not deleted by this phase.
+
+The report always says `ready_for_trial: false`. This command does not reload
+services, alter boot selectors, open a watchdog, write partition images or reboot.
+Effective sudo/SSH/service validation and separate root/runtime login tests must
+follow before any trial. Neither installed Pi root has been changed by this work.
 
 ## Persistent network profiles
 
