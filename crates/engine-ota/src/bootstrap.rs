@@ -34,6 +34,16 @@ pub use backup::{
 pub use device::backup_installed_package;
 pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap};
 
+#[path = "bootstrap_archive.rs"]
+mod archive;
+#[path = "bootstrap_data_backup.rs"]
+mod data_backup;
+pub use data_backup::{
+    DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
+    DataBackupStage, verify_data_backup_export,
+};
+pub use device::backup_installed_data;
+
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

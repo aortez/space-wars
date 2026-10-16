@@ -168,7 +168,11 @@ pub(super) fn read_binding(active: &File, owner: u32) -> Result<BootstrapBinding
     owned(&active.metadata()?, true, owner, true)?;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", active.as_raw_fd()))? {
         let name = entry?.file_name();
-        if name != RECORD && name != super::backup::DIRECTORY {
+        if name != RECORD
+            && name != super::backup::DIRECTORY
+            && name != super::data_backup::DIRECTORY
+            && name != super::data_backup::PENDING
+        {
             return Err(invalid(
                 "unexpected bootstrap preparation state; reconciliation required",
             ));

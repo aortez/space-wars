@@ -1,4 +1,29 @@
 use super::*;
+
+#[test]
+fn preservation_requires_a_loaded_stopped_kiosk_and_no_running_state_writer() {
+    for state in ["inactive", "failed"] {
+        require_stopped_snapshot(
+            &format!("LoadState=loaded\nActiveState={state}\nMainPID=0\n"),
+            false,
+        )
+        .unwrap();
+    }
+    require_stopped_snapshot("LoadState=masked\nActiveState=inactive\nMainPID=0\n", false).unwrap();
+    let absent = "LoadState=not-found\nActiveState=inactive\nMainPID=0\n";
+    assert!(require_stopped_snapshot(absent, false).is_err());
+    require_stopped_snapshot(absent, true).unwrap();
+    for text in [
+        "LoadState=loaded\nActiveState=active\nMainPID=10\n",
+        "LoadState=loaded\nActiveState=activating\nMainPID=0\n",
+        "LoadState=loaded\nActiveState=inactive\nMainPID=10\n",
+        "LoadState=loaded\nActiveState=inactive\n",
+        "LoadState=loaded\nActiveState=active\nActiveState=inactive\nMainPID=0\n",
+        "LoadState=error\nActiveState=inactive\nMainPID=0\n",
+    ] {
+        assert!(require_stopped_snapshot(text, true).is_err(), "{text}");
+    }
+}
 use crate::bootstrap::tests::linux::Fixture;
 use crate::recovery::Slot;
 use crate::recovery_linux::{DeviceNumber, DiskLayout, Partition};

@@ -24,6 +24,8 @@ url = { version = "2", features = ["serde"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.30.1", default-features = false, features = ["ioctl"] }
+tar = "=0.4.45"
+xattr = "=1.6.1"
 zstd = { version = "=0.13.3", default-features = false }
 
 [dev-dependencies]

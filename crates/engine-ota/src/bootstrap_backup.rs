@@ -610,7 +610,7 @@ fn stream(
     })
 }
 
-fn writable(directory: &File, component: &str, owner: u32) -> Result<File> {
+pub(super) fn writable(directory: &File, component: &str, owner: u32) -> Result<File> {
     let pinned = match super::device::private_asset(directory, component, owner) {
         Ok(file) => file,
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => open_at(
@@ -628,7 +628,7 @@ fn writable(directory: &File, component: &str, owner: u32) -> Result<File> {
         .open(format!("/proc/self/fd/{}", pinned.as_raw_fd()))?)
 }
 
-fn directory(parent: &File, component: &str, owner: u32) -> Result<File> {
+pub(super) fn directory(parent: &File, component: &str, owner: u32) -> Result<File> {
     if let Some(directory) = super::state::optional_directory(parent, component, owner)? {
         return Ok(directory);
     }
@@ -640,7 +640,12 @@ fn directory(parent: &File, component: &str, owner: u32) -> Result<File> {
         .ok_or_else(|| invalid("recovery-copy directory disappeared"))
 }
 
-fn check_named_directory(parent: &File, component: &str, held: &File, owner: u32) -> Result<()> {
+pub(super) fn check_named_directory(
+    parent: &File,
+    component: &str,
+    held: &File,
+    owner: u32,
+) -> Result<()> {
     let named = super::state::optional_directory(parent, component, owner)?
         .ok_or_else(|| invalid("recovery-copy directory disappeared"))?;
     if named.metadata()?.dev() != held.metadata()?.dev()
@@ -651,7 +656,7 @@ fn check_named_directory(parent: &File, component: &str, held: &File, owner: u32
     Ok(())
 }
 
-fn inventory(directory: &File, allowed: &[&str]) -> Result<()> {
+pub(super) fn inventory(directory: &File, allowed: &[&str]) -> Result<()> {
     for entry in fs::read_dir(format!("/proc/self/fd/{}", directory.as_raw_fd()))? {
         let name = entry?.file_name();
         if !allowed.iter().any(|allowed| name == *allowed) {
@@ -698,7 +703,7 @@ fn reset_pending(copies: &File, owner: u32, binding: &BootstrapBinding) -> Resul
     Ok(())
 }
 
-fn free_space(directory: &File) -> Result<u64> {
+pub(super) fn free_space(directory: &File) -> Result<u64> {
     let mut status = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     // SAFETY: directory remains live and fstatvfs initializes status on success.
     io_result(unsafe { libc::fstatvfs(directory.as_raw_fd(), status.as_mut_ptr()) })?;

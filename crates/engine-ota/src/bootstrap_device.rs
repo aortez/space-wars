@@ -151,6 +151,94 @@ pub fn backup_installed_package(
     Ok(result)
 }
 
+/// Fixed-source data/configuration archive. The operator stops the kiosk and
+/// any installed time/state service first; this never changes service state.
+pub fn backup_installed_data(
+    expected: Sha256,
+    mut report: impl FnMut(super::DataBackupProgress),
+) -> Result<super::DataBackupReport> {
+    let lock = InstallLock::acquire()?;
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before data preservation"))?;
+    crate::access_linux::preserved_for_bootstrap(&lock)?;
+    crate::network_linux::preserved_for_bootstrap(&lock)?;
+    let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
+    let check = || -> Result<()> {
+        inspected.check(&lock)?;
+        require_stopped_writers(&inspected.data)
+    };
+    let result = super::data_backup::create(
+        &root,
+        &inspected.data,
+        &inspected.parent,
+        0,
+        binding,
+        inspected.report.data_required_bytes,
+        check,
+        &mut report,
+    )?;
+    inspected.check(&lock)?;
+    let after = inspect_legacy_boot()?;
+    let current =
+        super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
+    super::state::existing(&inspected.parent, 0, &current)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    Ok(result)
+}
+
+fn require_stopped_writers(data: &File) -> Result<()> {
+    for (unit, optional) in [
+        ("spacewars-kiosk.service", false),
+        ("spacewars-system.service", true),
+    ] {
+        let mut command = std::process::Command::new("/usr/bin/systemctl");
+        command.args([
+            "show",
+            unit,
+            "--property=LoadState",
+            "--property=ActiveState",
+            "--property=MainPID",
+            "--no-pager",
+        ]);
+        let output = crate::file_command::FileCommand::default().run(
+            command,
+            data,
+            std::time::Duration::from_secs(5),
+            1024,
+        )?;
+        let text = std::str::from_utf8(&output)
+            .map_err(|_| invalid("invalid service state during preservation"))?;
+        require_stopped_snapshot(text, optional)?;
+    }
+    Ok(())
+}
+
+fn require_stopped_snapshot(text: &str, optional: bool) -> Result<()> {
+    let mut fields = BTreeMap::new();
+    for line in text.lines() {
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| invalid("malformed preservation service state"))?;
+        if fields.insert(key, value).is_some() {
+            return Err(invalid("duplicate preservation service state"));
+        }
+    }
+    if fields.len() != 3
+        || fields.get("MainPID") != Some(&"0")
+        || !matches!(fields.get("ActiveState"), Some(&"inactive" | &"failed"))
+        || !(matches!(fields.get("LoadState"), Some(&"loaded" | &"masked"))
+            || optional && fields.get("LoadState") == Some(&"not-found"))
+    {
+        return Err(invalid(
+            "stop the kiosk and installed device-state service before data preservation",
+        ));
+    }
+    Ok(())
+}
+
 struct Installed {
     data: File,
     parent: File,

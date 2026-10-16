@@ -7,9 +7,9 @@ installed boot assets.
 
 **Implemented:** read-only legacy inventory, workstation package creation,
 root-only package validation, a durable preparation reservation, raw boot/inactive
-root recovery copies and an independent-export verifier.
-**Remaining:** data/configuration recovery copies, root/boot apply and recovery of those
-operations, supervised boot verification,
+root recovery copies, a data/configuration archive and independent-export verifiers.
+**Remaining:** live preservation and independent exports, legacy privilege closure,
+root/boot apply and recovery of those operations, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -210,6 +210,74 @@ cargo build --locked -p engine-ota --example bootstrap_backup \
   --target aarch64-unknown-linux-gnu
 ```
 
+## Data and root configuration recovery copy
+
+`bootstrap_backup_data` takes the same separately selected bundle hash and uses
+the existing preparation. It requires preserved root/runtime login roles and
+the persistent network-profile directory. Under the shared installation lock,
+it checks that the kiosk is stopped (or masked and stopped), and that any
+installed device-state service is stopped. It never stops services or changes
+network/radio state itself. The supervised window must keep other writers and
+operator edits quiescent too; this is a checked file capture, not an atomic
+filesystem snapshot. A changing source fails without publishing a completed copy.
+
+The fixed selection includes all `/data` children except
+`/data/spacewars-bootstrap` (the package and backups), `/data/logs` and
+`/data/spacewars/coredumps` (disposable diagnostics). This includes unknown new
+user-data directories, settings, ROMs, network profiles, Bluetooth pairing,
+SSH host/login keys and device-service state. It also captures `/etc`, the
+root/runtime `.ssh` directories, `/var/lib/NetworkManager`, and the fixed legacy
+update helpers and units needed for migration recovery. An actual NetworkManager
+bind alias is captured once at its `/data` location; an unbound rootfs profile
+directory is retained separately. This selection is versioned in the receipt.
+
+The result is a standard uncompressed tar archive, retaining numeric owners,
+modes, hard links, symlink targets, nanosecond modification times and extended
+attributes, including ACLs. Symlinks are stored without following them. File
+access is relative to pinned descriptors; unexpected other filesystems,
+unsupported special files, source replacement and unsafe scratch paths fail.
+Bounds are 100,000 entries, 64 levels, 4,096-byte UTF-8 paths, 64 KiB of attributes
+per entry and 128 GiB of archive data. Unsupported names/attributes fail rather
+than disappear silently. Capacity includes a conservative archive allowance and
+the remaining raw-copy/reserve requirement.
+
+The command compares two complete archive captures and their source metadata,
+checks metadata again, flushes the output and verifies its readback hash. It
+publishes the archive and its binding/receipt together with a no-replace rename
+and directory flush:
+
+```text
+/data/spacewars-bootstrap/active/data-copy/
+  archive.tar
+  record.json
+```
+
+Directories are root-private and files are mode 0600; the archive contains
+credentials. Only known private `.data-copy.pending` scratch files can be
+restarted. A completed archive is verified and retained, never overwritten.
+On reuse, `source_matches` says whether the current source metadata matches the
+original snapshot. `false` is not a refreshed backup or permission to discard
+later user data; the apply procedure must reconcile it before proceeding.
+Every report still says `ready_for_write: false`.
+
+Keep the `receipt_sha256` from the authenticated device report and independently
+export `binding.json` plus the complete `data-copy` directory into a private
+workstation directory (0700 directories, 0600 files). The verifier compares the
+separately supplied digest before hashing the archive. It does not extract files:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_backup_data \
+  --target aarch64-unknown-linux-gnu
+cargo run --locked -p engine-ota --example bootstrap_verify_data_backup -- \
+  /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
+```
+
+Restoration must first be rehearsed in a fresh private directory using a tool
+that preserves tar extended attributes. Neither this command nor its verifier
+restores an archive onto a live root/data filesystem. No data/configuration copy
+has been taken from an installed Pi yet; actual root access, independent export
+and supervised restore qualification remain outstanding.
+
 ## Persistent network profiles
 
 The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`
@@ -238,8 +306,8 @@ attempt, but do not require its success. Startup does not require Internet acces
 This source change does not modify either installed legacy root. Before the
 first trial, the supervised migration must also replace the legacy profile-merge
 behavior on the original root, so returning to it cannot resurrect deleted
-credentials. Live migration, private data/configuration backup and independent
-export remain pending.
+credentials. Live migration, execution of the private data/configuration backup
+and independent export remain pending.
 
 The clean `c14c53f` image contains this importer and exact service wiring. All
 140 OTA and 38 manager host tests, 101 Yocto tooling tests, Clippy and Rust 1.89
