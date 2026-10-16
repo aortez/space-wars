@@ -146,5 +146,12 @@ This builds just the
 application recipe and deploys the matching client/CLI pair, checks runtime
 compatibility, and restarts the app without flashing/rebooting. `--skip-build`
 reuses the exported bundle; `--dry-run` has no build/network side effects.
+When the device service is present, the updater also obtains and renews a
+deployment network hold before transferring files. It retains that hold through
+restart, health checks and cleanup, and then releases it. A service/admission
+failure stops new update steps; it does not terminate an installer already
+writing. Older images without the manager retain their legacy behavior. These
+hooks do not enable unsigned A/B updates on managed images; the verified
+installer and physical rollout are still in progress.
 See [fast application updates](../docs/pi-kiosk.md#fast-application-updates)
 for the exact scope and recovery limitations.

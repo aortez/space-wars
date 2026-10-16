@@ -101,6 +101,11 @@ enum MaintenanceCommand {
 #[derive(Subcommand)]
 enum NetworkCommand {
     Status,
+    /// Admit/renew/release a deployment; read its secret capability line from stdin.
+    Deployment {
+        #[command(subcommand)]
+        operation: DeploymentCommand,
+    },
     Policy {
         #[arg(long)]
         generation: u64,
@@ -113,6 +118,13 @@ enum NetworkCommand {
         #[arg(long)]
         generation: u64,
     },
+}
+
+#[derive(Subcommand)]
+enum DeploymentCommand {
+    Admit,
+    Renew,
+    Release,
 }
 
 #[derive(Subcommand)]
@@ -243,6 +255,14 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
             };
             let request = match operation {
                 NetworkCommand::Status => Request::Status { schema: 1 },
+                NetworkCommand::Deployment { operation } => {
+                    use engine_os_manager::network_deployment::{self, Operation};
+                    network_deployment::request(match operation {
+                        DeploymentCommand::Admit => Operation::Admit,
+                        DeploymentCommand::Renew => Operation::Renew,
+                        DeploymentCommand::Release => Operation::Release,
+                    })?
+                }
                 NetworkCommand::Policy {
                     generation,
                     partial_offline,

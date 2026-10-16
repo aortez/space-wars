@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { checkRemoteIdentity, fastUpdate, parseArgs, readBundle } from '../scripts/fast-update.mjs';
 import { MACHINE, YOCTO_DIR } from '../scripts/paths.mjs';
+import { NETWORK_PROBE } from '../scripts/deployment-network.mjs';
 
 const compat = 'a'.repeat(64);
 const identity = `spacewars-fast-update-v2 ${compat}`;
@@ -62,7 +63,7 @@ test('missing/mismatched remote helper requires a full update', () => {
   }
 });
 
-function executor(reply = identity, failInstall = false) {
+function executor(reply = identity, failInstall = false, failNetwork = '') {
   const calls = [];
   return {
     calls,
@@ -70,6 +71,10 @@ function executor(reply = identity, failInstall = false) {
       calls.push([command, args]);
       const remote = args.at(-1);
       if (remote.endsWith('--check')) return reply;
+      if (remote === NETWORK_PROBE || remote.startsWith('/usr/bin/engine-os-manager network deployment ')) {
+        if (failNetwork && remote.endsWith(failNetwork)) throw new Error('network request failed');
+        return JSON.stringify({ schema: 1, error: null, availability: 'wireless-ready', status: { policy: { policy: { partial_offline: true } } } });
+      }
       if (remote.startsWith('mktemp')) return '/tmp/spacewars-fast.A123456789';
       if (failInstall && remote.startsWith('/usr/sbin/spacewars-fast-update /tmp/')) throw new Error('install failed');
       return '';
@@ -93,12 +98,15 @@ test('fast update builds only the recipe, transfers a pair, calls fixed helper, 
   const f = fixture(t);
   const e = executor();
   await fastUpdate(parseArgs(['--target', 'picade.local']), { ...e, bundleDir: f.directory });
-  assert.equal(e.calls.length, 6);
+  assert.equal(e.calls.length, 11);
   assert.deepEqual(e.calls[1][1].slice(-2), ['--target', 'spacewars']);
-  assert.equal(e.calls[3][0], 'scp');
-  assert.ok(e.calls[3][1].includes(join(f.directory, 'spacewars-cli')));
-  assert.match(e.calls[4][1].at(-1), /^\/usr\/sbin\/spacewars-fast-update \/tmp\/spacewars-fast\.A123456789 /);
-  assert.match(e.calls[5][1].at(-1), /^rm -f -- .* && rmdir -- /);
+  const transfer = e.calls.findIndex(([command]) => command === 'scp');
+  assert.ok(e.calls[transfer][1].includes(join(f.directory, 'spacewars-cli')));
+  assert.match(e.calls[transfer - 1][1].at(-1), /network deployment renew$/);
+  assert.match(e.calls[transfer + 1][1].at(-1), /network deployment renew$/);
+  assert.match(e.calls[transfer + 2][1].at(-1), /^\/usr\/sbin\/spacewars-fast-update \/tmp\/spacewars-fast\.A123456789 /);
+  assert.match(e.calls.at(-2)[1].at(-1), /^rm -f -- .* && rmdir -- /);
+  assert.match(e.calls.at(-1)[1].at(-1), /network deployment release$/);
   assert.doesNotMatch(JSON.stringify(e.calls), /reboot|ab-update|rootfs/);
 });
 
@@ -106,7 +114,37 @@ test('failed install still cleans only its own staged pair and reports failure',
   const f = fixture(t);
   const e = executor(identity, true);
   await assert.rejects(fastUpdate(parseArgs(['--skip-build']), { ...e, bundleDir: f.directory }), /install failed/);
-  assert.match(e.calls.at(-1)[1].at(-1), /^rm -f -- \/tmp\/spacewars-fast\.A123456789\/engine-client/);
+  assert.match(e.calls.at(-2)[1].at(-1), /^rm -f -- \/tmp\/spacewars-fast\.A123456789\/engine-client/);
+  assert.match(e.calls.at(-1)[1].at(-1), /network deployment release$/);
+});
+
+test('failed deployment admission or renewal stops before transfer/install and still releases', async t => {
+  const f = fixture(t);
+  for (const operation of ['admit', 'renew']) {
+    const e = executor(identity, false, operation);
+    await assert.rejects(fastUpdate(parseArgs(['--skip-build']), { ...e, bundleDir: f.directory }), /protection/);
+    assert.ok(!e.calls.some(([command]) => command === 'scp'));
+    assert.ok(!e.calls.some(([, args]) => args.at(-1).startsWith('/usr/sbin/spacewars-fast-update /tmp/')));
+    assert.match(e.calls.at(-1)[1].at(-1), /network deployment release$/);
+  }
+});
+
+test('renewal lost after transfer prevents installation and retains cleanup/release order', async t => {
+  const f = fixture(t);
+  const e = executor();
+  let renewals = 0;
+  const execute = async (command, args, options) => {
+    if (args.at(-1).endsWith('network deployment renew') && ++renewals === 2) {
+      e.calls.push([command, args]);
+      throw new Error('renewal unavailable after transfer');
+    }
+    return e.execute(command, args, options);
+  };
+  await assert.rejects(fastUpdate(parseArgs(['--skip-build']), { execute, bundleDir: f.directory }), /renew failed/);
+  assert.ok(e.calls.some(([command]) => command === 'scp'));
+  assert.ok(!e.calls.some(([, args]) => args.at(-1).startsWith('/usr/sbin/spacewars-fast-update /tmp/')));
+  assert.match(e.calls.at(-2)[1].at(-1), /^rm -f --/);
+  assert.match(e.calls.at(-1)[1].at(-1), /network deployment release$/);
 });
 
 test('wrapper routes --fast and legacy yolo refuses it instead of flashing', () => {

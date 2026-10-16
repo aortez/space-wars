@@ -580,6 +580,7 @@ fn returned_commands_require_matching_readback_and_survive_lost_observation() {
 fn hold_arriving_during_shutdown_waits_for_restoration_before_acknowledgment() {
     for (kind, owner, availability) in [
         (HoldKind::Setup, caller(), Availability::WirelessReady),
+        (HoldKind::Deployment, caller(), Availability::WirelessReady),
         (HoldKind::Ssh, ssh_caller(), Availability::SessionProtected),
     ] {
         let temp = tempfile::tempdir().unwrap();
@@ -807,4 +808,46 @@ fn setup_can_repair_a_profile_conflict_without_resuming_automatic_radio_control(
             .is_err()
     );
     assert!(fake.calls().is_empty());
+}
+
+#[test]
+fn unmanaged_deployments_preserve_ethernet_and_block_on_an_unresolved_radio_command() {
+    for unknown in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        fake.edit(|w| {
+            w.radio.wireless_enabled = false;
+            w.radio.ethernet_available = true;
+            w.unknown = unknown;
+        });
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        let admission = controller
+            .admit(&token(), caller(), HoldKind::Deployment)
+            .unwrap();
+        assert_eq!(admission.availability, Availability::DeploymentProtected);
+        assert!(fake.calls().is_empty());
+        fake.edit(|w| w.unknown = false);
+        enable(&mut controller);
+        assert_eq!(
+            controller.renew(&token(), caller()).unwrap().availability,
+            Availability::WirelessReady
+        );
+        assert_eq!(fake.calls(), [true]);
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    assert!(controller.tick().unwrap().owned_off);
+    fake.edit(|w| w.behavior = Behavior::Timeout);
+    let generation = controller.status().unwrap().policy.generation;
+    let status = controller
+        .set_policy(generation, Policy::default())
+        .unwrap();
+    assert!(status.pending.is_some());
+    assert!(
+        controller
+            .admit(&token(), caller(), HoldKind::Deployment)
+            .is_err()
+    );
 }

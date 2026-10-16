@@ -86,6 +86,9 @@ pub enum Availability {
     /// Mode Off preserves OS radio state, including a disabled/blocked radio.
     /// The setup worker can still inspect and manage saved profiles normally.
     SetupProtected,
+    /// Mode Off leaves connectivity to the OS; the deployment reservation
+    /// protects later policy changes without claiming a working radio/link.
+    DeploymentProtected,
     /// The root SSH helper may continue an already accepted TCP connection.
     /// This does not assert Wi-Fi readiness or change an independently off radio.
     SessionProtected,
@@ -161,6 +164,16 @@ impl<B: Backend> Controller<B> {
             }
             return Ok(Admission {
                 availability: Availability::SessionProtected,
+                status,
+            });
+        }
+        if kind == HoldKind::Deployment
+            && !status.policy.policy.partial_offline
+            && status.pending.is_none()
+            && !status.owned_off
+        {
+            return Ok(Admission {
+                availability: Availability::DeploymentProtected,
                 status,
             });
         }

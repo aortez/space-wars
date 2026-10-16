@@ -24,10 +24,10 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion, setup holds and SSH admission implemented; expected setup profile changes, deployment hooks, SSH idle qualification and offline scheduling remain |
+| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion, setup/deployment hooks and SSH admission implemented; expected setup profile changes, SSH idle qualification and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
-| #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
+| #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
 | #265 | HTTPS download worker, staging/resume and bounded connection ownership |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
@@ -280,6 +280,30 @@ automatic toggles. An uncertain/rejected radio command still blocks admission.
 Desktop builds retain their existing direct NetworkManager workflow. Kiosk builds
 require the device service and show a retryable setup error if it is unavailable.
 
+Workstation updates use `network deployment admit|renew|release`, supplying the
+same random capability as one bounded stdin line. The CLI does not accept it as
+a command argument, and replies never echo it. The saved two-hour deployment
+lease is account-owned, so separate SSH commands and kiosk restarts retain it.
+Mode Off reports `deployment-protected` without changing or claiming a working
+radio; unresolved radio commands and policy-owned shutdowns still block admission.
+
+The fast updater acquires protection before staging or transfer, renews every
+minute during work and before each new transfer/install step, and releases after
+cleanup. An unavailable managed service aborts new work; only an absent manager
+on an older image selects legacy behavior. Captured SSH output and request
+deadlines are bounded, and a failed heartbeat does not kill an installer mid-write.
+The next step requires a fresh acknowledgement. If release fails, the bounded
+lease remains subject to the normal live-operation and quiet checks.
+
+The A/B transport retains the same lifecycle through key transfer, confirmation,
+flash, reboot and reconnect. Confirmation happens before the final admission
+check, so cancellation can release protection instead of exiting inside the
+legacy helper. Renewal continues during a long flash; expected reboot outages
+are tolerated, but success requires reconnection and an acknowledged renewal.
+The reconnect check makes up to three bounded attempts, five seconds apart.
+The existing managed-image guard still rejects the legacy unsigned installer;
+this transport wrapper does not complete or enable the verified A/B service path.
+
 `engine-os-manager network-session-probe` now reads kernel TCP tables and the
 loaded systemd SSH socket/template, with a five-second observation deadline.
 It counts active, authenticating and closing connections, including non-interactive
@@ -315,8 +339,8 @@ change the radio. Corrupt/missing records inside an existing state directory and
 an active coordinator prevent the fallback. An uninitialized image keeps ordinary
 SSH startup behavior.
 
-**Integration remains incomplete:** deployment hooks remain required. The native
-observer currently defers idle
+**Integration remains incomplete:** the verified workstation A/B service path and
+physical deployment qualification remain required. The native observer currently defers idle
 qualification for other TCP listeners; both installed images have additional
 listeners on ports 53 and 111 that still need classification. Namespace confirmation
 must also work under the installed service's capability restrictions, without
@@ -1009,9 +1033,10 @@ journal reject both helpers before worker execution. Three changed OTA tests
 and the actual manager's unprivileged rejection paths also pass on the Pi 5.
 These checks do not yet qualify the installed sudo policy on the physical Pis.
 
-Reboot-capable maintenance/network holds, provisioning operator keys on the devices,
-the verified workstation A/B service path, and preservation across real trials
-remain integration work. Fast changes deliberately alter the packaged client
+Workstation deployment holds now span transfer, cleanup and reconnect, as
+described above. Provisioning operator keys on the devices, the verified
+workstation A/B service path, and preservation across real trials remain
+integration work. Fast changes deliberately alter the packaged client
 identity; automatic-install admission must account for that development state
 instead of treating the old image record as proof of the replacement binary.
 [Source and execution evidence](data/ota-maintenance-20261015.json) records

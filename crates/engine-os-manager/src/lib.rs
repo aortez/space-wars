@@ -16,6 +16,8 @@ pub mod maintenance;
 #[cfg(target_os = "linux")]
 pub mod network_controller;
 #[cfg(target_os = "linux")]
+pub mod network_deployment;
+#[cfg(target_os = "linux")]
 pub mod network_monitor;
 #[cfg(target_os = "linux")]
 pub mod network_observation;
