@@ -466,6 +466,85 @@ fn time_check_can_fall_back_from_ethernet_without_a_second_hold_or_longer_deadli
 }
 
 #[test]
+fn download_handoff_keeps_connectivity_after_time_release_and_ethernet_does_not_wake_wifi() {
+    for ethernet in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        ready(&mut controller, &fake);
+        controller.tick().unwrap();
+        fake.edit(|w| {
+            w.radio.ethernet_available = ethernet;
+            w.radio.wireless_available = !ethernet;
+        });
+        let root = Caller { uid: 0, ..caller() };
+        let parent = token();
+        controller
+            .admit(&parent, root, HoldKind::TimeCheck)
+            .unwrap();
+        let download = HoldToken::parse("b".repeat(64)).unwrap();
+        let status = controller.status().unwrap();
+        let request = DownloadReservation {
+            deadline: Clock {
+                boot_id: BOOT.into(),
+                ms: 110_000 + 1_800_000,
+            },
+            admission_deadline_ms: 230_000,
+            mode_generation: Some(status.policy.mode_generation),
+            time_hold: Some(parent.clone()),
+            handoff_deadline_ms: Some(200_000),
+        };
+        let admitted = controller
+            .admit_download(&download, root, &request)
+            .unwrap();
+        assert_eq!(admitted.status.policy.holds.len(), 2);
+        let released = controller.release(&parent, root).unwrap();
+        assert_eq!(released.policy.holds.len(), 1);
+        assert_eq!(released.policy.holds[0].kind, HoldKind::Download);
+        fake.edit(|w| w.clock.ms += 20_000);
+        controller.renew(&download, root).unwrap();
+        assert_eq!(
+            fake.calls(),
+            if ethernet {
+                vec![false]
+            } else {
+                vec![false, true]
+            }
+        );
+        // The old parent no longer authorizes another handoff.
+        assert!(
+            controller
+                .admit_download(&HoldToken::parse("c".repeat(64)).unwrap(), root, &request)
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn stale_connected_download_opportunity_does_not_wake_an_off_radio() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    controller.tick().unwrap();
+    fake.edit(|w| w.radio.wireless_available = false);
+    let root = Caller { uid: 0, ..caller() };
+    let request = DownloadReservation {
+        deadline: Clock {
+            boot_id: BOOT.into(),
+            ms: 110_000 + 1_800_000,
+        },
+        admission_deadline_ms: 230_000,
+        mode_generation: Some(controller.status().unwrap().policy.mode_generation),
+        time_hold: None,
+        handoff_deadline_ms: None,
+    };
+    assert!(controller.admit_download(&token(), root, &request).is_err());
+    assert_eq!(fake.calls(), [false]);
+    assert!(controller.status().unwrap().policy.holds.is_empty());
+}
+
+#[test]
 fn time_fallback_honors_radio_conflicts_hardware_block_and_mode_off() {
     for case in ["conflict", "hardware", "off"] {
         let temp = tempfile::tempdir().unwrap();

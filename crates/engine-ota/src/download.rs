@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream;
 use reqwest::{Client, Response, StatusCode, header};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::future::Future;
 use std::sync::{
@@ -30,7 +30,7 @@ const MAX_HTTP_REQUESTS: usize = 256;
 const MAX_REDIRECTS: usize = 5;
 const PAYLOAD_BYTES_PER_SECOND: u64 = 4 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Phase {
     Checking,
@@ -39,7 +39,7 @@ pub enum Phase {
     Ready,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Progress {
     pub phase: Phase,
     pub candidate_id: Option<Sha256>,
@@ -109,8 +109,21 @@ enum Deadline {
 
 impl DownloadSession {
     pub fn new(control: Arc<dyn Control>) -> Result<Self> {
-        let started = boottime_ms()?;
-        Ok(Self {
+        Self::new_at(control, boottime_ms()?)
+    }
+
+    /// The service supplies its original boot-relative request receipt so queue
+    /// and preparation time remain part of the same session. No UI path or
+    /// unvalidated wall-clock timestamp participates in these bounds.
+    pub fn new_at(control: Arc<dyn Control>, started: u64) -> Result<Self> {
+        let now = boottime_ms()?;
+        if now
+            .checked_sub(started)
+            .is_none_or(|age| age >= PREPARATION_MS)
+        {
+            return Err(Error::Download("preparation deadline exceeded"));
+        }
+        let session = Self {
             http: Http {
                 client: client(true)?,
                 budget: Arc::new(Budget {
@@ -126,7 +139,9 @@ impl DownloadSession {
                 #[cfg(test)]
                 fixture: None,
             },
-        })
+        };
+        session.http.budget.check_deadline(Deadline::Preparation)?;
+        Ok(session)
     }
 
     pub async fn run(

@@ -14,6 +14,45 @@ use tokio_rustls::{TlsAcceptor, rustls};
 
 use crate::test_support::{EXPIRES, Fault, Fixture, descriptor, device, location, time};
 
+#[tokio::test]
+async fn service_request_receipt_is_included_in_preparation_and_session_deadlines() {
+    let now = boottime_ms().unwrap();
+    let age = now.min(PREPARATION_MS / 2);
+    let started = now - age;
+    let session = DownloadSession::new_at(TestControl::new(), started).unwrap();
+    assert_eq!(
+        session.http.budget.deadline(Deadline::Preparation),
+        started + PREPARATION_MS
+    );
+    assert_eq!(
+        session.http.budget.deadline(Deadline::Session),
+        started + SESSION_MS
+    );
+    session
+        .http
+        .budget
+        .clock_offset
+        .store(PREPARATION_MS - age + 1, Ordering::SeqCst);
+    assert!(
+        session
+            .http
+            .budget
+            .check_deadline(Deadline::Preparation)
+            .is_err()
+    );
+    assert!(
+        session
+            .http
+            .budget
+            .check_deadline(Deadline::Session)
+            .is_ok()
+    );
+    assert!(DownloadSession::new_at(TestControl::new(), now + SESSION_MS).is_err());
+    if let Some(expired) = now.checked_sub(PREPARATION_MS) {
+        assert!(DownloadSession::new_at(TestControl::new(), expired).is_err());
+    }
+}
+
 struct TestControl {
     time: Mutex<Option<UsableTime>>,
     cancelled: AtomicBool,

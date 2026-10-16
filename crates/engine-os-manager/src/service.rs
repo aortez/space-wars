@@ -31,6 +31,8 @@ pub struct DeviceStatus {
     pub recovery: crate::recovery_status::RecoveryStatus,
     #[serde(default)]
     pub time_check: Option<crate::time_runtime::Status>,
+    #[serde(default)]
+    pub update: Option<crate::update_runtime::Status>,
 }
 
 pub struct ObservedState {
@@ -58,6 +60,7 @@ impl ObservedState {
             time: tracker.status(now),
             recovery: crate::recovery_status::read(&self.boot_id, now.boottime_us / 1000),
             time_check: None,
+            update: None,
         })
     }
 }
@@ -65,13 +68,34 @@ impl ObservedState {
 pub type SharedState = Arc<Mutex<ObservedState>>;
 pub type StatusReader = Arc<dyn Fn() -> Result<DeviceStatus> + Send + Sync>;
 pub type SyncNow = Arc<dyn Fn() -> Result<crate::time_runtime::Accepted> + Send + Sync>;
+#[derive(Clone, Copy)]
+pub enum UpdateAction {
+    Check,
+    Select(engine_ota::Channel),
+}
+pub type Update =
+    Arc<dyn Fn(UpdateAction) -> Result<crate::update_runtime::Accepted> + Send + Sync>;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
 enum Request {
-    Status { schema: u32 },
-    Subscribe { schema: u32, seconds: u16 },
-    SyncNow { schema: u32 },
+    Status {
+        schema: u32,
+    },
+    Subscribe {
+        schema: u32,
+        seconds: u16,
+    },
+    SyncNow {
+        schema: u32,
+    },
+    CheckUpdates {
+        schema: u32,
+    },
+    UpdateChannel {
+        schema: u32,
+        channel: engine_ota::Channel,
+    },
 }
 
 pub struct StatusServer {
@@ -91,6 +115,16 @@ impl StatusServer {
         kiosk_uid: u32,
         read: StatusReader,
         sync: Option<SyncNow>,
+    ) -> Result<Self> {
+        Self::bind_with_actions(path, kiosk_uid, read, sync, None)
+    }
+
+    pub fn bind_with_actions(
+        path: &Path,
+        kiosk_uid: u32,
+        read: StatusReader,
+        sync: Option<SyncNow>,
+        update: Option<Update>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         fs::set_permissions(path, fs::Permissions::from_mode(0o660))?;
@@ -119,9 +153,10 @@ impl StatusServer {
                         }
                         let read = read.clone();
                         let sync = sync.clone();
+                        let update = update.clone();
                         let stop = stopped.clone();
                         workers.push(thread::spawn(move || {
-                            let _ = handle(stream, &read, sync.as_ref(), &stop);
+                            let _ = handle(stream, &read, sync.as_ref(), update.as_ref(), &stop);
                         }));
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -181,6 +216,7 @@ fn handle(
     mut stream: UnixStream,
     read: &StatusReader,
     sync: Option<&SyncNow>,
+    update: Option<&Update>,
     stop: &AtomicBool,
 ) -> Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
@@ -196,6 +232,22 @@ fn handle(
         }
     };
     let seconds = match request {
+        Request::CheckUpdates { schema: 1 } | Request::UpdateChannel { schema: 1, .. } => {
+            let action = match request {
+                Request::UpdateChannel { channel, .. } => UpdateAction::Select(channel),
+                _ => UpdateAction::Check,
+            };
+            return match update
+                .filter(|_| !stop.load(Ordering::Relaxed))
+                .and_then(|update| update(action).ok())
+            {
+                Some(accepted) => write_json(&mut stream, &accepted),
+                None => write_json(
+                    &mut stream,
+                    &serde_json::json!({"schema":1,"error":"unavailable"}),
+                ),
+            };
+        }
         Request::SyncNow { schema: 1 } => {
             return match sync
                 .filter(|_| !stop.load(Ordering::Relaxed))
@@ -285,6 +337,28 @@ pub fn sync_now(path: &Path) -> Result<crate::time_runtime::Accepted> {
         .map_err(|_| Error::Invalid("time-check worker unavailable".into()))?;
     if accepted.schema != 1 {
         return Err(Error::Invalid("unsupported time-check reply".into()));
+    }
+    Ok(accepted)
+}
+
+pub fn update_request(
+    path: &Path,
+    action: UpdateAction,
+) -> Result<crate::update_runtime::Accepted> {
+    let mut stream = connect(path)?;
+    if peer_credentials(&stream)?.uid != 0 {
+        return Err(Error::Invalid("unexpected device service owner".into()));
+    }
+    let request = match action {
+        UpdateAction::Check => Request::CheckUpdates { schema: 1 },
+        UpdateAction::Select(channel) => Request::UpdateChannel { schema: 1, channel },
+    };
+    write_json(&mut stream, &request)?;
+    let response = read_frame(&mut stream, MAX_RESPONSE, REQUEST_DEADLINE)?;
+    let accepted: crate::update_runtime::Accepted = serde_json::from_slice(&response)
+        .map_err(|_| Error::Invalid("update worker unavailable".into()))?;
+    if accepted.schema != 1 {
+        return Err(Error::Invalid("unsupported update reply".into()));
     }
     Ok(accepted)
 }

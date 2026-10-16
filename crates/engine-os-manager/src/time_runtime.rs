@@ -188,7 +188,12 @@ impl Drop for Runtime {
     }
 }
 
-pub fn spawn(time: SharedState, network: Watch, boot_id: String) -> Runtime {
+pub fn spawn(
+    time: SharedState,
+    network: Watch,
+    boot_id: String,
+    updates: crate::update_runtime::Handle,
+) -> Runtime {
     let clock: ReadClock = Arc::new(move || {
         Ok(Clock {
             boot_id: boot_id.clone(),
@@ -202,6 +207,7 @@ pub fn spawn(time: SharedState, network: Watch, boot_id: String) -> Runtime {
             network,
             clock: clock.clone(),
             socket: network_service::SOCKET_PATH.into(),
+            updates,
         },
         clock,
     )
@@ -290,6 +296,7 @@ trait Backend {
     fn admit(&mut self, token: &HoldToken, active: &Active, mode: u64) -> Result<()>;
     fn fallback(&mut self, token: &HoldToken, active: &Active, mode: u64) -> Result<()>;
     fn release(&mut self, token: &HoldToken) -> Result<()>;
+    fn offer_download(&mut self, token: &HoldToken, active: &Active);
     fn query(
         &mut self,
         schedule: &mut Schedule,
@@ -304,6 +311,7 @@ struct Held {
     epoch: Option<u64>,
     escalated: bool,
     retry_ms: u64,
+    offered: bool,
 }
 struct Runner<B: Backend> {
     schedule: Schedule,
@@ -390,6 +398,7 @@ impl<B: Backend> Runner<B> {
                 epoch: None,
                 escalated: false,
                 retry_ms: 0,
+                offered: false,
             });
         }
         let held = self.held.as_mut().expect("allocated hold");
@@ -405,6 +414,10 @@ impl<B: Backend> Runner<B> {
                 if self.schedule.admitted(&current, active.id)? {
                     held.epoch = Some(initial.epoch);
                     held.escalated = false;
+                    if !held.offered {
+                        held.offered = true;
+                        self.backend.offer_download(&held.token, &active);
+                    }
                 }
             }
             (now, status, network) = self.observe(None)?;
@@ -520,6 +533,7 @@ struct Native {
     network: Watch,
     clock: ReadClock,
     socket: PathBuf,
+    updates: crate::update_runtime::Handle,
 }
 impl Native {
     fn operation(&self, request: Request, deadline_ms: Option<u64>) -> Result<()> {
@@ -610,6 +624,17 @@ impl Backend for Native {
             },
             None,
         )
+    }
+    fn offer_download(&mut self, token: &HoldToken, active: &Active) {
+        if let Ok(clock) = self.clock() {
+            self.updates.offer_time(
+                token,
+                &Clock {
+                    boot_id: clock.boot_id,
+                    ms: active.deadline_ms,
+                },
+            );
+        }
     }
     fn query(
         &mut self,

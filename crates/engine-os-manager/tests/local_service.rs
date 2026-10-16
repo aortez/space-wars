@@ -19,6 +19,7 @@ fn snapshot() -> DeviceStatus {
         rtc_error: None,
         recovery: Default::default(),
         time_check: None,
+        update: None,
         time: TimeStatus {
             usable: false,
             source: None,
@@ -83,6 +84,70 @@ fn explicit_sync_command_is_authenticated_and_status_reads_never_enqueue_work() 
             1,
             "client authenticates root before sending mutation"
         );
+    }
+}
+
+#[test]
+fn update_commands_are_explicit_bounded_and_authenticate_the_service_before_sending() {
+    use engine_os_manager::service::{UpdateAction, update_request};
+    use std::sync::Mutex;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("updates.sock");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let received = calls.clone();
+    let _server = StatusServer::bind_with_actions(
+        &path,
+        unsafe { libc::geteuid() },
+        Arc::new(|| Ok(snapshot())),
+        None,
+        Some(Arc::new(move |action| {
+            received.lock().unwrap().push(match action {
+                UpdateAction::Check => "check",
+                UpdateAction::Select(engine_ota::Channel::Nightly) => "nightly",
+                UpdateAction::Select(engine_ota::Channel::Release) => "release",
+            });
+            Ok(engine_os_manager::update_runtime::Accepted {
+                schema: 1,
+                received_ms: 123,
+                coalesced: false,
+            })
+        })),
+    )
+    .unwrap();
+    for _ in 0..3 {
+        read_status(&path).unwrap();
+    }
+    assert!(calls.lock().unwrap().is_empty());
+    let request = |body: &str| {
+        let mut socket = UnixStream::connect(&path).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        writeln!(socket, "{body}").unwrap();
+        let mut text = String::new();
+        BufReader::new(socket).read_line(&mut text).unwrap();
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()
+    };
+    assert_eq!(
+        request(r#"{"schema":1,"command":"check-updates"}"#)["received_ms"],
+        123
+    );
+    assert_eq!(
+        request(r#"{"schema":1,"command":"update-channel","channel":"nightly"}"#)["received_ms"],
+        123
+    );
+    for bad in [
+        r#"{"schema":2,"command":"check-updates"}"#,
+        r#"{"schema":1,"command":"check-updates","url":"https://untrusted.invalid/"}"#,
+        r#"{"schema":1,"command":"update-channel","channel":"custom"}"#,
+    ] {
+        assert!(request(bad)["error"].is_string());
+    }
+    assert_eq!(*calls.lock().unwrap(), ["check", "nightly"]);
+    if unsafe { libc::geteuid() } != 0 {
+        assert!(update_request(&path, UpdateAction::Check).is_err());
+        assert!(update_request(&path, UpdateAction::Select(engine_ota::Channel::Release)).is_err());
+        assert_eq!(*calls.lock().unwrap(), ["check", "nightly"]);
     }
 }
 

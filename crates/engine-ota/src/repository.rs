@@ -59,6 +59,16 @@ impl FeedLocation {
 #[derive(Clone, Copy, Debug)]
 pub struct UsableTime(pub Timestamp);
 
+impl UsableTime {
+    /// Convert a reading already admitted by the independent time service.
+    pub fn from_unix_microseconds(us: u64) -> Result<Self> {
+        let us = i64::try_from(us).map_err(|_| Error::WaitingForTime)?;
+        Timestamp::from_microsecond(us)
+            .map(Self)
+            .map_err(|_| Error::WaitingForTime)
+    }
+}
+
 impl tough::Clock for UsableTime {
     fn now(&self) -> Timestamp {
         self.0
@@ -239,7 +249,9 @@ impl TrustStore {
         Ok(())
     }
 
-    pub(crate) fn admit_time(&mut self, time: UsableTime) -> Result<()> {
+    /// Retain a reading admitted by the time service, including final checks
+    /// after a download. Later clock corrections cannot revive expired metadata.
+    pub fn admit_time(&mut self, time: UsableTime) -> Result<()> {
         if let Some(previous) = self.state.trusted.get("latest_known_time.json") {
             let previous: Timestamp = serde_json::from_str(previous)?;
             if time.0 < previous {

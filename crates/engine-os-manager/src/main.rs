@@ -54,6 +54,13 @@ enum Command {
     Status,
     /// Queue one bounded OS time check; repeated requests join active work.
     SyncNow,
+    /// Queue a bounded update check/download; never installs or reboots.
+    CheckUpdates,
+    /// Select a signed update channel; this does not change the installed image.
+    UpdateChannel {
+        #[arg(value_parser = ["release", "nightly"])]
+        channel: String,
+    },
     /// Inspect the current time provider without changing clocks or state.
     Probe,
     /// Read NetworkManager radio/checkpoint state without changing connectivity.
@@ -161,6 +168,31 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::CheckUpdates => println!(
+            "{}",
+            serde_json::to_string(&service::update_request(
+                SOCKET_PATH.as_ref(),
+                service::UpdateAction::Check
+            )?)?
+        ),
+        Command::UpdateChannel { channel } => {
+            let channel = match channel.as_str() {
+                "release" => engine_ota::Channel::Release,
+                "nightly" => engine_ota::Channel::Nightly,
+                _ => {
+                    return Err(engine_os_manager::Error::Invalid(
+                        "unknown update channel".into(),
+                    ));
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string(&service::update_request(
+                    SOCKET_PATH.as_ref(),
+                    service::UpdateAction::Select(channel)
+                )?)?
+            );
+        }
         Command::SyncNow => println!(
             "{}",
             serde_json::to_string(&service::sync_now(SOCKET_PATH.as_ref())?)?
@@ -364,7 +396,7 @@ fn run(args: Args) -> engine_os_manager::Result<()> {
 
 #[cfg(target_os = "linux")]
 mod daemon {
-    use engine_os_manager::service::{ObservedState, SharedState, StatusServer};
+    use engine_os_manager::service::{self, ObservedState, SharedState, StatusServer};
     use engine_os_manager::store::TimeStore;
     use engine_os_manager::time::{RtcBootReading, TimeReason, TimeTracker};
     use engine_os_manager::{Error, RTC_BOOT_PATH, Result, SOCKET_PATH, STATE_DIRECTORY, linux};
@@ -485,15 +517,23 @@ mod daemon {
         // Separate workers own radio and time-check IO. Neither blocks the
         // accepted-time observer or the local read-only status response.
         let network = engine_os_manager::network_runtime::spawn();
+        let updates = engine_os_manager::update_runtime::spawn(
+            shared.clone(),
+            network.watch(),
+            boot_id.clone(),
+        )?;
+        let update_status = updates.handle();
+        let update_action = update_status.clone();
         let time_checks = engine_os_manager::time_runtime::spawn(
             shared.clone(),
             network.watch(),
             boot_id.clone(),
+            updates.handle(),
         );
         let checks = time_checks.handle();
         let sync = checks.clone();
         let reader = shared.clone();
-        let _server = StatusServer::bind_with_sync(
+        let _server = StatusServer::bind_with_actions(
             SOCKET_PATH.as_ref(),
             1000,
             Arc::new(move || {
@@ -502,9 +542,14 @@ mod daemon {
                     .map_err(|_| Error::Invalid("device observation unavailable".into()))?
                     .status()?;
                 status.time_check = Some(checks.status()?);
+                status.update = Some(update_status.status()?);
                 Ok(status)
             }),
             Some(Arc::new(move || sync.sync_now())),
+            Some(Arc::new(move |action| match action {
+                service::UpdateAction::Check => update_action.check_now(),
+                service::UpdateAction::Select(channel) => update_action.select_channel(channel),
+            })),
         )?;
         let mut rtc_worker: Option<RtcWorker> = None;
         let mut save_retry = Instant::now();

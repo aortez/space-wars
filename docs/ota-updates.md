@@ -15,8 +15,9 @@ integration and Pi failure qualification remain outstanding.
 
 `engine-os-manager` contains the independent time/status service for
 [#256](https://github.com/aortez/space-wars/issues/256), plus a separate network
-coordinator and policy socket, described below. Neither socket exposes an
-installation, reboot or arbitrary-command operation. The service has not yet
+coordinator and scheduled download worker, described below. Its local APIs expose
+bounded time/update checks, channel selection and network policy. Installation,
+reboot and arbitrary-command operations are not exposed. The service has not yet
 been enabled on either physical kiosk.
 
 Remaining work retains the full OTA scope:
@@ -24,11 +25,11 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous monitoring, operation holds and the durable time-check runtime/API implemented; OTA hold handoff, expected setup profile changes and SSH idle qualification remain |
+| #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time checks and OTA handoff implemented; expected setup profile changes and SSH idle qualification remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Private staging, bounded HTTPS sessions and a separate durable update schedule implemented; device-service integration and connection ownership remain |
+| #265 | Dedicated scheduled download worker, bounded connection ownership, time-check handoff and local API implemented; production provisioning and installed-device qualification remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -242,9 +243,11 @@ the installed services, system provider, clocks or radios. The
 [runtime validation evidence](data/ota-time-runtime-20261016.json) records exact
 source and artifact identities.
 
-OTA still needs to reserve its own connection hold before time work releases
-connectivity. Its daily due/attempt record remains separate from NTP retry
-history. The service has not yet been enabled on either kiosk; saved-profile
+The time worker now offers an admitted connection to the updater before its
+provider query, so an early synchronization can release the time hold after a due
+updater has registered its own reservation. The offer waits at most five seconds
+within the original NTP deadline. OTA's daily due/attempt record remains separate
+from NTP retry history. The service has not yet been enabled on either kiosk; saved-profile
 association, captive-portal behavior and installed provider qualification remain
 physical integration work.
 
@@ -1493,13 +1496,10 @@ AArch64 test compilation and formatting also passed. Exact source/artifact
 identities and outputs are recorded in the
 [download validation evidence](data/ota-download-20261016.json).
 
-Remaining integration includes driving the persistent boot/daily scheduler,
-authenticated Check now admission and coalescing, ownership of the network hold before
-NTP releases its hold, Ethernet/offline-policy coordination, dedicated worker
-priority and outbound-IP sandbox permissions, production staging provisioning,
-authoritative device/history refresh, update status/API and installation-policy
-handoff. This library session has not been connected to the running kiosk service
-or a production release feed, and it does not establish an enabled auto updater.
+The production service integration is described below. Production trust and
+staging provisioning, installed-device qualification and installation-policy
+handoff remain. No production release feed or enabled auto updater has yet been
+qualified on either kiosk.
 
 ### Durable update-check schedule
 
@@ -1548,10 +1548,81 @@ and fake provider/network/time observations, with no installed service changes
 or reboot. The [schedule evidence](data/ota-update-schedule-20261016.json) records
 the exact source, binaries and results.
 
-This component is not yet driven by the production service. Remaining work is
-the dedicated download worker, bounded network admission/renewal, the time-check
-hold handoff, current device/history/time guards, Check now/status IPC, sandbox
-permissions and production trust/staging provisioning.
+### Dedicated download worker and network handoff
+
+`engine-os-manager serve` now drives the schedule from a separate coordinator and
+runs one combined check/download session on a dedicated IO thread. Neither runs
+inside the client or the accepted-time observer. Both update threads lower their
+own CPU and IO priority; the existing transport throttle remains 4 MiB/s. The
+service sandbox permits AF_INET/AF_INET6 for the fixed trusted feed and AF_UNIX for
+local control. UI requests cannot supply a URL, path, deadline or executable.
+
+`engine-os-manager check-updates` queues an explicit check; repeated requests join
+the original pending or active attempt. `engine-os-manager update-channel release`
+or `nightly` queues a saved channel change and cancels old work. Acknowledgement
+means queued, not downloaded or installed. Status reads remain passive and expose
+the schedule, phase, progress, safe reason and currently verified candidate.
+Clients authenticate the root service before sending either mutation; the service
+continues to admit only root and the kiosk UID through peer credentials.
+
+The root-only `admit-download` request carries the original session/admission
+deadlines. Automatic work also carries the observed mode generation and, for a
+time-check handoff, the live parent capability and the offer's absolute deadline.
+The coordinator checks actual connectivity before allowing an independent due
+automatic check in partial offline mode. A stale Connected observation or expired
+parent/offer cannot create a fresh radio wake. Explicit checks use the ordinary
+radio policy. Existing Ethernet does not require Wi-Fi.
+
+After admission, the updater owns a separate Download hold, renewing its rolling
+120-second lease every 30 seconds within the original thirty-minute cap. NTP can
+finish independently. The HTTP guard uses fresh coordinator observations, the
+admitted epoch/mode, accepted time and its own live lease. Channel change, revoked
+observations, coordinator restart, failed renewal, deadline or shutdown cancels
+the session. The worker waits for network IO to end before releasing its own
+capability. Late admission replies are cleaned up without starting HTTP.
+
+Preparation opens the fixed trust/staging stores and obtains actual boot, disk,
+installed-image and recovery-history evidence under the shared installation lock.
+The lock remains held through the download and final identity recheck, excluding
+concurrent recovery or workstation maintenance; those operations report busy
+during the session. It is released when IO finishes, before any later installer
+obtains its own authority. Downloads never begin an installation or request a
+reboot.
+
+Persistent data compatibility also requires the private, checksummed
+`/data/spacewars-system/data-schema.json` record. Its envelope contains
+`record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
+serialized record. Only supervised provisioning or a serialized schema migration
+may establish it. A rolled-back image's advertised write version is not proof of
+the current data version. Missing/corrupt data identity, an unprovisioned recovery
+journal, absent `/data/spacewars-system/trust` or missing staging reports
+preparation unavailable. This path does not initialize or reset trust implicitly.
+
+Ready follows complete payload verification, a fresh cached feed/eligibility
+check and a final boot/data/history check. Final accepted-time observations are
+persisted to the trusted-time floor before capturing readiness, including an
+observation that expires the candidate. Changes to the observed image, data,
+recovery, trust or staging records invalidate the cached readiness snapshot;
+unknown/backwards usable time or expiry hides it immediately. This is status
+evidence only: installation still needs its own full revalidation. After process
+restart, retained bytes are not advertised as Ready without another verification
+session. Partial bytes remain available for a later eligible or explicit retry.
+
+Production provisioning of the data-version record, trust root/feed and staging
+directory remains, as do installed network/provider qualification, startup
+presentation of retained partial-byte status, installer/policy/UI integration and
+physical failure/performance qualification. The service has not been installed or
+enabled on either Pi by these fixture runs.
+
+The final service suite passed 182 tests, and 63 runtime/schedule/handoff cases
+passed on each Pi (4.14 seconds on Pi 5; 5.36 seconds on Pi 4). The OTA suite passed
+276 unit and 22 signed-feed tests before the final service time-floor adjustment;
+the signed-feed and relevant downloader cases were rerun after that adjustment.
+Clippy, Rust 1.89, AArch64 compilation and 71 Yocto helper tests also passed.
+[Download runtime evidence](data/ota-update-runtime-20261016.json) records source
+identity, exact checks and fixture limits. The physical tests use injected
+network/provider observations and private UID-1000 directories; they do not
+qualify the installed native HTTP/boot path or its effect on game frame time.
 
 ## Reproducible verification
 

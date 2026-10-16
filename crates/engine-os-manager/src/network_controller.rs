@@ -2,7 +2,8 @@
 //! behind a radio command and are acknowledged only after a fresh readback.
 use crate::network_observation::Observation;
 use crate::network_policy::{
-    self, Activity, Caller, Clock, HoldKind, HoldToken, Intent, NetworkPolicy, Policy,
+    self, Activity, Caller, Clock, DownloadReservation, HoldKind, HoldToken, Intent, NetworkPolicy,
+    Policy,
 };
 use crate::network_radio_state::{Pending, Phase, RadioState, Witness};
 use crate::{Error, Result};
@@ -179,6 +180,29 @@ impl<B: Backend> Controller<B> {
     pub fn require_wireless(&mut self, token: &HoldToken, caller: Caller) -> Result<Admission> {
         let clock = self.backend.clock()?;
         self.policy.require_wireless(token, caller, &clock)?;
+        self.admission(token, caller)
+    }
+
+    pub fn admit_download(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        request: &DownloadReservation,
+    ) -> Result<Admission> {
+        // Refresh without changing the radio. A stale Connected opportunity
+        // cannot create a new automatic wake after the last connection ended.
+        let snapshot = self.refresh()?;
+        let clock = self.backend.clock()?;
+        let connected = snapshot.as_ref().is_some_and(|s| {
+            s.clock.boot_id == clock.boot_id
+                && clock
+                    .ms
+                    .checked_sub(s.clock.ms)
+                    .is_some_and(|age| age <= 5000)
+                && (s.radio.ethernet_available || s.radio.wireless_available)
+        });
+        self.policy
+            .reserve_download(token, caller, &clock, request, connected)?;
         self.admission(token, caller)
     }
 

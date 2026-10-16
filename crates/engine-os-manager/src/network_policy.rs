@@ -49,6 +49,17 @@ pub struct Caller {
     pub process_start_ticks: u64,
 }
 
+/// Root-worker admission tied to the original combined check/download window.
+/// None mode generation denotes an explicit manual check; automatic work must
+/// still match the mode observed when it selected a connection opportunity.
+pub struct DownloadReservation {
+    pub deadline: Clock,
+    pub admission_deadline_ms: u64,
+    pub mode_generation: Option<u64>,
+    pub time_hold: Option<HoldToken>,
+    pub handoff_deadline_ms: Option<u64>,
+}
+
 /// A caller-retained capability, generated before admission so a lost response
 /// can be retried without allocating another hold. Never publish it in status.
 #[derive(Clone, Eq, PartialEq)]
@@ -437,6 +448,65 @@ impl NetworkPolicy {
         self.reserve_inner(token, caller, HoldKind::TimeCheck, clock, Some(deadline.ms))
     }
 
+    pub(crate) fn reserve_download(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        clock: &Clock,
+        request: &DownloadReservation,
+        connected: bool,
+    ) -> Result<()> {
+        self.check(clock)?;
+        let start = request.deadline.ms.checked_sub(DOWNLOAD_MS);
+        let admission = start.and_then(|start| {
+            start.checked_add(if request.mode_generation.is_none() {
+                30_000
+            } else {
+                CHECK_MS
+            })
+        });
+        if caller.uid != 0
+            || request.deadline.boot_id != clock.boot_id
+            || start.is_none_or(|start| start > clock.ms)
+            || admission != Some(request.admission_deadline_ms)
+            || clock.ms >= request.admission_deadline_ms
+            || request.deadline.ms <= clock.ms
+            || request
+                .mode_generation
+                .is_some_and(|mode| mode != self.record.mode_generation)
+            || (request.mode_generation.is_none() && request.time_hold.is_some())
+            || (request.time_hold.is_some() != request.handoff_deadline_ms.is_some())
+            || request
+                .handoff_deadline_ms
+                .is_some_and(|end| clock.ms >= end)
+        {
+            return Err(invalid(
+                "download reservation is expired or no longer authorized",
+            ));
+        }
+        // Retrying an already reserved token does not need its former parent.
+        // reserve_inner still verifies the caller, kind, lease and exact cap.
+        if !self.temporary.contains_key(&token.id()) {
+            if let Some(parent) = &request.time_hold {
+                if self.held_kind(parent, caller, clock)? != HoldKind::TimeCheck {
+                    return Err(invalid("download handoff requires a live owned time hold"));
+                }
+            } else if request.mode_generation.is_some()
+                && self.record.policy.partial_offline
+                && !connected
+            {
+                return Err(invalid("automatic download has no connection opportunity"));
+            }
+        }
+        self.reserve_inner(
+            token,
+            caller,
+            HoldKind::Download,
+            clock,
+            Some(request.deadline.ms),
+        )
+    }
+
     fn reserve_inner(
         &mut self,
         token: &HoldToken,
@@ -458,7 +528,7 @@ impl NetworkPolicy {
                 return Err(invalid("network hold expired"));
             }
             if deadline_ms.is_some_and(|end| old.absolute_ms != Some(end)) {
-                return Err(invalid("time hold deadline changed"));
+                return Err(invalid("network hold deadline changed"));
             }
             return Ok(());
         }
@@ -490,7 +560,7 @@ impl NetworkPolicy {
         } else {
             let absolute_ms = match kind {
                 HoldKind::TimeCheck => Some(deadline_ms.unwrap_or(clock.after(CHECK_MS)?)),
-                HoldKind::Download => Some(clock.after(DOWNLOAD_MS)?),
+                HoldKind::Download => Some(deadline_ms.unwrap_or(clock.after(DOWNLOAD_MS)?)),
                 _ => None,
             };
             let expires_ms = clock.after(SETUP_MS)?.min(absolute_ms.unwrap_or(u64::MAX));

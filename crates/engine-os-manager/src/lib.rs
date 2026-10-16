@@ -54,6 +54,8 @@ pub mod service;
 #[cfg(target_os = "linux")]
 pub mod store;
 #[cfg(target_os = "linux")]
+pub mod update_runtime;
+#[cfg(target_os = "linux")]
 pub mod update_schedule;
 
 pub const SOCKET_PATH: &str = "/run/spacewars-system/status.sock";

@@ -81,6 +81,7 @@ struct World {
     releases: usize,
     queries: usize,
     fallbacks: usize,
+    offers: Vec<u64>,
 }
 
 #[derive(Clone)]
@@ -105,6 +106,7 @@ impl Fake {
             releases: 0,
             queries: 0,
             fallbacks: 0,
+            offers: Vec::new(),
         })))
     }
     fn edit(&self, change: impl FnOnce(&mut World)) {
@@ -199,6 +201,12 @@ impl Backend for Fake {
         w.grants.remove(token.expose());
         Ok(())
     }
+    fn offer_download(&mut self, token: &HoldToken, active: &Active) {
+        let mut w = self.0.lock().unwrap();
+        assert!(w.grants.contains_key(token.expose()));
+        assert!(w.ms < active.deadline_ms);
+        w.offers.push(active.id);
+    }
     fn query(
         &mut self,
         schedule: &mut Schedule,
@@ -206,6 +214,7 @@ impl Backend for Fake {
         stop: Arc<AtomicBool>,
     ) -> Outcome {
         let now = self.clock().unwrap();
+        assert!(self.0.lock().unwrap().offers.contains(&context.active.id));
         assert!(context.valid(&now, &self.network(&now).unwrap()));
         assert!(
             schedule

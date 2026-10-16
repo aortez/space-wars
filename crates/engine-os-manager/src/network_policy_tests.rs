@@ -24,6 +24,139 @@ fn token(n: u8) -> HoldToken {
 }
 
 #[test]
+fn download_reservation_requires_owned_opportunity_and_preserves_its_absolute_cap() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+    enable(&mut policy);
+    let root = Caller {
+        uid: 0,
+        ..caller(1)
+    };
+    let mode = policy.status(&clock(0)).unwrap().mode_generation;
+    let mut request = DownloadReservation {
+        deadline: clock(DOWNLOAD_MS),
+        admission_deadline_ms: CHECK_MS,
+        mode_generation: Some(mode),
+        time_hold: None,
+        handoff_deadline_ms: None,
+    };
+    assert!(
+        policy
+            .reserve_download(&token(2), caller(1), &clock(1), &request, true)
+            .is_err()
+    );
+    assert!(
+        policy
+            .reserve_download(&token(2), root, &clock(1), &request, false)
+            .is_err()
+    );
+    policy
+        .reserve(&token(1), root, HoldKind::TimeCheck, &clock(1))
+        .unwrap();
+    request.time_hold = Some(token(1));
+    request.handoff_deadline_ms = Some(100_000);
+    assert!(
+        policy
+            .reserve_download(
+                &token(2),
+                Caller { pid: 2, ..root },
+                &clock(1),
+                &request,
+                false
+            )
+            .is_err()
+    );
+    policy
+        .reserve_download(&token(2), root, &clock(1), &request, false)
+        .unwrap();
+    policy.release(&token(1), root, &clock(2)).unwrap();
+    // A lost admission reply is idempotent after the parent has released.
+    policy
+        .reserve_download(&token(2), root, &clock(2), &request, false)
+        .unwrap();
+    assert_eq!(policy.status(&clock(2)).unwrap().holds.len(), 1);
+    // Another token cannot reuse the completed parent even on an available link.
+    assert!(
+        policy
+            .reserve_download(&token(3), root, &clock(2), &request, true)
+            .is_err()
+    );
+    request.deadline.ms += 1;
+    request.admission_deadline_ms += 1;
+    assert!(
+        policy
+            .reserve_download(&token(2), root, &clock(2), &request, false)
+            .is_err()
+    );
+    for ms in (60_000..DOWNLOAD_MS).step_by(60_000) {
+        policy.renew(&token(2), root, &clock(ms)).unwrap();
+    }
+    assert_eq!(
+        policy.status(&clock(DOWNLOAD_MS - 1)).unwrap().holds[0].expires_in_ms,
+        1
+    );
+    assert!(policy.renew(&token(2), root, &clock(DOWNLOAD_MS)).is_err());
+}
+
+#[test]
+fn download_manual_admission_and_automatic_mode_guards_reject_delayed_requests() {
+    for case in ["manual", "mode", "boot", "late", "future", "parent-kind"] {
+        let temp = tempfile::tempdir().unwrap();
+        let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+        enable(&mut policy);
+        let root = Caller {
+            uid: 0,
+            ..caller(1)
+        };
+        let mut request = DownloadReservation {
+            deadline: clock(DOWNLOAD_MS),
+            admission_deadline_ms: CHECK_MS,
+            mode_generation: Some(policy.status(&clock(0)).unwrap().mode_generation),
+            time_hold: None,
+            handoff_deadline_ms: None,
+        };
+        let at = match case {
+            "manual" => {
+                request.mode_generation = None;
+                request.admission_deadline_ms = 30_000;
+                policy
+                    .reserve_download(&token(1), root, &clock(29_999), &request, false)
+                    .unwrap();
+                30_000
+            }
+            "mode" => {
+                request.mode_generation = Some(0);
+                1
+            }
+            "boot" => {
+                request.deadline.boot_id = OTHER_BOOT.into();
+                1
+            }
+            "late" => CHECK_MS,
+            "future" => {
+                request.deadline.ms += 100;
+                request.admission_deadline_ms += 100;
+                1
+            }
+            _ => {
+                policy
+                    .reserve(&token(1), root, HoldKind::Setup, &clock(0))
+                    .unwrap();
+                request.time_hold = Some(token(1));
+                request.handoff_deadline_ms = Some(100_000);
+                1
+            }
+        };
+        assert!(
+            policy
+                .reserve_download(&token(2), root, &clock(at), &request, true)
+                .is_err(),
+            "{case}"
+        );
+    }
+}
+
+#[test]
 fn wireless_fallback_preserves_the_time_hold_budget_and_owner() {
     let temp = tempfile::tempdir().unwrap();
     let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();

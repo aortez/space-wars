@@ -1,7 +1,7 @@
 //! Bounded, authenticated network requests handled by one radio coordinator.
 //! The independent time/status service does not wait for these operations.
 use crate::network_controller::{Availability, Backend, Controller, Status};
-use crate::network_policy::{Caller, Clock, HoldKind, HoldToken, Policy};
+use crate::network_policy::{Caller, Clock, DownloadReservation, HoldKind, HoldToken, Policy};
 use crate::network_watch::Watch;
 use crate::{Error, Result, kiosk_health, service};
 use serde::{Deserialize, Serialize};
@@ -54,6 +54,15 @@ pub enum Request {
         #[serde(default)]
         wireless_required: bool,
     },
+    AdmitDownload {
+        schema: u32,
+        token: String,
+        deadline: Clock,
+        admission_deadline_ms: u64,
+        mode_generation: Option<u64>,
+        time_hold: Option<String>,
+        handoff_deadline_ms: Option<u64>,
+    },
     Renew {
         schema: u32,
         token: String,
@@ -75,6 +84,7 @@ impl Request {
         | Self::Resume { schema, .. }
         | Self::Admit { schema, .. }
         | Self::AdmitTime { schema, .. }
+        | Self::AdmitDownload { schema, .. }
         | Self::Renew { schema, .. }
         | Self::RequireWireless { schema, .. }
         | Self::Release { schema, .. }) = self;
@@ -321,6 +331,33 @@ fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: 
                     admission_deadline_ms,
                     mode_generation,
                     wireless_required,
+                )?;
+                Reply {
+                    schema: 1,
+                    status: Some(admission.status),
+                    availability: Some(admission.availability),
+                    error: None,
+                }
+            }
+            Request::AdmitDownload {
+                token,
+                deadline,
+                admission_deadline_ms,
+                mode_generation,
+                time_hold,
+                handoff_deadline_ms,
+                ..
+            } => {
+                let admission = controller.admit_download(
+                    &HoldToken::parse(token)?,
+                    caller,
+                    &DownloadReservation {
+                        deadline,
+                        admission_deadline_ms,
+                        mode_generation,
+                        time_hold: time_hold.map(HoldToken::parse).transpose()?,
+                        handoff_deadline_ms,
+                    },
                 )?;
                 Reply {
                     schema: 1,
