@@ -1114,6 +1114,16 @@ records the validation order, exact binaries/logs, retained fallback guarantees
 and outstanding cleanup, production provisioning and physical qualification.
 These temporary fixtures exercised no live boot files, system bus or reboot.
 
+Finalization at `00d4bce` was validated with 256 OTA and 40 manager tests,
+71 Yocto checks, Clippy, Rust 1.89, formatting and AArch64 compilation. The final
+33 retirement, handoff and recovery fixtures passed on host ext4 in 197.17 seconds
+and on Pi 5 as UID 1000 in 308.82 seconds. All three real canonical commands
+rejected that account before digest parsing or installed-path access; the boot
+ID stayed unchanged. [Finalization evidence](data/ota-bootstrap-finish-20261015.json)
+records exact logs and artifacts, validation order, and the protocol-4 bootstrap /
+protocol-2 recovery contract. These checks used temporary files; live FAT cleanup,
+production provisioning and hardware qualification remain outstanding.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
