@@ -452,6 +452,17 @@ binding. The Pi 5 retained its boot ID, layout, hardware profile and all 101 boo
 files. [Raw recovery-copy validation evidence](data/ota-bootstrap-backup-20261015.json)
 keeps these fixture results separate from the still-unperformed live backups.
 
+The data/configuration archive at `16df0be` passed all 151 OTA tests and 38
+manager tests, Clippy, Rust 1.89 checks and AArch64 builds. Two additional
+workstation tests verified GNU tar restoration of metadata/links/attributes
+and actual bind-mount handling in a private namespace. All 11 new ordinary
+fixture tests passed on the Pi 5 as UID 1000; the installed-data command refused
+that account. Its boot ID remained unchanged. These tests used temporary data;
+no installed credentials were captured and no live recovery archive was made.
+[Data archive validation evidence](data/ota-data-backup-20261015.json) records
+the exact binaries and scopes. The latest clean runtime image remains
+`c14c53f`; these operator examples were built separately.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
