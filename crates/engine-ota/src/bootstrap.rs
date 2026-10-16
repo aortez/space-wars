@@ -40,11 +40,20 @@ mod archive;
 mod data_backup;
 #[path = "bootstrap_legacy_assets.rs"]
 mod legacy_assets;
+#[path = "bootstrap_legacy_files.rs"]
+mod legacy_files;
+#[path = "bootstrap_legacy_state.rs"]
+mod legacy_state;
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,
 };
 pub use device::backup_installed_data;
+pub use device::prepare_installed_legacy;
+pub use legacy_state::{
+    LegacyExportCheck, LegacyPreparationProgress, LegacyPreparationReport, LegacyPreparationStage,
+    verify_legacy_export,
+};
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
 

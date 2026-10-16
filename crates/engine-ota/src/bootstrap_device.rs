@@ -189,6 +189,106 @@ pub fn backup_installed_data(
     Ok(result)
 }
 
+/// Preserve the originals of the fixed fallback-root replacements. This does
+/// not modify that root or authorize installation; the caller separately
+/// selects the package and the two independently exported backup receipts.
+pub fn prepare_installed_legacy(
+    expected: Sha256,
+    raw_copies: Sha256,
+    data_copy: Sha256,
+    mut progress: impl FnMut(super::LegacyPreparationProgress),
+) -> Result<super::LegacyPreparationReport> {
+    let lock = InstallLock::acquire()?;
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before preserving legacy originals"))?;
+    crate::access_linux::preserved_for_bootstrap(&lock)?;
+    crate::network_linux::preserved_for_bootstrap(&lock)?;
+    require_stopped_writers(&inspected.data)?;
+    let active = super::state::optional_directory(&inspected.parent, super::state::ACTIVE, 0)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    let checked_raw = super::backup::verify_backup_export(
+        std::path::Path::new("/data/spacewars-bootstrap/active"),
+        raw_copies,
+    )?;
+    if checked_raw.package_sha256 != expected
+        || checked_raw.device_id != binding.device_id
+        || checked_raw.layout_id != binding.layout_id
+    {
+        return Err(invalid(
+            "raw backups belong to another bootstrap preparation",
+        ));
+    }
+    let receipt = super::data_backup::verified_receipt(&active, 0, binding, data_copy)?;
+    let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
+    let inputs = super::legacy_state::Inputs {
+        binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
+        raw_copies_sha256: raw_copies,
+        data_copy_sha256: data_copy,
+        replacements: super::legacy_files::targets()
+            .iter()
+            .map(|(path, mode)| {
+                let source = if *path == super::legacy_files::MANAGER {
+                    "engine-os-manager".to_owned()
+                } else {
+                    format!("{}{path}", super::legacy_assets::PREFIX)
+                };
+                let contents = inspected
+                    .package
+                    .record
+                    .files
+                    .get(&source)
+                    .cloned()
+                    .ok_or_else(|| {
+                        invalid("required legacy replacement is missing from package")
+                    })?;
+                Ok(super::legacy_state::Replacement {
+                    path: (*path).into(),
+                    mode: *mode,
+                    contents,
+                })
+            })
+            .collect::<Result<_>>()?,
+    };
+    let check = |initial: bool| -> Result<()> {
+        inspected.check(&lock)?;
+        super::backup::check_named_directory(&inspected.parent, super::state::ACTIVE, &active, 0)?;
+        require_stopped_writers(&inspected.data)?;
+        if initial
+            && super::archive::inspect(&root, &inspected.data)?.source_sha256
+                != receipt.source_sha256
+        {
+            return Err(invalid(
+                "data/configuration changed since its recovery copy; reconcile before preserving legacy originals",
+            ));
+        }
+        Ok(())
+    };
+    let result = super::legacy_state::prepare(
+        &root,
+        &inspected.data,
+        &inspected.parent,
+        0,
+        binding,
+        &inputs,
+        inspected.report.data_required_bytes,
+        check,
+        &mut |event| {
+            progress(event);
+            Ok(())
+        },
+    )?;
+    inspected.check(&lock)?;
+    let after = inspect_legacy_boot()?;
+    let current =
+        super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
+    super::state::existing(&inspected.parent, 0, &current)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    Ok(result)
+}
+
 fn require_stopped_writers(data: &File) -> Result<()> {
     for (unit, optional) in [
         ("spacewars-kiosk.service", false),

@@ -81,22 +81,7 @@ pub fn verify_data_backup_export(path: &Path, expected: Sha256) -> Result<DataBa
     let owner = unsafe { libc::geteuid() };
     let active = open_directory(path, owner)?;
     let binding = super::state::read_binding(&active, owner)?;
-    if super::state::optional_directory(&active, PENDING, owner)?.is_some() {
-        return Err(invalid("unpublished data copy in exported backup"));
-    }
-    let completed = super::state::optional_directory(&active, DIRECTORY, owner)?
-        .ok_or_else(|| invalid("missing exported data/configuration copy"))?;
-    let receipt = read_receipt(&completed, owner, &binding)?;
-    // The export's self-checksum is not an independent source of authority.
-    if receipt_digest(&receipt)? != expected {
-        return Err(invalid(
-            "data export differs from the authenticated device receipt",
-        ));
-    }
-    if verify_copy(&completed, owner, &binding)? != receipt {
-        return Err(invalid("data export changed during verification"));
-    }
-    check_named_directory(&active, DIRECTORY, &completed, owner)?;
+    let receipt = verified_receipt(&active, owner, &binding, expected)?;
     let named = open_directory(path, owner)?;
     if named.metadata()?.dev() != active.metadata()?.dev()
         || named.metadata()?.ino() != active.metadata()?.ino()
@@ -113,6 +98,31 @@ pub fn verify_data_backup_export(path: &Path, expected: Sha256) -> Result<DataBa
         archive_bytes: receipt.archive.bytes,
         entries: receipt.entries,
     })
+}
+
+pub(super) fn verified_receipt(
+    active: &File,
+    owner: u32,
+    binding: &BootstrapBinding,
+    expected: Sha256,
+) -> Result<DataBackupReceipt> {
+    if super::state::optional_directory(active, PENDING, owner)?.is_some() {
+        return Err(invalid("unpublished data copy in exported backup"));
+    }
+    let completed = super::state::optional_directory(active, DIRECTORY, owner)?
+        .ok_or_else(|| invalid("missing exported data/configuration copy"))?;
+    let receipt = read_receipt(&completed, owner, binding)?;
+    // The export's self-checksum is not an independent source of authority.
+    if receipt_digest(&receipt)? != expected {
+        return Err(invalid(
+            "data export differs from the authenticated device receipt",
+        ));
+    }
+    if verify_copy(&completed, owner, binding)? != receipt {
+        return Err(invalid("data export changed during verification"));
+    }
+    check_named_directory(active, DIRECTORY, &completed, owner)?;
+    Ok(receipt)
 }
 
 #[allow(clippy::too_many_arguments)]

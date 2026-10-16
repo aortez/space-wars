@@ -110,11 +110,7 @@ impl OpenedMount {
             .read(true)
             .custom_flags(libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW)
             .open(path)?;
-        let info = bounded_text(
-            &PathBuf::from(format!("/proc/self/fdinfo/{}", file.as_raw_fd())),
-            4096,
-        )?;
-        let id = fd_mount_id(&info)?;
+        let id = opened_mount_id(&file)?;
         let device = DeviceNumber::from_dev(file.metadata()?.dev());
         Ok(Self {
             file,
@@ -137,10 +133,7 @@ fn required_mount_handles() -> Result<[OpenedMount; 3]> {
 pub(crate) fn open_data_mount() -> Result<File> {
     let file = crate::owned_fs::open_directory(Path::new("/data"), 0)?;
     let view = MountView {
-        id: fd_mount_id(&bounded_text(
-            &PathBuf::from(format!("/proc/self/fdinfo/{}", file.as_raw_fd())),
-            4096,
-        )?)?,
+        id: opened_mount_id(&file)?,
         device: DeviceNumber::from_dev(file.metadata()?.dev()),
     };
     let mounts = parse_mountinfo(&bounded_text(
@@ -153,6 +146,13 @@ pub(crate) fn open_data_mount() -> Result<File> {
         return Err(invalid("persistent data is on the root filesystem"));
     }
     Ok(file)
+}
+
+pub(crate) fn opened_mount_id(file: &File) -> Result<u64> {
+    fd_mount_id(&bounded_text(
+        &PathBuf::from(format!("/proc/self/fdinfo/{}", file.as_raw_fd())),
+        4096,
+    )?)
 }
 
 fn fd_mount_id(info: &str) -> Result<u64> {

@@ -7,7 +7,8 @@ installed boot assets.
 
 **Implemented:** read-only legacy inventory, workstation package creation,
 root-only package validation, a durable preparation reservation, raw boot/inactive
-root recovery copies, a data/configuration archive and independent-export verifiers.
+root recovery copies, a data/configuration archive, original-file preservation
+for the fallback-root migration and independent-export verifiers.
 **Remaining:** live preservation and independent exports, legacy privilege closure,
 root/boot apply and recovery of those operations, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
@@ -302,6 +303,67 @@ that preserves tar extended attributes. Neither this command nor its verifier
 restores an archive onto a live root/data filesystem. No data/configuration copy
 has been taken from an installed Pi yet; actual root access, independent export
 and supervised restore qualification remain outstanding.
+
+## Preserve original fallback-root files
+
+`bootstrap_prepare_legacy` accepts the separately selected bundle hash, raw-copy
+digest and data-archive receipt digest. The operator must first independently
+export and verify both backups. The command verifies the local copies against
+those digests, requires the existing preparation, preserved access/network stores
+and stopped kiosk/device-state writers, and holds the shared installation lock.
+Other operator edits must remain quiescent during this checked capture; it is
+not an atomic snapshot of the running filesystem.
+It writes only private preparation files on `/data`; it never replaces a live
+root file or changes a service, boot selector or radio state.
+
+The fixed selection is the manager executable plus the 17 package replacements.
+The record includes each destination path, intended mode and replacement hash;
+each original's contents, numeric ownership, mode, inode/device, modification
+and change timestamps, and extended attributes; and the identities or absence
+of its parent directories. Missing files and present empty files are distinct.
+Inode/change timestamps support conflict detection; restoration cannot recreate
+an original inode number or change timestamp.
+
+The command rejects symlinks, hard-linked originals, special files, writable
+parent directories, unexpected ownership and mount crossings, including bind
+mounts on the same filesystem. Sources are read relative to pinned descriptors.
+It compares complete source captures, checks the saved bytes, flushes the files
+and record, and publishes them together by a no-replace directory rename:
+
+```text
+/data/spacewars-bootstrap/active/legacy-root/
+  record.json
+  original-00.bin ... original-17.bin
+```
+
+The numbered files correspond to the explicitly recorded replacement list;
+an absent original has a checked empty placeholder. Directories are mode 0700
+and files are mode 0600. The record is bounded to 8 MiB, original helpers/configs
+to 64 KiB each, and the original manager to 256 MiB. Capacity retains the
+remaining recovery reserve. Before first publication, the full data archive's
+source metadata must still match, and the fixed original files are checked again.
+
+Only recognized private `.legacy-root.pending` files can be restarted. Every
+pending object is validated before any truncation. Published originals remain
+immutable; a repeat verifies them and reports `original_files_match: false` if
+the fixed live paths have changed. That flag does not describe all `/data`,
+refresh a backup, permit discarding later edits, or authorize replacement.
+Reports still say `ready_for_write: false`.
+
+Export `binding.json` and the complete `legacy-root` directory into a private
+workstation directory. Retain the device-reported digest separately and verify:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_prepare_legacy \
+  --target aarch64-unknown-linux-gnu
+cargo run --locked -p engine-ota --example bootstrap_verify_legacy -- \
+  /path/to/exported-active DEVICE_REPORTED_RECEIPT_SHA256
+```
+
+The next phase still needs a durable replacement journal, safe handling of
+existing legacy helpers, effective sudo/SSH/service validation and verified
+operator logins. These original copies do not implement that phase or restore
+files onto a live device. No installed Pi original-file preparation has run yet.
 
 ## Persistent network profiles
 

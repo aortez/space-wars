@@ -379,7 +379,7 @@ fn relative(root: &File, path: &str) -> Result<Option<(File, String, File)>> {
     Err(invalid("empty preservation path"))
 }
 
-fn attributes(file: &File) -> Result<Attributes> {
+pub(super) fn attributes(file: &File) -> Result<Attributes> {
     collect_attributes(file.list_xattr()?, |name| file.get_xattr(name))
 }
 
