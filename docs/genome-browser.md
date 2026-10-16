@@ -15,6 +15,11 @@ They are not a ranking across different curricula or evidence about the current
 application build. **Refresh** reads newly saved candidates without changing
 the selected ID when that entry remains available.
 
+[Training → History](managed-training.md#saved-history) links a retained winner,
+validation result or practice receipt to its exact component or saved brain.
+Missing links leave the browser unavailable rather than selecting a substitute.
+The history view preserves the original result even when its export is missing.
+
 Choose **Stationary target** or **Moving target**, then **Try**. These are the
 fixed `stationary_right` and `moving_right` arrival cases from the existing
 [material arrival fixture](ship-arrival-diagnostic.md). The trial pins the exact

@@ -120,6 +120,43 @@ pub(crate) fn install(window: &MainWindow, root: PathBuf) -> Result<Browser, std
         })?;
     let state = Rc::new(RefCell::new(State::default()));
     let weak = window.as_weak();
+    let selection_state = state.clone();
+    let selection_sender = sender.clone();
+    window.on_genomes_select(move |brain, id| {
+        let Some(w) = weak.upgrade() else {
+            return false;
+        };
+        let mut s = selection_state.borrow_mut();
+        if s.busy || !w.get_launcher_visible() || w.get_launcher_busy() {
+            return false;
+        }
+        let selection = if brain {
+            Selection::Brain(id.to_string())
+        } else {
+            Selection::Component(id.to_string())
+        };
+        if selection_sender
+            .try_send(Request::Select(selection))
+            .is_err()
+        {
+            return false;
+        }
+        // A failed exact link must never expose a previously selected genome
+        // as though it were the requested artifact.
+        s.components.clear();
+        s.assemblies.clear();
+        s.copying = None;
+        s.brains = brain;
+        s.busy = true;
+        s.warning.clear();
+        clear_trial(&w);
+        publish(&w, &s);
+        w.set_training_visible(false);
+        w.set_genomes_visible(true);
+        w.set_genomes_focus(1);
+        true
+    });
+    let weak = window.as_weak();
     window.on_genomes_open(move || {
         let Some(w) = weak.upgrade() else { return };
         if !w.get_launcher_visible() || w.get_launcher_busy() {

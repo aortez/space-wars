@@ -500,6 +500,7 @@ export component MainWindow inherits Window {
     in property <string> genomes-result: "Try this genome in a fixed arrival case. Each trial uses the named practice brain.";
     in property <image> genomes-plot;
     callback genomes-open();
+    callback genomes-select(bool, string) -> bool;
     callback genomes-command(string);
     in-out property <string> training-seed-genome;
     in-out property <string> training-seed-label: "Recipe default";
@@ -544,6 +545,24 @@ export component MainWindow inherits Window {
     out property <int> training-preview-height: Math.max(48, Math.min(root.height / 1px - 24, 520) - 386);
     callback training-open();
     callback training-command(string);
+    in-out property <bool> training-history: false;
+    in-out property <int> history-focus: 0;
+    in property <int> history-section: 0;
+    in property <bool> history-busy: false;
+    in property <int> history-count: 0;
+    in property <int> history-details: 0;
+    in property <bool> history-can-open: false;
+    in property <bool> history-can-pin: false;
+    in property <bool> history-pinned: false;
+    in property <bool> history-error: false;
+    in property <string> history-label;
+    in property <string> history-id;
+    in property <string> history-title;
+    in property <string> history-body;
+    in property <string> history-warning;
+    in property <string> history-comparison;
+    in property <string> history-snapshot;
+    callback history-command(string);
     in property <bool> launcher-busy: false;
     in property <string> launcher-busy-title;
     in property <string> launcher-busy-stage;
@@ -2703,13 +2722,20 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.training-visible && root.launcher-visible: Rectangle {
+    if root.training-visible && root.launcher-visible && !root.training-history: Rectangle {
         x: 0px; y: 0px; width: parent.width; height: parent.height; background: #050514;
         MenuPage {
             available-width: parent.width; available-height: parent.height;
             heading: root.training-setup ? "Training · New run" : "Training";
             subtitle: root.training-setup ? root.training-budget : root.training-run-label;
             hint: root.training-setup ? "D-pad selects · Left / Right adjusts · A confirms" : "Back leaves this view · Job controls change the run";
+
+            MenuButton {
+                x: parent.width - 124px; y: 16px; width: 100px; height: 32px;
+                text: "History"; text-size: 14px;
+                selected: root.training-focus == (root.training-setup ? 8 : 9);
+                activated => { root.training-command("training.history.open"); }
+            }
 
             if root.training-setup: Rectangle {
                 x: 24px; y: 84px; width: parent.width - 48px; height: parent.height - 180px;
@@ -2874,6 +2900,58 @@ export component MainWindow inherits Window {
                     text: "Back"; selected: root.training-focus == 3;
                     activated => { root.training-command("training.back"); }
                 }
+            }
+        }
+    }
+
+    if root.training-visible && root.launcher-visible && root.training-history: Rectangle {
+        width: parent.width; height: parent.height; background: #050514;
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: "Training · History";
+            subtitle: "Current job: " + root.training-status + " · " + root.training-run-label;
+            hint: "D-pad selects · Left / Right browses · Back returns to current job";
+            for title[index] in ["Runs", "Validation", "Practice"]: MenuButton {
+                x: 24px + index * (parent.width - 36px) / 3; y: 84px;
+                width: (parent.width - 72px) / 3; height: 36px;
+                text: title; text-size: 14px; text-padding: 4px;
+                primary: root.history-section == index;
+                enabled: !root.history-busy;
+                selected: root.history-focus == (index == 0 ? 0 : index + 6);
+                activated => { root.history-focus = index == 0 ? 0 : index + 6; root.training-command("training.history." + ["runs", "validation", "trials"][index]); }
+            }
+            ChoiceRow {
+                x: 24px; y: 126px; width: parent.width - 48px; height: 40px;
+                label: "Record"; value: root.history-label; label-fraction: 0.18;
+                selected: root.history-focus == 1; enabled: !root.history-busy && root.history-count > 1;
+                previous => { root.history-focus = 1; root.training-command("training.history.previous"); }
+                next => { root.history-focus = 1; root.training-command("training.history.next"); }
+            }
+            ChoiceRow {
+                x: 24px; y: 172px; width: parent.width - 48px; height: 36px;
+                label: "Detail"; value: root.history-title; label-fraction: 0.18;
+                selected: root.history-focus == 2; enabled: !root.history-busy && root.history-details > 1;
+                previous => { root.history-focus = 2; root.training-command("training.history.detail.previous"); }
+                next => { root.history-focus = 2; root.training-command("training.history.detail.next"); }
+            }
+            Text {
+                x: 24px; y: 216px; width: parent.width - 48px; height: parent.height - 326px;
+                text: root.history-pinned && root.history-can-pin && !root.history-error ? root.history-comparison : root.history-body;
+                color: root.history-error ? #ffb0a0 : #d3e2ef; font-size: 13px;
+                wrap: word-wrap; overflow: elide;
+            }
+            Text {
+                x: 24px; y: parent.height - 106px; width: parent.width - 48px; height: 22px;
+                text: root.history-warning != "" ? root.history-warning : root.history-pinned ? "Comparison pinned · Unpin returns to the selected record's details" : "History reads saved evidence · Open links its exact genome or brain";
+                color: root.history-warning != "" ? #ffb0a0 : #9fb4cc; font-size: 11px; wrap: word-wrap; overflow: elide;
+            }
+            for title[index] in ["Open", root.history-pinned ? "Unpin" : "Pin", "Refresh", "Current"]: MenuButton {
+                x: 24px + index * (parent.width - 38px) / 4; y: parent.height - 80px;
+                width: (parent.width - 78px) / 4; height: 48px;
+                text: title; text-size: 14px; text-padding: 4px;
+                selected: root.history-focus == index + 3;
+                enabled: index == 0 ? root.history-can-open : index == 1 ? (root.history-pinned || root.history-can-pin) : index == 2 ? !root.history-busy : true;
+                activated => { root.history-focus = index + 3; root.training-command("training.history." + (index == 1 && root.history-pinned ? "unpin" : ["artifact", "pin", "refresh", "current"][index])); }
             }
         }
     }

@@ -137,6 +137,77 @@ one evaluation worker, and at most 64 generation summaries. The UI polls every
 
 ## UI control interface
 
+### Saved history
+
+**History** opens retained evidence without changing the current job. The header
+continues to identify the current job; the **Record** arrows select historical
+runs or receipts, and **Detail** pages through their configuration, identities
+and measurements. **Current** or Back returns to the current job's controls.
+Pause, Resume and Stop are only offered there, never against a historical selection.
+
+- **Runs** shows the recorded recipe and evolution settings, seed and initial
+  genome IDs, saved candidate/generation progress, and each completed generation's
+  winner and ordered training-fitness terms.
+- **Validation** browses every saved monitoring result for the selected run,
+  followed by each case's outcome, elapsed ticks, distance and relative speed.
+  An absent result has no score; the previously inspected monitoring cases
+  remain separate from training selection and untouched qualification evidence.
+- **Practice** browses retained component and assembly trial receipts, including
+  their exact case, brain, genome, assembly when present, build and measurements.
+  It does not assign a training generation to a practice result.
+
+**Pin** retains one measured result. Select another result to see its values
+alongside the pin only when their result type, executable/platform identity,
+case/recipe and scoring/host protocol match. Different protocols are explicitly
+separated. Values are never pooled, ranked across curricula, or counted as
+independent evidence when their cases overlap. **Unpin** restores ordinary details.
+
+**Open** follows the exact selected genome or saved brain into the
+[Genomes browser](genome-browser.md), where compatible artifacts can be tried or
+used to seed a new run. It never starts or resumes a job. Missing artifacts show
+an error rather than redirecting to a different selection. An assembly's **Part**
+action opens its component for seeding. Starting a new run remains disabled while
+the current worker is active.
+
+Refresh preserves the selected identity, even when its file has gone missing.
+Old builds can be inspected without weakening exact-resume checks. Version-one
+saves record an executable/platform hash but no source revision or pause/stop/crash
+reason; the view reports those omissions and labels unfinished saves as incomplete
+checkpoints. Training generations finishing is separate from final validation
+being saved. No historical-resume command is provided in this slice.
+
+One background reader performs discovery, checksum/structure checks, detail
+formatting and snapshot serialization. It scans at most **8,192 directory entries**
+and retains at most **2,048 record identities**, plus one previously selected ID.
+Only the selected file is decoded. Existing job limits allow 64 MiB + 4 KiB per
+job envelope and 32 MiB per inner checkpoint; practice receipts are capped at
+256 KiB, and the displayed structured record at 512 KiB. Truncation is visible;
+files are never deleted or repaired by history browsing. Records outside a
+truncated discovery set remain on disk; this first browser has no filename search.
+The worker has one request/reply slot and does no evaluation. Leaving the view
+does not pause training or change its random draws.
+
+The shared UI controls are `training.history.open`,
+`training.history.{runs,validation,trials}`, `{previous,next}`,
+`detail.{previous,next}`, `{artifact,pin,unpin,refresh,current,back}` with the
+`training.history.` prefix. Read-only `snapshot`, `detail` and `comparison`
+controls expose the full selected identities, recorded configuration and protocol
+results through the same CLI surface. The screen remains `launcher.training`.
+
+Automated real Slint tests cover 800×480, 1024×768 and 480×800 at **1×**, keyboard,
+touch and shared controller-menu actions. The retained workflow starts run B,
+inspects run A and trials its exact winner, then compares B's final selection and
+validation against the same run without browsing. Restart retains both runs.
+This checks workflow isolation, not learned-controller strength or physical-device
+input handling. Set `SPACEWARS_HISTORY_ARTIFACTS` to an absolute directory while
+running the `keyboard_tests::training_history` tests to retain screenshots.
+
+![Saved run with a different current job, from the automated 1× UI test](images/training/history-runs-800x480.png)
+
+![Historical validation in the portrait 1× layout](images/training/history-validation-480x800.png)
+
+### Current-job controls
+
 The screen ID is `launcher.training`. The existing CLI can open it and activate
 the controls reported by `ui state`:
 
@@ -207,7 +278,7 @@ This prototype hosts the worker in the client process. A separate persistent
 runner, tick-level pause, configurable worker pool, and survival after client
 exit remain planned. The first [component browser](genome-browser.md), single
 saved-seed selection, fixed practice trials, Current/Best animated replays,
-and periodic validation now work. General scenario assignment, saved
-hybrid-brain composition, tick stepping, and validation-history browsing remain
-to be delivered. Only the latest job is available
-in Training; older checkpoints and genome exports are retained on disk.
+and periodic validation now work. Saved practice-brain composition and history
+browsing are also available. General scenario assignment, broader hybrid brains
+and tick stepping remain planned. Only the latest compatible job can be resumed;
+older checkpoints, validation and practice receipts can be inspected in History.
