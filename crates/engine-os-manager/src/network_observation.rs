@@ -1,6 +1,7 @@
 //! Read-only, uncached NetworkManager observations. This does not establish
 //! session safety or permission to change the radio; it never scans/connects.
 use crate::{Error, Result};
+use engine_ota::Sha256;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -22,7 +23,9 @@ pub struct Observation {
     pub checkpoint_count: usize,
     /// NetworkManager's overall state, not a claim that Wi-Fi is connected.
     pub state: u32,
-    pub settings_version: u64,
+    /// Digest of sorted profile object paths and per-profile VersionId values.
+    pub profile_revision: Sha256,
+    pub profile_count: usize,
     /// An activated primary Ethernet connection; not proof of Internet access.
     pub ethernet_available: bool,
 }
@@ -107,31 +110,85 @@ fn parse(mut values: HashMap<String, OwnedValue>) -> Result<Properties> {
     })
 }
 
-async fn settings_version(connection: &zbus::Connection, owner: &str) -> Result<u64> {
-    let proxy = zbus::Proxy::new(
-        connection,
-        owner,
-        "/org/freedesktop/NetworkManager/Settings",
-        "org.freedesktop.DBus.Properties",
-    )
-    .await
-    .map_err(bus_error)?;
-    let reply = proxy
-        .call_method(
-            "Get",
-            &("org.freedesktop.NetworkManager.Settings", "VersionId"),
-        )
+async fn property(
+    connection: &zbus::Connection,
+    owner: &str,
+    path: &str,
+    interface: &str,
+    name: &str,
+) -> Result<OwnedValue> {
+    let proxy = zbus::Proxy::new(connection, owner, path, "org.freedesktop.DBus.Properties")
         .await
         .map_err(bus_error)?;
-    if reply.data().len() > 4096 {
+    let reply = proxy
+        .call_method("Get", &(interface, name))
+        .await
+        .map_err(bus_error)?;
+    if reply.data().len() > 16 * 1024 {
         return Err(invalid(
             "NetworkManager settings revision reply exceeds limit",
         ));
     }
-    let value: OwnedValue = reply.body().deserialize().map_err(bus_error)?;
-    value
+    reply.body().deserialize().map_err(bus_error)
+}
+
+fn profile_paths(value: OwnedValue) -> Result<Vec<OwnedObjectPath>> {
+    let mut paths: Vec<OwnedObjectPath> = value
         .try_into()
-        .map_err(|_| invalid("NetworkManager settings revision is unavailable"))
+        .map_err(|_| invalid("NetworkManager profile inventory is unavailable"))?;
+    if paths.len() > 64
+        || paths.iter().any(|path| {
+            path.as_str().len() > 128
+                || !path
+                    .as_str()
+                    .strip_prefix("/org/freedesktop/NetworkManager/Settings/")
+                    .is_some_and(|suffix| {
+                        !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit())
+                    })
+        })
+    {
+        return Err(invalid("NetworkManager profile inventory exceeds bounds"));
+    }
+    paths.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+    if paths.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(invalid(
+            "NetworkManager profile inventory contains duplicates",
+        ));
+    }
+    Ok(paths)
+}
+
+async fn profile_revision(connection: &zbus::Connection, owner: &str) -> Result<(Sha256, usize)> {
+    let paths = profile_paths(
+        property(
+            connection,
+            owner,
+            "/org/freedesktop/NetworkManager/Settings",
+            "org.freedesktop.NetworkManager.Settings",
+            "Connections",
+        )
+        .await?,
+    )?;
+    let mut versions = Vec::with_capacity(paths.len());
+    for path in paths {
+        // NM 1.46.6 implements VersionId on Settings.Connection, despite its
+        // generated introspection docs listing it on the Settings interface.
+        let version: u64 = property(
+            connection,
+            owner,
+            path.as_str(),
+            "org.freedesktop.NetworkManager.Settings.Connection",
+            "VersionId",
+        )
+        .await?
+        .try_into()
+        .map_err(|_| invalid("NetworkManager profile revision is unavailable"))?;
+        versions.push((path, version));
+    }
+    Ok((
+        Sha256::digest(&serde_json::to_vec(&versions)?),
+        versions.len(),
+    ))
 }
 
 async fn properties(connection: &zbus::Connection, owner: &str) -> Result<Properties> {
@@ -170,11 +227,11 @@ pub(crate) async fn connection_observation(
     if uid != expected_uid || pid == 0 {
         return Err(invalid("NetworkManager has an unexpected owner"));
     }
-    let revision = settings_version(connection, owner.as_str()).await?;
+    let revision = profile_revision(connection, owner.as_str()).await?;
     let first = properties(connection, owner.as_str()).await?;
     let second = properties(connection, owner.as_str()).await?;
     if first != second
-        || revision != settings_version(connection, owner.as_str()).await?
+        || revision != profile_revision(connection, owner.as_str()).await?
         || bus
             .get_name_owner(NAME.try_into().map_err(bus_error)?)
             .await
@@ -193,7 +250,8 @@ pub(crate) async fn connection_observation(
         startup: first.startup,
         checkpoint_count: first.checkpoints.len(),
         state: first.state,
-        settings_version: revision,
+        profile_revision: revision.0,
+        profile_count: revision.1,
         ethernet_available: first.networking
             && first.state >= 50
             && first.primary_type == "802-3-ethernet",

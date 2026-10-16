@@ -2,6 +2,7 @@
 use crate::network_observation::Observation;
 use crate::network_policy::Clock;
 use crate::{Error, Result};
+use engine_ota::Sha256;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -21,7 +22,7 @@ pub(crate) struct Witness {
     pub boot_id: String,
     pub owner: String,
     pub pid: u32,
-    pub settings_version: u64,
+    pub profile_revision: Sha256,
     pub networking: bool,
     pub wireless: bool,
 }
@@ -32,7 +33,7 @@ impl Witness {
             boot_id: clock.boot_id.clone(),
             owner: radio.bus_owner.clone(),
             pid: radio.pid,
-            settings_version: radio.settings_version,
+            profile_revision: radio.profile_revision,
             networking: radio.networking_enabled,
             wireless: radio.wireless_enabled,
         }
@@ -54,7 +55,7 @@ impl Witness {
             if self.owner != observed.owner || self.pid != observed.pid {
                 return Some(Suspension::ManagerChanged);
             }
-            if self.settings_version != observed.settings_version {
+            if self.profile_revision != observed.profile_revision {
                 return Some(Suspension::ProfilesChanged);
             }
         }

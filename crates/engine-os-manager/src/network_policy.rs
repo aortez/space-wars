@@ -135,7 +135,7 @@ struct Record {
 impl Record {
     fn initial() -> Self {
         Self {
-            schema: 2,
+            schema: 3,
             ..Self::default()
         }
     }
@@ -143,7 +143,7 @@ impl Record {
     fn validate(&self) -> Result<()> {
         let mut ids = std::collections::BTreeSet::new();
         self.radio.validate()?;
-        if self.schema != 2
+        if self.schema != 3
             || self.deployments.len() > MAX_DEPLOYMENTS
             || self.deployments.iter().any(|hold| {
                 !ids.insert(hold.id)

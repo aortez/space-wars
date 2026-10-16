@@ -47,6 +47,7 @@ struct Fixture {
     radio_off: AtomicBool,
     deny_write: AtomicBool,
     slow_write: AtomicBool,
+    omit_second_profile: AtomicBool,
 }
 struct Manager(Arc<Fixture>);
 #[zbus::interface(name = "org.freedesktop.NetworkManager")]
@@ -122,6 +123,16 @@ async fn server(bus: &PrivateBus, fixture: &Arc<Fixture>) -> zbus::Connection {
             Settings(fixture.clone()),
         )
         .unwrap()
+        .serve_at(
+            "/org/freedesktop/NetworkManager/Settings/1",
+            Profile(fixture.clone()),
+        )
+        .unwrap()
+        .serve_at(
+            "/org/freedesktop/NetworkManager/Settings/2",
+            Profile(fixture.clone()),
+        )
+        .unwrap()
         .build()
         .await
         .unwrap()
@@ -143,7 +154,7 @@ fn wireless_only_command_checks_owner_revision_hardware_and_permission() {
             let mut stale = before.clone();
             match field {
                 "owner" => stale.bus_owner = ":1.999999".into(),
-                "revision" => stale.settings_version += 1,
+                "revision" => stale.profile_revision = Sha256::digest(b"changed"),
                 "pid" => stale.pid += 1,
                 _ => unreachable!(),
             }
@@ -166,7 +177,7 @@ fn wireless_only_command_checks_owner_revision_hardware_and_permission() {
         let off = connection_observation(&client, uid).await.unwrap();
         assert!(!off.wireless_enabled);
         assert!(off.networking_enabled && off.ethernet_available);
-        assert_eq!(off.settings_version, before.settings_version);
+        assert_eq!(off.profile_revision, before.profile_revision);
         assert_eq!(
             write(&client, uid, &before, true).await.unwrap(),
             WriteResult::Rejected
@@ -231,6 +242,27 @@ fn timed_out_dbus_write_can_still_execute_and_is_not_a_rejection() {
 struct Settings(Arc<Fixture>);
 #[zbus::interface(name = "org.freedesktop.NetworkManager.Settings")]
 impl Settings {
+    #[zbus(property)]
+    fn connections(&self) -> Vec<OwnedObjectPath> {
+        let mut paths = vec![
+            "/org/freedesktop/NetworkManager/Settings/1"
+                .try_into()
+                .unwrap(),
+        ];
+        if !self.0.omit_second_profile.load(Ordering::SeqCst) {
+            paths.push(
+                "/org/freedesktop/NetworkManager/Settings/2"
+                    .try_into()
+                    .unwrap(),
+            );
+        }
+        paths
+    }
+}
+
+struct Profile(Arc<Fixture>);
+#[zbus::interface(name = "org.freedesktop.NetworkManager.Settings.Connection")]
+impl Profile {
     #[zbus(property, name = "VersionId")]
     fn version_id(&self) -> u64 {
         let count = self.0.revision_reads.fetch_add(1, Ordering::SeqCst);
@@ -247,20 +279,7 @@ fn actual_private_bus_reports_radio_and_checkpoint_state_without_mutations() {
     let bus = PrivateBus::new();
     futures_lite::future::block_on(async {
         let fixture = Arc::new(Fixture::default());
-        let server = zbus::connection::Builder::address(bus.1.as_str())
-            .unwrap()
-            .name(NAME)
-            .unwrap()
-            .serve_at(OBJECT, Manager(fixture.clone()))
-            .unwrap()
-            .serve_at(
-                "/org/freedesktop/NetworkManager/Settings",
-                Settings(fixture.clone()),
-            )
-            .unwrap()
-            .build()
-            .await
-            .unwrap();
+        let server = server(&bus, &fixture).await;
         let client = bus.connect().await;
         let uid = unsafe { libc::geteuid() };
         let observed = bounded(DEADLINE, connection_observation(&client, uid))
@@ -271,8 +290,13 @@ fn actual_private_bus_reports_radio_and_checkpoint_state_without_mutations() {
         assert_eq!(observed.checkpoint_count, 1);
         assert_eq!(observed.state, 70);
         assert!(observed.ethernet_available);
-        assert_eq!(observed.settings_version, 7);
+        assert_eq!(observed.profile_count, 2);
         assert_eq!(observed.bus_owner, server.unique_name().unwrap().as_str());
+        fixture.omit_second_profile.store(true, Ordering::SeqCst);
+        let fewer = connection_observation(&client, uid).await.unwrap();
+        assert_eq!(fewer.profile_count, 1);
+        assert_ne!(fewer.profile_revision, observed.profile_revision);
+        fixture.omit_second_profile.store(false, Ordering::SeqCst);
         assert!(
             connection_observation(&client, uid.wrapping_add(1))
                 .await
@@ -361,4 +385,36 @@ fn missing_malformed_or_unbounded_properties_cannot_imply_an_idle_radio() {
         );
         assert!(parse(input).is_err());
     }
+}
+
+#[test]
+fn profile_inventory_is_bounded_unique_and_limited_to_connection_objects() {
+    assert!(profile_paths(true.into()).is_err());
+    for paths in [
+        vec!["/org/freedesktop/NetworkManager/Settings/1".to_string(); 2],
+        vec!["/org/freedesktop/NetworkManager/Settings".into()],
+        vec!["/org/freedesktop/NetworkManager/Devices/1".into()],
+        (1..=65)
+            .map(|n| format!("/org/freedesktop/NetworkManager/Settings/{n}"))
+            .collect(),
+    ] {
+        let paths: Vec<OwnedObjectPath> = paths
+            .into_iter()
+            .map(|path| path.try_into().unwrap())
+            .collect();
+        let value = OwnedValue::try_from(zbus::zvariant::Value::from(paths)).unwrap();
+        assert!(profile_paths(value).is_err());
+    }
+    let paths: Vec<OwnedObjectPath> = [
+        "/org/freedesktop/NetworkManager/Settings/2",
+        "/org/freedesktop/NetworkManager/Settings/1",
+    ]
+    .into_iter()
+    .map(|path| path.try_into().unwrap())
+    .collect();
+    let value = OwnedValue::try_from(zbus::zvariant::Value::from(paths)).unwrap();
+    assert_eq!(
+        profile_paths(value).unwrap()[0].as_str(),
+        "/org/freedesktop/NetworkManager/Settings/1"
+    );
 }

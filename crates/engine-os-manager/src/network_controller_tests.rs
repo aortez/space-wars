@@ -56,7 +56,8 @@ impl Fake {
                 startup: false,
                 checkpoint_count: 0,
                 state: 70,
-                settings_version: 7,
+                profile_revision: engine_ota::Sha256::digest(b"profiles"),
+                profile_count: 2,
                 ethernet_available: false,
             },
             activity: Activity {
@@ -318,7 +319,7 @@ fn external_changes_suspend_across_service_restart_until_explicit_resume() {
         ready(&mut controller, &fake);
         fake.edit(|w| match case {
             "radio" => w.radio.wireless_enabled = false,
-            "profiles" => w.radio.settings_version += 1,
+            "profiles" => w.radio.profile_revision = engine_ota::Sha256::digest(b"changed"),
             "manager" => w.radio.bus_owner = ":1.8".into(),
             "networking" => w.radio.networking_enabled = false,
             _ => unreachable!(),
@@ -555,7 +556,7 @@ fn a_clean_reboot_keeps_owned_off_and_persistent_stay_connected() {
             boot_id: NEXT_BOOT.into(),
             ms: 0,
         };
-        w.radio.settings_version = 1;
+        w.radio.profile_revision = engine_ota::Sha256::digest(b"new boot");
         w.radio.pid = 87;
         w.radio.bus_owner = ":1.5".into();
     });

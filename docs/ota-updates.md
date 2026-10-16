@@ -176,10 +176,13 @@ busy or stale observations prevent shutdown intent.
 without scanning, activating connections or changing settings. It pins the
 root-owned unique bus name, compares two uncached snapshots and rechecks the
 owner, with one five-second overall deadline. Replies, property counts and
-checkpoint inventories are bounded. It also brackets the snapshots with the
-[settings revision counter](https://networkmanager.dev/docs/api/1.46.0/gdbus-org.freedesktop.NetworkManager.Settings.html)
-and reports an activated primary Ethernet connection without reading profile
-credentials. Output distinguishes global networking,
+checkpoint inventories are bounded. It brackets the radio snapshots with a digest
+of sorted connection object paths and each connection's revision counter (at most
+64 profiles), and reports an activated primary Ethernet connection without reading
+profile credentials. NetworkManager 1.46.6's generated documentation incorrectly
+lists `VersionId` on the top-level Settings interface; its
+[implementation exposes it on Settings.Connection](https://github.com/NetworkManager/NetworkManager/blob/1.46.6/src/core/settings/nm-settings-connection.c#L2894),
+as confirmed on both installed Pis. Output distinguishes global networking,
 software radio enablement and hardware enablement; these are not evidence of
 a usable Wi-Fi connection.
 
@@ -211,8 +214,8 @@ and actual radio/checkpoint state, then sets only `WirelessEnabled`, with a boun
 deadline. It does not invoke global networking control or change profiles. The
 controller requires a shutdown guard across its final activity check, command and
 readback; an unavailable guard or incomplete live-activity observation defers off.
-The private policy record is now schema 2. These unpublished schema-1/2 policy
-records have not been installed on either kiosk; older records are rejected
+The private policy record is now schema 3. These unpublished policy
+records have not been installed on either kiosk; older schemas are rejected
 rather than silently reset.
 
 **Integration remains incomplete:** `serve` does not yet load the controller or
