@@ -967,3 +967,5 @@ fn worker(root: PathBuf, channel: Arc<Channel>) {
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) mod history;

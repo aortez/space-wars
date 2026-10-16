@@ -8,6 +8,7 @@ use std::time::Duration;
 struct TestPlatform;
 
 mod brain_assemblies;
+mod training_history;
 
 #[test]
 fn training_replays_keep_results_identical_and_support_pinning_speed_and_navigation() {

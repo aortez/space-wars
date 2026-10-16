@@ -13,6 +13,7 @@ pub(super) enum Selection {
 pub(super) enum Request {
     Refresh,
     Component(String),
+    Select(Selection),
     Save(String),
     Copy { source: String, component: String },
     Trial(Selection, Practice),
@@ -82,6 +83,19 @@ pub(super) fn execute(root: &Path, request: Request) -> Result<Reply, EvolutionE
     match request {
         Request::Refresh => refresh(root, None),
         Request::Component(id) => refresh(root, Some(Selection::Component(id))),
+        Request::Select(selection) => {
+            // Resolve the exact identity before legacy migration. A missing
+            // link must fail rather than open another library entry.
+            match &selection {
+                Selection::Component(id) => {
+                    library::resolve(&root.join("genomes"), id)?;
+                }
+                Selection::Brain(id) => {
+                    assemblies::inspect(root, id)?;
+                }
+            }
+            refresh(root, Some(selection))
+        }
         Request::Save(id) => {
             let entry = library::resolve(&root.join("genomes"), &id)?;
             let artifact = assemblies::create(root, &id, &name(&entry.origin.label, false))?;

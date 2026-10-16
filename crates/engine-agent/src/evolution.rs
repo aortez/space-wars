@@ -343,6 +343,21 @@ impl<F: Clone + Ord + Serialize + DeserializeOwned> EvolutionRun<F> {
         bytes: &[u8],
         task: &T,
     ) -> Result<Self, EvolutionError> {
+        let run = Self::inspect(bytes)?;
+        if run.runtime != runtime_id()? {
+            return Err(EvolutionError(
+                "checkpoint runtime differs; start a new run from compatible genomes".into(),
+            ));
+        }
+        if run.task != task.manifest() {
+            return Err(EvolutionError("checkpoint task recipe differs".into()));
+        }
+        Ok(run)
+    }
+
+    /// Read historical evidence without granting permission to resume it.
+    /// Kept inside this crate so callers cannot bypass `decode`'s runtime gate.
+    pub(crate) fn inspect(bytes: &[u8]) -> Result<Self, EvolutionError> {
         if bytes.len() > MAX_CHECKPOINT_BYTES {
             return Err(EvolutionError("checkpoint size limit exceeded".into()));
         }
@@ -353,19 +368,15 @@ impl<F: Clone + Ord + Serialize + DeserializeOwned> EvolutionRun<F> {
             ));
         }
         let run = checkpoint.run;
-        run.validate(task)?;
+        run.validate()?;
         Ok(run)
     }
 
-    fn validate<T: EvaluationTask<Fitness = F>>(&self, task: &T) -> Result<(), EvolutionError> {
-        if self.runtime != runtime_id()? {
-            return Err(EvolutionError(
-                "checkpoint runtime differs; start a new run from compatible genomes".into(),
-            ));
-        }
-        if self.task != task.manifest() {
-            return Err(EvolutionError("checkpoint task recipe differs".into()));
-        }
+    pub(crate) fn runtime(&self) -> &str {
+        &self.runtime
+    }
+
+    fn validate(&self) -> Result<(), EvolutionError> {
         DenseModel::new(self.template.clone())
             .map_err(error)?
             .require_contract(&self.task.contract)

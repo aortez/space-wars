@@ -21,6 +21,20 @@ fn new_run() -> EvolutionRun<LineFitness> {
     .unwrap()
 }
 
+#[test]
+fn historical_inspection_preserves_old_protocols_without_allowing_resume() {
+    let mut run = new_run();
+    finish(&mut run);
+    run.runtime.push_str("/old-build");
+    run.task.id.push_str("/old-recipe");
+    let bytes = run.encode().unwrap();
+    let historical = EvolutionRun::<LineFitness>::inspect(&bytes).unwrap();
+    assert_eq!(historical, run);
+    assert!(EvolutionRun::<LineFitness>::decode(&bytes, &LineTask::default()).is_err());
+    run.history[0].best_id = "invalid".into();
+    assert!(EvolutionRun::<LineFitness>::inspect(&run.encode().unwrap()).is_err());
+}
+
 fn finish(run: &mut EvolutionRun<LineFitness>) {
     while run.advance(&LineTask::default()).unwrap() {}
 }

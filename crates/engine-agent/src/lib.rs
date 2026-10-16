@@ -13,6 +13,7 @@ pub mod ship_arrival;
 pub mod ship_curriculum;
 pub mod ship_qualification;
 pub mod ship_training;
+pub mod training_history;
 pub mod training_job;
 pub mod training_validation;
 

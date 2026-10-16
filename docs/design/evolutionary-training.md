@@ -33,9 +33,11 @@ fixed stationary/moving practice trials with trajectory previews, and
 single-genome seeding. Its Brains tab saves the complete arrival-practice
 assembly, exposes its handwritten/learned parts and exact dependency, and can
 copy it with compatible replacement guidance. Behavior identities, names and
-trial receipts remain separate. This first assembly owns one guidance slot;
-evaluation-history UI, whole learned brains, broader hybrids and general
-gameplay assignment remain open.
+trial receipts remain separate. [Training history](../managed-training.md#saved-history)
+browses retained runs, generation winners, monitoring results and practice
+receipts, with explicit protocol checks for comparisons and exact artifact links.
+This first assembly owns one guidance slot; whole learned brains, broader hybrids
+and general gameplay assignment remain open.
 
 ## Product requirements
 

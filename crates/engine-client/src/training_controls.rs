@@ -11,6 +11,7 @@ pub(crate) struct Training {
     // Stop refreshing before joining the worker at application shutdown.
     _timer: Timer,
     _preview: crate::training_preview::Preview,
+    _history: crate::training_history::Browser,
     _manager: TrainingManager,
 }
 
@@ -18,7 +19,9 @@ pub(crate) fn install(
     window: &MainWindow,
     root: PathBuf,
 ) -> Result<Training, engine_agent::evolution::EvolutionError> {
-    let manager = TrainingManager::new(root)?;
+    let manager = TrainingManager::new(root.clone())?;
+    let history = crate::training_history::install(window, root)
+        .map_err(|e| engine_agent::evolution::EvolutionError(e.to_string()))?;
     let control = manager.control();
     let preview = crate::training_preview::install(window, control.clone())
         .map_err(|e| engine_agent::evolution::EvolutionError(e.to_string()))?;
@@ -33,6 +36,7 @@ pub(crate) fn install(
         window.set_launcher_focus_index(7);
         window.set_training_setup(!window.get_training_has_job());
         window.set_training_focus(0);
+        window.set_training_history(false);
         window.set_training_visible(true);
     });
     let weak = window.as_weak();
@@ -49,6 +53,10 @@ pub(crate) fn install(
             return;
         }
         let result = match id.as_str() {
+            id if id.starts_with("training.history.") => {
+                window.invoke_history_command(id.into());
+                return;
+            }
             id if id.starts_with("training.preview.") => {
                 crate::training_preview::command(&window, id);
                 return;
@@ -104,6 +112,7 @@ pub(crate) fn install(
     Ok(Training {
         _timer: timer,
         _preview: preview,
+        _history: history,
         _manager: manager,
     })
 }
@@ -241,6 +250,7 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
         window.set_training_setup(false);
     }
     window.set_training_has_job(snapshot.run_id.is_some());
+    window.set_training_run_id(snapshot.run_id.as_deref().unwrap_or("").into());
     window.set_training_active(snapshot.state.busy());
     window.set_training_status(state_label(snapshot.state).into());
     window.set_training_status_code(
@@ -374,6 +384,9 @@ pub(crate) fn publish(window: &MainWindow, snapshot: &JobSnapshot) {
 }
 
 pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
+    if window.get_training_history() {
+        return crate::training_history::inventory(window);
+    }
     let mut controls = vec![
         UiControl::new("training.status", "Run state", false)
             .with_value(window.get_training_status_code().to_string()),
@@ -478,10 +491,18 @@ pub(crate) fn inventory(window: &MainWindow) -> Vec<UiControl> {
         ));
     }
     controls.push(UiControl::new("training.back", "Back", true));
+    controls.push(UiControl::new(
+        "training.history.open",
+        "Saved history",
+        true,
+    ));
     controls
 }
 
 pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
+    if window.get_training_history() {
+        return crate::training_history::selected_id(window);
+    }
     if window.get_training_setup() {
         match window.get_training_focus() {
             0 => "training.recipe.next",
@@ -491,6 +512,7 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
             4 => "training.initial.reset",
             5 => "training.start",
             7 => "training.current",
+            8 => "training.history.open",
             _ => "training.back",
         }
     } else {
@@ -504,27 +526,29 @@ pub(crate) fn selected_id(window: &MainWindow) -> &'static str {
             6 => "training.preview.best",
             7 => "training.preview.speed",
             8 => "training.preview.follow",
+            9 => "training.history.open",
             _ => "training.back",
         }
     }
 }
 
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
+    if window.get_training_history() {
+        crate::training_history::handle_action(window, action);
+        return;
+    }
     let setup = window.get_training_setup();
     let current = window.get_training_focus();
-    let count = if setup {
-        if window.get_training_has_job() { 8 } else { 7 }
-    } else {
-        9
+    let count = if setup { 9 } else { 10 };
+    let move_focus = |delta| {
+        let mut next = crate::ui_navigation::moved_selection(current, count, delta);
+        if setup && !window.get_training_has_job() && next == 7 {
+            next = crate::ui_navigation::moved_selection(next, count, delta);
+        }
+        window.set_training_focus(next);
     };
     match action {
-        UiAction::Up | UiAction::Down => {
-            window.set_training_focus(crate::ui_navigation::moved_selection(
-                current,
-                count,
-                if action == UiAction::Up { -1 } else { 1 },
-            ))
-        }
+        UiAction::Up | UiAction::Down => move_focus(if action == UiAction::Up { -1 } else { 1 }),
         UiAction::Left | UiAction::Right if setup && current < 4 => {
             let field =
                 ["recipe", "population", "generations", "seed"][current.clamp(0, 3) as usize];
@@ -539,11 +563,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.invoke_training_command("training.initial.reset".into());
         }
         UiAction::Left | UiAction::Right => {
-            window.set_training_focus(crate::ui_navigation::moved_selection(
-                current,
-                count,
-                if action == UiAction::Left { -1 } else { 1 },
-            ))
+            move_focus(if action == UiAction::Left { -1 } else { 1 })
         }
         UiAction::Confirm => window.invoke_training_command(selected_id(window).into()),
         UiAction::Back | UiAction::Controls => {
