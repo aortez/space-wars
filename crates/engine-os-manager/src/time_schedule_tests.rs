@@ -491,7 +491,7 @@ fn corrupt_missing_or_replaced_state_does_not_reset_a_schedule() {
     }
     let temp = tempfile::tempdir().unwrap();
     assert!(
-        store::Store::existing(&temp.path().join("missing"))
+        store::Store::<Record>::existing(&temp.path().join("missing"))
             .unwrap()
             .is_none()
     );

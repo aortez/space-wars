@@ -7,8 +7,7 @@ use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[path = "time_schedule_store.rs"]
-mod store;
+use crate::schedule_store::{self as store, StateRecord};
 
 pub const ATTEMPT_MS: u64 = 120_000;
 pub const ADMISSION_MS: u64 = 30_000;
@@ -200,6 +199,18 @@ impl Record {
     }
 }
 
+impl StateRecord for Record {
+    fn initial() -> Self {
+        Self::initial()
+    }
+    fn validate(&self) -> Result<()> {
+        self.validate()
+    }
+    fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Active {
@@ -234,7 +245,7 @@ pub struct Status {
 /// to the runner. Storage uncertainty disables further actions until reopening;
 /// missing or corrupt state in an existing directory is never a new schedule.
 pub struct Schedule {
-    store: store::Store,
+    store: store::Store<Record>,
     record: Record,
     last_ms: u64,
 }
@@ -244,7 +255,7 @@ impl Schedule {
         if !clock.valid() {
             return Err(invalid("invalid time-check boot clock"));
         }
-        let (store, record) = store::Store::open(path)?;
+        let (store, record) = store::Store::<Record>::open(path)?;
         let mut schedule = Self {
             store,
             record,

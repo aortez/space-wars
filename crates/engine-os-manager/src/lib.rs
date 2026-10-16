@@ -48,9 +48,13 @@ pub mod recovery_service;
 #[cfg(target_os = "linux")]
 pub mod recovery_status;
 #[cfg(target_os = "linux")]
+mod schedule_store;
+#[cfg(target_os = "linux")]
 pub mod service;
 #[cfg(target_os = "linux")]
 pub mod store;
+#[cfg(target_os = "linux")]
+pub mod update_schedule;
 
 pub const SOCKET_PATH: &str = "/run/spacewars-system/status.sock";
 pub const STATE_DIRECTORY: &str = "/data/spacewars-system/time";

@@ -28,7 +28,7 @@ Remaining work retains the full OTA scope:
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Private staging and bounded HTTPS check/download sessions implemented; device-service integration, scheduling and connection ownership remain |
+| #265 | Private staging, bounded HTTPS sessions and a separate durable update schedule implemented; device-service integration and connection ownership remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -1493,13 +1493,65 @@ AArch64 test compilation and formatting also passed. Exact source/artifact
 identities and outputs are recorded in the
 [download validation evidence](data/ota-download-20261016.json).
 
-Remaining integration includes the persistent boot/daily scheduler, 30-second
-Check now admission and request coalescing, ownership of the network hold before
+Remaining integration includes driving the persistent boot/daily scheduler,
+authenticated Check now admission and coalescing, ownership of the network hold before
 NTP releases its hold, Ethernet/offline-policy coordination, dedicated worker
 priority and outbound-IP sandbox permissions, production staging provisioning,
 authoritative device/history refresh, update status/API and installation-policy
 handoff. This library session has not been connected to the running kiosk service
 or a production release feed, and it does not establish an enabled auto updater.
+
+### Durable update-check schedule
+
+`engine_os_manager::update_schedule::Schedule` keeps OTA's selected channel,
+attempt ID, daily due time and original deadlines separate from time-sync retry
+history. Its fixed state-path constant is
+`/data/spacewars-system/update-check`. Both schedules use the same private,
+locked, checksummed and atomically flushed storage implementation; the time
+schedule's serialized format remains unchanged.
+
+Normal networking permits one startup check and then one automatic attempt per
+24 hours of boot time. Partial offline mode admits a due automatic attempt only
+when the coordinator supplies an existing connection or time-check opportunity.
+Mode toggles and failed NTP retries do not replenish OTA's allowance. A new boot
+offers one startup check; service/client restarts within that boot retain the
+daily allowance. Both installation policies use this schedule: it contains no
+installation permission or reboot action.
+
+An explicit Check now can retry before the next day and joins an already active
+attempt. The server's original receipt time counts toward 30-second admission,
+two-minute preparation and the thirty-minute total session. Admission may precede
+association. First-payload progress retains its actual timestamp so delayed
+worker notification cannot renew preparation or incorrectly reject an on-time
+transition; the original total deadline still applies. The HTTPS session owns
+the separate sixty-second no-progress limit and request/redirect budgets.
+
+The daily allowance is committed before any connection request. Success,
+ineligibility, cancellation and failure retain that next due time. Reopening
+terminates an interrupted combined session rather than granting it new network
+budgets. Partial staging bytes remain available for a later eligible or explicit
+attempt. Switching Release/Nightly cancels old work, advances a selection revision
+and makes the new feed due; queued old-selection requests and old attempt callbacks
+cannot complete replacement work. The worker must join cancelled IO before
+starting another session. Installed image identity and TUF history are unaffected.
+
+Status reads perform no transition. Missing, corrupt, replaced or public records
+cannot reset the daily allowance; uncertain writes authorize no network work.
+The schedule's completion field describes the last attempt and is not evidence
+that a retained image is currently verified or installable.
+
+Validation passed all 163 device-service host tests, with one fixture entry point
+ignored, plus Clippy, Rust 1.89 compatibility, formatting and AArch64 compilation.
+The 45 update-schedule, time-schedule and time-runtime cases passed on both Pis
+(3.52 seconds on Pi 5; 3.25 seconds on Pi 4). Tests used isolated UID-1000 state
+and fake provider/network/time observations, with no installed service changes
+or reboot. The [schedule evidence](data/ota-update-schedule-20261016.json) records
+the exact source, binaries and results.
+
+This component is not yet driven by the production service. Remaining work is
+the dedicated download worker, bounded network admission/renewal, the time-check
+hold handoff, current device/history/time guards, Check now/status IPC, sandbox
+permissions and production trust/staging provisioning.
 
 ## Reproducible verification
 
