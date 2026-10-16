@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-16T04:26:17.696883+00:00",
+  "implementation_commit": "e02f182df547ddd090148245cf38453178f8f6a4",
+  "scope": "Root-operator boot staging verifies the completed inactive image and selected recovery copies, publishes a durable staging record, then a temporary boot tree and trial selector while retaining the original normal boot. It does not request a one-shot reboot or enable automatic updates.",
+  "host_validation": {
+    "ota_tests_passed": 228,
+    "manager_tests_passed": 38,
+    "ordinary_suite_ignored": 8,
+    "clippy_warnings_denied": "passed",
+    "rust_1_89_all_targets": "passed",
+    "format": "passed",
+    "aarch64_ota_manager_test_build": "passed",
+    "aarch64_staging_command_build": "passed",
+    "selected_tests_on_workspace_ext4": 9,
+    "selected_ext4_seconds": 12.32,
+    "commands": [
+      "cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1",
+      "cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings",
+      "cargo +1.89.0 check --locked -p engine-ota -p engine-os-manager --all-targets",
+      "cargo fmt --all -- --check",
+      "cargo test --locked -p engine-ota -p engine-os-manager --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "cargo build --locked -p engine-ota --example bootstrap_stage_boot --target aarch64-unknown-linux-gnu",
+      "TMPDIR=/home/data/workspace/space-wars-ota/target/ota-bootstrap-stage-tmp cargo test --locked -p engine-ota --lib -- bootstrap::stage_files bootstrap::trial_store::tests::staging_record bootstrap::device::tests::checked_staged_bytes bootstrap::root_install::tests::staging_requires --test-threads=1"
+    ]
+  },
+  "pi5_validation": {
+    "remote_directory": "/tmp/spacewars-boot-stage.25GYNt",
+    "uid": 1000,
+    "boot_id_before_and_after": "de606400-dc75-446e-b26b-385592b0f562",
+    "artifacts": {
+      "tests": {
+        "path": "/home/data/workspace/space-wars-ota/target/aarch64-unknown-linux-gnu/debug/deps/engine_ota-f7c7f1697874a6b9",
+        "bytes": 81266480,
+        "sha256": "1c40d92534511cb8176e2d7e06e3bc9a490e54adac785b480a5ca5d82c59ca2d"
+      },
+      "command": {
+        "path": "target/aarch64-unknown-linux-gnu/debug/examples/bootstrap_stage_boot",
+        "bytes": 59671376,
+        "sha256": "82abd60241bd99477a15b815b55420e45aee8f47489d689efdf81912012d390b"
+      }
+    },
+    "artifact_build_state": "Built from the source working tree subsequently committed as implementation_commit. These debug executables are not a clean Yocto runtime image.",
+    "selected_tests_passed": 9,
+    "ignored": 0,
+    "elapsed_test_seconds": 20.67,
+    "filters": [
+      "bootstrap::stage_files",
+      "bootstrap::trial_store::tests::staging_record",
+      "bootstrap::device::tests::checked_staged_bytes",
+      "bootstrap::root_install::tests::staging_requires"
+    ],
+    "actual_command_denial": "Error: Store(\"installation requires the root service or operator\")\nstage_command_exit=1",
+    "scope": "Temporary ordinary-user journal, boot-tree, capacity and small ext4 image fixtures. The actual operator command rejects UID 1000 before installed-path admission. No privileged adapter, boot mutation, block target or reboot was exercised."
+  },
+  "covered_cases": [
+    "A staging record is published and flushed before boot-file mutation. Interrupted unpublished record creation can resume; corrupt/linked/unknown/oversized pending state is rejected.",
+    "Staging and trial-ready phases cannot authorize runtime health or watchdog completion. Existing trial record publication cannot be silently replaced.",
+    "Errors at every distinct staging publication checkpoint, including first/middle/last repeated file-copy checkpoints, permit explicit resumption while the retained normal boot files stay byte-identical.",
+    "Published trees must remain complete and match the recorded plan. Changed/missing published assets, modified original files or selectors, unknown pending entries, unsafe links and conflicting trees stop preparation without repair.",
+    "Source mismatch and failed final authorization prevent trial-selector publication. Verified staged-byte credit is bounded by the selected tree and cannot hide missing capacity.",
+    "The completed-root observer rejects absent, corrupt and mismatched receipts without creating or repairing state. Device staging also rehashes/checks the exclusively held image before and after boot preparation; that live admission path remains unexecuted."
+  ],
+  "limits": [
+    "The fixed-path privileged staging adapter has not run on either Pi. Full admission, actual raw block claims, live access verification and FAT publication need supervised hardware qualification.",
+    "The tests use ordinary files and small ext4 artifacts. Injected failures are not physical power-loss, FAT recovery, watchdog or boot tests.",
+    "No installed Pi root, boot file, service, persistent data store, radio state or watchdog was changed. The ordinary-user Pi 5 temporary test files/binaries are the only device writes in this step; Pi 4 was not exercised.",
+    "One-shot activation is still unimplemented. The new command ends at trial-ready and does not request a reboot; manual tryboot must not bypass the later gate.",
+    "No new clean Yocto image or schema-3 kits were built. The existing c14c53f image and schema-2 kits predate this implementation and remain unsuitable for this migration.",
+    "Root connection details, independent live recovery exports, effective privilege closure and actual root/runtime logins, live root installation/staging, activation, canonical migration and production baseline provisioning remain outstanding.",
+    "Both-board physical failure qualification and end-to-end feed/service/radio/scheduling/UI integration remain required before automatic update rollout."
+  ],
+  "logs": {
+    "host": {
+      "path": "target/ota-bootstrap-stage-host.log",
+      "sha256": "005e2d1f08b910576bb7701a16dd328168ef7d4753708eade61488f4ccf2fd6b",
+      "test_results": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.69s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.54s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 206 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 94.57s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "clippy": {
+      "path": "target/ota-bootstrap-stage-clippy.log",
+      "sha256": "96d40e85840389b126dacfab7706451095c9bed2aa068879b3b29326a3382eac"
+    },
+    "msrv": {
+      "path": "target/ota-bootstrap-stage-msrv.log",
+      "sha256": "8bb95875f249a5c1019173172e600774ffcd31e6905ee79933765df0b956229a"
+    },
+    "format": {
+      "path": "target/ota-bootstrap-stage-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "aarch64": {
+      "path": "target/ota-bootstrap-stage-aarch64.log",
+      "sha256": "eee997d07dc8478012f1c899d4d6f2a2bb9b5e97dba862d633a09d2a92fef9ce"
+    },
+    "aarch64_artifacts": {
+      "path": "target/ota-bootstrap-stage-aarch64.jsonl",
+      "sha256": "f69613e460acf5fefff868de28c266f951c423d029a3f68762a01752db7fd400"
+    },
+    "command_build": {
+      "path": "target/ota-bootstrap-stage-command.log",
+      "sha256": "ee76ea09fcc783be0210751c339e1c9633188079833c4c8cd7dec78df4142ef0"
+    },
+    "host_ext4": {
+      "path": "target/ota-bootstrap-stage-ext4.log",
+      "sha256": "22ae280ce3a975ebec67ef547df00ae3ae9ebc80846c48d557be3b5da514a03e",
+      "test_results": [
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 205 filtered out; finished in 12.32s"
+      ]
+    },
+    "pi5": {
+      "path": "target/ota-bootstrap-stage-pi5.log",
+      "sha256": "d1fb322d7860cfa1924ec5705287de95fcd39940d8808b5a32896ab973878fbf",
+      "test_results": [
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 205 filtered out; finished in 20.67s"
+      ]
+    },
+    "pi5_denial": {
+      "path": "target/ota-bootstrap-stage-pi5-denial.log",
+      "sha256": "1c580e82198c8532eef123559ec836cdecd65e3abac00d5088f5c36bc1c63d44"
+    }
+  }
+}

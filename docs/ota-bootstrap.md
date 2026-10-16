@@ -886,6 +886,16 @@ built, and no live boot staging, trial activation or recovery qualification
 occurred. [Runtime evidence](data/ota-bootstrap-runtime-20261015.json) records the
 exact artifact/log hashes and the remaining migration/integration work.
 
+Boot staging at `e02f182` passed 228 OTA and 38 manager tests, Clippy, Rust 1.89,
+formatting and AArch64 test/command builds. Nine new fixtures passed on host
+ext4 in 12.32 seconds and on Pi 5 as UID 1000 in 20.67 seconds. They cover
+interrupted preparation/publication, immutable completed trees, unchanged
+retained boot files, selected space credit and receipt admission. The actual
+staging command rejected the ordinary Pi account before installed-path admission;
+its boot ID stayed unchanged. No root staging operation, clean image build,
+one-shot activation or physical failure test occurred. [Staging evidence](data/ota-bootstrap-stage-20261015.json)
+records the exact artifacts, logs and remaining hardware/integration limits.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
