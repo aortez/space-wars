@@ -414,6 +414,15 @@ client Clippy warnings remain. [Setup-hold evidence](data/ota-setup-holds-202610
 records exact artifacts and the distinction between fixtures, host kiosk checks
 and the still-pending physical UI/service rollout.
 
+Deployment integration at `204a747` passed 58 manager network cases on the host
+and each Pi (8.42 seconds on Pi 5, 12.10 seconds on Pi 4), plus malformed-input
+CLI checks. The final workstation suite passed 51 Node cases, including 21
+deployment/fast-update cases; the 71-test Python suite also passed before the
+final JS confirmation/reconnect refinements. Clippy, Rust 1.89, formatting and
+AArch64 compilation pass. [Deployment-hold evidence](data/ota-deployment-holds-20261016.json)
+separates mocked workstation transactions and private Pi fixtures from actual
+root installation, native lease admission and physical reboot qualification.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
