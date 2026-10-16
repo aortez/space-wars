@@ -109,12 +109,14 @@ applies the fixed destination modes. Nothing under `legacy-root/` is executed
 by the packager or interpreted as an arbitrary installation hook.
 
 The device package checker requires the complete fixed list and bootstrap
-protocol 1. The builder and inactive-root readback check require
+protocol 2. The builder and inactive-root readback check require
 `/etc/spacewars/bootstrap-runtime.json` in the actual ext4 image, with schema 1
-and protocol 1. This marker is installed by the image recipe and is part of the
+and protocol 2. This marker is installed by the image recipe and is part of the
 rootfs identity. It identifies first-image recovery with persistent-store health
-checks; the production recovery protocol alone cannot establish that capability.
-Schema 1/2 packages are rejected; previous local packages must be rebuilt,
+checks and an activation boot ID; the production recovery protocol alone cannot
+establish that capability. The trial journal is schema 2. Schema 1/2 packages,
+bootstrap protocol 1 images and schema 1 trial journals are rejected;
+previous local packages must be rebuilt,
 never relabeled. This packaging step does not close any live privileges. The
 migration needs the separately implemented durable per-file record of original
 contents/absence, restartable replacements, a check for running legacy helpers,
@@ -572,8 +574,67 @@ The journal advances to `trial-ready` only after the complete boot tree and
 installed image pass verification. A repeated ready operation verifies that
 state; an already requested, observed, failed or confirmed trial cannot be
 prepared again. The result always reports `reboot_requested: false` and
-`automatic_updates_enabled: false`. The separately gated one-shot activation
-operation is still pending; do not substitute a manual tryboot command for it.
+`automatic_updates_enabled: false`. Use the separate activation operation below
+after the supervised prerequisites; do not bypass it with a manual tryboot.
+
+## Supervised one-shot activation
+
+The root-only manager command accepts the selected package, completed root
+receipt and ready trial identity, plus the original SSH connection context:
+
+```sh
+engine-os-manager bootstrap-activate \
+  --package BUNDLE_SHA256 \
+  --written-root ROOT_INSTALL_SHA256 \
+  --trial TRIAL_ID \
+  --ssh-connection 'CLIENT_IP CLIENT_PORT SERVER_IP SERVER_PORT'
+```
+
+This is an operator command, not a device-socket request. It requires an existing
+`trial-ready` journal and cannot initialize, finish or repair staging. It derives
+the backup selections from the digest-bound completed root receipt, then repeats
+the staging admission checks: package/device/layout, originals and recovery
+copies, effective SSH/sudo/service policy, persistent access/network stores,
+complete boot inventory and the exclusively claimed inactive image. The shared
+installation lock, legacy-helper lock, private journal and inactive-root claim
+stay held until the reboot request returns. No raw target or selector is written.
+
+Before any reboot mutation it requires an empty systemd reboot parameter and
+durably consumes the attempt as `trial-requested`, recording the current boot ID.
+The staged image must later run in a different boot from both staging and this
+request. It rechecks the held context before setting the fixed `0 tryboot`
+argument through logind, reads that parameter back without a property cache,
+rechecks context and parameter, and asks PID 1 to start only `reboot.target` in
+`replace-irreversibly` mode. No arbitrary command, unit or reboot argument is
+accepted. The firmware argument follows the [Raspberry Pi tryboot contract](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#fail-safe-os-updates-tryboot).
+The systemd 255 [logind implementation](https://github.com/systemd/systemd/blob/v255/src/login/logind-dbus.c)
+writes the volatile reboot parameter; the [shutdown path](https://github.com/systemd/systemd/blob/v255/src/shutdown/shutdown.c)
+uses it after orderly shutdown. This source review does not establish the
+installed boards' physical reboot behavior.
+
+Each bus call and initial connection has a two-second deadline. Synchronous
+media/access validation is not covered by that deadline. On a request error,
+the manager first tries to persist `activation-request-failed`, then attempts
+bounded cleanup only when the reboot parameter still equals its exact trial
+argument. An empty value is left alone; a different value is not overwritten.
+Failure persistence and cleanup errors remain visible. A failed or requested
+attempt never becomes ready again through this command, even after restart.
+
+A bus timeout cannot cancel a request already delivered to systemd. A late
+reboot may still happen; a durable failed record tells the candidate runtime
+to return to the retained legacy default. Process death can prevent the failure
+record or cleanup, leaving a consumed request and a volatile tryboot argument.
+An accepted job reply also does not prove reboot occurred. In any uncertain
+case, use the independent root/recovery connection to inspect the journal,
+current boot and pending reboot state before deciding how to recover. Do not
+delete the record, rerun activation, issue another tryboot or clear another
+operator's reboot request to manufacture a retry. No automatic reconciliation
+or retry is implemented for this supervised handoff.
+
+Success reports only `reboot_job_accepted: true`; trial health, normal-boot
+confirmation and physical qualification remain unobserved. Automatic updates
+remain disabled. No live activation or new clean runtime image has been tested
+on either Pi yet.
 
 ## First-boot recovery runtime
 
@@ -582,9 +643,9 @@ its own root-private journal at
 `/data/spacewars-bootstrap/active/boot-trial/record.json`. Opening this journal
 never creates a missing attempt, reuses unpublished temporary state or resets a
 failed attempt. Bootstrap and production recovery journals cannot coexist.
-The staging command creates the initial record; the separate activation operation
-that moves a prepared attempt to `trial-requested` remains pending. This runtime
-alone does not make a device ready for a supervised trial.
+The staging command creates the initial record; the separate root-operator
+activation command consumes it before requesting the one-shot reboot. These
+source implementations alone do not qualify a device for a supervised trial.
 
 The immutable record binds the preparation/package, completed root-install
 digest, image identity, original boot configuration, staged plan and originating
@@ -710,8 +771,8 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    The shared kiosk health worker now checks persistent network/Bluetooth binds
    and SSH-store structure as well as settings writes. The separate bootstrap
    coordinator uses that worker and its own persisted health authorization for
-   watchdog completion. Initial boot staging is implemented; activation and all
-   live migration/boot qualification remain pending.
+   watchdog completion. Boot staging and supervised activation are implemented;
+   all live migration/boot qualification remains pending.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.

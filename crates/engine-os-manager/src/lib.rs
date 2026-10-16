@@ -1,5 +1,7 @@
 //! Device-owned state and a bounded local status interface, independent of the UI.
 #[cfg(target_os = "linux")]
+pub mod bootstrap_activation;
+#[cfg(target_os = "linux")]
 mod bootstrap_recovery;
 pub mod time;
 

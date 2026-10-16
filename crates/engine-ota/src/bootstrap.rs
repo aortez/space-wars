@@ -39,6 +39,8 @@ pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap
 
 #[path = "bootstrap_access_check.rs"]
 mod access_check;
+#[path = "bootstrap_activation.rs"]
+mod activation;
 #[path = "bootstrap_archive.rs"]
 mod archive;
 #[path = "bootstrap_data_backup.rs"]
@@ -57,6 +59,7 @@ mod quiesce;
 mod root_install;
 #[path = "bootstrap_stage_files.rs"]
 mod stage_files;
+pub use activation::{BootActivationReport, TrialActivation};
 #[path = "bootstrap_trial.rs"]
 mod trial;
 pub use trial::{TrialFailure, TrialPhase};
@@ -77,6 +80,7 @@ pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,
 };
+pub use device::activate_bootstrap_boot;
 pub use device::backup_installed_data;
 pub use device::check_installed_legacy_access;
 pub use device::install_bootstrap_root;
@@ -95,7 +99,7 @@ pub use trial_linux::BootstrapBoot;
 
 pub const STAGE_DIRECTORY: &str = "sw-bootstrap";
 /// First-image health, persistent-store checks and separate normal confirmation.
-pub const BOOTSTRAP_PROTOCOL: u32 = 1;
+pub const BOOTSTRAP_PROTOCOL: u32 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

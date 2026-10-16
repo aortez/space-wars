@@ -31,6 +31,7 @@ mod root_device;
 pub use root_device::install_bootstrap_root;
 #[path = "bootstrap_stage_device.rs"]
 mod stage_device;
+pub use stage_device::activate_bootstrap_boot;
 pub use stage_device::{BootStageProgress, BootStageReport, stage_bootstrap_boot};
 
 #[derive(Debug, Serialize)]

@@ -39,14 +39,129 @@ pub fn stage_bootstrap_boot(
     connection: bootstrap::SshCheckConnection,
     mut report: impl FnMut(BootStageProgress),
 ) -> Result<BootStageReport> {
+    operate(
+        expected,
+        Selection::Stage {
+            raw_copies,
+            data_copy,
+            originals,
+            written_root,
+        },
+        connection,
+        &mut report,
+        |store, inputs, _, _| {
+            Ok(BootStageReport {
+                schema: 1,
+                scope: "temporary boot tree and trial file prepared; normal default retained; one-shot reboot and physical qualification remain separate",
+                package_sha256: expected,
+                root_install_sha256: written_root,
+                trial_id: inputs.plan.trial_id,
+                phase: store.phase(),
+                original_default_retained: true,
+                reboot_requested: false,
+                automatic_updates_enabled: false,
+            })
+        },
+    )
+}
+
+/// Activate only an already completed stage. All claims and locks stay held
+/// while the trusted root-operator caller requests the fixed systemd reboot.
+pub fn activate_bootstrap_boot(
+    expected: Sha256,
+    written_root: Sha256,
+    trial_id: Sha256,
+    connection: bootstrap::SshCheckConnection,
+    mut report: impl FnMut(BootStageProgress),
+    request: impl FnOnce(&mut bootstrap::TrialActivation<'_>) -> Result<()>,
+) -> Result<bootstrap::BootActivationReport> {
+    operate(
+        expected,
+        Selection::Activate {
+            written_root,
+            trial_id,
+        },
+        connection,
+        &mut report,
+        |store, _, boot_id, guard| bootstrap::activation::run(store, boot_id, guard, request),
+    )
+}
+
+enum Selection {
+    Stage {
+        raw_copies: Sha256,
+        data_copy: Sha256,
+        originals: Sha256,
+        written_root: Sha256,
+    },
+    Activate {
+        written_root: Sha256,
+        trial_id: Sha256,
+    },
+}
+
+fn operate<T>(
+    expected: Sha256,
+    selection: Selection,
+    connection: bootstrap::SshCheckConnection,
+    report: &mut impl FnMut(BootStageProgress),
+    finish: impl FnOnce(
+        &mut TrialStore,
+        &bootstrap::trial::TrialInputs,
+        &str,
+        &mut dyn FnMut() -> Result<()>,
+    ) -> Result<T>,
+) -> Result<T> {
     let lock = InstallLock::acquire()?;
     report(BootStageProgress::CheckingPrerequisites);
-    let quiet = bootstrap::quiesce::QuietRuntime::acquire()?;
+    let staging = matches!(&selection, Selection::Stage { .. });
+    let quiet = if staging {
+        bootstrap::quiesce::QuietRuntime::acquire()?
+    } else {
+        bootstrap::quiesce::QuietRuntime::for_activation()?
+    };
     let mut store = TrialStore::for_staging(&lock)?;
     let previous = store
         .as_ref()
         .map(|store| staging_inputs(store).cloned())
         .transpose()?;
+    let (raw_copies, data_copy, originals, written_root) = match selection {
+        Selection::Stage {
+            raw_copies,
+            data_copy,
+            originals,
+            written_root,
+        } => (raw_copies, data_copy, originals, written_root),
+        Selection::Activate {
+            written_root,
+            trial_id,
+        } => {
+            let store = store
+                .as_ref()
+                .ok_or_else(|| invalid("activation requires an existing ready stage"))?;
+            let inputs = store.durable()?;
+            if inputs.phase != TrialPhase::TrialReady
+                || inputs.inputs.binding.package_sha256 != expected
+                || inputs.inputs.root_install_sha256 != written_root
+                || inputs.inputs.plan.trial_id != trial_id
+            {
+                return Err(invalid(
+                    "activation does not match the selected ready stage",
+                ));
+            }
+            let (root, digest) =
+                bootstrap::root_install::read_completed(store.active_directory()?, 0)?;
+            if digest != written_root {
+                return Err(invalid("activation root receipt differs from selection"));
+            }
+            (
+                root.raw_copies_sha256,
+                root.data_receipt_sha256,
+                root.originals_sha256,
+                written_root,
+            )
+        }
+    };
     let mut inspected = Installed::open_staging(expected, &lock, false, previous.as_ref())?;
     let binding = inspected
         .existing
@@ -215,6 +330,9 @@ pub fn stage_bootstrap_boot(
     report(BootStageProgress::CheckingWrittenRoot);
     check_root(&mut target)?;
     if store.is_none() {
+        if !staging {
+            return Err(invalid("activation cannot initialize staging"));
+        }
         bootstrap::trial_store::prepare(&active, 0, &inputs, |point| {
             guard()?;
             report(BootStageProgress::Preparing(point.into()));
@@ -231,6 +349,9 @@ pub fn stage_bootstrap_boot(
     if store.phase() == TrialPhase::TrialReady {
         bootstrap::trial_files::TrialBootFiles::open(boot.try_clone()?, 0, inputs.clone())?;
     } else {
+        if !staging {
+            return Err(invalid("activation cannot repair an incomplete stage"));
+        }
         bootstrap::stage_files::apply(
             &boot,
             0,
@@ -256,28 +377,25 @@ pub fn stage_bootstrap_boot(
     report(BootStageProgress::CheckingWrittenRoot);
     check_root(&mut target)?;
     bootstrap::trial_files::TrialBootFiles::open(boot.try_clone()?, 0, inputs.clone())?;
-    store.advance(|record| {
-        if !matches!(record.phase, TrialPhase::Staging | TrialPhase::TrialReady) {
-            return Err(invalid(
-                "bootstrap trial has already been requested or observed",
-            ));
-        }
-        record.phase = TrialPhase::TrialReady;
-        Ok(())
-    })?;
+    if staging {
+        store.advance(|record| {
+            if !matches!(record.phase, TrialPhase::Staging | TrialPhase::TrialReady) {
+                return Err(invalid(
+                    "bootstrap trial has already been requested or observed",
+                ));
+            }
+            record.phase = TrialPhase::TrialReady;
+            Ok(())
+        })?;
+    }
     bootstrap::access_check::check(&root, &inspected.data, &connection)?;
     guard()?;
     report(BootStageProgress::Ready);
-    Ok(BootStageReport {
-        schema: 1,
-        scope: "temporary boot tree and trial file prepared; normal default retained; one-shot reboot and physical qualification remain separate",
-        package_sha256: expected,
-        root_install_sha256: written_root,
-        trial_id: inputs.plan.trial_id,
-        phase: store.phase(),
-        original_default_retained: true,
-        reboot_requested: false,
-        automatic_updates_enabled: false,
+    finish(store, &inputs, &inspected.legacy.boot_id, &mut || {
+        guard()?;
+        bootstrap::trial_files::TrialBootFiles::open(boot.try_clone()?, 0, inputs.clone())?;
+        bootstrap::access_check::check(&root, &inspected.data, &connection)?;
+        guard()
     })
 }
 

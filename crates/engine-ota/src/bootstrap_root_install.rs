@@ -213,6 +213,18 @@ fn optional_record(directory: &File, component: &str, owner: u32) -> Result<Opti
 /// install. The staging caller separately rehashes the exclusively held target.
 pub(super) fn completed(active: &File, owner: u32, inputs: &Inputs) -> Result<Sha256> {
     inputs.validate()?;
+    let (actual, hash) = read_completed(active, owner)?;
+    if actual != *inputs {
+        return Err(invalid(
+            "completed root installation belongs to different inputs",
+        ));
+    }
+    Ok(hash)
+}
+
+/// Read only a published completion. Callers must compare its digest with the
+/// operator-selected receipt and revalidate every input against the device.
+pub(super) fn read_completed(active: &File, owner: u32) -> Result<(Inputs, Sha256)> {
     let directory = super::state::optional_directory(active, DIRECTORY, owner)?
         .ok_or_else(|| invalid("bootstrap root installation is missing"))?;
     backup::inventory(&directory, &[RECORD, PENDING])?;
@@ -227,19 +239,19 @@ pub(super) fn completed(active: &File, owner: u32, inputs: &Inputs) -> Result<Sh
     let hash = Sha256::digest(&serde_json::to_vec(&envelope.record)?);
     if envelope.record.schema != 1
         || envelope.record.phase != Phase::Written
-        || envelope.record.inputs != *inputs
         || envelope.checksum != hash
     {
         return Err(invalid(
             "bootstrap root installation is not the selected completed copy",
         ));
     }
+    envelope.record.inputs.validate()?;
     optional_record(&directory, PENDING, owner)?;
     backup::check_named_directory(active, DIRECTORY, &directory, owner)?;
     if optional_record(&directory, RECORD, owner)?.as_deref() != Some(bytes.as_slice()) {
         return Err(invalid("completed root-install record changed"));
     }
-    Ok(hash)
+    Ok((envelope.record.inputs, hash))
 }
 
 /// The caller supplies checked package/backup identities, holds the installation

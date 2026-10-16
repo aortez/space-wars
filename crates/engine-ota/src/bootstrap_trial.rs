@@ -96,6 +96,7 @@ pub enum TrialPhase {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TrialFailure {
+    ActivationRequestFailed,
     HealthTimeout,
     WatchdogUnavailable,
     TrialReset,
@@ -107,6 +108,7 @@ pub(super) struct TrialRecord {
     schema: u32,
     pub inputs: TrialInputs,
     pub phase: TrialPhase,
+    request_boot_id: Option<String>,
     trial_boot_id: Option<String>,
     trial_health: Option<HealthProof>,
     normal_boot_id: Option<String>,
@@ -128,9 +130,10 @@ pub(super) enum TrialAction {
 impl TrialRecord {
     pub(super) fn staging(inputs: TrialInputs) -> Result<Self> {
         let record = Self {
-            schema: 1,
+            schema: 2,
             inputs,
             phase: TrialPhase::Staging,
+            request_boot_id: None,
             trial_boot_id: None,
             trial_health: None,
             normal_boot_id: None,
@@ -145,6 +148,7 @@ impl TrialRecord {
     pub(super) fn requested(inputs: TrialInputs) -> Result<Self> {
         let mut record = Self::staging(inputs)?;
         record.phase = TrialPhase::TrialRequested;
+        record.request_boot_id = Some(record.inputs.origin_boot_id.clone());
         record.validate()?;
         Ok(record)
     }
@@ -152,8 +156,11 @@ impl TrialRecord {
     pub(super) fn validate(&self) -> Result<()> {
         self.inputs.validate()?;
         let valid_boot = |id: &Option<String>| {
-            id.as_ref()
-                .is_none_or(|id| crate::recovery::boot_id(id) && id != &self.inputs.origin_boot_id)
+            id.as_ref().is_none_or(|id| {
+                crate::recovery::boot_id(id)
+                    && id != &self.inputs.origin_boot_id
+                    && Some(id) != self.request_boot_id.as_ref()
+            })
         };
         let valid_health = |normal, id: &Option<String>, proof: &Option<HealthProof>| {
             proof.as_ref().is_none_or(|proof| {
@@ -165,10 +172,12 @@ impl TrialRecord {
         let healthy = self.trial_health.is_some();
         let normal = self.normal_boot_id.is_some();
         let confirmed = self.normal_health.is_some();
+        let requested = self.request_boot_id.is_some();
         let shape = match self.phase {
-            TrialPhase::Staging | TrialPhase::TrialReady | TrialPhase::TrialRequested => {
-                !started && !healthy && !normal && !confirmed
+            TrialPhase::Staging | TrialPhase::TrialReady => {
+                !requested && !started && !healthy && !normal && !confirmed
             }
+            TrialPhase::TrialRequested => !started && !healthy && !normal && !confirmed,
             TrialPhase::ObservingTrial => started && !healthy && !normal && !confirmed,
             TrialPhase::PromotingStaged | TrialPhase::StagedDefault => {
                 started && healthy && !normal && !confirmed
@@ -177,8 +186,15 @@ impl TrialRecord {
             TrialPhase::NormalConfirmed => started && healthy && normal && confirmed,
             TrialPhase::Failed => !confirmed,
         };
-        if self.schema != 1
+        if self.schema != 2
             || !shape
+            || (!matches!(self.phase, TrialPhase::Staging | TrialPhase::TrialReady) && !requested)
+            || self
+                .request_boot_id
+                .as_ref()
+                .is_some_and(|id| !crate::recovery::boot_id(id))
+            || (self.failure == Some(TrialFailure::ActivationRequestFailed)
+                && (started || healthy || normal || confirmed))
             || (self.phase == TrialPhase::Failed) != self.failure.is_some()
             || !valid_boot(&self.trial_boot_id)
             || !valid_boot(&self.normal_boot_id)
@@ -191,11 +207,49 @@ impl TrialRecord {
         Ok(())
     }
 
+    pub(super) fn request(&mut self, boot_id: &str) -> Result<()> {
+        self.validate()?;
+        if self.phase != TrialPhase::TrialReady || !crate::recovery::boot_id(boot_id) {
+            return Err(invalid(
+                "bootstrap activation requires an unused ready attempt",
+            ));
+        }
+        self.request_boot_id = Some(boot_id.into());
+        self.phase = TrialPhase::TrialRequested;
+        self.validate()
+    }
+
+    pub(super) fn authorize_request(&self, boot_id: &str) -> Result<()> {
+        self.validate()?;
+        if self.phase != TrialPhase::TrialRequested
+            || self.request_boot_id.as_deref() != Some(boot_id)
+        {
+            return Err(invalid(
+                "bootstrap reboot request is not authorized for this boot",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn fail_request(&mut self, boot_id: &str) -> Result<()> {
+        if self.phase == TrialPhase::Failed
+            && self.failure == Some(TrialFailure::ActivationRequestFailed)
+            && self.request_boot_id.as_deref() == Some(boot_id)
+        {
+            return self.validate();
+        }
+        self.authorize_request(boot_id)?;
+        self.phase = TrialPhase::Failed;
+        self.failure = Some(TrialFailure::ActivationRequestFailed);
+        self.validate()
+    }
+
     pub(super) fn check_boot(&self, boot: &BootObservation) -> Result<()> {
         self.validate()?;
         if boot.binding != self.inputs.boot_binding()
             || !crate::recovery::boot_id(&boot.boot_id)
             || boot.boot_id == self.inputs.origin_boot_id
+            || self.request_boot_id.as_ref() == Some(&boot.boot_id)
             || boot.actual_slot != Some(self.inputs.plan.target)
             || boot.actual_build_id.as_deref() != Some(self.inputs.image.build_id.as_str())
             || boot.recovery_protocol != self.inputs.image.recovery_protocol

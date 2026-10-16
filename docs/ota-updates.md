@@ -397,8 +397,12 @@ watchdog completion, followed by a separate normal-boot health check. Package
 schema 3 requires that runtime capability and the updated fallback-root helpers.
 The root-operator boot-staging command now rechecks the completed inactive image,
 publishes a durable staging intent, and adds the temporary boot tree and trial
-file while retaining the normal default. One-shot activation and canonical
-migration tools remain pending, and neither Pi has undergone this migration. These tools do not
+file while retaining the normal default. The root-only activation command now
+revalidates that ready stage, durably consumes the attempt, then requests the
+fixed one-shot reboot through systemd. Request failures never reset the attempt;
+lost replies and interrupted cleanup require operator reconciliation. Bootstrap
+protocol 2 binds the requesting boot separately from staging and trial boots.
+Canonical migration remains pending, and neither Pi has undergone this migration. These tools do not
 initialize a production recovery baseline or enable automatic updates. The
 [bootstrap preparation and remaining migration steps](ota-bootstrap.md)
 describe the package layout, reproduction commands and supervised boundary.

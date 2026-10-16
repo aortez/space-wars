@@ -206,6 +206,11 @@ impl TrialStore {
         Ok(&self.record)
     }
 
+    pub(super) fn active_directory(&self) -> Result<&File> {
+        self.check()?;
+        Ok(&self.active)
+    }
+
     pub(super) fn advance<T>(
         &mut self,
         transition: impl FnOnce(&mut TrialRecord) -> Result<T>,

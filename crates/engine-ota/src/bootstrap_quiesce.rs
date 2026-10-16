@@ -26,10 +26,21 @@ const HELPERS: &[&[u8]] = &[
 pub(super) struct QuietRuntime {
     directory: File,
     lock: File,
+    activation_pid: Option<u32>,
 }
 
 impl QuietRuntime {
     pub(super) fn acquire() -> Result<Self> {
+        Self::acquire_mode(None)
+    }
+
+    /// Only the current root process's exact activation subcommand may pass
+    /// the manager-name check. Thread UIDs and block descriptors are still checked.
+    pub(super) fn for_activation() -> Result<Self> {
+        Self::acquire_mode(Some(std::process::id()))
+    }
+
+    fn acquire_mode(activation_pid: Option<u32>) -> Result<Self> {
         if unsafe { libc::geteuid() } != 0 {
             return Err(invalid("legacy migration requires a root operator"));
         }
@@ -56,7 +67,11 @@ impl QuietRuntime {
                 error.into()
             });
         }
-        let guard = Self { directory, lock };
+        let guard = Self {
+            directory,
+            lock,
+            activation_pid,
+        };
         guard.check()?;
         Ok(guard)
     }
@@ -76,7 +91,7 @@ impl QuietRuntime {
         }
         let proc = File::open("/proc")?;
         let allowed = target.map(OwnedTarget::from_file).transpose()?;
-        inspect(&proc, allowed.as_ref())
+        inspect(&proc, allowed.as_ref(), self.activation_pid)
     }
 }
 
@@ -163,7 +178,7 @@ fn same_inode(a: &File, b: &File) -> Result<bool> {
     Ok(a.metadata()?.dev() == b.metadata()?.dev() && a.metadata()?.ino() == b.metadata()?.ino())
 }
 
-fn inspect(proc: &File, allowed: Option<&OwnedTarget>) -> Result<()> {
+fn inspect(proc: &File, allowed: Option<&OwnedTarget>, activation_pid: Option<u32>) -> Result<()> {
     let mut count = 0;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", proc.as_raw_fd()))? {
         let name = entry?.file_name();
@@ -183,7 +198,7 @@ fn inspect(proc: &File, allowed: Option<&OwnedTarget>) -> Result<()> {
             Err(e) => return Err(e),
         };
         let pid = pid.parse().map_err(|_| invalid("invalid process number"))?;
-        match inspect_process(&process, pid, allowed) {
+        match inspect_process(&process, pid, allowed, activation_pid) {
             Ok(()) => (),
             // A process exiting during inspection is no longer a writer.
             Err(Error::Io(e))
@@ -195,7 +210,12 @@ fn inspect(proc: &File, allowed: Option<&OwnedTarget>) -> Result<()> {
     Ok(())
 }
 
-fn inspect_process(process: &File, pid: u32, allowed: Option<&OwnedTarget>) -> Result<()> {
+fn inspect_process(
+    process: &File,
+    pid: u32,
+    allowed: Option<&OwnedTarget>,
+    activation_pid: Option<u32>,
+) -> Result<()> {
     let tasks = open_at(process, "task", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     let mut count = 0;
     for entry in fs::read_dir(format!("/proc/self/fd/{}", tasks.as_raw_fd()))? {
@@ -221,8 +241,15 @@ fn inspect_process(process: &File, pid: u32, allowed: Option<&OwnedTarget>) -> R
         }
     }
     let command = bounded(process, "cmdline")?;
+    let mut arguments = command.split(|b| *b == 0);
+    let own_activation = activation_pid == Some(pid)
+        && arguments.next().is_some_and(|arg| {
+            arg.rsplit(|b| *b == b'/').next() == Some(b"engine-os-manager".as_slice())
+        })
+        && arguments.next() == Some(b"bootstrap-activate".as_slice());
     if command
         .split(|b| *b == 0)
+        .skip(usize::from(own_activation))
         .any(|arg| HELPERS.contains(&arg.rsplit(|b| *b == b'/').next().unwrap_or(b"")))
     {
         return Err(invalid(
@@ -415,21 +442,42 @@ mod tests {
             inode: 0,
             raw_device: 0,
         };
-        inspect(&proc, None).unwrap();
+        inspect(&proc, None, None).unwrap();
         for helper in HELPERS {
             fs::write(
                 process.join("cmdline"),
                 [b"/bin/bash\0/usr/sbin/".as_slice(), helper, b"\0"].concat(),
             )
             .unwrap();
-            assert!(inspect(&proc, None).is_err());
-            assert!(inspect(&proc, Some(&claimed)).is_err());
+            assert!(inspect(&proc, None, None).is_err());
+            assert!(inspect(&proc, Some(&claimed), None).is_err());
+        }
+        // A manager-hosted activation is permitted only for the selected
+        // current PID, never an existing daemon or another activation process.
+        fs::write(
+            process.join("cmdline"),
+            b"/usr/bin/engine-os-manager\0bootstrap-activate\0--package\0digest\0",
+        )
+        .unwrap();
+        assert!(inspect(&proc, None, None).is_err());
+        assert!(inspect(&proc, None, Some(124)).is_err());
+        inspect(&proc, None, Some(123)).unwrap();
+        fs::write(process.join("task/456/status"), b"Uid: 0 0 1000 0\n").unwrap();
+        assert!(inspect(&proc, None, Some(123)).is_err());
+        fs::write(process.join("task/456/status"), b"Uid: 0 0 0 0\n").unwrap();
+        for command in [
+            b"/usr/bin/engine-os-manager\0serve\0".as_slice(),
+            b"/bin/bash\0engine-os-manager\0bootstrap-activate\0",
+            b"engine-os-manager\0bootstrap-activate\0ab-update\0",
+        ] {
+            fs::write(process.join("cmdline"), command).unwrap();
+            assert!(inspect(&proc, None, Some(123)).is_err());
         }
         fs::write(process.join("cmdline"), b"sshd\0root@pts/1\0").unwrap();
         fs::write(process.join("task/456/status"), b"Uid: 0 0 1000 0\n").unwrap();
-        assert!(inspect(&proc, None).is_err());
-        assert!(inspect(&proc, Some(&claimed)).is_err());
+        assert!(inspect(&proc, None, None).is_err());
+        assert!(inspect(&proc, Some(&claimed), None).is_err());
         fs::remove_dir_all(process.join("task/456")).unwrap();
-        inspect(&proc, None).unwrap();
+        inspect(&proc, None, None).unwrap();
     }
 }

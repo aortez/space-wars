@@ -12,6 +12,17 @@ fn runtime_identity_cannot_invoke_root_maintenance() {
         vec!["maintenance", "import-root-keys"],
         vec!["maintenance", "fast", "--check"],
         vec!["maintenance", "renderer", "gpu"],
+        vec![
+            "bootstrap-activate",
+            "--package",
+            "invalid",
+            "--written-root",
+            "invalid",
+            "--trial",
+            "invalid",
+            "--ssh-connection",
+            "invalid",
+        ],
     ] {
         let result = std::process::Command::new(env!("CARGO_BIN_EXE_engine-os-manager"))
             .args(args)

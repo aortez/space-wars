@@ -63,6 +63,10 @@ fn staging_requires_an_existing_completed_root_receipt_without_creating_or_repai
         completed(&fixture.active, fixture.owner, &image().inputs).unwrap(),
         report.journal_sha256
     );
+    assert_eq!(
+        read_completed(&fixture.active, fixture.owner).unwrap(),
+        (image().inputs.clone(), report.journal_sha256)
+    );
     let mut changed = image().inputs.clone();
     changed.package_sha256 = Sha256::digest(b"another package");
     assert!(completed(&fixture.active, fixture.owner, &changed).is_err());

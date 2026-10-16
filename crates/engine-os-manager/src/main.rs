@@ -10,6 +10,19 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Request one supervised tryboot of an already staged bootstrap image.
+    /// Root operator only; consumes the attempt even if the reboot reply is lost.
+    BootstrapActivate {
+        #[arg(long)]
+        package: String,
+        #[arg(long)]
+        written_root: String,
+        #[arg(long)]
+        trial: String,
+        /// The four original SSH_CONNECTION fields, quoted as one argument.
+        #[arg(long)]
+        ssh_connection: String,
+    },
     /// Run the root-owned device service (normally started by systemd).
     Serve,
     /// Reconcile an existing recovery journal and observe a trial boot.
@@ -82,6 +95,25 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::BootstrapActivate {
+            package,
+            written_root,
+            trial,
+            ssh_connection,
+        } => {
+            daemon::require_root()?;
+            let digest = |value: String| {
+                engine_ota::Sha256::try_from(value)
+                    .map_err(|cause| engine_os_manager::Error::Invalid(cause.into()))
+            };
+            let report = engine_os_manager::bootstrap_activation::activate(
+                digest(package)?,
+                digest(written_root)?,
+                digest(trial)?,
+                &ssh_connection,
+            )?;
+            println!("{}", serde_json::to_string(&report)?);
+        }
         Command::Status => println!(
             "{}",
             serde_json::to_string_pretty(&service::read_status(SOCKET_PATH.as_ref())?)?
