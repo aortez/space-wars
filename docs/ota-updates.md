@@ -23,7 +23,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Policy/hold persistence and read-only radio probing implemented; serialized radio control, setup/deployment integration and offline scheduling remain |
+| #258–#260 | Policy/hold persistence, serialized radio controller and Wi-Fi-only D-Bus adapter implemented; session protection, service/setup/deployment integration and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
@@ -176,16 +176,53 @@ busy or stale observations prevent shutdown intent.
 without scanning, activating connections or changing settings. It pins the
 root-owned unique bus name, compares two uncached snapshots and rechecks the
 owner, with one five-second overall deadline. Replies, property counts and
-checkpoint inventories are bounded. Output distinguishes global networking,
+checkpoint inventories are bounded. It also brackets the snapshots with the
+[settings revision counter](https://networkmanager.dev/docs/api/1.46.0/gdbus-org.freedesktop.NetworkManager.Settings.html)
+and reports an activated primary Ethernet connection without reading profile
+credentials. Output distinguishes global networking,
 software radio enablement and hardware enablement; these are not evidence of
 a usable Wi-Fi connection.
 
-**Integration remains incomplete:** `serve` does not yet load this policy or
-admit holds. The serialized radio adapter, persistent ownership of radio changes,
-external-change reconciliation, complete SSH/session observer, socket controls,
-setup lifecycle and deployment hooks remain required. The library's intent is
-not a radio-write capability, and reserving a lease does not acknowledge actual
-availability. No automatic radio change is enabled by these additions.
+`network_controller::Controller` serializes policy changes, lease admission and
+radio transitions. Before a write it saves the intended change in the same
+durable record as policy and deployment holds. It records a successful method
+reply separately from matching readback; only the latter confirms radio
+ownership. Disabling partial offline mode restores a policy-owned shutdown,
+while mode Off leaves an independently disabled radio alone. Time-check and
+download holds may use an already activated primary Ethernet connection without
+waking Wi-Fi. Admission reports radio/network availability, not Internet access
+or a successful Wi-Fi association.
+
+A hold queued during shutdown waits for restoration and readback before success.
+Failed restoration, expired ownership or unknown observations cannot acknowledge
+availability. A transport/preflight failure known to precede dispatch may retry;
+it does not invent a pending command. Ambiguous writes remain pending across
+service restart; an explicit
+resume cannot clear an unanswered command in the same boot. A new boot fences
+that request, after which explicit reconciliation is allowed. Returned commands
+can finish reconciliation after a temporarily unavailable readback. Observed
+external radio/profile changes or a changed NetworkManager owner suspend further
+automatic toggles until explicit resume. On a new boot, matching radio state
+establishes a fresh revision baseline; this does not prove profiles were unchanged
+while the service was absent.
+
+`network_radio::set_wireless` rechecks the observed unique owner, settings revision
+and actual radio/checkpoint state, then sets only `WirelessEnabled`, with a bounded
+deadline. It does not invoke global networking control or change profiles. The
+controller requires a shutdown guard across its final activity check, command and
+readback; an unavailable guard or incomplete live-activity observation defers off.
+The private policy record is now schema 2. These unpublished schema-1/2 policy
+records have not been installed on either kiosk; older records are rejected
+rather than silently reset.
+
+**Integration remains incomplete:** `serve` does not yet load the controller or
+admit holds. The native complete SSH/session observer and admission barrier,
+install guards, continuous radio-change monitoring (including changes reversed
+between polls), socket controls, setup lifecycle and deployment hooks remain
+required. The controller tests supply activity and guards from fixtures; these
+do not qualify physical SSH admission. Expected profile changes from the setup
+worker still need coordination with the observer. No automatic radio change is
+enabled in the runtime service by these additions.
 
 The implementation at `7dde8ca` passed all 53 manager tests with temporary files
 on host ext4, Clippy, Rust 1.89, formatting and AArch64 compilation. Its 13 new

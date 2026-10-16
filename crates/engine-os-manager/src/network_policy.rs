@@ -1,6 +1,7 @@
 //! Saved Wi-Fi intent and bounded connection ownership for the device service.
 //! Decisions are policy intent, not permission to write NetworkManager: the
 //! serialized radio adapter must still recheck actual state and live operations.
+use crate::network_radio_state::RadioState;
 use crate::{Error, Result};
 use engine_ota::Sha256;
 use serde::{Deserialize, Serialize};
@@ -93,7 +94,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn valid(&self) -> bool {
+    pub(crate) fn valid(&self) -> bool {
         self.boot_id.len() == 36
             && self.boot_id.bytes().enumerate().all(|(i, b)| {
                 if [8, 13, 18, 23].contains(&i) {
@@ -128,19 +129,21 @@ struct Record {
     generation: u64,
     policy: Policy,
     deployments: Vec<Deployment>,
+    radio: RadioState,
 }
 
 impl Record {
     fn initial() -> Self {
         Self {
-            schema: 1,
+            schema: 2,
             ..Self::default()
         }
     }
 
     fn validate(&self) -> Result<()> {
         let mut ids = std::collections::BTreeSet::new();
-        if self.schema != 1
+        self.radio.validate()?;
+        if self.schema != 2
             || self.deployments.len() > MAX_DEPLOYMENTS
             || self.deployments.iter().any(|hold| {
                 !ids.insert(hold.id)
@@ -298,6 +301,51 @@ impl NetworkPolicy {
         self.store.save(&next)?;
         self.record = next;
         Ok(())
+    }
+
+    pub(crate) fn radio(&mut self, clock: &Clock) -> Result<RadioState> {
+        self.check(clock)?;
+        Ok(self.record.radio.clone())
+    }
+
+    pub(crate) fn save_radio(&mut self, radio: RadioState, clock: &Clock) -> Result<()> {
+        self.check(clock)?;
+        if self.record.radio != radio {
+            let mut next = self.record.clone();
+            next.radio = radio;
+            self.commit(next)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn reset_quiet(&mut self) {
+        self.quiet_since_ms = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_save_at(&mut self, point: &'static str) {
+        self.store.fail_at = Some(point);
+    }
+
+    pub(crate) fn held_kind(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        clock: &Clock,
+    ) -> Result<HoldKind> {
+        self.check(clock)?;
+        let id = token.id();
+        if let Some(hold) = self.temporary.get(&id) {
+            if hold.caller == caller && hold.expires_ms > clock.ms {
+                return Ok(hold.kind);
+            }
+        } else if let Some(hold) = self.record.deployments.iter().find(|hold| hold.id == id)
+            && hold.uid == caller.uid
+            && hold.expires_ms > clock.ms
+        {
+            return Ok(HoldKind::Deployment);
+        }
+        Err(invalid("network hold is not live for this caller"))
     }
 
     pub fn set_policy(&mut self, generation: u64, policy: Policy, clock: &Clock) -> Result<()> {

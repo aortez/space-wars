@@ -41,6 +41,12 @@ struct Fixture {
     slow: AtomicBool,
     reads: AtomicU32,
     mutations: AtomicU32,
+    profile_changes: AtomicBool,
+    revision_reads: AtomicU32,
+    controls: AtomicBool,
+    radio_off: AtomicBool,
+    deny_write: AtomicBool,
+    slow_write: AtomicBool,
 }
 struct Manager(Arc<Fixture>);
 #[zbus::interface(name = "org.freedesktop.NetworkManager")]
@@ -55,11 +61,12 @@ impl Manager {
             async_io::Timer::after(Duration::from_secs(2)).await;
         }
         let reads = self.0.reads.fetch_add(1, Ordering::SeqCst);
-        !self.0.unstable.load(Ordering::SeqCst) || reads.is_multiple_of(2)
+        !self.0.radio_off.load(Ordering::SeqCst)
+            && (!self.0.unstable.load(Ordering::SeqCst) || reads.is_multiple_of(2))
     }
     #[zbus(property)]
     fn wireless_hardware_enabled(&self) -> bool {
-        false
+        self.0.controls.load(Ordering::SeqCst)
     }
     #[zbus(property)]
     fn startup(&self) -> bool {
@@ -67,6 +74,9 @@ impl Manager {
     }
     #[zbus(property)]
     fn checkpoints(&self) -> Vec<OwnedObjectPath> {
+        if self.0.controls.load(Ordering::SeqCst) {
+            return Vec::new();
+        }
         vec![
             "/org/freedesktop/NetworkManager/Checkpoint/1"
                 .try_into()
@@ -77,12 +87,158 @@ impl Manager {
     fn state(&self) -> u32 {
         70
     }
+    #[zbus(property)]
+    fn primary_connection_type(&self) -> &str {
+        "802-3-ethernet"
+    }
     fn enable(&self, _enabled: bool) {
         self.0.mutations.fetch_add(1, Ordering::SeqCst);
     }
     #[zbus(property)]
-    fn set_wireless_enabled(&mut self, _enabled: bool) {
+    async fn set_wireless_enabled(&mut self, enabled: bool) -> zbus::fdo::Result<()> {
+        if self.0.deny_write.load(Ordering::SeqCst) {
+            return Err(zbus::fdo::Error::AccessDenied(
+                "private fixture denial".into(),
+            ));
+        }
+        if self.0.slow_write.load(Ordering::SeqCst) {
+            async_io::Timer::after(Duration::from_secs(2)).await;
+        }
         self.0.mutations.fetch_add(1, Ordering::SeqCst);
+        self.0.radio_off.store(!enabled, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+async fn server(bus: &PrivateBus, fixture: &Arc<Fixture>) -> zbus::Connection {
+    zbus::connection::Builder::address(bus.1.as_str())
+        .unwrap()
+        .name(NAME)
+        .unwrap()
+        .serve_at(OBJECT, Manager(fixture.clone()))
+        .unwrap()
+        .serve_at(
+            "/org/freedesktop/NetworkManager/Settings",
+            Settings(fixture.clone()),
+        )
+        .unwrap()
+        .build()
+        .await
+        .unwrap()
+}
+
+#[test]
+fn wireless_only_command_checks_owner_revision_hardware_and_permission() {
+    use crate::network_controller::WriteResult;
+    use crate::network_radio::write;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        let _server = server(&bus, &fixture).await;
+        let client = bus.connect().await;
+        let uid = unsafe { libc::geteuid() };
+        let before = connection_observation(&client, uid).await.unwrap();
+        for field in ["owner", "revision", "pid"] {
+            let mut stale = before.clone();
+            match field {
+                "owner" => stale.bus_owner = ":1.999999".into(),
+                "revision" => stale.settings_version += 1,
+                "pid" => stale.pid += 1,
+                _ => unreachable!(),
+            }
+            assert_eq!(
+                write(&client, uid, &stale, false).await.unwrap(),
+                WriteResult::Rejected
+            );
+        }
+        assert_eq!(
+            write(&client, uid.wrapping_add(1), &before, false)
+                .await
+                .unwrap(),
+            WriteResult::NotSubmitted
+        );
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            write(&client, uid, &before, false).await.unwrap(),
+            WriteResult::Returned
+        );
+        let off = connection_observation(&client, uid).await.unwrap();
+        assert!(!off.wireless_enabled);
+        assert!(off.networking_enabled && off.ethernet_available);
+        assert_eq!(off.settings_version, before.settings_version);
+        assert_eq!(
+            write(&client, uid, &before, true).await.unwrap(),
+            WriteResult::Rejected
+        );
+        assert_eq!(
+            write(&client, uid, &off, true).await.unwrap(),
+            WriteResult::Returned
+        );
+        let on = connection_observation(&client, uid).await.unwrap();
+        assert!(on.wireless_enabled);
+        fixture.deny_write.store(true, Ordering::SeqCst);
+        assert_eq!(
+            write(&client, uid, &on, false).await.unwrap(),
+            WriteResult::Rejected
+        );
+        assert!(
+            connection_observation(&client, uid)
+                .await
+                .unwrap()
+                .wireless_enabled
+        );
+        fixture.controls.store(false, Ordering::SeqCst);
+        let blocked = connection_observation(&client, uid).await.unwrap();
+        assert_eq!(
+            write(&client, uid, &blocked, false).await.unwrap(),
+            WriteResult::Rejected
+        );
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 2);
+    });
+}
+
+#[test]
+fn timed_out_dbus_write_can_still_execute_and_is_not_a_rejection() {
+    use crate::network_radio::write;
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        let _server = server(&bus, &fixture).await;
+        let client = bus.connect().await;
+        let uid = unsafe { libc::geteuid() };
+        let before = connection_observation(&client, uid).await.unwrap();
+        fixture.slow_write.store(true, Ordering::SeqCst);
+        let started = std::time::Instant::now();
+        assert!(
+            bounded(
+                Duration::from_millis(30),
+                write(&client, uid, &before, false)
+            )
+            .await
+            .is_err()
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
+        let after = bounded(Duration::from_secs(3), connection_observation(&client, uid))
+            .await
+            .unwrap();
+        assert!(!after.wireless_enabled);
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 1);
+    });
+}
+
+struct Settings(Arc<Fixture>);
+#[zbus::interface(name = "org.freedesktop.NetworkManager.Settings")]
+impl Settings {
+    #[zbus(property, name = "VersionId")]
+    fn version_id(&self) -> u64 {
+        let count = self.0.revision_reads.fetch_add(1, Ordering::SeqCst);
+        7 + if self.0.profile_changes.load(Ordering::SeqCst) {
+            u64::from(count)
+        } else {
+            0
+        }
     }
 }
 
@@ -97,6 +253,11 @@ fn actual_private_bus_reports_radio_and_checkpoint_state_without_mutations() {
             .unwrap()
             .serve_at(OBJECT, Manager(fixture.clone()))
             .unwrap()
+            .serve_at(
+                "/org/freedesktop/NetworkManager/Settings",
+                Settings(fixture.clone()),
+            )
+            .unwrap()
             .build()
             .await
             .unwrap();
@@ -109,12 +270,17 @@ fn actual_private_bus_reports_radio_and_checkpoint_state_without_mutations() {
         assert!(!observed.wireless_hardware_enabled);
         assert_eq!(observed.checkpoint_count, 1);
         assert_eq!(observed.state, 70);
+        assert!(observed.ethernet_available);
+        assert_eq!(observed.settings_version, 7);
         assert_eq!(observed.bus_owner, server.unique_name().unwrap().as_str());
         assert!(
             connection_observation(&client, uid.wrapping_add(1))
                 .await
                 .is_err()
         );
+        fixture.profile_changes.store(true, Ordering::SeqCst);
+        assert!(connection_observation(&client, uid).await.is_err());
+        fixture.profile_changes.store(false, Ordering::SeqCst);
         fixture.unstable.store(true, Ordering::SeqCst);
         assert!(connection_observation(&client, uid).await.is_err());
         fixture.slow.store(true, Ordering::SeqCst);
@@ -139,6 +305,10 @@ fn values() -> HashMap<String, OwnedValue> {
         ("WirelessHardwareEnabled".into(), true.into()),
         ("Startup".into(), false.into()),
         ("State".into(), 30u32.into()),
+        (
+            "PrimaryConnectionType".into(),
+            zbus::zvariant::Str::from("802-11-wireless").into(),
+        ),
     ]);
     values.insert(
         "Checkpoints".into(),
@@ -156,6 +326,7 @@ fn missing_malformed_or_unbounded_properties_cannot_imply_an_idle_radio() {
         "WirelessHardwareEnabled",
         "Startup",
         "State",
+        "PrimaryConnectionType",
         "Checkpoints",
     ] {
         let mut input = values();
@@ -168,6 +339,14 @@ fn missing_malformed_or_unbounded_properties_cannot_imply_an_idle_radio() {
     let mut input = values();
     input.insert("State".into(), 999u32.into());
     assert!(parse(input).is_err());
+    for value in ["x".repeat(65), "ethernet\n".into(), "../device".into()] {
+        let mut input = values();
+        input.insert(
+            "PrimaryConnectionType".into(),
+            zbus::zvariant::Str::from(value.as_str()).into(),
+        );
+        assert!(parse(input).is_err());
+    }
     for paths in [
         vec!["/foreign"],
         vec!["/org/freedesktop/NetworkManager/Checkpoint/1"; 2],

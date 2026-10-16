@@ -22,6 +22,9 @@ pub struct Observation {
     pub checkpoint_count: usize,
     /// NetworkManager's overall state, not a claim that Wi-Fi is connected.
     pub state: u32,
+    pub settings_version: u64,
+    /// An activated primary Ethernet connection; not proof of Internet access.
+    pub ethernet_available: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -32,6 +35,7 @@ struct Properties {
     startup: bool,
     checkpoints: Vec<OwnedObjectPath>,
     state: u32,
+    primary_type: String,
 }
 
 fn parse(mut values: HashMap<String, OwnedValue>) -> Result<Properties> {
@@ -78,6 +82,20 @@ fn parse(mut values: HashMap<String, OwnedValue>) -> Result<Properties> {
     if ![0, 10, 20, 30, 40, 50, 60, 70].contains(&state) {
         return Err(invalid("unsupported NetworkManager state"));
     }
+    let primary_type: String = values
+        .remove("PrimaryConnectionType")
+        .ok_or_else(|| invalid("NetworkManager omitted its primary connection type"))?
+        .try_into()
+        .map_err(|_| invalid("NetworkManager primary connection type is invalid"))?;
+    if primary_type.len() > 64
+        || !primary_type
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
+        return Err(invalid(
+            "NetworkManager primary connection type exceeds bounds",
+        ));
+    }
     Ok(Properties {
         networking,
         wireless,
@@ -85,7 +103,35 @@ fn parse(mut values: HashMap<String, OwnedValue>) -> Result<Properties> {
         startup,
         checkpoints,
         state,
+        primary_type,
     })
+}
+
+async fn settings_version(connection: &zbus::Connection, owner: &str) -> Result<u64> {
+    let proxy = zbus::Proxy::new(
+        connection,
+        owner,
+        "/org/freedesktop/NetworkManager/Settings",
+        "org.freedesktop.DBus.Properties",
+    )
+    .await
+    .map_err(bus_error)?;
+    let reply = proxy
+        .call_method(
+            "Get",
+            &("org.freedesktop.NetworkManager.Settings", "VersionId"),
+        )
+        .await
+        .map_err(bus_error)?;
+    if reply.data().len() > 4096 {
+        return Err(invalid(
+            "NetworkManager settings revision reply exceeds limit",
+        ));
+    }
+    let value: OwnedValue = reply.body().deserialize().map_err(bus_error)?;
+    value
+        .try_into()
+        .map_err(|_| invalid("NetworkManager settings revision is unavailable"))
 }
 
 async fn properties(connection: &zbus::Connection, owner: &str) -> Result<Properties> {
@@ -102,7 +148,7 @@ async fn properties(connection: &zbus::Connection, owner: &str) -> Result<Proper
     parse(reply.body().deserialize().map_err(bus_error)?)
 }
 
-async fn connection_observation(
+pub(crate) async fn connection_observation(
     connection: &zbus::Connection,
     expected_uid: u32,
 ) -> Result<Observation> {
@@ -124,9 +170,11 @@ async fn connection_observation(
     if uid != expected_uid || pid == 0 {
         return Err(invalid("NetworkManager has an unexpected owner"));
     }
+    let revision = settings_version(connection, owner.as_str()).await?;
     let first = properties(connection, owner.as_str()).await?;
     let second = properties(connection, owner.as_str()).await?;
     if first != second
+        || revision != settings_version(connection, owner.as_str()).await?
         || bus
             .get_name_owner(NAME.try_into().map_err(bus_error)?)
             .await
@@ -145,10 +193,14 @@ async fn connection_observation(
         startup: first.startup,
         checkpoint_count: first.checkpoints.len(),
         state: first.state,
+        settings_version: revision,
+        ethernet_available: first.networking
+            && first.state >= 50
+            && first.primary_type == "802-3-ethernet",
     })
 }
 
-async fn bounded<T>(
+pub(crate) async fn bounded<T>(
     duration: Duration,
     task: impl std::future::Future<Output = Result<T>>,
 ) -> Result<T> {
@@ -174,7 +226,7 @@ pub fn observe() -> Result<Observation> {
 fn invalid(value: &str) -> Error {
     Error::Invalid(value.into())
 }
-fn bus_error(_: impl std::fmt::Display) -> Error {
+pub(crate) fn bus_error(_: impl std::fmt::Display) -> Error {
     // D-Bus errors can include arbitrary peer text; status must not echo it.
     invalid("NetworkManager observation is unavailable")
 }
