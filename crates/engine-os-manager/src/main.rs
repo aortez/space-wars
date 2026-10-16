@@ -52,6 +52,8 @@ enum Command {
     },
     /// Read a bounded JSON status snapshot independently of the game client.
     Status,
+    /// Queue one bounded OS time check; repeated requests join active work.
+    SyncNow,
     /// Inspect the current time provider without changing clocks or state.
     Probe,
     /// Read NetworkManager radio/checkpoint state without changing connectivity.
@@ -159,6 +161,10 @@ fn run(_args: Args) -> engine_os_manager::Result<()> {
 fn run(args: Args) -> engine_os_manager::Result<()> {
     use engine_os_manager::{RTC_BOOT_PATH, SOCKET_PATH, linux, service};
     match args.command {
+        Command::SyncNow => println!(
+            "{}",
+            serde_json::to_string(&service::sync_now(SOCKET_PATH.as_ref())?)?
+        ),
         Command::BootstrapCanonical {
             package,
             written_root,
@@ -476,20 +482,30 @@ mod daemon {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
+        // Separate workers own radio and time-check IO. Neither blocks the
+        // accepted-time observer or the local read-only status response.
+        let network = engine_os_manager::network_runtime::spawn();
+        let time_checks = engine_os_manager::time_runtime::spawn(
+            shared.clone(),
+            network.watch(),
+            boot_id.clone(),
+        );
+        let checks = time_checks.handle();
+        let sync = checks.clone();
         let reader = shared.clone();
-        let _server = StatusServer::bind(
+        let _server = StatusServer::bind_with_sync(
             SOCKET_PATH.as_ref(),
             1000,
             Arc::new(move || {
-                reader
+                let mut status = reader
                     .lock()
                     .map_err(|_| Error::Invalid("device observation unavailable".into()))?
-                    .status()
+                    .status()?;
+                status.time_check = Some(checks.status()?);
+                Ok(status)
             }),
+            Some(Arc::new(move || sync.sync_now())),
         )?;
-        // Radio observations and commands run on their own coordinator thread.
-        // A corrupt network store must not stop independent time observation.
-        let _network = engine_os_manager::network_runtime::spawn();
         let mut rtc_worker: Option<RtcWorker> = None;
         let mut save_retry = Instant::now();
         let mut save_delay = Duration::from_secs(15);

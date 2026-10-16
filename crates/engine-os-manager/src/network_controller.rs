@@ -67,6 +67,7 @@ pub struct Transition {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Status {
+    pub observed: Clock,
     pub policy: network_policy::Status,
     pub actual: Option<Observation>,
     pub activity: Option<Activity>,
@@ -104,6 +105,7 @@ pub struct Controller<B: Backend> {
     policy: NetworkPolicy,
     backend: B,
     actual: Option<Observation>,
+    observed_clock: Option<Clock>,
     activity: Option<Activity>,
     deferred: Option<Deferred>,
 }
@@ -115,6 +117,7 @@ impl<B: Backend> Controller<B> {
             policy,
             backend,
             actual: None,
+            observed_clock: None,
             activity: None,
             deferred: None,
         })
@@ -146,6 +149,30 @@ impl<B: Backend> Controller<B> {
     pub fn renew(&mut self, token: &HoldToken, caller: Caller) -> Result<Admission> {
         let clock = self.backend.clock()?;
         self.policy.renew(token, caller, &clock)?;
+        self.admission(token, caller)
+    }
+
+    pub fn admit_time(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        deadline: &Clock,
+        admission_deadline_ms: u64,
+        mode_generation: Option<u64>,
+        wireless_required: bool,
+    ) -> Result<Admission> {
+        let clock = self.backend.clock()?;
+        self.policy.reserve_time(
+            token,
+            caller,
+            &clock,
+            deadline,
+            admission_deadline_ms,
+            mode_generation,
+        )?;
+        if wireless_required {
+            self.policy.require_wireless(token, caller, &clock)?;
+        }
         self.admission(token, caller)
     }
 
@@ -352,6 +379,7 @@ impl<B: Backend> Controller<B> {
 
     fn snapshot(&mut self) -> Result<Option<Snapshot>> {
         self.actual = None;
+        self.observed_clock = None;
         self.activity = None;
         self.deferred = None;
         let mut snapshot = match self.backend.snapshot() {
@@ -367,6 +395,7 @@ impl<B: Backend> Controller<B> {
         snapshot.activity.checkpoints = Some(snapshot.radio.checkpoint_count != 0);
         self.policy.observe(snapshot.activity, &snapshot.clock)?;
         self.actual = Some(snapshot.radio.clone());
+        self.observed_clock = Some(snapshot.clock.clone());
         self.activity = Some(snapshot.activity);
         Ok(Some(snapshot))
     }
@@ -428,9 +457,10 @@ impl<B: Backend> Controller<B> {
         }
         if status.policy.stay_connected
             || status.holds.iter().any(|hold| {
-                hold.wireless_required
-                    || !any_network(hold.kind)
-                    || !snapshot.radio.ethernet_available
+                hold.expires_in_ms > 0
+                    && (hold.wireless_required
+                        || !any_network(hold.kind)
+                        || !snapshot.radio.ethernet_available)
             })
         {
             return Ok(Some(true));
@@ -442,6 +472,7 @@ impl<B: Backend> Controller<B> {
         let clock = self.backend.clock()?;
         let state: RadioState = self.policy.radio(&clock)?;
         Ok(Status {
+            observed: self.observed_clock.clone().unwrap_or_else(|| clock.clone()),
             policy: self.policy.status(&clock)?,
             actual: self.actual.clone(),
             activity: self.activity,

@@ -61,6 +61,7 @@ impl Fake {
                 profile_revision: engine_ota::Sha256::digest(b"profiles"),
                 profile_count: 2,
                 ethernet_available: false,
+                wireless_available: true,
             },
             activity: Activity {
                 ssh_sessions: Some(false),
@@ -493,6 +494,71 @@ fn time_fallback_honors_radio_conflicts_hardware_block_and_mode_off() {
         assert!(controller.require_wireless(&token(), caller()).is_err());
         assert_eq!(fake.calls(), before);
     }
+}
+
+#[test]
+fn delayed_scheduler_admission_cannot_wake_radio_after_admission_or_attempt_expiry() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    controller.tick().unwrap();
+    let mode = controller.status().unwrap().policy.mode_generation;
+    let deadline = Clock {
+        boot_id: BOOT.into(),
+        ms: 230_000,
+    };
+    fake.edit(|w| w.clock.ms = 140_000);
+    assert!(
+        controller
+            .admit_time(
+                &token(),
+                ssh_caller(),
+                &deadline,
+                140_000,
+                Some(mode),
+                false
+            )
+            .is_err()
+    );
+    assert_eq!(fake.calls(), [false]);
+    fake.edit(|w| w.clock.ms = 230_000);
+    assert!(
+        controller
+            .admit_time(
+                &token(),
+                ssh_caller(),
+                &deadline,
+                230_000,
+                Some(mode),
+                false
+            )
+            .is_err()
+    );
+    assert_eq!(fake.calls(), [false]);
+    assert!(controller.status().unwrap().policy.holds.is_empty());
+}
+
+#[test]
+fn expired_retained_holds_protect_existing_activity_without_waking_an_off_radio() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    controller.tick().unwrap();
+    fake.edit(|w| w.radio.ethernet_available = true);
+    controller
+        .admit(&token(), caller(), HoldKind::TimeCheck)
+        .unwrap();
+    fake.edit(|w| {
+        w.clock.ms = 230_000;
+        w.radio.ethernet_available = false;
+        w.activity.operations = None;
+    });
+    let status = controller.tick().unwrap();
+    assert_eq!(status.policy.holds.len(), 1);
+    assert_eq!(status.policy.holds[0].expires_in_ms, 0);
+    assert_eq!(fake.calls(), [false]);
 }
 
 #[test]

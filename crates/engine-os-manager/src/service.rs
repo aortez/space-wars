@@ -29,6 +29,8 @@ pub struct DeviceStatus {
     pub time: TimeStatus,
     #[serde(default)]
     pub recovery: crate::recovery_status::RecoveryStatus,
+    #[serde(default)]
+    pub time_check: Option<crate::time_runtime::Status>,
 }
 
 pub struct ObservedState {
@@ -55,18 +57,21 @@ impl ObservedState {
             rtc_error: self.rtc_error.clone(),
             time: tracker.status(now),
             recovery: crate::recovery_status::read(&self.boot_id, now.boottime_us / 1000),
+            time_check: None,
         })
     }
 }
 
 pub type SharedState = Arc<Mutex<ObservedState>>;
 pub type StatusReader = Arc<dyn Fn() -> Result<DeviceStatus> + Send + Sync>;
+pub type SyncNow = Arc<dyn Fn() -> Result<crate::time_runtime::Accepted> + Send + Sync>;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "command", rename_all = "kebab-case", deny_unknown_fields)]
 enum Request {
     Status { schema: u32 },
     Subscribe { schema: u32, seconds: u16 },
+    SyncNow { schema: u32 },
 }
 
 pub struct StatusServer {
@@ -78,6 +83,15 @@ impl StatusServer {
     /// The parent directory is created by systemd with root:spacewars ownership.
     /// Callers must already own the independent service's exclusive state lock.
     pub fn bind(path: &Path, kiosk_uid: u32, read: StatusReader) -> Result<Self> {
+        Self::bind_with_sync(path, kiosk_uid, read, None)
+    }
+
+    pub fn bind_with_sync(
+        path: &Path,
+        kiosk_uid: u32,
+        read: StatusReader,
+        sync: Option<SyncNow>,
+    ) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         fs::set_permissions(path, fs::Permissions::from_mode(0o660))?;
         listener.set_nonblocking(true)?;
@@ -104,9 +118,10 @@ impl StatusServer {
                             continue;
                         }
                         let read = read.clone();
+                        let sync = sync.clone();
                         let stop = stopped.clone();
                         workers.push(thread::spawn(move || {
-                            let _ = handle(stream, &read, &stop);
+                            let _ = handle(stream, &read, sync.as_ref(), &stop);
                         }));
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -162,7 +177,12 @@ pub(crate) fn peer_credentials(stream: &UnixStream) -> Result<libc::ucred> {
     Ok(credentials)
 }
 
-fn handle(mut stream: UnixStream, read: &StatusReader, stop: &AtomicBool) -> Result<()> {
+fn handle(
+    mut stream: UnixStream,
+    read: &StatusReader,
+    sync: Option<&SyncNow>,
+    stop: &AtomicBool,
+) -> Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     let request = match read_frame(&mut stream, MAX_REQUEST, REQUEST_DEADLINE)
         .and_then(|frame| serde_json::from_slice::<Request>(&frame).map_err(Error::from))
@@ -176,6 +196,18 @@ fn handle(mut stream: UnixStream, read: &StatusReader, stop: &AtomicBool) -> Res
         }
     };
     let seconds = match request {
+        Request::SyncNow { schema: 1 } => {
+            return match sync
+                .filter(|_| !stop.load(Ordering::Relaxed))
+                .and_then(|sync| sync().ok())
+            {
+                Some(accepted) => write_json(&mut stream, &accepted),
+                None => write_json(
+                    &mut stream,
+                    &serde_json::json!({"schema":1,"error":"unavailable"}),
+                ),
+            };
+        }
         Request::Status { schema: 1 } => 0,
         Request::Subscribe { schema: 1, seconds } if (1..=60).contains(&seconds) => seconds,
         _ => {
@@ -234,7 +266,31 @@ pub(crate) fn write_json(stream: &mut UnixStream, value: &impl Serialize) -> Res
 
 /// This diagnostic has no dependency on the UI process or selected scenario.
 pub fn read_status(path: &Path) -> Result<DeviceStatus> {
-    let mut stream = futures_lite::future::block_on(futures_lite::future::or(
+    let mut stream = connect(path)?;
+    stream.write_all(b"{\"schema\":1,\"command\":\"status\"}\n")?;
+    let response = read_frame(&mut stream, MAX_RESPONSE, REQUEST_DEADLINE)?;
+    Ok(serde_json::from_slice(&response)?)
+}
+
+/// Explicit, bounded request to the root-owned service. Acknowledgement means
+/// queued/coalesced; inspect status for a confirmed synchronization afterwards.
+pub fn sync_now(path: &Path) -> Result<crate::time_runtime::Accepted> {
+    let mut stream = connect(path)?;
+    if peer_credentials(&stream)?.uid != 0 {
+        return Err(Error::Invalid("unexpected device service owner".into()));
+    }
+    stream.write_all(b"{\"schema\":1,\"command\":\"sync-now\"}\n")?;
+    let response = read_frame(&mut stream, MAX_RESPONSE, REQUEST_DEADLINE)?;
+    let accepted: crate::time_runtime::Accepted = serde_json::from_slice(&response)
+        .map_err(|_| Error::Invalid("time-check worker unavailable".into()))?;
+    if accepted.schema != 1 {
+        return Err(Error::Invalid("unsupported time-check reply".into()));
+    }
+    Ok(accepted)
+}
+
+fn connect(path: &Path) -> Result<UnixStream> {
+    let stream = futures_lite::future::block_on(futures_lite::future::or(
         async { async_io::Async::<UnixStream>::connect(path).await },
         async {
             async_io::Timer::after(REQUEST_DEADLINE).await;
@@ -247,7 +303,5 @@ pub fn read_status(path: &Path) -> Result<DeviceStatus> {
     .into_inner()?;
     stream.set_nonblocking(false)?;
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
-    stream.write_all(b"{\"schema\":1,\"command\":\"status\"}\n")?;
-    let response = read_frame(&mut stream, MAX_RESPONSE, REQUEST_DEADLINE)?;
-    Ok(serde_json::from_slice(&response)?)
+    Ok(stream)
 }

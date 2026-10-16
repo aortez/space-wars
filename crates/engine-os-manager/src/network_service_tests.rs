@@ -31,6 +31,7 @@ impl Fake {
                 profile_revision: engine_ota::Sha256::digest(b"fixture"),
                 profile_count: 1,
                 ethernet_available: false,
+                wireless_available: true,
             },
             writes: Vec::new(),
             barrier: None,
@@ -123,6 +124,75 @@ fn socket_wireless_fallback_changes_only_the_owned_time_reservation() {
     fake.0.lock().unwrap().ms = 120_000;
     let late = request(&path, &Request::RequireWireless { schema: 1, token }).unwrap();
     assert!(!late["error"].is_null());
+}
+
+#[test]
+fn network_watch_revokes_old_authority_before_a_blocking_policy_mutation() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("state"), fake.clone()).unwrap();
+    let generation = controller.status().unwrap().policy.generation;
+    controller
+        .set_policy(
+            generation,
+            Policy {
+                partial_offline: true,
+                stay_connected: false,
+            },
+        )
+        .unwrap();
+    for ms in (0..=110_000).step_by(1000) {
+        fake.0.lock().unwrap().ms = ms;
+        controller.tick().unwrap();
+    }
+    assert!(!fake.0.lock().unwrap().radio.wireless_enabled);
+    let watch = Watch::default();
+    let _server = NetworkServer::bind_watched(&path, uid(), controller, watch.clone()).unwrap();
+    let before = status(&path);
+    let clock = Clock {
+        boot_id: "11111111-2222-3333-4444-555555555555".into(),
+        ms: 110_000,
+    };
+    assert!(
+        watch
+            .read(&clock)
+            .unwrap()
+            .status
+            .policy
+            .policy
+            .partial_offline
+    );
+    let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+    let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+    fake.0.lock().unwrap().barrier = Some((entered_tx, resume_rx));
+    let work = thread::spawn(move || {
+        request(
+            &path,
+            &Request::SetPolicy {
+                schema: 1,
+                generation: before["status"]["policy"]["generation"].as_u64().unwrap(),
+                policy: Policy::default(),
+            },
+        )
+        .unwrap()
+    });
+    entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert!(
+        watch.read(&clock).is_none(),
+        "provider guard must not see old mode during write"
+    );
+    resume_tx.send(()).unwrap();
+    assert!(work.join().unwrap()["error"].is_null());
+    assert!(
+        !watch
+            .read(&clock)
+            .unwrap()
+            .status
+            .policy
+            .policy
+            .partial_offline
+    );
 }
 
 #[test]
@@ -580,7 +650,7 @@ fn expired_queue_work_and_changed_process_identity_cannot_mutate_policy() {
     let (tx, rx) = mpsc::sync_channel(4);
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = stop.clone();
-    let worker = thread::spawn(move || coordinate(controller, rx, &stopping));
+    let worker = thread::spawn(move || coordinate(controller, rx, &stopping, Watch::default()));
     let identity = Caller {
         uid: uid(),
         pid: std::process::id(),

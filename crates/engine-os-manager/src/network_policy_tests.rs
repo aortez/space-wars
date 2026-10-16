@@ -77,6 +77,193 @@ fn wireless_fallback_preserves_the_time_hold_budget_and_owner() {
         .unwrap();
     assert_eq!(policy.status(&clock(120_000)).unwrap().holds.len(), 1);
 }
+
+#[test]
+fn scheduler_reservations_bind_boot_admission_deadline_mode_and_original_expiry() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+    enable(&mut policy);
+    let root = Caller {
+        uid: 0,
+        ..caller(1)
+    };
+    let mode = policy.status(&clock(0)).unwrap().mode_generation;
+    for (who, end, admit, expected) in [
+        (caller(1), clock(120_000), 30_000, Some(mode)),
+        (
+            root,
+            Clock {
+                boot_id: OTHER_BOOT.into(),
+                ms: 120_000,
+            },
+            30_000,
+            Some(mode),
+        ),
+        (root, clock(120_000), 0, Some(mode)),
+        (root, clock(120_001), 30_000, Some(mode)),
+        (root, clock(120_000), 30_000, Some(mode + 1)),
+    ] {
+        assert!(
+            policy
+                .reserve_time(&token(1), who, &clock(0), &end, admit, expected)
+                .is_err()
+        );
+    }
+    policy
+        .reserve_time(
+            &token(1),
+            root,
+            &clock(20_000),
+            &clock(120_000),
+            30_000,
+            Some(mode),
+        )
+        .unwrap();
+    assert_eq!(
+        policy.status(&clock(20_000)).unwrap().holds[0].expires_in_ms,
+        100_000
+    );
+    policy
+        .reserve_time(
+            &token(1),
+            root,
+            &clock(29_999),
+            &clock(120_000),
+            30_000,
+            Some(mode),
+        )
+        .unwrap();
+    assert!(
+        policy
+            .reserve_time(
+                &token(2),
+                root,
+                &clock(30_000),
+                &clock(120_000),
+                30_000,
+                Some(mode)
+            )
+            .is_err()
+    );
+    assert!(
+        policy
+            .reserve_time(
+                &token(1),
+                root,
+                &clock(30_000),
+                &clock(150_000),
+                150_000,
+                Some(mode)
+            )
+            .is_err()
+    );
+    policy
+        .reserve_time(
+            &token(1),
+            root,
+            &clock(30_000),
+            &clock(120_000),
+            120_000,
+            Some(mode),
+        )
+        .unwrap();
+    assert_eq!(
+        policy.status(&clock(30_000)).unwrap().holds[0].expires_in_ms,
+        90_000
+    );
+}
+
+#[test]
+fn mode_generation_distinguishes_off_on_from_hold_updates_and_stay_connected() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    let mut policy = NetworkPolicy::open(&path, clock(0)).unwrap();
+    enable(&mut policy);
+    let first = policy.status(&clock(0)).unwrap();
+    policy
+        .set_policy(
+            first.generation,
+            Policy {
+                stay_connected: true,
+                ..enabled()
+            },
+            &clock(0),
+        )
+        .unwrap();
+    policy
+        .reserve(&token(1), caller(1), HoldKind::Setup, &clock(0))
+        .unwrap();
+    assert_eq!(
+        policy.status(&clock(0)).unwrap().mode_generation,
+        first.mode_generation
+    );
+    for partial_offline in [false, true] {
+        let generation = policy.status(&clock(0)).unwrap().generation;
+        policy
+            .set_policy(
+                generation,
+                Policy {
+                    partial_offline,
+                    stay_connected: true,
+                },
+                &clock(0),
+            )
+            .unwrap();
+    }
+    let mode = policy.status(&clock(0)).unwrap().mode_generation;
+    assert_eq!(mode, first.mode_generation + 2);
+    assert!(
+        policy
+            .reserve_time(
+                &token(2),
+                Caller {
+                    uid: 0,
+                    ..caller(1)
+                },
+                &clock(0),
+                &clock(120_000),
+                30_000,
+                Some(first.mode_generation)
+            )
+            .is_err()
+    );
+    drop(policy);
+    assert_eq!(
+        NetworkPolicy::open(&path, clock(1))
+            .unwrap()
+            .status(&clock(1))
+            .unwrap()
+            .mode_generation,
+        mode
+    );
+}
+
+#[test]
+fn legacy_network_record_without_mode_generation_retains_saved_policy_and_checksum() {
+    use sha2::Digest;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network");
+    drop(NetworkPolicy::open(&path, clock(0)).unwrap());
+    let mut record = Record::initial();
+    record.generation = 8;
+    record.policy = enabled();
+    let bytes = serde_json::to_string(&record).unwrap();
+    assert!(!bytes.contains("mode_generation"));
+    let checksum = format!("{:x}", sha2::Sha256::digest(bytes.as_bytes()));
+    fs::write(
+        path.join("state.json"),
+        format!("{{\"record\":{bytes},\"checksum\":\"{checksum}\"}}"),
+    )
+    .unwrap();
+    let mut policy = NetworkPolicy::open(&path, clock(1)).unwrap();
+    let status = policy.status(&clock(1)).unwrap();
+    assert_eq!(status.policy, enabled());
+    assert_eq!(status.mode_generation, 0);
+    policy
+        .set_policy(status.generation, Policy::default(), &clock(1))
+        .unwrap();
+    assert_eq!(policy.status(&clock(1)).unwrap().mode_generation, 1);
+}
 fn idle() -> Activity {
     Activity {
         ssh_sessions: Some(false),

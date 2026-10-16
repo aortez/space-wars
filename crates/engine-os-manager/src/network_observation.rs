@@ -28,6 +28,8 @@ pub struct Observation {
     pub profile_count: usize,
     /// An activated primary Ethernet connection; not proof of Internet access.
     pub ethernet_available: bool,
+    /// An activated primary Wi-Fi connection; not proof of Internet access.
+    pub wireless_available: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -255,6 +257,12 @@ pub(crate) async fn connection_observation(
         ethernet_available: first.networking
             && first.state >= 50
             && first.primary_type == "802-3-ethernet",
+        wireless_available: first.networking
+            && first.wireless
+            && first.hardware
+            && !first.startup
+            && first.state >= 50
+            && first.primary_type == "802-11-wireless",
     })
 }
 

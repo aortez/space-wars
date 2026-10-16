@@ -9,6 +9,8 @@ pub mod time;
 #[cfg(target_os = "linux")]
 pub mod time_query;
 #[cfg(target_os = "linux")]
+pub mod time_runtime;
+#[cfg(target_os = "linux")]
 pub mod time_schedule;
 
 #[cfg(target_os = "linux")]
@@ -39,6 +41,8 @@ pub mod network_service;
 pub mod network_sessions;
 #[cfg(target_os = "linux")]
 pub mod network_ssh;
+#[cfg(target_os = "linux")]
+pub mod network_watch;
 #[cfg(target_os = "linux")]
 pub mod recovery_service;
 #[cfg(target_os = "linux")]

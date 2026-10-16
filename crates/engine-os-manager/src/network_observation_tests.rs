@@ -50,6 +50,8 @@ struct Fixture {
     write_received: AtomicBool,
     release_write: AtomicBool,
     omit_second_profile: AtomicBool,
+    wireless_primary: AtomicBool,
+    disconnected: AtomicBool,
 }
 struct Manager(Arc<Fixture>);
 #[zbus::interface(name = "org.freedesktop.NetworkManager")]
@@ -88,11 +90,19 @@ impl Manager {
     }
     #[zbus(property)]
     fn state(&self) -> u32 {
-        70
+        if self.0.disconnected.load(Ordering::SeqCst) {
+            40
+        } else {
+            70
+        }
     }
     #[zbus(property)]
     fn primary_connection_type(&self) -> &str {
-        "802-3-ethernet"
+        if self.0.wireless_primary.load(Ordering::SeqCst) {
+            "802-11-wireless"
+        } else {
+            "802-3-ethernet"
+        }
     }
     fn enable(&self, _enabled: bool) {
         self.0.mutations.fetch_add(1, Ordering::SeqCst);
@@ -466,6 +476,40 @@ fn actual_private_bus_reports_radio_and_checkpoint_state_without_mutations() {
             .is_err()
         );
         assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
+fn primary_wireless_observation_requires_association_and_available_radio() {
+    let bus = PrivateBus::new();
+    futures_lite::future::block_on(async {
+        let fixture = Arc::new(Fixture::default());
+        fixture.controls.store(true, Ordering::SeqCst);
+        fixture.wireless_primary.store(true, Ordering::SeqCst);
+        let _server = server(&bus, &fixture).await;
+        let client = bus.connect().await;
+        let uid = unsafe { libc::geteuid() };
+        let ready = connection_observation(&client, uid).await.unwrap();
+        assert!(ready.wireless_available);
+        assert!(!ready.ethernet_available);
+        for unavailable in [&fixture.radio_off, &fixture.disconnected] {
+            unavailable.store(true, Ordering::SeqCst);
+            assert!(
+                !connection_observation(&client, uid)
+                    .await
+                    .unwrap()
+                    .wireless_available
+            );
+            unavailable.store(false, Ordering::SeqCst);
+        }
+        fixture.controls.store(false, Ordering::SeqCst);
+        assert!(
+            !connection_observation(&client, uid)
+                .await
+                .unwrap()
+                .wireless_available
+        );
         assert_eq!(fixture.mutations.load(Ordering::SeqCst), 0);
     });
 }

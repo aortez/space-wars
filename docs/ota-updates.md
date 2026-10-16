@@ -24,7 +24,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time-check scheduler and bounded provider request implemented; scheduler runtime/API integration, expected setup profile changes and SSH idle qualification remain |
+| #258–#260 | Native coordinator, continuous monitoring, operation holds and the durable time-check runtime/API implemented; OTA hold handoff, expected setup profile changes and SSH idle qualification remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
@@ -150,8 +150,8 @@ state. Its private store locks one owner, validates/checksums the record and
 flushes each transition before returning work to its caller. Missing/corrupt
 state in an existing directory requires repair; it does not open a fresh
 connection window. Status reads and unchanged observations do not write state
-or initiate work. The production runtime still needs to select and provision
-the fixed schedule directory.
+or initiate work. The runtime opens the fixed private directory
+`/data/spacewars-system/time-check`, beneath the validated service-owned parent.
 
 Enabling partial offline mode or entering a new boot makes one automatic check
 due. An accepted synchronization from the preceding five minutes satisfies it
@@ -194,14 +194,6 @@ A lost/rejected reply leaves the query allowance consumed. The reply itself is
 never a successful synchronization: completion requires new accepted evidence
 within the attempt, from a new provider identity after a requested restart.
 
-These scheduling and provider components are not yet driven by the production
-service. Remaining integration is the dedicated runtime, authenticated Sync now
-and status API, fresh policy/time/hold observations, acquisition and release of
-the time-check hold, and OTA's own reservation before that hold is released.
-The OTA daily due/attempt record remains separate from NTP retry history. Fixture
-tests do not establish saved-profile association, captive-portal behavior, or
-installed provider qualification on the Pis.
-
 Validation on 2026-10-16 passed all 127 device-service host tests, with one
 fixture entry point ignored. The 28 new scheduler, provider and fallback cases
 passed on both Pi 5 (1.80 seconds) and Pi 4 (2.80 seconds). The board runs used
@@ -211,6 +203,50 @@ open production schedule state or reboot. Clippy, Rust 1.89 compatibility,
 AArch64 test compilation and formatting passed.
 [Exact source, binary and validation identities](data/ota-time-schedule-20261016.json)
 retain the fixture scope and outstanding runtime work.
+
+### Device worker and Sync now API
+
+`engine-os-manager serve` now runs the time scheduler on its own worker, separate
+from accepted-time observation, local status responses and the serialized radio
+coordinator. `engine-os-manager sync-now` sends an explicit authenticated request
+to the status socket. Its acknowledgement means queued or joined to existing
+work, not synchronized. Repeated requests retain the original receipt time and
+deadlines; reading or subscribing to status never queues a check. Status includes
+the worker phase, retained schedule and pending manual request. Stalled workers
+report unavailable rather than continuing to advertise live progress.
+
+The worker uses fresh, boot-qualified observations from the network coordinator.
+Policy mutations invalidate the cached observation before blocking work begins.
+A saved mode generation distinguishes an Off/On cycle from an unchanged enabled
+mode, even when the worker misses the intermediate Off state. Coordinator restarts
+invalidate prior admissions. The worker can reacquire its reservation only within
+the original attempt window; neither restart nor a delayed reply replenishes a
+provider query or extends a deadline.
+
+The root-only `admit-time` network request carries the original boot, admission
+deadline, attempt deadline and automatic mode generation. Initial admission and
+Wi-Fi fallback use this bounded request. Manual admission can finish within
+30 seconds while saved-profile association continues inside the same two-minute
+attempt. Radio-on alone is not an available route: dispatch requires an activated
+primary Ethernet or Wi-Fi connection. Expired retained holds protect existing
+activity but cannot wake an off radio. Every end path releases only the worker's
+own hold, including cancellation and shutdown.
+
+Validation passed 148 device-service host tests, with one fixture entry point
+ignored, plus Clippy, Rust 1.89 compatibility, formatting and AArch64 compilation.
+The 48 schedule/provider/runtime and related network cases passed on Pi 5 in
+2.92 seconds and Pi 4 in 4.83 seconds. These durations describe fixture suites,
+not time synchronization performance. The board runs used private UID-1000
+directories, fake clocks/radios and private D-Bus services; they did not alter
+the installed services, system provider, clocks or radios. The
+[runtime validation evidence](data/ota-time-runtime-20261016.json) records exact
+source and artifact identities.
+
+OTA still needs to reserve its own connection hold before time work releases
+connectivity. Its daily due/attempt record remains separate from NTP retry
+history. The service has not yet been enabled on either kiosk; saved-profile
+association, captive-portal behavior and installed provider qualification remain
+physical integration work.
 
 ## Wi-Fi policy and connection ownership
 

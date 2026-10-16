@@ -4,6 +4,7 @@ use crate::network_monitor::Monitor;
 use crate::network_observation::Observation;
 use crate::network_policy::{Activity, Clock};
 use crate::network_service::{NetworkServer, SOCKET_PATH, STATE_DIRECTORY};
+use crate::network_watch::Watch;
 use crate::{Error, Result, linux, network_radio, network_sessions};
 use engine_ota::install_lock::InstallLock;
 use std::fs;
@@ -17,6 +18,13 @@ use std::time::{Duration, Instant};
 pub struct Runtime {
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<()>>,
+    watch: Watch,
+}
+
+impl Runtime {
+    pub fn watch(&self) -> Watch {
+        self.watch.clone()
+    }
 }
 
 impl Drop for Runtime {
@@ -31,7 +39,11 @@ impl Drop for Runtime {
 /// Initialization and retries also stay off the time/status thread. In
 /// particular, a short recovery-helper lock must not disable this boot's API.
 pub fn spawn() -> Runtime {
-    spawn_with(start)
+    let watch = Watch::default();
+    let observed = watch.clone();
+    let mut runtime = spawn_with(move || start(observed.clone()));
+    runtime.watch = watch;
+    runtime
 }
 
 pub(crate) fn spawn_with(
@@ -80,6 +92,7 @@ pub(crate) fn spawn_with(
     Runtime {
         stop,
         worker: Some(worker),
+        watch: Watch::default(),
     }
 }
 
@@ -187,20 +200,32 @@ impl Backend for Native {
 
 /// Called after the service has validated the private parent directory. The
 /// policy store lock is acquired before removing a stale socket inode.
-fn start() -> Result<NetworkServer> {
-    start_with(
+fn start(watch: Watch) -> Result<NetworkServer> {
+    start_watched(
         Path::new(STATE_DIRECTORY),
         Path::new(SOCKET_PATH),
         1000,
         Native::default(),
+        watch,
     )
 }
 
+#[cfg(test)]
 pub(crate) fn start_with<B: Backend + Send + 'static>(
     directory: &Path,
     socket: &Path,
     kiosk_uid: u32,
     backend: B,
+) -> Result<NetworkServer> {
+    start_watched(directory, socket, kiosk_uid, backend, Watch::default())
+}
+
+pub(crate) fn start_watched<B: Backend + Send + 'static>(
+    directory: &Path,
+    socket: &Path,
+    kiosk_uid: u32,
+    backend: B,
+    watch: Watch,
 ) -> Result<NetworkServer> {
     let controller = Controller::open(directory, backend)?;
     // SAFETY: geteuid has no preconditions. The production entry point is root.
@@ -211,5 +236,5 @@ pub(crate) fn start_with<B: Backend + Send + 'static>(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.into()),
     }
-    NetworkServer::bind(socket, kiosk_uid, controller)
+    NetworkServer::bind_watched(socket, kiosk_uid, controller, watch)
 }

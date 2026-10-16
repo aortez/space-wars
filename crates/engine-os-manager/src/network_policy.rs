@@ -89,7 +89,8 @@ impl HoldToken {
 
 /// Boot-relative milliseconds, including suspend; a wall-clock correction
 /// cannot extend a lease. Callers must use the actual current boot ID.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Clock {
     pub boot_id: String,
     pub ms: u64,
@@ -129,6 +130,8 @@ struct Deployment {
 struct Record {
     schema: u32,
     generation: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    mode_generation: u64,
     policy: Policy,
     deployments: Vec<Deployment>,
     radio: RadioState,
@@ -146,6 +149,7 @@ impl Record {
         let mut ids = std::collections::BTreeSet::new();
         self.radio.validate()?;
         if self.schema != 3
+            || self.mode_generation > self.generation
             || self.deployments.len() > MAX_DEPLOYMENTS
             || self.deployments.iter().any(|hold| {
                 !ids.insert(hold.id)
@@ -226,6 +230,7 @@ pub enum Intent {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Status {
     pub generation: u64,
+    pub mode_generation: u64,
     pub policy: Policy,
     pub intent: Intent,
     pub holds: Vec<HoldStatus>,
@@ -378,6 +383,12 @@ impl NetworkPolicy {
         }
         if policy != self.record.policy {
             let mut next = self.record.clone();
+            if policy.partial_offline != next.policy.partial_offline {
+                next.mode_generation = next
+                    .mode_generation
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("network mode generation exhausted"))?;
+            }
             next.policy = policy;
             self.commit(next)?;
             self.quiet_since_ms = None;
@@ -394,6 +405,46 @@ impl NetworkPolicy {
         kind: HoldKind,
         clock: &Clock,
     ) -> Result<()> {
+        self.reserve_inner(token, caller, kind, clock, None)
+    }
+
+    /// Root-owned scheduler reservation. A queue delay or coordinator restart
+    /// cannot grant a fresh two-minute window to an existing time attempt.
+    pub(crate) fn reserve_time(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        clock: &Clock,
+        deadline: &Clock,
+        admission_deadline_ms: u64,
+        mode_generation: Option<u64>,
+    ) -> Result<()> {
+        self.check(clock)?;
+        if caller.uid != 0
+            || deadline.boot_id != clock.boot_id
+            || deadline.ms <= clock.ms
+            || admission_deadline_ms > deadline.ms
+            || clock.ms >= admission_deadline_ms
+            || deadline.ms - clock.ms > CHECK_MS
+            || mode_generation.is_some_and(|expected| {
+                expected != self.record.mode_generation || !self.record.policy.partial_offline
+            })
+        {
+            return Err(invalid(
+                "time reservation is expired or no longer authorized",
+            ));
+        }
+        self.reserve_inner(token, caller, HoldKind::TimeCheck, clock, Some(deadline.ms))
+    }
+
+    fn reserve_inner(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        kind: HoldKind,
+        clock: &Clock,
+        deadline_ms: Option<u64>,
+    ) -> Result<()> {
         self.check(clock)?;
         if kind == HoldKind::Ssh && caller.uid != 0 {
             return Err(invalid("SSH admission requires the root helper"));
@@ -405,6 +456,9 @@ impl NetworkPolicy {
             }
             if old.expires_ms <= clock.ms {
                 return Err(invalid("network hold expired"));
+            }
+            if deadline_ms.is_some_and(|end| old.absolute_ms != Some(end)) {
+                return Err(invalid("time hold deadline changed"));
             }
             return Ok(());
         }
@@ -435,7 +489,7 @@ impl NetworkPolicy {
             self.commit(next)?;
         } else {
             let absolute_ms = match kind {
-                HoldKind::TimeCheck => Some(clock.after(CHECK_MS)?),
+                HoldKind::TimeCheck => Some(deadline_ms.unwrap_or(clock.after(CHECK_MS)?)),
                 HoldKind::Download => Some(clock.after(DOWNLOAD_MS)?),
                 _ => None,
             };
@@ -634,6 +688,7 @@ impl NetworkPolicy {
         };
         Ok(Status {
             generation: self.record.generation,
+            mode_generation: self.record.mode_generation,
             policy: self.record.policy,
             intent,
             holds,
@@ -643,6 +698,10 @@ impl NetworkPolicy {
 
 fn invalid(message: &str) -> Error {
     Error::Invalid(message.into())
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 #[cfg(test)]

@@ -1,7 +1,8 @@
 //! Bounded, authenticated network requests handled by one radio coordinator.
 //! The independent time/status service does not wait for these operations.
 use crate::network_controller::{Availability, Backend, Controller, Status};
-use crate::network_policy::{Caller, HoldKind, HoldToken, Policy};
+use crate::network_policy::{Caller, Clock, HoldKind, HoldToken, Policy};
+use crate::network_watch::Watch;
 use crate::{Error, Result, kiosk_health, service};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -44,6 +45,15 @@ pub enum Request {
         token: String,
         kind: HoldKind,
     },
+    AdmitTime {
+        schema: u32,
+        token: String,
+        deadline: Clock,
+        admission_deadline_ms: u64,
+        mode_generation: Option<u64>,
+        #[serde(default)]
+        wireless_required: bool,
+    },
     Renew {
         schema: u32,
         token: String,
@@ -64,6 +74,7 @@ impl Request {
         | Self::SetPolicy { schema, .. }
         | Self::Resume { schema, .. }
         | Self::Admit { schema, .. }
+        | Self::AdmitTime { schema, .. }
         | Self::Renew { schema, .. }
         | Self::RequireWireless { schema, .. }
         | Self::Release { schema, .. }) = self;
@@ -142,13 +153,23 @@ impl NetworkServer {
         kiosk_uid: u32,
         controller: Controller<B>,
     ) -> Result<Self> {
+        Self::bind_watched(path, kiosk_uid, controller, Watch::default())
+    }
+
+    pub(crate) fn bind_watched<B: Backend + Send + 'static>(
+        path: &Path,
+        kiosk_uid: u32,
+        controller: Controller<B>,
+        watch: Watch,
+    ) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         fs::set_permissions(path, fs::Permissions::from_mode(0o660))?;
         listener.set_nonblocking(true)?;
         let stop = Arc::new(AtomicBool::new(false));
         let (tx, rx) = mpsc::sync_channel(CLIENTS);
         let stopped = stop.clone();
-        let coordinator = thread::spawn(move || coordinate(controller, rx, &stopped));
+        watch.reset();
+        let coordinator = thread::spawn(move || coordinate(controller, rx, &stopped, watch));
         let stopped = stop.clone();
         let accept = thread::spawn(move || {
             let mut workers: Vec<JoinHandle<()>> = Vec::new();
@@ -218,13 +239,18 @@ fn peer(stream: &UnixStream, kiosk_uid: u32) -> Result<Caller> {
     })
 }
 
-fn coordinate<B: Backend>(mut controller: Controller<B>, rx: Receiver<Work>, stop: &AtomicBool) {
+fn coordinate<B: Backend>(
+    mut controller: Controller<B>,
+    rx: Receiver<Work>,
+    stop: &AtomicBool,
+    watch: Watch,
+) {
     let mut next_tick = Instant::now();
     while !stop.load(Ordering::Relaxed) {
         if Instant::now() >= next_tick {
             // A failed observation is retried; the controller never treats it
             // as idle. Storage uncertainty remains poisoned inside the store.
-            let _ = controller.tick();
+            watch.publish(controller.tick().ok());
             next_tick = Instant::now() + TICK;
         }
         match rx.recv_timeout(Duration::from_millis(100)) {
@@ -238,14 +264,26 @@ fn coordinate<B: Backend>(mut controller: Controller<B>, rx: Receiver<Work>, sto
                 {
                     Reply::reject(Rejection::OwnerGone)
                 } else {
+                    if matches!(
+                        work.request,
+                        Request::SetPolicy { .. } | Request::Resume { .. }
+                    ) {
+                        // An old snapshot cannot authorize work while a policy
+                        // mutation is in flight, including off/on toggle races.
+                        watch.publish(None);
+                    }
                     perform(&mut controller, work.caller, work.request)
                 };
+                if let Some(status) = &reply.status {
+                    watch.publish(Some(status.clone()));
+                }
                 let _ = work.reply.try_send(reply);
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
+    watch.reset();
 }
 
 fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: Request) -> Reply {
@@ -261,6 +299,29 @@ fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: 
             Request::Resume { generation, .. } => Reply::status(controller.resume(generation)?),
             Request::Admit { token, kind, .. } => {
                 let admission = controller.admit(&HoldToken::parse(token)?, caller, kind)?;
+                Reply {
+                    schema: 1,
+                    status: Some(admission.status),
+                    availability: Some(admission.availability),
+                    error: None,
+                }
+            }
+            Request::AdmitTime {
+                token,
+                deadline,
+                admission_deadline_ms,
+                mode_generation,
+                wireless_required,
+                ..
+            } => {
+                let admission = controller.admit_time(
+                    &HoldToken::parse(token)?,
+                    caller,
+                    &deadline,
+                    admission_deadline_ms,
+                    mode_generation,
+                    wireless_required,
+                )?;
                 Reply {
                     schema: 1,
                     status: Some(admission.status),

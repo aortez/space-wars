@@ -576,3 +576,32 @@ fn only_accepted_clock_evidence_can_satisfy_the_fast_path() {
     let accepted = Evidence::accepted(&tracker, later).unwrap();
     assert_eq!(accepted.success.at_ms, 1_000);
 }
+
+#[test]
+fn queued_manual_admission_keeps_its_receipt_deadline_and_allows_later_association() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut schedule = open(&temp, 1000);
+    let a = active(
+        schedule
+            .sync_received(&clock(20_000), &clock(1000), None)
+            .unwrap(),
+    );
+    assert_eq!(a.admission_deadline_ms, 31_000);
+    assert!(schedule.admitted(&clock(30_999), a.id).unwrap());
+    assert!(
+        schedule
+            .observe(&clock(40_000), false, None)
+            .unwrap()
+            .active
+            .is_some()
+    );
+    assert!(
+        schedule
+            .connected(&clock(40_000), a.id, Connection::Wireless)
+            .unwrap()
+    );
+    assert_eq!(
+        active(schedule.status(&clock(40_000)).unwrap()).deadline_ms,
+        121_000
+    );
+}

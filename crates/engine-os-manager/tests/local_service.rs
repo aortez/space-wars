@@ -18,6 +18,7 @@ fn snapshot() -> DeviceStatus {
         persistence_error: None,
         rtc_error: None,
         recovery: Default::default(),
+        time_check: None,
         time: TimeStatus {
             usable: false,
             source: None,
@@ -27,6 +28,61 @@ fn snapshot() -> DeviceStatus {
             sync_age: SyncAge::Unknown,
             success_generation: 0,
         },
+    }
+}
+
+#[test]
+fn explicit_sync_command_is_authenticated_and_status_reads_never_enqueue_work() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("device.sock");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let requested = calls.clone();
+    let _server = StatusServer::bind_with_sync(
+        &path,
+        unsafe { libc::geteuid() },
+        Arc::new(|| Ok(snapshot())),
+        Some(Arc::new(move || {
+            requested.fetch_add(1, Ordering::SeqCst);
+            Ok(engine_os_manager::time_runtime::Accepted {
+                schema: 1,
+                received_ms: 1234,
+                coalesced: false,
+            })
+        })),
+    )
+    .unwrap();
+    for _ in 0..3 {
+        read_status(&path).unwrap();
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let request = |value: &[u8]| {
+        let mut stream = UnixStream::connect(&path).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        stream.write_all(value).unwrap();
+        let mut reply = String::new();
+        BufReader::new(stream).read_line(&mut reply).unwrap();
+        serde_json::from_str::<serde_json::Value>(&reply).unwrap()
+    };
+    assert_eq!(
+        request(b"{\"schema\":1,\"command\":\"sync-now\"}\n")["received_ms"],
+        1234
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert!(
+        request(b"{\"schema\":1,\"command\":\"sync-now\",\"deadline\":999}\n")["error"].is_string()
+    );
+    assert!(request(b"{\"schema\":2,\"command\":\"sync-now\"}\n")["error"].is_string());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    if unsafe { libc::geteuid() } != 0 {
+        assert!(engine_os_manager::service::sync_now(&path).is_err());
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "client authenticates root before sending mutation"
+        );
     }
 }
 

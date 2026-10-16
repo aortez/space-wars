@@ -101,6 +101,8 @@ struct Attempt {
     admission_deadline_ms: u64,
     baseline_generation: u64,
     connection: Option<Connection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    admitted_ms: Option<u64>,
     ethernet_until_ms: Option<u64>,
     query: Option<Query>,
 }
@@ -113,6 +115,8 @@ struct Record {
     boot_id: String,
     transition_ms: u64,
     enabled: bool,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    mode_generation: u64,
     immediate_check: bool,
     failure_stage: usize,
     next_ms: Option<u64>,
@@ -130,6 +134,7 @@ impl Record {
             boot_id: "00000000-0000-0000-0000-000000000000".into(),
             transition_ms: 0,
             enabled: false,
+            mode_generation: 0,
             immediate_check: false,
             failure_stage: 0,
             next_ms: None,
@@ -169,6 +174,9 @@ impl Record {
                 || (a.trigger == Trigger::Automatic && !self.enabled)
                 || a.ethernet_until_ms
                     .is_some_and(|end| end < a.started_ms || end > a.deadline_ms)
+                || a.admitted_ms.is_some_and(|at| {
+                    at < a.started_ms || at >= a.deadline_ms || at > self.transition_ms
+                })
                 || (a.connection == Some(Connection::Ethernet) && a.ethernet_until_ms.is_none())
                 || a.query.as_ref().is_some_and(|q| {
                     a.connection.is_none()
@@ -192,7 +200,8 @@ impl Record {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Active {
     pub id: u64,
     pub trigger: Trigger,
@@ -200,6 +209,7 @@ pub struct Active {
     pub deadline_ms: u64,
     pub admission_deadline_ms: u64,
     pub connection: Option<Connection>,
+    pub admitted: bool,
     /// Escalate the existing reservation, without creating another attempt or
     /// restarting the provider. This is permission to request Wi-Fi, not to
     /// override a hardware block or an external radio conflict.
@@ -207,9 +217,11 @@ pub struct Active {
     pub query_requested: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Status {
     pub enabled: bool,
+    pub mode_generation: u64,
     pub generation: u64,
     pub active: Option<Active>,
     pub next_ms: Option<u64>,
@@ -282,18 +294,39 @@ impl Schedule {
         enabled: bool,
         evidence: Option<&Evidence>,
     ) -> Result<Status> {
+        let mode_generation = if enabled != self.record.enabled {
+            self.record
+                .mode_generation
+                .checked_add(1)
+                .ok_or_else(|| invalid("time-check mode generation exhausted"))?
+        } else {
+            self.record.mode_generation
+        };
+        self.observe_policy(clock, enabled, mode_generation, evidence)
+    }
+
+    pub fn observe_policy(
+        &mut self,
+        clock: &Clock,
+        enabled: bool,
+        mode_generation: u64,
+        evidence: Option<&Evidence>,
+    ) -> Result<Status> {
         self.check(clock)?;
+        if mode_generation < self.record.mode_generation {
+            return Err(invalid("network mode generation regressed"));
+        }
         let evidence = self.evidence(clock, evidence)?;
         let mut next = self.record.clone();
-        if enabled != next.enabled {
+        if enabled != next.enabled || mode_generation != next.mode_generation {
             next.enabled = enabled;
+            next.mode_generation = mode_generation;
             next.immediate_check = enabled;
             next.next_ms = enabled.then_some(clock.ms);
-            if !enabled
-                && next
-                    .active
-                    .as_ref()
-                    .is_some_and(|a| a.trigger == Trigger::Automatic)
+            if next
+                .active
+                .as_ref()
+                .is_some_and(|a| a.trigger == Trigger::Automatic)
             {
                 next.active = None;
                 next.completion = Some(Completion::Cancelled);
@@ -341,12 +374,27 @@ impl Schedule {
     /// Coalesces with an active automatic or manual attempt, preserving its ID,
     /// provider-query allowance and original deadlines. Failure history remains.
     pub fn sync_now(&mut self, clock: &Clock, evidence: Option<&Evidence>) -> Result<Status> {
+        self.sync_received(clock, clock, evidence)
+    }
+
+    /// The authenticated server timestamps receipt before queueing. Queue time
+    /// is part of manual admission and cannot be replenished by a busy worker.
+    pub fn sync_received(
+        &mut self,
+        clock: &Clock,
+        received: &Clock,
+        evidence: Option<&Evidence>,
+    ) -> Result<Status> {
         self.check(clock)?;
+        if received.boot_id != clock.boot_id || received.ms > clock.ms {
+            return Err(invalid("invalid time-check request receipt"));
+        }
         let evidence = self.evidence(clock, evidence)?;
         let mut next = self.record.clone();
         expire(&mut next, clock)?;
         if next.active.is_none() {
-            begin(&mut next, clock, Trigger::Manual, evidence)?;
+            begin(&mut next, received, Trigger::Manual, evidence)?;
+            expire(&mut next, clock)?;
         }
         self.commit(next, clock)?;
         self.status(clock)
@@ -360,14 +408,35 @@ impl Schedule {
         let Some(a) = live(&mut next, clock, id) else {
             return Ok(false);
         };
-        if a.connection.is_none() && clock.ms >= a.admission_deadline_ms {
+        if !admitted(a) && clock.ms >= a.admission_deadline_ms {
             return Ok(false);
+        }
+        if !admitted(a) {
+            a.admitted_ms = Some(clock.ms);
         }
         if a.connection != Some(Connection::Wireless) {
             if connection == Connection::Ethernet && a.ethernet_until_ms.is_none() {
                 a.ethernet_until_ms = Some(after(clock.ms, ETHERNET_MS)?.min(a.deadline_ms));
             }
             a.connection = Some(connection);
+        }
+        self.commit(next, clock)?;
+        Ok(true)
+    }
+
+    /// Network admission can precede association. A manual hold starts within
+    /// 30 seconds; a saved profile may connect later inside the same window.
+    pub fn admitted(&mut self, clock: &Clock, id: u64) -> Result<bool> {
+        self.check(clock)?;
+        let mut next = self.record.clone();
+        let Some(a) = live(&mut next, clock, id) else {
+            return Ok(false);
+        };
+        if !admitted(a) {
+            if clock.ms >= a.admission_deadline_ms {
+                return Ok(false);
+            }
+            a.admitted_ms = Some(clock.ms);
         }
         self.commit(next, clock)?;
         Ok(true)
@@ -426,6 +495,7 @@ impl Schedule {
         self.check(clock)?;
         Ok(Status {
             enabled: self.record.enabled,
+            mode_generation: self.record.mode_generation,
             generation: self.record.generation,
             active: self.record.active.as_ref().map(|a| Active {
                 id: a.id,
@@ -434,6 +504,7 @@ impl Schedule {
                 deadline_ms: a.deadline_ms,
                 admission_deadline_ms: a.admission_deadline_ms,
                 connection: a.connection,
+                admitted: admitted(a),
                 wireless_required: a.connection == Some(Connection::Wireless)
                     || a.ethernet_until_ms.is_some_and(|until| clock.ms >= until),
                 query_requested: a.query.is_some(),
@@ -511,6 +582,7 @@ fn begin(
         )?,
         baseline_generation: record.success.as_ref().map_or(0, |s| s.generation),
         connection: None,
+        admitted_ms: None,
         ethernet_until_ms: None,
         query: None,
     });
@@ -536,15 +608,25 @@ fn failed(record: &mut Record, end: u64, reason: Completion) -> Result<()> {
 
 fn expire(record: &mut Record, clock: &Clock) -> Result<()> {
     if let Some(a) = &record.active {
-        if clock.ms >= a.deadline_ms {
+        if !admitted(a)
+            && a.admission_deadline_ms < a.deadline_ms
+            && clock.ms >= a.admission_deadline_ms
+        {
+            let end = a.admission_deadline_ms;
+            failed(record, end, Completion::AdmissionTimeout)?;
+        } else if clock.ms >= a.deadline_ms {
             let end = a.deadline_ms;
             failed(record, end, Completion::AttemptTimeout)?;
-        } else if a.connection.is_none() && clock.ms >= a.admission_deadline_ms {
+        } else if !admitted(a) && clock.ms >= a.admission_deadline_ms {
             let end = a.admission_deadline_ms;
             failed(record, end, Completion::AdmissionTimeout)?;
         }
     }
     Ok(())
+}
+
+fn admitted(a: &Attempt) -> bool {
+    a.admitted_ms.is_some() || a.connection.is_some()
 }
 
 fn live<'a>(record: &'a mut Record, clock: &Clock, id: u64) -> Option<&'a mut Attempt> {
@@ -570,6 +652,10 @@ fn after(at: u64, duration: u64) -> Result<u64> {
 
 fn invalid(message: &str) -> Error {
     Error::Invalid(message.into())
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 #[cfg(test)]
