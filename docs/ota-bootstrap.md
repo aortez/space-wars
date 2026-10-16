@@ -1044,6 +1044,16 @@ temporary-file/private-bus testing, not live system-bus or reboot qualification.
 [Activation evidence](data/ota-bootstrap-activation-20261015.json) records exact
 artifacts/logs and the remaining root-access, migration and integration work.
 
+Canonical migration at `48acde7` was validated with 247 OTA and 40 manager tests,
+71 Yocto checks, Clippy, Rust 1.89, formatting and AArch64 compilation. The final
+14 migration fixtures passed on host ext4 in 84.17 seconds and Pi 5 in 107.10
+seconds; the private normal-reboot D-Bus test passed on Pi 5 in 0.10 seconds.
+Both real canonical commands rejected UID 1000 before digest parsing or installed
+paths, with an unchanged boot ID. [Canonical migration evidence](data/ota-bootstrap-canonical-20261015.json)
+records the validation order, exact binaries/logs, retained fallback guarantees
+and outstanding cleanup, production provisioning and physical qualification.
+These temporary fixtures exercised no live boot files, system bus or reboot.
+
 ```sh
 cargo test --locked -p engine-ota -p engine-os-manager -- --test-threads=1
 cargo clippy --locked -p engine-ota -p engine-os-manager --all-targets --no-deps -- -D warnings
