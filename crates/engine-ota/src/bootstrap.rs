@@ -38,6 +38,8 @@ pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap
 mod archive;
 #[path = "bootstrap_data_backup.rs"]
 mod data_backup;
+#[path = "bootstrap_legacy_assets.rs"]
+mod legacy_assets;
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,

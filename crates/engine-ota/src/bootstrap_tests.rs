@@ -351,6 +351,27 @@ pub(crate) mod linux {
                 serde_json::to_vec(&assets.image).unwrap(),
             )
             .unwrap();
+            let mut legacy_paths = std::collections::BTreeSet::new();
+            legacy_paths.insert("/".to_owned());
+            for &(path, mode) in super::super::legacy_assets::FILES {
+                let destination = source.join(path);
+                fs::create_dir_all(destination.parent().unwrap()).unwrap();
+                fs::write(&destination, format!("fixture legacy asset {path}\n")).unwrap();
+                fs::set_permissions(&destination, fs::Permissions::from_mode(mode)).unwrap();
+                legacy_paths.insert(format!("/{path}"));
+                let mut parent = destination.parent().unwrap();
+                while parent.starts_with(&source) {
+                    fs::set_permissions(parent, fs::Permissions::from_mode(0o755)).unwrap();
+                    legacy_paths.insert(format!(
+                        "/{}",
+                        parent.strip_prefix(&source).unwrap().display()
+                    ));
+                    if parent == source {
+                        break;
+                    }
+                    parent = parent.parent().unwrap();
+                }
+            }
             let root = directory.path().join("fixture.ext4");
             let result = Command::new("/usr/sbin/mke2fs")
                 .args([
@@ -366,6 +387,30 @@ pub(crate) mod linux {
                 .arg(source)
                 .arg(&root)
                 .arg("16384")
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            // Normalize only the fixture image's numeric ownership. No host
+            // file is chowned and the tests still run as an ordinary user.
+            let commands = directory.path().join("fixture-inode-owners");
+            fs::write(
+                &commands,
+                legacy_paths
+                    .iter()
+                    .map(|path| {
+                        format!("set_inode_field {path} uid 0\nset_inode_field {path} gid 0\n")
+                    })
+                    .collect::<String>(),
+            )
+            .unwrap();
+            let result = Command::new("/usr/sbin/debugfs")
+                .args(["-w", "-f"])
+                .arg(&commands)
+                .arg(&root)
                 .output()
                 .unwrap();
             assert!(
@@ -398,6 +443,7 @@ pub(crate) mod linux {
         let fixture = Fixture::new();
         let original = fs::read(&fixture.root).unwrap();
         let package = fixture.build().unwrap();
+        assert_eq!(package.schema, 2);
         assert_eq!(package.purpose, "supervised-bootstrap");
         assert_eq!(package.image, fixture.assets.image);
         assert_eq!(package.expanded.sha256, Sha256::digest(&original));
@@ -417,6 +463,13 @@ pub(crate) mod linux {
             let bytes = fs::read(fixture.output().join(path)).unwrap();
             assert_eq!(expected.bytes, bytes.len() as u64, "{path}");
             assert_eq!(expected.sha256, Sha256::digest(&bytes), "{path}");
+        }
+        for &(path, _) in super::super::legacy_assets::FILES {
+            let captured = fs::read(fixture.output().join(format!("legacy-root/{path}"))).unwrap();
+            assert_eq!(
+                captured,
+                format!("fixture legacy asset {path}\n").as_bytes()
+            );
         }
         assert!(!fixture.output().join("boot/hostname.txt").exists());
         assert_eq!(
@@ -518,5 +571,30 @@ pub(crate) mod linux {
         assert!(result.status.success());
         assert!(fixture.build().is_err());
         assert!(!fixture.output().exists());
+    }
+
+    #[test]
+    fn missing_linked_or_unsafe_legacy_sources_never_publish_a_package() {
+        for commands in [
+            "rm /usr/sbin/ab-update\n",
+            "set_inode_field /usr/sbin/ab-update mode 0100777\n",
+            "set_inode_field /usr/sbin/ab-update uid 1000\n",
+            "set_inode_field /usr/sbin mode 040777\n",
+            "rm /usr/sbin/ab-update\nsymlink /usr/sbin/ab-update /usr/sbin/ab-update-with-key\n",
+            "rm /etc/ssh/sshd_config.d/10-spacewars-access.conf\nrmdir /etc/ssh/sshd_config.d\nsymlink /etc/ssh/sshd_config.d /usr/sbin\n",
+        ] {
+            let fixture = Fixture::new();
+            let script = fixture.directory.path().join("mutate-fixture");
+            fs::write(&script, commands).unwrap();
+            let result = Command::new("/usr/sbin/debugfs")
+                .args(["-w", "-f"])
+                .arg(&script)
+                .arg(&fixture.root)
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+            assert!(fixture.build().is_err(), "{commands}");
+            assert!(!fixture.output().exists());
+        }
     }
 }

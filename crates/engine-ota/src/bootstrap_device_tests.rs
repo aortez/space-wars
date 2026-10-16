@@ -155,6 +155,49 @@ fn private_package_checks_assets_and_rederives_the_live_inactive_target() {
 }
 
 #[test]
+fn legacy_replacements_require_the_complete_fixed_inventory_and_new_schema() {
+    let fixture = Fixture::new();
+    fixture.build().unwrap();
+    rewrite_record(&fixture, |package| package.schema = 1);
+    assert!(open(&fixture).is_err());
+    rewrite_record(&fixture, |package| package.schema = 2);
+    open(&fixture).unwrap();
+    let name = "legacy-root/usr/sbin/ab-update";
+    let contents = fs::read(fixture.output().join(name)).unwrap();
+    rewrite_record(&fixture, |package| {
+        package.files.remove(name).unwrap();
+    });
+    assert!(open(&fixture).is_err());
+    rewrite_record(&fixture, |package| {
+        package.files.insert(
+            name.into(),
+            Blob {
+                bytes: contents.len() as u64,
+                sha256: Sha256::digest(&contents),
+            },
+        );
+    });
+    open(&fixture).unwrap();
+    let unknown = "legacy-root/etc/unplanned-file";
+    fs::write(fixture.output().join(unknown), b"unplanned").unwrap();
+    fs::set_permissions(
+        fixture.output().join(unknown),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    rewrite_record(&fixture, |package| {
+        package.files.insert(
+            unknown.into(),
+            Blob {
+                bytes: 9,
+                sha256: Sha256::digest(b"unplanned"),
+            },
+        );
+    });
+    assert!(open(&fixture).is_err());
+}
+
+#[test]
 fn verified_backup_credit_keeps_resume_space_checks_without_demanding_duplicate_copies() {
     let fixture = Fixture::new();
     let record = fixture.build().unwrap();

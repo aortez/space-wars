@@ -238,6 +238,19 @@ pub fn build_package(
         }
     }
 
+    // The fallback root needs the same access/network and maintenance guards.
+    // Carry their exact image bytes, not files from the builder's checkout.
+    super::legacy_assets::extract(&root, |path, bytes| {
+        fs::create_dir_all(
+            pending
+                .path()
+                .join(path)
+                .parent()
+                .expect("fixed asset parent"),
+        )?;
+        write(pending.path(), &mut files, path, bytes)
+    })?;
+
     root.rewind()?;
     let compressed_path = pending.path().join("rootfs.ext4.zst");
     let compressed_file = new_file(&compressed_path)?;
@@ -258,7 +271,7 @@ pub fn build_package(
     let compressed = transfer(&mut compressed_file, &mut std::io::sink(), length)?;
     files.insert("rootfs.ext4.zst".into(), compressed.clone());
     let package = BootstrapPackage {
-        schema: 1,
+        schema: 2,
         purpose: "supervised-bootstrap".into(),
         image,
         format: ImageFormat::RootfsExt4Zstd,

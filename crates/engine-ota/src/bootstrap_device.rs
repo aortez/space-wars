@@ -374,7 +374,7 @@ impl OperatorPackage {
         }
         let record: BootstrapPackage = serde_json::from_slice(&bytes)?;
         record.image.validate()?;
-        if record.schema != 1
+        if record.schema != 2
             || record.purpose != "supervised-bootstrap"
             || record.image.source.dirty
             || record.image.machine != "raspberrypi-spacewars"
@@ -500,6 +500,18 @@ impl OperatorPackage {
             "engine-os-manager".into(),
             image.binaries.os_manager.clone(),
         );
+        for &(path, _) in super::legacy_assets::FILES {
+            let name = format!("{}{path}", super::legacy_assets::PREFIX);
+            let blob = self
+                .record
+                .files
+                .get(&name)
+                .ok_or_else(|| invalid("missing legacy replacement asset"))?;
+            if !(1..=super::legacy_assets::MAX_BYTES).contains(&blob.bytes) {
+                return Err(invalid("invalid legacy replacement asset length"));
+            }
+            expected.insert(name, blob.clone());
+        }
         for name in [
             "image.json",
             "README.txt",
@@ -782,18 +794,20 @@ fn capacity(files: &BTreeMap<String, Blob>, legacy: &LegacyBootEvidence) -> Resu
 }
 
 fn package_path(path: &str) -> bool {
-    matches!(
-        path,
-        "image.json"
-            | "README.txt"
-            | "engine-os-manager"
-            | "rootfs.ext4.zst"
-            | "trial-config.txt"
-            | "normal-config.txt"
-    ) || path
-        .strip_prefix("boot/")
-        .or_else(|| path.strip_prefix("sw-bootstrap/"))
-        .is_some_and(crate::boot::asset_path)
+    super::legacy_assets::package_path(path).is_some()
+        || matches!(
+            path,
+            "image.json"
+                | "README.txt"
+                | "engine-os-manager"
+                | "rootfs.ext4.zst"
+                | "trial-config.txt"
+                | "normal-config.txt"
+        )
+        || path
+            .strip_prefix("boot/")
+            .or_else(|| path.strip_prefix("sw-bootstrap/"))
+            .is_some_and(crate::boot::asset_path)
 }
 
 pub(super) fn private_asset(root: &File, path: &str, owner: u32) -> Result<File> {

@@ -79,6 +79,7 @@ Files include:
 | `SHA256SUMS` | Transfer-integrity checks, including `bundle.json`; not signatures |
 | `rootfs.ext4.zst` | Actual compressed root filesystem |
 | `engine-os-manager` | Exact manager extracted from that filesystem, not executed by the builder |
+| `legacy-root/` | Fixed fallback-root replacement files extracted from that same filesystem |
 | `boot/` | Complete canonical boot assets and generated normal selectors |
 | `sw-bootstrap/` | One common kernel, selected board DTB, initramfs, overlays and staged command lines |
 | `trial-config.txt`, `normal-config.txt` | Explicit staged boot paths for the supervised migration |
@@ -88,6 +89,30 @@ key is shipped in the package. The device's own state must remain authoritative.
 The canonical trial command line remains unprepared. The separate temporary
 trial receives a random attempt identity; that identity grants no production
 installation or watchdog-completion authority.
+
+Package schema 2 additionally carries 17 fixed fallback-root files: disabled
+legacy A/B helpers, guarded maintenance wrappers/backends, the restricted OTA
+sudoers file, persistent access configuration, and network initialization/bind
+units. The packager reads their bytes from the selected ext4 artifact, checks
+root ownership, exact destination modes, single regular-file links and safe
+directory ancestors, and includes every file in the package inventory and
+checksums. All transferred files remain private mode 0600; the future migration
+applies the fixed destination modes. Nothing under `legacy-root/` is executed
+by the packager or interpreted as an arbitrary installation hook.
+
+The device package checker requires the complete fixed list. Schema 1 packages
+are rejected because they lack these replacements; previous local packages
+must be rebuilt, never relabeled. This packaging step does not close any live
+privileges. The migration still needs a durable per-file record of original
+contents/absence, restartable replacements, a check for running legacy helpers,
+and validation of effective sudo/SSH/systemd configuration before a trial.
+The data archive is a recovery copy, not that per-file migration journal.
+
+The current schema 2 workstation kits are
+`target/ota-bootstrap-c14c53f-pi5-v2` (Pi 5/HyperPixel, target A) and
+`target/ota-bootstrap-c14c53f-pi4-v2` (Pi 4/Picade, target B). Both contain the
+clean `c14c53f` rootfs and its exact replacement assets. Their board, profile and
+slot choices still require a fresh live preflight on the intended device.
 
 ## Root package check and preparation reservation
 
