@@ -311,6 +311,18 @@ process credentials with a fake radio backend, not installed service or SSH
 admission. [Control-server evidence](data/ota-network-service-20261016.json)
 records source/artifact identities, bounds and those qualification limits.
 
+The SSH observation/admission work at `2a13aa7` passed the 87-test manager suite,
+10 bootstrap access checks, Clippy, Rust 1.89, formatting and AArch64 compilation.
+The final 47 network cases passed on the host and on both Pis (7.48 seconds on
+Pi 5 and 10.01 seconds on Pi 4). Root peer admission was exercised inside a user
+namespace, without host root access. An initial Pi 4 failure exposed a timeout
+fixture that could cancel during preflight; the corrected fixture explicitly
+waits for provider receipt before cancelling and verifies the subsequent late
+write. Static systemd verification accepts the new drop-in and its dependencies.
+[SSH protection evidence](data/ota-network-sessions-20261016.json) retains both
+runs, exact artifact identities, native probe results and the pending physical
+qualification. No installed service, radio setting or boot identity changed.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
