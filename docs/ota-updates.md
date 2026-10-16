@@ -380,6 +380,16 @@ both boards. [Native runtime evidence](data/ota-network-runtime-20261016.json)
 records exact source, artifacts and logs. These fixture and read-only checks do
 not qualify a live root service, SSH idle shutdown or an end-to-end OTA update.
 
+The setup integration at `1100412` passed 26 Wi-Fi worker/private-bus tests,
+56 manager network cases and three shared-client cases. The real shared client
+also passed a coordinator interoperability test inside a root user namespace.
+Both Pis passed the same 59 selected manager/client cases as UID 1000, with
+unchanged boot IDs. The kiosk feature configuration type-checks on the host;
+manager/control Clippy, Rust 1.89 and AArch64 checks pass. Existing unrelated
+client Clippy warnings remain. [Setup-hold evidence](data/ota-setup-holds-20261016.json)
+records exact artifacts and the distinction between fixtures, host kiosk checks
+and the still-pending physical UI/service rollout.
+
 ## Trial recovery journal and health model
 
 `engine_ota::recovery` and `RecoveryStore` implement the transaction/state portion
