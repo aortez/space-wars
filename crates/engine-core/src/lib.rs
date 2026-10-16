@@ -9,6 +9,7 @@ pub mod constants;
 pub mod math;
 pub mod physics;
 pub mod planning;
+pub mod plants;
 pub mod rng;
 pub mod transform;
 
