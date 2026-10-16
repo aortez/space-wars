@@ -24,7 +24,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Native coordinator, continuous radio monitoring, install exclusion, setup/deployment hooks and SSH admission implemented; expected setup profile changes, SSH idle qualification and offline scheduling remain |
+| #258–#260 | Native coordinator, continuous monitoring, operation holds, durable time-check scheduler and bounded provider request implemented; scheduler runtime/API integration, expected setup profile changes and SSH idle qualification remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
@@ -142,6 +142,75 @@ compatibility guard correctly prevents using this image as an in-place OTA.
 It has not been installed on either kiosk.
 [Raw Pi output and binary/source identities](data/device-time-20261014.json)
 distinguish fixture execution from installed service/RTC qualification.
+
+## Durable time-check schedule and provider request (#259)
+
+`engine_os_manager::time_schedule::Schedule` owns the boot/daily time-check
+state. Its private store locks one owner, validates/checksums the record and
+flushes each transition before returning work to its caller. Missing/corrupt
+state in an existing directory requires repair; it does not open a fresh
+connection window. Status reads and unchanged observations do not write state
+or initiate work. The production runtime still needs to select and provision
+the fixed schedule directory.
+
+Enabling partial offline mode or entering a new boot makes one automatic check
+due. An accepted synchronization from the preceding five minutes satisfies it
+without a network operation. Age comes from the accepted receipt's boot clock,
+not the observation time, provider's sticky flags or wall-clock subtraction.
+The next ordinary check is 24 hours after that actual success. A new confirmed
+success while another operation keeps connectivity also resets the retry state.
+Each attempt has one two-minute deadline; manual admission has a 30-second
+deadline inside it. Repeated manual requests join the active attempt. Failures
+retry after 15 minutes, then one hour, then six hours. Manual retries retain the
+failure stage. A long sleep collapses overdue work to one new check.
+
+The retained record includes boot identity, attempt ID, original deadlines,
+failure stage, last accepted generation/provider/time and the consumed provider
+query allowance. Same-boot reopening preserves them. New boots invalidate old
+attempt IDs. Mode Off cancels automatic work and its next due time, while an
+explicit manual check can continue under the ordinary radio policy. Regressed
+boot clocks, changed accepted identities and backwards accepted generations fail
+closed rather than resetting a deadline.
+
+An Ethernet admission grants 15 seconds for synchronization before requesting
+Wi-Fi fallback within the same two minutes. The network API's `require-wireless`
+operation changes only the caller's live TimeCheck reservation. It cannot change
+its expiry, create another hold, override another caller, or escalate a download
+or setup reservation. Radio conflicts, hardware blocks and Mode Off continue to
+use the existing coordinator rules. Repeated fallback requests are idempotent.
+
+`time_query::request` permits one bounded request to the existing provider after
+that allowance has been saved. It authenticates the systemd bus owner as root
+PID 1, checks a loaded/active enabled-or-static timesyncd service, and correlates
+the provider's bus PID with its unit MainPID and invocation identity. It repeats
+the identity/enablement checks after persistence. It sends only
+`TryRestartUnit("systemd-timesyncd.service", "fail")`, which avoids starting an
+inactive provider or replacing a conflicting queued job; see the
+[systemd 255 D-Bus contract](https://raw.githubusercontent.com/systemd/systemd/v255/man/org.freedesktop.systemd1.xml).
+There is no server/timezone edit, NetworkManager restart or application NTP
+implementation. A five-second total bound and 100-ms local guard polling cover
+bus setup, preflight and the method reply, inside the original attempt deadline.
+A lost/rejected reply leaves the query allowance consumed. The reply itself is
+never a successful synchronization: completion requires new accepted evidence
+within the attempt, from a new provider identity after a requested restart.
+
+These scheduling and provider components are not yet driven by the production
+service. Remaining integration is the dedicated runtime, authenticated Sync now
+and status API, fresh policy/time/hold observations, acquisition and release of
+the time-check hold, and OTA's own reservation before that hold is released.
+The OTA daily due/attempt record remains separate from NTP retry history. Fixture
+tests do not establish saved-profile association, captive-portal behavior, or
+installed provider qualification on the Pis.
+
+Validation on 2026-10-16 passed all 127 device-service host tests, with one
+fixture entry point ignored. The 28 new scheduler, provider and fallback cases
+passed on both Pi 5 (1.80 seconds) and Pi 4 (2.80 seconds). The board runs used
+private UID-1000 state directories, private D-Bus providers and fake radio/clock
+observations. They did not restart the installed time provider, change a radio,
+open production schedule state or reboot. Clippy, Rust 1.89 compatibility,
+AArch64 test compilation and formatting passed.
+[Exact source, binary and validation identities](data/ota-time-schedule-20261016.json)
+retain the fixture scope and outstanding runtime work.
 
 ## Wi-Fi policy and connection ownership
 

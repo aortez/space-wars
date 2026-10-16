@@ -48,6 +48,10 @@ pub enum Request {
         schema: u32,
         token: String,
     },
+    RequireWireless {
+        schema: u32,
+        token: String,
+    },
     Release {
         schema: u32,
         token: String,
@@ -61,6 +65,7 @@ impl Request {
         | Self::Resume { schema, .. }
         | Self::Admit { schema, .. }
         | Self::Renew { schema, .. }
+        | Self::RequireWireless { schema, .. }
         | Self::Release { schema, .. }) = self;
         *schema == 1
     }
@@ -265,6 +270,15 @@ fn perform<B: Backend>(controller: &mut Controller<B>, caller: Caller, request: 
             }
             Request::Renew { token, .. } => {
                 let admission = controller.renew(&HoldToken::parse(token)?, caller)?;
+                Reply {
+                    schema: 1,
+                    status: Some(admission.status),
+                    availability: Some(admission.availability),
+                    error: None,
+                }
+            }
+            Request::RequireWireless { token, .. } => {
+                let admission = controller.require_wireless(&HoldToken::parse(token)?, caller)?;
                 Reply {
                     schema: 1,
                     status: Some(admission.status),

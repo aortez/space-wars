@@ -438,6 +438,64 @@ fn time_and_download_can_use_ethernet_but_setup_requires_wireless() {
 }
 
 #[test]
+fn time_check_can_fall_back_from_ethernet_without_a_second_hold_or_longer_deadline() {
+    let temp = tempfile::tempdir().unwrap();
+    let fake = Fake::new();
+    let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+    ready(&mut controller, &fake);
+    controller.tick().unwrap();
+    fake.edit(|w| w.radio.ethernet_available = true);
+    assert_eq!(
+        controller
+            .admit(&token(), caller(), HoldKind::TimeCheck)
+            .unwrap()
+            .availability,
+        Availability::EthernetReady
+    );
+    fake.edit(|w| w.clock.ms += 15_000);
+    let reply = controller.require_wireless(&token(), caller()).unwrap();
+    assert_eq!(reply.availability, Availability::WirelessReady);
+    assert_eq!(reply.status.policy.holds.len(), 1);
+    assert_eq!(reply.status.policy.holds[0].expires_in_ms, 105_000);
+    assert_eq!(fake.calls(), [false, true]);
+    controller.require_wireless(&token(), caller()).unwrap();
+    assert_eq!(fake.calls(), [false, true]);
+    fake.edit(|w| w.clock.ms = 230_000);
+    assert!(controller.require_wireless(&token(), caller()).is_err());
+}
+
+#[test]
+fn time_fallback_honors_radio_conflicts_hardware_block_and_mode_off() {
+    for case in ["conflict", "hardware", "off"] {
+        let temp = tempfile::tempdir().unwrap();
+        let fake = Fake::new();
+        let mut controller = Controller::open(&temp.path().join("network"), fake.clone()).unwrap();
+        if case == "off" {
+            fake.edit(|w| w.radio.wireless_enabled = false);
+        } else {
+            ready(&mut controller, &fake);
+            controller.tick().unwrap();
+        }
+        fake.edit(|w| w.radio.ethernet_available = true);
+        controller
+            .admit(&token(), caller(), HoldKind::TimeCheck)
+            .unwrap();
+        fake.edit(|w| {
+            w.clock.ms += 15_000;
+            if case == "conflict" {
+                w.change = Some(Suspension::ExternalRadioChange);
+            }
+            if case == "hardware" {
+                w.radio.wireless_hardware_enabled = false;
+            }
+        });
+        let before = fake.calls();
+        assert!(controller.require_wireless(&token(), caller()).is_err());
+        assert_eq!(fake.calls(), before);
+    }
+}
+
+#[test]
 fn incomplete_or_new_activity_and_busy_guards_prevent_shutdown() {
     for case in [
         "unknown",

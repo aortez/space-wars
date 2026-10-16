@@ -176,6 +176,7 @@ struct Temporary {
     caller: Caller,
     expires_ms: u64,
     absolute_ms: Option<u64>,
+    wireless_required: bool,
 }
 
 /// None means the observer is incomplete, not that no activity exists.
@@ -235,6 +236,7 @@ pub struct HoldStatus {
     pub kind: HoldKind,
     pub expires_in_ms: u64,
     pub reconnect_grace: bool,
+    pub wireless_required: bool,
 }
 
 /// One instance belongs to the serialized device coordinator. The private
@@ -446,6 +448,7 @@ impl NetworkPolicy {
                     caller,
                     expires_ms,
                     absolute_ms,
+                    wireless_required: false,
                 },
             );
         }
@@ -487,6 +490,41 @@ impl NetworkPolicy {
             self.commit(next)?;
         }
         Ok(())
+    }
+
+    /// Escalate an existing time-check reservation after Ethernet fails to
+    /// produce a sync. No new hold, renewal or absolute deadline is granted.
+    pub(crate) fn require_wireless(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        clock: &Clock,
+    ) -> Result<()> {
+        if self.held_kind(token, caller, clock)? != HoldKind::TimeCheck {
+            return Err(invalid("wireless fallback requires a time-check hold"));
+        }
+        let id = token.id();
+        if !self.temporary[&id].wireless_required {
+            self.commit(self.record.clone())?;
+            self.temporary
+                .get_mut(&id)
+                .expect("live time hold")
+                .wireless_required = true;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn requires_wireless(
+        &mut self,
+        token: &HoldToken,
+        caller: Caller,
+        clock: &Clock,
+    ) -> Result<bool> {
+        self.held_kind(token, caller, clock)?;
+        Ok(self
+            .temporary
+            .get(&token.id())
+            .is_some_and(|h| h.wireless_required))
     }
 
     pub fn release(&mut self, token: &HoldToken, caller: Caller, clock: &Clock) -> Result<()> {
@@ -565,12 +603,14 @@ impl NetworkPolicy {
                 kind: h.kind,
                 expires_in_ms: h.expires_ms.saturating_sub(clock.ms),
                 reconnect_grace: false,
+                wireless_required: h.wireless_required,
             })
             .collect();
         holds.extend(self.record.deployments.iter().map(|h| HoldStatus {
             kind: HoldKind::Deployment,
             expires_in_ms: h.expires_ms.saturating_sub(clock.ms),
             reconnect_grace: h.reboot_grace_used,
+            wireless_required: false,
         }));
         let intent = if !self.record.policy.partial_offline {
             Intent::Unmanaged

@@ -22,6 +22,61 @@ fn caller(pid: u32) -> Caller {
 fn token(n: u8) -> HoldToken {
     HoldToken::parse(format!("{n:064x}")).unwrap()
 }
+
+#[test]
+fn wireless_fallback_preserves_the_time_hold_budget_and_owner() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut policy = NetworkPolicy::open(&temp.path().join("network"), clock(0)).unwrap();
+    policy
+        .reserve(&token(1), caller(1), HoldKind::TimeCheck, &clock(0))
+        .unwrap();
+    policy
+        .reserve(&token(2), caller(1), HoldKind::Download, &clock(0))
+        .unwrap();
+    assert!(
+        policy
+            .require_wireless(&token(1), caller(2), &clock(15_000))
+            .is_err()
+    );
+    assert!(
+        policy
+            .require_wireless(&token(2), caller(1), &clock(15_000))
+            .is_err()
+    );
+    assert!(
+        policy
+            .require_wireless(&token(3), caller(1), &clock(15_000))
+            .is_err()
+    );
+    policy
+        .require_wireless(&token(1), caller(1), &clock(15_000))
+        .unwrap();
+    let status = policy.status(&clock(15_000)).unwrap();
+    let hold = status
+        .holds
+        .iter()
+        .find(|h| h.kind == HoldKind::TimeCheck)
+        .unwrap();
+    assert!(hold.wireless_required);
+    assert_eq!(hold.expires_in_ms, 105_000);
+    policy
+        .require_wireless(&token(1), caller(1), &clock(16_000))
+        .unwrap();
+    assert_eq!(
+        policy.status(&clock(16_000)).unwrap().generation,
+        status.generation
+    );
+    policy.renew(&token(1), caller(1), &clock(119_999)).unwrap();
+    assert!(
+        policy
+            .require_wireless(&token(1), caller(1), &clock(120_000))
+            .is_err()
+    );
+    policy
+        .release(&token(1), caller(1), &clock(120_000))
+        .unwrap();
+    assert_eq!(policy.status(&clock(120_000)).unwrap().holds.len(), 1);
+}
 fn idle() -> Activity {
     Activity {
         ssh_sessions: Some(false),

@@ -85,6 +85,47 @@ fn status(path: &Path) -> serde_json::Value {
 }
 
 #[test]
+fn socket_wireless_fallback_changes_only_the_owned_time_reservation() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("network.sock");
+    let fake = Fake::new();
+    fake.0.lock().unwrap().radio.ethernet_available = true;
+    let _server =
+        crate::network_runtime::start_with(&temp.path().join("state"), &path, uid(), fake.clone())
+            .unwrap();
+    let token = "a".repeat(64);
+    let admitted = request(
+        &path,
+        &Request::Admit {
+            schema: 1,
+            token: token.clone(),
+            kind: HoldKind::TimeCheck,
+        },
+    )
+    .unwrap();
+    assert_eq!(admitted["availability"], "ethernet-ready");
+    fake.0.lock().unwrap().ms = 15_000;
+    let fallback = request(
+        &path,
+        &Request::RequireWireless {
+            schema: 1,
+            token: token.clone(),
+        },
+    )
+    .unwrap();
+    assert!(fallback["error"].is_null());
+    assert_eq!(fallback["availability"], "wireless-ready");
+    assert_eq!(
+        fallback["status"]["policy"]["holds"][0]["expires_in_ms"],
+        105_000
+    );
+    assert!(!fallback.to_string().contains(&token));
+    fake.0.lock().unwrap().ms = 120_000;
+    let late = request(&path, &Request::RequireWireless { schema: 1, token }).unwrap();
+    assert!(!late["error"].is_null());
+}
+
+#[test]
 fn runtime_start_owns_policy_before_replacing_a_stale_socket_and_preserves_saved_policy() {
     use crate::network_runtime::start_with;
     use std::os::unix::fs::MetadataExt;

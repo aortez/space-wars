@@ -149,10 +149,17 @@ impl<B: Backend> Controller<B> {
         self.admission(token, caller)
     }
 
+    pub fn require_wireless(&mut self, token: &HoldToken, caller: Caller) -> Result<Admission> {
+        let clock = self.backend.clock()?;
+        self.policy.require_wireless(token, caller, &clock)?;
+        self.admission(token, caller)
+    }
+
     fn admission(&mut self, token: &HoldToken, caller: Caller) -> Result<Admission> {
         let status = self.tick()?;
         let clock = self.backend.clock()?;
         let kind = self.policy.held_kind(token, caller, &clock)?;
+        let wireless_required = self.policy.requires_wireless(token, caller, &clock)?;
         if kind == HoldKind::Ssh {
             // The queued hold excludes future off decisions. An old off request
             // may still arrive after a timeout, and a completed policy-owned off
@@ -204,7 +211,7 @@ impl<B: Backend> Controller<B> {
             && !wireless_ready
         {
             Availability::SetupProtected
-        } else if any_network(kind) && radio.ethernet_available {
+        } else if any_network(kind) && !wireless_required && radio.ethernet_available {
             Availability::EthernetReady
         } else if wireless_ready {
             Availability::WirelessReady
@@ -420,10 +427,11 @@ impl<B: Backend> Controller<B> {
             return Ok(state.owned_off.then_some(true));
         }
         if status.policy.stay_connected
-            || status
-                .holds
-                .iter()
-                .any(|hold| !any_network(hold.kind) || !snapshot.radio.ethernet_available)
+            || status.holds.iter().any(|hold| {
+                hold.wireless_required
+                    || !any_network(hold.kind)
+                    || !snapshot.radio.ethernet_available
+            })
         {
             return Ok(Some(true));
         }

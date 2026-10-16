@@ -1,5 +1,5 @@
-//! Linux adapters. All observations are read-only; RTC writing is a separate,
-//! fixed-device operation invoked only after a verified provider completion.
+//! Linux time observations and bounded provider requests. RTC writing is a
+//! separate fixed-device operation after a verified provider completion.
 use crate::time::{ClockReading, ClockReceipt, ProviderIdentity, RtcBootReading, SyncObservation};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,9 @@ type NtpMessage = (
     u64,
 );
 
-async fn identity(connection: &zbus::Connection) -> std::result::Result<ProviderIdentity, String> {
+pub(crate) async fn identity(
+    connection: &zbus::Connection,
+) -> std::result::Result<ProviderIdentity, String> {
     let bus = zbus::fdo::DBusProxy::new(connection)
         .await
         .map_err(explain)?;

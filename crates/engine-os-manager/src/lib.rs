@@ -6,6 +6,10 @@ pub mod bootstrap_canonical;
 #[cfg(target_os = "linux")]
 mod bootstrap_recovery;
 pub mod time;
+#[cfg(target_os = "linux")]
+pub mod time_query;
+#[cfg(target_os = "linux")]
+pub mod time_schedule;
 
 #[cfg(target_os = "linux")]
 pub mod kiosk_health;
