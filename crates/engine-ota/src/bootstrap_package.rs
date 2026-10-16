@@ -392,7 +392,11 @@ fn blob(bytes: &[u8]) -> Blob {
     }
 }
 
-fn transfer(reader: &mut impl Read, writer: &mut impl Write, expected: u64) -> Result<Blob> {
+pub(super) fn transfer(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    expected: u64,
+) -> Result<Blob> {
     let mut hash = Hasher::new();
     let mut remaining = expected;
     let mut buffer = [0; 64 * 1024];

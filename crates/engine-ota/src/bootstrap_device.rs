@@ -1,6 +1,7 @@
 //! Root-operator package validation. This is deliberately separate from TUF
 //! VerifiedCandidate authority. Operator phases replace fixed legacy files and
-//! the checked inactive root. They never select a boot slot or authorize a trial.
+//! the checked inactive root, and prepare separate temporary boot assets. They
+//! never change the normal boot selection or request a reboot.
 use super::{
     Board, BootPlan, BootstrapPackage, LegacyBootEvidence, PlanRequest, STAGE_DIRECTORY,
     active_lines, inspect_legacy_boot, invalid,
@@ -28,6 +29,9 @@ const PACKAGE: &str = "package";
 #[path = "bootstrap_root_device.rs"]
 mod root_device;
 pub use root_device::install_bootstrap_root;
+#[path = "bootstrap_stage_device.rs"]
+mod stage_device;
+pub use stage_device::{BootStageProgress, BootStageReport, stage_bootstrap_boot};
 
 #[derive(Debug, Serialize)]
 pub struct PackageCheck {
@@ -536,6 +540,15 @@ struct Installed {
 
 impl Installed {
     fn open(expected: Sha256, lock: &InstallLock, require_data_space: bool) -> Result<Self> {
+        Self::open_staging(expected, lock, require_data_space, None)
+    }
+
+    fn open_staging(
+        expected: Sha256,
+        lock: &InstallLock,
+        require_data_space: bool,
+        stage: Option<&super::trial::TrialInputs>,
+    ) -> Result<Self> {
         lock.check()?;
         let data = crate::recovery_linux::open_data_mount()?;
         reject_provisioned(&data)?;
@@ -554,7 +567,7 @@ impl Installed {
         }
         let directory = open_at(&parent, PACKAGE, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
         let mut package = OperatorPackage::under(directory, 0, expected)?;
-        let legacy = inspect_legacy_boot()?;
+        let (legacy, staged_credit) = super::inspect::inspect_staging(stage)?;
         if crate::recovery_linux::DeviceNumber::from_dev(data.metadata()?.dev())
             != legacy.layout.partitions[3].device
         {
@@ -568,7 +581,7 @@ impl Installed {
         } else {
             0
         };
-        let report = package.check_device_with_credit(&legacy, credit)?;
+        let report = package.check_device_with_credits(&legacy, credit, staged_credit)?;
         if require_data_space {
             report.require_data_space()?;
         }
@@ -887,10 +900,20 @@ impl OperatorPackage {
         Ok(report)
     }
 
+    #[cfg(test)]
     fn check_device_with_credit(
         &mut self,
         legacy: &LegacyBootEvidence,
         backup_credit: u64,
+    ) -> Result<PackageCheck> {
+        self.check_device_with_credits(legacy, backup_credit, 0)
+    }
+
+    fn check_device_with_credits(
+        &mut self,
+        legacy: &LegacyBootEvidence,
+        backup_credit: u64,
+        staged_credit: u64,
     ) -> Result<PackageCheck> {
         self.check()?;
         let roots = SlotRoots::new(
@@ -974,7 +997,7 @@ impl OperatorPackage {
                 "bootstrap would alter the device's hardware configuration",
             ));
         }
-        let boot_space = capacity(&self.record.files, legacy)?;
+        let boot_space = capacity_with_credit(&self.record.files, legacy, staged_credit)?;
         let package_bytes = self.files.values().try_fold(0u64, |n, f| {
             n.checked_add(f.original.len())
                 .ok_or_else(|| invalid("package size overflow"))
@@ -1031,7 +1054,11 @@ fn normalized_profile(lines: &[String], profile: &str) -> Vec<String> {
     result
 }
 
-fn capacity(files: &BTreeMap<String, Blob>, legacy: &LegacyBootEvidence) -> Result<Capacity> {
+fn capacity_with_credit(
+    files: &BTreeMap<String, Blob>,
+    legacy: &LegacyBootEvidence,
+    credit: u64,
+) -> Result<Capacity> {
     let cluster = legacy.boot_allocation_bytes;
     if !cluster.is_power_of_two() || !(512..=65536).contains(&cluster) {
         return Err(invalid("unsupported FAT allocation size"));
@@ -1058,7 +1085,10 @@ fn capacity(files: &BTreeMap<String, Blob>, legacy: &LegacyBootEvidence) -> Resu
         }
     }
     let (directories, reserve) = (64 * 1024, 4 * 1024 * 1024);
-    let required = stage
+    if credit > stage {
+        return Err(invalid("staging space credit exceeds the selected tree"));
+    }
+    let required = (stage - credit)
         .checked_add(growth)
         .and_then(|n| n.checked_add(replacement))
         .and_then(|n| n.checked_add(directories + reserve))

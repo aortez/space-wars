@@ -1,6 +1,8 @@
 //! Private first-boot journal. Opening never initializes an absent attempt.
 //! No state transition/action escapes until file and directory flush complete.
-use super::trial::{TrialAction, TrialRecord};
+#[cfg(test)]
+use super::trial::TrialAction;
+use super::trial::TrialRecord;
 use super::{backup, device, invalid, state};
 use crate::install_lock::InstallLock;
 use crate::owned_fs::{io_result, name, open_at, open_directory, owned, read_file};
@@ -13,6 +15,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 pub(super) const DIRECTORY: &str = "boot-trial";
+pub(super) const PREPARING: &str = ".boot-trial.pending";
 const RECORD: &str = "record.json";
 const PENDING: &str = ".record.pending";
 const LIMIT: u64 = 512 * 1024;
@@ -48,7 +51,23 @@ impl TrialStore {
         )
     }
 
+    /// A staging operator may find no trial directory yet; the runtime path
+    /// still rejects that incomplete reservation rather than initializing it.
+    pub(super) fn for_staging(lock: &InstallLock) -> Result<Option<Self>> {
+        lock.check()?;
+        Self::under_mode(
+            open_directory(Path::new("/"), 0)?,
+            crate::recovery_linux::open_data_mount()?,
+            0,
+            true,
+        )
+    }
+
     fn under(root: File, data: File, owner: u32) -> Result<Option<Self>> {
+        Self::under_mode(root, data, owner, false)
+    }
+
+    fn under_mode(root: File, data: File, owner: u32, preparing: bool) -> Result<Option<Self>> {
         let Some(parent) = state::optional_directory(&data, device::DIRECTORY, owner)? else {
             return Ok(None);
         };
@@ -56,8 +75,11 @@ impl TrialStore {
             return Ok(None);
         };
         let binding = state::read_binding(&active, owner)?;
-        let directory = state::optional_directory(&active, DIRECTORY, owner)?
-            .ok_or_else(|| invalid("bootstrap reservation has no staged trial record"))?;
+        let directory = match state::optional_directory(&active, DIRECTORY, owner)? {
+            Some(directory) => directory,
+            None if preparing => return Ok(None),
+            None => return Err(invalid("bootstrap reservation has no staged trial record")),
+        };
         // The install lock excludes other tools; this also excludes separately
         // opened journal handles, including in fixtures without a system lock.
         if unsafe { libc::flock(directory.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } < 0 {
@@ -145,6 +167,11 @@ impl TrialStore {
             &self.data,
             "spacewars-bootstrap/active/boot-trial",
         )?;
+        if state::optional_directory(&self.active, PREPARING, self.owner)?.is_some() {
+            return Err(invalid(
+                "published and pending bootstrap trial records conflict",
+            ));
+        }
         if state::read_binding(&self.active, self.owner)? != self.record.inputs.binding {
             return Err(invalid("bootstrap preparation changed during trial"));
         }
@@ -179,10 +206,10 @@ impl TrialStore {
         Ok(&self.record)
     }
 
-    pub(super) fn advance(
+    pub(super) fn advance<T>(
         &mut self,
-        transition: impl FnOnce(&mut TrialRecord) -> Result<TrialAction>,
-    ) -> Result<TrialAction> {
+        transition: impl FnOnce(&mut TrialRecord) -> Result<T>,
+    ) -> Result<T> {
         self.check()?;
         let mut next = self.record.clone();
         let action = transition(&mut next)?;
@@ -248,6 +275,83 @@ impl TrialStore {
         let _ = point;
         Ok(())
     }
+}
+
+/// Called only after the root-operator admission and written-image checks.
+/// The immutable staging intent is durable before any boot file may change.
+pub(super) fn prepare(
+    active: &File,
+    owner: u32,
+    inputs: &super::trial::TrialInputs,
+    mut checkpoint: impl FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    let record = TrialRecord::staging(inputs.clone())?;
+    if state::read_binding(active, owner)? != inputs.binding {
+        return Err(invalid("staging preparation binding differs"));
+    }
+    if state::optional_directory(active, DIRECTORY, owner)?.is_some() {
+        return Err(invalid("bootstrap trial record already exists"));
+    }
+    let pending = backup::directory(active, PREPARING, owner)?;
+    if crate::recovery_linux::opened_mount_id(&pending)?
+        != crate::recovery_linux::opened_mount_id(active)?
+    {
+        return Err(invalid("pending staging record crossed mounts"));
+    }
+    // SAFETY: the independently opened private directory remains live.
+    if unsafe { libc::flock(pending.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } < 0 {
+        let error = std::io::Error::last_os_error();
+        return Err(if error.kind() == std::io::ErrorKind::WouldBlock {
+            Error::Busy
+        } else {
+            error.into()
+        });
+    }
+    backup::inventory(&pending, &[RECORD])?;
+    let bytes = serde_json::to_vec(&Envelope {
+        checksum: Sha256::digest(&serde_json::to_vec(&record)?),
+        record,
+    })?;
+    if bytes.len() as u64 > LIMIT || backup::free_space(active)? < 2 * LIMIT {
+        return Err(invalid("insufficient staging record capacity"));
+    }
+    let mut file = backup::writable(&pending, RECORD, owner)?;
+    if file.metadata()?.len() > LIMIT
+        || crate::recovery_linux::opened_mount_id(&file)?
+            != crate::recovery_linux::opened_mount_id(&pending)?
+    {
+        return Err(invalid("oversized or over-mounted pending staging record"));
+    }
+    file.set_len(0)?;
+    file.write_all(&bytes)?;
+    checkpoint("trial-record-written")?;
+    file.sync_all()?;
+    pending.sync_all()?;
+    checkpoint("trial-record-synced")?;
+    backup::check_named_directory(active, PREPARING, &pending, owner)?;
+    if state::read_binding(active, owner)? != inputs.binding {
+        return Err(invalid("staging binding changed before publication"));
+    }
+    let from = name(PREPARING)?;
+    let to = name(DIRECTORY)?;
+    // SAFETY: fixed validated names and the held private parent remain live.
+    io_result(unsafe {
+        libc::renameat2(
+            active.as_raw_fd(),
+            from.as_ptr(),
+            active.as_raw_fd(),
+            to.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    })?;
+    checkpoint("trial-record-published")?;
+    active.sync_all()?;
+    checkpoint("trial-record-directory-synced")?;
+    backup::check_named_directory(active, DIRECTORY, &pending, owner)?;
+    if read(&pending, RECORD, owner)? != bytes {
+        return Err(invalid("staging record readback differs"));
+    }
+    Ok(())
 }
 
 fn read(directory: &File, name: &str, owner: u32) -> Result<Vec<u8>> {

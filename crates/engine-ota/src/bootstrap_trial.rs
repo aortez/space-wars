@@ -82,6 +82,8 @@ impl TrialInputs {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TrialPhase {
+    Staging,
+    TrialReady,
     TrialRequested,
     ObservingTrial,
     PromotingStaged,
@@ -124,18 +126,25 @@ pub(super) enum TrialAction {
 }
 
 impl TrialRecord {
-    #[cfg(test)]
-    pub(super) fn requested(inputs: TrialInputs) -> Result<Self> {
+    pub(super) fn staging(inputs: TrialInputs) -> Result<Self> {
         let record = Self {
             schema: 1,
             inputs,
-            phase: TrialPhase::TrialRequested,
+            phase: TrialPhase::Staging,
             trial_boot_id: None,
             trial_health: None,
             normal_boot_id: None,
             normal_health: None,
             failure: None,
         };
+        record.validate()?;
+        Ok(record)
+    }
+
+    #[cfg(test)]
+    pub(super) fn requested(inputs: TrialInputs) -> Result<Self> {
+        let mut record = Self::staging(inputs)?;
+        record.phase = TrialPhase::TrialRequested;
         record.validate()?;
         Ok(record)
     }
@@ -157,7 +166,9 @@ impl TrialRecord {
         let normal = self.normal_boot_id.is_some();
         let confirmed = self.normal_health.is_some();
         let shape = match self.phase {
-            TrialPhase::TrialRequested => !started && !healthy && !normal && !confirmed,
+            TrialPhase::Staging | TrialPhase::TrialReady | TrialPhase::TrialRequested => {
+                !started && !healthy && !normal && !confirmed
+            }
             TrialPhase::ObservingTrial => started && !healthy && !normal && !confirmed,
             TrialPhase::PromotingStaged | TrialPhase::StagedDefault => {
                 started && healthy && !normal && !confirmed

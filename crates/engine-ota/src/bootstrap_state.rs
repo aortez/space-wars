@@ -177,6 +177,7 @@ pub(super) fn read_binding(active: &File, owner: u32) -> Result<BootstrapBinding
             && name != super::legacy_replace::DIRECTORY
             && name != super::root_install::DIRECTORY
             && name != super::trial_store::DIRECTORY
+            && name != super::trial_store::PREPARING
         {
             return Err(invalid(
                 "unexpected bootstrap preparation state; reconciliation required",

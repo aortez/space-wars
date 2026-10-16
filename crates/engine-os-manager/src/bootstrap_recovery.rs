@@ -32,7 +32,9 @@ pub(crate) fn run(lock: &InstallLock, store: &mut TrialStore, reporter: &Reporte
     };
     let result = bootstrap::recover_bootstrap(store, &mut backend, |phase, detail| {
         let stage = match phase {
-            TrialPhase::TrialRequested => RecoveryStage::Starting,
+            TrialPhase::Staging | TrialPhase::TrialReady | TrialPhase::TrialRequested => {
+                RecoveryStage::Starting
+            }
             TrialPhase::ObservingTrial | TrialPhase::ObservingNormal => RecoveryStage::Observing,
             TrialPhase::PromotingStaged | TrialPhase::StagedDefault => RecoveryStage::Promoting,
             TrialPhase::NormalConfirmed => RecoveryStage::BootstrapConfirmed,

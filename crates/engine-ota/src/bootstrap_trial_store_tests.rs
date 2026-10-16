@@ -196,6 +196,91 @@ pub(in crate::bootstrap) fn sample(boot: &BootObservation, number: u64) -> Healt
 }
 
 #[test]
+fn staging_record_publication_resumes_but_never_authorizes_an_unrequested_trial() {
+    for point in [
+        "trial-record-written",
+        "trial-record-synced",
+        "trial-record-published",
+        "trial-record-directory-synced",
+    ] {
+        let fixture = Fixture::new();
+        fs::remove_dir_all(fixture.journal()).unwrap();
+        let active = File::open(fixture.journal().parent().unwrap()).unwrap();
+        assert!(
+            prepare(&active, fixture.owner, &fixture.inputs, |current| {
+                if current == point {
+                    return Err(invalid("interrupted staging record"));
+                }
+                Ok(())
+            })
+            .is_err(),
+            "{point}"
+        );
+        if !fixture.journal().exists() {
+            assert!(fixture.try_open().is_err());
+            assert!(
+                TrialStore::under_mode(
+                    File::open(fixture.temp.path()).unwrap(),
+                    File::open(fixture.temp.path().join("data")).unwrap(),
+                    fixture.owner,
+                    true
+                )
+                .unwrap()
+                .is_none()
+            );
+            prepare(&active, fixture.owner, &fixture.inputs, |_| Ok(())).unwrap();
+        }
+        let mut store = fixture.open();
+        assert_eq!(store.phase(), TrialPhase::Staging);
+        assert!(
+            store
+                .advance(|record| record.reconcile(&fixture.boot()))
+                .is_err()
+        );
+        store
+            .advance(|record| {
+                record.phase = TrialPhase::TrialReady;
+                Ok(())
+            })
+            .unwrap();
+        assert!(
+            store
+                .advance(|record| record.reconcile(&fixture.boot()))
+                .is_err()
+        );
+        assert!(store.watchdog_token(&fixture.boot()).is_err());
+        assert!(prepare(&active, fixture.owner, &fixture.inputs, |_| Ok(())).is_err());
+        assert_eq!(store.phase(), TrialPhase::TrialReady);
+    }
+}
+
+#[test]
+fn staging_record_rejects_unsafe_pending_state_without_touching_it() {
+    for case in ["unknown", "link", "oversized", "binding"] {
+        let fixture = Fixture::new();
+        fs::remove_dir_all(fixture.journal()).unwrap();
+        let active_path = fixture.journal().parent().unwrap().to_owned();
+        let active = File::open(&active_path).unwrap();
+        let pending = backup::directory(&active, PREPARING, fixture.owner).unwrap();
+        match case {
+            "unknown" => fs::write(active_path.join(PREPARING).join("unknown"), b"keep").unwrap(),
+            "link" => symlink("/dev/zero", active_path.join(PREPARING).join(RECORD)).unwrap(),
+            "oversized" => {
+                let file = backup::writable(&pending, RECORD, fixture.owner).unwrap();
+                file.set_len(LIMIT + 1).unwrap();
+            }
+            "binding" => fs::write(active_path.join("binding.json"), b"corrupt").unwrap(),
+            _ => unreachable!(),
+        }
+        assert!(
+            prepare(&active, fixture.owner, &fixture.inputs, |_| Ok(())).is_err(),
+            "{case}"
+        );
+        assert!(!fixture.journal().exists());
+    }
+}
+
+#[test]
 fn interrupted_publication_never_releases_an_action_and_reopen_uses_only_published_state() {
     for point in ["write", "file-sync", "rename", "directory-sync"] {
         let fixture = Fixture::new();

@@ -222,6 +222,33 @@ fn legacy_replacements_require_the_complete_fixed_inventory_and_new_schema() {
 }
 
 #[test]
+fn checked_staged_bytes_reduce_remaining_boot_space_but_cannot_hide_extra_usage() {
+    let fixture = Fixture::new();
+    let record = fixture.build().unwrap();
+    let mut package = open(&fixture).unwrap();
+    let mut device = legacy(&record);
+    let report = package.check_device(&device).unwrap();
+    let credit = report.boot_space.staged_allocation_bytes;
+    device.boot_free_bytes = report.boot_space.required_bytes - credit;
+    assert!(package.check_device_with_credits(&device, 0, 0).is_err());
+    let resumed = package
+        .check_device_with_credits(&device, 0, credit)
+        .unwrap();
+    assert_eq!(resumed.boot_space.required_bytes, device.boot_free_bytes);
+    assert!(
+        package
+            .check_device_with_credits(&device, 0, credit + 1)
+            .is_err()
+    );
+    device.boot_free_bytes -= 1;
+    assert!(
+        package
+            .check_device_with_credits(&device, 0, credit)
+            .is_err()
+    );
+}
+
+#[test]
 fn verified_backup_credit_keeps_resume_space_checks_without_demanding_duplicate_copies() {
     let fixture = Fixture::new();
     let record = fixture.build().unwrap();

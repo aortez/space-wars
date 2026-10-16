@@ -43,6 +43,14 @@ pub struct LegacyBootEvidence {
 /// obtaining an installation lock, changing state or requiring root. Reports
 /// the live inactive slot/UUIDs; package planning arguments cannot supply them.
 pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
+    inspect_staging(None).map(|(legacy, _)| legacy)
+}
+
+/// Only the explicit staging path supplies an already validated durable intent.
+/// The public legacy probe continues to reject all existing staging/trial files.
+pub(super) fn inspect_staging(
+    stage: Option<&super::trial::TrialInputs>,
+) -> Result<(LegacyBootEvidence, u64)> {
     let layout = inspect_layout()?;
     let physical = PhysicalIdentity::inspect(&layout)?;
     let board = Board::from_model(&physical.model)?;
@@ -67,11 +75,22 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
     let kernel = kernel_build_id(&read("/sys/kernel/notes", 64 * 1024)?)?;
     let mut files = BTreeMap::new();
     inventory(&boot, "", boot.metadata()?.dev(), 0, &mut files, &mut 0)?;
+    let all_files = files.clone();
+    let (boot_free_bytes, boot_allocation_bytes) = space(&boot)?;
+    let credit = if let Some(stage) = stage {
+        let (retained, credit) =
+            super::stage_files::retained(&files, stage, boot_allocation_bytes)?;
+        files = retained;
+        credit
+    } else {
+        0
+    };
     if files.keys().any(|path| {
         matches!(
             path.as_str(),
             "tryboot.txt" | "autoboot.txt" | "spacewars-boot-manifest.json"
         ) || path.starts_with("sw-bootstrap/")
+            || path.starts_with(".sw-bootstrap-")
     }) {
         return Err(invalid(
             "existing trial, bootstrap or partition-selection state needs explicit reconciliation",
@@ -133,13 +152,12 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
         // Retain this breadcrumb in backups, but never use it to choose a slot.
         let _ = contents("boot_slot", 16)?;
     }
-    let (boot_free_bytes, boot_allocation_bytes) = space(&boot)?;
     let (data_free_bytes, _) = space(&data)?;
     let mut after = BTreeMap::new();
     inventory(&boot, "", boot.metadata()?.dev(), 0, &mut after, &mut 0)?;
     let current = inspect_layout()?;
     let named = open_at(&root, "boot", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    if after != files
+    if after != all_files
         || current != layout
         || physical != PhysicalIdentity::inspect(&current)?
         || named.metadata()?.dev() != boot.metadata()?.dev()
@@ -148,22 +166,25 @@ pub fn inspect_legacy_boot() -> Result<LegacyBootEvidence> {
     {
         return Err(invalid("boot context changed during legacy preflight"));
     }
-    Ok(LegacyBootEvidence {
-        schema: 1,
-        purpose: "read-only-legacy-bootstrap-inventory",
-        physical,
-        boot_id,
-        layout,
-        kernel_build_id: kernel,
-        hardware_profile: profile,
-        hardware_configuration,
-        hostname: device_hostname,
-        boot_files: files,
-        boot_free_bytes,
-        boot_allocation_bytes,
-        data_free_bytes,
-        root_preflight_complete: false,
-    })
+    Ok((
+        LegacyBootEvidence {
+            schema: 1,
+            purpose: "read-only-legacy-bootstrap-inventory",
+            physical,
+            boot_id,
+            layout,
+            kernel_build_id: kernel,
+            hardware_profile: profile,
+            hardware_configuration,
+            hostname: device_hostname,
+            boot_files: files,
+            boot_free_bytes,
+            boot_allocation_bytes,
+            data_free_bytes,
+            root_preflight_complete: false,
+        },
+        credit,
+    ))
 }
 
 fn legacy_selection(config: &str, default: &[u8], running: &str, active: &str) -> Result<()> {

@@ -9,11 +9,12 @@ installed boot assets.
 root-only package validation, a durable preparation reservation, raw boot/inactive
 root recovery copies, a data/configuration archive, original-file preservation,
 restartable fixed-file replacement, effective access checks, a restartable
-inactive-root installer, independent-export verifiers, and a first-boot recovery
+inactive-root installer, independent-export verifiers, restartable boot staging,
+and a first-boot recovery
 coordinator with a separate staged normal-boot health check.
 **Remaining:** live preservation and independent exports, effective legacy
-privilege/access/service qualification, live root installation, boot staging and
-trial activation, supervised boot verification,
+privilege/access/service qualification, live root installation and staging,
+one-shot trial activation, supervised boot verification,
 canonical boot migration, recovery-journal provisioning and physical failure
 qualification. A package is not a signed OTA candidate or an enabled updater.
 
@@ -168,7 +169,7 @@ reimport keys if that store has disappeared during bootstrap. These guards do
 not change the legacy tools already installed on the Pis; their unsigned write
 and reboot paths still must be closed before trial. Preparation and raw recovery
 copies can resume today. Root installation uses its separate operator example
-below; boot staging and trial activation are not yet implemented.
+below; one-shot trial activation is not yet implemented.
 
 ```sh
 cargo build --locked -p engine-ota --example bootstrap_check \
@@ -522,6 +523,58 @@ Independent logins, the full privilege audit, boot staging/handoff and physical
 qualification remain separate requirements. No installed Pi partition has been
 written during the fixture validation of this command.
 
+## Stage the temporary boot files
+
+`bootstrap_stage_boot` requires the completed inactive-root receipt as well as
+the selected package and recovery-copy digests. The operator must retain the
+independent recovery copies and authenticated root connection, with the runtime
+services masked/stopped and their account quiescent as in the preceding phase.
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_stage_boot \
+  --target aarch64-unknown-linux-gnu
+# On the Pi through the authenticated root operator connection:
+./bootstrap_stage_boot BUNDLE_SHA256 RAW_COPIES_SHA256 DATA_RECEIPT_SHA256 \
+  ORIGINALS_RECEIPT_SHA256 ROOT_INSTALL_SHA256 "$SSH_CONNECTION"
+```
+
+The command takes both installation/legacy-maintenance locks, checks the actual
+normal boot and package, rehashes the recovery copies, verifies fallback-root
+replacement and access configuration, and rejects a missing or incomplete
+root-install receipt. It exclusively holds the observed inactive partition while
+rehashing its image, checking the actual ext4 identity/bootstrap capability, and
+preparing boot files. It repeats those image checks before reporting completion.
+It has no root-image write or repair path.
+
+Before any boot-file change, it publishes a private `staging` record at
+`active/boot-trial/record.json`, binding the written image, retained default and
+the checked plan. An interrupted initialization uses only
+`active/.boot-trial.pending`; unpublished bytes are never runtime authority.
+The normal recovery service cannot start a trial from `staging` or `trial-ready`.
+
+Assets and generated command lines are copied into `/boot/.sw-bootstrap-pending`.
+The command bounds and verifies every file, flushes files/directories and the
+filesystem, then publishes `/boot/sw-bootstrap` without replacing an existing
+tree. It writes the checked `/boot/tryboot.txt` last, through the fixed
+`.sw-bootstrap-tryboot.pending` file and a no-replace rename. The original
+`config.txt`, command line, firmware, kernel, profile and hostname stay unchanged.
+
+An explicit rerun can finish bounded partial files only in its recorded pending
+tree. A published tree must already be complete and match its plan; changed or
+missing completed assets stop preparation. Unknown entries in the pending or
+staged trees, unsafe links,
+conflicting trees, replaced paths or changed receipts also stop it. Resume
+credits only the allocated bytes of recorded stage files, while retaining space
+for later canonical migration and its reserve. An ordinary legacy reboot can
+resume copying without changing the original staging boot ID or trial token.
+
+The journal advances to `trial-ready` only after the complete boot tree and
+installed image pass verification. A repeated ready operation verifies that
+state; an already requested, observed, failed or confirmed trial cannot be
+prepared again. The result always reports `reboot_requested: false` and
+`automatic_updates_enabled: false`. The separately gated one-shot activation
+operation is still pending; do not substitute a manual tryboot command for it.
+
 ## First-boot recovery runtime
 
 `engine-os-manager recover` now dispatches an explicitly staged bootstrap through
@@ -529,8 +582,9 @@ its own root-private journal at
 `/data/spacewars-bootstrap/active/boot-trial/record.json`. Opening this journal
 never creates a missing attempt, reuses unpublished temporary state or resets a
 failed attempt. Bootstrap and production recovery journals cannot coexist.
-The production staging/activation command that creates the initial record is
-still pending; this runtime alone does not make a device ready for trial.
+The staging command creates the initial record; the separate activation operation
+that moves a prepared attempt to `trial-requested` remains pending. This runtime
+alone does not make a device ready for a supervised trial.
 
 The immutable record binds the preparation/package, completed root-install
 digest, image identity, original boot configuration, staged plan and originating
@@ -656,7 +710,8 @@ tool or instructions to copy the whole boot tree onto a live Pi**:
    The shared kiosk health worker now checks persistent network/Bluetooth binds
    and SSH-store structure as well as settings writes. The separate bootstrap
    coordinator uses that worker and its own persisted health authorization for
-   watchdog completion. Initial staging and trial activation remain pending.
+   watchdog completion. Initial boot staging is implemented; activation and all
+   live migration/boot qualification remain pending.
 5. After a successful supervised trial, select a normal boot using the staged
    assets and reboot normally. Keep the backed-up legacy configuration/assets
    available until the canonical migration is proven.

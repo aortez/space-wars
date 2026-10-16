@@ -55,6 +55,8 @@ mod legacy_state;
 mod quiesce;
 #[path = "bootstrap_root_install.rs"]
 mod root_install;
+#[path = "bootstrap_stage_files.rs"]
+mod stage_files;
 #[path = "bootstrap_trial.rs"]
 mod trial;
 pub use trial::{TrialFailure, TrialPhase};
@@ -80,6 +82,7 @@ pub use device::check_installed_legacy_access;
 pub use device::install_bootstrap_root;
 pub use device::prepare_installed_legacy;
 pub use device::replace_installed_legacy;
+pub use device::{BootStageProgress, BootStageReport, stage_bootstrap_boot};
 pub use legacy_replace::{
     LegacyReplacementProgress, LegacyReplacementReport, LegacyReplacementStage,
 };

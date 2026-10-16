@@ -52,6 +52,25 @@ struct Fixture {
     target: PathBuf,
     owner: u32,
 }
+
+#[test]
+fn staging_requires_an_existing_completed_root_receipt_without_creating_or_repairing_one() {
+    let fixture = Fixture::new();
+    assert!(completed(&fixture.active, fixture.owner, &image().inputs).is_err());
+    assert!(!fixture._temp.path().join("active/root-install").exists());
+    let report = fixture.run(&mut |_| Ok(())).unwrap();
+    assert_eq!(
+        completed(&fixture.active, fixture.owner, &image().inputs).unwrap(),
+        report.journal_sha256
+    );
+    let mut changed = image().inputs.clone();
+    changed.package_sha256 = Sha256::digest(b"another package");
+    assert!(completed(&fixture.active, fixture.owner, &changed).is_err());
+    let path = fixture._temp.path().join("active/root-install/record.json");
+    fs::write(&path, b"corrupt").unwrap();
+    assert!(completed(&fixture.active, fixture.owner, &image().inputs).is_err());
+    assert_eq!(fs::read(path).unwrap(), b"corrupt");
+}
 impl Fixture {
     fn new() -> Self {
         let temp = tempfile::tempdir().unwrap();

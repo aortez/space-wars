@@ -209,6 +209,39 @@ fn optional_record(directory: &File, component: &str, owner: u32) -> Result<Opti
     }
 }
 
+/// Observe only a completed copy; this cannot initialize, resume or repair an
+/// install. The staging caller separately rehashes the exclusively held target.
+pub(super) fn completed(active: &File, owner: u32, inputs: &Inputs) -> Result<Sha256> {
+    inputs.validate()?;
+    let directory = super::state::optional_directory(active, DIRECTORY, owner)?
+        .ok_or_else(|| invalid("bootstrap root installation is missing"))?;
+    backup::inventory(&directory, &[RECORD, PENDING])?;
+    if crate::recovery_linux::opened_mount_id(&directory)?
+        != crate::recovery_linux::opened_mount_id(active)?
+    {
+        return Err(invalid("root-install journal crossed mounts"));
+    }
+    let bytes = optional_record(&directory, RECORD, owner)?
+        .ok_or_else(|| invalid("bootstrap root installation is incomplete"))?;
+    let envelope: Envelope = serde_json::from_slice(&bytes)?;
+    let hash = Sha256::digest(&serde_json::to_vec(&envelope.record)?);
+    if envelope.record.schema != 1
+        || envelope.record.phase != Phase::Written
+        || envelope.record.inputs != *inputs
+        || envelope.checksum != hash
+    {
+        return Err(invalid(
+            "bootstrap root installation is not the selected completed copy",
+        ));
+    }
+    optional_record(&directory, PENDING, owner)?;
+    backup::check_named_directory(active, DIRECTORY, &directory, owner)?;
+    if optional_record(&directory, RECORD, owner)?.as_deref() != Some(bytes.as_slice()) {
+        return Err(invalid("completed root-install record changed"));
+    }
+    Ok(hash)
+}
+
 /// The caller supplies checked package/backup identities, holds the installation
 /// lock and excludes other writers. Only the device wrapper can open a raw target.
 #[allow(clippy::too_many_arguments)]
