@@ -23,7 +23,7 @@ Remaining work retains the full OTA scope:
 | Issue | Integration required |
 | --- | --- |
 | #256 | Service implemented; installed-provider and RTC retention qualification remain |
-| #258–#260 | Policy/hold persistence, serialized radio controller and Wi-Fi-only D-Bus adapter implemented; session protection, service/setup/deployment integration and offline scheduling remain |
+| #258–#260 | Policy/holds, radio controller, Wi-Fi-only adapter and bounded control server implemented; session protection, runtime/setup/deployment integration and offline scheduling remain |
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard and persistent SSH login keys implemented; final service/handoff, maintenance holds and physical data preservation qualification remain |
@@ -218,10 +218,28 @@ The private policy record is now schema 3. These unpublished policy
 records have not been installed on either kiosk; older schemas are rejected
 rather than silently reset.
 
+`network_service::NetworkServer` adds the bounded control boundary around that
+controller. Its version-1 requests are status, saved policy changes, explicit
+resume, and hold admission/renewal/release. There are no executable, file-path,
+unit-name, install or reboot requests. The server authenticates root/the kiosk
+account from `SO_PEERCRED`, captures the kernel process start time and rechecks
+the identity before dispatch; request JSON cannot supply identity. The client
+verifies a root peer before sending a capability. Temporary holds cannot be
+released by a different process, while deployment capabilities retain their
+account ownership across command gaps. Replies never echo capabilities.
+
+One coordinator owns the controller and queues commands behind in-flight radio
+work. It has a bounded eight-command queue and eight socket workers, 1 KiB request
+frames, a five-second absolute frame deadline and a thirty-second operation wait.
+Expired queued work and changed process identities cannot mutate state. A lost
+reply does not undo a reservation; retry with the same capability. Status failures
+and a stopped coordinator report unavailability, while queue pressure is distinct.
+The network coordinator does not share the time/status service's work loop.
+
 **Integration remains incomplete:** `serve` does not yet load the controller or
-admit holds. The native complete SSH/session observer and admission barrier,
+bind this network socket. The native complete SSH/session observer and admission barrier,
 install guards, continuous radio-change monitoring (including changes reversed
-between polls), socket controls, setup lifecycle and deployment hooks remain
+between polls), runtime/CLI binding, setup lifecycle and deployment hooks remain
 required. The controller tests supply activity and guards from fixtures; these
 do not qualify physical SSH admission. Expected profile changes from the setup
 worker still need coordination with the observer. No automatic radio change is

@@ -140,6 +140,10 @@ pub fn authorized(uid: u32, kiosk_uid: u32) -> bool {
 }
 
 fn peer_uid(stream: &UnixStream) -> Result<u32> {
+    Ok(peer_credentials(stream)?.uid)
+}
+
+pub(crate) fn peer_credentials(stream: &UnixStream) -> Result<libc::ucred> {
     // SAFETY: SO_PEERCRED fills the initialized Linux ucred and its size.
     let mut credentials: libc::ucred = unsafe { std::mem::zeroed() };
     let mut length = std::mem::size_of_val(&credentials) as libc::socklen_t;
@@ -155,7 +159,7 @@ fn peer_uid(stream: &UnixStream) -> Result<u32> {
     if result != 0 || length as usize != std::mem::size_of_val(&credentials) {
         return Err(std::io::Error::last_os_error().into());
     }
-    Ok(credentials.uid)
+    Ok(credentials)
 }
 
 fn handle(mut stream: UnixStream, read: &StatusReader, stop: &AtomicBool) -> Result<()> {
@@ -194,7 +198,11 @@ fn handle(mut stream: UnixStream, read: &StatusReader, stop: &AtomicBool) -> Res
     }
 }
 
-fn read_frame(stream: &mut UnixStream, limit: usize, timeout: Duration) -> Result<Vec<u8>> {
+pub(crate) fn read_frame(
+    stream: &mut UnixStream,
+    limit: usize,
+    timeout: Duration,
+) -> Result<Vec<u8>> {
     let deadline = Instant::now() + timeout;
     let mut bytes = Vec::with_capacity(256);
     loop {
@@ -214,7 +222,7 @@ fn read_frame(stream: &mut UnixStream, limit: usize, timeout: Duration) -> Resul
     }
 }
 
-fn write_json(stream: &mut UnixStream, value: &impl Serialize) -> Result<()> {
+pub(crate) fn write_json(stream: &mut UnixStream, value: &impl Serialize) -> Result<()> {
     let mut bytes = serde_json::to_vec(value)?;
     if bytes.len() > MAX_RESPONSE {
         return Err(Error::Invalid("socket response exceeds limit".into()));

@@ -24,6 +24,8 @@ pub mod network_radio;
 #[cfg(target_os = "linux")]
 mod network_radio_state;
 #[cfg(target_os = "linux")]
+pub mod network_service;
+#[cfg(target_os = "linux")]
 pub mod recovery_service;
 #[cfg(target_os = "linux")]
 pub mod recovery_status;

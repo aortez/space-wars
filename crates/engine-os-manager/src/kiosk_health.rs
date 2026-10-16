@@ -189,7 +189,7 @@ fn start_ticks(stat: &str, expected_pid: u32) -> Result<u64> {
     }
 }
 
-fn process(pid: u32, uid: u32) -> Result<u64> {
+pub(crate) fn process(pid: u32, uid: u32) -> Result<u64> {
     let root = Path::new("/proc").join(pid.to_string());
     let status = read_small(&root.join("status"), 64 * 1024)?;
     let uids = status
