@@ -181,6 +181,36 @@ fn independently_opened_transactions_cannot_replace_files_concurrently() {
 }
 
 #[test]
+fn completed_verification_never_initializes_resumes_or_repairs_a_transaction() {
+    let fixture = Prepared::new();
+    let f = &fixture.fixture;
+    let check = || {
+        completed(
+            &f.root,
+            &File::open(f.active()).unwrap(),
+            f.owner,
+            &f.binding,
+            &f.inputs,
+            fixture.originals,
+        )
+    };
+    assert!(check().is_err());
+    assert!(!f.active().join(DIRECTORY).exists());
+    fixture.stop(0, Stage::Renamed);
+    let before = fs::read(f.active().join(DIRECTORY).join(RECORD)).unwrap();
+    assert!(check().is_err());
+    assert_eq!(
+        fs::read(f.active().join(DIRECTORY).join(RECORD)).unwrap(),
+        before
+    );
+    let report = fixture.run(&mut |_, _| Ok(())).unwrap();
+    assert_eq!(check().unwrap(), report.journal_sha256);
+    fs::write(f.manager(), b"operator edit").unwrap();
+    assert!(check().is_err());
+    assert_eq!(fs::read(f.manager()).unwrap(), b"operator edit");
+}
+
+#[test]
 fn abrupt_process_exit_after_link_and_exchange_resumes() {
     const CHILD: &str = "SPACEWARS_REPLACEMENT_CRASH_FIXTURE";
     if let Some(path) = std::env::var_os(CHILD) {

@@ -413,6 +413,49 @@ services, alter boot selectors, open a watchdog, write partition images or reboo
 Effective sudo/SSH/service validation and separate root/runtime login tests must
 follow before any trial. Neither installed Pi root has been changed by this work.
 
+## Check access after replacement
+
+After the operator reloads systemd, `bootstrap_check_legacy_access` verifies the
+completed replacement transaction and selected effective access settings. It
+holds the shared installation lock and accepts the same four independently
+selected digests as replacement, plus one explicit SSH connection context:
+
+```sh
+cargo build --locked -p engine-ota --example bootstrap_check_legacy_access \
+  --target aarch64-unknown-linux-gnu
+# Run on the Pi from the authenticated root operator session:
+./bootstrap_check_legacy_access BUNDLE_SHA256 RAW_COPIES_SHA256 \
+  DATA_RECEIPT_SHA256 ORIGINALS_RECEIPT_SHA256 "$SSH_CONNECTION"
+```
+
+The final argument contains client address, client port, server address and
+server port. It selects the context for SSH `Match` rules; it is not evidence of
+operator authentication. The process must itself run as root. The checker
+never initializes or resumes an incomplete replacement, repairs configuration,
+reloads a service or authorizes a trial. It rechecks package, preserved key roles,
+network stores, original files and completed replacements before and after the
+commands. Backup digests must match the preservation receipt, but this read-only
+follow-up does not reread the entire raw/data archives; the next writing phase
+must verify those independently retained backups again.
+
+Each fixed command has a ten-second deadline and 64 KiB output bound. The checks
+cover strict sudoers syntax, an allowlist of effective runtime sudo commands,
+the exact reviewed log helper, SSH public-key and persistent host-key paths for
+both users, and selected loaded service commands/dependencies. Unsupported
+sudo defaults or privileges, SSH command/environment overrides, stale systemd
+configuration and missing persistence ordering fail the check. SSH inspection
+uses `sshd -T -C`; it checks configuration and host-key validity without starting
+a daemon. Only configuration hashes are reported, and command diagnostics do
+not echo input contents.
+
+The report always leaves `independent_logins_verified`,
+`equivalent_privilege_audit_complete` and `ready_for_trial` false. Before a trial,
+retain the existing root session while verifying new root and runtime logins
+independently, exercise the denial cases as the actual runtime UID, and review
+equivalent D-Bus, Polkit and service-control permissions. Loaded dependencies
+alone do not establish that services have run successfully or that an existing
+SSH daemon has adopted new settings. Pi 4 and Pi 5 need their own results.
+
 ## Persistent network profiles
 
 The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`

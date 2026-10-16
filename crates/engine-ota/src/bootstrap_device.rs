@@ -362,6 +362,60 @@ fn legacy_package_path(path: &str) -> String {
     }
 }
 
+/// Read-only follow-up after the operator reloads systemd. This checks the
+/// completed file transaction and effective settings for one supplied SSH
+/// context. It does not stand in for independent logins or a full privilege audit.
+pub fn check_installed_legacy_access(
+    expected: Sha256,
+    raw_copies: Sha256,
+    data_copy: Sha256,
+    originals: Sha256,
+    connection: super::SshCheckConnection,
+) -> Result<super::LegacyAccessCheck> {
+    let lock = InstallLock::acquire()?;
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before checking migrated access"))?;
+    let active = super::state::optional_directory(&inspected.parent, super::state::ACTIVE, 0)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared"))?;
+    let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
+    let inputs = legacy_inputs(&inspected.package, binding, raw_copies, data_copy)?;
+    let check = || -> Result<Sha256> {
+        inspected.check(&lock)?;
+        super::backup::check_named_directory(&inspected.parent, super::state::ACTIVE, &active, 0)?;
+        crate::access_linux::preserved_for_bootstrap(&lock)?;
+        crate::network_linux::preserved_for_bootstrap(&lock)?;
+        super::legacy_replace::completed(&root, &active, 0, binding, &inputs, originals)
+    };
+    let journal = check()?;
+    let observed = super::access_check::check(&root, &inspected.data, &connection)?;
+    if check()? != journal {
+        return Err(invalid(
+            "legacy replacement journal changed during access checks",
+        ));
+    }
+    Ok(super::LegacyAccessCheck {
+        schema: 1,
+        scope: "completed fixed replacements, effective sudo/SSH settings and selected loaded dependencies; no login, complete privilege audit or boot authority",
+        package_sha256: expected,
+        raw_copies_sha256: raw_copies,
+        data_receipt_sha256: data_copy,
+        originals_sha256: originals,
+        replacement_journal_sha256: journal,
+        sudo_policy_sha256: observed.sudo_sha256,
+        permitted_sudo_commands: observed.commands,
+        ssh_connection: connection,
+        root_sshd_configuration_sha256: observed.root_sshd,
+        runtime_sshd_configuration_sha256: observed.runtime_sshd,
+        checked_services: observed.services,
+        independent_logins_verified: false,
+        equivalent_privilege_audit_complete: false,
+        ready_for_trial: false,
+    })
+}
+
 fn legacy_inputs(
     package: &OperatorPackage,
     binding: &super::BootstrapBinding,

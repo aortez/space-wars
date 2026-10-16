@@ -35,6 +35,8 @@ pub use backup::{
 pub use device::backup_installed_package;
 pub use state::{BootstrapBinding, PreparationReport, require_no_active_bootstrap};
 
+#[path = "bootstrap_access_check.rs"]
+mod access_check;
 #[path = "bootstrap_archive.rs"]
 mod archive;
 #[path = "bootstrap_data_backup.rs"]
@@ -49,11 +51,13 @@ mod legacy_replace;
 mod legacy_state;
 #[path = "bootstrap_quiesce.rs"]
 mod quiesce;
+pub use access_check::{LegacyAccessCheck, SshCheckConnection};
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
     DataBackupStage, verify_data_backup_export,
 };
 pub use device::backup_installed_data;
+pub use device::check_installed_legacy_access;
 pub use device::prepare_installed_legacy;
 pub use device::replace_installed_legacy;
 pub use legacy_replace::{

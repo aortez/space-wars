@@ -454,6 +454,71 @@ pub(super) fn started(active: &File, owner: u32) -> Result<bool> {
     Ok(optional_record(&directory, RECORD, owner)?.is_some())
 }
 
+/// Observe a completed transaction without initializing or resuming it. The
+/// outer installation lock and this shared lock exclude concurrent replacement.
+pub(super) fn completed(
+    root: &File,
+    active: &File,
+    owner: u32,
+    binding: &BootstrapBinding,
+    inputs: &Inputs,
+    originals: Sha256,
+) -> Result<Sha256> {
+    let receipt = legacy_state::verified_receipt(active, owner, binding, originals)?;
+    if &receipt.inputs != inputs || receipt.source.root.uid != owner {
+        return Err(invalid(
+            "legacy verification inputs differ from the preserved originals",
+        ));
+    }
+    let directory = super::state::optional_directory(active, DIRECTORY, owner)?
+        .ok_or_else(|| invalid("legacy replacement has not begun"))?;
+    // SAFETY: the directory descriptor remains open for this check.
+    if unsafe { libc::flock(directory.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) } < 0 {
+        let error = std::io::Error::last_os_error();
+        return Err(if error.kind() == std::io::ErrorKind::WouldBlock {
+            Error::Busy
+        } else {
+            error.into()
+        });
+    }
+    let bytes = optional_record(&directory, RECORD, owner)?
+        .ok_or_else(|| invalid("legacy replacement journal is missing"))?;
+    let journal = decode_journal(&bytes, originals)?;
+    let actions = actions(&receipt.source);
+    if journal.steps.len() != actions.len()
+        || journal.steps.iter().any(|s| !matches!(s, Step::Done(_)))
+    {
+        return Err(invalid(
+            "legacy replacement is incomplete; resume it before checking access",
+        ));
+    }
+    let transaction = Transaction {
+        root,
+        active,
+        directory,
+        owner,
+        receipt,
+        journal,
+        persisted: Some(bytes),
+        actions,
+    };
+    transaction.check_store()?;
+    transaction.validate_journal()?;
+    transaction.check_tree()?;
+    transaction.check_store()?;
+    Ok(Sha256::digest(&serde_json::to_vec(&transaction.journal)?))
+}
+
+fn decode_journal(bytes: &[u8], originals: Sha256) -> Result<Journal> {
+    let envelope: Envelope = serde_json::from_slice(bytes)?;
+    if Sha256::digest(&serde_json::to_vec(&envelope.journal)?) != envelope.checksum
+        || envelope.journal.originals_sha256 != originals
+    {
+        return Err(invalid("legacy migration journal identity mismatch"));
+    }
+    Ok(envelope.journal)
+}
+
 /// Caller must hold the installation lock, check the package and backups,
 /// and exclude running legacy helpers and runtime sessions for the full call.
 /// `check` is repeated at each durable boundary; it is not a user-supplied flag.
@@ -501,13 +566,7 @@ pub(super) fn apply(
     inventory(&directory, &[RECORD, PENDING])?;
     let persisted = optional_record(&directory, RECORD, owner)?;
     let journal = if let Some(bytes) = &persisted {
-        let envelope: Envelope = serde_json::from_slice(bytes)?;
-        if Sha256::digest(&serde_json::to_vec(&envelope.journal)?) != envelope.checksum
-            || envelope.journal.originals_sha256 != originals
-        {
-            return Err(invalid("legacy migration journal identity mismatch"));
-        }
-        envelope.journal
+        decode_journal(bytes, originals)?
     } else {
         Journal {
             schema: 1,
