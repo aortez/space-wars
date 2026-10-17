@@ -14,7 +14,7 @@ import re
 import subprocess
 import tempfile
 
-from ota_delivery import digest, integer, sha, strict_json, valid_blob, valid_record
+from ota_delivery import Bundle, digest, integer, sha, strict_json, valid_blob, valid_record
 
 ROLES = ('targets', 'release', 'nightly', 'snapshot', 'timestamp')
 MAX_BYTES = 16 * 1024 * 1024
@@ -119,7 +119,7 @@ def load(data):
     pending = state['pending']
     if pending is not None:
         if (not isinstance(pending, dict)
-                or set(pending) != {'intent', 'prepared_at', 'versions', 'generation', 'stages'}
+                or set(pending) != {'intent', 'prepared_at', 'versions', 'generation', 'stages', 'publication'}
                 or pending['versions'] != state['versions'] or not isinstance(pending['stages'], dict)
                 or not set(pending['stages']) <= set(ROLES)):
             raise ValueError('Invalid pending publication')
@@ -150,6 +150,8 @@ def load(data):
             if stage['signed'] is not None:
                 if metadata(stage['signed'])['version'] != pending['versions'][role]:
                     raise ValueError('Signed role differs from reserved version')
+        if pending['publication'] is not None:
+            publication_record(state, pending['publication'])
     return state
 
 
@@ -194,7 +196,7 @@ def reserve(state, selected, prepared_at):
         generation = known['generation']
     state['versions'] = {r: v + 1 for r, v in state['versions'].items()}
     state['pending'] = dict(intent=copy.deepcopy(selected), prepared_at=prepared_at,
-                            versions=state['versions'].copy(), generation=generation, stages={})
+                            versions=state['versions'].copy(), generation=generation, stages={}, publication=None)
     return changed(state)
 
 
@@ -254,12 +256,55 @@ def retain(state, role, response, tooling):
     return changed(state)
 
 
+def publication_record(state, manifest):
+    if not isinstance(manifest, str):
+        raise ValueError('Invalid retained publication manifest')
+    raw = manifest.encode()
+    bundle = Bundle('.', raw, digest(raw))  # Structural checks; no filesystem access.
+    value = strict_json(raw)
+    if (value['trusted_root_sha256'] != state['root_sha256']
+            or bundle.record['version'] != state['pending']['versions']['timestamp']):
+        raise ValueError('Publication manifest differs from reserved authority/version')
+    expected = {}
+    for role in ROLES:
+        data = signed(state, role).encode()
+        version = state['pending']['versions'][role]
+        name = 'timestamp.json' if role == 'timestamp' else f'{version}.{role}.json'
+        expected[name] = dict(bytes=len(data), sha256=digest(data))
+    for channel in ('release', 'nightly'):
+        for name, target in metadata(signed(state, channel))['targets'].items():
+            hashed = target['hashes']['sha256']
+            expected[hashed + '.' + name] = dict(bytes=target['length'], sha256=hashed)
+    roots = {name: blob for name, blob in bundle.files.items() if name.endswith('.root.json')}
+    if not any(blob['sha256'] == state['root_sha256'] for blob in roots.values()):
+        raise ValueError('Publication manifest omits the independently trusted root')
+    if bundle.files != {**expected, **roots}:
+        raise ValueError('Publication manifest differs from exact retained roles and payloads')
+    return bundle.record
+
+
+def seal(state, verified_manifest):
+    """Persist the exact feed_inventory output before any delivery mutation."""
+    state = load(encode(state))
+    raw = verified_manifest.decode()
+    publication_record(state, raw)
+    prior = state['pending']['publication']
+    if prior is not None:
+        if prior != raw:
+            raise ValueError('Cannot replace an already sealed publication manifest')
+        return state
+    state['pending']['publication'] = raw
+    return changed(state)
+
+
 def confirm(state, verified_record, observed_record, published_at):
     """After inventory + delivery + fresh public readback, under the writer lock."""
     state = load(encode(state))
     pending = state['pending']
     if pending is None or not valid_record(verified_record) or observed_record != verified_record:
         raise ValueError('Publication has not been verified at the public feed')
+    if publication_record(state, pending['publication']) != verified_record:
+        raise ValueError('Public observation differs from the durably sealed manifest')
     raw = signed(state, 'timestamp').encode()
     if (verified_record['version'] != pending['versions']['timestamp']
             or verified_record['timestamp'] != {'bytes': len(raw), 'sha256': digest(raw)}

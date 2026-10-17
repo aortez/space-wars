@@ -8,6 +8,7 @@ from ota_delivery import digest
 
 NOW = '2026-10-17T03:00:00Z'
 LATER = '2026-10-18T03:00:00Z'
+ROOT = b'independently verified fixture root'
 
 
 def role_bytes(role, version):
@@ -22,7 +23,7 @@ def record(roles):
 
 def genesis():
     roles = {r: role_bytes(r, 1).decode() for r in helper.ROLES}
-    return helper.initialize(b'independently verified fixture root', roles, record(roles))
+    return helper.initialize(ROOT, roles, record(roles))
 
 
 def nightly(payload=b'first image'):
@@ -50,12 +51,30 @@ class FakeTooling:
             raise ValueError('Fixture response mismatch')
 
 
-def finish(state, tooling):
+def staged(state, tooling):
     for role in helper.ROLES:
         state = helper.prepare(state, role, tooling)
         state = helper.retain(state, role, role_bytes(role, state['versions'][role]), tooling)
+    return state
+
+
+def manifest(state):
+    files = {'1.root.json': dict(bytes=len(ROOT), sha256=digest(ROOT))}
+    for role in helper.ROLES:
+        raw = helper.signed(state, role).encode()
+        name = 'timestamp.json' if role == 'timestamp' else f"{state['versions'][role]}.{role}.json"
+        files[name] = dict(bytes=len(raw), sha256=digest(raw))
+    return helper.encode(dict(schema=1, trusted_root_sha256=state['root_sha256'],
+                              timestamp_version=state['versions']['timestamp'], files=files))
+
+
+def finish(state, tooling):
+    state = staged(state, tooling)
+    raw = manifest(state)
+    state = helper.seal(state, raw)
     roles = {r: helper.signed(state, r) for r in helper.ROLES}
     published = record(roles)
+    published['manifest_sha256'] = digest(raw)
     return helper.confirm(state, published, published, state['pending']['prepared_at'])
 
 
@@ -146,6 +165,11 @@ class PublisherJournalTests(unittest.TestCase):
             state = helper.prepare(state, role, self.tooling)
             state = helper.retain(state, role, role_bytes(role, 2), self.tooling)
         published = record({r: helper.signed(state, r) for r in helper.ROLES})
+        raw = manifest(state)
+        published['manifest_sha256'] = digest(raw)
+        with self.assertRaises(ValueError):
+            helper.confirm(state, published, published, NOW)
+        state = helper.seal(state, raw)
         with self.assertRaises(ValueError):
             helper.confirm(state, published, state['current'], NOW)
         with self.assertRaises(ValueError):
@@ -153,6 +177,40 @@ class PublisherJournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             helper.confirm(state, state['current'], state['current'], NOW)
         self.assertIsNone(helper.confirm(state, published, published, NOW)['pending'])
+
+    def test_sealed_manifest_survives_reload_and_cannot_be_replaced(self):
+        state = staged(helper.reserve(self.state, nightly(), NOW), self.tooling)
+        raw = manifest(state)
+        sealed = helper.seal(state, raw)
+        restored = helper.load(helper.encode(sealed))
+        self.assertEqual(restored['pending']['publication'].encode(), raw)
+        self.assertEqual(helper.seal(restored, raw), sealed)
+        with self.assertRaises(ValueError):
+            helper.seal(restored, raw + b' ')
+
+    def test_seal_rejects_changed_role_bytes_root_or_extra_assets(self):
+        state = staged(helper.reserve(self.state, nightly(), NOW), self.tooling)
+        value = json.loads(manifest(state))
+        mutations = [lambda v: v.update(trusted_root_sha256='f' * 64),
+                     lambda v: v['files']['timestamp.json'].update(sha256='f' * 64),
+                     lambda v: v['files'].update({'9.targets.json': v['files']['2.targets.json']}),
+                     lambda v: v['files'].pop('2.nightly.json')]
+        for mutate in mutations:
+            changed = copy.deepcopy(value)
+            mutate(changed)
+            with self.assertRaises(ValueError):
+                helper.seal(state, helper.encode(changed))
+
+    def test_past_visible_publication_is_accounted_without_resigning_or_extending_expiry(self):
+        state = staged(helper.reserve(self.state, nightly(), NOW), self.tooling)
+        state = helper.seal(state, manifest(state))
+        retained = state['pending']['publication']
+        visible = helper.publication_record(state, retained)
+        before = len(self.tooling.calls)
+        reconciled = helper.confirm(state, visible, visible, '2026-11-01T03:00:00Z')
+        self.assertEqual(before, len(self.tooling.calls))
+        self.assertEqual(reconciled['roles']['timestamp'], helper.signed(state, 'timestamp'))
+        self.assertEqual(reconciled['current'], visible)
 
     def test_missing_corrupt_duplicate_or_exhausted_state_cannot_reset_counters(self):
         for raw in (b'', b'{}', b'{"schema":1,"schema":1}', b'[]'):

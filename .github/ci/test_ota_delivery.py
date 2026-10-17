@@ -160,6 +160,70 @@ class DeliveryTests(unittest.TestCase):
         for name in set(self.first.files) - {'timestamp.json'} | {self.first.archive_name}:
             self.assertLess(self.api.calls.index('verify:' + name), position)
 
+    def pending_second(self, alias):
+        self.api = FakeGitHub()
+        self.publish()
+        self.api.release['body'] = helper.body(dict(schema=1, current=self.first.record, pending=self.second.record))
+        raw = (self.second.directory / 'timestamp.json').read_bytes()
+        self.api.insert(self.second.archive_name, raw)
+        if alias != 'old':
+            self.api.delete_asset(self.api.named('timestamp.json')[0])
+            if alias == 'starter':
+                self.api.insert('timestamp.json', b'', 'starter')
+            elif alias == 'pending':
+                self.api.insert('timestamp.json', raw)
+            elif alias == 'unknown':
+                self.api.insert('timestamp.json', b'unrecognized metadata')
+
+    def test_abandonment_at_every_request_boundary_preserves_history_and_resumes(self):
+        for alias in ('old', 'missing', 'starter'):
+            self.pending_second(alias)
+            self.api.calls.clear()
+            self.assertEqual(helper.abandon(self.api, self.first.record, self.second.record), 'abandoned')
+            count = len(self.api.calls)
+            for offset in range(count):
+                for when in ('before', 'after'):
+                    with self.subTest(alias=alias, offset=offset, when=when):
+                        self.pending_second(alias)
+                        retained = {asset['name']: data for asset, data in self.api.files.values()
+                                    if asset['name'] != 'timestamp.json'}
+                        self.api.failure = (len(self.api.calls) + offset, when)
+                        with self.assertRaises(OSError):
+                            helper.abandon(self.api, self.first.record, self.second.record)
+                        self.assertEqual(helper.abandon(self.api, self.first.record, self.second.record), 'abandoned')
+                        self.assertEqual(helper.parse_state(self.api.release),
+                                         dict(schema=1, current=self.first.record, pending=None))
+                        for name, raw in retained.items():
+                            self.assertEqual(self.api.named(name)[1], raw)
+                        actual = self.api.named('timestamp.json')
+                        if alias == 'old':
+                            self.assertEqual(actual[1], (self.first.directory / 'timestamp.json').read_bytes())
+                        else:
+                            self.assertIsNone(actual)
+
+    def test_visible_or_committed_pending_timestamp_must_be_reconciled_never_abandoned(self):
+        for committed in ('pending', 'committed', 'repairing'):
+            self.pending_second('pending')
+            if committed != 'pending':
+                self.api.release['body'] = helper.body(dict(schema=1, current=self.second.record,
+                    pending=self.second.record if committed == 'repairing' else None))
+            self.api.calls.clear()
+            before = copy.deepcopy((self.api.release, self.api.files))
+            self.assertEqual(helper.abandon(self.api, self.first.record, self.second.record), 'already-visible')
+            self.assertEqual((self.api.release, self.api.files), before)
+            self.assertFalse(any(call.startswith(('delete:', 'upload:', 'update')) for call in self.api.calls))
+
+    def test_abandonment_rejects_unknown_bytes_and_different_reservations_without_mutation(self):
+        for alias, mismatch in (('unknown', None), ('old', 'current'), ('old', 'pending')):
+            self.pending_second(alias)
+            current, pending = copy.deepcopy(self.first.record), copy.deepcopy(self.second.record)
+            if mismatch:
+                (current if mismatch == 'current' else pending)['manifest_sha256'] = 'f' * 64
+            before = copy.deepcopy((self.api.release, self.api.files))
+            with self.assertRaises(ValueError):
+                helper.abandon(self.api, current, pending)
+            self.assertEqual((self.api.release, self.api.files), before)
+
     def test_lost_response_at_every_boundary_resumes_first_and_later_publication(self):
         for replacement in (False, True):
             baseline = FakeGitHub()

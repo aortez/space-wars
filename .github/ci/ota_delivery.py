@@ -103,6 +103,7 @@ class Bundle:
                 raise ValueError('Invalid delivery asset')
         if 'timestamp.json' not in manifest['files']:
             raise ValueError('Missing timestamp')
+        self.manifest_bytes = bytes(manifest_bytes)
         self.directory = Path(directory)
         self.files = manifest['files']
         self.record = dict(manifest_sha256=expected_sha256,
@@ -280,6 +281,47 @@ def publish(api, bundle, publisher_commit):
     release = reservation(api, state)
     api.update_release(release, body(dict(schema=1, current=candidate, pending=None)))
     return 'published'
+
+
+def abandon(api, current_record, pending_record):
+    """Clear an unexposed attempt only with old jobs quiescent and writer lock held.
+
+    The records come from the trusted journal's current and sealed publication.
+    This never publishes expired metadata, removes images, or rolls back a
+    visible timestamp. 'already-visible' requires journal confirmation instead.
+    """
+    if (api.repo != REPOSITORY or api.tag != TAG
+            or not valid_record(current_record) or not valid_record(pending_record)
+            or pending_record['version'] <= current_record['version']):
+        raise ValueError('Invalid publication abandonment selection')
+    release = api.get_release()
+    if release is None:
+        raise ValueError('Previously initialized OTA feed is missing')
+    state = parse_state(release)
+    if state['current'] == pending_record and state['pending'] in (None, pending_record):
+        visible = known_timestamp(api, asset_map(api, release).get('timestamp.json'), state)
+        if visible == pending_record:
+            return 'already-visible'
+        raise ValueError('Committed publication is not available for reconciliation')
+    if state['current'] != current_record or state['pending'] not in (None, pending_record):
+        raise ValueError('Feed reservation differs from the selected journal attempt')
+    alias = asset_map(api, release).get('timestamp.json')
+    visible = known_timestamp(api, alias, state)
+    if visible == pending_record:
+        return 'already-visible'
+    if state['pending'] is None:
+        return 'abandoned'  # A previous clearing update succeeded but lost its reply.
+    if alias and alias['state'] == 'starter' and alias['size'] == 0:
+        api.delete_asset(alias)
+    release = reservation(api, state)
+    visible = known_timestamp(api, asset_map(api, release).get('timestamp.json'), state)
+    if visible == pending_record:
+        return 'already-visible'
+    cleared = dict(schema=1, current=current_record, pending=None)
+    api.update_release(release, body(cleared))
+    release = reservation(api, cleared)
+    known_timestamp(api, asset_map(api, release).get('timestamp.json'), cleared)
+    return 'abandoned'
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

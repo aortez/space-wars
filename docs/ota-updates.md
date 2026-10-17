@@ -1721,12 +1721,27 @@ Preparation and signature collection are separate checkpoints. The helper uses
 the independently selected `feed_sign` binary without private keys to preview
 and verify responses; candidate paths cannot select the executable or root.
 
+After `feed_inventory` verifies the complete publication, `seal` stores its exact
+manifest in another checkpoint before upload starts. Its root, every metadata
+file and every payload must match the retained signed roles. The manifest cannot
+be replaced during a retry. This is also the receipt needed to account for a
+previously published timestamp after a lost acknowledgement, even if its metadata
+has since expired; accounting for that observed publication neither signs nor
+extends anything. A new upload still requires current verification/expiry checks.
+
 An identical retry keeps its preparation time, versions, generation and saved
 signature bytes. A conflicting intent is rejected until the pending attempt is
 reconciled. Abandonment requires quiescent old signer/delivery jobs under the
 shared writer lock and a fresh public observation matching the old publication.
 It consumes every reserved version and retains the image's generation. If the
 public timestamp has advanced, that publication must be reconciled first.
+For an unexposed sealed attempt, clear the delivery reservation with
+`ota_delivery.abandon` before abandoning the journal. It preserves all immutable
+assets and an existing old timestamp; it can remove an empty unfinished alias
+upload. A visible or already committed attempted timestamp returns
+`already-visible` and must be confirmed in the journal instead. Unknown bytes or
+a different reservation reject without mutation. Lost clearing replies resume
+without publishing an expired timestamp or reusing consumed versions.
 
 Nightly assigns a generation once per complete image identity. Reusing the
 payload with different immutable fields rejects. Release promotion uses an
@@ -1778,6 +1793,12 @@ boot. CI now requires the small disposable-key fixture. Local validation passed
 175 Python cases, Clippy, formatting, both workflow lint checks and Rust 1.89
 publisher/service checks. The [checkpoint evidence](data/ota-publisher-journal-20261016.json)
 records the exact files, logs and outstanding production integration.
+The subsequent [sealed-manifest evidence](data/ota-publication-sealing-20261016.json)
+adds expiry-safe reconciliation and abandonment checks: 181 Python cases and the
+signed-delivery Rust integration case pass, and both signed fixtures pass again.
+The four-core/12 GiB cold build is running separately from the initial eight-core
+measurement; neither is evidence of GitHub-hosted disk capacity until completed
+and checked against a real hosted run after cleanup.
 
 ## Feed delivery under development
 

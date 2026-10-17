@@ -156,6 +156,7 @@ def run(signer, inventory, candidate=None):
                 if saved.raw != store.read().raw:
                     raise AssertionError('Retained signature did not survive checkpoint reload')
             publication = bundle({r: journal.signed(saved.state, r) for r in journal.ROLES}, f'publication-{index}')
+            saved = store.advance(saved, journal.seal(saved.state, publication.manifest_bytes))
             delivery.publish(api, publication, 'a' * 40)
             remote = delivery.parse_state(api.get_release())['current']
             api.verify(delivery.asset_map(api, api.get_release())['timestamp.json'], remote['timestamp'])
