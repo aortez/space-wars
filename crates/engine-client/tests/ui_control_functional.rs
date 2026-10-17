@@ -25,6 +25,9 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 
+#[path = "ui_control_functional/garden_lab.rs"]
+mod garden_lab;
+
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
 

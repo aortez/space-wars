@@ -19,6 +19,7 @@ engine-terrain = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true, features = ["terrain-recovery"] }
 spacewars-control = { workspace = true }
+scenario-garden-lab = { workspace = true }
 scenario-clock = { workspace = true }
 scenario-falling = { workspace = true }
 scenario-nes = { workspace = true }
