@@ -451,7 +451,7 @@ fn a_fully_open_exit_flap_is_local_recovery_support_and_retires_with_its_arena()
 
 #[test]
 fn automatic_ledge_scene_fixtures_replay_pause_and_render_at_target_sizes() {
-    use crate::{ClockConfig, ClockScenario};
+    use crate::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
     use engine_common::{ClockEventProfile, Scenario};
     use std::time::Duration;
     let mut captures = Vec::new();
@@ -469,6 +469,15 @@ fn automatic_ledge_scene_fixtures_replay_pause_and_render_at_target_sizes() {
                             ..Default::default()
                         },
                         42,
+                    );
+                    ClockScenario::step(
+                        &mut state,
+                        &[ClockAction::set_reading(
+                            ClockReading::new(10, 8, 0)
+                                .unwrap()
+                                .with_date(ClockDate::new(2026, 10, 17).unwrap()),
+                        )],
+                        Duration::ZERO,
                     );
                     state.duck_visit = Some(Box::new(duck));
                     let mut frames = Vec::new();
