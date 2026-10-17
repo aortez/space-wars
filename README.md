@@ -89,6 +89,9 @@ The local launcher includes the following scenarios and presets:
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
   benchmarks and live host timings.
+- **Garden Lab** — a reproducible grass lifecycle testbed with underground
+  inspection, shade, light/resource controls, cutting and bounded playback.
+  See [Garden Lab](docs/garden-lab.md).
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating

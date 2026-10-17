@@ -1502,6 +1502,7 @@ dependencies = [
  "png 0.17.16",
  "scenario-clock",
  "scenario-falling",
+ "scenario-garden-lab",
  "scenario-nes",
  "scenario-null",
  "scenario-pizza",
@@ -4661,6 +4662,16 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-nes",
+]
+
+[[package]]
+name = "scenario-garden-lab"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "engine-core",
+ "engine-rapier",
+ "engine-terrain",
 ]
 
 [[package]]

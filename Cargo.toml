@@ -16,6 +16,7 @@ members = [
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/clock",
+    "scenarios/garden-lab",
     "scenarios/falling",
     "scenarios/line-mover",
     "scenarios/nes",
@@ -84,6 +85,7 @@ engine-terrain = { path = "crates/engine-terrain" }
 engine-water = { path = "crates/engine-water" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
+scenario-garden-lab = { path = "scenarios/garden-lab" }
 scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-line-mover = { path = "scenarios/line-mover" }

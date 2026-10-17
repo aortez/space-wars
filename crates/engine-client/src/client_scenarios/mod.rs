@@ -13,6 +13,7 @@ use crate::render::{FrameLayout, Viewport};
 
 mod clock;
 mod falling;
+mod garden_lab;
 mod nes;
 mod null;
 mod pizza;
@@ -433,6 +434,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
     clock::REGISTRATION,
     falling::REGISTRATION,
+    garden_lab::REGISTRATION,
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
@@ -541,6 +543,7 @@ mod tests {
             vec![
                 "clock",
                 "falling",
+                "garden-lab",
                 "nes",
                 "pizza",
                 "rover-lab",
