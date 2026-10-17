@@ -474,6 +474,16 @@ its previous boot's journal was unavailable after the user's reboot; the exact
 historical cause remains unconfirmed.
 [Setup admission reproduction](data/ota-setup-admission-20261017.json).
 
+The correction at `a76ec32` also passed on the primary Picade using a temporary
+device-service override. After restarting that service, 32 separate SSH logins
+filled the table again. The real setup client, running as the kiosk account,
+was rejected while all reservations were live. After 130 seconds, status still
+showed 32 expired SSH reservations; setup then admitted, renewed and released
+successfully, leaving no holds. Radio observations, the game PID and boot ID
+remained unchanged. The original service was restored and its executable hash
+verified. The installed image still needs the correction; this test did not
+enable partial offline policy or change saved Wi-Fi profiles.
+
 The helper has a 45-second socket/retry budget and reuses one capability. Its unit
 wants and follows the device service without requiring successful startup. If the
 service is absent or stopped, the helper can instead acquire its exclusive policy
@@ -937,18 +947,26 @@ tryboots, while retaining the original default kernel and root filesystem:
   advanced twice. No trial userspace was reachable, so the exact reset time and
   its early arm record were not directly observed.
 
+A subsequent same-root trial on the primary Picade (Pi 4 Model B Rev 1.4)
+observed that same corrected kernel, its early arm record at 1,484 ms, and
+65 samples through 211.55 seconds of uptime. It then returned automatically to
+the original kernel and game. This firmware exposes no boot-count property;
+distinct trial/normal boot IDs and kernel build IDs were observed directly.
+
 Each test restored the original trial files, removed its extra kernel, and
 verified all original boot-asset hashes after returning. The devices still run
 the original flashed image; no production qualification flags or recovery
-baseline were created. Pi 4 tests, post-promotion watchdog completion and
-interrupted-promotion testing remain. The corrected kernel changes the shared
-boot identity and therefore needs boot-asset provisioning, not a rootfs-only OTA.
+baseline were created. Pi 4 missing-root testing, post-promotion watchdog
+completion and interrupted-promotion testing remain. The corrected kernel
+changes the shared boot identity and therefore needs boot-asset provisioning,
+not a rootfs-only OTA.
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
 
 The combined image at `ef44f5b` includes this kernel correction and the SSH
 reservation fix. All 6,768 Yocto tasks passed, with 6,738 reused, and the frozen
 rootfs passed unsigned candidate validation. Its shared boot identity remains
-the corrected kernel's identity. This image has not been installed on a Pi.
+the corrected kernel's identity. This image has not been installed on a Pi and
+predates the subsequent setup-admission fix at `a76ec32`.
 Freshly flashed devices still need a supported bootstrap into recovery state:
 the current legacy bootstrap intentionally rejects their existing recovery
 manifest and trial configuration. The

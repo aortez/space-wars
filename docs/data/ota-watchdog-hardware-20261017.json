@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-10-17",
-  "purpose": "Pi 5 same-root tryboot and early watchdog qualification",
+  "purpose": "Pi 4 and Pi 5 operator tryboot and early watchdog qualification",
   "source_before_fix": "5a554cf1949dfbe521fa6786162330f54c0a7e63",
   "image": {
     "architecture": "aarch64",
@@ -90,7 +90,7 @@
   "limits": [
     "The first failed trial was not directly observed; its precise reset path is not established.",
     "The physical timer probe confirms the original kernel counter defect. Later fixed-kernel operator tests are recorded separately.",
-    "The corrected kernel passed same-root expiry and missing-root fallback on Pi 5; Pi 4 execution and post-promotion watchdog completion checks are still pending.",
+    "The corrected kernel passed same-root expiry on Pi 4 and Pi 5, and missing-root fallback on Pi 5. Pi 4 missing-root execution and post-promotion watchdog completion checks remain pending.",
     "The tests temporarily selected a separately named kernel only for tryboot. The default kernel and root image remain the original 5f3eafc image, and all temporary boot changes were restored.",
     "No recovery qualification flags, production recovery baseline or OTA trust were created. These tests do not qualify interruption during FAT writes or complete production OTA installation."
   ],
@@ -461,6 +461,132 @@
           }
         },
         "measurement_limit": "Trial userspace and early watchdog record were inaccessible because the root never mounted; exact reset time was not directly observed."
+      },
+      {
+        "host": "sw-picade.local",
+        "model": "Raspberry Pi 4 Model B Rev 1.4",
+        "serial": "100000006786f8b6",
+        "case": "same-root without userspace watchdog takeover",
+        "local_archive": "target/ota-pi4-primary-watchdog-82fcfb0",
+        "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+        "initial_boot_id": "18c00abc-873b-4b79-9e07-5f3ba94a2c01",
+        "initial_boot_count": null,
+        "root_partuuid": "076c4a2a-02",
+        "activation": {
+          "requested_utc": "2026-10-17T07:59:20.014340+00:00",
+          "reply_utc": "2026-10-17T07:59:21.508802+00:00",
+          "exit_code": 0,
+          "stdout": "o \"/org/freedesktop/systemd1/job/866\"\n",
+          "stderr": ""
+        },
+        "fixed_kernel": {
+          "source_artifact": "/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu/tmp/deploy/images/raspberrypi-spacewars/Image-1-6.6.63+git0+52ff0d7571_e442e5c1ab-r0-raspberrypi-spacewars-20261017071309.bin",
+          "boot_path": "/boot/spacewars-wd82fcfb0.img",
+          "bytes": 27400704,
+          "sha256": "1fc9180b229f6debd937316a0d7a588eba0dd39abc35b073da49d50bd26406ea",
+          "build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "driver_sha256": "a0216686df1049917eaa5891a9e058cf00ab6df2de99736fa52204fa626e558a",
+          "frozen_utc": "2026-10-17T07:17:30.245983+00:00"
+        },
+        "observed_trial_samples": 65,
+        "first_trial": {
+          "utc": "2026-10-17T07:59:45.684958+00:00",
+          "elapsed_seconds": 33.28,
+          "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+          "uptime_seconds": 15.06,
+          "tryboot": true,
+          "boot_count": null,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+            "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+            "armed_boottime_ms": 1484,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "last_trial": {
+          "utc": "2026-10-17T08:03:05.520713+00:00",
+          "elapsed_seconds": 233.116,
+          "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+          "uptime_seconds": 211.55,
+          "tryboot": true,
+          "boot_count": null,
+          "early_watchdog": {
+            "schema": 1,
+            "boot_id": "0cb239f3-9640-41d6-8fa5-9313e3b9bf53",
+            "trial_id": "a114dc8ff6ffd54324e969f8bd10efe229e97f11213fef0fa389af6f4cac6e30",
+            "armed_boottime_ms": 1484,
+            "timeout_seconds": 210
+          },
+          "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "returned_to_normal": {
+          "utc": "2026-10-17T08:03:32.701026+00:00",
+          "elapsed_seconds": 260.296,
+          "boot_id": "dcd3ab67-e327-4ba7-a68f-3a34b5140cf4",
+          "uptime_seconds": 15.61,
+          "tryboot": false,
+          "boot_count": null,
+          "early_watchdog": null,
+          "kernel_build_id": "e2eba337d5d4e0116d805c09231c063468301bda",
+          "kiosk": "active",
+          "system": "active"
+        },
+        "restoration": {
+          "utc": "2026-10-17T08:03:41.603076+00:00",
+          "exit_code": 0,
+          "stdout": "Returned to original normal boot; original boot assets restored.\nactive\nactive\n",
+          "stderr": ""
+        },
+        "result": "observed corrected-kernel trial and automatic return to original normal kernel; original boot asset hashes verified",
+        "measurement_limit": "This Pi 4 firmware does not expose boot count. Trial and normal boot IDs, kernel build IDs and the early arm record were observed directly.",
+        "artifacts": {
+          "plan.json": {
+            "bytes": 4137,
+            "sha256": "eebcb1009a2117499ca796e73fff07e9da23d6c6566a23e428dfcda1b1f0a893"
+          },
+          "stage.sh": {
+            "bytes": 21638,
+            "sha256": "826b3e822f18473f7e76d4607f2d8e575640c1ebbdc5c31b1bad39f2ab06984f"
+          },
+          "stage-result.json": {
+            "bytes": 144,
+            "sha256": "322640d41f4c11ec3d58f5295c5ea1fda3e7cbaf9d45c568720ab66654246d27"
+          },
+          "activate.sh": {
+            "bytes": 17727,
+            "sha256": "0f4e2163e46ba0c7c87b75073038f504223aae6c67f3d1609065a064c7920dfe"
+          },
+          "activation.json": {
+            "bytes": 199,
+            "sha256": "37ccb541a34bde93ab198f028e3a1705232521e547f19d952a3a2771a8b1ade5"
+          },
+          "monitor.py": {
+            "bytes": 4697,
+            "sha256": "c23dbd7c773fdf037ca355870e7029ab4e2ab671b0ffd1ca550a26b5fdeee639"
+          },
+          "observations.json": {
+            "bytes": 156260,
+            "sha256": "605c20e1b41fda2f5a6b86d110ac11e02ec19f7b922ec2444c8d1e40a6f189e7"
+          },
+          "returned-to-normal.json": {
+            "bytes": 1640,
+            "sha256": "2ce2176b235aa63750db5ddfb4a1522d38b6649bd7d8416c7171555c08b6eb94"
+          },
+          "restore.sh": {
+            "bytes": 33385,
+            "sha256": "cc10584ce77705c8c52c99bf14c28644564b2af6e26d6f6b0a8da1a73d5a80c8"
+          },
+          "restore.json": {
+            "bytes": 180,
+            "sha256": "e8d0ff2966f35265e7858cc497693251610a97d5c069413e58bbaa721bc621e2"
+          }
+        }
       }
     ]
   }
