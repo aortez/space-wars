@@ -51,18 +51,23 @@ fn falling_shares_visible_course_and_moving_floor_in_production_adapters() {
                     let pixels = raster(&frames[0], viewport);
                     let vector = svg(&frames[0], viewport);
                     assert!(!vector.contains("NaN") && !vector.contains("inf"));
-                    assert!(
-                        pixels
-                            .as_slice()
-                            .iter()
-                            .any(|p| p.r > 240 && p.g > 220 && p.b < 50),
-                        "visible duck: {arena} {name} tick {elapsed}"
-                    );
                     if let Some(output) = &output {
                         let name = format!("player-falling-{arena}-{name}-{elapsed}");
                         write_png(&output.join(format!("{name}.png")), &pixels);
                         std::fs::write(output.join(format!("{name}.svg")), vector).unwrap();
                     }
+                    assert!(
+                        pixels
+                            .as_slice()
+                            .iter()
+                            // Falling bars can push the duck into the frame's
+                            // shadow. Require visible yellow, not its unshaded RGB.
+                            .filter(|p| p.r > 230 && p.g > 180 && p.b < 50)
+                            .count()
+                            >= 4,
+                        "visible duck: {arena} {name} tick {elapsed}: {:?}",
+                        scene.state.player_duck_state()
+                    );
                 }
                 if elapsed < 300 {
                     scene.step(&[], Duration::from_nanos(16_666_667));
