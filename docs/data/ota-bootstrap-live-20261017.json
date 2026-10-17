@@ -11,7 +11,7 @@
     "active_slot": "a",
     "target_slot": "b",
     "package_sha256": "f22710ef653c6ca4b6a228e54523fd4c3132643c224d5496f4dc242e2a1aa42c",
-    "status": "original disk migration stopped on medium errors; replacement flashed, restored and verified, awaiting first boot",
+    "status": "original disk migration stopped on medium errors; replacement restored and first boot verified; new bootstrap preparation pending",
     "raw_backup_failure": {
       "partition": "/dev/sda3",
       "copied_bytes": 3123773440,
@@ -81,8 +81,8 @@
       "old_recovery_journals_present": false,
       "device_written": true,
       "physical_restore_verified": true,
-      "boot_verified": false,
-      "pending": "move the replacement drive to the powered-off Pi 5 and verify first boot, running image/media identity, SSH access and kiosk health",
+      "boot_verified": true,
+      "pending": "prepare a new bootstrap binding and preservation run on the verified replacement; qualify recovery before enabling OTA",
       "resume_dry_run_passed": true,
       "completed_before_profile_failure": {
         "evidence": "owner-provided terminal output; independently observed resulting partition layout",
@@ -175,8 +175,76 @@
         "user_reported_final_verified_entries": 18148,
         "all_four_partitions_observed_unmounted": true,
         "boot_verified": false
+      },
+      "first_boot": {
+        "evidence_path": "target/ota-pi5-replacement-first-boot-20261017/verification.json",
+        "evidence_sha256": {
+          "capture.json": "5be74571136388097b4feebb2fe77463d9912e5f101f3620a571c1ed7c6c9b94",
+          "bootstrap-probe.json": "8785966e06b5ac593101e2dd72c7d3d08fcb242e5229e1dd0a6a11f7a6e09f7f",
+          "kernel-journal.stdout": "06baa23fca82107fc467d24290c92600eb3b4bb4c62d7ac06aed080b75539e77",
+          "services.stdout": "6f63ca05e3f44256f97e655833715bfc1d9a55924e7bec85d5061f8a2960b654",
+          "binaries.stdout": "fb5f55a33e74b3683148318534aab349e463ed9ffd9a95fc3b4f7eac380d97d3",
+          "original-disk.json": "2c4b0599b4e14bd6427d11aef807af6f574e5886d503ac4a432a99886ed81f78"
+        },
+        "operator_source": "6b0d9ee",
+        "schema": 1,
+        "observed_at": "2026-10-17T21:02:47.168724+00:00",
+        "host": "spacewars.local",
+        "boot_id": "1dee0405-e541-414d-9711-44d237849481",
+        "uptime_seconds_at_final_check": 284.78,
+        "image_source": "04b6cb75f8639772e2de4bd86fe1ae795614be04",
+        "board": "Raspberry Pi 5 Model B Rev 1.1",
+        "board_serial": "ddde6ffbe45bcea8",
+        "medium_model": "Extreme_Pro",
+        "medium_bytes": 128043712512,
+        "active_slot": "a",
+        "layout_id": "26156f3a6af2248d2d5b684f9d49b8616ad14601b073048edd9535a080ea55a6",
+        "root_device": "/dev/sda2",
+        "data_device": "/dev/sda4",
+        "data_partition_bytes": 108633299456,
+        "kernel_build_id": "47f967636a2308dc1bc92278b1764c834804e040",
+        "hardware_profile": "hyperpixel",
+        "fresh_image_boot_inventory_verified": true,
+        "installed_and_running_executable_hashes_verified": true,
+        "wifi_connected": true,
+        "system_clock_synchronized": true,
+        "administrator_uid": 1001,
+        "administrator_sudo_uid": 0,
+        "runtime_uid": 1000,
+        "runtime_unrestricted_sudo_denied": true,
+        "services": {
+          "spacewars-kiosk.service": {
+            "MainPID": "880",
+            "NRestarts": "0",
+            "ExecMainStatus": "0",
+            "ActiveState": "active",
+            "SubState": "running"
+          },
+          "spacewars-system.service": {
+            "MainPID": "881",
+            "NRestarts": "0",
+            "ExecMainStatus": "0",
+            "ActiveState": "active",
+            "SubState": "running"
+          }
+        },
+        "failed_units": [],
+        "service_warning_entries": 0,
+        "storage_error_entries": 0,
+        "kernel_warning_scope": "Other board/driver startup warnings are retained in the private kernel journal. Goodix at 0x14 did not respond; the 0x5d touchscreen and DPI framebuffer then registered successfully.",
+        "original_disk_on_workstation": {
+          "device": "/dev/sdb",
+          "model": "SanDisk 3.2Gen1",
+          "bytes": 123048296448,
+          "serial": "0401843f23a06e8d407779c23f89428fc6f81f6b4c71579cecb2ef50a2e3dbca3747000000000000000000004cbc7cb2ff89801891558107c63087e7",
+          "all_partitions_unmounted": true,
+          "writes_or_repairs_attempted": false
+        },
+        "scope": "First boot and observed running-system health; no full-media surface test, bootstrap reservation, trial activation, baseline publication or automatic OTA installation.",
+        "verification_sha256": "85bf6ecb20b862f99a1d0c1e4851a0b317fc1ffec5b07298f8596466c9ca21f7"
       }
-    }
+    },
+    "boot_id_scope": "original failing disk preparation; replacement boot identity is recorded separately"
   },
   "checks": {
     "archive_tests_passed": 4,
@@ -200,7 +268,7 @@
     }
   },
   "remaining": [
-    "Verify first boot and hardware identity on the completed Pi 5 replacement, then prepare a new bootstrap binding.",
+    "Prepare a new bootstrap binding and preservation run on the verified Pi 5 replacement, then complete staged/canonical recovery qualification.",
     "Revalidate the Picade after its reboot, then complete root installation, staged/canonical health checks and baseline handoff.",
     "Qualify failure recovery and physical restoration on both board types.",
     "Provision production trust, publish signed candidates and integrate user installation policy."

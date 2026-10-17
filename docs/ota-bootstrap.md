@@ -19,8 +19,9 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Remaining:** completing preservation on the Pi 5 after resolving its storage
-fault, effective legacy privilege/access/service qualification, live root installation and staging,
+**Remaining:** a new preparation and preservation run on the verified Pi 5
+replacement, effective legacy privilege/access/service qualification, live root
+installation and staging,
 live one-shot trial activation, supervised staged/canonical boot verification,
 live finalization and physical failure qualification. A package is not a signed
 OTA candidate or an enabled updater.
@@ -69,8 +70,27 @@ and passed the final read-only data check before unmounting and printing
 `READY`. The workstation completion receipt was inspected, and all four USB
 partitions were independently observed unmounted. No image write, partition
 resize or data restoration was repeated during this final invocation.
-The replacement is ready to move to the powered-off Pi 5; first boot, network
-access, running image/media identity and kiosk health still need verification.
+The owner moved the replacement to the Pi 5 and booted it. Independent SSH
+checks and the read-only native probe confirmed the same Pi 5 board, the
+128 GB Extreme Pro, slot A, HyperPixel, and the clean `04b6cb7` image. The
+running kernel build ID and both installed and running executable hashes match
+the frozen artifacts. Wi-Fi is connected, the clock is synchronized, separate
+administrator login and sudo work, and the runtime account cannot run
+unrestricted sudo. Both services are active with zero restarts; at the final
+check, uptime was 285 seconds, with no failed units, service warnings or storage
+errors in the current boot journal. Other driver startup warnings are retained
+in the private evidence; the touchscreen and DPI framebuffer registered
+successfully. This is a first-boot observation, not a complete media surface
+test or an OTA recovery qualification.
+
+The owner also connected the original SanDisk 3.2Gen1 to the workstation. Its
+capacity and full serial match the failing source disk, and all four partitions
+are unmounted. No writes or repairs were attempted. Keep that disk and the
+verified workstation archive for recovery. The replacement command's historical
+`/dev/sdb` path now refers to this original disk, not the replacement; its model,
+capacity and connection checks must not be weakened or rebound to run again.
+Private first-boot evidence is retained in
+`target/ota-pi5-replacement-first-boot-20261017/verification.json`.
 
 This operator command pins the reviewed image, data archive and helper hashes,
 plus the connected disk's model, capacity, USB path and connection sequence. Its
@@ -94,7 +114,7 @@ numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
 destination conflicts. A further isolated root-container rehearsal restored
 the actual archive's entire selected tree and verified all 18,148 entries,
 including numeric ownership. Replacement-device restoration, access
-provisioning and final readback have passed; first boot remains pending.
+provisioning, final readback and the observed first boot have passed.
 The complete Yocto suite passes 70 Node tests and 87 Python tests, with one
 skipped in each. The focused hardware suite has 16 passing tests.
 A fresh flash still needs its own recovery-baseline qualification; these tests
