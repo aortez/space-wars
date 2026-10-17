@@ -498,6 +498,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.event-profile",
             "pause.clock.fonts",
             "pause.clock.show-date",
+            "pause.clock.cell-swap",
             "pause.clock.rain",
             "pause.clock.falling",
             "pause.clock.preview-event",
@@ -899,6 +900,11 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
             Some("pause.clock.show-date")
         );
         assert_eq!(control_value(&page, "pause.clock.show-date"), Some("On"));
+        let page = harness.press_guarded(UiAction::Down, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.cell-swap")
+        );
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
