@@ -14,6 +14,8 @@ machine: raspberrypi-spacewars
 # default when this variable is absent; never encode host cache paths in images.
 env:
   SPACEWARS_CACHE_ROOT:
+  SPACEWARS_OTA_BUILD_INPUTS:
+  SPACEWARS_OTA_BUILD_INPUTS_SHA256:
 
 repos:
   poky:

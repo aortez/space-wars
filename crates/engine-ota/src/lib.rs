@@ -15,6 +15,8 @@ mod test_support;
 
 #[cfg(target_os = "linux")]
 pub mod access_linux;
+#[cfg(all(target_os = "linux", any(test, feature = "publisher")))]
+pub mod artifact;
 pub mod boot;
 #[cfg(target_os = "linux")]
 mod boot_files;

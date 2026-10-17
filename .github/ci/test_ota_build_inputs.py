@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -133,6 +135,64 @@ class InputsTests(unittest.TestCase):
             helper.blob(conf / 'local.conf')
         with self.assertRaises(ValueError):
             helper.blob(self.root / 'Cargo.lock', maximum=1)
+
+    def run_builder(self, driver, during_build):
+        expected = self.snapshot()
+        original_command = helper.command
+        original_run = subprocess.run
+        with tempfile.TemporaryDirectory() as temporary:
+            build = Path(temporary)
+            output = build / 'build.json'
+            def command(args, **kwargs):
+                if args == ['kas', '--version']:
+                    return 'kas 5.4 (fixture)'
+                if args == ['kas', 'dump', '--format', 'json', helper.CONFIG]:
+                    return json.dumps(self.configuration)
+                return original_command(args, **kwargs)
+            def run(args, **kwargs):
+                if args != driver:
+                    return original_run(args, **kwargs)
+                env = kwargs['env']
+                selected = Path(env['SPACEWARS_OTA_BUILD_INPUTS'])
+                raw = selected.read_bytes()
+                self.assertEqual(json.loads(raw), expected)
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), env['SPACEWARS_OTA_BUILD_INPUTS_SHA256'])
+                self.assertNotIn('GH_TOKEN', env)
+                self.assertEqual(kwargs['cwd'], self.root / 'yocto')
+                during_build()
+                conf = build / 'conf'
+                conf.mkdir()
+                for name in ('local.conf', 'bblayers.conf'):
+                    (conf / name).write_text('generated configuration')
+                deploy = build / 'tmp/deploy/images' / helper.MACHINE
+                deploy.mkdir(parents=True)
+                image = deploy / f'spacewars-image-{helper.MACHINE}.rootfs-fixture.ext4.gz'
+                image.write_bytes(b'fixture image (not qualified by this build record)')
+                image.with_name(f'spacewars-image-{helper.MACHINE}.rootfs.ext4.gz').symlink_to(image.name)
+                Path(str(image) + '.image.json').write_text(json.dumps(dict(source=dict(
+                    schema=1, commit=self.source, dirty=False, revision=self.source[:12]))))
+                return subprocess.CompletedProcess(args, 0)
+            try:
+                with patch.object(helper, 'command', side_effect=command), patch.object(subprocess, 'run', side_effect=run):
+                    helper.build(self.root, self.source, build, output, build / 'cache', driver[0] == 'kas')
+                result = json.loads(output.read_text())
+                raw = json.dumps(expected, sort_keys=True, separators=(',', ':')).encode()
+                self.assertEqual(result['embedded_inputs'], dict(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()))
+            finally:
+                self.assertEqual(list(build.glob('ota-build-inputs-*.json')), [])
+
+    def test_builder_passes_exact_inputs_to_local_and_container_drivers(self):
+        for driver in (['node', 'scripts/build.mjs', '--gpu'], ['kas', 'build', helper.CONFIG]):
+            with self.subTest(driver=driver):
+                self.run_builder(driver, lambda: None)
+
+    def test_build_failure_or_source_change_leaves_no_success_record(self):
+        def failure():
+            raise subprocess.CalledProcessError(1, 'fixture kas build')
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_builder(['kas', 'build', helper.CONFIG], failure)
+        with self.assertRaises(ValueError):
+            self.run_builder(['kas', 'build', helper.CONFIG], lambda: (self.root / 'Cargo.lock').write_text('changed during build'))
 
 
 if __name__ == '__main__':

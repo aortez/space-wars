@@ -79,6 +79,10 @@ It rejects extra BitBake configuration such as `auto.conf`, and does not reset
 changed layers at the end. The new output file records the exact deployed gzip
 image hash/name instead of relying on its mutable alias. It also records the
 full layer commits, configuration hashes, source and image sidecar identity.
+The exact pre-build record is also embedded as
+`/usr/share/spacewars/build-inputs.json`; the recipe checks its selected SHA-256
+and source before installation. `--direct-kas` runs kas without the local Node
+wrapper for the pinned build container, which already supplies GNU host tools.
 
 Inside the recipe, `/usr/share/spacewars/build.json` records the actual Rust,
 Cargo and target C compiler version responses, target, profile, selected kiosk
@@ -86,6 +90,9 @@ feature and source. The file is included in the final rootfs tree identity.
 These records are build evidence, not publication authorization. Independent
 validation of the actual image contents, signed metadata and device rollout
 remain separate steps described in [OTA updates](../docs/ota-updates.md).
+The [candidate validator](../docs/ota-updates.md#rootfs-candidate-qualification)
+requires the embedded input record and independently selected source/toolchain
+policy before it accepts or packages the actual ext4 bytes.
 
 `rm_work` is enabled. The build warns below 25 GiB free, stops scheduling tasks
 below 20 GiB, and halts below 10 GiB. Free space and rerun to resume.

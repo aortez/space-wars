@@ -13,6 +13,10 @@ publisher = ["dep:aws-lc-rs"]
 name = "feed_sign"
 required-features = ["publisher"]
 
+[[example]]
+name = "image_candidate"
+required-features = ["publisher"]
+
 [dependencies]
 async-trait = "0.1"
 aws-lc-rs = { version = "1", optional = true }

@@ -1320,10 +1320,11 @@ describe its invocation. This record is provenance, not image approval.
 
 The recipe records the actual Rust, Cargo and target C compiler responses in
 `/usr/share/spacewars/build.json`, along with source, target, profile and kiosk
-feature. This file is included in the rootfs tree identity. Layer/configuration
-provenance is currently retained in the external build record; the final
-publisher must bind that record to its admitted artifact and publication history
-(or embed it in the image) rather than accept a detached, editable claim.
+feature. This file is included in the rootfs tree identity. The OTA builder also
+embeds its exact pre-build layer/configuration record in
+`/usr/share/spacewars/build-inputs.json`. The recipe requires the supplied digest
+and clean source to match before installing those bytes. Normal development
+builds can omit this record; signed-feed candidate validation requires it.
 
 Source `7e69bc00038b0590883c9d06e9432eb937520351` built successfully in 418 seconds,
 using existing caches. The actual 528,482,304-byte ext4 image passes forced
@@ -1338,6 +1339,54 @@ remains; no reproducible container build is claimed.
 All 123 CI Python helper, 51 Yocto JavaScript and 79 Yocto Python tests pass.
 The [build evidence](data/ota-build-inputs-20261016.json) records source, layers,
 logs, actual image checks and remaining workflow/image-validation work.
+
+## Rootfs candidate qualification
+
+The Linux `image_candidate` tool packages or independently verifies an unsigned
+candidate using fixed read-only filesystem tools. It accepts a regular ext4 file
+up to 3 GiB, checks its filesystem, source and compatibility records, actual
+executable hashes/AArch64 ELF headers, embedded boot manifest, build inputs and
+compiler records. It checks root ownership, file modes and every parent
+directory of those records and binaries. It does not mount or execute the image.
+
+The expected input digest comes from
+[`ota_image_policy.py`](../.github/ci/ota_image_policy.py), reading an independently
+selected clean source checkout and its pinned configuration. This helper never
+reads the candidate's qualification report or runs that checkout's build code.
+The policy explicitly selects Rust/Cargo 1.94.0 and target GCC 13.5.0. A source
+configuration with includes, overrides or expanded environment values requires
+policy review. The caller must admit the source through GitHub/CI policy first;
+creating a local policy file is not source approval.
+
+Run a reviewed, pinned copy of the helper and validator without signing keys:
+
+```sh
+cargo build --locked -p engine-ota --features publisher --example image_candidate
+python3 .github/ci/ota_image_policy.py \
+  --source-checkout /absolute/path/to/approved-checkout \
+  --approved-source <full-source-commit> \
+  --output /private/work/image-policy.json
+target/debug/examples/image_candidate pack \
+  /private/work/image-policy.json /private/work/rootfs.ext4 /private/work/candidate
+target/debug/examples/image_candidate verify \
+  /private/work/image-policy.json /private/work/candidate/candidate.json \
+  /private/work/candidate/image.ext4.zst /private/work
+```
+
+`pack` produces `image.ext4.zst`, `candidate.json` and `qualification.json` in a
+new private directory, refusing to replace any existing output. Before exposing
+the directory it independently decompresses and checks the packaged bytes with
+the installer's bounded single-frame Zstandard decoder, flush/readback and
+ext4 checks. `verify` repeats this against a private temporary regular file;
+it rejects wrong lengths/hashes, trailing bytes and concatenated frames. The
+qualification report is unsigned evidence, never an input that authorizes
+signing. No generation or channel is assigned here.
+
+This step does not verify external boot-partition assets, prove a successful Pi
+boot, or publish metadata. GitHub admission, boot compatibility, publication
+history and isolated signing/delivery remain required. Images built before the
+embedded input record was added fail this stricter validation, including the
+historical `7e69bc0` image above.
 
 ## GitHub candidate origin admission
 

@@ -91,6 +91,20 @@ python install_spacewars_ota_bundle() {
 do_install[postfuncs] += "install_spacewars_ota_bundle"
 do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/ota_bundle.py:True"
 
+# The public, pre-build input record is inside the hashed image, so layer and
+# configuration provenance cannot be detached from a published payload.
+SPACEWARS_OTA_BUILD_INPUTS ?= ""
+SPACEWARS_OTA_BUILD_INPUTS_SHA256 ?= ""
+python () {
+    import json
+    from spacewars.build_provenance import selected_inputs
+    path = d.getVar("SPACEWARS_OTA_BUILD_INPUTS")
+    selected_inputs(path, d.getVar("SPACEWARS_OTA_BUILD_INPUTS_SHA256"),
+                    json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")))
+    if path:
+        d.appendVarFlag("do_install", "file-checksums", " " + path + ":True")
+}
+
 python verify_spacewars_source_identity() {
     import json
     from spacewars.image_identity import source_identity
@@ -121,7 +135,7 @@ do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provena
 python write_spacewars_source_identity() {
     import json
     from pathlib import Path
-    from spacewars.build_provenance import PROVENANCE_PATH, write
+    from spacewars.build_provenance import INPUTS_PATH, PROVENANCE_PATH, selected_inputs, write
 
     bb.build.exec_func("verify_spacewars_source_identity", d)
     path = Path(d.getVar("D")) / "usr/share/spacewars/source.json"
@@ -132,6 +146,12 @@ python write_spacewars_source_identity() {
     if provenance["source"] != json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")):
         bb.fatal("Space-Wars toolchain record belongs to a different source")
     write(Path(d.getVar("D")) / PROVENANCE_PATH, provenance)
+    inputs = selected_inputs(d.getVar("SPACEWARS_OTA_BUILD_INPUTS"),
+                             d.getVar("SPACEWARS_OTA_BUILD_INPUTS_SHA256"), provenance["source"])
+    if inputs is not None:
+        output = Path(d.getVar("D")) / INPUTS_PATH
+        output.write_bytes(inputs)
+        output.chmod(0o644)
 }
 do_install[postfuncs] += "write_spacewars_source_identity"
 do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provenance.py:True"
@@ -333,6 +353,7 @@ FILES:${PN} = " \
     ${datadir}/spacewars/fast-update-compat \
     ${datadir}/spacewars/source.json \
     ${datadir}/spacewars/build.json \
+    ${datadir}/spacewars/build-inputs.json \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-access.service \
     ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \

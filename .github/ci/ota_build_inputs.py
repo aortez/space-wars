@@ -13,6 +13,7 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 
 KAS_VERSION = '5.4'
 MACHINE = 'raspberrypi-spacewars'
@@ -90,23 +91,29 @@ def configured_repositories(configuration):
     return repositories
 
 
-def snapshot(repo, source, configuration):
-    """Read-only: never repair/reset a changed layer before recording its state."""
+def expected_inputs(repo, source, configuration):
+    """Derive expected inputs from an independently selected clean source tree."""
     clean_repository(repo, source)
     repositories = configured_repositories(configuration)
-    layers = {}
-    for name, url in REPOSITORIES.items():
-        directory = repo / 'yocto' / name
-        if git(directory, 'remote', 'get-url', 'origin') != url:
-            raise ValueError('Layer checkout has a different origin')
-        commit = clean_repository(directory, repositories[name]['commit'])
-        layers[name] = dict(url=url, commit=commit)
+    layers = {name: dict(url=url, commit=repositories[name]['commit'])
+              for name, url in REPOSITORIES.items()}
     encoded = json.dumps(configuration, sort_keys=True, separators=(',', ':')).encode()
     return dict(schema=1, source_commit=source, kas_version=KAS_VERSION,
                 machine=MACHINE, target='spacewars-image', layers=layers,
                 local_layer=dict(path='yocto/meta-spacewars', source_commit=source),
                 configuration={name: blob(repo / name) for name in CONFIGURATION_FILES},
                 expanded_kas_sha256=hashlib.sha256(encoded).hexdigest())
+
+
+def snapshot(repo, source, configuration):
+    """Read-only: never repair/reset a changed layer before recording its state."""
+    expected = expected_inputs(repo, source, configuration)
+    for name, layer in expected['layers'].items():
+        directory = repo / 'yocto' / name
+        if git(directory, 'remote', 'get-url', 'origin') != layer['url']:
+            raise ValueError('Layer checkout has a different origin')
+        clean_repository(directory, layer['commit'])
+    return expected
 
 
 def environment(repo, build_directory, cache):
@@ -127,7 +134,7 @@ def check_build_directory(build_directory):
             raise ValueError('OTA build has additional or linked BitBake configuration')
 
 
-def build(repo, source, build_directory, output, cache):
+def build(repo, source, build_directory, output, cache, direct_kas=False):
     repo = repo.resolve()
     build_directory, output, cache = build_directory.resolve(), output.absolute(), cache.resolve()
     if os.getuid() == 0:
@@ -152,8 +159,19 @@ def build(repo, source, build_directory, output, cache):
     configuration = json.loads(command(['kas', 'dump', '--format', 'json', CONFIG],
                                        cwd=repo / 'yocto', env=env))
     before = snapshot(repo, source, configuration)
-    # This wrapper supplies GNU host tools where needed, without pruning caches.
-    subprocess.run(['node', 'scripts/build.mjs', '--gpu'], cwd=repo / 'yocto', env=env, check=True)
+    # Keep this immutable record alive through recipe parsing/install. It is
+    # public provenance, not a secret or a caller-provided executable hook.
+    build_directory.mkdir(parents=True, exist_ok=True)
+    raw_inputs = json.dumps(before, sort_keys=True, separators=(',', ':')).encode()
+    with tempfile.NamedTemporaryFile(prefix='ota-build-inputs-', suffix='.json', dir=build_directory) as selected:
+        selected.write(raw_inputs)
+        selected.flush()
+        env.update(SPACEWARS_OTA_BUILD_INPUTS=selected.name,
+                   SPACEWARS_OTA_BUILD_INPUTS_SHA256=hashlib.sha256(raw_inputs).hexdigest())
+        # The normal local wrapper supplies GNU host tools where needed. The
+        # pinned kas container already supplies them and needs no Node runtime.
+        driver = ['kas', 'build', CONFIG] if direct_kas else ['node', 'scripts/build.mjs', '--gpu']
+        subprocess.run(driver, cwd=repo / 'yocto', env=env, check=True)
     # Do not run kas checkout/dump here: it could reset evidence of layer changes.
     after = snapshot(repo, source, configuration)
     if after != before:
@@ -161,6 +179,7 @@ def build(repo, source, build_directory, output, cache):
     check_build_directory(build_directory)
     conf = build_directory / 'conf'
     after['generated_configuration'] = {name: blob(conf / name) for name in ('local.conf', 'bblayers.conf')}
+    after['embedded_inputs'] = dict(bytes=len(raw_inputs), sha256=hashlib.sha256(raw_inputs).hexdigest())
     deploy = build_directory / 'tmp/deploy/images' / MACHINE
     image = deploy / f'spacewars-image-{MACHINE}.rootfs.ext4.gz'
     image = image.resolve(strict=True)
@@ -184,8 +203,9 @@ def main():
     parser.add_argument('--build-directory', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cache', type=Path, required=True)
+    parser.add_argument('--direct-kas', action='store_true', help='Use the pinned kas container toolchain directly')
     args = parser.parse_args()
-    build(Path(__file__).resolve().parents[2], args.source, args.build_directory, args.output, args.cache)
+    build(Path(__file__).resolve().parents[2], args.source, args.build_directory, args.output, args.cache, args.direct_kas)
 
 
 if __name__ == '__main__':

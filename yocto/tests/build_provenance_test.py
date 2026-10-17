@@ -1,4 +1,6 @@
+import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -7,7 +9,7 @@ from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meta-spacewars/lib"))
-from spacewars.build_provenance import capture, write
+from spacewars.build_provenance import capture, selected_inputs, write
 
 
 class BuildProvenanceTest(unittest.TestCase):
@@ -73,6 +75,45 @@ class BuildProvenanceTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 write(link, {})
             self.assertEqual(json.loads(path.read_text()), value)
+
+    def test_selected_inputs_preserve_exact_bytes_and_are_optional_only_as_a_pair(self):
+        value = dict(schema=1, source_commit=self.source['commit'],
+                     machine='raspberrypi-spacewars', target='spacewars-image')
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'inputs.json'
+            raw = json.dumps(value, indent=2).encode() + b'\n'
+            path.write_bytes(raw)
+            digest = hashlib.sha256(raw).hexdigest()
+            self.assertEqual(selected_inputs(path, digest, self.source), raw)
+            self.assertIsNone(selected_inputs('', '', self.source))
+            for p, sha in ((path, ''), ('', digest), (path, '0' * 64), (path, 'not a hash')):
+                with self.assertRaises(ValueError):
+                    selected_inputs(p, sha, self.source)
+            for change in ({'schema': True}, {'source_commit': 'b' * 40},
+                           {'machine': 'other'}, {'target': 'other'}):
+                raw = json.dumps(value | change).encode()
+                path.write_bytes(raw)
+                with self.assertRaises(ValueError):
+                    selected_inputs(path, hashlib.sha256(raw).hexdigest(), self.source)
+            path.write_bytes(json.dumps(value).encode())
+            with self.assertRaises(ValueError):
+                selected_inputs(path, hashlib.sha256(path.read_bytes()).hexdigest(), self.source | {'dirty': True})
+
+    def test_selected_inputs_reject_links_fifos_oversized_or_nonobject_records(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'inputs.json'
+            for raw in (b'[]', b'null', b'x' * (16 * 1024 + 1), b''):
+                path.write_bytes(raw)
+                with self.assertRaises(ValueError):
+                    selected_inputs(path, hashlib.sha256(raw).hexdigest(), self.source)
+            link = Path(temporary) / 'link'
+            link.symlink_to(path)
+            with self.assertRaises(OSError):
+                selected_inputs(link, 'a' * 64, self.source)
+            fifo = Path(temporary) / 'fifo'
+            os.mkfifo(fifo)
+            with self.assertRaises(ValueError):
+                selected_inputs(fifo, 'a' * 64, self.source)
 
 
 if __name__ == "__main__":
