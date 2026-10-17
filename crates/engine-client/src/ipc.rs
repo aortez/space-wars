@@ -1530,6 +1530,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_aquarium_enabled: window.get_launcher_clock_aquarium_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
+            clock_cell_swap_enabled: window.get_launcher_clock_cell_swap_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
                 window.get_launcher_clock_rain_amount().to_string()
             } else {

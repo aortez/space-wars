@@ -238,6 +238,7 @@ fn automatic_rain_and_wet_digit_changes_preserve_the_visit_settings_and_volume()
         crow: false,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
     };
     state.configure(settings);
     let session = state.player_duck_session();

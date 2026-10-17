@@ -8,6 +8,8 @@ use std::{cell::RefCell, rc::Rc};
 struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
+mod cell_swap;
+
 #[test]
 fn training_setup_progress_and_errors_render_with_working_back_controls() {
     use engine_agent::training_job::{GenerationProgress, JobSnapshot, JobSpec, JobState, Recipe};

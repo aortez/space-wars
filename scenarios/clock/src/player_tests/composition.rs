@@ -1,9 +1,10 @@
 use super::*;
 
-const VISUAL: [ClockEventKind; 3] = [
+const VISUAL: [ClockEventKind; 4] = [
     ClockEventKind::ColorCycle,
     ClockEventKind::Marquee,
     ClockEventKind::DigitSlide,
+    ClockEventKind::CellSwap,
 ];
 
 fn off_player(seed: u64) -> ClockState {
@@ -65,6 +66,7 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     settings.events.crow = true;
     settings.events.explosion = true;
     settings.events.aquarium = true;
+    settings.events.cell_swap = true;
     state.configure(settings);
     let session = state.player_duck_state();
     for cycle in 0..3 {

@@ -5,6 +5,75 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn cell_swap_preview_and_saved_switch_use_the_public_controls() {
+    run_functional_test("clock-cell-swap", |h| {
+        let page = h.wait_until_ready();
+        let page = h.activate_until_scenario("clock", page);
+        let page = h.activate_guarded("launcher.settings", &page);
+        let page = h.activate_guarded("launcher.settings.clock.event-profile.previous", &page);
+        let page = h.activate_guarded("launcher.settings.clock.cell-swap.next", &page);
+        assert_eq!(
+            control_value(&page, "launcher.settings.clock.cell-swap.next"),
+            Some("Off")
+        );
+        h.activate_guarded("launcher.settings.start", &page);
+        let gameplay = h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let mut page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        for _ in 0..ClockEventKind::CellSwap as usize {
+            page = h.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Cell Swap")
+        );
+        let initial = h.clock_state();
+        h.activate_guarded("pause.clock.preview", &page);
+        let gameplay = h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        // The one-second animation is covered at exact ticks by core/render
+        // tests; this process workflow must tolerate a loaded CI host.
+        let recovered = h.clock_wait(&initial, "idle", 1, 0);
+        assert!(recovered.cell_swap.is_none());
+        assert!(!recovered.settings.events.cell_swap);
+        assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
+        assert_eq!(recovered.next_event_tick, None);
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = h.clock_state();
+        let page = h.change_clock_setting("pause.clock.cell-swap", "On", &page);
+        let configured = h.clock_state();
+        assert_eq!(configured.simulation_tick, paused.simulation_tick);
+        assert!(configured.settings.events.cell_swap);
+        let page = h.activate_guarded("pause.clock.back", &page);
+        h.activate_guarded("pause.resume", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let gameplay = h.state();
+        h.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = h.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let page = h.activate_guarded("pause.clock.back", &page);
+        h.activate_guarded("pause.restart", &page);
+        h.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let restarted = h.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert!(restarted.cell_swap.is_none());
+        assert_eq!(restarted.settings, configured.settings);
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        loop {
+            let saved: engine_common::Settings = toml::from_str(
+                &fs::read_to_string(h.run_path().join("config/settings.toml")).unwrap(),
+            )
+            .unwrap();
+            if saved.clock == configured.settings {
+                break;
+            }
+            assert!(Instant::now() < deadline, "Cell Swap choice was not saved");
+            thread::sleep(POLL_INTERVAL);
+        }
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn aquarium_preview_pause_enablement_and_restart_use_the_public_ui() {
     run_functional_test("clock-aquarium", |harness| {
         let page = harness.wait_until_ready();
@@ -769,6 +838,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         }
         page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
         page = harness.change_clock_setting("pause.clock.aquarium", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.cell-swap", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -1119,6 +1189,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.aquarium.next",
+            "launcher.settings.clock.cell-swap.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {

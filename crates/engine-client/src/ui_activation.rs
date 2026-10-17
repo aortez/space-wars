@@ -233,6 +233,7 @@ fn activation_target(
         "pause.clock.crow" => pause_clock(14, UiAction::Confirm),
         "pause.clock.explosion" => pause_clock(15, UiAction::Confirm),
         "pause.clock.aquarium" => pause_clock(17, UiAction::Confirm),
+        "pause.clock.cell-swap" => pause_clock(18, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -303,6 +304,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.crow" => 13,
         "launcher.settings.clock.explosion" => 14,
         "launcher.settings.clock.aquarium" => 16,
+        "launcher.settings.clock.cell-swap" => 17,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

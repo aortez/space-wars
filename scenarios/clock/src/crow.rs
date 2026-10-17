@@ -62,6 +62,7 @@ fn perches(
             ClockEventKind::Falling
                 | ClockEventKind::Meltdown
                 | ClockEventKind::DigitSlide
+                | ClockEventKind::CellSwap
                 | ClockEventKind::Marquee
                 | ClockEventKind::Explosion
         )

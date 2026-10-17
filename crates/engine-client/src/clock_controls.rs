@@ -29,6 +29,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_aquarium_enabled(settings.events.aquarium);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
+    window.set_launcher_clock_cell_swap_enabled(settings.events.cell_swap);
     window.set_launcher_clock_rain_enabled(settings.events.rain);
     window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
@@ -162,6 +163,7 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         }
         15 => settings.events.explosion = !settings.events.explosion,
         17 => settings.events.aquarium = !settings.events.aquarium,
+        18 => settings.events.cell_swap = !settings.events.cell_swap,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -236,7 +238,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17) {
+            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11 | 17 | 18) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));
@@ -247,7 +249,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=15 | 17 | 18) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

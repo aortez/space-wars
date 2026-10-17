@@ -96,6 +96,7 @@ impl ClockState {
             crow: enabled(ClockEventKind::Crow),
             explosion: enabled(ClockEventKind::Explosion),
             aquarium: enabled(ClockEventKind::Aquarium),
+            cell_swap: enabled(ClockEventKind::CellSwap),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

@@ -1395,6 +1395,7 @@ mod tests {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "crow"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "explosion"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "aquarium"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "cell-swap"]).is_ok());
         for phase in ["warning", "exploding", "reforming"] {
             assert!(
                 Args::try_parse_from([

@@ -1,4 +1,5 @@
 pub(crate) mod aquarium;
+pub(crate) mod cell_swap;
 mod color_cycle;
 pub(crate) mod digit_slide;
 pub(crate) mod duck;
@@ -56,6 +57,8 @@ pub enum EventPhase {
     Resetting,
     Presenting,
     Sliding,
+    Swapping,
+    Reconciling,
     Raining,
     Clearing,
     Warning,
@@ -78,6 +81,8 @@ impl EventPhase {
             Self::Resetting => "resetting",
             Self::Presenting => "presenting",
             Self::Sliding => "sliding",
+            Self::Swapping => "swapping",
+            Self::Reconciling => "reconciling",
             Self::Raining => "raining",
             Self::Clearing => "clearing",
             Self::Warning => "warning",
@@ -203,6 +208,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: aquarium::AQUARIUM_TICKS,
         cooldown_ticks: 45 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::CellSwap,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: cell_swap::CELL_SWAP_MAX_TICKS,
+        cooldown_ticks: 20 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -220,6 +232,7 @@ pub(super) enum ActiveEvent {
     Meltdown(Box<MeltdownEvent>),
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
+    CellSwap(Box<cell_swap::CellSwapEvent>),
     Rain(Box<crate::rain::RainEvent>),
     Explosion(ExplosionEvent),
     Aquarium(Box<aquarium::AquariumEvent>),
@@ -269,6 +282,10 @@ impl ActiveEvent {
             ClockEventKind::DigitSlide => {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
+            ClockEventKind::CellSwap => Self::CellSwap(Box::new(cell_swap::CellSwapEvent::new(
+                context.display,
+                seed,
+            ))),
             ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
                 context.layout,
                 seed,
@@ -287,6 +304,7 @@ impl ActiveEvent {
             Self::Meltdown(_) => ClockEventKind::Meltdown,
             Self::Marquee(_) => ClockEventKind::Marquee,
             Self::DigitSlide(_) => ClockEventKind::DigitSlide,
+            Self::CellSwap(_) => ClockEventKind::CellSwap,
             Self::Rain(_) => ClockEventKind::Rain,
         }
     }
@@ -374,6 +392,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.step(context),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
+            Self::CellSwap(event) => event.step(),
             Self::Rain(event) => {
                 event.synchronize(context.display, context.segments);
                 event.step()
@@ -390,6 +409,13 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase(),
             Self::Marquee(_) => EventPhase::Presenting,
             Self::DigitSlide(_) => EventPhase::Sliding,
+            Self::CellSwap(event) => {
+                if event.tick < cell_swap::CELL_SWAP_TICKS {
+                    EventPhase::Swapping
+                } else {
+                    EventPhase::Reconciling
+                }
+            }
             Self::Rain(event) => event.phase(),
         }
     }
@@ -403,6 +429,15 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.phase_tick(),
             Self::Marquee(event) => event.tick,
             Self::DigitSlide(event) => event.tick,
+            Self::CellSwap(event) => {
+                event
+                    .tick
+                    .saturating_sub(if event.tick < cell_swap::CELL_SWAP_TICKS {
+                        0
+                    } else {
+                        cell_swap::CELL_SWAP_TICKS
+                    })
+            }
             Self::Rain(event) => event.phase_tick(),
         }
     }
@@ -413,7 +448,9 @@ impl ActiveEvent {
             Self::Falling(event) => event.physics_counts(),
             Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
-            Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) => (0, 0),
+            Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) | Self::CellSwap(_) => {
+                (0, 0)
+            }
             Self::Rain(event) => event.physics_counts(),
         }
     }

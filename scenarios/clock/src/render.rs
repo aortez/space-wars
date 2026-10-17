@@ -10,6 +10,7 @@ use crate::{
 use engine_core::Vec2;
 
 mod aquarium;
+mod cell_swap;
 mod crow;
 mod digit_slide;
 mod duck;
@@ -279,6 +280,10 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    if let Some(crate::events::ActiveEvent::CellSwap(event)) = &state.active_event {
+        cell_swap::render(frame, event, layout, state.palette());
+        return;
+    }
     if let Some(crate::events::ActiveEvent::Explosion(event)) = &state.active_event {
         explosion::render(frame, state, event, layout);
         return;
