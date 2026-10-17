@@ -419,3 +419,116 @@ mod grass_policy_contract_limits {
         );
     }
 }
+
+#[cfg(test)]
+mod grass_policy_contract_ordered_refusals {
+    use super::*;
+    struct Site {
+        support: bool,
+        space: bool,
+    }
+    impl Environment for Site {
+        fn exposure(&self, _: &Tissue) -> Exposure {
+            Exposure::default()
+        }
+        fn support_valid(&self, _: Option<Support>, _: [i32; 2]) -> bool {
+            self.support
+        }
+        fn space_available(&self, _: [i32; 2], _: Role, _: u16) -> bool {
+            self.space
+        }
+    }
+    #[test]
+    fn actual_candidates_preserve_masking_and_partial_enumeration() {
+        let support = Support {
+            body: 1,
+            generation: 1,
+        };
+        let mut grass = Grass::new(Traits::default(), [0, 0], [0, 1], support).unwrap();
+        let mut plants = Plants::new(Config::default(), 42).unwrap();
+        grass
+            .plant(
+                &mut plants,
+                &Site {
+                    support: true,
+                    space: true,
+                },
+            )
+            .unwrap();
+        let mut o = plants.observe();
+        let bad = Site {
+            support: false,
+            space: false,
+        };
+        assert!(
+            grass
+                .plan(&o, &bad)
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Support)
+        );
+        assert!(
+            grass
+                .plan(
+                    &o,
+                    &Site {
+                        support: true,
+                        space: false
+                    }
+                )
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Space)
+        );
+        o.tissues[0].stores = [0; 3];
+        let good = Site {
+            support: true,
+            space: true,
+        };
+        assert!(
+            grass
+                .plan(&o, &good)
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Resource)
+        );
+        grass.traits.radius = 0;
+        assert!(
+            grass
+                .plan(&o, &bad)
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Spread)
+        );
+        grass.traits.max_tissues = 1;
+        assert!(
+            grass
+                .plan(&o, &bad)
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Population)
+        );
+        grass.traits = Traits::default();
+        o.tissues[0].stores = [30; 3];
+        let mut occupied = o.tissues[0].clone();
+        occupied.id = 99;
+        occupied.cell = [0, 1];
+        occupied.health = 0;
+        o.tissues.push(occupied);
+        let mixed = grass.plan(&o, &bad);
+        assert_eq!(mixed.decisions[0].limit, Limit::Occupied);
+        assert!(
+            mixed
+                .decisions
+                .iter()
+                .skip(1)
+                .all(|d| d.limit == Limit::Support)
+        );
+        let partial = grass.plan(&o, &good);
+        assert_eq!(partial.decisions.len(), 2);
+        assert_eq!(partial.decisions[1].limit, Limit::Proposed);
+        assert_eq!(partial.intents.len(), 1);
+        o.tissues[0].health = 0;
+        assert!(grass.plan(&o, &good).decisions.is_empty());
+    }
+}
