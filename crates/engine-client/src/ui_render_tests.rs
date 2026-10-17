@@ -9,6 +9,98 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn launcher_filter_keyboard_and_touch_share_selection_and_save_behavior() {
+    use engine_common::Settings;
+    use slint::platform::{Key, PointerEventButton, WindowEvent};
+    use spacewars_control::UiAction;
+    use std::sync::{Arc, RwLock};
+
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let writer =
+        crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
+            .unwrap();
+    crate::launcher_catalog::install(&ui, Arc::clone(&settings), writer.clone());
+    crate::install_ui_navigation(&ui);
+    crate::install_keyboard_navigation(&ui, crate::input::new_shared_input().0);
+    ui.show().unwrap();
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        reset_panels(&ui);
+        ui.set_launcher_visible(true);
+        ui.set_launcher_seed_text("4242".into());
+        crate::launcher_catalog::restore(&ui, "clock", &settings, &writer);
+        for key in [Key::DownArrow, Key::Return] {
+            ui.window()
+                .dispatch_event(WindowEvent::KeyPressed { text: key.into() });
+            ui.window()
+                .dispatch_event(WindowEvent::KeyReleased { text: key.into() });
+        }
+        assert_eq!(ui.get_launcher_focus_index(), 9);
+        assert!(ui.get_launcher_show_all());
+        assert_eq!(ui.get_launcher_scenario(), "clock");
+        assert_eq!(ui.get_launcher_seed_text(), "4242");
+
+        crate::launcher_catalog::restore(
+            &ui,
+            "planetary-tank-comparison-angular",
+            &settings,
+            &writer,
+        );
+        slint::platform::update_timers_and_animations();
+        let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+        windows.borrow()[0].draw_if_needed(|renderer| {
+            renderer.render(pixels.make_mut_slice(), width as usize);
+        });
+        let page_width = (width as f32 - 32.0).min(760.0);
+        let page_height = (height as f32 - 24.0).min(if width < 600 { 580.0 } else { 520.0 });
+        let x = if width < 600 {
+            width as f32 / 2.0
+        } else {
+            (width as f32 + page_width) / 2.0 - 24.0 - 74.0
+        };
+        let y = (height as f32 - page_height) / 2.0 + 82.0 + if width < 600 { 98.0 } else { 32.0 };
+        for event in [
+            WindowEvent::PointerPressed {
+                position: slint::LogicalPosition::new(x, y),
+                button: PointerEventButton::Left,
+            },
+            WindowEvent::PointerReleased {
+                position: slint::LogicalPosition::new(x, y),
+                button: PointerEventButton::Left,
+            },
+        ] {
+            ui.window().dispatch_event(event);
+        }
+        assert!(
+            !ui.get_launcher_show_all(),
+            "touch toggle at {width}x{height}"
+        );
+        assert_eq!(ui.get_launcher_scenario(), "spacewars");
+        assert_eq!(ui.get_launcher_scenario_title(), "Space-Wars");
+        assert_eq!(ui.get_launcher_focus_index(), 9);
+        assert_eq!(ui.get_launcher_seed_text(), "4242");
+        assert!(ui.get_launcher_visible());
+        assert!(!settings.read().unwrap().launcher.show_all);
+        ui.invoke_ui_action(UiAction::Back.code());
+        assert!(ui.get_launcher_visible());
+    }
+    writer
+        .save_blocking(settings.read().unwrap().clone())
+        .unwrap();
+    assert!(
+        !crate::settings::load_settings(&directory.path().join("settings.toml"))
+            .unwrap()
+            .settings
+            .launcher
+            .show_all
+    );
+}
+
+#[test]
 fn training_setup_progress_and_errors_render_with_working_back_controls() {
     use engine_agent::training_job::{GenerationProgress, JobSnapshot, JobSpec, JobState, Recipe};
     use slint::platform::{PointerEventButton, WindowEvent};
@@ -1038,6 +1130,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_spacewars_ui_visible(false);
     ui.set_launcher_scenario("clock".into());
     ui.set_launcher_scenario_title("Clock".into());
+    ui.set_launcher_show_all(false);
     ui.set_launcher_focus_index(0);
 }
 
@@ -1123,6 +1216,24 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
         }),
         ("launcher", |ui| ui.set_launcher_visible(true)),
+        ("launcher-show-all", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_show_all(true);
+            ui.set_launcher_focus_index(9);
+            ui.set_launcher_scenario("planetary-tank-comparison-angular".into());
+            crate::apply_scenario_metadata(ui, "planetary-tank-comparison-angular");
+        }),
+        ("launcher-filter-save-error", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_show_all(true);
+            ui.set_launcher_focus_index(9);
+            ui.set_settings_save_error("Storage is not writable".into());
+        }),
+        ("launcher-filter-save-recovered", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_show_all(true);
+            ui.set_launcher_focus_index(9);
+        }),
         ("genome-browser", |ui| {
             ui.set_launcher_visible(true);
             ui.set_genomes_visible(true);

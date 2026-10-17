@@ -25,6 +25,9 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 
+#[path = "ui_control_functional/launcher_catalog.rs"]
+mod launcher_catalog;
+
 #[path = "ui_control_functional/garden_lab.rs"]
 mod garden_lab;
 
@@ -80,6 +83,7 @@ fn launcher_navigation_uses_the_public_control_api() {
         let mut reached = BTreeSet::from([selected_control(&state)]);
         for action in [
             UiAction::Down,
+            UiAction::Down,
             UiAction::Right,
             UiAction::Down,
             UiAction::Left,
@@ -98,6 +102,7 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.controls".into(),
                 "launcher.quit".into(),
                 "launcher.scenario".into(),
+                "launcher.scenarios.show_all".into(),
                 "launcher.settings".into(),
                 "launcher.sound".into(),
                 "launcher.start".into(),
@@ -843,6 +848,19 @@ impl FunctionalHarness {
         if state.selected_scenario == target {
             return state;
         }
+        if ![
+            "clock",
+            "spacewars",
+            "scorched-earth",
+            "pizza",
+            "falling",
+            "nes",
+        ]
+        .contains(&target)
+            && control_value(&state, "launcher.scenarios.show_all") == Some("Off")
+        {
+            state = self.activate_guarded("launcher.scenarios.show_all", &state);
+        }
         let mut visited = BTreeSet::from([state.selected_scenario.clone()]);
         loop {
             state = self.activate_guarded("launcher.scenario.next", &state);
@@ -1267,6 +1285,7 @@ fn assert_launcher_main(state: &UiState) {
         [
             "launcher.scenario.previous",
             "launcher.scenario.next",
+            "launcher.scenarios.show_all",
             "launcher.start",
             "launcher.settings",
             "launcher.controls",

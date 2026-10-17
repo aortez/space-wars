@@ -29,6 +29,7 @@ mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
 mod launcher;
+mod launcher_catalog;
 #[cfg(test)]
 mod lighting_presentation_contract;
 mod match_world;
@@ -537,7 +538,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show_launcher(
             &window,
             &effective_launch,
-            &settings.read().unwrap(),
+            &settings,
+            &settings_writer,
             &rom_catalog,
         );
         window.set_touch_test_visible(true);
@@ -572,7 +574,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(timer) => *render_timer.borrow_mut() = Some(timer),
             Err(error) => {
                 tracing::error!(%error, "direct scenario launch failed; showing launcher.");
-                show_launcher(&window, &effective_launch, &scenario_settings, &rom_catalog);
+                show_launcher(
+                    &window,
+                    &effective_launch,
+                    &settings,
+                    &settings_writer,
+                    &rom_catalog,
+                );
                 window.set_launcher_error_text(SharedString::from(error));
             }
         }
@@ -580,7 +588,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show_launcher(
             &window,
             &effective_launch,
-            &settings.read().unwrap(),
+            &settings,
+            &settings_writer,
             &rom_catalog,
         );
     }
@@ -632,9 +641,12 @@ fn normalize_launch_settings(settings: &mut Settings) -> bool {
         changed = true;
     }
 
-    let saved_scenario_is_launchable =
-        host::scenario_registration(settings.launch.scenario.as_str())
-            .is_some_and(|registration| registration.launcher_visible);
+    let saved_scenario_is_launchable = host::scenario_registration(
+        settings.launch.scenario.as_str(),
+    )
+    .is_some_and(|registration| {
+        registration.launcher_category != client_scenarios::LauncherCategory::Hidden
+    });
     if settings.launch.scenario.trim().is_empty() || !saved_scenario_is_launchable {
         tracing::warn!(
             scenario = %settings.launch.scenario,
@@ -712,9 +724,12 @@ fn should_launch_directly(args: &Args) -> bool {
 fn show_launcher(
     window: &MainWindow,
     launch: &EffectiveLaunch,
-    settings: &Settings,
+    shared_settings: &Arc<RwLock<Settings>>,
+    settings_writer: &settings_writer::SettingsWriter,
     rom_catalog: &SharedNesRomCatalog,
 ) {
+    launcher_catalog::restore(window, &launch.scenario, shared_settings, settings_writer);
+    let settings = shared_settings.read().unwrap().clone();
     window.set_sound_visible(false);
     // Release any scenario-specific native-video presenter retained by the
     // generated callback before exposing the launcher again.
@@ -733,13 +748,6 @@ fn show_launcher(
     window.set_scoreboard_visible(false);
     window.set_scenario_error_text(SharedString::from(""));
     clear_runtime_diagnostics(window);
-    let scenario_names = host::launcher_scenario_names()
-        .into_iter()
-        .map(SharedString::from)
-        .collect::<Vec<_>>();
-    window.set_launcher_scenarios(ModelRc::new(VecModel::from(scenario_names)));
-    window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
-    apply_scenario_metadata(window, launch.scenario.as_str());
     window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
     let renderer =
         renderer_policy::resolve(launch.renderer, window.get_raster_only(), "show_launcher");
@@ -834,7 +842,7 @@ fn show_launcher(
     window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
     window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
-    refresh_nes_rom_library(window, settings, rom_catalog);
+    refresh_nes_rom_library(window, &settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
     window.set_launcher_settings_focus_index(0);
@@ -997,6 +1005,7 @@ fn install_launcher_callbacks(
     rom_catalog: SharedNesRomCatalog,
     settings_writer: settings_writer::SettingsWriter,
 ) -> Rc<launcher::Launcher> {
+    launcher_catalog::install(window, Arc::clone(&settings), settings_writer.clone());
     let launcher = launcher::Launcher::new(
         window,
         render_timer,
@@ -1096,6 +1105,7 @@ fn install_ingame_menu_callbacks(
 
     let weak = window.as_weak();
     let world_settings = Arc::clone(&settings);
+    let world_writer = settings_writer.clone();
     window.on_match_world_changed(move || {
         let Some(window) = weak.upgrade() else {
             return;
@@ -1112,7 +1122,7 @@ fn install_ingame_menu_callbacks(
         settings.launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
         let snapshot = settings.clone();
         drop(settings);
-        let _ = settings_writer.save(snapshot);
+        let _ = world_writer.save(snapshot);
     });
 
     let controls = Rc::clone(&scenario_controls);
@@ -1148,6 +1158,7 @@ fn install_ingame_menu_callbacks(
             &scenario_controls,
             &input,
             &settings,
+            &settings_writer,
             &rom_catalog,
         );
     });
@@ -1375,6 +1386,7 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             5 => window.invoke_sound_open(),
             7 => window.invoke_training_open(),
             8 => window.invoke_genomes_open(),
+            9 => window.invoke_launcher_toggle_show_all(),
             6 if window.get_launcher_scenario() == "spacewars" => {
                 window.invoke_launcher_new_match()
             }
@@ -1907,6 +1919,7 @@ fn handle_return_to_launcher(
     scenario_controls: &host::SharedScenarioControls,
     input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
+    settings_writer: &settings_writer::SettingsWriter,
     rom_catalog: &SharedNesRomCatalog,
 ) {
     let Some(window) = weak_window.upgrade() else {
@@ -1923,15 +1936,14 @@ fn handle_return_to_launcher(
     scenario_controls.borrow_mut().clear();
     input.borrow_mut().clear();
     input.borrow_mut().reset_spacewars_controls();
-    let settings = settings.read().unwrap();
-    let mut launch = launch_from_settings(&settings);
-    if window.get_launcher_scenario() == "spacewars" {
-        launch.scenario = "spacewars".into();
-        launch.seed = window.get_launcher_seed_text().parse().unwrap();
-        launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
-        launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
-    }
-    show_launcher(&window, &launch, &settings, rom_catalog);
+    let mut launch = launch_from_settings(&settings.read().unwrap());
+    // Direct launches may differ from the saved scenario. Return to the exact
+    // running selection; the catalog resolves hidden scenarios to Space-Wars.
+    launch.scenario = window.get_launcher_scenario().to_string();
+    launch.seed = window.get_launcher_seed_text().parse().unwrap();
+    launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
+    launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+    show_launcher(&window, &launch, settings, settings_writer, rom_catalog);
 }
 
 fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {

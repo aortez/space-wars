@@ -299,12 +299,6 @@ pub fn scenario_names() -> Vec<&'static str> {
         .collect()
 }
 
-pub fn launcher_scenario_names() -> Vec<&'static str> {
-    client_scenarios::launcher_registrations()
-        .map(|registration| registration.id)
-        .collect()
-}
-
 pub fn is_known_scenario(name: &str) -> bool {
     client_scenarios::registration(name).is_some()
 }
