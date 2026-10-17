@@ -268,6 +268,39 @@ def extract(stream, directory, limits):
     return files
 
 
+def inspect_candidate(api, policy, selection, now):
+    policy.validate()
+    selection.validate()
+    build = inspect_run(api, policy.build, selection.build_run, selection.build_attempt,
+                        selection.source, now, policy.max_age_hours)
+    ci = inspect_run(api, policy.ci, selection.ci_run, selection.ci_attempt,
+                     selection.source, now, policy.max_age_hours)
+    artifact = inspect_artifact(api, selection, build, policy.producer_job, now)
+    return build, ci, artifact
+
+
+def recheck(api, policy, selection, receipt, clock=lambda: datetime.now(UTC)):
+    """Recheck live origin after expensive image validation, without downloading.
+
+    The caller must already hold the verified bytes from candidate(). An
+    unsigned receipt alone is not image qualification or signing approval.
+    """
+    if (receipt.get('scope') != 'github-artifact-origin'
+            or receipt.get('source') != selection.source
+            or receipt.get('repository') != REPOSITORY or receipt.get('repository_id') != REPOSITORY_ID
+            or receipt.get('policy_sha256') != digest(canonical(asdict(policy)))):
+        raise ValueError('Origin receipt differs from selected publisher policy')
+    after = inspect_candidate(api, policy, selection, clock())
+    if canonical(after) != canonical(tuple(receipt.get(name) for name in ('build', 'ci', 'artifact'))):
+        raise ValueError('Build, CI or artifact changed during qualification')
+    finished = clock()
+    if (not timestamp(receipt['admitted_at']) <= finished < timestamp(after[2]['expires_at'])
+            or any(timestamp(run['created_at']) < finished - timedelta(hours=policy.max_age_hours)
+                   for run in after[:2])):
+        raise ValueError('Qualification time changed or artifact expired')
+    return finished.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
 @contextmanager
 def candidate(api, policy, selection, scratch, clock=lambda: datetime.now(UTC)):
     """Yield private verified data and an origin receipt; delete both on exit.
@@ -281,13 +314,7 @@ def candidate(api, policy, selection, scratch, clock=lambda: datetime.now(UTC)):
     started = clock()
 
     def inspect():
-        now = clock()
-        build = inspect_run(api, policy.build, selection.build_run, selection.build_attempt,
-                            selection.source, now, policy.max_age_hours)
-        ci = inspect_run(api, policy.ci, selection.ci_run, selection.ci_attempt,
-                         selection.source, now, policy.max_age_hours)
-        artifact = inspect_artifact(api, selection, build, policy.producer_job, now)
-        return build, ci, artifact
+        return inspect_candidate(api, policy, selection, clock())
 
     before = inspect()
     with tempfile.TemporaryDirectory(prefix='ota-admission-', dir=scratch) as temporary:
@@ -365,7 +392,9 @@ class GitHub:
                     if not chunk:
                         break
                     data.extend(chunk)
-        except urllib.error.URLError:
+        except urllib.error.URLError as error:
+            if isinstance(error, urllib.error.HTTPError):
+                error.close()
             raise OSError('GitHub admission API read failed') from None
         if len(data) > MAX_JSON_BYTES:
             raise ValueError('GitHub JSON response exceeds limit')
@@ -439,6 +468,8 @@ class GitHub:
                     target.write(chunk)
                 if response.read(1) or hashed.hexdigest() != expected['sha256']:
                     raise ValueError('Artifact download differs from GitHub digest')
-        except urllib.error.URLError:
+        except urllib.error.URLError as error:
             # HTTP errors may contain temporary signed CDN query credentials.
+            if isinstance(error, urllib.error.HTTPError):
+                error.close()
             raise OSError('OTA artifact body download failed') from None

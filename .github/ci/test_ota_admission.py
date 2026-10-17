@@ -420,6 +420,7 @@ class TransportTests(unittest.TestCase):
                 self.api.download(12, dict(bytes=7, sha256=helper.digest(b'payload')), io.BytesIO())
             self.assertNotIn('temporary-secret', str(caught.exception))
             self.assertNotIn('test-token', str(caught.exception))
+            self.assertTrue(response.closed)
 
     def test_api_json_rejects_redirects_duplicates_excess_size_and_non_objects(self):
         for response in (self.redirect(), Response(b'{"id":1,"id":2}'), Response(b'[]'),
@@ -428,6 +429,7 @@ class TransportTests(unittest.TestCase):
             self.api.api_opener = Opener([response])
             with self.assertRaises((ValueError, OSError)):
                 self.api.json('/actions/runs/10')
+            self.assertTrue(response.closed)
 
     def test_workflow_file_decodes_exact_bounded_bytes(self):
         content = b'name: reviewed\n'

@@ -390,6 +390,7 @@ class AdapterTests(unittest.TestCase):
                 api.verify(asset, expected)
             self.assertEqual(str(error.exception), 'Public OTA asset download failed')
             self.assertTrue(error.exception.__suppress_context__)
+            self.assertTrue(opener.return_value.open.side_effect.closed)
 
     def test_pagination_limits_duplicates_and_incorrect_public_lengths_fail(self):
         api = helper.GitHub('unused')

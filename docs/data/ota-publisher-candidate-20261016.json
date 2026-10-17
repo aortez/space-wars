@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T03:06:56.007030+00:00",
+  "scope": "Combined real image validation and mocked GitHub origin; no live publisher, signing, release mutation, or Pi installation.",
+  "implementation_base": "7f7677445c087dbd26920887ea9ff3b4078a1c60",
+  "files": {
+    ".github/ci/ota_admission.py": {
+      "bytes": 23562,
+      "sha256": "c9547d9611a0cf549e89acb7d719a4a9b00b2790a1e78c28b0d66ffaa5d0302a"
+    },
+    ".github/ci/ota_delivery.py": {
+      "bytes": 18219,
+      "sha256": "93c943f4d333e0f24e1673d30650baaa8e2a5b50d7f752904ae45f96eeede15c"
+    },
+    ".github/ci/ota_publisher_policy.py": {
+      "bytes": 5019,
+      "sha256": "020e98033dc47b23c783708bc083d5b0d50fff1bc99c7fc2921bd4eb46a0a88c"
+    },
+    ".github/ci/ota_publisher_candidate.py": {
+      "bytes": 8345,
+      "sha256": "271d6c3e8c7bcebfa0337bfa27168fda93818c7e1bc5f9842e6e086896aa6eda"
+    },
+    ".github/workflows/ci.yml": {
+      "bytes": 17420,
+      "sha256": "2433f37ca898fb9f8bfc1ab9aa0f20178611fc56c0cdb2663bc7dc86666622ca"
+    },
+    ".github/workflows/ota-build.yml": {
+      "bytes": 2649,
+      "sha256": "f23214de1aa01bdecbb810a38c1a9f884f854e0bf9ea5550aa196844303aa3bf"
+    }
+  },
+  "tests": {
+    "ci_python": 156,
+    "resource_warnings": "error; none observed",
+    "actionlint": "v1.7.12: both workflows passed",
+    "rust": "No Rust changes in this phase; new CI job runs the already validated publisher all-targets command."
+  },
+  "command_parity": {
+    "existing_jobs": {
+      "yocto-tools": {
+        "run_commands": 6,
+        "unchanged": true
+      },
+      "nes-core": {
+        "run_commands": 4,
+        "unchanged": true
+      },
+      "linux-workspace": {
+        "run_commands": 14,
+        "unchanged": true
+      },
+      "spacewars-recovery": {
+        "run_commands": 3,
+        "unchanged": true
+      },
+      "spacewars-ai-regression": {
+        "run_commands": 2,
+        "unchanged": true
+      },
+      "windows-client": {
+        "run_commands": 2,
+        "unchanged": true
+      },
+      "aarch64-core": {
+        "run_commands": 2,
+        "unchanged": true
+      },
+      "windows-release": {
+        "run_commands": 2,
+        "unchanged": true
+      }
+    },
+    "windows_nightly_workflow_unchanged": true,
+    "added_job": "ota-publisher"
+  },
+  "real_image_smoke": {
+    "status": "passed",
+    "scope": "Actual image validation joined to mock GitHub origin; this does not prove live GitHub CI or production qualification.",
+    "source": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+    "seconds": 57.36,
+    "candidate": {
+      "schema": 1,
+      "format": "rootfs-ext4-zstd",
+      "compressed": {
+        "bytes": 131792120,
+        "sha256": "eecfe55d24f628cbd2ab08c6ad578f01b7c71335acb3b1a530c7faaa8b6b9395"
+      },
+      "expanded": {
+        "bytes": 528482304,
+        "sha256": "6c438f63aa823d8a6f0db2cc4f5e3996498e333df36f6e1d764799794be6ba75"
+      }
+    },
+    "image_policy": {
+      "schema": 1,
+      "source_commit": "7673fa123403f11ecc0f9bed9eab6780fe553280",
+      "build_inputs_sha256": "d5f11f41686a96a908d3d5d987d24ccc52bab3e7cb136ced3e6eea90094798b3",
+      "rust_version": "1.94.0",
+      "cargo_version": "1.94.0",
+      "cc_version_line": "aarch64-poky-linux-gcc (GCC) 13.5.0"
+    },
+    "github_origin_checks": 3,
+    "output": "/home/data/workspace/space-wars-ota/target/ota-publisher-image-smoke",
+    "validator_sha256": "e7466effafcb38182503aa2dda20570e32f75fff136834bbe5fc0e5e74ea502a",
+    "implementation": "uncommitted continuation of 7f76774; component hashes recorded separately"
+  },
+  "fixture_tooling_identity": "publisher.json has tooling_source=null and an explicit fixture note; this uncommitted test did not admit a publisher revision.",
+  "boot_hook_review": "Read-only real-image inspection found no /etc/{rpm,ipk,deb}-postinsts, /usr/sbin/rpi-eeprom-update or /usr/bin/rpi-update. This is a spot check, not proof that all future image boot hooks are excluded.",
+  "logs": {
+    "target/ota-publisher-all-python-tests.log": {
+      "bytes": 474,
+      "sha256": "36d62704f58464c5e919f7f64863fb25fb7ec7ea5058de5cc076bc9d316989f1"
+    },
+    "target/ota-publisher-workflows-actionlint.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/ota-publisher-image-smoke.log": {
+      "bytes": 1199,
+      "sha256": "3c228e465c07e3ed9281b0eb746fa72ae77323de2d4e1880660b9a0c9460e365"
+    },
+    "target/ota-ci-command-parity.json": {
+      "bytes": 751,
+      "sha256": "0f5754c8918e58a9e26f5107ec3123d1cf3e026de213fabc3548d6d9630d9d44"
+    },
+    "target/ota-image-boot-hook-review.log": {
+      "bytes": 3107,
+      "sha256": "51e4dc7f704ec7309e448924bdb26c9331a6a69b408ea190e45dba1f27055bd3"
+    }
+  },
+  "remaining": [
+    "Finish/qualify isolated cold image and standard-runner capacity",
+    "Durable generation/history and protected publisher workflows",
+    "Renewal/rotation/retention and offline root provisioning",
+    "Installed updater/UI/install policy integration",
+    "Supervised bootstrap and physical recovery/rollout evidence on both Pis"
+  ]
+}

@@ -1533,6 +1533,68 @@ candidate or validation of the unpushed OTA branch. The adapter follows GitHub's
 The [admission evidence](data/ota-admission-20261016.json) records exact source,
 test results, live run/artifact identities and remaining integration boundaries.
 
+## Combined publisher candidate qualification
+
+[`ota_publisher_policy.py`](../.github/ci/ota_publisher_policy.py) derives the
+expected workflow hashes from an independently selected, clean publisher
+checkout at a complete reviewed commit. It requires all nine source CI jobs,
+including the dedicated OTA updater/publisher fixture suite, and explicit
+successful qualification steps. All build/source-CI action references are pinned
+to immutable commits; custom secrets, signing environments, job permission
+overrides and allowed failures on required steps are rejected. This is a policy
+for a previously reviewed publisher revision, not automatic approval of a
+candidate's checkout. Updating a reviewed workflow requires a corresponding
+publisher revision review.
+
+[`ota_publisher_candidate.py`](../.github/ci/ota_publisher_candidate.py) joins that
+origin gate to the real image validator. It derives image policy from the
+selected clean source, admits the exact build/CI attempts and artifact, checks
+the embedded-input/build record binding, and independently verifies the
+downloaded Zstandard image with pinned publisher tooling. The unsigned builder
+qualification is compared with the new result; it never substitutes for running
+the validator. Image identity, compiler/input records, expanded payload and the
+admitted compressed bytes must agree. The source policy, local artifact hashes
+and live GitHub origin are checked again after validation, rejecting changed
+attempts, expired artifacts, backward time or local byte substitution.
+
+Use only a read-only Actions/Contents token in this pre-signing process. The
+validator receives no caller environment credentials, and no candidate script
+or executable path is evaluated. The callable `qualified(...)` context keeps
+verified files private and removes them on exit, including failure. The CLI
+can save an atomic, non-overwriting evidence directory:
+
+```sh
+python3 /reviewed-publisher/.github/ci/ota_publisher_candidate.py \
+  --tooling-checkout /reviewed-publisher --tooling-source <reviewed-full-commit> \
+  --source-checkout /selected-main --source <candidate-full-commit> \
+  --build-run <id> --build-attempt <attempt> \
+  --ci-run <id> --ci-attempt <attempt> --artifact <id> \
+  --validator /reviewed-publisher/target/debug/examples/image_candidate \
+  --output /private/new-qualified-candidate
+```
+
+The caller supplies `GH_TOKEN` through its environment. The saved directory has
+the original four artifact files plus `origin.json`, `image-policy.json` and
+`publisher.json`. These remain unsigned evidence, not a capability to sign:
+current publisher history/generation allocation, protected role jobs, explicit
+Release approval, retention, renewal and final delivery are still required.
+
+All 156 CI Python tests pass, including late origin/byte changes, bogus builder
+reports, failed source CI, expiry, time regression and clean-checkout/pinned
+workflow checks. HTTP failure paths now explicitly close their responses while
+keeping temporary CDN credentials out of error text. Both workflows pass
+Actionlint 1.7.12. Existing CI run commands and the Windows nightly workflow
+remain unchanged; the new serial publisher fixture job includes the previously
+validated Rust publisher tests that ordinary feature-disabled builds omit.
+
+A combined check on the real `7673fa1` image passed in 57.360 seconds, using
+the actual Rust validator and three origin inspections around download and
+validation. Its GitHub records were fixtures, not live CI evidence; the saved
+test output explicitly does not identify an admitted publisher revision.
+The [combined-check evidence](data/ota-publisher-candidate-20261016.json) records
+the image/tool/component hashes and test logs. Live hosted qualification,
+protected publication and physical Pi rollout remain unverified.
+
 ## Role-scoped publisher signing
 
 The optional `engine-ota` feature `publisher` supplies signing operations and the

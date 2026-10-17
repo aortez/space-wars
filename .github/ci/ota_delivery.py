@@ -334,8 +334,12 @@ class GitHub:
         request = urllib.request.Request(url, data=raw, method=method, headers=headers)
         # Never retry a mutation after a lost response. Reconciliation belongs to
         # the next serialized invocation, which reads reservation and asset state.
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=120) as response:
-            data = response.read(MAX_MANIFEST_BYTES + 1)
+        try:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=120) as response:
+                data = response.read(MAX_MANIFEST_BYTES + 1)
+        except urllib.error.HTTPError as error:
+            error.close()
+            raise
         if len(data) > MAX_MANIFEST_BYTES:
             raise ValueError('GitHub JSON response exceeds limit')
         return strict_json(data) if data else None
@@ -389,6 +393,8 @@ class GitHub:
                 if response.status != 200 or response.headers.get('Content-Encoding', 'identity') != 'identity':
                     raise ValueError('Invalid public asset response')
                 verify_stream(response, expected)
-        except urllib.error.URLError:
+        except urllib.error.URLError as error:
             # Redirect URLs can contain temporary CDN query credentials.
+            if isinstance(error, urllib.error.HTTPError):
+                error.close()
             raise OSError('Public OTA asset download failed') from None
