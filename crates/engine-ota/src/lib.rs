@@ -45,6 +45,8 @@ pub mod persistence_linux;
 #[cfg(target_os = "linux")]
 pub mod provision_linux;
 pub mod publication;
+#[cfg(any(test, feature = "publisher"))]
+pub mod signing;
 #[cfg(target_os = "linux")]
 mod watchdog_linux;
 #[cfg(target_os = "linux")]

@@ -163,6 +163,15 @@ pub struct Fixture {
 }
 
 impl Fixture {
+    /// Ephemeral test credentials only; production keys are never generated here.
+    #[allow(dead_code)] // Shared with integration tests that only consume feeds.
+    pub fn signing_keys(&self, indices: &[usize]) -> Vec<Box<dyn KeySource>> {
+        indices
+            .iter()
+            .map(|index| Box::new(self.keys[*index].clone()) as Box<dyn KeySource>)
+            .collect()
+    }
+
     pub async fn new() -> Self {
         let rng = SystemRandom::new();
         let keys: Vec<_> = (0..8)

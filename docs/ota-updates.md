@@ -1307,6 +1307,97 @@ actual inactive slot. Persistent staging applies its separate space quota. The
 HTTPS session adds redirect/request bounds, progress deadlines and transfer
 throttling and service-owned network holds, described below.
 
+## Role-scoped publisher signing
+
+The optional `engine-ota` feature `publisher` supplies signing operations and the
+Linux `feed_sign` tool. Device builds do not enable this feature. These are
+building blocks for the isolated #262 publisher, not an enabled workflow or
+evidence that production keys or approval environments have been configured.
+
+`signing::Authority` checks an independently selected root and top-level targets
+policy: both signatures and expiration apply. The four top-level roles must use
+separate signing authorities, and Release/Nightly keys remain distinct from each
+other and all top-level roles. Channel namespaces and descriptors use the same
+policy functions as the device verifier. The caller must supply the latest
+trusted policy and parent metadata from retained publisher state; accepting an
+arbitrary candidate's root or old signed parent would not establish freshness.
+
+The public request has `prepared_at` plus a tagged `change` object. Supported
+operations are:
+
+- `channel`: select `release` or `nightly`, supply its signed `previous` role,
+  and optionally append one `image` descriptor. Existing targets are retained,
+  including older boot-compatible candidates. `image: null` renews the current
+  role. Known generations and immutable image identities cannot be reassigned.
+- `targets-renewal`: refresh the current delegation policy's version and expiry
+  without changing its keys, thresholds or namespaces.
+- `snapshot`: verify the supplied signed `targets`, `release` and `nightly`
+  roles and bind their exact versions, lengths and SHA-256 hashes. The new
+  references cannot roll back or substitute different bytes at a previous version.
+- `timestamp`: verify the supplied signed `snapshot`, enforce the same reference
+  rules and bind its exact bytes.
+
+`previous` is the signed JSON text, not a filename; `null` is reserved for an
+explicitly admitted first publication. Requests contain no executable hooks,
+private-key paths or delegation-management operation. Root creation/rotation and
+changing channel authority remain separate offline/management work. The publisher
+must still enforce historical generation allocation and deliberate retention;
+this helper appends/renews catalogs and does not remove targets.
+
+Proposals increment the selected parent metadata version, use 30-day
+targets/snapshot and seven-day timestamp lifetimes, and bind the precise
+authority, parent, prepared time and unsigned role in canonical approval bytes.
+A proposal must not be future-dated or older than 24 hours when signed. Each job
+must independently admit that exact proposal digest before exposing credentials.
+The digest binds the proposed operation; it does not prove that source CI, Yocto
+validation or a required maintainer approval actually happened.
+
+After the approval and current-policy checks, the signer reads each supplied
+credential once. It rejects missing threshold members, duplicates and any key
+outside the requested role, even if other supplied keys could satisfy the
+threshold. Loaded keys are retained for that operation instead of reopening a
+path during signing. The maintained TUF signing implementation creates the
+signatures, and the result is reverified against the selected authority before
+returning bytes. The output uses canonical JSON and sorted signatures, avoiding
+differences caused by map/key iteration order. Ed25519 retries are byte-stable
+for the identical proposal and key set; randomized signing algorithms still
+require retaining the original output.
+
+The manual tool interface is:
+
+```sh
+cargo build -p engine-ota --features publisher --example feed_sign
+target/debug/examples/feed_sign trusted-root.json current-targets.json request.json \
+  preview > proposal.json
+
+# The isolated caller supplies the independently admitted proposal digest.
+target/debug/examples/feed_sign trusted-root.json current-targets.json request.json \
+  "$APPROVED_PROPOSAL_SHA256" /private/selected-role-key.pkcs8 > signed-role.json
+```
+
+Preview receives no keys and emits the exact bytes whose digest it reports.
+Signing uses the publisher host's UTC clock. Private files must be regular,
+owned by the executing account, inaccessible to other accounts and singly
+linked; symlinks and oversized inputs are rejected. Credential errors are
+redacted. This helper does not generate, log or write private keys. The tests use
+ephemeral credentials, including a two-signature Release policy.
+
+Before production use, the caller still needs pinned trusted tooling, GitHub
+run/artifact admission, same-source build qualification, separate protected
+signing jobs and explicit Release promotion approval. Nightly jobs must receive
+only Nightly keys; policy-renewal, Release, snapshot and timestamp jobs each
+receive their own role's credentials. The library cannot establish those job
+boundaries. In particular, it must not run candidate-provided scripts while
+credentials are accessible. GitHub documents [workflow trust boundaries and
+immutable action references](https://docs.github.com/en/actions/reference/security/secure-use)
+and [environment protection rules](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+
+Retain each exact request, admitted digest and signed output durably before
+delivery. An interrupted publication resumes those bytes; it does not change
+`prepared_at`, reallocate versions, select a newer parent or regenerate a
+randomized signature under an already reserved immutable name. The final
+`feed_inventory` check and timestamp-last delivery below remain required.
+
 ## Feed delivery under development
 
 The delivery component for #262 is implemented separately from signing and

@@ -6,8 +6,16 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+publisher = ["dep:aws-lc-rs"]
+
+[[example]]
+name = "feed_sign"
+required-features = ["publisher"]
+
 [dependencies]
 async-trait = "0.1"
+aws-lc-rs = { version = "1", optional = true }
 bytes = "1"
 futures = "0.3"
 jiff = { version = "0.2", features = ["serde"] }

@@ -282,11 +282,31 @@ pub(crate) fn metadata_limits() -> Limits {
 }
 
 pub(crate) fn validate_catalog(repository: &tough::Repository) -> Result<Vec<ImageDescriptor>> {
+    let delegations = channel_policy(&repository.root().signed, &repository.targets().signed)?;
+    let mut images = Vec::new();
+    for channel in [Channel::Release, Channel::Nightly] {
+        let targets = &delegations
+            .roles
+            .iter()
+            .find(|role| role.name == channel.name())
+            .expect("checked channel policy")
+            .targets
+            .as_ref()
+            .ok_or_else(|| Error::Feed("unverified channel role".into()))?
+            .signed;
+        images.extend(channel_images(channel, targets)?);
+    }
+    Ok(images)
+}
+
+pub(crate) fn channel_policy<'a>(
+    root: &tough::schema::Root,
+    top: &'a tough::schema::Targets,
+) -> Result<&'a tough::schema::Delegations> {
     let invalid = |reason: &str| Error::Feed(reason.into());
-    if !repository.root().signed.consistent_snapshot {
+    if !root.consistent_snapshot {
         return Err(invalid("consistent snapshots are required"));
     }
-    let top = &repository.targets().signed;
     if !top.targets.is_empty() {
         return Err(invalid("images must belong to channel delegations"));
     }
@@ -298,10 +318,9 @@ pub(crate) fn validate_catalog(repository: &tough::Repository) -> Result<Vec<Ima
         return Err(invalid("expected exactly Release and Nightly roles"));
     }
     let mut keys = BTreeSet::new();
-    for role in repository.root().signed.roles.values() {
+    for role in root.roles.values() {
         keys.extend(role.keyids.iter().map(|key| key.as_ref().to_vec()));
     }
-    let mut images = Vec::new();
     for channel in [Channel::Release, Channel::Nightly] {
         let role = delegations
             .roles
@@ -321,40 +340,46 @@ pub(crate) fn validate_catalog(repository: &tough::Repository) -> Result<Vec<Ima
                 ));
             }
         }
-        let targets = &role
-            .targets
-            .as_ref()
-            .ok_or_else(|| invalid("unverified channel role"))?
-            .signed;
-        if targets.delegations.as_ref().is_some_and(|delegations| {
-            !delegations.roles.is_empty() || !delegations.keys.is_empty()
-        }) {
-            return Err(invalid("nested channel delegations are unsupported"));
+    }
+    Ok(delegations)
+}
+
+pub(crate) fn channel_images(
+    channel: Channel,
+    targets: &tough::schema::Targets,
+) -> Result<Vec<ImageDescriptor>> {
+    let invalid = |reason: &str| Error::Feed(reason.into());
+    let mut images = Vec::new();
+    if targets
+        .delegations
+        .as_ref()
+        .is_some_and(|delegations| !delegations.roles.is_empty() || !delegations.keys.is_empty())
+    {
+        return Err(invalid("nested channel delegations are unsupported"));
+    }
+    for (name, target) in &targets.targets {
+        if target.custom.len() != 1 {
+            return Err(invalid("expected custom.spacewars descriptor"));
         }
-        for (name, target) in &targets.targets {
-            if target.custom.len() != 1 {
-                return Err(invalid("expected custom.spacewars descriptor"));
-            }
-            let image: ImageDescriptor = serde_json::from_value(
-                target
-                    .custom
-                    .get("spacewars")
-                    .ok_or_else(|| invalid("missing image descriptor"))?
-                    .clone(),
-            )?;
-            image.validate()?;
-            if image.channel != channel
-                || name.raw() != image.target_name()
-                || name.raw() != name.resolved()
-                || target.length != image.compressed.bytes
-                || target.hashes.sha256.as_ref() != image.compressed.sha256.as_bytes()
-            {
-                return Err(invalid(
-                    "target name, channel, length or hash disagrees with descriptor",
-                ));
-            }
-            images.push(image);
+        let image: ImageDescriptor = serde_json::from_value(
+            target
+                .custom
+                .get("spacewars")
+                .ok_or_else(|| invalid("missing image descriptor"))?
+                .clone(),
+        )?;
+        image.validate()?;
+        if image.channel != channel
+            || name.raw() != image.target_name()
+            || name.raw() != name.resolved()
+            || target.length != image.compressed.bytes
+            || target.hashes.sha256.as_ref() != image.compressed.sha256.as_bytes()
+        {
+            return Err(invalid(
+                "target name, channel, length or hash disagrees with descriptor",
+            ));
         }
+        images.push(image);
     }
     Ok(images)
 }
