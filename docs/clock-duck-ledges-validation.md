@@ -97,3 +97,19 @@ Raster images use the production raster adapter. Vector images export the
 production vector geometry through Slint's SVG loader, with the native text
 overlay, because the headless software window cannot draw native Path items.
 These are local captures; no Pi deployment or device GPU validation was done.
+
+[Source revision, capture telemetry and image hashes](screenshots/clock/duck-ledges-manifest.json)
+record the selected frames. The capture matrix peaks at 610 primitives and
+9 total bodies, including at most two flap bodies.
+
+| Reaching, 800×480 raster | Hanging, 800×480 raster |
+| --- | --- |
+| ![Normal jump reaching toward the flap](screenshots/clock/ledge-800x480-left-reaching-raster.png) | ![Duck hanging from the flap](screenshots/clock/ledge-800x480-left-hanging-raster.png) |
+
+| Pull-up, 800×480 raster | Confirmed standing after turning, 800×480 raster |
+| --- | --- |
+| ![Duck pulling itself onto the flap](screenshots/clock/ledge-800x480-left-pull-up-raster.png) | ![Duck standing on the flap](screenshots/clock/ledge-800x480-left-standing-raster.png) |
+
+| Right entrance, 1024×768 vector | Portrait hang, 480×800 vector |
+| --- | --- |
+| ![Duck standing on the right flap](screenshots/clock/ledge-1024x768-right-standing-vector.png) | ![Duck hanging in the portrait layout](screenshots/clock/ledge-480x800-left-hanging-vector.png) |
