@@ -930,6 +930,16 @@ interrupted-promotion testing remain. The corrected kernel changes the shared
 boot identity and therefore needs boot-asset provisioning, not a rootfs-only OTA.
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
 
+The combined image at `ef44f5b` includes this kernel correction and the SSH
+reservation fix. All 6,768 Yocto tasks passed, with 6,738 reused, and the frozen
+rootfs passed unsigned candidate validation. Its shared boot identity remains
+the corrected kernel's identity. This image has not been installed on a Pi.
+Freshly flashed devices still need a supported bootstrap into recovery state:
+the current legacy bootstrap intentionally rejects their existing recovery
+manifest and trial configuration. The
+[combined image evidence](data/ota-integrated-image-20261017.json) records the
+exact build, payload and outstanding device/runner qualification.
+
 ### Immutable boot assets and root selection
 
 Recovery images use a v2 boot manifest. It hashes every packaged kernel,
@@ -1556,13 +1566,22 @@ task failed and no out-of-memory kill was reported.
 
 Observed allocated build/cache/source directories reached at least 43.8 GiB;
 sampling did not cover every instant, so that is not a guaranteed peak. A separate
-cold build of `cfd20a1` is running with four assigned CPUs and 12 GiB, matching
-the planned runner limits. Neither the larger completed build nor this still
-running probe proves hosted free-space capacity. The
+cold build of `cfd20a1`, with four assigned CPUs and 12 GiB, subsequently failed
+the recipe's source-provenance check before compiling Space Wars. Its retained
+log does not establish the exact source mismatch, and it provides no capacity
+pass. Neither probe proves hosted free-space capacity. The
 [cold-container evidence](data/ota-cold-container-20261016.json) records source,
 policy, exact payloads and resource limits. The next hosted probe uses a dedicated
 manual branch and a non-production artifact name, without signing keys or feed
 write access.
+
+The later `ef44f5b` workstation build passed, but a single client-compiler RSS
+sample was 15,945,320 KiB, already above the workflow's 12 GiB container limit.
+This is not a continuous peak measurement or a constrained-runner failure.
+Source-provenance diagnosis and a successful constrained build remain required
+before claiming standard-runner fit; memory tuning may also be needed. The
+[combined build evidence](data/ota-integrated-image-20261017.json) retains both
+the failed cold-build log identity and the workstation memory observation.
 
 ## GitHub candidate origin admission
 
@@ -1895,9 +1914,9 @@ records the exact files, logs and outstanding production integration.
 The subsequent [sealed-manifest evidence](data/ota-publication-sealing-20261016.json)
 adds expiry-safe reconciliation and abandonment checks: 181 Python cases and the
 signed-delivery Rust integration case pass, and both signed fixtures pass again.
-The four-core/12 GiB cold build is running separately from the initial eight-core
-measurement; neither is evidence of GitHub-hosted disk capacity until completed
-and checked against a real hosted run after cleanup.
+The subsequent four-core/12 GiB cold build failed source-provenance validation
+before the application compile. Neither it nor the initial eight-core
+measurement qualifies GitHub-hosted disk or memory capacity.
 
 ## Feed delivery under development
 
