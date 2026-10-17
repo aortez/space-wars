@@ -94,7 +94,10 @@ local_conf_header:
     BB_DISKMON_WARNINTERVAL = "1G,50K"
 
     BB_ENV_PASSTHROUGH_ADDITIONS:append = " SPACEWARS_CACHE_ROOT"
-    SPACEWARS_CACHE_ROOT = "${@os.getenv('SPACEWARS_CACHE_ROOT', '/home/data/linux1/yocto-cache' if os.path.isdir('/home/data/linux1') else '/home/data/workspace/yocto-cache')}"
+    # Keep the imported value in BitBake's datastore. Worker processes sanitize
+    # os.environ, so resolving this again from their environment loses the
+    # explicitly selected cache and breaks isolated/container builds.
+    SPACEWARS_CACHE_ROOT ?= "${@'/home/data/linux1/yocto-cache' if os.path.isdir('/home/data/linux1') else '/home/data/workspace/yocto-cache'}"
     DL_DIR ?= "${SPACEWARS_CACHE_ROOT}/downloads"
     SSTATE_DIR ?= "${SPACEWARS_CACHE_ROOT}/sstate-cache"
 

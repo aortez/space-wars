@@ -1388,6 +1388,26 @@ history and isolated signing/delivery remain required. Images built before the
 embedded input record was added fail this stricter validation, including the
 historical `7e69bc0` image above.
 
+Source `7673fa123403f11ecc0f9bed9eab6780fe553280` built the real Pi image with its
+embedded input record and passed both `pack` and a separate `verify` invocation.
+The payload is 131,792,120 bytes and expands to 528,482,304 bytes. All 337 Rust
+tests, 128 CI Python helpers, 51 Yocto JavaScript tests and 81 Yocto Python tests
+pass, along with Clippy and Rust 1.89 checks. The
+[candidate evidence](data/ota-image-candidate-20261016.json) records exact hashes,
+compiler/input records and local logs. This is local image qualification; no
+production feed or device rollout is claimed.
+
+An isolated cold-build probe uses the pinned kas image without host mounts or
+credentials, running as UID 30000 with capabilities dropped. On this workstation
+Docker's default syscall filter prevents Yocto's user/network namespaces; a
+probe with the syscall filter disabled succeeds. The full build also exposed a
+cache-path bug: evaluating `os.getenv` again in a sanitized BitBake worker loses
+the explicit cache selection. The configuration now retains the imported
+datastore value with a weak default, and an actual BitBake datastore probe
+confirms download, sstate and compiler caches retain the supplied path. A
+standard build umask is also required. Container completion and GitHub runner
+capacity still need validation before enabling the build workflow.
+
 ## GitHub candidate origin admission
 
 The read-only [OTA admission helper](../.github/ci/ota_admission.py) checks a
