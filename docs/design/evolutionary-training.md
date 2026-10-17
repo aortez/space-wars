@@ -797,6 +797,10 @@ write, recovery from a terminated runner, stale/incompatible artifacts, and
 distinct Pause versus Save and stop behavior. Library storage and preview queues
 need explicit bounds so an unattended run cannot accumulate unbounded data.
 
+The [first match-hybrid integration plan](learned-guidance-match-v1.md) scopes
+#291 to a retained arrival component inside Recovery bot v1, beginning with
+measurements of the flight states encountered by the real match host.
+
 After those slices, a hybrid match brain and its adapter can be assigned to P1
 or P2. They need both-seat, reset, transfer, vehicle-loss, and recovery checks
 plus paired match comparisons. A complete learned pilot and joint evolution of

@@ -10,6 +10,10 @@ const OBSERVATION_WORK: Work = Work {
     physics_queries: 384,
 };
 
+#[cfg(test)]
+mod guidance_approach;
+#[cfg(test)]
+mod guidance_census;
 mod profiling;
 #[cfg(test)]
 mod recovery_tests;

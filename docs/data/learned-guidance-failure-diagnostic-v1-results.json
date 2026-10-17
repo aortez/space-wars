@@ -1,0 +1,5756 @@
+{
+  "experiment": "recovery_guidance_failure_diagnostic_v1",
+  "runtime": "diagnostic_v1/linux/x86_64/5ef5dddbec014a3c4f784d5119eeed7d6b652c42261c1ef1c89ce0798615c544",
+  "plan_sha256": "f465a3bc316168ed38b3260fa4f12f033718b271414c3b6a18f79a566d92f68c",
+  "controllers": [
+    {
+      "controller": "reference",
+      "genome": null,
+      "fitness": {
+        "approach_completed": 40,
+        "approach_position_points": 34346,
+        "approach_speed_points": 40349,
+        "retained_completed": 157,
+        "retained_position_points": 154073,
+        "retained_velocity_points": 156053,
+        "spare_ticks": 66897
+      },
+      "retention_outcomes": {
+        "arrived": 157
+      },
+      "retention_failures": [],
+      "approach_outcomes": {
+        "arrived": 40,
+        "timeout": 3
+      },
+      "approaches": [
+        {
+          "case": "train-42-p1-d65",
+          "outcome": "arrived",
+          "ticks": 20,
+          "thrust_ticks": 16,
+          "brake_ticks": 19,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d65",
+          "outcome": "timeout",
+          "ticks": 300,
+          "thrust_ticks": 95,
+          "brake_ticks": 300,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d35",
+          "outcome": "arrived",
+          "ticks": 193,
+          "thrust_ticks": 58,
+          "brake_ticks": 192,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d65",
+          "outcome": "timeout",
+          "ticks": 300,
+          "thrust_ticks": 90,
+          "brake_ticks": 300,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d35",
+          "outcome": "arrived",
+          "ticks": 146,
+          "thrust_ticks": 50,
+          "brake_ticks": 145,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d65",
+          "outcome": "timeout",
+          "ticks": 300,
+          "thrust_ticks": 151,
+          "brake_ticks": 300,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d35",
+          "outcome": "arrived",
+          "ticks": 145,
+          "thrust_ticks": 69,
+          "brake_ticks": 144,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 34,
+          "thrust_ticks": 0,
+          "brake_ticks": 33,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 117,
+          "thrust_ticks": 36,
+          "brake_ticks": 116,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 114,
+          "thrust_ticks": 44,
+          "brake_ticks": 113,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 149,
+          "thrust_ticks": 12,
+          "brake_ticks": 148,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 161,
+          "thrust_ticks": 115,
+          "brake_ticks": 160,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 152,
+          "thrust_ticks": 100,
+          "brake_ticks": 151,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 164,
+          "thrust_ticks": 47,
+          "brake_ticks": 163,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 229,
+          "thrust_ticks": 38,
+          "brake_ticks": 228,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 20,
+          "thrust_ticks": 16,
+          "brake_ticks": 19,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 193,
+          "thrust_ticks": 58,
+          "brake_ticks": 192,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 146,
+          "thrust_ticks": 50,
+          "brake_ticks": 145,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 145,
+          "thrust_ticks": 69,
+          "brake_ticks": 144,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 34,
+          "thrust_ticks": 0,
+          "brake_ticks": 33,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 117,
+          "thrust_ticks": 36,
+          "brake_ticks": 116,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 114,
+          "thrust_ticks": 44,
+          "brake_ticks": 113,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 149,
+          "thrust_ticks": 12,
+          "brake_ticks": 148,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 161,
+          "thrust_ticks": 115,
+          "brake_ticks": 160,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 152,
+          "thrust_ticks": 100,
+          "brake_ticks": 151,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 164,
+          "thrust_ticks": 47,
+          "brake_ticks": 163,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 229,
+          "thrust_ticks": 38,
+          "brake_ticks": 228,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 130,
+          "thrust_ticks": 21,
+          "brake_ticks": 129,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 143,
+          "thrust_ticks": 14,
+          "brake_ticks": 142,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 130,
+          "thrust_ticks": 21,
+          "brake_ticks": 129,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 143,
+          "thrust_ticks": 14,
+          "brake_ticks": 142,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 43,
+          "thrust_ticks": 0,
+          "brake_ticks": 42,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 185,
+          "thrust_ticks": 16,
+          "brake_ticks": 184,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 43,
+          "thrust_ticks": 0,
+          "brake_ticks": 42,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 185,
+          "thrust_ticks": 16,
+          "brake_ticks": 184,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 151,
+          "thrust_ticks": 93,
+          "brake_ticks": 150,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 170,
+          "thrust_ticks": 108,
+          "brake_ticks": 169,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 151,
+          "thrust_ticks": 93,
+          "brake_ticks": 150,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 170,
+          "thrust_ticks": 108,
+          "brake_ticks": 169,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 128,
+          "thrust_ticks": 35,
+          "brake_ticks": 127,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 173,
+          "thrust_ticks": 22,
+          "brake_ticks": 172,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 128,
+          "thrust_ticks": 35,
+          "brake_ticks": 127,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 173,
+          "thrust_ticks": 22,
+          "brake_ticks": 172,
+          "raw_output_ranges": null,
+          "host_goal": null,
+          "final_health": 100.0
+        }
+      ],
+      "precision": [
+        {
+          "case": "qualification_target_motion_b0_p0",
+          "outcome": "arrived",
+          "ticks": 929,
+          "final_measure": {
+            "distance": 1.807020902633667,
+            "dwell": 30,
+            "relative_speed": 0.14420220255851746
+          },
+          "min_distance": 1.807020902633667,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.807020902633667,
+              5.011069297790527
+            ],
+            "speed_range": [
+              0.14200538396835327,
+              1.3576050996780396
+            ],
+            "mean_abs_spin": 0.017353712826346356,
+            "brake_ticks": 300,
+            "thrust_ticks": 165,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "arrived",
+          "ticks": 929,
+          "final_measure": {
+            "distance": 1.8117095232009888,
+            "dwell": 30,
+            "relative_speed": 0.4021100103855133
+          },
+          "min_distance": 1.8117095232009888,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.8117095232009888,
+              5.00454044342041
+            ],
+            "speed_range": [
+              0.13574060797691345,
+              1.3093070983886719
+            ],
+            "mean_abs_spin": 0.01719006243472298,
+            "brake_ticks": 300,
+            "thrust_ticks": 165,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "arrived",
+          "ticks": 929,
+          "final_measure": {
+            "distance": 1.8051296472549438,
+            "dwell": 30,
+            "relative_speed": 0.19585421681404114
+          },
+          "min_distance": 1.8051296472549438,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.8051296472549438,
+              5.014915466308594
+            ],
+            "speed_range": [
+              0.14214222133159637,
+              1.3660186529159546
+            ],
+            "mean_abs_spin": 0.017262978022918107,
+            "brake_ticks": 300,
+            "thrust_ticks": 165,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "arrived",
+          "ticks": 928,
+          "final_measure": {
+            "distance": 1.80263090133667,
+            "dwell": 30,
+            "relative_speed": 0.24218787252902985
+          },
+          "min_distance": 1.80263090133667,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.80263090133667,
+              5.029606342315674
+            ],
+            "speed_range": [
+              0.14773839712142944,
+              1.3464208841323853
+            ],
+            "mean_abs_spin": 0.017417108189935485,
+            "brake_ticks": 300,
+            "thrust_ticks": 165,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p0",
+          "outcome": "arrived",
+          "ticks": 965,
+          "final_measure": {
+            "distance": 1.8065783977508545,
+            "dwell": 30,
+            "relative_speed": 0.6707320809364319
+          },
+          "min_distance": 1.8065783977508545,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.8065783977508545,
+              5.033870220184326
+            ],
+            "speed_range": [
+              0.1260787397623062,
+              1.4184006452560425
+            ],
+            "mean_abs_spin": 0.01799732129710416,
+            "brake_ticks": 300,
+            "thrust_ticks": 146,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "arrived",
+          "ticks": 965,
+          "final_measure": {
+            "distance": 1.7977606058120728,
+            "dwell": 30,
+            "relative_speed": 0.3378816246986389
+          },
+          "min_distance": 1.7977606058120728,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.7977606058120728,
+              5.0284576416015625
+            ],
+            "speed_range": [
+              0.1286281943321228,
+              1.4065850973129272
+            ],
+            "mean_abs_spin": 0.01813572699204087,
+            "brake_ticks": 300,
+            "thrust_ticks": 146,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "arrived",
+          "ticks": 981,
+          "final_measure": {
+            "distance": 1.8135000467300415,
+            "dwell": 30,
+            "relative_speed": 0.2045847475528717
+          },
+          "min_distance": 1.8135000467300415,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.8135000467300415,
+              4.95326566696167
+            ],
+            "speed_range": [
+              0.2045847475528717,
+              1.346364140510559
+            ],
+            "mean_abs_spin": 0.016020651251698534,
+            "brake_ticks": 300,
+            "thrust_ticks": 155,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p0",
+          "outcome": "arrived",
+          "ticks": 982,
+          "final_measure": {
+            "distance": 1.8145338296890259,
+            "dwell": 30,
+            "relative_speed": 0.1757749766111374
+          },
+          "min_distance": 1.8145338296890259,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.8145338296890259,
+              4.933332920074463
+            ],
+            "speed_range": [
+              0.1665801703929901,
+              1.3618913888931274
+            ],
+            "mean_abs_spin": 0.01607918944209814,
+            "brake_ticks": 300,
+            "thrust_ticks": 155,
+            "count": 300
+          }
+        }
+      ]
+    },
+    {
+      "controller": "parent",
+      "genome": "693447c6df8315017a67f8dba8809568cf08f3ec66131302bfd026fa49f343fb",
+      "fitness": {
+        "approach_completed": 21,
+        "approach_position_points": 35496,
+        "approach_speed_points": 25306,
+        "retained_completed": 157,
+        "retained_position_points": 155757,
+        "retained_velocity_points": 155800,
+        "spare_ticks": 95216
+      },
+      "retention_outcomes": {
+        "arrived": 157
+      },
+      "retention_failures": [],
+      "approach_outcomes": {
+        "host_preempted": 22,
+        "arrived": 21
+      },
+      "approaches": [
+        {
+          "case": "train-42-p1-d65",
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "thrust_ticks": 52,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.579942226409912,
+              -1.6092311143875122
+            ],
+            [
+              0.1287776380777359,
+              0.4833490252494812
+            ],
+            [
+              -0.8767598867416382,
+              -0.2290409952402115
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d65",
+          "outcome": "host_preempted",
+          "ticks": 31,
+          "thrust_ticks": 31,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.758502960205078,
+              -2.4262444972991943
+            ],
+            [
+              0.15680021047592163,
+              0.38246312737464905
+            ],
+            [
+              -1.1669710874557495,
+              -0.7452685236930847
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d35",
+          "outcome": "arrived",
+          "ticks": 65,
+          "thrust_ticks": 27,
+          "brake_ticks": 40,
+          "raw_output_ranges": [
+            [
+              -2.9023003578186035,
+              -2.0179762840270996
+            ],
+            [
+              -0.3483855724334717,
+              0.3539085388183594
+            ],
+            [
+              -0.4428432583808899,
+              0.4401507079601288
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d65",
+          "outcome": "arrived",
+          "ticks": 121,
+          "thrust_ticks": 8,
+          "brake_ticks": 44,
+          "raw_output_ranges": [
+            [
+              -2.219008684158325,
+              -1.2169806957244873
+            ],
+            [
+              -0.28826212882995605,
+              0.013018965721130371
+            ],
+            [
+              -0.375011146068573,
+              1.0454216003417969
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d35",
+          "outcome": "arrived",
+          "ticks": 58,
+          "thrust_ticks": 33,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.647123098373413,
+              -1.767068862915039
+            ],
+            [
+              -0.13374340534210205,
+              0.14947780966758728
+            ],
+            [
+              -0.007550865411758423,
+              0.6047309637069702
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d65",
+          "outcome": "host_preempted",
+          "ticks": 46,
+          "thrust_ticks": 26,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.601916790008545,
+              -0.8605998158454895
+            ],
+            [
+              -0.39398229122161865,
+              0.47370317578315735
+            ],
+            [
+              -1.3181955814361572,
+              -0.5589634776115417
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d35",
+          "outcome": "host_preempted",
+          "ticks": 33,
+          "thrust_ticks": 33,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7769744396209717,
+              -2.5522942543029785
+            ],
+            [
+              0.05844828486442566,
+              0.2971552014350891
+            ],
+            [
+              -0.7810691595077515,
+              -0.2370447963476181
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "ticks": 11,
+          "thrust_ticks": 11,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.814934015274048,
+              -2.741711139678955
+            ],
+            [
+              0.1846955418586731,
+              0.20108552277088165
+            ],
+            [
+              -0.24922311305999756,
+              -0.09290808439254761
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "ticks": 26,
+          "thrust_ticks": 26,
+          "brake_ticks": 10,
+          "raw_output_ranges": [
+            [
+              -2.775757312774658,
+              -2.5306339263916016
+            ],
+            [
+              0.02007967233657837,
+              0.154976949095726
+            ],
+            [
+              -0.05666187405586243,
+              0.1494012176990509
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 61,
+          "thrust_ticks": 24,
+          "brake_ticks": 43,
+          "raw_output_ranges": [
+            [
+              -2.371433973312378,
+              -1.3266487121582031
+            ],
+            [
+              -0.3256615102291107,
+              0.09474639594554901
+            ],
+            [
+              -0.01225433498620987,
+              0.8772039413452148
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.4914770126342773,
+              -1.4632560014724731
+            ],
+            [
+              -0.26428258419036865,
+              0.09678369760513306
+            ],
+            [
+              0.01849585771560669,
+              0.8616735935211182
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "thrust_ticks": 30,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.838874101638794,
+              -2.7059011459350586
+            ],
+            [
+              0.16312099993228912,
+              0.3388817608356476
+            ],
+            [
+              -0.6352119445800781,
+              -0.36813756823539734
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "ticks": 32,
+          "thrust_ticks": 32,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.8505630493164062,
+              -2.635111093521118
+            ],
+            [
+              0.057815492153167725,
+              0.29552435874938965
+            ],
+            [
+              -0.7123392224311829,
+              -0.19886910915374756
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 71,
+          "thrust_ticks": 20,
+          "brake_ticks": 35,
+          "raw_output_ranges": [
+            [
+              -2.3202064037323,
+              -1.2764630317687988
+            ],
+            [
+              -0.292106956243515,
+              0.10463376343250275
+            ],
+            [
+              -0.06201432645320892,
+              0.7978547215461731
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "ticks": 41,
+          "thrust_ticks": 41,
+          "brake_ticks": 5,
+          "raw_output_ranges": [
+            [
+              -2.674848794937134,
+              -2.3876631259918213
+            ],
+            [
+              0.021378248929977417,
+              0.2504650354385376
+            ],
+            [
+              -0.4772278666496277,
+              0.05298946797847748
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p1",
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "thrust_ticks": 52,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.579942226409912,
+              -1.6092311143875122
+            ],
+            [
+              0.1287776380777359,
+              0.4833490252494812
+            ],
+            [
+              -0.8767598867416382,
+              -0.2290409952402115
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 65,
+          "thrust_ticks": 27,
+          "brake_ticks": 40,
+          "raw_output_ranges": [
+            [
+              -2.9023003578186035,
+              -2.0179762840270996
+            ],
+            [
+              -0.3483855724334717,
+              0.3539085388183594
+            ],
+            [
+              -0.4428432583808899,
+              0.4401507079601288
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 58,
+          "thrust_ticks": 33,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.647123098373413,
+              -1.767068862915039
+            ],
+            [
+              -0.13374340534210205,
+              0.14947780966758728
+            ],
+            [
+              -0.007550865411758423,
+              0.6047309637069702
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p2",
+          "outcome": "host_preempted",
+          "ticks": 33,
+          "thrust_ticks": 33,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7769744396209717,
+              -2.5522942543029785
+            ],
+            [
+              0.05844828486442566,
+              0.2971552014350891
+            ],
+            [
+              -0.7810691595077515,
+              -0.2370447963476181
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p1",
+          "outcome": "host_preempted",
+          "ticks": 11,
+          "thrust_ticks": 11,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.814934015274048,
+              -2.741711139678955
+            ],
+            [
+              0.1846955418586731,
+              0.20108552277088165
+            ],
+            [
+              -0.24922311305999756,
+              -0.09290808439254761
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p2",
+          "outcome": "host_preempted",
+          "ticks": 26,
+          "thrust_ticks": 26,
+          "brake_ticks": 10,
+          "raw_output_ranges": [
+            [
+              -2.775757312774658,
+              -2.5306339263916016
+            ],
+            [
+              0.02007967233657837,
+              0.154976949095726
+            ],
+            [
+              -0.05666187405586243,
+              0.1494012176990509
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 61,
+          "thrust_ticks": 24,
+          "brake_ticks": 43,
+          "raw_output_ranges": [
+            [
+              -2.371433973312378,
+              -1.3266487121582031
+            ],
+            [
+              -0.3256615102291107,
+              0.09474639594554901
+            ],
+            [
+              -0.01225433498620987,
+              0.8772039413452148
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.4914770126342773,
+              -1.4632560014724731
+            ],
+            [
+              -0.26428258419036865,
+              0.09678369760513306
+            ],
+            [
+              0.01849585771560669,
+              0.8616735935211182
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p1",
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "thrust_ticks": 30,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.838874101638794,
+              -2.7059011459350586
+            ],
+            [
+              0.16312099993228912,
+              0.3388817608356476
+            ],
+            [
+              -0.6352119445800781,
+              -0.36813756823539734
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p2",
+          "outcome": "host_preempted",
+          "ticks": 32,
+          "thrust_ticks": 32,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.8505630493164062,
+              -2.635111093521118
+            ],
+            [
+              0.057815492153167725,
+              0.29552435874938965
+            ],
+            [
+              -0.7123392224311829,
+              -0.19886910915374756
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 71,
+          "thrust_ticks": 20,
+          "brake_ticks": 35,
+          "raw_output_ranges": [
+            [
+              -2.3202064037323,
+              -1.2764630317687988
+            ],
+            [
+              -0.292106956243515,
+              0.10463376343250275
+            ],
+            [
+              -0.06201432645320892,
+              0.7978547215461731
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p1",
+          "outcome": "host_preempted",
+          "ticks": 41,
+          "thrust_ticks": 41,
+          "brake_ticks": 5,
+          "raw_output_ranges": [
+            [
+              -2.674848794937134,
+              -2.3876631259918213
+            ],
+            [
+              0.021378248929977417,
+              0.2504650354385376
+            ],
+            [
+              -0.4772278666496277,
+              0.05298946797847748
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 46,
+          "thrust_ticks": 27,
+          "brake_ticks": 45,
+          "raw_output_ranges": [
+            [
+              -2.6337459087371826,
+              -2.1527867317199707
+            ],
+            [
+              -0.11487323045730591,
+              0.10539226233959198
+            ],
+            [
+              0.027677208185195923,
+              0.21159657835960388
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "ticks": 36,
+          "thrust_ticks": 33,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7135238647460938,
+              -2.5108511447906494
+            ],
+            [
+              -0.05716560781002045,
+              0.2798069715499878
+            ],
+            [
+              -0.7939358949661255,
+              -0.16111937165260315
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 46,
+          "thrust_ticks": 27,
+          "brake_ticks": 45,
+          "raw_output_ranges": [
+            [
+              -2.6337459087371826,
+              -2.1527867317199707
+            ],
+            [
+              -0.11487323045730591,
+              0.10539226233959198
+            ],
+            [
+              0.027677208185195923,
+              0.21159657835960388
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p2",
+          "outcome": "host_preempted",
+          "ticks": 36,
+          "thrust_ticks": 33,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7135238647460938,
+              -2.5108511447906494
+            ],
+            [
+              -0.05716560781002045,
+              0.2798069715499878
+            ],
+            [
+              -0.7939358949661255,
+              -0.16111937165260315
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 43,
+          "thrust_ticks": 16,
+          "brake_ticks": 42,
+          "raw_output_ranges": [
+            [
+              -2.6512837409973145,
+              -2.104349374771118
+            ],
+            [
+              -0.1600291132926941,
+              0.0785849392414093
+            ],
+            [
+              0.0279989093542099,
+              0.2779155969619751
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "ticks": 29,
+          "thrust_ticks": 27,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7872235774993896,
+              -2.6663193702697754
+            ],
+            [
+              -0.027807310223579407,
+              0.29281365871429443
+            ],
+            [
+              -0.6859247088432312,
+              -0.16265326738357544
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 43,
+          "thrust_ticks": 16,
+          "brake_ticks": 42,
+          "raw_output_ranges": [
+            [
+              -2.6512837409973145,
+              -2.104349374771118
+            ],
+            [
+              -0.1600291132926941,
+              0.0785849392414093
+            ],
+            [
+              0.0279989093542099,
+              0.2779155969619751
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p2",
+          "outcome": "host_preempted",
+          "ticks": 29,
+          "thrust_ticks": 27,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7872235774993896,
+              -2.6663193702697754
+            ],
+            [
+              -0.027807310223579407,
+              0.29281365871429443
+            ],
+            [
+              -0.6859247088432312,
+              -0.16265326738357544
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 79,
+          "thrust_ticks": 17,
+          "brake_ticks": 30,
+          "raw_output_ranges": [
+            [
+              -2.214691162109375,
+              -1.1338878870010376
+            ],
+            [
+              -0.33019304275512695,
+              0.0791168212890625
+            ],
+            [
+              -0.12644268572330475,
+              0.7730534076690674
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 84,
+          "thrust_ticks": 25,
+          "brake_ticks": 33,
+          "raw_output_ranges": [
+            [
+              -2.300913095474243,
+              -1.2202610969543457
+            ],
+            [
+              -0.27943122386932373,
+              0.1265365332365036
+            ],
+            [
+              -0.10422009229660034,
+              0.7690063714981079
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 79,
+          "thrust_ticks": 17,
+          "brake_ticks": 30,
+          "raw_output_ranges": [
+            [
+              -2.214691162109375,
+              -1.1338878870010376
+            ],
+            [
+              -0.33019304275512695,
+              0.0791168212890625
+            ],
+            [
+              -0.12644268572330475,
+              0.7730534076690674
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 84,
+          "thrust_ticks": 25,
+          "brake_ticks": 33,
+          "raw_output_ranges": [
+            [
+              -2.300913095474243,
+              -1.2202610969543457
+            ],
+            [
+              -0.27943122386932373,
+              0.1265365332365036
+            ],
+            [
+              -0.10422009229660034,
+              0.7690063714981079
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p2",
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "thrust_ticks": 35,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7447876930236816,
+              -2.4912376403808594
+            ],
+            [
+              0.016107916831970215,
+              0.2921058237552643
+            ],
+            [
+              -0.8006908297538757,
+              -0.24476292729377747
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 66,
+          "thrust_ticks": 3,
+          "brake_ticks": 31,
+          "raw_output_ranges": [
+            [
+              -2.0002260208129883,
+              -1.0997117757797241
+            ],
+            [
+              -0.35410043597221375,
+              0.007525011897087097
+            ],
+            [
+              -0.10503999888896942,
+              0.8151326775550842
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p2",
+          "outcome": "host_preempted",
+          "ticks": 35,
+          "thrust_ticks": 35,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.7447876930236816,
+              -2.4912376403808594
+            ],
+            [
+              0.016107916831970215,
+              0.2921058237552643
+            ],
+            [
+              -0.8006908297538757,
+              -0.24476292729377747
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 66,
+          "thrust_ticks": 3,
+          "brake_ticks": 31,
+          "raw_output_ranges": [
+            [
+              -2.0002260208129883,
+              -1.0997117757797241
+            ],
+            [
+              -0.35410043597221375,
+              0.007525011897087097
+            ],
+            [
+              -0.10503999888896942,
+              0.8151326775550842
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        }
+      ],
+      "precision": [
+        {
+          "case": "qualification_target_motion_b0_p0",
+          "outcome": "arrived",
+          "ticks": 832,
+          "final_measure": {
+            "distance": 0.2792431116104126,
+            "dwell": 30,
+            "relative_speed": 0.3719930350780487
+          },
+          "min_distance": 0.04711775854229927,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 46,
+          "last_300_ticks": {
+            "distance_range": [
+              0.04711775854229927,
+              5.431641101837158
+            ],
+            "speed_range": [
+              0.04464681074023247,
+              4.446485996246338
+            ],
+            "mean_abs_spin": 1.7624589494864147,
+            "brake_ticks": 0,
+            "thrust_ticks": 33,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "arrived",
+          "ticks": 829,
+          "final_measure": {
+            "distance": 0.3047837018966675,
+            "dwell": 30,
+            "relative_speed": 0.15243561565876007
+          },
+          "min_distance": 0.1620943397283554,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 47,
+          "last_300_ticks": {
+            "distance_range": [
+              0.1620943397283554,
+              5.429804801940918
+            ],
+            "speed_range": [
+              0.04096798971295357,
+              3.4279255867004395
+            ],
+            "mean_abs_spin": 1.7624853905042013,
+            "brake_ticks": 0,
+            "thrust_ticks": 31,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "arrived",
+          "ticks": 826,
+          "final_measure": {
+            "distance": 0.49011746048927307,
+            "dwell": 30,
+            "relative_speed": 0.15730345249176025
+          },
+          "min_distance": 0.49011746048927307,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              0.49011746048927307,
+              7.449511528015137
+            ],
+            "speed_range": [
+              0.15730345249176025,
+              5.1639180183410645
+            ],
+            "mean_abs_spin": 1.7618548862139385,
+            "brake_ticks": 0,
+            "thrust_ticks": 35,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "arrived",
+          "ticks": 828,
+          "final_measure": {
+            "distance": 0.5319656729698181,
+            "dwell": 30,
+            "relative_speed": 0.3257071077823639
+          },
+          "min_distance": 0.2757365107536316,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 41,
+          "last_300_ticks": {
+            "distance_range": [
+              0.2757365107536316,
+              6.672685146331787
+            ],
+            "speed_range": [
+              0.08697514235973358,
+              6.08131742477417
+            ],
+            "mean_abs_spin": 1.7618403776486715,
+            "brake_ticks": 0,
+            "thrust_ticks": 38,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p0",
+          "outcome": "arrived",
+          "ticks": 786,
+          "final_measure": {
+            "distance": 0.9839311838150024,
+            "dwell": 30,
+            "relative_speed": 0.8704614043235779
+          },
+          "min_distance": 0.9839311838150024,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              0.9839311838150024,
+              7.0166425704956055
+            ],
+            "speed_range": [
+              0.07339189946651459,
+              4.883523941040039
+            ],
+            "mean_abs_spin": 1.7578024816513063,
+            "brake_ticks": 0,
+            "thrust_ticks": 36,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "arrived",
+          "ticks": 767,
+          "final_measure": {
+            "distance": 0.444710910320282,
+            "dwell": 30,
+            "relative_speed": 0.46975526213645935
+          },
+          "min_distance": 0.40550169348716736,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 35,
+          "last_300_ticks": {
+            "distance_range": [
+              0.40550169348716736,
+              8.118200302124023
+            ],
+            "speed_range": [
+              0.30948197841644287,
+              7.03654670715332
+            ],
+            "mean_abs_spin": 1.7581795064608257,
+            "brake_ticks": 3,
+            "thrust_ticks": 31,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "arrived",
+          "ticks": 770,
+          "final_measure": {
+            "distance": 0.3690580427646637,
+            "dwell": 30,
+            "relative_speed": 0.3949204087257385
+          },
+          "min_distance": 0.21836505830287933,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 38,
+          "last_300_ticks": {
+            "distance_range": [
+              0.21836505830287933,
+              7.98097038269043
+            ],
+            "speed_range": [
+              0.29156070947647095,
+              6.333961009979248
+            ],
+            "mean_abs_spin": 1.7585702196756998,
+            "brake_ticks": 0,
+            "thrust_ticks": 31,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p0",
+          "outcome": "arrived",
+          "ticks": 765,
+          "final_measure": {
+            "distance": 1.060014247894287,
+            "dwell": 30,
+            "relative_speed": 0.8429653644561768
+          },
+          "min_distance": 1.060014247894287,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              1.060014247894287,
+              8.567476272583008
+            ],
+            "speed_range": [
+              0.3109685778617859,
+              6.213578224182129
+            ],
+            "mean_abs_spin": 1.757901477018992,
+            "brake_ticks": 1,
+            "thrust_ticks": 35,
+            "count": 300
+          }
+        }
+      ]
+    },
+    {
+      "controller": "finalist",
+      "genome": "7895c85cce3cc0a156393d23355a1d62f90cddc964b9c125ba5eec9826bf1073",
+      "fitness": {
+        "approach_completed": 37,
+        "approach_position_points": 36618,
+        "approach_speed_points": 31277,
+        "retained_completed": 152,
+        "retained_position_points": 155014,
+        "retained_velocity_points": 155654,
+        "spare_ticks": 95835
+      },
+      "retention_outcomes": {
+        "arrived": 152,
+        "timeout": 5
+      },
+      "retention_failures": [
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.584895610809326,
+            "dwell": 0,
+            "relative_speed": 1.0691901445388794
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.570925712585449,
+            "dwell": 0,
+            "relative_speed": 0.9743585586547852
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.5960617065429688,
+            "dwell": 0,
+            "relative_speed": 1.0145459175109863
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.0634589195251465,
+            "dwell": 0,
+            "relative_speed": 0.4388183355331421
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.113579511642456,
+            "dwell": 0,
+            "relative_speed": 0.49742570519447327
+          }
+        }
+      ],
+      "approach_outcomes": {
+        "host_preempted": 6,
+        "arrived": 37
+      },
+      "approaches": [
+        {
+          "case": "train-42-p1-d65",
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "thrust_ticks": 52,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.6009511947631836,
+              -1.4323347806930542
+            ],
+            [
+              0.18496441841125488,
+              0.5086336731910706
+            ],
+            [
+              -0.8649163842201233,
+              -0.3860028386116028
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d65",
+          "outcome": "host_preempted",
+          "ticks": 31,
+          "thrust_ticks": 31,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.76029896736145,
+              -2.3086049556732178
+            ],
+            [
+              0.19803237915039062,
+              0.43060731887817383
+            ],
+            [
+              -1.1359491348266602,
+              -0.4401554763317108
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d35",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.900120258331299,
+              -2.363056182861328
+            ],
+            [
+              -0.21769684553146362,
+              0.379252165555954
+            ],
+            [
+              -0.28371188044548035,
+              0.4234634339809418
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d65",
+          "outcome": "arrived",
+          "ticks": 112,
+          "thrust_ticks": 5,
+          "brake_ticks": 41,
+          "raw_output_ranges": [
+            [
+              -2.13120698928833,
+              -1.1675227880477905
+            ],
+            [
+              -0.3624719977378845,
+              0.008334942162036896
+            ],
+            [
+              -0.4395509362220764,
+              1.0372247695922852
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d35",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 35,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.7391772270202637,
+              -1.5202924013137817
+            ],
+            [
+              -0.18850713968276978,
+              0.13571757078170776
+            ],
+            [
+              0.08101555705070496,
+              0.7454172372817993
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d65",
+          "outcome": "host_preempted",
+          "ticks": 50,
+          "thrust_ticks": 32,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.6156294345855713,
+              -0.8139357566833496
+            ],
+            [
+              -0.3404756188392639,
+              0.49800431728363037
+            ],
+            [
+              -1.3737930059432983,
+              -0.8461408615112305
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d35",
+          "outcome": "arrived",
+          "ticks": 72,
+          "thrust_ticks": 33,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.775184392929077,
+              -2.295654058456421
+            ],
+            [
+              -0.37896227836608887,
+              0.3216080069541931
+            ],
+            [
+              -0.7178095579147339,
+              0.438945472240448
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 63,
+          "thrust_ticks": 25,
+          "brake_ticks": 62,
+          "raw_output_ranges": [
+            [
+              -2.8308305740356445,
+              -2.2255077362060547
+            ],
+            [
+              -0.35178858041763306,
+              0.18524432182312012
+            ],
+            [
+              0.08122611045837402,
+              0.44570696353912354
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.8162732124328613,
+              -2.2935941219329834
+            ],
+            [
+              -0.14887115359306335,
+              0.12888027727603912
+            ],
+            [
+              0.1576024889945984,
+              0.3710351586341858
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 67,
+          "thrust_ticks": 26,
+          "brake_ticks": 44,
+          "raw_output_ranges": [
+            [
+              -2.5125582218170166,
+              -1.1817872524261475
+            ],
+            [
+              -0.3875114917755127,
+              0.09418610483407974
+            ],
+            [
+              -0.008030544966459274,
+              0.9415114521980286
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.6397159099578857,
+              -1.3080049753189087
+            ],
+            [
+              -0.3125910758972168,
+              0.09048565477132797
+            ],
+            [
+              -0.006490148603916168,
+              0.9445016384124756
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p1",
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "thrust_ticks": 30,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.835848093032837,
+              -2.5484609603881836
+            ],
+            [
+              0.12538379430770874,
+              0.3657166063785553
+            ],
+            [
+              -0.4314080476760864,
+              -0.094790980219841
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 69,
+          "thrust_ticks": 32,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.854595184326172,
+              -2.3535990715026855
+            ],
+            [
+              -0.31364449858665466,
+              0.3223129212856293
+            ],
+            [
+              -0.6143588423728943,
+              0.3698233962059021
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 74,
+          "thrust_ticks": 20,
+          "brake_ticks": 33,
+          "raw_output_ranges": [
+            [
+              -2.4860780239105225,
+              -1.1373162269592285
+            ],
+            [
+              -0.3476535677909851,
+              0.10683684051036835
+            ],
+            [
+              -0.040903300046920776,
+              0.8225530385971069
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 70,
+          "thrust_ticks": 37,
+          "brake_ticks": 45,
+          "raw_output_ranges": [
+            [
+              -2.6117849349975586,
+              -2.1131510734558105
+            ],
+            [
+              -0.34805458784103394,
+              0.2614259123802185
+            ],
+            [
+              -0.14809787273406982,
+              0.3613714575767517
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p1",
+          "outcome": "host_preempted",
+          "ticks": 52,
+          "thrust_ticks": 52,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.6009511947631836,
+              -1.4323347806930542
+            ],
+            [
+              0.18496441841125488,
+              0.5086336731910706
+            ],
+            [
+              -0.8649163842201233,
+              -0.3860028386116028
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.900120258331299,
+              -2.363056182861328
+            ],
+            [
+              -0.21769684553146362,
+              0.379252165555954
+            ],
+            [
+              -0.28371188044548035,
+              0.4234634339809418
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 35,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.7391772270202637,
+              -1.5202924013137817
+            ],
+            [
+              -0.18850713968276978,
+              0.13571757078170776
+            ],
+            [
+              0.08101555705070496,
+              0.7454172372817993
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 72,
+          "thrust_ticks": 33,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.775184392929077,
+              -2.295654058456421
+            ],
+            [
+              -0.37896227836608887,
+              0.3216080069541931
+            ],
+            [
+              -0.7178095579147339,
+              0.438945472240448
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 63,
+          "thrust_ticks": 25,
+          "brake_ticks": 62,
+          "raw_output_ranges": [
+            [
+              -2.8308305740356445,
+              -2.2255077362060547
+            ],
+            [
+              -0.35178858041763306,
+              0.18524432182312012
+            ],
+            [
+              0.08122611045837402,
+              0.44570696353912354
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.8162732124328613,
+              -2.2935941219329834
+            ],
+            [
+              -0.14887115359306335,
+              0.12888027727603912
+            ],
+            [
+              0.1576024889945984,
+              0.3710351586341858
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 67,
+          "thrust_ticks": 26,
+          "brake_ticks": 44,
+          "raw_output_ranges": [
+            [
+              -2.5125582218170166,
+              -1.1817872524261475
+            ],
+            [
+              -0.3875114917755127,
+              0.09418610483407974
+            ],
+            [
+              -0.008030544966459274,
+              0.9415114521980286
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.6397159099578857,
+              -1.3080049753189087
+            ],
+            [
+              -0.3125910758972168,
+              0.09048565477132797
+            ],
+            [
+              -0.006490148603916168,
+              0.9445016384124756
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p1",
+          "outcome": "host_preempted",
+          "ticks": 30,
+          "thrust_ticks": 30,
+          "brake_ticks": 0,
+          "raw_output_ranges": [
+            [
+              -2.835848093032837,
+              -2.5484609603881836
+            ],
+            [
+              0.12538379430770874,
+              0.3657166063785553
+            ],
+            [
+              -0.4314080476760864,
+              -0.094790980219841
+            ]
+          ],
+          "host_goal": "launch",
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 69,
+          "thrust_ticks": 32,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.854595184326172,
+              -2.3535990715026855
+            ],
+            [
+              -0.31364449858665466,
+              0.3223129212856293
+            ],
+            [
+              -0.6143588423728943,
+              0.3698233962059021
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 74,
+          "thrust_ticks": 20,
+          "brake_ticks": 33,
+          "raw_output_ranges": [
+            [
+              -2.4860780239105225,
+              -1.1373162269592285
+            ],
+            [
+              -0.3476535677909851,
+              0.10683684051036835
+            ],
+            [
+              -0.040903300046920776,
+              0.8225530385971069
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 70,
+          "thrust_ticks": 37,
+          "brake_ticks": 45,
+          "raw_output_ranges": [
+            [
+              -2.6117849349975586,
+              -2.1131510734558105
+            ],
+            [
+              -0.34805458784103394,
+              0.2614259123802185
+            ],
+            [
+              -0.14809787273406982,
+              0.3613714575767517
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 42,
+          "thrust_ticks": 23,
+          "brake_ticks": 41,
+          "raw_output_ranges": [
+            [
+              -2.6781702041625977,
+              -2.170185089111328
+            ],
+            [
+              -0.09298645704984665,
+              0.05975176393985748
+            ],
+            [
+              0.2069818079471588,
+              0.4159611761569977
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 73,
+          "thrust_ticks": 31,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.7048354148864746,
+              -2.2393176555633545
+            ],
+            [
+              -0.4446670413017273,
+              0.30617478489875793
+            ],
+            [
+              -0.737300455570221,
+              0.4516333341598511
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 42,
+          "thrust_ticks": 23,
+          "brake_ticks": 41,
+          "raw_output_ranges": [
+            [
+              -2.6781702041625977,
+              -2.170185089111328
+            ],
+            [
+              -0.09298645704984665,
+              0.05975176393985748
+            ],
+            [
+              0.2069818079471588,
+              0.4159611761569977
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 73,
+          "thrust_ticks": 31,
+          "brake_ticks": 39,
+          "raw_output_ranges": [
+            [
+              -2.7048354148864746,
+              -2.2393176555633545
+            ],
+            [
+              -0.4446670413017273,
+              0.30617478489875793
+            ],
+            [
+              -0.737300455570221,
+              0.4516333341598511
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 37,
+          "thrust_ticks": 10,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.672276735305786,
+              -2.3717434406280518
+            ],
+            [
+              -0.10586883127689362,
+              0.024630874395370483
+            ],
+            [
+              0.24158993363380432,
+              0.29573360085487366
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 62,
+          "thrust_ticks": 25,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.7662675380706787,
+              -2.274047374725342
+            ],
+            [
+              -0.3525182008743286,
+              0.32419294118881226
+            ],
+            [
+              -0.5610719919204712,
+              0.37677502632141113
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 37,
+          "thrust_ticks": 10,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.672276735305786,
+              -2.3717434406280518
+            ],
+            [
+              -0.10586883127689362,
+              0.024630874395370483
+            ],
+            [
+              0.24158993363380432,
+              0.29573360085487366
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 62,
+          "thrust_ticks": 25,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.7662675380706787,
+              -2.274047374725342
+            ],
+            [
+              -0.3525182008743286,
+              0.32419294118881226
+            ],
+            [
+              -0.5610719919204712,
+              0.37677502632141113
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 79,
+          "thrust_ticks": 16,
+          "brake_ticks": 30,
+          "raw_output_ranges": [
+            [
+              -2.378849983215332,
+              -1.0045679807662964
+            ],
+            [
+              -0.38435614109039307,
+              0.07433903217315674
+            ],
+            [
+              -0.22062256932258606,
+              0.7508129477500916
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 88,
+          "thrust_ticks": 24,
+          "brake_ticks": 32,
+          "raw_output_ranges": [
+            [
+              -2.4689245223999023,
+              -1.0810825824737549
+            ],
+            [
+              -0.3341984748840332,
+              0.1332511007785797
+            ],
+            [
+              -0.1021524965763092,
+              0.7772130966186523
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 79,
+          "thrust_ticks": 16,
+          "brake_ticks": 30,
+          "raw_output_ranges": [
+            [
+              -2.378849983215332,
+              -1.0045679807662964
+            ],
+            [
+              -0.38435614109039307,
+              0.07433903217315674
+            ],
+            [
+              -0.22062256932258606,
+              0.7508129477500916
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 88,
+          "thrust_ticks": 24,
+          "brake_ticks": 32,
+          "raw_output_ranges": [
+            [
+              -2.4689245223999023,
+              -1.0810825824737549
+            ],
+            [
+              -0.3341984748840332,
+              0.1332511007785797
+            ],
+            [
+              -0.1021524965763092,
+              0.7772130966186523
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 75,
+          "thrust_ticks": 33,
+          "brake_ticks": 40,
+          "raw_output_ranges": [
+            [
+              -2.7463974952697754,
+              -2.2699201107025146
+            ],
+            [
+              -0.4388227164745331,
+              0.32054251432418823
+            ],
+            [
+              -0.7630457282066345,
+              0.43196558952331543
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 65,
+          "thrust_ticks": 1,
+          "brake_ticks": 31,
+          "raw_output_ranges": [
+            [
+              -2.1612260341644287,
+              -0.9742797613143921
+            ],
+            [
+              -0.4061487913131714,
+              0.005158230662345886
+            ],
+            [
+              -0.22661809623241425,
+              0.7678452134132385
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 75,
+          "thrust_ticks": 33,
+          "brake_ticks": 40,
+          "raw_output_ranges": [
+            [
+              -2.7463974952697754,
+              -2.2699201107025146
+            ],
+            [
+              -0.4388227164745331,
+              0.32054251432418823
+            ],
+            [
+              -0.7630457282066345,
+              0.43196558952331543
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 65,
+          "thrust_ticks": 1,
+          "brake_ticks": 31,
+          "raw_output_ranges": [
+            [
+              -2.1612260341644287,
+              -0.9742797613143921
+            ],
+            [
+              -0.4061487913131714,
+              0.005158230662345886
+            ],
+            [
+              -0.22661809623241425,
+              0.7678452134132385
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        }
+      ],
+      "precision": [
+        {
+          "case": "qualification_target_motion_b0_p0",
+          "outcome": "arrived",
+          "ticks": 961,
+          "final_measure": {
+            "distance": 1.5537257194519043,
+            "dwell": 30,
+            "relative_speed": 0.940223217010498
+          },
+          "min_distance": 0.6899946928024292,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              0.6899946928024292,
+              6.596368312835693
+            ],
+            "speed_range": [
+              0.15901093184947968,
+              4.72938346862793
+            ],
+            "mean_abs_spin": 1.7652900278568269,
+            "brake_ticks": 0,
+            "thrust_ticks": 35,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 2.584895610809326,
+            "dwell": 0,
+            "relative_speed": 1.0691901445388794
+          },
+          "min_distance": 0.6619599461555481,
+          "longest_dwell": 16,
+          "ticks_within_both_tolerances": 60,
+          "last_300_ticks": {
+            "distance_range": [
+              0.6861397624015808,
+              2.584895610809326
+            ],
+            "speed_range": [
+              0.5178428292274475,
+              1.704520583152771
+            ],
+            "mean_abs_spin": 1.7666113285223644,
+            "brake_ticks": 0,
+            "thrust_ticks": 31,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 2.570925712585449,
+            "dwell": 0,
+            "relative_speed": 0.9743585586547852
+          },
+          "min_distance": 0.6867157220840454,
+          "longest_dwell": 18,
+          "ticks_within_both_tolerances": 59,
+          "last_300_ticks": {
+            "distance_range": [
+              0.6867157220840454,
+              2.570925712585449
+            ],
+            "speed_range": [
+              0.5118118524551392,
+              1.7252100706100464
+            ],
+            "mean_abs_spin": 1.7666215535004934,
+            "brake_ticks": 0,
+            "thrust_ticks": 32,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 2.5960617065429688,
+            "dwell": 0,
+            "relative_speed": 1.0145459175109863
+          },
+          "min_distance": 0.6178284883499146,
+          "longest_dwell": 17,
+          "ticks_within_both_tolerances": 53,
+          "last_300_ticks": {
+            "distance_range": [
+              0.6341859102249146,
+              2.5960617065429688
+            ],
+            "speed_range": [
+              0.496616929769516,
+              1.7491246461868286
+            ],
+            "mean_abs_spin": 1.7666439759731292,
+            "brake_ticks": 0,
+            "thrust_ticks": 31,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p0",
+          "outcome": "arrived",
+          "ticks": 784,
+          "final_measure": {
+            "distance": 1.2857178449630737,
+            "dwell": 30,
+            "relative_speed": 0.9909810423851013
+          },
+          "min_distance": 0.39319244027137756,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 31,
+          "last_300_ticks": {
+            "distance_range": [
+              0.39319244027137756,
+              6.613093852996826
+            ],
+            "speed_range": [
+              0.2033059000968933,
+              5.181150436401367
+            ],
+            "mean_abs_spin": 1.7652840701738994,
+            "brake_ticks": 0,
+            "thrust_ticks": 35,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 2.0634589195251465,
+            "dwell": 0,
+            "relative_speed": 0.4388183355331421
+          },
+          "min_distance": 0.39873307943344116,
+          "longest_dwell": 28,
+          "ticks_within_both_tolerances": 104,
+          "last_300_ticks": {
+            "distance_range": [
+              1.0702506303787231,
+              2.7349741458892822
+            ],
+            "speed_range": [
+              0.2882220447063446,
+              1.817124843597412
+            ],
+            "mean_abs_spin": 1.7662061488628387,
+            "brake_ticks": 0,
+            "thrust_ticks": 34,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 2.113579511642456,
+            "dwell": 0,
+            "relative_speed": 0.49742570519447327
+          },
+          "min_distance": 0.5790594220161438,
+          "longest_dwell": 20,
+          "ticks_within_both_tolerances": 106,
+          "last_300_ticks": {
+            "distance_range": [
+              1.2049744129180908,
+              2.6527297496795654
+            ],
+            "speed_range": [
+              0.4591509997844696,
+              1.5902968645095825
+            ],
+            "mean_abs_spin": 1.7661713937918344,
+            "brake_ticks": 0,
+            "thrust_ticks": 35,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p0",
+          "outcome": "arrived",
+          "ticks": 783,
+          "final_measure": {
+            "distance": 1.5740633010864258,
+            "dwell": 30,
+            "relative_speed": 0.906168520450592
+          },
+          "min_distance": 0.6281477808952332,
+          "longest_dwell": 30,
+          "ticks_within_both_tolerances": 30,
+          "last_300_ticks": {
+            "distance_range": [
+              0.6281477808952332,
+              5.659977436065674
+            ],
+            "speed_range": [
+              0.1628328114748001,
+              4.16865873336792
+            ],
+            "mean_abs_spin": 1.7655939690272013,
+            "brake_ticks": 0,
+            "thrust_ticks": 34,
+            "count": 300
+          }
+        }
+      ]
+    },
+    {
+      "controller": "brake_on",
+      "genome": "7d28a8745a6837d803e36fa836fd114593c04802b4195069de1c91ac7d3a7002",
+      "fitness": {
+        "approach_completed": 43,
+        "approach_position_points": 35257,
+        "approach_speed_points": 34895,
+        "retained_completed": 9,
+        "retained_position_points": 121805,
+        "retained_velocity_points": 150360,
+        "spare_ticks": 16188
+      },
+      "retention_outcomes": {
+        "timeout": 148,
+        "arrived": 9
+      },
+      "retention_failures": [
+        {
+          "case": "stationary_radial",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 13.001312255859375,
+            "dwell": 0,
+            "relative_speed": 2.7598302364349365
+          }
+        },
+        {
+          "case": "stationary_right",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 17.99998664855957,
+            "dwell": 0,
+            "relative_speed": 5.941229343414307
+          }
+        },
+        {
+          "case": "stationary_left",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.110420227050781,
+            "dwell": 0,
+            "relative_speed": 2.127849817276001
+          }
+        },
+        {
+          "case": "stationary_rotated",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 17.109487533569336,
+            "dwell": 0,
+            "relative_speed": 2.361128568649292
+          }
+        },
+        {
+          "case": "qualification_target_motion_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 86.56462097167969,
+            "dwell": 0,
+            "relative_speed": 5.188797950744629
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.5358006954193115,
+            "dwell": 0,
+            "relative_speed": 1.0836563110351562
+          }
+        },
+        {
+          "case": "qualification_target_motion_b0_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 69.18092346191406,
+            "dwell": 0,
+            "relative_speed": 4.877155303955078
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.130271911621094,
+            "dwell": 0,
+            "relative_speed": 2.6545541286468506
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.181664943695068,
+            "dwell": 0,
+            "relative_speed": 2.8657796382904053
+          }
+        },
+        {
+          "case": "mixed_train_inward_stationary",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.0871357917785645,
+            "dwell": 0,
+            "relative_speed": 1.9607337713241577
+          }
+        },
+        {
+          "case": "mixed_train_inward_mirrored",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 5.385888576507568,
+            "dwell": 0,
+            "relative_speed": 0.841870903968811
+          }
+        },
+        {
+          "case": "validation_radial_close",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.108813285827637,
+            "dwell": 0,
+            "relative_speed": 2.655466318130493
+          }
+        },
+        {
+          "case": "validation_right_drift",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 11.643238067626953,
+            "dwell": 0,
+            "relative_speed": 2.4628615379333496
+          }
+        },
+        {
+          "case": "validation_left_rotated",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.99785852432251,
+            "dwell": 0,
+            "relative_speed": 2.321161985397339
+          }
+        },
+        {
+          "case": "stationary_reversed",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.380228996276855,
+            "dwell": 0,
+            "relative_speed": 1.6124155521392822
+          }
+        },
+        {
+          "case": "moving_right",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 65.37384796142578,
+            "dwell": 0,
+            "relative_speed": 4.6502251625061035
+          }
+        },
+        {
+          "case": "moving_rotated",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 64.08499908447266,
+            "dwell": 0,
+            "relative_speed": 4.363672256469727
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.981040954589844,
+            "dwell": 0,
+            "relative_speed": 2.5981907844543457
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 32.11129379272461,
+            "dwell": 0,
+            "relative_speed": 2.803157329559326
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.985659599304199,
+            "dwell": 0,
+            "relative_speed": 1.9916915893554688
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 33.309669494628906,
+            "dwell": 0,
+            "relative_speed": 5.328982830047607
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.837262153625488,
+            "dwell": 0,
+            "relative_speed": 2.2753520011901855
+          }
+        },
+        {
+          "case": "qualification_geometry_b0_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 11.97887134552002,
+            "dwell": 0,
+            "relative_speed": 1.4844529628753662
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.445068359375,
+            "dwell": 0,
+            "relative_speed": 4.166274547576904
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.589993476867676,
+            "dwell": 0,
+            "relative_speed": 2.3706603050231934
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.215033531188965,
+            "dwell": 0,
+            "relative_speed": 2.151493787765503
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.458608627319336,
+            "dwell": 0,
+            "relative_speed": 2.4721968173980713
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 22.510408401489258,
+            "dwell": 0,
+            "relative_speed": 6.848832607269287
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b0_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.0594892501831055,
+            "dwell": 0,
+            "relative_speed": 1.9773932695388794
+          }
+        },
+        {
+          "case": "qualification_target_motion_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.5499660968780518,
+            "dwell": 0,
+            "relative_speed": 1.0779032707214355
+          }
+        },
+        {
+          "case": "qualification_target_motion_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 31.560543060302734,
+            "dwell": 0,
+            "relative_speed": 3.294785499572754
+          }
+        },
+        {
+          "case": "qualification_target_motion_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.789394378662109,
+            "dwell": 0,
+            "relative_speed": 2.6034603118896484
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.817852973937988,
+            "dwell": 0,
+            "relative_speed": 2.6009457111358643
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 31.387331008911133,
+            "dwell": 0,
+            "relative_speed": 2.8141989707946777
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.96408224105835,
+            "dwell": 0,
+            "relative_speed": 1.997554898262024
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 32.65393829345703,
+            "dwell": 0,
+            "relative_speed": 5.545864105224609
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.834750652313232,
+            "dwell": 0,
+            "relative_speed": 2.279364585876465
+          }
+        },
+        {
+          "case": "qualification_geometry_b1_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 11.675225257873535,
+            "dwell": 0,
+            "relative_speed": 1.4999879598617554
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 20.801252365112305,
+            "dwell": 0,
+            "relative_speed": 4.48063850402832
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.575697898864746,
+            "dwell": 0,
+            "relative_speed": 2.3774495124816895
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.198005676269531,
+            "dwell": 0,
+            "relative_speed": 2.1375229358673096
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.461883544921875,
+            "dwell": 0,
+            "relative_speed": 2.484539031982422
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 22.454219818115234,
+            "dwell": 0,
+            "relative_speed": 6.812227725982666
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b1_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.036773204803467,
+            "dwell": 0,
+            "relative_speed": 1.9811073541641235
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 86.58853912353516,
+            "dwell": 0,
+            "relative_speed": 5.199417591094971
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.409822940826416,
+            "dwell": 0,
+            "relative_speed": 1.0385414361953735
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 30.993083953857422,
+            "dwell": 0,
+            "relative_speed": 3.2953755855560303
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.745306015014648,
+            "dwell": 0,
+            "relative_speed": 2.662022590637207
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 68.86210632324219,
+            "dwell": 0,
+            "relative_speed": 4.889281272888184
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.811612606048584,
+            "dwell": 0,
+            "relative_speed": 2.6196391582489014
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 31.56171226501465,
+            "dwell": 0,
+            "relative_speed": 2.826171398162842
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.9496564865112305,
+            "dwell": 0,
+            "relative_speed": 2.014835834503174
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 33.2821044921875,
+            "dwell": 0,
+            "relative_speed": 5.552459716796875
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.796604156494141,
+            "dwell": 0,
+            "relative_speed": 2.3067522048950195
+          }
+        },
+        {
+          "case": "qualification_geometry_b2_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 11.952879905700684,
+            "dwell": 0,
+            "relative_speed": 1.5047105550765991
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.36900520324707,
+            "dwell": 0,
+            "relative_speed": 4.485813617706299
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.703925132751465,
+            "dwell": 0,
+            "relative_speed": 2.396939516067505
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.32150936126709,
+            "dwell": 0,
+            "relative_speed": 2.2146880626678467
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.74942398071289,
+            "dwell": 0,
+            "relative_speed": 2.497711181640625
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 22.770090103149414,
+            "dwell": 0,
+            "relative_speed": 6.808777332305908
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b2_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.161508083343506,
+            "dwell": 0,
+            "relative_speed": 2.000906229019165
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 86.97586059570312,
+            "dwell": 0,
+            "relative_speed": 5.208974838256836
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 31.28053092956543,
+            "dwell": 0,
+            "relative_speed": 3.304840087890625
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.829563140869141,
+            "dwell": 0,
+            "relative_speed": 2.6749107837677
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 68.91826629638672,
+            "dwell": 0,
+            "relative_speed": 4.8999786376953125
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.944821834564209,
+            "dwell": 0,
+            "relative_speed": 2.619100570678711
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 32.39118194580078,
+            "dwell": 0,
+            "relative_speed": 2.8116064071655273
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.110644817352295,
+            "dwell": 0,
+            "relative_speed": 2.013317584991455
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 33.83727264404297,
+            "dwell": 0,
+            "relative_speed": 5.33552360534668
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.957324981689453,
+            "dwell": 0,
+            "relative_speed": 2.3080248832702637
+          }
+        },
+        {
+          "case": "qualification_geometry_b3_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 12.342324256896973,
+            "dwell": 0,
+            "relative_speed": 1.5020359754562378
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 22.005836486816406,
+            "dwell": 0,
+            "relative_speed": 4.170845031738281
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.698024272918701,
+            "dwell": 0,
+            "relative_speed": 2.3913698196411133
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.339344024658203,
+            "dwell": 0,
+            "relative_speed": 2.1701412200927734
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 22.01740074157715,
+            "dwell": 0,
+            "relative_speed": 2.491971731185913
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 23.145885467529297,
+            "dwell": 0,
+            "relative_speed": 6.702564239501953
+          }
+        },
+        {
+          "case": "qualification_initial_motion_b3_p5",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.174565315246582,
+            "dwell": 0,
+            "relative_speed": 1.9983735084533691
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 86.86685180664062,
+            "dwell": 0,
+            "relative_speed": 5.197885036468506
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.524383068084717,
+            "dwell": 0,
+            "relative_speed": 1.0804693698883057
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 31.598648071289062,
+            "dwell": 0,
+            "relative_speed": 3.305551052093506
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.901278972625732,
+            "dwell": 0,
+            "relative_speed": 2.635377883911133
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p4",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 69.49925994873047,
+            "dwell": 0,
+            "relative_speed": 4.884549617767334
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 73.22455596923828,
+            "dwell": 0,
+            "relative_speed": 4.386336803436279
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.870209217071533,
+            "dwell": 0,
+            "relative_speed": 1.1242421865463257
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 44.20817184448242,
+            "dwell": 0,
+            "relative_speed": 3.373345375061035
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 73.92109680175781,
+            "dwell": 0,
+            "relative_speed": 4.4209370613098145
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.9712889194488525,
+            "dwell": 0,
+            "relative_speed": 1.1606658697128296
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 44.27200698852539,
+            "dwell": 0,
+            "relative_speed": 3.3483798503875732
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 82.37708282470703,
+            "dwell": 0,
+            "relative_speed": 5.0002522468566895
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.7855818271636963,
+            "dwell": 0,
+            "relative_speed": 1.186970829963684
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.33263635635376,
+            "dwell": 0,
+            "relative_speed": 3.9030139446258545
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 47.83348083496094,
+            "dwell": 0,
+            "relative_speed": 3.68345308303833
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 82.84014129638672,
+            "dwell": 0,
+            "relative_speed": 5.023674964904785
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.7626566886901855,
+            "dwell": 0,
+            "relative_speed": 1.2082339525222778
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.35597562789917,
+            "dwell": 0,
+            "relative_speed": 4.01801061630249
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 48.01836395263672,
+            "dwell": 0,
+            "relative_speed": 3.6946613788604736
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 90.31813049316406,
+            "dwell": 0,
+            "relative_speed": 5.487427234649658
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.9227311611175537,
+            "dwell": 0,
+            "relative_speed": 1.4138927459716797
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.859982967376709,
+            "dwell": 0,
+            "relative_speed": 4.752068996429443
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 52.4410400390625,
+            "dwell": 0,
+            "relative_speed": 4.018805503845215
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 90.41366577148438,
+            "dwell": 0,
+            "relative_speed": 5.497673034667969
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 3.08668851852417,
+            "dwell": 0,
+            "relative_speed": 1.431444764137268
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.908985137939453,
+            "dwell": 0,
+            "relative_speed": 4.989892482757568
+          }
+        },
+        {
+          "case": "qualification_combined_a2_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 52.51187515258789,
+            "dwell": 0,
+            "relative_speed": 4.028059959411621
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.583633422851562,
+            "dwell": 0,
+            "relative_speed": 2.092696189880371
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.02712631225586,
+            "dwell": 0,
+            "relative_speed": 2.2029316425323486
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.723354816436768,
+            "dwell": 0,
+            "relative_speed": 2.13143253326416
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 15.28304386138916,
+            "dwell": 0,
+            "relative_speed": 5.2205915451049805
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.452054023742676,
+            "dwell": 0,
+            "relative_speed": 2.0723659992218018
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 20.82532501220703,
+            "dwell": 0,
+            "relative_speed": 2.215090751647949
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.683104991912842,
+            "dwell": 0,
+            "relative_speed": 2.382258653640747
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 14.958904266357422,
+            "dwell": 0,
+            "relative_speed": 4.730722427368164
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.68876838684082,
+            "dwell": 0,
+            "relative_speed": 2.1191768646240234
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.367462158203125,
+            "dwell": 0,
+            "relative_speed": 2.2137622833251953
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.748533725738525,
+            "dwell": 0,
+            "relative_speed": 2.1522674560546875
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b2_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 15.806385040283203,
+            "dwell": 0,
+            "relative_speed": 5.760869979858398
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 8.658239364624023,
+            "dwell": 0,
+            "relative_speed": 2.145592212677002
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 21.560199737548828,
+            "dwell": 0,
+            "relative_speed": 2.230424165725708
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 7.699801445007324,
+            "dwell": 0,
+            "relative_speed": 2.127734661102295
+          }
+        },
+        {
+          "case": "mixed_fresh_stationary_b3_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 15.286029815673828,
+            "dwell": 0,
+            "relative_speed": 5.239356994628906
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 87.74400329589844,
+            "dwell": 0,
+            "relative_speed": 5.007011890411377
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.4607341289520264,
+            "dwell": 0,
+            "relative_speed": 0.8792824149131775
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 63.49467086791992,
+            "dwell": 0,
+            "relative_speed": 4.855922222137451
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 87.60591125488281,
+            "dwell": 0,
+            "relative_speed": 5.023308277130127
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.4556751251220703,
+            "dwell": 0,
+            "relative_speed": 0.8822916150093079
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 63.295677185058594,
+            "dwell": 0,
+            "relative_speed": 4.869781970977783
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 88.11295318603516,
+            "dwell": 0,
+            "relative_speed": 5.010227203369141
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.5074353218078613,
+            "dwell": 0,
+            "relative_speed": 0.9055135846138
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 63.62192916870117,
+            "dwell": 0,
+            "relative_speed": 4.8583245277404785
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 88.09197998046875,
+            "dwell": 0,
+            "relative_speed": 5.023176670074463
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 2.3786380290985107,
+            "dwell": 0,
+            "relative_speed": 0.8707069754600525
+          }
+        },
+        {
+          "case": "mixed_fresh_moving_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 63.72951126098633,
+            "dwell": 0,
+            "relative_speed": 4.872713088989258
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b0_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.43405294418335,
+            "dwell": 0,
+            "relative_speed": 2.798234462738037
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b0_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 5.266251087188721,
+            "dwell": 0,
+            "relative_speed": 0.8965312838554382
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b0_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.741119861602783,
+            "dwell": 0,
+            "relative_speed": 2.739027738571167
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b0_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.146124362945557,
+            "dwell": 0,
+            "relative_speed": 0.8073112964630127
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b1_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.228200912475586,
+            "dwell": 0,
+            "relative_speed": 3.267678737640381
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b1_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 5.296398162841797,
+            "dwell": 0,
+            "relative_speed": 0.9316408634185791
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b1_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.655304431915283,
+            "dwell": 0,
+            "relative_speed": 2.5512194633483887
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b1_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.044948577880859,
+            "dwell": 0,
+            "relative_speed": 0.8606898784637451
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b2_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.576141834259033,
+            "dwell": 0,
+            "relative_speed": 3.4915144443511963
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b2_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 5.540083408355713,
+            "dwell": 0,
+            "relative_speed": 0.958676815032959
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b2_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.85836124420166,
+            "dwell": 0,
+            "relative_speed": 2.8095250129699707
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b2_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.291565895080566,
+            "dwell": 0,
+            "relative_speed": 0.8377116322517395
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b3_p0",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.353335857391357,
+            "dwell": 0,
+            "relative_speed": 3.2938201427459717
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b3_p1",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 5.389281272888184,
+            "dwell": 0,
+            "relative_speed": 0.976919949054718
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b3_p2",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 6.7758002281188965,
+            "dwell": 0,
+            "relative_speed": 3.0609753131866455
+          }
+        },
+        {
+          "case": "mixed_fresh_inward_b3_p3",
+          "outcome": "timeout",
+          "measure": {
+            "distance": 4.180063247680664,
+            "dwell": 0,
+            "relative_speed": 0.8853151798248291
+          }
+        }
+      ],
+      "approach_outcomes": {
+        "arrived": 43
+      },
+      "approaches": [
+        {
+          "case": "train-42-p1-d65",
+          "outcome": "arrived",
+          "ticks": 19,
+          "thrust_ticks": 18,
+          "brake_ticks": 18,
+          "raw_output_ranges": [
+            [
+              -2.0165369510650635,
+              -1.4323347806930542
+            ],
+            [
+              0.1653711497783661,
+              0.18581077456474304
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d65",
+          "outcome": "arrived",
+          "ticks": 84,
+          "thrust_ticks": 57,
+          "brake_ticks": 83,
+          "raw_output_ranges": [
+            [
+              -2.7060766220092773,
+              -2.3086049556732178
+            ],
+            [
+              -0.056414030492305756,
+              0.2716856300830841
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-42-p2-d35",
+          "outcome": "arrived",
+          "ticks": 49,
+          "thrust_ticks": 35,
+          "brake_ticks": 48,
+          "raw_output_ranges": [
+            [
+              -2.865407943725586,
+              -2.552872896194458
+            ],
+            [
+              -0.05971894413232803,
+              0.3778191804885864
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d65",
+          "outcome": "arrived",
+          "ticks": 276,
+          "thrust_ticks": 92,
+          "brake_ticks": 275,
+          "raw_output_ranges": [
+            [
+              -2.9453163146972656,
+              -1.1675227880477905
+            ],
+            [
+              -0.42590442299842834,
+              0.3502233922481537
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p1-d35",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 35,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.7391772270202637,
+              -1.5202924013137817
+            ],
+            [
+              -0.18850713968276978,
+              0.13571757078170776
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d65",
+          "outcome": "arrived",
+          "ticks": 126,
+          "thrust_ticks": 83,
+          "brake_ticks": 125,
+          "raw_output_ranges": [
+            [
+              -2.824476957321167,
+              -0.8139357566833496
+            ],
+            [
+              -0.3404756188392639,
+              0.15058988332748413
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-10101-p2-d35",
+          "outcome": "arrived",
+          "ticks": 47,
+          "thrust_ticks": 40,
+          "brake_ticks": 46,
+          "raw_output_ranges": [
+            [
+              -2.701202630996704,
+              -2.485801935195923
+            ],
+            [
+              -0.009837977588176727,
+              0.2409990131855011
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 63,
+          "thrust_ticks": 25,
+          "brake_ticks": 62,
+          "raw_output_ranges": [
+            [
+              -2.8308305740356445,
+              -2.2255077362060547
+            ],
+            [
+              -0.35178858041763306,
+              0.18524432182312012
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-17-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.8162732124328613,
+              -2.2935941219329834
+            ],
+            [
+              -0.14887115359306335,
+              0.12888027727603912
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 214,
+          "thrust_ticks": 46,
+          "brake_ticks": 213,
+          "raw_output_ranges": [
+            [
+              -2.5125582218170166,
+              -1.1817872524261475
+            ],
+            [
+              -0.3875114917755127,
+              0.09418610483407974
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-113-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 54,
+          "raw_output_ranges": [
+            [
+              -2.6397159099578857,
+              -1.3080049753189087
+            ],
+            [
+              -0.3125910758972168,
+              0.09048565477132797
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 59,
+          "thrust_ticks": 49,
+          "brake_ticks": 58,
+          "raw_output_ranges": [
+            [
+              -2.7807116508483887,
+              -2.5484609603881836
+            ],
+            [
+              -0.02558652125298977,
+              0.34581899642944336
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-2027-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 45,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.806668758392334,
+              -2.571002960205078
+            ],
+            [
+              -0.012112634256482124,
+              0.2589740455150604
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 202,
+          "thrust_ticks": 48,
+          "brake_ticks": 201,
+          "raw_output_ranges": [
+            [
+              -2.584848642349243,
+              -1.1373162269592285
+            ],
+            [
+              -0.3476535677909851,
+              0.10858414322137833
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "train-inspected-9001-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 60,
+          "thrust_ticks": 31,
+          "brake_ticks": 59,
+          "raw_output_ranges": [
+            [
+              -2.5112180709838867,
+              -2.1131510734558105
+            ],
+            [
+              -0.07976896315813065,
+              0.2614259123802185
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 19,
+          "thrust_ticks": 18,
+          "brake_ticks": 18,
+          "raw_output_ranges": [
+            [
+              -2.0165369510650635,
+              -1.4323347806930542
+            ],
+            [
+              0.1653711497783661,
+              0.18581077456474304
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-42-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 49,
+          "thrust_ticks": 35,
+          "brake_ticks": 48,
+          "raw_output_ranges": [
+            [
+              -2.865407943725586,
+              -2.552872896194458
+            ],
+            [
+              -0.05971894413232803,
+              0.3778191804885864
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p1",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 35,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.7391772270202637,
+              -1.5202924013137817
+            ],
+            [
+              -0.18850713968276978,
+              0.13571757078170776
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "seed-10101-weak-round-p2",
+          "outcome": "arrived",
+          "ticks": 47,
+          "thrust_ticks": 40,
+          "brake_ticks": 46,
+          "raw_output_ranges": [
+            [
+              -2.701202630996704,
+              -2.485801935195923
+            ],
+            [
+              -0.009837977588176727,
+              0.2409990131855011
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 63,
+          "thrust_ticks": 25,
+          "brake_ticks": 62,
+          "raw_output_ranges": [
+            [
+              -2.8308305740356445,
+              -2.2255077362060547
+            ],
+            [
+              -0.35178858041763306,
+              0.18524432182312012
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-17-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 52,
+          "thrust_ticks": 29,
+          "brake_ticks": 51,
+          "raw_output_ranges": [
+            [
+              -2.8162732124328613,
+              -2.2935941219329834
+            ],
+            [
+              -0.14887115359306335,
+              0.12888027727603912
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 214,
+          "thrust_ticks": 46,
+          "brake_ticks": 213,
+          "raw_output_ranges": [
+            [
+              -2.5125582218170166,
+              -1.1817872524261475
+            ],
+            [
+              -0.3875114917755127,
+              0.09418610483407974
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-113-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 55,
+          "thrust_ticks": 27,
+          "brake_ticks": 54,
+          "raw_output_ranges": [
+            [
+              -2.6397159099578857,
+              -1.3080049753189087
+            ],
+            [
+              -0.3125910758972168,
+              0.09048565477132797
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 59,
+          "thrust_ticks": 49,
+          "brake_ticks": 58,
+          "raw_output_ranges": [
+            [
+              -2.7807116508483887,
+              -2.5484609603881836
+            ],
+            [
+              -0.02558652125298977,
+              0.34581899642944336
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-2027-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 54,
+          "thrust_ticks": 45,
+          "brake_ticks": 53,
+          "raw_output_ranges": [
+            [
+              -2.806668758392334,
+              -2.571002960205078
+            ],
+            [
+              -0.012112634256482124,
+              0.2589740455150604
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 202,
+          "thrust_ticks": 48,
+          "brake_ticks": 201,
+          "raw_output_ranges": [
+            [
+              -2.584848642349243,
+              -1.1373162269592285
+            ],
+            [
+              -0.3476535677909851,
+              0.10858414322137833
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "development-inspected-9001-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 60,
+          "thrust_ticks": 31,
+          "brake_ticks": 59,
+          "raw_output_ranges": [
+            [
+              -2.5112180709838867,
+              -2.1131510734558105
+            ],
+            [
+              -0.07976896315813065,
+              0.2614259123802185
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 42,
+          "thrust_ticks": 23,
+          "brake_ticks": 41,
+          "raw_output_ranges": [
+            [
+              -2.6781702041625977,
+              -2.170185089111328
+            ],
+            [
+              -0.09298645704984665,
+              0.05975176393985748
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 47,
+          "thrust_ticks": 28,
+          "brake_ticks": 46,
+          "raw_output_ranges": [
+            [
+              -2.585594415664673,
+              -2.4418978691101074
+            ],
+            [
+              -0.03319393843412399,
+              0.2322845160961151
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 42,
+          "thrust_ticks": 23,
+          "brake_ticks": 41,
+          "raw_output_ranges": [
+            [
+              -2.6781702041625977,
+              -2.170185089111328
+            ],
+            [
+              -0.09298645704984665,
+              0.05975176393985748
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-73-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 47,
+          "thrust_ticks": 28,
+          "brake_ticks": 46,
+          "raw_output_ranges": [
+            [
+              -2.585594415664673,
+              -2.4418978691101074
+            ],
+            [
+              -0.03319393843412399,
+              0.2322845160961151
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 37,
+          "thrust_ticks": 10,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.672276735305786,
+              -2.3717434406280518
+            ],
+            [
+              -0.10586883127689362,
+              0.024630874395370483
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 38,
+          "thrust_ticks": 26,
+          "brake_ticks": 37,
+          "raw_output_ranges": [
+            [
+              -2.6970055103302,
+              -2.5792441368103027
+            ],
+            [
+              -0.06177694350481033,
+              0.31628653407096863
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 37,
+          "thrust_ticks": 10,
+          "brake_ticks": 36,
+          "raw_output_ranges": [
+            [
+              -2.672276735305786,
+              -2.3717434406280518
+            ],
+            [
+              -0.10586883127689362,
+              0.024630874395370483
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-509-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 38,
+          "thrust_ticks": 26,
+          "brake_ticks": 37,
+          "raw_output_ranges": [
+            [
+              -2.6970055103302,
+              -2.5792441368103027
+            ],
+            [
+              -0.06177694350481033,
+              0.31628653407096863
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 239,
+          "thrust_ticks": 73,
+          "brake_ticks": 238,
+          "raw_output_ranges": [
+            [
+              -2.7444217205047607,
+              -1.0045679807662964
+            ],
+            [
+              -0.38435614109039307,
+              0.18558269739151
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 256,
+          "thrust_ticks": 94,
+          "brake_ticks": 255,
+          "raw_output_ranges": [
+            [
+              -2.7326784133911133,
+              -1.0810825824737549
+            ],
+            [
+              -0.3341984748840332,
+              0.23178908228874207
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 239,
+          "thrust_ticks": 73,
+          "brake_ticks": 238,
+          "raw_output_ranges": [
+            [
+              -2.7444217205047607,
+              -1.0045679807662964
+            ],
+            [
+              -0.38435614109039307,
+              0.18558269739151
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-4093-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 256,
+          "thrust_ticks": 94,
+          "brake_ticks": 255,
+          "raw_output_ranges": [
+            [
+              -2.7326784133911133,
+              -1.0810825824737549
+            ],
+            [
+              -0.3341984748840332,
+              0.23178908228874207
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p2",
+          "outcome": "arrived",
+          "ticks": 44,
+          "thrust_ticks": 32,
+          "brake_ticks": 43,
+          "raw_output_ranges": [
+            [
+              -2.6351935863494873,
+              -2.4302215576171875
+            ],
+            [
+              -0.021884791553020477,
+              0.22713568806648254
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakAngular-p1",
+          "outcome": "arrived",
+          "ticks": 157,
+          "thrust_ticks": 23,
+          "brake_ticks": 156,
+          "raw_output_ranges": [
+            [
+              -2.664401054382324,
+              -0.9742797613143921
+            ],
+            [
+              -0.4061487913131714,
+              0.12251131236553192
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p2",
+          "outcome": "arrived",
+          "ticks": 44,
+          "thrust_ticks": 32,
+          "brake_ticks": 43,
+          "raw_output_ranges": [
+            [
+              -2.6351935863494873,
+              -2.4302215576171875
+            ],
+            [
+              -0.021884791553020477,
+              0.22713568806648254
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        },
+        {
+          "case": "validation-65537-WeakRound-p1",
+          "outcome": "arrived",
+          "ticks": 157,
+          "thrust_ticks": 23,
+          "brake_ticks": 156,
+          "raw_output_ranges": [
+            [
+              -2.664401054382324,
+              -0.9742797613143921
+            ],
+            [
+              -0.4061487913131714,
+              0.12251131236553192
+            ],
+            [
+              1.0,
+              1.0
+            ]
+          ],
+          "host_goal": null,
+          "final_health": 100.0
+        }
+      ],
+      "precision": [
+        {
+          "case": "qualification_target_motion_b0_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 86.56462097167969,
+            "dwell": 0,
+            "relative_speed": 5.188797950744629
+          },
+          "min_distance": 19.747486114501953,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              68.57190704345703,
+              86.56462097167969
+            ],
+            "speed_range": [
+              3.59997296333313,
+              10.88457202911377
+            ],
+            "mean_abs_spin": 1.601663248538971,
+            "brake_ticks": 300,
+            "thrust_ticks": 98,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b1_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 86.58853912353516,
+            "dwell": 0,
+            "relative_speed": 5.199417591094971
+          },
+          "min_distance": 19.74728775024414,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              68.61006164550781,
+              86.58853912353516
+            ],
+            "speed_range": [
+              3.5833520889282227,
+              10.799426078796387
+            ],
+            "mean_abs_spin": 1.603244728644689,
+            "brake_ticks": 300,
+            "thrust_ticks": 97,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b2_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 86.97586059570312,
+            "dwell": 0,
+            "relative_speed": 5.208974838256836
+          },
+          "min_distance": 19.74728775024414,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              68.85411834716797,
+              86.97586059570312
+            ],
+            "speed_range": [
+              3.5739874839782715,
+              10.931187629699707
+            ],
+            "mean_abs_spin": 1.6007394858201345,
+            "brake_ticks": 300,
+            "thrust_ticks": 98,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_target_motion_b3_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 86.86685180664062,
+            "dwell": 0,
+            "relative_speed": 5.197885036468506
+          },
+          "min_distance": 19.747486114501953,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              68.85879516601562,
+              86.86685180664062
+            ],
+            "speed_range": [
+              3.5895285606384277,
+              10.861835479736328
+            ],
+            "mean_abs_spin": 1.59949671904246,
+            "brake_ticks": 300,
+            "thrust_ticks": 98,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b0_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 73.22455596923828,
+            "dwell": 0,
+            "relative_speed": 4.386336803436279
+          },
+          "min_distance": 26.402441024780273,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              58.56929016113281,
+              73.22455596923828
+            ],
+            "speed_range": [
+              3.7900493144989014,
+              10.286388397216797
+            ],
+            "mean_abs_spin": 1.6611686376730601,
+            "brake_ticks": 300,
+            "thrust_ticks": 114,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a0_b1_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 73.92109680175781,
+            "dwell": 0,
+            "relative_speed": 4.4209370613098145
+          },
+          "min_distance": 26.40293312072754,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              59.11824035644531,
+              73.92109680175781
+            ],
+            "speed_range": [
+              3.8449606895446777,
+              10.348098754882812
+            ],
+            "mean_abs_spin": 1.6586182260513305,
+            "brake_ticks": 300,
+            "thrust_ticks": 115,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b0_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 82.37708282470703,
+            "dwell": 0,
+            "relative_speed": 5.0002522468566895
+          },
+          "min_distance": 26.402997970581055,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              65.39401245117188,
+              82.37708282470703
+            ],
+            "speed_range": [
+              3.937567949295044,
+              10.611787796020508
+            ],
+            "mean_abs_spin": 1.62638454635938,
+            "brake_ticks": 300,
+            "thrust_ticks": 117,
+            "count": 300
+          }
+        },
+        {
+          "case": "qualification_combined_a1_b1_p0",
+          "outcome": "timeout",
+          "ticks": 1200,
+          "final_measure": {
+            "distance": 82.84014129638672,
+            "dwell": 0,
+            "relative_speed": 5.023674964904785
+          },
+          "min_distance": 26.403162002563477,
+          "longest_dwell": 0,
+          "ticks_within_both_tolerances": 0,
+          "last_300_ticks": {
+            "distance_range": [
+              65.70606231689453,
+              82.84014129638672
+            ],
+            "speed_range": [
+              3.901937484741211,
+              10.60707950592041
+            ],
+            "mean_abs_spin": 1.6246106541156768,
+            "brake_ticks": 300,
+            "thrust_ticks": 116,
+            "count": 300
+          }
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "reused_initial_state_records_identical": 43,
+    "prior_match_traces_byte_identical": 129,
+    "prior_practice_endpoints_identical_except_runtime": 471,
+    "precision_decisions_verified": 32139,
+    "approach_decisions_verified": 15074,
+    "precision_dwell_counts_verified": true
+  }
+}
