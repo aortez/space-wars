@@ -8,6 +8,8 @@ use std::{cell::RefCell, rc::Rc};
 struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
+mod cell_swap;
+
 #[test]
 fn launcher_filter_keyboard_and_touch_share_selection_and_save_behavior() {
     use engine_common::Settings;

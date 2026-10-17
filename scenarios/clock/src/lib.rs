@@ -5,6 +5,8 @@ mod autonomous_tests;
 mod calendar;
 #[cfg(test)]
 mod calendar_tests;
+#[cfg(test)]
+mod cell_swap_tests;
 mod crow;
 #[cfg(test)]
 mod crow_tests;
@@ -52,6 +54,7 @@ use engine_common::{
     ClockFontPool, ClockFontSettings, ClockMarqueeMessage, ClockMarqueePreset, ClockRainAmount,
     ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
 };
+pub use events::cell_swap::{CELL_SWAP_FADE_TICKS, CELL_SWAP_MAX_TICKS, CELL_SWAP_TICKS};
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
 pub use events::marquee::MARQUEE_TICKS;
@@ -234,7 +237,7 @@ impl ClockAction {
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
             (CLOCK_ACTION_CONFIGURE, 14..=MAX_CONFIGURE_BYTES)
-                if payload[5] <= 3 && payload[8] <= 1 && payload[10] <= 1 =>
+                if payload[5] <= 7 && payload[8] <= 1 && payload[10] <= 1 =>
             {
                 Some(Self::Configure(ClockSettings {
                     fonts: ClockFontSettings {
@@ -264,6 +267,7 @@ impl ClockAction {
                         crow: payload[4] & 128 != 0,
                         explosion: payload[5] & 1 != 0,
                         aquarium: payload[5] & 2 != 0,
+                        cell_swap: payload[5] & 4 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
@@ -655,6 +659,12 @@ impl ClockState {
             self.sync_event_schedule();
         }
     }
+    pub fn cell_swap_state(&self) -> Option<engine_common::ClockCellSwapState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::CellSwap(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
     pub fn digit_slide_state(&self) -> Option<engine_common::ClockDigitSlideState> {
         match self.active_event.as_ref()? {
             ActiveEvent::DigitSlide(event) => Some(event.diagnostics()),
@@ -1031,6 +1041,9 @@ impl ClockState {
         // digits finish over a newer reading. Ordinary seconds don't restart it.
         if matches!(self.active_event, Some(ActiveEvent::DigitSlide(_))) && minute_changed {
             self.finish_event();
+        }
+        if let Some(ActiveEvent::CellSwap(event)) = &mut self.active_event {
+            event.synchronize(self.display);
         }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);

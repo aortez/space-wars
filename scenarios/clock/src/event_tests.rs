@@ -17,6 +17,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 crow: false,
                 explosion: false,
                 aquarium: false,
+                cell_swap: false,
             },
             ..ClockConfig::default()
         },
@@ -389,7 +390,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
     ClockScenario::step(&mut a, std::slice::from_ref(&reading), Duration::ZERO);
     ClockScenario::step(&mut b, &[reading], Duration::ZERO);
     let mut seen = [false; ClockEventKind::ALL.len()];
-    for _ in 0..300 * 60 {
+    for _ in 0..600 * 60 {
         ticks(&mut a, 1);
         ticks(&mut b, 1);
         assert_eq!(
@@ -412,6 +413,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         assert_eq!(a.duck_state(), b.duck_state());
         assert_eq!(a.crow_state(), b.crow_state());
         assert_eq!(a.marquee_state(), b.marquee_state());
+        assert_eq!(a.cell_swap_state(), b.cell_swap_state());
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }
@@ -421,7 +423,9 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
     for definition in EVENT_CATALOG {
         assert_eq!(
             seen[definition.kind as usize],
-            definition.trigger == engine_common::ClockEventTrigger::Periodic
+            definition.trigger == engine_common::ClockEventTrigger::Periodic,
+            "{:?}",
+            definition.kind
         );
     }
 }

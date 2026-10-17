@@ -585,6 +585,29 @@ impl ClockEventTrigger {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockCellSwapPattern {
+    Shuffle,
+    MirrorHorizontal,
+    MirrorVertical,
+}
+
+impl ClockCellSwapPattern {
+    pub const ALL: [Self; 3] = [Self::Shuffle, Self::MirrorHorizontal, Self::MirrorVertical];
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCellSwapState {
+    pub pattern: ClockCellSwapPattern,
+    pub from_digits: [Option<u8>; 4],
+    pub to_digits: [Option<u8>; 4],
+    pub elapsed_ticks: u64,
+    pub progress_milli: u32,
+    pub participating_cells: u32,
+    pub moving_cells: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDigitSlideState {
     pub from_digits: [Option<u8>; 4],
     pub to_digits: [Option<u8>; 4],
@@ -608,10 +631,11 @@ pub enum ClockEventKind {
     Crow = 7,
     Explosion = 8,
     Aquarium = 9,
+    CellSwap = 10,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -622,6 +646,7 @@ impl ClockEventKind {
         Self::Crow,
         Self::Explosion,
         Self::Aquarium,
+        Self::CellSwap,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -636,6 +661,7 @@ impl ClockEventKind {
             Self::Crow => "crow",
             Self::Explosion => "explosion",
             Self::Aquarium => "aquarium",
+            Self::CellSwap => "cell-swap",
         }
     }
 
@@ -651,6 +677,7 @@ impl ClockEventKind {
             Self::Crow => "Crow",
             Self::Explosion => "Explosion",
             Self::Aquarium => "Aquarium",
+            Self::CellSwap => "Cell Swap",
         }
     }
 }
@@ -669,6 +696,7 @@ pub struct ClockEvents {
     pub crow: bool,
     pub explosion: bool,
     pub aquarium: bool,
+    pub cell_swap: bool,
 }
 
 impl Default for ClockEvents {
@@ -684,6 +712,7 @@ impl Default for ClockEvents {
             crow: true,
             explosion: true,
             aquarium: true,
+            cell_swap: true,
         }
     }
 }
@@ -701,6 +730,7 @@ impl ClockEvents {
             ClockEventKind::Crow => self.crow,
             ClockEventKind::Explosion => self.explosion,
             ClockEventKind::Aquarium => self.aquarium,
+            ClockEventKind::CellSwap => self.cell_swap,
         }
     }
 }

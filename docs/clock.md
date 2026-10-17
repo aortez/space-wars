@@ -286,7 +286,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, and **Explosion** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, **Explosion**, **Aquarium**, and **Cell Swap** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -318,9 +318,53 @@ the Off profile still disables every automatic event.
 | `duck` | Admit one independent floor-course runner | 35 s visit, exit appears 20 s after spawn | 30 s after departure |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
+| `cell-swap` | Occupied cells shuffle or exchange mirrored positions, no physics | 1 s, plus up to 0.25 s to reconcile a changed time | 20 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
 | `crow` | One visitor with wingbeat flight, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
 | `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
+
+### Cell swaps
+
+**Cell Swap** occasionally exchanges the lit cells across the clock face. A
+seeded choice selects a random permutation, pairs across the horizontal
+centerline, or pairs across the vertical centerline. Mirrored partners must both
+be occupied; unmatched cells stay in place. A mirror with no partners falls back
+to a shuffle. Curved paths stay inside the digit face and finish at the exchanged
+positions. With an unchanged reading the event ends there after 60 simulation
+ticks (one second). Colon, AM/PM, date, scenery and the floor keep their normal
+behavior. The animation adds no physics bodies and preserves an existing duck
+visit; the crow withdraws from moving digit perches.
+
+A reading change updates authoritative time immediately without restarting the
+paths or starting Digit Slide. At the end of the exchange, obsolete cells fade
+out and new cells brighten over 15 ticks; unchanged cells remain lit. Further
+corrections retarget from the current brightness and replace the pending target.
+They can extend the fade only until tick 90 (1.5 seconds after admission), so
+there is no queue of old clock faces. Seconds-only updates do not restart either
+phase. Pause freezes progress while accepting the latest reading. Font changes
+follow the existing deferral until completion. Cancellation and resize restore
+the latest reading using the existing event cleanup path.
+
+Use **Cell Swap** in launcher settings or live Clock Controls, select it in the
+**Preview Event** picker and press **Preview & Resume**, or run
+`spacewars-cli clock trigger cell-swap`. The saved `clock.events.cell_swap`
+switch defaults to On when missing; an existing Off profile remains Off. Manual
+previews work with the switch disabled. Next Event honors the switch. The event
+uses the shared periodic cadence and a 20-second reuse delay. The catalog reports
+the maximum 90-tick envelope; an unchanged reading completes at tick 60.
+
+`clock state` exposes `cell_swap` with the chosen pattern, original/latest digits,
+elapsed ticks, movement progress in thousandths, participating cells and moving
+cells. The top-level phase is `swapping` or `reconciling`. There are at most 216
+cells (four 6×9 grids), one bounded permutation and two fixed opacity arrays.
+Mapping allocates only at admission; stepping allocates no event-owned storage.
+Tests bound the retained event state and permutation to 4 KiB and rendered
+geometry to fewer than 1,600 primitives, including the ordinary frame and glow.
+Future attached moss/digit-surface work (#223/#228) must carry attachment identity
+through this mapping when that feature lands.
+
+Local validation and screen captures are described in
+[cell-swap validation](clock-cell-swap-validation.md).
 
 ### Exploding digits
 
@@ -2143,8 +2187,8 @@ are null. The optional `digit_slide` object reports old/new digits, changed slot
 eased progress in thousandths, and whether this is a manual preview; it is null
 after completion or cancellation. Use matching client/CLI builds: schema 19 and
 older requests are rejected. The internal Clock action payload is version 12;
-event ordinals 0–8 are unchanged and Aquarium is 9. Configure contains a
-little-endian u16 switch mask (bits 0–9, reserved bits rejected),
+event ordinals 0–9 are unchanged; Cell Swap is 10. Configure contains a
+little-endian u16 switch mask (bits 0–10, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 font ID, rotation (0/1) and nonempty four-bit font-pool bytes, a crow-water-tolerance
 byte (0 Varied, 1 Shy, 2 Hardy), and 1–32 message
@@ -2172,7 +2216,7 @@ fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
 tick. A raw `clock trigger` request must include schema version 20, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, or `explosion`), `expected_scenario_revision`, and
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, `explosion`, `aquarium`, or `cell-swap`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification

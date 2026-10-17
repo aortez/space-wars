@@ -2675,6 +2675,7 @@ mod tests {
                     | ClockEventKind::ColorCycle
                     | ClockEventKind::Marquee
                     | ClockEventKind::DigitSlide
+                    | ClockEventKind::CellSwap
                     | ClockEventKind::Rain
                     | ClockEventKind::Crow
                     | ClockEventKind::Explosion

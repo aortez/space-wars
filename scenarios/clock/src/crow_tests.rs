@@ -208,6 +208,7 @@ fn crow_only_schedule_blocks_duplicates_then_obeys_departure_cooldown() {
         crow: true,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
         falling: false,
         color_cycle: false,
         meltdown: false,
@@ -324,6 +325,7 @@ fn transformed_or_destroyed_perches_make_crow_depart_without_interrupting_the_ev
         ClockEventKind::Meltdown,
         ClockEventKind::Marquee,
         ClockEventKind::DigitSlide,
+        ClockEventKind::CellSwap,
         ClockEventKind::Explosion,
     ] {
         let mut state = fixture(1.6, 42);

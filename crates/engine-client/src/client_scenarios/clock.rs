@@ -245,6 +245,7 @@ impl ClientScenario for ClockClientScenario {
             automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
+            cell_swap: self.state.cell_swap_state(),
             rain: self.state.rain_state(),
             aquarium: self.state.aquarium_state(),
             reading: self

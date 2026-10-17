@@ -23,6 +23,7 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
                 crow: false,
                 explosion: false,
                 aquarium: false,
+                cell_swap: false,
                 ..Default::default()
             },
             ..Default::default()
@@ -251,6 +252,7 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         crow: false,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
     };
     ClockScenario::step(
         &mut state,

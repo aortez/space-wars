@@ -63,6 +63,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             crow: kind == ClockEventKind::Crow,
             explosion: kind == ClockEventKind::Explosion,
             aquarium: kind == ClockEventKind::Aquarium,
+            cell_swap: kind == ClockEventKind::CellSwap,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -102,6 +103,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 crow: false,
                 explosion: false,
                 aquarium: false,
+                cell_swap: false,
             },
         ),
     ] {
@@ -149,6 +151,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         crow: false,
         explosion: false,
         aquarium: false,
+        cell_swap: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);
