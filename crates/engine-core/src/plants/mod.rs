@@ -97,10 +97,27 @@ pub enum Rejection {
     Stale,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UptakeZero {
+    NoContact,
+    SupplyOrRounding,
+    Capacity,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RootIntake {
+    pub eligible: bool,
+    pub offered: Resources,
+    pub accepted: Resources,
+    pub overflow: Resources,
+    pub zero: [Option<UptakeZero>; 2],
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ledger {
     pub tick: u64,
     pub intake: Resources,
+    pub roots: BTreeMap<TissueId, RootIntake>,
     pub maintenance: Resources,
     pub unmet: Resources,
     pub growth: Resources,
@@ -507,6 +524,10 @@ impl Plants {
         self.normalize();
         for group in self.components() {
             let mut pool = self.total(&group);
+            let mut capacity = [0; 3];
+            for id in &group {
+                add(&mut capacity, self.capacity(*id));
+            }
             for id in &group {
                 let t = &self.tissues[id];
                 let e = samples[id];
@@ -523,6 +544,30 @@ impl Plants {
                     intake[2] =
                         self.config.shoot_energy_per_size * u64::from(t.size) * u64::from(e.light)
                             / 1000;
+                }
+                if t.role == Role::Root {
+                    let accepted =
+                        std::array::from_fn(|i| intake[i].min(capacity[i].saturating_sub(pool[i])));
+                    self.ledger.roots.insert(
+                        *id,
+                        RootIntake {
+                            zero: std::array::from_fn(|i| {
+                                if !e.dirt_contact {
+                                    Some(UptakeZero::NoContact)
+                                } else if intake[i] == 0 {
+                                    Some(UptakeZero::SupplyOrRounding)
+                                } else if accepted[i] == 0 {
+                                    Some(UptakeZero::Capacity)
+                                } else {
+                                    None
+                                }
+                            }),
+                            eligible: e.dirt_contact,
+                            offered: intake,
+                            accepted,
+                            overflow: std::array::from_fn(|i| intake[i] - accepted[i]),
+                        },
+                    );
                 }
                 add(&mut pool, intake);
                 add(&mut self.ledger.intake, intake);

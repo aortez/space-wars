@@ -58,6 +58,7 @@ impl Default for TerrainSpec {
 #[derive(Debug, Clone)]
 pub struct TerrainAssembly {
     body: BodyId,
+    incarnation: (u32, u32),
     spec: TerrainSpec,
     revisions: Vec<Option<u64>>,
     shapes: Vec<(Vec<SolidRect>, Vec<SolidPolygon>)>,
@@ -89,6 +90,7 @@ impl TerrainAssembly {
         }
         let mut assembly = Self {
             body,
+            incarnation: world.body_handle(body)?.into_raw_parts(),
             spec,
             revisions: vec![None; terrain.chunk_count()],
             shapes: vec![(Vec::new(), Vec::new()); terrain.chunk_count()],
@@ -105,6 +107,30 @@ impl TerrainAssembly {
             true,
         );
         Some(assembly)
+    }
+
+    /// Plant attachment identity for this exact canonical body incarnation.
+    pub fn plant_support(&self) -> engine_core::plants::Support {
+        engine_core::plants::Support {
+            body: self.body.entity.value(),
+            generation: (u64::from(self.incarnation.0) << 32) | u64::from(self.incarnation.1),
+        }
+    }
+
+    pub(crate) fn plant_current(
+        &self,
+        world: &PhysicsWorld,
+        terrain: &Terrain,
+        geometry: &TerrainGeometry,
+    ) -> bool {
+        world.body_handle(self.body).map(|h| h.into_raw_parts()) == Some(self.incarnation)
+            && geometry.is_current(terrain)
+            && geometry.surface() == self.spec.surface
+            && self
+                .revisions
+                .iter()
+                .zip(geometry.chunks())
+                .all(|(r, c)| *r == Some(c.generation))
     }
 
     pub fn body(&self) -> BodyId {

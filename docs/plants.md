@@ -131,3 +131,59 @@ The foundation fixtures use controlled host inputs. Soil/raycast integration,
 a concrete grass brain, visible lab, ShipBrain and tree stability remain separate
 issues. Candidate acceptance also requires the registered foundation regression,
 formatting, whitespace and nextest plants-contract checks and independent review.
+
+## Renewable dirt contact adapter (#209)
+
+`engine_rapier::root_uptake::RootUptake` is a borrowed environmental view of one
+canonical `TerrainAssembly`, terrain, derived geometry and `PhysicsWorld`.
+A plant instance uses that support's local integer cell frame. Absorbing roots
+are lightweight points at terrain cell centers, independent of tissue size
+(size scales physiological capacity and intake, not geometric radius). The
+point must lie in canonical solid geometry whose source material equals the
+explicit `dirt` material ID. Air, proximity, other materials and VOID do not
+qualify. No neighbouring-cell search or face count multiplies intake.
+
+Use `TerrainAssembly::plant_support()` when seeding or growing attached tissue.
+It includes the canonical rigid body's slot and generation, so removing and
+replacing a body under the same scenario ID invalidates old attachments. The
+adapter checks that identity, body liveness, current terrain geometry, surface
+mode and synchronized assembly revisions on every query. Refresh geometry and
+synchronize colliders after edits before the next tick. An unsynchronized edit
+fails closed. Translation and rotation preserve support-local contact; removed
+support, material or tissue affects the next physiology boundary. Growth first
+samples on the following tick. Hosts must not reuse an attachment across worlds.
+
+Rates and availability are independently configurable 0..1000 fractions for
+nutrients and water. `Config::root_intake_per_size` specifies the maximum units
+per size per simulation second for this adapter. A fixed `tick_ms` of 1..1000
+specifies physiology duration. Effective fraction is
+`floor(rate * availability * tick_ms / 1_000_000)`; the runtime then floors
+`maximum * size * fraction / 1000`. There is no fractional carry: choose a
+fixed duration and rates large enough for the intended integer supply. The
+1000 ms default gives the foundation's 4 nutrient / 3 water allowance. Retune
+maintenance and grace if selecting another duration. Render schedules never
+choose duration or issue extra ticks; acceleration batches the same fixed ticks.
+Invalid controls reject atomically. Pause and zero elapsed ticks are no-ops.
+Queries are observational and the runtime samples each living root once; stale
+tick submissions reject before mutation. The substrate is renewable and never
+loses material or gains unused ecology fields.
+
+`contact()` distinguishes eligible, dead, non-root, missing/mismatched support,
+stale geometry, air and ineligible material. Ledger `roots` records each living
+root's eligible contact, offered intake, accepted storage and overflow in tissue
+ID order. Zero accepted intake distinguishes no contact, supply/rounding and
+capacity. The existing aggregate `intake` remains offered intake; discarded
+amounts remain in `loss`, preserving the original conservation equation.
+Acceptance is into the connected component before maintenance. No energy is
+supplied by this adapter; hosts compose shoot lighting separately. Dead roots
+are absent from intake ledgers and remain inspectable through `contact()`.
+
+Non-ignored `root_uptake_contract` fixtures exercise actual terrain assemblies:
+positive/air/non-dirt/dead contacts, transformed and replaced supports, terrain
+removal and stale synchronization, query/tick duplication, pause, independent
+shortage damage/recovery/death, growth timing, invalid controls, duration scaling
+and 1000-second renewable bounded accounting across ordinary/accelerated batches.
+Long runs provide a finite energy endowment sufficient for the test duration.
+This adapter advances the environment milestone toward Garden Lab; plant light
+integration, grass policy, lab presentation and ordinary gameplay remain later
+issues.
