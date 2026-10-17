@@ -54,6 +54,10 @@ The ordinary [Training view](managed-training.md) already shows winner and media
 progress for its managed recipes; this experimental match-training recipe runs
 through the separate harness and is not a managed UI job.
 
+The [headless performance profile](learned-guidance-training-performance.md)
+measures this recipe's throughput and identifies per-tick world cloning as the
+dominant match-evaluation cost.
+
 ## Frozen recipe
 
 The [v3 recipe](data/learned-guidance-match-training-v3-plan.json) keeps the same

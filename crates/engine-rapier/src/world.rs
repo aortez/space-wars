@@ -658,11 +658,37 @@ pub struct PhysicsWorld {
 
 impl Clone for PhysicsWorld {
     fn clone(&self) -> Self {
-        let snapshot = self
-            .snapshot_bytes()
-            .expect("an in-memory physics world must serialize");
-        let mut clone =
-            Self::from_snapshot_bytes(&snapshot).expect("a same-build physics snapshot must load");
+        // Copy simulation state directly. Rapier's shared shapes keep immutable
+        // terrain geometry cheap to copy; edits use copy-on-write. The pipeline
+        // and event collector are workspaces, not shared simulation state.
+        let mut clone = Self {
+            raw: RapierWorld {
+                gravity: self.raw.gravity,
+                integration_parameters: self.raw.integration_parameters,
+                physics_pipeline: PhysicsPipeline::new(),
+                islands: self.raw.islands.clone(),
+                broad_phase: self.raw.broad_phase.clone(),
+                narrow_phase: self.raw.narrow_phase.clone(),
+                bodies: self.raw.bodies.clone(),
+                colliders: self.raw.colliders.clone(),
+                impulse_joints: self.raw.impulse_joints.clone(),
+                multibody_joints: self.raw.multibody_joints.clone(),
+                ccd_solver: self.raw.ccd_solver.clone(),
+            },
+            bodies: self.bodies.clone(),
+            body_indices: self.body_indices.clone(),
+            colliders: self.colliders.clone(),
+            collider_indices: self.collider_indices.clone(),
+            joints: self.joints.clone(),
+            joint_indices: self.joint_indices.clone(),
+            entities: self.entities.clone(),
+            contact_events: Vec::new(),
+            contact_event_collector: ContactEventCollector::default(),
+            sensor_intersections: Vec::new(),
+            collect_events: self.collect_events,
+        };
+        // Match snapshot restoration: report current contacts, without replaying
+        // transient force callbacks from the source world's previous step.
         if clone.collect_events {
             clone.rebuild_events();
         }
@@ -2728,6 +2754,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod cloning;
     mod compound;
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
@@ -3029,6 +3056,11 @@ mod tests {
         assert_eq!(event.collider_b, fixed_collider_id);
         assert!(event.impulse_magnitude > 0.0);
         assert!(world.motion(moving_body).unwrap().linear_velocity.x < 0.0);
+
+        let cloned = world.clone();
+        cloning::assert_same(&cloned, &cloning::snapshot_clone(&world));
+        assert!(cloned.contact_events().is_empty());
+        assert_eq!(world.contact_events(), &[event]);
     }
 
     #[test]

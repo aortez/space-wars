@@ -1,0 +1,72 @@
+{
+  "description": "Serial baseline then direct-clone benchmark on the same busy Ryzen 7 9800X3D; identical ci profile and evaluation workload. Four precision workers, serial match cases. Medians of four finalist batches per executable.",
+  "before": {
+    "runtime": "diagnostic_v1/linux/x86_64/17128fa5e851bf3d66cc8884eae1d0d91a5a8ec7d263153a628cb1432ec1000e",
+    "samples": 4,
+    "precision_seconds": 0.545006028,
+    "match_seconds": 9.517683098500001,
+    "candidate_seconds": 10.0835256955,
+    "candidate_seconds_range": [
+      7.383683614,
+      10.549979525
+    ],
+    "precision_ticks_per_second": 151175.78236569124,
+    "match_ticks_per_second": 91.70441718555439,
+    "combined_ticks_per_second": 8273.935772882725,
+    "clone_ms_per_call": 7.787151711086229,
+    "match_profile_ms": 8176.198919,
+    "match_stages_ms": {
+      "match_clone": 6953.926478000002,
+      "host_step": 260.4563429999999,
+      "component_step": 147.00577900000002,
+      "match_network_decision": 1.9879070000000028,
+      "other": 812.8224119999986
+    },
+    "match_clone_percent": 85.05084755020259,
+    "precision_replayed_ticks": 82391,
+    "all_parity_checks_passed": true
+  },
+  "after": {
+    "runtime": "diagnostic_v1/linux/x86_64/44bc0a750a95fb54ca89bae1ab5db8ba61b4116d5082ad213e3db81477608d6c",
+    "samples": 4,
+    "precision_seconds": 0.5244878584999999,
+    "match_seconds": 0.9977197575000001,
+    "candidate_seconds": 1.516699571,
+    "candidate_seconds_range": [
+      1.4042161850000001,
+      1.711526973
+    ],
+    "precision_ticks_per_second": 157425.26027952717,
+    "match_ticks_per_second": 878.6489598115281,
+    "combined_ticks_per_second": 55192.99292024686,
+    "clone_ms_per_call": 0.5266432206047031,
+    "match_profile_ms": 1076.238799,
+    "match_stages_ms": {
+      "match_clone": 470.29239599999994,
+      "host_step": 190.73564799999997,
+      "component_step": 123.11176599999997,
+      "match_network_decision": 0.8616650000000001,
+      "other": 291.23732400000006
+    },
+    "match_clone_percent": 43.697773806052865,
+    "precision_replayed_ticks": 82391,
+    "all_parity_checks_passed": true
+  },
+  "candidate_speedup": 6.648334243842152,
+  "match_speedup": 9.53943532435259,
+  "clone_speedup": 14.786389355102402,
+  "historical_replay": {
+    "episodes": 276,
+    "ticks": 20479,
+    "trace_byte_parity": true,
+    "episode_result_parity": true
+  },
+  "regression_tests": {
+    "engine-agent": 91,
+    "engine-rapier": 163,
+    "scenario-spacewars": 619,
+    "spacewars-ai": 451,
+    "guidance-fixtures": 8
+  },
+  "raw_evidence": "data/training-experiments/training-profile-20261017/clone-optimization"
+}
