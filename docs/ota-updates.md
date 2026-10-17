@@ -1307,6 +1307,92 @@ actual inactive slot. Persistent staging applies its separate space quota. The
 HTTPS session adds redirect/request bounds, progress deadlines and transfer
 throttling and service-owned network holds, described below.
 
+## Feed delivery under development
+
+The delivery component for #262 is implemented separately from signing and
+build admission. It is not an enabled publication workflow. No production root,
+signing credential or `ota-feed` release has been created by this work.
+
+`engine_ota::publication::inventory` and the `feed_inventory` example verify a
+flat local publication against an independently selected trusted root and UTC
+time. They use the device's TUF implementation and catalog policy: signatures,
+expiration, root rotation, distinct channel authorities, exact target names and
+descriptors all apply. Snapshot and timestamp references must bind exact lengths
+and SHA-256 hashes. The directory includes the pinned root and its supported
+rotation chain, the current timestamp and referenced versioned metadata, and
+every referenced consistently named compressed payload. Extra files, mixed or
+incomplete metadata, symlinks, corrupted payloads and conflicting image identities
+within the snapshot are rejected. Input metadata and asset counts are bounded;
+payload hashing streams through a fixed buffer.
+
+The read-only invocation is:
+
+```sh
+cargo run -p engine-ota --example feed_inventory -- \
+  /path/to/independently-trusted-root.json /path/to/flat-publication/ \
+  2026-10-16T12:00:00Z > /path/outside-publication/delivery-manifest.json
+```
+
+Use the publisher's actual admitted UTC time, not the example date. The output
+binds the trusted root, timestamp version and exact name/length/hash of every
+asset. This check does not inspect the expanded ext4 image, prove same-source CI
+or Yocto qualification, allocate historical image generations, or approve a
+Release promotion. Those are upstream requirements; a manifest checksum alone
+is not authorization.
+
+`.github/ci/ota_delivery.py` supplies the delivery transaction and GitHub adapter
+as a library. Its caller must use the pinned verifier, independently admit the
+exact manifest digest, and hold one shared cross-channel publisher concurrency
+lock for the entire operation. Candidate-provided scripts must not execute in
+that caller. The release body is a durable reservation and detects stale or
+changed intent; it is not a compare-and-swap lock and cannot serialize competing
+writers by itself. Workflow admission, protected signing/promotion environments,
+metadata renewal and the shared concurrency group still need implementation.
+
+The delivery sequence is:
+
+1. Recheck all local files against the admitted manifest and reserve its identity
+   in the separate `ota-feed` release. An unfinished reservation must resume the
+   same package before another publication can begin. Retain that exact package
+   and manifest outside the runner until publication completes.
+2. Upload missing immutable images, root-chain files and versioned metadata, and
+   read every required asset back through its public HTTPS download. An existing
+   immutable name with different contents is a hard conflict. Only empty GitHub
+   `starter` uploads may be removed and retried.
+3. Retain an immutable timestamp archive named
+   `timestamp-<version>-<sha256>.json`. Recheck the reservation and current alias,
+   then replace only `timestamp.json` after all prerequisite readbacks succeed.
+   The delete/upload gap can make a check fail temporarily; it cannot authorize
+   an incomplete candidate. Verify the new public alias before recording success.
+4. A later invocation reconciles responses lost before or after a mutation.
+   Unknown timestamp contents or a changed reservation stop publication instead
+   of overwriting unexplained state.
+
+There is no automatic history deletion in this component. It preflights the
+1,000-asset release limit and requires each asset to remain below 2 GiB; capacity
+failure preserves every existing asset. A separately reviewed retention planner
+must eventually preserve at least 30 days of Nightly history plus current
+references, Release images and supported root-rotation chains. These limits and
+the possibility of an empty `starter` following a failed upload are documented
+by [GitHub's release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
+and [release-asset API](https://docs.github.com/en/rest/releases/assets?apiVersion=2022-11-28).
+
+Uploads and readbacks stream bounded chunks. Authenticated API calls never follow
+redirects; public readbacks carry no token and follow only bounded,
+credential-free HTTPS redirects. The destination is fixed to this repository's
+`ota-feed` release; the Windows `nightly` publisher is unchanged. A read-only
+probe of the existing Windows asset on 2026-10-16 received a 302 redirect followed
+by HTTP 200 without authentication. That is transport evidence, not validation
+of a production OTA feed or installed device update.
+
+The fixtures cover actual signed metadata through the Rust verifier and Python
+mock delivery together, plus API failures before and after every transaction
+boundary, incomplete uploads, immutable conflicts, source-file substitution,
+stale/changed reservations, capacity exhaustion and the final timestamp gap.
+Production signer isolation, build provenance/qualification, durable generation
+history, retention, metadata refresh, real feed publication and device rollout
+remain separate work.
+
 ## Persistent verification and installation evidence
 
 `TrustStore::initialize` is an explicit bootstrap operation and requires a new

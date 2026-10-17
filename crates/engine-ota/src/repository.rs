@@ -271,7 +271,7 @@ impl TrustStore {
     }
 }
 
-fn metadata_limits() -> Limits {
+pub(crate) fn metadata_limits() -> Limits {
     Limits {
         max_root_size: MAX_METADATA_BYTES as u64,
         max_targets_size: MAX_METADATA_BYTES as u64,
@@ -281,7 +281,7 @@ fn metadata_limits() -> Limits {
     }
 }
 
-fn validate_catalog(repository: &tough::Repository) -> Result<Vec<ImageDescriptor>> {
+pub(crate) fn validate_catalog(repository: &tough::Repository) -> Result<Vec<ImageDescriptor>> {
     let invalid = |reason: &str| Error::Feed(reason.into());
     if !repository.root().signed.consistent_snapshot {
         return Err(invalid("consistent snapshots are required"));

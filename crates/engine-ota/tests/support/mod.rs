@@ -147,6 +147,12 @@ pub enum Fault {
     DescriptorHash,
     ExtraDelegation,
     SharedChannelKey,
+    // These cases are used by publisher unit tests. This shared fixture is
+    // also compiled separately by the device-verifier integration tests.
+    #[allow(dead_code)]
+    UnboundSnapshotReference,
+    #[allow(dead_code)]
+    ExtraSnapshotReference,
 }
 
 pub struct Fixture {
@@ -366,6 +372,16 @@ impl Fixture {
         snapshot
             .meta
             .insert("targets.json".into(), meta(version, targets.buffer()));
+        if matches!(fault, Fault::UnboundSnapshotReference) {
+            let reference = snapshot.meta.get_mut("release.json").unwrap();
+            reference.length = None;
+            reference.hashes = None;
+        }
+        if matches!(fault, Fault::ExtraSnapshotReference) {
+            snapshot
+                .meta
+                .insert("obsolete.json".into(), meta(version, b"unused"));
+        }
         transport
             .files
             .insert(format!("{version}.targets.json"), targets.buffer().clone());
