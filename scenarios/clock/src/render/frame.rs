@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::events::duck::DuckEvent;
+use crate::events::duck::flaps::DoorPanel;
 use crate::presentation::{Bounds, clip_quad};
 use engine_common::{RenderCircle, RenderLine};
 
@@ -14,17 +15,9 @@ const LAMP_LAYER: i32 = 11;
 const DOOR_LAYER: i32 = 12;
 const SHADOW_LAYER: i32 = 9;
 
-#[derive(Clone, Copy)]
-struct DoorPanel {
-    bottom: f32,
-    top: f32,
-    hinge: Vec2,
-    angle: f32,
-}
-
 impl DoorPanel {
     fn transform(self, point: Vec2) -> RenderPoint {
-        let rotated = self.hinge + (point - self.hinge).rotate_radians(self.angle);
+        let rotated = self.point(point);
         RenderPoint::new(rotated.x, rotated.y)
     }
 }
@@ -248,26 +241,8 @@ fn door_shadow(frame: &mut RenderFrame, door: DoorPanel, width: f32) {
 fn door_panels(event: Option<&DuckEvent>) -> [Option<DoorPanel>; 2] {
     let mut panels = [None; 2];
     if let Some(event) = event {
-        let (entrance, exit) = event.door_openness();
-        for (x, open, visible) in [
-            (0.0, entrance, event.entrance_visible()),
-            (event.width, exit, event.exit_visible()),
-        ] {
-            let open = open.min(event.course_opacity()).clamp(0.0, 1.0);
-            if !visible || open <= 0.0 {
-                continue;
-            }
-            let wall_x = event.render_position(Vec2::new(x, 0.0)).x;
-            let bottom = event.door_floor(x);
-            let top = bottom + event.radius * 4.25;
-            // Ease at both stops, with mirrored rotations into the scene.
-            let angle = open * open * (3.0 - 2.0 * open) * std::f32::consts::FRAC_PI_2;
-            panels[usize::from(wall_x > 0.0)] = Some(DoorPanel {
-                bottom,
-                top,
-                hinge: Vec2::new(wall_x, top),
-                angle: if wall_x < 0.0 { angle } else { -angle },
-            });
+        for panel in event.door_panels().into_iter().flatten() {
+            panels[usize::from(panel.hinge.x > 0.0)] = Some(panel);
         }
     }
     panels

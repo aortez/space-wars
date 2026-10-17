@@ -101,7 +101,7 @@ fn promoted_meltdown_replays_and_conserves_through_deadline_and_cleanup() {
                 tick(&mut b);
             }
             assert!(a.active_event.is_none());
-            assert!(a.body_count() <= 4);
+            assert!(a.body_count() <= 4 + a.flap_body_count());
             a.set_aspect_ratio(2.0);
             assert_eq!((a.body_count(), a.collider_count()), (0, 0));
             assert!(a.duck_visit.is_none());

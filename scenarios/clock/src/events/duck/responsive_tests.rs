@@ -23,7 +23,8 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
             duck.step();
             grounded += usize::from(duck.grounded());
             assert!(!duck.feet_moving(), "riding a closing panel is not walking");
-            assert_eq!(duck.physics_counts(), (4, 4));
+            let count = 4 + duck.flap_body_count();
+            assert_eq!(duck.physics_counts(), (count, count));
             let p = duck.position().unwrap();
             let x = duck.render_position(p).x;
             let floor = duck.responsive_floor().unwrap();
@@ -96,5 +97,9 @@ fn dry_recovery_holds_an_occupied_drain_until_the_character_leaves_the_view() {
     }
     assert_eq!(duck.outcome, Some(ClockDuckOutcome::Fell));
     assert!(duck.responsive_floor().unwrap().clearance_holds > 0);
+    assert!(duck.actor_body().is_none());
+    for _ in 0..RESET_TICKS {
+        duck.step();
+    }
     assert_eq!(duck.physics_counts(), (0, 0));
 }

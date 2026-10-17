@@ -5,6 +5,8 @@ use slint::platform::{Platform, PlatformError, WindowAdapter};
 use slint::{ComponentHandle, Image, PhysicalSize, Rgb8Pixel, SharedPixelBuffer};
 use std::{cell::RefCell, rc::Rc};
 
+mod duck_flaps;
+
 struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 

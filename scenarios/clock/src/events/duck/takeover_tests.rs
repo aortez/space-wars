@@ -86,7 +86,11 @@ fn takeover_keeps_every_existing_body_mass_contact_and_clock_in_both_directions(
                         for record in motions {
                             assert_eq!(world.motion(record.id), Some(record.motion));
                         }
-                        assert!(duck.buoyant.is_some(), "same hull is already water-ready");
+                        assert_eq!(
+                            duck.buoyant.is_some(),
+                            mass.is_some(),
+                            "preserve the actor's spawn boundary"
+                        );
                     } else {
                         assert!(duck.world.is_none(), "opening does not spawn early");
                     }

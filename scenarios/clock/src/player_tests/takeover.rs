@@ -155,7 +155,7 @@ fn an_already_departed_bot_starts_a_fresh_visit_instead_of_reviving_a_missing_bo
         state.duck_visit.as_ref().map(|duck| duck.phase),
         Some(EventPhase::Resetting)
     );
-    assert_eq!(state.body_count(), 0);
+    assert!(state.duck_visit.as_ref().unwrap().actor_body().is_none());
     assert!(state.duck_state().unwrap().outcome.is_some());
     toggle(&mut state, 1);
     let duck = state.player_duck_state().unwrap();

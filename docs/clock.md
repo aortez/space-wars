@@ -968,8 +968,9 @@ previews, not new scenarios; normal Clock startup is unchanged. See
 [spilling displacement and verification](design/water.md#displacement-driven-spills).
 
 Duck lifts a hinged section of the wooden wall and spawns a yellow pixel duck.
-The entrance flap closes flush behind it and stays closed for the rest of the
-visit. The duck makes two vertical
+The entrance flap closes flush behind it once clear, and stays closed for the
+rest of the visit. Standing on the flap or a validated attachment holds closure
+until released. The duck makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently
 selects a seeded course pattern and movement personality. The patterns are:
@@ -1097,11 +1098,27 @@ switch the personality to `careful` to watch the adjacent route on the same cour
 These overrides are independent and do not change event scheduling.
 The seeded physics comparison below
 exercises both profiles.
-The upright pixel sprite and hinged wooden doors are presentation, not articulated
-physics. Doors are logical backstage entry/exit markers, not trapping colliders.
-Both flaps use the existing entry/exit timing, ease at each end of the swing and
-close into a continuous frame. A small pin at the top and the exposed cut edge
-make the hinge visible while the flap moves.
+The upright pixel sprite follows its round physical hull. The hinged wooden
+doors are rigid kinematic surfaces in the same mechanics world. Their shared
+description supplies the visible rail width, hinge, angle and physical footprint
+in both orientations. At most two door bodies/colliders exist, with stable
+identities during a visit; closed panels leave no horizontal collider behind.
+A small pin at the top and the exposed cut edge make the hinge visible.
+
+Standing contact or a valid nearby attachment holds a pending closure. A bounded
+swept-box check also stops closure before it enters the duck's hull. Once clear,
+the flap resumes from its held pose at the ordinary rate, without catching up to
+an expired deadline. An empty exit stays open until the visit ends. Ordinary
+jumps inherit the supporting point's current physical velocity. The flaps have
+no spring response or extra jump bonus; [#474](https://github.com/aortez/space-wars/issues/474)
+records that future experiment. The attachment seam is qualified with fixtures;
+the player ledge-grab controller follows in [#281](https://github.com/aortez/space-wars/issues/281).
+
+The public duck diagnostics include `flaps` in entrance/exit order, reporting
+requested/actual opening, hinge, angle, body ID, motion and any standing,
+attachment or obstruction hold. Older payloads may omit this additive field.
+[Rigid-flap validation and target-size captures](clock-duck-flaps-validation.md)
+cover standing, jumping, delayed closure, shared ownership and cleanup.
 
 This close-up uses the production renderer at half speed, with the camera moved
 to the entrance of the 800×480 layout:
@@ -1124,8 +1141,9 @@ Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
 still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.
 `exiting` starts when the door appears, even if the duck is still heading toward
 the entrance before its final return crossing.
-Reset immediately removes the actor and, if not leased to a sharing physical
-event, its course physics. It fades the course over half a second and keeps the
+Reset immediately removes the actor and releases attachments. The flaps finish
+closing within the half-second reset; an unleased world is then released. The
+course fades over that half second and keeps the
 last outcome until the fixed 35-second visit envelope ends. Rain/Falling/Meltdown
 retain their course/material until their own cleanup. Resize/restart release both
 lifetimes; compatible previews preserve the visit. Narrow

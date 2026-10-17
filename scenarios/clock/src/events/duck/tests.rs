@@ -93,10 +93,13 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                 if phases.last().copied() != state.duck_visit.as_ref().map(|duck| duck.phase) {
                     phases.push(state.duck_visit.as_ref().map(|duck| duck.phase).unwrap());
                 }
-                assert!(state.body_count() <= 5 && state.collider_count() <= 5);
+                let flaps = state.flap_body_count();
+                assert!(flaps <= 2);
+                assert!(state.body_count() <= 5 + flaps && state.collider_count() <= 5 + flaps);
                 assert!(stats.entrance_open_milli <= 1000 && stats.exit_open_milli <= 1000);
                 if state.duck_visit.as_ref().map(|duck| duck.phase) == Some(EventPhase::Opening) {
-                    assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+                    let count = if tick == 0 { 0 } else { 4 + flaps };
+                    assert_eq!((state.body_count(), state.collider_count()), (count, count));
                     assert_eq!(stats.position_milli, None);
                     assert_eq!(stats.jumps, 0);
                     assert_eq!(stats.exit_open_milli, 0);
@@ -112,7 +115,7 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                     state.duck_visit.as_ref().map(|duck| duck.phase),
                     Some(EventPhase::Running | EventPhase::Exiting)
                 ) {
-                    assert_eq!(state.body_count(), 5);
+                    assert_eq!(state.body_count(), 5 + flaps);
                     airborne |= stats.jumps > 0 && !stats.grounded;
                 }
                 if state.duck_visit.as_ref().map(|duck| duck.phase) == Some(EventPhase::Exiting) {
@@ -138,7 +141,7 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                         stats.jumps,
                         2 + 3 * (navigation.wall_tags.iter().sum::<u32>() + 1)
                     );
-                    assert_eq!(state.body_count(), 0);
+                    assert_eq!(state.body_count(), if flaps == 0 { 0 } else { 4 + flaps });
                     assert_eq!(stats.position_milli, None);
                     if outcome.is_none() {
                         exit_range[0] = exit_range[0].min(tick);
@@ -402,9 +405,10 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
                 ClockDuckOutcome::TimedOut
             })
         );
-        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        assert!(state.duck_visit.as_ref().unwrap().actor_body().is_none());
         ticks(&mut state, RESET_TICKS);
         assert_eq!(state.duck_state(), None);
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
     }
 }
 

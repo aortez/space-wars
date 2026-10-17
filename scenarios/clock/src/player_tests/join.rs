@@ -94,6 +94,7 @@ fn joining_keeps_the_visible_scene_identical_before_time_advances_including_refo
 
 #[test]
 fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
+    let mut free_flight_samples = 0;
     for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
         for elapsed in [0, 60, 150, 208, 260] {
             let mut baseline = standalone(ClockEventKind::Falling, elapsed, aspect);
@@ -107,14 +108,33 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
                     "world moves, nothing is rebuilt/inserted"
                 );
             }
+            let mut contacted = std::collections::HashSet::new();
             for step in 0..35 {
+                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                for id in world.collider_ids() {
+                    if world.surface_contacts(id).next().is_some() {
+                        contacted.insert(id.entity);
+                    }
+                }
                 tick(&mut baseline, &[]);
                 tick(&mut joined, &[]);
                 assert_eq!(
                     (joined.event_kind(), joined.phase_tick()),
                     (baseline.event_kind(), baseline.phase_tick())
                 );
+                let world = joined.duck_visit.as_ref().unwrap().arena_world();
+                for id in world.collider_ids() {
+                    if world.surface_contacts(id).next().is_some() {
+                        contacted.insert(id.entity);
+                    }
+                }
                 for (a, b) in joined.segments.iter().zip(&baseline.segments) {
+                    // Free flight proves momentum and one gravity step survive
+                    // handoff. Physical flaps introduce new contacts and solver
+                    // batches, so settled/contacting piles need not be identical.
+                    if contacted.contains(&crate::physics::body_id(a.id).entity) {
+                        continue;
+                    }
                     if let (
                         SegmentRepresentation::Rigid {
                             position: p,
@@ -126,9 +146,10 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
                         },
                     ) = (&a.representation, &b.representation)
                     {
+                        free_flight_samples += 1;
                         // Equivalent gravity is factored as g * body scale on
-                        // portrait layouts. Tiny rounding differences amplify
-                        // over many bar contacts; bound them well below a pixel.
+                        // portrait layouts. Bound accumulated free-flight
+                        // rounding differences well below a pixel.
                         let tolerance = if step == 0 {
                             0.0001
                         } else {
@@ -147,6 +168,10 @@ fn adopted_falling_preserves_trajectories_and_steps_once_during_door_opening() {
             }
         }
     }
+    assert!(
+        free_flight_samples > 100,
+        "exercise actual falling trajectories"
+    );
 }
 
 #[test]
@@ -169,7 +194,7 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             assert_eq!(state.event_kind(), None);
             assert_eq!(opacity, 1.0);
             assert!(state.duck_visit.as_ref().unwrap().grounded());
-            assert!(state.body_count() <= 5);
+            assert!(state.body_count() <= 5 + state.flap_body_count());
             let duck = state.duck_visit.as_ref().unwrap();
             let start_y = duck.position().unwrap().y;
             let radius = duck.radius;

@@ -1520,6 +1520,13 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         // Short door phases are checked at exact simulation ticks in the core
         // tests. A loaded UI runner need not catch a sub-second animation.
         let running = harness.clock_wait(&initial, "running", 1, 140);
+        let flap_count = running
+            .duck
+            .unwrap()
+            .flaps
+            .iter()
+            .filter(|f| f.body_id.is_some())
+            .count();
         let surfaces = running
             .duck
             .unwrap()
@@ -1530,7 +1537,7 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
             .surface_count;
         assert_eq!(
             (running.body_count, running.collider_count),
-            (surfaces + 1, surfaces + 1)
+            (surfaces + 1 + flap_count, surfaces + 1 + flap_count)
         );
         assert!(running.duck.unwrap().jumps >= 1);
         harness.capture_screenshot("clock-duck-running.png");
@@ -1605,7 +1612,20 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
             (0, 0, 0)
         );
         assert!(navigation.exit_visible);
-        assert_eq!((resetting.body_count, resetting.collider_count), (0, 0));
+        let flap_count = duck.flaps.iter().filter(|f| f.body_id.is_some()).count();
+        let closing_bodies = if flap_count == 0 {
+            0
+        } else {
+            surfaces + flap_count
+        };
+        assert_eq!(
+            (resetting.body_count, resetting.collider_count),
+            (closing_bodies, closing_bodies)
+        );
+        assert!(
+            duck.position_milli.is_none(),
+            "the character has left while the doors close"
+        );
         harness.capture_screenshot("clock-duck-resetting.png");
         let idle = harness.clock_wait_no_duck(&initial);
         assert_eq!(idle.duck, None);
