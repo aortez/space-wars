@@ -44,8 +44,20 @@ The owner selected the connected 128 GB SanDisk Extreme Pro as the replacement
 for `spacewars.local` and explicitly approved erasing its Ubuntu installer and
 writable partition. The prepared workstation command is
 `python3 target/flash-spacewars-replacement.py`, with `--dry-run` for inspection.
-The dry run passed; no replacement-device write has occurred yet. Execution
-still needs the owner's interactive workstation sudo authentication.
+The owner's execution completed the image write, verified all mapped image
+bytes, grew the data partition and wrote the hostname. Hardware-profile
+selection then stopped before data restoration because its unprivileged
+`existsSync` check could not enter the root-mounted FAT filesystem under the
+operator's private umask. The same error was reproduced in a regression test.
+Boot profile/identity reads now use sudo, and the written selection is read
+back before success.
+
+Resume this particular drive with
+`python3 target/flash-spacewars-replacement.py --finish`. This checks the
+already-flashed boot/root identities, finishes hostname/profile selection and
+restores data/access without erasing, rewriting or resizing the disk again.
+`--finish --dry-run` passed. Execution still needs the owner's interactive
+workstation sudo authentication; do not boot until it prints `READY`.
 
 This operator command pins the reviewed image, data archive and helper hashes,
 plus the connected disk's model, capacity, USB path and connection sequence. Its
@@ -66,7 +78,11 @@ read-only data verification before the command prints `READY`.
 
 Seven focused tests passed in an isolated root container, including foreign
 numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
-destination conflicts. The actual replacement restore and boot remain pending.
+destination conflicts. A further isolated root-container rehearsal restored
+the actual archive's entire selected tree and verified all 18,148 entries,
+including numeric ownership. The actual replacement-device restore and boot
+remain pending. The profile fix passed all 16 hardware tests and the complete
+Yocto suite (69 Node tests and 87 Python tests passed, with one skipped in each).
 A fresh flash still needs its own recovery-baseline qualification; these tests
 do not enable automatic OTA installation.
 

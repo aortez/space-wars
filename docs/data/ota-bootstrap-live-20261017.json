@@ -79,10 +79,50 @@
       "ssh_host_keys_present": true,
       "administrator_key_present": true,
       "old_recovery_journals_present": false,
-      "device_written": false,
+      "device_written": true,
       "physical_restore_verified": false,
       "boot_verified": false,
-      "pending": "interactive workstation sudo authentication and execution"
+      "pending": "interactive workstation sudo authentication to finish profile selection and data/access restoration; subsequent Pi 5 boot",
+      "resume_command": "python3 target/flash-spacewars-replacement.py --finish",
+      "resume_dry_run_passed": true,
+      "completed_before_profile_failure": {
+        "evidence": "owner-provided terminal output; independently observed resulting partition layout",
+        "image_write": true,
+        "mapped_image_readback_bytes": 637599744,
+        "data_partition_grown": true,
+        "data_partition_bytes": 108633299456,
+        "hostname_written": true,
+        "data_restore_started": false
+      },
+      "profile_failure": {
+        "message": "Flashed image does not contain unified hardware profiles and boot metadata.",
+        "cause": "unprivileged existence checks could not enter a root-mounted FAT filesystem under the private umask",
+        "image_contains_required_profile": true,
+        "regression_reproduced_exact_error": true,
+        "fix": "privileged presence/identity reads and profile write readback; finish path repeats provisioning after checking image identity",
+        "hardware_tests_passed": 16,
+        "physical_finish_pending": true
+      },
+      "full_data_restore_rehearsal": {
+        "archive": {
+          "bytes": 1504819712,
+          "sha256": "019a557c17edee5034a6c34ce1aa28ef69507b11fdf5c04864882b67e7405b8b"
+        },
+        "data_entries": 18148,
+        "data_payload_bytes": 1450912068,
+        "directories": 942,
+        "files": 17204,
+        "links": 2,
+        "root_configuration_imported": false,
+        "recovery_journals_imported": false,
+        "contents_verified": true,
+        "numeric_owners_verified": true,
+        "modes_verified": true,
+        "links_verified": true,
+        "nanosecond_timestamps_verified": true,
+        "extended_attributes_verified": true,
+        "scope": "actual selected data archive restored into isolated root-container tmpfs; replacement-device restoration and boot remain pending"
+      }
     }
   },
   "checks": {
@@ -93,13 +133,14 @@
     "format_and_diff_check": "passed",
     "offline_archive_restore_root_container_tests_passed": 7,
     "yocto_node_tests": {
-      "passed": 66,
+      "passed": 69,
       "skipped": 1
     },
     "yocto_python_tests": {
       "passed": 87,
       "skipped": 1
-    }
+    },
+    "hardware_profile_tests_passed": 16
   },
   "remaining": [
     "Flash the selected Pi 5 replacement, verify its restored data and boot, then prepare a new bootstrap binding.",
