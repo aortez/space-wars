@@ -1307,6 +1307,72 @@ actual inactive slot. Persistent staging applies its separate space quota. The
 HTTPS session adds redirect/request bounds, progress deadlines and transfer
 throttling and service-owned network holds, described below.
 
+## GitHub candidate origin admission
+
+The read-only [OTA admission helper](../.github/ci/ota_admission.py) checks a
+candidate's GitHub origin before the publisher validates the image. It is a
+library for the pending #262 workflow; no OTA build or signing workflow is
+enabled yet. It needs only Actions/Contents read access, with no signing or
+release-writing credentials in its process.
+
+Its caller supplies `Policy` from the publisher's independently pinned, reviewed
+checkout and an exact `Selection`: source commit, build/CI run IDs and attempts,
+and artifact ID. Policy includes both workflow-file SHA-256s, required jobs and
+successful steps, the producing job, and exact flat archive member names/size
+limits. None of these expectations may come from the candidate archive. There
+is deliberately no default policy that approves whatever GitHub returns.
+
+`candidate(api, policy, selection, scratch)` is a context manager. It queries
+GitHub directly for both the current run and the selected attempt, rather than
+accepting a caller's `build-result` string. Both runs must belong to
+`aortez/space-wars` (repository ID 3003186), use `main` and the same exact source,
+and have completed successfully. The OTA build accepts only schedule/manual
+events; CI accepts only push/manual events. PR/fork runs, reusable workflows,
+disabled/changed workflow registrations, changed workflow bytes, failed jobs,
+missing/skipped required steps, and old attempts are rejected. All expected jobs
+must be present and successful; a skipped optional failure-report step is fine.
+Runs are bounded to at most seven days old, configurable downward by policy.
+Rerunning only failed jobs does not qualify older jobs as part of the new attempt.
+
+The selected artifact must be named
+`ota-candidate-<source>-<run>-<attempt>`, unexpired, and below 2 GiB. Its repository,
+run and source must match GitHub's artifact record. Since that record does not
+include an attempt or producer-job ID, admission also checks that creation falls
+inside the successful producing job's time window. This is a consistency check;
+the reviewed workflow must ensure that only that job uploads the candidate.
+
+The adapter downloads by artifact ID and requires the ZIP bytes to match
+GitHub's recorded length and SHA-256. Its authenticated API request does not
+follow redirects: it uses a separate, token-free HTTPS request for the artifact
+body and subsequent CDN redirects. JSON, transfer time, ZIP metadata allocation,
+member sizes and total size are bounded. Extraction permits only the policy's
+flat regular files; links, traversal, duplicates, encryption and unsupported
+compression are rejected. Executable archive modes are not preserved. The gate
+queries both runs/jobs and the artifact again after download and extraction,
+and yields only if their selected identities still agree.
+
+The context yields a private temporary directory and an unsigned origin receipt
+containing the policy digest, source/run/job/artifact identities, and extracted
+file hashes. It deletes the directory on exit, including downstream validation
+failure. The receipt is evidence, **not authorization for a later signing job**.
+The pinned consumer must still validate actual compressed/expanded image bytes,
+embedded identity, protocols/data/boot compatibility and build provenance. It
+must also enforce current publisher history, generation assignment, separate
+role credentials and exact promotion approval. A workflow-file hash alone does
+not pin its transitive actions, build scripts or dependencies. Workflow review
+must also ensure qualifying commands fail the job instead of hiding errors with
+`continue-on-error` or shell error suppression. Those pins and isolated jobs are
+part of the remaining build/publisher integration.
+
+The host suite passes all 116 CI-helper tests, including 29 admission tests with
+negative event/source/attempt, skipped-test, artifact substitution, expiry,
+ZIP and credential-redirect cases. A read-only live probe also checked all eight
+jobs in main CI run `38964193098`, attempt 1, at
+`1df24f2b574400a7b9ae78145c67402721aae907`, and verified the GitHub digest/length of
+its 246,622-byte timing artifact. This is API compatibility evidence, not an OTA
+candidate or validation of the unpushed OTA branch. The adapter follows GitHub's
+[artifact API](https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28).
+
 ## Role-scoped publisher signing
 
 The optional `engine-ota` feature `publisher` supplies signing operations and the
