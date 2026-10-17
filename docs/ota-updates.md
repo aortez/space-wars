@@ -1405,8 +1405,9 @@ cache-path bug: evaluating `os.getenv` again in a sanitized BitBake worker loses
 the explicit cache selection. The configuration now retains the imported
 datastore value with a weak default, and an actual BitBake datastore probe
 confirms download, sstate and compiler caches retain the supplied path. A
-standard build umask is also required. Container completion and GitHub runner
-capacity still need validation.
+standard build umask is also required. The corrected isolated build subsequently
+completed all 6,768 tasks and its exact output passed image qualification;
+GitHub runner capacity still needs validation.
 
 ## Standard-runner candidate build
 
@@ -1422,8 +1423,12 @@ The first build preparation step is
 unused Android, .NET, CodeQL, Haskell, Swift and Boost directories, with a
 60-second deadline and a five-second kill grace. It performs no package purge,
 Docker prune, disk relocation or swap setup. Guards restrict this operation to
-this repository's `main` schedule/manual job on a GitHub-hosted Linux runner;
-do not run it on a workstation. It reports free bytes and inodes before/after
+this repository's `main` schedule/manual job on a GitHub-hosted Linux runner.
+For a separate manual capacity probe, `--qualification-branch` permits only the
+exact selected `test/ota-runner-capacity-N` branch with `workflow_dispatch`;
+the original repository, hosted-runner and Linux checks still apply. It does not
+admit the branch's output for production publication. Do not run cleanup on a
+workstation. It reports free bytes and inodes before/after
 and requires at least 60 GiB and 500,000 free inodes on the temporary and Docker
 filesystems. This is a provisional capacity floor, including Yocto's 20 GiB
 stop threshold; a completed cold build and real hosted run must establish fit.
@@ -1464,6 +1469,25 @@ component and log hashes. These checks do not yet establish a successful cold
 build on the standard GitHub runner. The workflow is prepared locally, and
 publication, unchanged-source skipping and device qualification remain
 separate work.
+
+The first completed cold container build used source `75c0dee`, eight CPUs and
+24 GiB, with no compiled/sstate cache reuse. All 6,768 tasks ran successfully in
+96.46 minutes. Its exact gzip was collected and independently qualified against
+the policy saved before the build. The resulting Zstandard candidate is
+131,792,226 bytes, expands to 528,482,304 bytes, and passed the disposable-key
+Nightly/promotion/renewal fixture with mocked GitHub. Four build warnings covered
+the Debian 13 host and three source URLs that used fallback mirrors; no build
+task failed and no out-of-memory kill was reported.
+
+Observed allocated build/cache/source directories reached at least 43.8 GiB;
+sampling did not cover every instant, so that is not a guaranteed peak. A separate
+cold build of `cfd20a1` is running with four assigned CPUs and 12 GiB, matching
+the planned runner limits. Neither the larger completed build nor this still
+running probe proves hosted free-space capacity. The
+[cold-container evidence](data/ota-cold-container-20261016.json) records source,
+policy, exact payloads and resource limits. The next hosted probe uses a dedicated
+manual branch and a non-production artifact name, without signing keys or feed
+write access.
 
 ## GitHub candidate origin admission
 

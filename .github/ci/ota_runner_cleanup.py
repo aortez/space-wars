@@ -1,12 +1,15 @@
 """Fast, bounded SDK cleanup only on a disposable GitHub-hosted Linux runner.
 
 No package purge, Docker prune, disk relocation or swap setup. Only the fixed
-SDK directories below are removed, and only for this repository's main build.
+SDK directories below are removed, only for this repository's main build or an
+explicitly selected manual runner-qualification branch.
 The caller must still qualify actual runner capacity with a successful build.
 """
+import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -23,13 +26,19 @@ CLEANUP = ('sudo', '-n', 'timeout', '--signal=TERM', '--kill-after=5s', '60s',
            '--', *SDK_PATHS)
 
 
-def allowed(env):
+def allowed(env, qualification_branch=None):
     expected = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
-                    RUNNER_OS='Linux', GITHUB_REPOSITORY='aortez/space-wars',
-                    GITHUB_REF='refs/heads/main')
-    if (sys.platform != 'linux' or any(env.get(key) != value for key, value in expected.items())
-            or env.get('GITHUB_EVENT_NAME') not in ('schedule', 'workflow_dispatch')):
-        raise ValueError('SDK cleanup is restricted to the main GitHub-hosted OTA build')
+                    RUNNER_OS='Linux', GITHUB_REPOSITORY='aortez/space-wars')
+    if sys.platform != 'linux' or any(env.get(key) != value for key, value in expected.items()):
+        raise ValueError('SDK cleanup is restricted to this repository on GitHub-hosted Linux')
+    if qualification_branch is None:
+        if (env.get('GITHUB_REF') != 'refs/heads/main'
+                or env.get('GITHUB_EVENT_NAME') not in ('schedule', 'workflow_dispatch')):
+            raise ValueError('SDK cleanup requires the main OTA build or explicit manual qualification')
+    elif (not re.fullmatch(r'test/ota-runner-capacity-[1-9][0-9]*', qualification_branch)
+            or env.get('GITHUB_REF') != 'refs/heads/' + qualification_branch
+            or env.get('GITHUB_EVENT_NAME') != 'workflow_dispatch'):
+        raise ValueError('SDK cleanup qualification requires the exact selected manual test branch')
 
 
 def filesystem_space(paths):
@@ -37,8 +46,8 @@ def filesystem_space(paths):
                             free_inodes=os.statvfs(path).f_favail) for path in paths}
 
 
-def cleanup(env):
-    allowed(env)  # Before querying Docker, touching files or running sudo.
+def cleanup(env, qualification_branch=None):
+    allowed(env, qualification_branch)  # Before querying Docker, touching files or running sudo.
     temporary = Path(env['RUNNER_TEMP']).resolve(strict=True)
     docker_root = Path(subprocess.check_output(
         ['docker', 'info', '--format', '{{.DockerRootDir}}'], text=True, timeout=15).strip())
@@ -51,7 +60,8 @@ def cleanup(env):
     result = subprocess.run(CLEANUP, check=False, timeout=75)
     after = filesystem_space(paths)
     report = dict(schema=1, cleanup_exit=result.returncode, paths=list(SDK_PATHS),
-                  before=before, after=after, minimum_free_bytes=MINIMUM_FREE)
+                  before=before, after=after, minimum_free_bytes=MINIMUM_FREE,
+                  qualification_branch=qualification_branch)
     print(json.dumps(report, sort_keys=True), flush=True)
     if result.returncode not in (0, 124, 137):
         raise ValueError('Fast SDK cleanup failed; see its exit code above')
@@ -63,7 +73,10 @@ def cleanup(env):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--qualification-branch', help='Exact manual test/ota-runner-capacity-N branch')
+    args = parser.parse_args()
     try:
-        cleanup(os.environ)
+        cleanup(os.environ, args.qualification_branch)
     except (KeyError, OSError, ValueError, subprocess.SubprocessError) as error:
         sys.exit(str(error))

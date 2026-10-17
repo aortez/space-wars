@@ -27,7 +27,7 @@ class CleanupTests(unittest.TestCase):
                 run.assert_not_called()
                 query.assert_not_called()
 
-    def invoke(self, code=0, free_bytes=70 * helper.GIB, free_inodes=1_000_000):
+    def invoke(self, code=0, free_bytes=70 * helper.GIB, free_inodes=1_000_000, qualification_branch=None):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'docker').mkdir()
@@ -39,7 +39,7 @@ class CleanupTests(unittest.TestCase):
                     patch.object(helper, 'filesystem_space', side_effect=[before, after]), \
                     contextlib.redirect_stdout(io.StringIO()):
                 try:
-                    return helper.cleanup(self.env | {'RUNNER_TEMP': str(root)})
+                    return helper.cleanup(self.env | {'RUNNER_TEMP': str(root)}, qualification_branch)
                 finally:
                     run.assert_called_once_with(helper.CLEANUP, check=False, timeout=75)
 
@@ -65,6 +65,24 @@ class CleanupTests(unittest.TestCase):
             self.invoke(free_inodes=499_999)
         with self.assertRaisesRegex(ValueError, 'cleanup failed'):
             self.invoke(code=1)
+
+    def test_manual_qualification_requires_exact_branch_and_all_original_host_guards(self):
+        branch = 'test/ota-runner-capacity-254'
+        self.env.update(GITHUB_REF='refs/heads/' + branch, GITHUB_EVENT_NAME='workflow_dispatch')
+        report = self.invoke(qualification_branch=branch)
+        self.assertEqual(report['qualification_branch'], branch)
+        cases = [(self.env, None), (self.env, 'main'), (self.env, branch + '0')]
+        for key, value in [('GITHUB_REF', 'refs/heads/main'), ('GITHUB_EVENT_NAME', 'schedule'),
+                           ('GITHUB_EVENT_NAME', 'pull_request'), ('GITHUB_ACTIONS', 'false'),
+                           ('RUNNER_ENVIRONMENT', 'self-hosted'), ('GITHUB_REPOSITORY', 'fork/space-wars')]:
+            cases.append((self.env | {key: value}, branch))
+        for env, selected in cases:
+            with patch.object(helper.subprocess, 'run') as run, \
+                    patch.object(helper.subprocess, 'check_output') as query:
+                with self.assertRaises(ValueError):
+                    helper.cleanup(env, selected)
+                run.assert_not_called()
+                query.assert_not_called()
 
 
 if __name__ == '__main__':
