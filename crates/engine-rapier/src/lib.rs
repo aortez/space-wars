@@ -12,3 +12,5 @@ pub mod terrain;
 pub mod world;
 
 pub mod root_uptake;
+
+pub mod plant_light;
