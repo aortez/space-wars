@@ -124,7 +124,9 @@ pub(super) fn clear_path(
             Vec2::Y
         },
         BallCastOptions {
-            max_distance: delta.length(),
+            // Rapier's sweep traversal excludes hits at a zero upper bound,
+            // even initial overlaps. Keep stationary occupancy probes nonzero.
+            max_distance: delta.length().max(radius * 0.001),
             exclude_entity: Some(DUCK_ENTITY),
             ..Default::default()
         },

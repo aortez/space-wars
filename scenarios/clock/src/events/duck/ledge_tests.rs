@@ -166,6 +166,39 @@ fn blocked_pull_up_waits_in_a_real_hang_and_can_retry_when_clear() {
 }
 
 #[test]
+fn an_occupied_landing_refuses_the_initial_catch() {
+    let mut duck = entrance(5.0 / 3.0, 1.0);
+    let panel = duck.door_panels()[0].unwrap();
+    let r = duck.radius;
+    let anchor = panel.point(Vec2::new(panel.hinge.x + panel.width, panel.bottom));
+    block(
+        &mut duck,
+        anchor + Vec2::new(-r * 1.5, r * 1.5),
+        Vec2::splat(r * 0.5),
+    );
+    duck.world.as_mut().unwrap().step(DT);
+    let mut refused = false;
+    for _ in 0..65 {
+        let jump = duck.jumps == 0 && duck.grounded();
+        let steer = if duck.position().unwrap().x > r * 5.6 {
+            -300
+        } else {
+            0
+        };
+        duck.set_player_input(steer, jump, false, false);
+        duck.set_ledge_command(LedgeCommand::Catch);
+        duck.step();
+        refused |= duck.ledge_state().reason == Some(Reason::Obstructed);
+        assert_eq!(duck.ledge_state().catches, 0);
+    }
+    assert!(
+        refused,
+        "the reachable edge's occupied landing must be rejected"
+    );
+    assert_eq!(duck.jumps, 1);
+}
+
+#[test]
 fn an_obstacle_added_during_the_pull_up_releases_without_passing_through_it() {
     let mut duck = entrance(5.0 / 3.0, 1.0);
     catch_flap(&mut duck);
