@@ -1618,7 +1618,14 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert_eq!(harness.clock_state().duck, paused.duck);
         // The event switches remain reachable past the font and date controls.
         let mut page = page;
-        for expected in ["event-profile", "fonts", "show-date", "rain", "falling"] {
+        for expected in [
+            "event-profile",
+            "fonts",
+            "show-date",
+            "cell-swap",
+            "rain",
+            "falling",
+        ] {
             page = harness.press_guarded(UiAction::Down, &page);
             assert_eq!(
                 page.selected_control,
