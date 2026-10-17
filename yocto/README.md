@@ -94,6 +94,24 @@ The [candidate validator](../docs/ota-updates.md#rootfs-candidate-qualification)
 requires the embedded input record and independently selected source/toolchain
 policy before it accepts or packages the actual ext4 bytes.
 
+The [OTA candidate workflow](../.github/workflows/ota-build.yml) uses a standard
+GitHub-hosted Ubuntu runner with bounded cleanup of unused SDKs before building.
+The [container helper](../.github/ci/ota_container_build.py) also runs locally
+from a clean, committed checkout, without deleting host SDKs or sharing caches:
+
+```sh
+python3 .github/ci/ota_container_build.py \
+  --source-checkout "$PWD" --source <full-source-commit> \
+  --output /absolute/path/to/new-build-result \
+  --cpus 4 --memory-gib 12
+```
+
+The output directory contains the exact gzip, build record and caller's image
+policy. Use `ota_candidate.py` to qualify/package it before candidate upload;
+see [standard-runner details](../docs/ota-updates.md#standard-runner-candidate-build).
+The helper pins the container to the selected number of available CPU cores;
+BitBake/Make use that affinity, capped at eight jobs on larger workstations.
+
 `rm_work` is enabled. The build warns below 25 GiB free, stops scheduling tasks
 below 20 GiB, and halts below 10 GiB. Free space and rerun to resume.
 `npm test` runs hardware-profile, compiled input-layout and update-compatibility

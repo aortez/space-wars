@@ -86,8 +86,10 @@ local_conf_header:
     PERSISTENT_DATA_APP_USER = "spacewars"
     PERSISTENT_DATA_APP_GROUP = "spacewars"
 
-    BB_NUMBER_THREADS = "8"
-    PARALLEL_MAKE = "-j 8"
+    # Follow the available CPU affinity, including the candidate container's
+    # explicit CPU set. Keep the existing eight-job ceiling on workstations.
+    BB_NUMBER_THREADS = "${@oe.utils.cpu_count(at_most=8)}"
+    PARALLEL_MAKE = "-j ${BB_NUMBER_THREADS}"
 
     # Leave enough room for running tasks to finish and for other checkouts.
     BB_DISKMON_DIRS = "STOPTASKS,${TMPDIR},20G,200K HALT,${TMPDIR},10G,100K WARN,${TMPDIR},25G,300K"

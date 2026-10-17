@@ -1406,7 +1406,64 @@ the explicit cache selection. The configuration now retains the imported
 datastore value with a weak default, and an actual BitBake datastore probe
 confirms download, sstate and compiler caches retain the supplied path. A
 standard build umask is also required. Container completion and GitHub runner
-capacity still need validation before enabling the build workflow.
+capacity still need validation.
+
+## Standard-runner candidate build
+
+The [candidate workflow](../.github/workflows/ota-build.yml) selects the standard
+`ubuntu-24.04` GitHub-hosted runner, once daily at 02:23 UTC or by manual dispatch
+on `main`. It checks out the exact event SHA with persisted credentials disabled.
+Actions and the kas container are pinned to immutable revisions. The job has
+only Contents read permission, with no signing keys or release-writing access.
+It produces an unsigned candidate; it does not publish an update.
+
+The first build preparation step is
+[fast SDK cleanup](../.github/ci/ota_runner_cleanup.py). It removes only fixed,
+unused Android, .NET, CodeQL, Haskell, Swift and Boost directories, with a
+60-second deadline and a five-second kill grace. It performs no package purge,
+Docker prune, disk relocation or swap setup. Guards restrict this operation to
+this repository's `main` schedule/manual job on a GitHub-hosted Linux runner;
+do not run it on a workstation. It reports free bytes and inodes before/after
+and requires at least 60 GiB and 500,000 free inodes on the temporary and Docker
+filesystems. This is a provisional capacity floor, including Yocto's 20 GiB
+stop threshold; a completed cold build and real hosted run must establish fit.
+If the short cleanup does not recover enough space, the job stops before Yocto.
+
+[`ota_container_build.py`](../.github/ci/ota_container_build.py) makes a shallow,
+clean clone with its Git identity, excluding caller Git configuration/hooks and
+untracked/ignored host files. It copies that archive into a disposable kas
+container as UID 30000, without mounts, forwarded host credentials, capabilities
+or a Docker socket. The host helper alone uses Docker. The container receives
+four assigned CPU cores, a 12 GiB memory limit with no additional swap and a
+bounded process count. BitBake and Make follow CPU affinity up to the existing
+eight-job workstation ceiling. The helper removes only its own exact container
+ID on success or failure; no shared cache or caller container is pruned.
+
+The successful build's exact recorded gzip is copied out and hash-checked.
+[`ota_candidate.py`](../.github/ci/ota_candidate.py) checks the record against
+the caller's independently derived input digest, expands the gzip with a bound,
+and invokes the reviewed Rust image validator. Image identity, input digest,
+expanded bytes and compressed payload must agree before atomic publication of
+the local artifact directory. Existing destinations are never replaced. The
+flat artifact contains only `image.ext4.zst`, `candidate.json`,
+`qualification.json` and `build.json`; its name binds source, run and attempt.
+Artifacts are retained for seven days and uploaded only after successful
+qualification. Publisher admission must still independently check same-source
+CI, origin and actual image contents.
+
+The assembly helper reproduced the already qualified `7673fa1` image's exact
+compressed bytes in 115.951 seconds, including gzip expansion and full image
+validation. The 145 CI helper tests, 51 Yocto JavaScript tests and 81 Yocto
+Python tests pass. A real BitBake datastore probe confirmed matching task/Make
+concurrency for one, four and eight assigned cores. Actionlint 1.7.12 passes. A
+real Docker smoke test exercised source transfer, four-core/12 GiB limits,
+credential exclusion, output collection and container removal in 1.336 seconds;
+its synthetic payload was not an image qualification. The
+[runner preparation evidence](data/ota-standard-runner-20261016.json) records
+component and log hashes. These checks do not yet establish a successful cold
+build on the standard GitHub runner. The workflow is prepared locally, and
+publication, unchanged-source skipping and device qualification remain
+separate work.
 
 ## GitHub candidate origin admission
 
