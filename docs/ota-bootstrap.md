@@ -92,7 +92,20 @@ capacity and connection checks must not be weakened or rebound to run again.
 Private first-boot evidence is retained in
 `target/ota-pi5-replacement-first-boot-20261017/verification.json`.
 
-This operator command pins the reviewed image, data archive and helper hashes,
+The owner then ran the serial- and connection-bound read-only diagnostic on
+the original disk. Direct 4 KiB reads at sectors 0 and 12,711,936 succeeded;
+sector 12,712,136 returned `Medium Error / Unrecovered read error`, matching
+the exact sector that failed on the Pi. The failure therefore follows the
+drive across hosts: retire it from service and retain it only as a recovery
+source for now. The diagnostic exited with status 3 because its read-error
+handler omitted `ENODATA` (errno 61); the saved kernel evidence establishes the
+read failure independently. That handler is corrected and its injected-error
+regression passes. The full scan never started, and no writes or repairs were
+performed. Flash-chip versus controller/firmware failure remains undiagnosed.
+Evidence and assessment are retained in
+`target/original-pi5-disk-check-vf4cjtlj/assessment.json`.
+
+The replacement flash command pins the reviewed image, data archive and helper hashes,
 plus the connected disk's model, capacity, USB path and connection sequence. Its
 serial is all zeroes, so that value alone is insufficient to select the disk.
 After exact-path confirmation, it removes the old partition signatures, writes

@@ -244,7 +244,45 @@
         "verification_sha256": "85bf6ecb20b862f99a1d0c1e4851a0b317fc1ffec5b07298f8596466c9ca21f7"
       }
     },
-    "boot_id_scope": "original failing disk preparation; replacement boot identity is recorded separately"
+    "boot_id_scope": "original failing disk preparation; replacement boot identity is recorded separately",
+    "original_disk_workstation_diagnosis": {
+      "schema": 1,
+      "assessment_date": "2026-10-17",
+      "source": "owner-run read-only diagnostic; saved log independently inspected",
+      "model": "SanDisk 3.2Gen1",
+      "bytes": 123048296448,
+      "serial": "0401843f23a06e8d407779c23f89428fc6f81f6b4c71579cecb2ef50a2e3dbca3747000000000000000000004cbc7cb2ff89801891558107c63087e7",
+      "workstation_device": "/dev/sdb",
+      "original_pi_device": "/dev/sda",
+      "same_failed_sector_on_both_hosts": 12712136,
+      "workstation_kernel_sense": "Medium Error / Unrecovered read error",
+      "successful_control_read_sectors": [
+        0,
+        12711936
+      ],
+      "workstation_failed_read_bytes": 4096,
+      "direct_io": true,
+      "full_scan_started": false,
+      "disk_writes": false,
+      "repairs_attempted": false,
+      "diagnostic_exit_status": 3,
+      "diagnostic_issue": "ENODATA (errno 61) escaped the read-failure classifier; kernel evidence nevertheless confirms the same unrecovered read error.",
+      "diagnostic_fix": "ENODATA now follows the failed-read path; injected-error regression passed without accessing the disk.",
+      "assessment": "Read failure follows this drive between the Pi 5 and workstation. Retire from service; retain only as a recovery source for now.",
+      "limits": "Does not isolate flash chips versus internal controller/firmware, measure total damaged capacity, or test writes or retention.",
+      "evidence": {
+        "workstation_log": {
+          "path": "target/original-pi5-disk-check-vf4cjtlj/diagnostic.log",
+          "sha256": "2de2826bc0f2690d589b6f4ece0cd569921d4180a1965b6423a65950dd8d496c"
+        },
+        "pi_log": {
+          "path": "target/ota-pi5-bootstrap-04b6cb7/backup-failure-device.txt",
+          "sha256": "c4d9ca6f52ed42120e1a6c8ec941be167dea046b968a1eebeb5402112c9ab491"
+        }
+      },
+      "private_assessment_path": "target/original-pi5-disk-check-vf4cjtlj/assessment.json",
+      "private_assessment_sha256": "9e58144f29ceffdc7153b20fdbe71792a654159ac87f3f1f5da9b13cc997a37e"
+    }
   },
   "checks": {
     "archive_tests_passed": 4,
