@@ -108,6 +108,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) selected_scenario: String,
     pub(crate) world_seed: String,
     pub(crate) launcher_focus_index: i32,
+    pub(crate) launcher_show_all: bool,
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
     pub(crate) ingame_menu_focus_index: i32,
@@ -409,6 +410,13 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
                 .with_value(context.selected_scenario.clone()),
             UiControl::new("launcher.scenario.next", "›", true)
                 .with_value(context.selected_scenario.clone()),
+            UiControl::new("launcher.scenarios.show_all", "Show all", true).with_value(
+                if context.launcher_show_all {
+                    "On"
+                } else {
+                    "Off"
+                },
+            ),
             if material_match {
                 world_control("launcher.start", "Play", "Play", context)
             } else {
@@ -447,6 +455,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
         if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
+    }
+    if context.launcher_focus_index == 9 {
+        inventory.selected_control = Some("launcher.scenarios.show_all".into());
     }
     if context.launcher_focus_index == 8 {
         inventory.selected_control = Some("launcher.genomes".into());
@@ -1421,6 +1432,7 @@ mod tests {
             [
                 "launcher.scenario.previous",
                 "launcher.scenario.next",
+                "launcher.scenarios.show_all",
                 "launcher.start",
                 "launcher.settings",
                 "launcher.controls",
@@ -1430,7 +1442,7 @@ mod tests {
                 "launcher.training",
             ]
         );
-        assert!(!inventory.controls[2].enabled);
+        assert!(!inventory.controls[3].enabled);
         assert_eq!(inventory.controls[0].value.as_deref(), Some("nes"));
         assert_eq!(inventory.error.as_deref(), Some("No cartridge selected"));
     }

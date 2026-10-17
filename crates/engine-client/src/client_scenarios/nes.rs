@@ -21,7 +21,7 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "nes",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(5),
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

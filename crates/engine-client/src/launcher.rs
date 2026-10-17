@@ -449,6 +449,7 @@ mod tests {
 
     struct Harness {
         window: MainWindow,
+        settings_writer: crate::settings_writer::SettingsWriter,
         launcher: Rc<Launcher>,
         _directory: tempfile::TempDir,
     }
@@ -468,6 +469,9 @@ mod tests {
             let (input, _) = input::new_shared_input();
             crate::install_ui_navigation(&window);
             crate::install_keyboard_navigation(&window, Rc::clone(&input));
+            let settings_writer =
+                crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
+                    .unwrap();
             let mut launcher = Launcher::new(
                 &window,
                 Rc::new(RefCell::new(None)),
@@ -475,8 +479,7 @@ mod tests {
                 input,
                 settings,
                 catalog,
-                crate::settings_writer::SettingsWriter::new(directory.path().join("settings.toml"))
-                    .unwrap(),
+                settings_writer.clone(),
             );
             Rc::get_mut(&mut launcher).unwrap().writer = writer;
             let start = Rc::clone(&launcher);
@@ -484,6 +487,7 @@ mod tests {
             let harness = Self {
                 window,
                 launcher,
+                settings_writer,
                 _directory: directory,
             };
             harness.show_menu();
@@ -493,11 +497,12 @@ mod tests {
         }
 
         fn show_menu(&self) {
-            let settings = self.launcher.settings.read().unwrap();
+            let settings = self.launcher.settings.read().unwrap().clone();
             crate::show_launcher(
                 &self.window,
                 &crate::launch_from_settings(&settings),
-                &settings,
+                &self.launcher.settings,
+                &self.settings_writer,
                 &self.launcher.catalog,
             );
         }

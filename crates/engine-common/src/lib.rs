@@ -135,6 +135,7 @@ pub struct Settings {
     pub audio: AudioSettings,
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
+    pub launcher: LauncherSettings,
     pub clock: ClockSettings,
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
@@ -144,6 +145,13 @@ pub struct Settings {
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+/// Device-wide launcher presentation, independent of launch and simulation settings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LauncherSettings {
+    pub show_all: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

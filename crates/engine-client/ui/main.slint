@@ -289,8 +289,8 @@ component ScenarioPicker inherits Rectangle {
     }
     Text {
         x: 72px; width: parent.width - 144px; height: parent.height;
-        text: root.title; color: #ffffff; font-size: 22px; font-weight: 700;
-        horizontal-alignment: center; vertical-alignment: center; overflow: elide;
+        text: root.title; color: #ffffff; font-size: parent.width < 540px ? 18px : 22px; font-weight: 700;
+        horizontal-alignment: center; vertical-alignment: center; wrap: word-wrap; overflow: elide;
     }
     MenuButton {
         x: parent.width - 59px; y: 3px; width: 56px; height: parent.height - 6px;
@@ -663,6 +663,7 @@ export component MainWindow inherits Window {
     in property <string> scoreboard-round;
     in property <string> scoreboard-planets;
     in property <[string]> launcher-scenarios;
+    in property <bool> launcher-show-all: false;
     in property <string> launcher-scenario-title: "Space-Wars";
     in-out property <string> launcher-scenario: "spacewars";
     in-out property <string> launcher-seed-text: "0";
@@ -764,6 +765,7 @@ export component MainWindow inherits Window {
     callback launcher-p2-zoom-in();
     callback launcher-p2-zoom-out();
     callback launcher-scenario-selected(string);
+    callback launcher-toggle-show-all();
     callback launcher-nes-rom-cycle(int);
     callback launcher-quit();
     callback ingame-resume();
@@ -1830,13 +1832,15 @@ export component MainWindow inherits Window {
             MenuPage {
                 available-width: parent.width; available-height: parent.height;
                 // Scenario-specific forms retain their existing geometry in this pass.
-                height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : 520px);
+                height: Math.min(parent.height - 24px, root.launcher-controls-visible || root.launcher-settings-visible ? 440px : root.width < 600px ? 580px : 520px);
                 heading: root.launcher-settings-visible ? "Scenario Settings" : root.launcher-controls-visible ? "Controls" : "Space-Wars";
                 subtitle: root.launcher-error-text != "" ? root.launcher-error-text : root.launcher-settings-visible && root.launcher-material-match ? "World seed: " + root.launcher-seed-text : root.launcher-controls-visible || root.launcher-settings-visible ? root.launcher-scenario-title : root.autostart-caption != "" ? root.autostart-caption : "Choose a scenario";
                 error: root.launcher-error-text != "";
                 hint: root.launcher-controls-visible || root.launcher-settings-visible ? "" : root.launcher-focus-index == 0 ? (self.width < 600px ? "Left / Right browse · A confirm" : "Left / Right browse · A / Enter confirm · Start plays") : self.width < 600px ? "D-pad move · A select · Tap to choose" : "D-pad / arrows move · A / Enter selects · Tap to choose";
 
-                if !root.launcher-controls-visible && !root.launcher-settings-visible: Rectangle {
+                if !root.launcher-controls-visible && !root.launcher-settings-visible: launcher-body := Rectangle {
+                    private property <bool> stacked: root.width < 600px;
+                    private property <length> extra-row: self.stacked ? 60px : 0px;
                     x: 24px;
                     y: 82px;
                     width: parent.width - 48px;
@@ -1846,7 +1850,7 @@ export component MainWindow inherits Window {
                     ScenarioPicker {
                         x: 0px;
                         y: 0px;
-                        width: parent.width;
+                        width: parent.width - (launcher-body.stacked ? 0px : 160px);
                         height: 64px;
                         title: root.launcher-scenario-title;
                         selected: root.launcher-focus-index == 0;
@@ -1860,9 +1864,22 @@ export component MainWindow inherits Window {
                         }
                     }
 
+                    MenuButton {
+                        x: launcher-body.stacked ? 0px : parent.width - 148px;
+                        y: launcher-body.stacked ? 74px : 0px;
+                        width: launcher-body.stacked ? parent.width : 148px;
+                        height: launcher-body.stacked ? 48px : 64px;
+                        text: "Show all: " + (root.launcher-show-all ? "On" : "Off");
+                        selected: root.launcher-focus-index == 9;
+                        activated => {
+                            root.launcher-focus-index = 9;
+                            root.ui-action(4);
+                        }
+                    }
+
                     Rectangle {
                         x: 0px;
-                        y: 74px;
+                        y: 74px + launcher-body.extra-row;
                         width: parent.width;
                         height: 76px;
                         background: #00000000;
@@ -1893,7 +1910,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: 158px;
+                        y: 158px + launcher-body.extra-row;
                         width: root.launcher-material-match ? (parent.width - 12px) * 0.60 : parent.width;
                         height: 56px;
                         text: "Play";
@@ -1907,7 +1924,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "Scenario Settings";
@@ -1920,7 +1937,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: (parent.width + 12px) / 3;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "Controls";
@@ -1933,7 +1950,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 2 * (parent.width + 12px) / 3;
-                        y: 226px;
+                        y: 226px + launcher-body.extra-row;
                         width: (parent.width - 24px) / 3;
                         height: 52px;
                         text: "App Settings";
@@ -1981,7 +1998,7 @@ export component MainWindow inherits Window {
                     MenuButton {
                         visible: root.launcher-material-match;
                         x: (parent.width - 12px) * 0.60 + 12px;
-                        y: 158px;
+                        y: 158px + launcher-body.extra-row;
                         width: (parent.width - 12px) * 0.40;
                         height: 56px;
                         text: "Play New World";

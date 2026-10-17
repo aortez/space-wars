@@ -313,6 +313,36 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn launcher_filter_defaults_recovers_and_preserves_other_preferences() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        for launcher in ["", "[launcher]\n", "[launcher]\nshow_all = 'invalid'\n"] {
+            fs::write(&path, format!("[launch]\nscenario = 'garden-lab'\nseed = 123\n[audio]\nmaster_volume = 0.05\n{launcher}")).unwrap();
+            let mut loaded = load_settings(&path).unwrap().settings;
+            assert!(!loaded.launcher.show_all);
+            for show_all in [true, false] {
+                loaded.launcher.show_all = show_all;
+                save_settings(&loaded, &path).unwrap();
+                let saved = load_settings(&path).unwrap().settings;
+                assert_eq!(saved.launcher.show_all, show_all);
+                assert_eq!(saved.launch.scenario, "garden-lab");
+                assert_eq!(saved.launch.seed, 123);
+                assert_eq!(saved.audio.master_volume, 0.05);
+            }
+        }
+        fs::write(
+            &path,
+            "[launcher]\nshow_all = true\nfuture_view = 'tiles'\n",
+        )
+        .unwrap();
+        let mut loaded = load_settings(&path).unwrap().settings;
+        loaded.launcher.show_all = false;
+        save_settings(&loaded, &path).unwrap();
+        let stored: toml::Table = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(stored["launcher"]["future_view"].as_str(), Some("tiles"));
+    }
+
+    #[test]
     fn clock_fonts_migrate_and_preserve_the_selected_pool() {
         use engine_common::{ClockFont, ClockFontPool};
         let directory = tempfile::tempdir().unwrap();

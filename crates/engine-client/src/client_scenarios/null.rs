@@ -12,7 +12,7 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "null",
-    launcher_visible: false,
+    launcher_category: crate::client_scenarios::LauncherCategory::Hidden,
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

@@ -783,7 +783,7 @@ fn scenario_confirmation_focuses_play_without_changing_the_selection() {
     assert_eq!(window.get_launcher_scenario(), "clock");
     key(&window, Key::LeftArrow);
     assert_eq!(window.get_launcher_scenario(), "spacewars");
-    click(&window, 725.0, 125.0);
+    click(&window, 565.0, 125.0);
     assert_eq!(window.get_launcher_scenario(), "clock");
     click(&window, 75.0, 125.0);
     assert_eq!(window.get_launcher_scenario(), "spacewars");
@@ -942,6 +942,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     install_keyboard_navigation(&window, Rc::clone(&input));
     window.set_launcher_visible(true);
     window.show().unwrap();
+    key(&window, Key::DownArrow);
+    assert_eq!(window.get_launcher_focus_index(), 9);
     key(&window, Key::DownArrow);
     assert_eq!(window.get_launcher_focus_index(), 1);
     let starts = Rc::new(Cell::new(0));
@@ -1224,6 +1226,8 @@ fn recreated_launcher_buttons_do_not_retain_pressed_state_or_lose_shortcuts() {
         assert_eq!(starts.get(), cycle * 2 + 1);
         window.set_launcher_focus_index(0);
         key(&window, Key::DownArrow);
+        assert_eq!(window.get_launcher_focus_index(), 9);
+        key(&window, Key::DownArrow);
         assert_eq!(window.get_launcher_focus_index(), 1);
         key(&window, Key::Return);
         assert_eq!(starts.get(), cycle * 2 + 2);
@@ -1261,6 +1265,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     window.set_launcher_visible(true);
     window.show().unwrap();
 
+    key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);

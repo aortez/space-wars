@@ -190,9 +190,18 @@ pub struct PlayerPanelState {
     pub color: Color,
 }
 
+/// Launcher presentation only; every registration remains directly launchable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LauncherCategory {
+    Hidden,
+    /// Position in the main picker. Extras retain their registry order.
+    Main(u8),
+    Extra,
+}
+
 pub struct ScenarioRegistration {
     pub id: &'static str,
-    pub launcher_visible: bool,
+    pub launcher_category: LauncherCategory,
     pub capabilities: ScenarioCapabilities,
     pub controls_help: &'static str,
     create: ScenarioFactory,
@@ -481,7 +490,7 @@ pub fn registration(name: &str) -> Option<&'static ScenarioRegistration> {
 pub fn launcher_registrations() -> impl Iterator<Item = &'static ScenarioRegistration> {
     SCENARIOS
         .iter()
-        .filter(|registration| registration.launcher_visible)
+        .filter(|registration| registration.launcher_category != LauncherCategory::Hidden)
 }
 
 #[cfg(test)]
@@ -518,7 +527,7 @@ mod tests {
 
     static MISSING_ASSET_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         id: "missing-test",
-        launcher_visible: false,
+        launcher_category: LauncherCategory::Hidden,
         capabilities: ScenarioCapabilities {
             benchmark: false,
             headless_benchmark: false,

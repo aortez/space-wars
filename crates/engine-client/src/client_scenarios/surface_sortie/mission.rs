@@ -16,6 +16,7 @@ mod recovery_tests;
 
 pub(crate) const MATCH_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars",
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(1),
     controls_help: concat!(
         "Pad: Left/right turn/walk, A thrust/jump, Down brake, B board/exit.\n",
         "Hold A in air: jetpack. RB cruise, RT/LB laser/mining, X missile.\n",

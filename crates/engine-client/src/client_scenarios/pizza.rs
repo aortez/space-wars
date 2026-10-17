@@ -12,7 +12,7 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "pizza",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(3),
     capabilities: ScenarioCapabilities {
         benchmark: true,
         headless_benchmark: true,
