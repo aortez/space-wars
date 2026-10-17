@@ -370,3 +370,48 @@ restoration before death, underground shade exemption, paid cutting/regrowth,
 query ceilings and support-loss accounting. These are deterministic headless
 claims. Garden Lab visuals, device captures, reproduction and evolution remain
 outside #211; no visible presentation or device performance is established here.
+
+## Paid shoot development runtime (issue #472 checkpoint)
+
+`Intent::Develop { tissue }` purchases at most one unit of each still-needed
+resource toward the next shoot size. `Tissue::development` records the paid
+N/W/E balance toward that increment, whose target is the configured shoot
+`development_per_size`. `Tissue::invested` records lifetime development spending;
+this is a diagnostic of resources already spent, not spendable stores. Both
+start at zero on newly constructed tissue. Completing the target resets only
+the current increment balance and atomically raises size by one, up to size
+three and the configured size ceiling. Every payment appears once in the
+existing growth ledger. Construction costs remain separate.
+
+Development executes after upkeep and requires a living shoot with no current
+resource or local light deficit, valid support, space for the next size and
+sufficient funds in its own living component. Refused intents change neither
+progress nor spending. Population/spread restrictions on new sites do not
+restrict this operation. Identity, edges, health and deficit history survive
+enlargement; expanded capacity receives only the unspent existing pool. Intake,
+maintenance and light geometry use the new size starting at the next physiology
+boundary. Work remains bounded by `max_intents`; one development intent pays
+at most three resource units. No additional light sample is taken for admission.
+Removal discards paid work with the tissue and does not refund it.
+
+Grass profile v2 (`0x6772617373000002`, trait/config identity 2) uses
+`grass::physiology()`: root uptake [8,8,0] per size per one-second tick and
+incremental development target [10,10,10] per added shoot size. Construction
+retains the default role costs. Roots remain size two, runners and new shoots
+size one; finite seed reserves remain [30,30,30]. Generic runtime defaults
+remain distinct from this selected grass profile.
+
+The policy prioritizes eligible root sites, shoot sites, then runner sites.
+When no new site can be proposed it develops the least-invested eligible shoot,
+using ID order to break ties. One development proposal pays one unit of each
+resource toward its target; 20 admitted proposals mature a blade. There is no
+age or establishment timer. Tissue/spread caps restrict new sites while still
+allowing development. Every candidate remains advisory until post-upkeep
+runtime admission. A shoot with a previous deficit is reconsidered after its
+physiology recovers; local shade cannot be funded by another shoot.
+
+`remove_many` validates the entire removal set before mutation, normalizes once,
+and records all pre-cut shares before redistributing survivor stores. It makes
+cut losses independent of removal order. Surviving IDs, health, topology among
+survivors and investment are retained; canonical store rounding can redistribute
+individual survivor shares without altering their total.

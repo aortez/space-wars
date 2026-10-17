@@ -23,7 +23,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 4x, maximum 16x, run limit 300 ticks.",
+    controls_help: "Garden Lab: up/down chooses a control; Space or gamepad bottom face activates it. Left/right moves the opaque shade. Controls include pause/step, speed, light, nutrients, water, shade, inspection, cutting, fresh planting, tissue limits 1–128 and spread 0–8 cells. Limits apply in place; full supplies do not guarantee affordable growth. R restarts; Esc/Start opens host pause. Green living, amber stressed, grey dead; cyan lines show real connections. A pink outline identifies the selected tissue. Physiology ticks are 1000ms, default viewing is 1x, maximum 16x, run limit 480 ticks.",
     create,
 };
 
@@ -93,7 +93,8 @@ impl ClientScenario for GardenLabClientScenario {
         let tissues: Vec<_> = o.tissues.iter().map(|t|serde_json::json!({
             "id":t.id,"organism":t.organism,"role":format!("{:?}",t.role),
             "cell":t.cell,"health":t.health,"shade":t.shade_ticks,"shortage":t.shortage_ticks,
-            "stores":t.stores,"size":t.size,"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
+            "stores":t.stores,"size":t.size,"development":t.development,"invested":t.invested,
+            "next_cost":if t.role == engine_core::plants::Role::Shoot && t.size < 3 { std::array::from_fn::<_,3,_>(|i|u64::from(t.development[i] < o.config.development_per_size[i])) } else { [0;3] },"policy":t.policy,"allocation":t.allocation,"support":format!("{:?}",t.support),
         })).collect();
         let selected = tissues.get(s.selected % tissues.len().max(1)).cloned();
         format!(
@@ -103,7 +104,7 @@ impl ClientScenario for GardenLabClientScenario {
                 "run_state":if o.tick >= scenario_garden_lab::MAX_TICKS { "complete" } else if s.paused { "lab_paused" } else { "running" },
                 "tissue_limit":s.grass.traits.max_tissues,"spread_radius":s.grass.traits.radius,
                 "pending_ns":s.pending_ns(),"growth_summary":s.growth_summary(),"admission_summary":s.admission_summary(),"admission_tick":o.ledger.tick,"admission":format!("{:?}",o.ledger.results),
-                "tick":o.tick,"seed":o.seed,"paused":s.paused,"speed":s.speed,
+                "configuration":format!("{:?}",o.config),"profile":format!("{:?}",s.grass.traits),"tick":o.tick,"seed":o.seed,"paused":s.paused,"speed":s.speed,
                 "intensity":s.intensity,"availability":s.availability,"shade":s.shade,
                 "shade_x":s.shade_x,"inspect":s.inspect,"control":s.control,
                 "tissues":tissues,"selected_tissue":selected,"connections":o.connections,
@@ -189,7 +190,7 @@ mod tests {
     #[test]
     fn garden_render_contract_selected_target_matches_diagnostics() {
         let mut client = GardenLabClientScenario {
-            state: GardenLabScenario::init((), 4242),
+            state: GardenLabScenario::init((), 42),
             held: std::cell::Cell::new([false; 5]),
         };
         for _ in 0..10 {
@@ -220,7 +221,7 @@ mod tests {
                 pixels
                     .iter()
                     .all(|(i, _)| ((*i % 800) as f64 - x).abs() < 0.6 * 480.0 / 22.0
-                        && (*i / 800) as f64 > y - 1.1 * 480.0 / 22.0
+                        && (*i / 800) as f64 > y - 2.0 * 480.0 / 22.0
                         && ((*i / 800) as f64) < y + 0.6 * 480.0 / 22.0)
             );
             if let Some(dir) =
@@ -252,8 +253,20 @@ mod tests {
         if let Some(dir) = &output {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let mut s = GardenLabScenario::init((), 4242);
+        let mut s = GardenLabScenario::init((), 42);
         let capture = |name: &str, s: &GardenLabState| {
+            if let Some(dir) = &output {
+                let o = s.plants.observe();
+                let state = serde_json::json!({"seed":o.seed,"simulation_seconds":o.tick,
+                    "configuration":format!("{:?}",o.config),"profile":format!("{:?}",s.grass.traits),
+                    "observation":format!("{:?}",o),"plan":format!("{:?}",s.plan),
+                    "preview_only":true});
+                std::fs::write(
+                    dir.join(format!("{name}-state.json")),
+                    serde_json::to_vec_pretty(&state).unwrap(),
+                )
+                .unwrap();
+            }
             let frame = GardenLabScenario::render_frame(s);
             for (w, h) in [(1280.0, 720.0), (800.0, 480.0)] {
                 let viewport = Viewport::new(w, h);
@@ -339,5 +352,16 @@ mod tests {
         capture("cut", &s);
         s.tick();
         capture("regrowth", &s);
+        s.command(Command::Reset);
+        for tick in 1..=480 {
+            s.tick();
+            if [2, 60, 120, 186, 240, 241, 300, 360, 403, 480].contains(&tick) {
+                capture(&format!("maturation-{tick}"), &s);
+            }
+            if tick == 240 {
+                s.command(Command::Cut);
+                capture("maturation-240-cut", &s);
+            }
+        }
     }
 }

@@ -1,7 +1,17 @@
 //! Versioned, deterministic grass policy. Physiology remains owned by `Plants`.
 use super::*;
 
-pub const POLICY: u64 = 0x6772_6173_7300_0001;
+pub const POLICY: u64 = 0x6772_6173_7300_0002;
+
+/// Garden profile v2: resource units per size per one-second tick.
+pub fn physiology() -> Config {
+    Config {
+        identity: 2,
+        root_intake_per_size: [8, 8, 0],
+        development_per_size: [10; 3],
+        ..Config::default()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Traits {
@@ -17,7 +27,7 @@ pub struct Traits {
 impl Default for Traits {
     fn default() -> Self {
         Self {
-            identity: 1,
+            identity: 2,
             growth_interval_ticks: 1,
             radius: 4,
             max_tissues: 32,
@@ -39,6 +49,8 @@ pub struct Grass {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Limit {
     Cadence,
+    Shade,
+    Shortage,
     Occupied,
     Size,
     Spread,
@@ -148,7 +160,7 @@ impl Grass {
             }
         }
 
-        for preferred in [Role::Shoot, Role::Root, Role::Runner] {
+        for preferred in [Role::Root, Role::Shoot, Role::Runner] {
             for t in o
                 .tissues
                 .iter()
@@ -226,6 +238,56 @@ impl Grass {
                         return plan;
                     }
                 }
+            }
+        }
+        // Least-invested first, stable ID tie-break: no hidden age timer.
+        // New sites and root provisioning above share this single work slot.
+        let mut shoots: Vec<_> = o
+            .tissues
+            .iter()
+            .filter(|t| {
+                t.health > 0
+                    && t.policy == POLICY
+                    && t.role == Role::Shoot
+                    && t.size < 3
+                    && t.support == Some(self.support)
+            })
+            .collect();
+        shoots.sort_by_key(|t| (t.invested.iter().sum::<u64>(), t.id));
+        for t in shoots {
+            let cost = std::array::from_fn(|i| {
+                u64::from(t.development[i] < o.config.development_per_size[i])
+            });
+            let pool = pools[&t.id];
+            let limit = if t.shade_ticks > 0 {
+                Limit::Shade
+            } else if t.shortage_ticks > 0 {
+                Limit::Shortage
+            } else if t.size >= o.config.max_size {
+                Limit::Size
+            } else if o.config.max_intents == 0 {
+                Limit::Work
+            } else if !env.support_valid(t.support, t.cell) {
+                Limit::Support
+            } else if !env.space_available(t.cell, t.role, t.size + 1) {
+                Limit::Space
+            } else if (0..3).any(|i| pool[i] < cost[i]) {
+                Limit::Resource
+            } else {
+                Limit::Proposed
+            };
+            plan.decisions.push(Decision {
+                available: pool,
+                cost,
+                size: t.size + 1,
+                parent: t.id,
+                role: t.role,
+                cell: t.cell,
+                limit: limit.clone(),
+            });
+            if limit == Limit::Proposed {
+                plan.intents.push(Intent::Develop { tissue: t.id });
+                break;
             }
         }
         plan

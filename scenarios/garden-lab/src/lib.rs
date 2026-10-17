@@ -19,7 +19,7 @@ use engine_terrain::{CellCoord, Material, MaterialId, Terrain, TerrainGeometry};
 use std::{collections::BTreeMap, time::Duration};
 
 pub const TICK_MS: u64 = 1000;
-pub const MAX_TICKS: u64 = 300;
+pub const MAX_TICKS: u64 = 480;
 pub const MAX_CATCHUP: u64 = 8;
 const ACTION: u32 = 0x4741_5244;
 /// Commands are edge triggered by the client; step works only while lab-paused.
@@ -237,6 +237,8 @@ impl GardenLabState {
                 Limit::Support => "invalid support".into(),
                 Limit::Size => "hard size limit".into(),
                 Limit::Work => "hard work limit".into(),
+                Limit::Shortage => "development waiting for upkeep recovery".into(),
+                Limit::Shade => "local shade prevents development".into(),
                 Limit::Cadence => "growth cadence".into(),
                 Limit::Proposed => "growth proposed (runtime admission still required)".into(),
                 Limit::Resource => {
@@ -263,6 +265,7 @@ impl GardenLabState {
             .iter()
             .map(|r| match r {
                 Ok(()) => "growth admitted and paid",
+                Err(plants::Rejection::Shade) => "local shade prevents development",
                 Err(plants::Rejection::Unaffordable) => "insufficient reserves after intake/upkeep",
                 Err(plants::Rejection::Space) => "occupied or unsuitable space",
                 Err(plants::Rejection::Support) => "invalid support",
@@ -344,10 +347,7 @@ impl GardenLabState {
                     .filter(|t| t.role == Role::Shoot)
                     .map(|t| t.id)
                     .collect();
-                for id in ids {
-                    self.plants.damage(id, 100).unwrap();
-                    self.plants.remove(id).unwrap();
-                }
+                self.plants.remove_many(&ids).unwrap();
             }
             Command::Reset => *self = GardenLabScenario::init((), self.seed),
         }
@@ -408,10 +408,10 @@ impl Scenario for GardenLabScenario {
         let grass =
             Grass::new(Traits::default(), [8, 3], [0, 1], assembly.plant_support()).unwrap();
         let mut state = GardenLabState {
-            plants: Plants::new(plants::Config::default(), seed).unwrap(),
+            plants: Plants::new(plants::grass::physiology(), seed).unwrap(),
             grass,
             paused: false,
-            speed: 4,
+            speed: 1,
             intensity: 1000,
             availability: [1000; 2],
             shade: false,
@@ -499,7 +499,12 @@ impl Scenario for GardenLabScenario {
             };
             let center = p(t.cell);
             let (start, end) = match t.role {
-                Role::Shoot => (center, RenderPoint::new(center.x + 0.15, center.y + 0.75)),
+                Role::Shoot => {
+                    let target = o.config.development_per_size.iter().sum::<u64>().max(1);
+                    let progress = t.development.iter().sum::<u64>() as f32 / target as f32;
+                    let length = 0.75 + 0.4 * (f32::from(t.size - 1) + progress);
+                    (center, RenderPoint::new(center.x + 0.15, center.y + length))
+                }
                 Role::Root => (
                     RenderPoint::new(center.x, center.y - 0.3),
                     RenderPoint::new(center.x, center.y + 0.3),
@@ -514,7 +519,7 @@ impl Scenario for GardenLabScenario {
         if let Some(t) = o.tissues.get(s.selected % o.tissues.len().max(1)) {
             if s.inspect || t.role == Role::Shoot {
                 let center = p(t.cell);
-                let top = if t.role == Role::Shoot { 0.95 } else { 0.43 };
+                let top = if t.role == Role::Shoot { 1.85 } else { 0.43 };
                 let corners = [
                     RenderPoint::new(center.x - 0.43, center.y - 0.43),
                     RenderPoint::new(center.x + 0.43, center.y - 0.43),
@@ -556,7 +561,7 @@ impl Scenario for GardenLabScenario {
         );
         let mut lines = vec![
             format!(
-                "GARDEN LAB | seed {} | {}s / 300s | {}x {} | light {} | nutrients {} water {}",
+                "GARDEN LAB | seed {} | {}s / 480s | {}x {} | light {} | nutrients {} water {}",
                 s.seed,
                 o.tick,
                 s.speed,
@@ -590,14 +595,24 @@ impl Scenario for GardenLabScenario {
         ];
         lines.push(s.growth_summary());
         lines.push(s.admission_summary());
-        lines.push(
-            "Idle tissue still pays maintenance; full supplies do not guarantee affordable growth"
-                .into(),
-        );
         if let Some(t) = o.tissues.get(s.selected % o.tissues.len().max(1)) {
             lines.push(format!(
                 "Tissue {} | organism {} | {:?} | health {} | reserves {:?}",
                 t.id, t.organism, t.role, t.health, t.stores
+            ));
+            lines.push(format!(
+                "Size {}/3 | paid {:?} / {:?} | invested {:?} | next {:?}",
+                t.size,
+                t.development,
+                o.config.development_per_size,
+                t.invested,
+                if t.role == Role::Shoot && t.size < 3 {
+                    std::array::from_fn::<_, 3, _>(|i| {
+                        u64::from(t.development[i] < o.config.development_per_size[i])
+                    })
+                } else {
+                    [0; 3]
+                }
             ));
             if let Some(e) = s.exposure.get(&t.id) {
                 lines.push(format!(
@@ -612,24 +627,19 @@ impl Scenario for GardenLabScenario {
                 ));
             }
             lines.push(format!(
-                "Wait {:?} | shade {} shortage {}",
+                "Wait {:?} | shade {} shortage {} | upkeep {:?}",
                 o.ledger.waiting.get(&t.id),
                 t.shade_ticks,
-                t.shortage_ticks
+                t.shortage_ticks,
+                o.config.maintenance_per_size[match t.role {
+                    Role::Root => 0,
+                    Role::Runner => 1,
+                    Role::Shoot => 2,
+                }]
+                .map(|v| v * u64::from(t.size))
             ));
         }
 
-        if let Some(t) = o.tissues.get(s.selected % o.tissues.len().max(1)) {
-            let index = match t.role {
-                Role::Root => 0,
-                Role::Runner => 1,
-                Role::Shoot => 2,
-            };
-            lines.push(format!(
-                "Maintenance/tick {:?} | exposure/contact = last pre-tick sample",
-                o.config.maintenance_per_size[index].map(|v| v * u64::from(t.size))
-            ));
-        }
         for (i, line) in lines.into_iter().enumerate() {
             let mut text = RenderText::new(RenderPoint::new(-13.5, 9.5 - i as f32 * 0.6), line);
             text.size = 13.0;
@@ -783,9 +793,9 @@ mod garden_lab_contract {
         assert!(s.growth_summary().contains("tissue limit"));
         assert!(
             s.current_plan()
-                .decisions
+                .intents
                 .iter()
-                .all(|d| d.limit == Limit::Population)
+                .all(|i| matches!(i, plants::Intent::Develop { .. }))
         );
         s.command(Command::MoreTissues);
         let plan = s.current_plan();
@@ -941,7 +951,11 @@ mod garden_lab_contract {
         s.command(Command::Cut);
         let cut = s.plants.observe();
         assert!(cut.tissues.iter().all(|t| t.role != Role::Shoot));
-        assert!(cut.tissues.iter().all(|t| old.tissues.contains(t)));
+        assert!(cut.tissues.iter().all(|t| old.tissues.iter().any(|b| {
+            let mut b = b.clone();
+            b.stores = t.stores;
+            b == *t
+        })));
         assert!(run(&mut s, 20).iter().any(|o| {
             o.ledger.growth != [0; 3]
                 && o.tissues
@@ -1028,6 +1042,8 @@ mod garden_lab_contract {
 
         let mut changing = GardenLabScenario::init((), 42);
         let mut reference = GardenLabScenario::init((), 42);
+        changing.speed = 4;
+        reference.speed = 4;
         changing.advance(Duration::from_nanos(125_000_003));
         assert_eq!(changing.pending_ns, 500_000_012);
         changing.command(Command::Faster);
@@ -1106,7 +1122,7 @@ mod garden_lab_contract {
         fast.advance(Duration::from_secs(100));
         assert_eq!(fast.plants.observe().tick, MAX_CATCHUP);
         assert!(fast.dropped_ms > 0);
-        run(&mut fast, 400);
+        run(&mut fast, 500);
         assert_eq!(fast.plants.observe().tick, MAX_TICKS);
     }
 }
@@ -1182,5 +1198,278 @@ mod garden_lab_contract_rendered_milestones {
         println!("cut loss={:?}", s.plants.observe().ledger.loss);
         s.tick();
         assert!(s.plants.observe().ledger.growth.iter().all(|v| *v > 0));
+    }
+}
+
+#[cfg(test)]
+mod garden_lab_contract_maturation {
+    use super::*;
+    #[test]
+    fn first_establishment_and_paid_regrowth_every_tick() {
+        let mut s = GardenLabScenario::init((), 42);
+        let mut first = None;
+        let mut replacement = None;
+        let mut old_ids = std::collections::BTreeSet::new();
+        let mut intake = [0u64; 3];
+        let mut upkeep = [0u64; 3];
+        let mut growth = [0u64; 3];
+        let mut loss = [0u64; 3];
+        for tick in 1..=480 {
+            let before = s.plants.observe();
+            s.tick();
+            let o = s.plants.observe();
+            assert!(o.tissues.iter().all(|t| t.health == 100));
+            for i in 0..3 {
+                intake[i] += o.ledger.intake[i];
+                upkeep[i] += o.ledger.maintenance[i];
+                growth[i] += o.ledger.growth[i];
+                loss[i] += o.ledger.loss[i];
+                assert_eq!(
+                    before.tissues.iter().map(|t| t.stores[i]).sum::<u64>() + o.ledger.intake[i],
+                    o.tissues.iter().map(|t| t.stores[i]).sum::<u64>()
+                        + o.ledger.maintenance[i]
+                        + o.ledger.growth[i]
+                        + o.ledger.loss[i]
+                );
+            }
+            assert!(s.plan.intents.len() <= 1);
+            assert!(s.plan.decisions.len() <= 4 * before.tissues.len());
+            if tick == 1 || tick == 2 {
+                assert!(
+                    o.tissues
+                        .iter()
+                        .any(|t| t.role == Role::Shoot && t.size == 1 && t.health > 0)
+                );
+            }
+            let mature = o
+                .tissues
+                .iter()
+                .filter(|t| t.role == Role::Shoot && t.size == 3 && t.health > 0)
+                .count();
+            if tick <= 240 && mature >= 3 && first.is_none() {
+                first = Some(tick);
+            }
+            if tick > 240 && mature >= 3 && replacement.is_none() {
+                replacement = Some(tick);
+            }
+            if [2, 30, 60, 120, 180, 210, 240, 241, 300, 360, 420, 480].contains(&tick) {
+                println!(
+                    "checkpoint {tick}: mature={mature}, tissues={} sizes={:?} upkeep={:?} intake={:?}",
+                    o.tissues.len(),
+                    o.tissues
+                        .iter()
+                        .filter(|t| t.role == Role::Shoot)
+                        .map(|t| (t.id, t.size, t.development, t.health))
+                        .collect::<Vec<_>>(),
+                    o.ledger.maintenance,
+                    o.ledger.intake
+                );
+            }
+            if tick == 240 {
+                old_ids = o.tissues.iter().map(|t| t.id).collect();
+                s.command(Command::Cut);
+                let cut = s.plants.observe();
+                assert!(cut.tissues.iter().all(|t| t.role != Role::Shoot
+                    && o.tissues.iter().any(|b| {
+                        let mut b = b.clone();
+                        b.stores = t.stores;
+                        b == *t
+                    })));
+                for i in 0..3 {
+                    let removed = o
+                        .tissues
+                        .iter()
+                        .filter(|t| t.role == Role::Shoot)
+                        .map(|t| t.stores[i])
+                        .sum::<u64>();
+                    assert_eq!(cut.ledger.loss[i] - o.ledger.loss[i], removed);
+                    loss[i] += removed;
+                }
+                println!(
+                    "cut loss={:?}, survivor ids={:?}",
+                    cut.ledger.loss,
+                    cut.tissues.iter().map(|t| t.id).collect::<Vec<_>>()
+                );
+            }
+            if tick > 240 {
+                assert!(
+                    o.tissues
+                        .iter()
+                        .filter(|t| t.role == Role::Shoot)
+                        .all(|t| !old_ids.contains(&t.id))
+                );
+            }
+        }
+        let end = s.plants.observe();
+        let stores: [u64; 3] =
+            std::array::from_fn(|i| end.tissues.iter().map(|t| t.stores[i]).sum());
+        for i in 0..3 {
+            assert_eq!(30 + intake[i], stores[i] + upkeep[i] + growth[i] + loss[i]);
+        }
+        assert_eq!(growth, [474; 3]);
+        assert!(
+            end.tissues
+                .iter()
+                .filter(|t| t.role == Role::Shoot)
+                .all(|t| t.invested == [20; 3])
+        );
+        println!(
+            "cumulative: initial=[30,30,30] intake={intake:?} stores={stores:?} upkeep={upkeep:?} growth={growth:?} loss={loss:?}"
+        );
+        println!("first establishment={first:?}; first mature replacements={replacement:?}");
+        assert!(
+            first.is_some_and(|t| (180..=240).contains(&t)),
+            "first={first:?}"
+        );
+        assert!(
+            replacement.is_some_and(|t| t <= 480),
+            "replacement={replacement:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod garden_lab_contract_development_limits {
+    use super::*;
+    #[test]
+    fn independent_deficits_pause_paid_work_and_recover_without_reseeding() {
+        for resource in 0..3 {
+            let mut s = GardenLabScenario::init((), 42);
+            for _ in 0..60 {
+                s.tick();
+            }
+            let initial = s.plants.observe();
+            let ids: Vec<_> = initial.tissues.iter().map(|t| t.id).collect();
+            if resource < 2 {
+                s.availability[resource] = 0;
+            } else {
+                s.intensity = 250;
+            }
+            let mut stopped = None;
+            for _ in 0..60 {
+                s.tick();
+                let o = s.plants.observe();
+                if o.ledger.unmet[resource] > 0 {
+                    if let Some(t) = o
+                        .tissues
+                        .iter()
+                        .find(|t| t.role == Role::Shoot && t.shortage_ticks > 0 && t.health > 0)
+                    {
+                        stopped = Some(t.clone());
+                        break;
+                    }
+                }
+            }
+            let t = stopped.expect("independent supply must constrain development");
+            assert_eq!(t.shade_ticks, 0, "energy fixture must not use local shade");
+            s.tick();
+            let blocked = s.plants.observe();
+            let b = blocked.tissues.iter().find(|b| b.id == t.id).unwrap();
+            assert_eq!(b.development, t.development);
+            assert_eq!(b.invested, t.invested);
+            s.availability = [1000; 2];
+            s.intensity = 1000;
+            for _ in 0..60 {
+                s.tick();
+            }
+            let recovered = s.plants.observe();
+            let r = recovered.tissues.iter().find(|b| b.id == t.id).unwrap();
+            assert!(r.health > 0);
+            assert!(r.invested[0] > t.invested[0]);
+            assert_eq!(
+                recovered.tissues.iter().map(|t| t.id).collect::<Vec<_>>(),
+                ids
+            );
+        }
+    }
+    #[test]
+    fn equal_time_maturation_cut_and_stop_at_all_playback_speeds() {
+        let mut reference = None;
+        for speed in [1, 4, 16] {
+            let mut s = GardenLabScenario::init((), 42);
+            assert_eq!(s.speed, 1);
+            s.speed = speed;
+            for _ in 0..240 * 16 / speed {
+                s.advance(Duration::from_millis(62));
+                s.advance(Duration::from_micros(500));
+            }
+            assert_eq!(s.plants.observe().tick, 240);
+            s.command(Command::Cut);
+            for _ in 0..240 * 16 / speed {
+                s.advance(Duration::from_micros(62500));
+            }
+            assert_eq!(s.plants.observe().tick, 480);
+            let before = s.plants.clone();
+            s.advance(Duration::from_secs(100));
+            s.command(Command::Step);
+            assert_eq!(s.plants, before);
+            if let Some(ref p) = reference {
+                assert_eq!(&s.plants, p);
+            } else {
+                reference = Some(s.plants);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod garden_lab_contract_local_development {
+    use super::*;
+    #[test]
+    fn connected_local_shade_retains_work_while_sunlit_shoots_develop() {
+        let mut s = GardenLabScenario::init((), 42);
+        for _ in 0..60 {
+            s.tick();
+        }
+        let before = s.plants.observe();
+        s.command(Command::Shade);
+        s.tick();
+        let stressed = s.plants.observe();
+        let shaded: Vec<_> = stressed
+            .tissues
+            .iter()
+            .filter(|t| t.role == Role::Shoot && t.shade_ticks > 0)
+            .map(|t| t.id)
+            .collect();
+        assert!(!shaded.is_empty());
+        for _ in 0..3 {
+            s.tick();
+        }
+        let shaded_state = s.plants.observe();
+        for id in &shaded {
+            let old = before.tissues.iter().find(|t| t.id == *id).unwrap();
+            let t = shaded_state.tissues.iter().find(|t| t.id == *id).unwrap();
+            assert_eq!(t.invested, old.invested);
+            assert_eq!(t.development, old.development);
+            assert!(t.health > 0);
+        }
+        assert!(shaded_state.tissues.iter().any(|t| {
+            t.role == Role::Shoot
+                && t.shade_ticks == 0
+                && t.invested[0]
+                    > before
+                        .tissues
+                        .iter()
+                        .find(|b| b.id == t.id)
+                        .unwrap()
+                        .invested[0]
+        }));
+        s.command(Command::Shade);
+        for _ in 0..20 {
+            s.tick();
+        }
+        let recovered = s.plants.observe();
+        assert!(shaded.iter().all(|id| {
+            let t = recovered.tissues.iter().find(|t| t.id == *id).unwrap();
+            t.health == 100
+                && t.shade_ticks == 0
+                && t.invested[0]
+                    > before
+                        .tissues
+                        .iter()
+                        .find(|b| b.id == *id)
+                        .unwrap()
+                        .invested[0]
+        }));
     }
 }

@@ -2,7 +2,7 @@
 
 Select **Garden Lab** in the ordinary launcher or use `--scenario garden-lab`.
 This is the P4 visible grass testbed. It composes shared Plants, grass policy
-`0x6772617373000001`, real dirt contact and canonical directional visibility.
+`0x6772617373000002`, real dirt contact and canonical directional visibility.
 No hidden feeding or random spawning is added.
 
 Up/down selects the displayed control; Space or the gamepad bottom button
@@ -31,22 +31,22 @@ are the last pre-physiology sample; new tissue has no sample until the next
 boundary. Aggregate intake/upkeep/growth and grass plan reason are displayed.
 
 Physiology always advances in 1000 ms ticks with unchanged authoritative
-coefficients. Viewing defaults to 4x, adjustable from 1x to 16x. Fractional
+coefficients. Viewing defaults to 1x, adjustable from 1x to 16x. Fractional
 nanoseconds carry between host updates. Lab pause freezes accumulated time;
 step runs exactly one tick while paused. Host pause does not call scenario
 updates. At most eight ticks run per update; excess elapsed time is discarded
 and reported rather than charging a partial or enlarged tick. A run stops
-aging at 300 ticks. Reset starts another bounded run.
+aging at 480 ticks. Reset starts another bounded run.
 
 Fixtures use seed 42, origin [8,3], 16x8 cells, dirt at y<=3, initial reserves
 [30,30,30], radius four, at most 32 tissues and one growth proposal per tick.
-Roots/runners establish multiple shoots by simulation second nine (2.25 wall
+Roots/runners establish multiple shoots by simulation second nine (nine wall
 seconds at default speed with no dropped time). This is a viewing configuration,
 not a biological realism or device performance claim. Each light publication is
 bounded by 256 rays, 65,536 footprint tests and 524,288 collider records; actual
 last-tick counts appear in the scene and deterministic fixture output.
 
-The eight `garden_lab_contract` tests cover replay/topology/accounting, paired
+The `garden_lab_contract` tests cover replay/topology/accounting, paired
 sun/dim and isolated supplies, connected shade death/recovery, paid regrowth
 and permanent death, pause/step/reset/equal-time playback/work bounds, and exact rendered-workflow
 milestones.
@@ -131,4 +131,58 @@ separately with its ledger tick because intake and upkeep precede final growth
 spending. Idle tissue still pays maintenance. No eligible candidates is not a
 resource or tissue-cap diagnosis. Current explanations are recomputed without
 advancing physiology. Growth limits, lab PAUSED, host pause and the COMPLETE
-300-second run are distinct; raising limits never extends a completed run.
+480-second run are distinct; raising limits never extends a completed run.
+
+
+## Paid maturation profile v2
+
+Actual soil/contact and directional-light fixtures with seed 42 first produce a
+small shoot at second 1 and three living size-three blades at second **186**.
+They reach eight mature blades before cutting at second 240. Cutting preserves
+24 underground tissue identities and removes blade resource shares without
+refunding their investment. Small, newly constructed replacements appear at
+second **241**; the first three mature at **403**, with eight mature survivors
+through the bounded second-480 stop. Every healthy fixture tick requires full
+health, checks conservation and enforces a single proposed growth operation.
+
+The named profile retains root size 2, runner size 1, initial blade size 1 and
+finite seed stores [30,30,30]. Root uptake is [8,8,0] resource units per size per
+second. Construction costs per size remain root [3,3,3], runner [2,2,2], blade
+[4,4,4]. Development pays at most [1,1,1] each admitted second toward [10,10,10]
+per size increment: two increments cost [20,20,20] per mature blade. Selection
+is by least lifetime investment then ID, after provisioning new root/shoot/runner
+sites; no elapsed-age timer earns growth. Canonical upkeep and photosynthesis
+rates are unchanged. These coefficients are abstract resource units, not
+biological measurements.
+
+The healthy connected patch contains 12 size-two roots, 12 size-one runners
+and 8 size-three blades. Its mature offered intake is [192,192,192] per second,
+and actual paid upkeep is [60,84,84]. At size one, the same blade population
+produces only 64 energy per second and pays [44,52,52] total upkeep. Immediately
+after cutting, underground upkeep is [36,36,36] and energy intake is zero; stored
+energy must pay upkeep and fresh blade construction until photosynthesis resumes.
+Added capacity creates no reserves. The 480-second fixture spends [474,474,474]
+on construction plus development, with per-tick and cumulative resource
+reconciliation including overflow and simultaneous cut losses.
+
+Both production renderer paths use the same filled blade geometry. Length grows
+with authoritative size and paid progress. The selected diagnostic displays size,
+paid balance, increment target, lifetime investment and next payment. Exported
+state includes these fields, complete config/profile/seed and actual admission
+outcomes. Playback contracts compare full biology at 1x, 4x and 16x through a
+240-second cut and the 480-second stop; fractional phase and catch-up tests remain.
+
+The real UI workflow now requests emergence, intermediate development,
+establishment, pre/post-cut, small replacement and mature-regrowth PNG/state pairs
+in both renderers, in addition to shortage/recovery and control histories.
+Window-free render exports include a corresponding milestone sequence and matching
+state records, explicitly labeled preview-only. They do not establish real UI
+acceptance. This worker's Xvfb attempt failed creating `/tmp/.tX100-lock` under
+the restricted sandbox; launcher host verification and inspection of real UI
+sequences remain required.
+
+The retained deterministic run reconciles initial [30,30,30] plus offered intake
+[89216,89216,56192] against final stores [1020,996,996], paid upkeep
+[23732,30756,30756], construction/development [474,474,474] and recorded losses
+[64020,57020,23996]. Losses include discarded capacity overflow as well as cuts;
+o offered intake is silently omitted from this equation.

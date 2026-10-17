@@ -40,6 +40,10 @@ pub struct Tissue {
     pub role: Role,
     pub cell: [i32; 2],
     pub size: u16,
+    /// Paid resource units toward the next size; never transferable.
+    pub development: Resources,
+    /// Lifetime development spending, including completed size increments.
+    pub invested: Resources,
     pub support: Option<Support>,
     pub health: u16,
     pub shortage_ticks: u32,
@@ -59,6 +63,7 @@ pub struct Config {
     pub capacity_per_size: [Resources; 3],
     pub maintenance_per_size: [Resources; 3],
     pub growth_per_size: [Resources; 3],
+    pub development_per_size: Resources,
     pub root_intake_per_size: Resources,
     pub shoot_energy_per_size: u64,
     pub local_light_threshold: u16,
@@ -77,6 +82,7 @@ impl Default for Config {
             capacity_per_size: [[20; 3], [10; 3], [20; 3]],
             maintenance_per_size: [[1, 1, 1], [1, 1, 1], [1, 2, 2]],
             growth_per_size: [[3; 3], [2; 3], [4; 3]],
+            development_per_size: [4; 3],
             root_intake_per_size: [4, 3, 0],
             shoot_energy_per_size: 8,
             local_light_threshold: 250,
@@ -93,6 +99,7 @@ pub enum Rejection {
     Space,
     Support,
     Unaffordable,
+    Shade,
     TissueLimit,
     OrganismLimit,
     WorkLimit,
@@ -144,6 +151,8 @@ pub enum Intent {
         cell: [i32; 2],
         support: Option<Support>,
     },
+    /// Pay at most one unit of each resource toward the next shoot size.
+    Develop { tissue: TissueId },
     /// Relative maintenance priority inside a living component; does not waive costs.
     Allocate { tissue: TissueId, priority: u16 },
 }
@@ -230,6 +239,10 @@ impl Plants {
                 .flatten()
                 .any(|v| *v > 1_000_000)
             || config.root_intake_per_size.iter().any(|v| *v > 1_000_000)
+            || config
+                .development_per_size
+                .iter()
+                .any(|v| *v == 0 || *v > 1_000_000)
             || config.shoot_energy_per_size > 1_000_000
             || config.root_intake_per_size[2] != 0
             || config
@@ -398,6 +411,8 @@ impl Plants {
                 role,
                 cell,
                 size,
+                development: [0; 3],
+                invested: [0; 3],
                 support,
                 health: 100,
                 shortage_ticks: 0,
@@ -429,6 +444,50 @@ impl Plants {
     }
     fn apply(&mut self, intent: &Intent, env: &impl Environment) -> Result<(), Rejection> {
         match *intent {
+            Intent::Develop { tissue } => {
+                let t = self.tissues.get(&tissue).ok_or(Rejection::Invalid)?.clone();
+                if t.health == 0 {
+                    return Err(Rejection::Dead);
+                }
+                if t.role != Role::Shoot || t.size >= 3 || t.size >= self.config.max_size {
+                    return Err(Rejection::Invalid);
+                }
+                // Use this tick's physiology result: no additional exposure query,
+                // and connected sunlight cannot waive the shoot's local deficit.
+                if t.shade_ticks != 0 {
+                    return Err(Rejection::Shade);
+                }
+                if t.shortage_ticks != 0 {
+                    return Err(Rejection::Unaffordable);
+                }
+                if !env.support_valid(t.support, t.cell) {
+                    return Err(Rejection::Support);
+                }
+                if !env.space_available(t.cell, t.role, t.size + 1) {
+                    return Err(Rejection::Space);
+                }
+                let target = self.config.development_per_size;
+                let cost = std::array::from_fn(|i| u64::from(t.development[i] < target[i]));
+                let group = self
+                    .components()
+                    .into_iter()
+                    .find(|g| g.contains(&tissue))
+                    .unwrap();
+                let total = self.total(&group);
+                if (0..3).any(|i| total[i] < cost[i]) {
+                    return Err(Rejection::Unaffordable);
+                }
+                let next = self.tissues.get_mut(&tissue).unwrap();
+                add(&mut next.development, cost);
+                add(&mut next.invested, cost);
+                if next.development == target {
+                    next.size += 1;
+                    next.development = [0; 3];
+                }
+                add(&mut self.ledger.growth, cost);
+                self.distribute(&group, std::array::from_fn(|i| total[i] - cost[i]));
+                Ok(())
+            }
             Intent::Allocate { tissue, priority } => {
                 let t = self.tissues.get_mut(&tissue).ok_or(Rejection::Invalid)?;
                 if t.health == 0 {
@@ -480,6 +539,8 @@ impl Plants {
                         role,
                         cell,
                         size,
+                        development: [0; 3],
+                        invested: [0; 3],
                         support,
                         health: 100,
                         shortage_ticks: 0,
@@ -692,13 +753,21 @@ impl Plants {
         Ok(())
     }
     pub fn remove(&mut self, id: u64) -> Result<(), Rejection> {
-        if !self.tissues.contains_key(&id) {
+        self.remove_many(&[id])
+    }
+    /// Simultaneous cutting loses the pre-cut shares, independent of ID order.
+    pub fn remove_many(&mut self, ids: &[TissueId]) -> Result<(), Rejection> {
+        let ids: BTreeSet<_> = ids.iter().copied().collect();
+        if ids.iter().any(|id| !self.tissues.contains_key(id)) {
             return Err(Rejection::Invalid);
         }
         self.normalize();
-        let t = self.tissues.remove(&id).unwrap();
-        add(&mut self.ledger.loss, t.stores);
-        self.edges.retain(|(a, b)| *a != id && *b != id);
+        for id in &ids {
+            let t = self.tissues.remove(id).unwrap();
+            add(&mut self.ledger.loss, t.stores);
+        }
+        self.edges
+            .retain(|(a, b)| !ids.contains(a) && !ids.contains(b));
         self.normalize();
         Ok(())
     }
