@@ -547,6 +547,8 @@ pub(super) fn apply(
     for (file, replacement) in sources.iter_mut().zip(&inputs.replacements) {
         let before = file.metadata()?;
         owned(&before, false, owner, true)?;
+        // Package validation already consumed these shared file descriptors.
+        file.rewind()?;
         verify_blob(file, &replacement.contents)?;
         if !unchanged(&before, &file.metadata()?) {
             return Err(invalid("legacy replacement changed"));

@@ -126,6 +126,39 @@ fn absent_top_level_directories_are_created_in_parent_order() {
 }
 
 #[test]
+fn already_verified_package_handles_are_read_again_from_the_start() {
+    let fixture = Prepared::new();
+    let f = &fixture.fixture;
+    let sources = f
+        .inputs
+        .replacements
+        .iter()
+        .enumerate()
+        .map(|(index, replacement)| {
+            let mut file =
+                File::open(f.temp.path().join("package").join(index.to_string())).unwrap();
+            verify_blob(&mut file, &replacement.contents).unwrap();
+            // The live package checker retains these verified descriptors;
+            // try_clone shares their position at the end of each source.
+            file.try_clone().unwrap()
+        })
+        .collect();
+    apply(
+        &f.root,
+        &File::open(f.active()).unwrap(),
+        f.owner,
+        &f.binding,
+        &f.inputs,
+        fixture.originals,
+        sources,
+        || Ok(()),
+        &mut |_, _| Ok(()),
+    )
+    .unwrap();
+    fixture.assert_finished();
+}
+
+#[test]
 fn replacement_preserves_original_inodes_attributes_and_empty_files() {
     let fixture = Prepared::new();
     let report = fixture.run(&mut |_, _| Ok(())).unwrap();
