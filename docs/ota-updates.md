@@ -1307,6 +1307,38 @@ actual inactive slot. Persistent staging applies its separate space quota. The
 HTTPS session adds redirect/request bounds, progress deadlines and transfer
 throttling and service-owned network holds, described below.
 
+## Pinned Pi build inputs
+
+The five external Yocto layers now use full commit pins. The unprivileged
+[`ota_build_inputs.py`](../.github/ci/ota_build_inputs.py) builder requires kas
+5.4, an exact clean source commit, clean pinned layer checkouts and a separate
+build directory. It drops inherited credentials/implicit build overrides and
+rejects additional BitBake configuration. It compares source, layers and source
+configuration hashes before and after the real build, then records the exact
+gzip image's name/hash and sidecar identity. The [build instructions](../yocto/README.md)
+describe its invocation. This record is provenance, not image approval.
+
+The recipe records the actual Rust, Cargo and target C compiler responses in
+`/usr/share/spacewars/build.json`, along with source, target, profile and kiosk
+feature. This file is included in the rootfs tree identity. Layer/configuration
+provenance is currently retained in the external build record; the final
+publisher must bind that record to its admitted artifact and publication history
+(or embed it in the image) rather than accept a detached, editable claim.
+
+Source `7e69bc00038b0590883c9d06e9432eb937520351` built successfully in 418 seconds,
+using existing caches. The actual 528,482,304-byte ext4 image passes forced
+read-only fsck, embedded record comparisons, AArch64 executable hash checks and
+boot-manifest validation. Rust/Cargo are 1.94.0 and the target GCC is 13.5.0.
+Bootstrap-fixture compression produces a 131,825,106-byte Zstandard payload;
+decoding matches the exact expanded length and SHA-256. This local fixture uses
+the image's WIC PARTUUIDs, not the installed Pis' layout, and is not an authorized
+device package or production feed. The existing Ubuntu 26.04 host warning
+remains; no reproducible container build is claimed.
+
+All 123 CI Python helper, 51 Yocto JavaScript and 79 Yocto Python tests pass.
+The [build evidence](data/ota-build-inputs-20261016.json) records source, layers,
+logs, actual image checks and remaining workflow/image-validation work.
+
 ## GitHub candidate origin admission
 
 The read-only [OTA admission helper](../.github/ci/ota_admission.py) checks a
