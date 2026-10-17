@@ -1398,6 +1398,15 @@ delivery. An interrupted publication resumes those bytes; it does not change
 randomized signature under an already reserved immutable name. The final
 `feed_inventory` check and timestamp-last delivery below remain required.
 
+Validation passed 306 OTA unit tests, 22 signed-feed integration tests and three
+CLI cases, including actual temporary-key signing. The nine signing cases cover
+credential/threshold separation, approval before key access, unchanged-byte
+promotion, retained compatibility candidates, version/hash rollback checks and
+composition into a feed accepted by Release and Nightly consumers. Clippy,
+formatting, and Rust 1.89 checks for both publisher and default service builds
+pass. The [signing evidence](data/ota-signing-20261016.json) records the exact
+source, logs and remaining workflow/production prerequisites.
+
 ## Feed delivery under development
 
 The delivery component for #262 is implemented separately from signing and
