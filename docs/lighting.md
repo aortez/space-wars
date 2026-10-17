@@ -1,8 +1,9 @@
 # Shared direct lighting
 
 The `engine-core::lighting` service is a generic simulation foundation for the
-plant roadmap's environment inputs. It does not admit Clock lights or connect
-living tissue. Hosts publish after their canonical physics/event update, once
+plant roadmap's environment inputs. The overhead plant adapter connects living
+tissue; Clock light admission remains separate. Hosts publish after their
+canonical physics/event update, once
 per completed tick; paused rendering retains the existing `Arc` snapshot.
 `LightingPublisher` rejects repeated/backward ticks and backward geometry
 revisions. A restarted simulation needs a new publisher.
@@ -145,3 +146,27 @@ The client currently has no global quality enum or display gamma/bloom controls.
 Software output scales and both frame consumers exercise the existing controls;
 future presentation controls must preserve this read-only dependency. These
 fixtures do not claim GPU pixel equivalence or performance on a device.
+
+## Overhead plant consumer
+
+`engine_rapier::plant_light` now publishes the overhead-only tissue consumer
+using this service and canonical `lighting_visibility`. Its reproducible
+full-sun/dim-room strengths are 1000/50; no host growth multiplier is applied.
+Incident intensity is independent of tick duration, including for the plant's
+shade threshold. Shoot energy uses the runtime's per-logical-tick
+`shoot_energy_per_size` coefficient; root supply keeps its separate duration
+scaling. See the plant contract below for integer rounding and energy units.
+It admits the complete support-local set plus world-space lightweight occluders
+from all relevant supports before querying. `publish_with_occluders` accepts
+`WorldOccluders` tagged with the matching tick and geometry revision; the host
+rebuilds these disks from canonical poses after motion or removal. Stale tags,
+invalid geometry and duplicate surface identities reject. Local tissues and
+external disks share a single 256-entry cap across 64-receiver batches; external
+disks add no rays. Thus each publication still has at most 256 rays, 65536 disk
+tests and 524288 collider-record visits. Consumption requires zero age. It measures
+all samples before committing the `LightingPublisher` update. The adapter owns
+no additional physics world and leaves shared localized-source behavior intact.
+See [plant geometry and publication contract](plants.md#directional-light-adapter-210)
+for disk identities, support transforms, diagnostics, aggregate bounds and host
+publication responsibilities. Garden/Clock wiring remains later
+work; the earlier generic-service descriptions above describe that shared layer.

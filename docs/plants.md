@@ -187,3 +187,100 @@ Long runs provide a finite energy endowment sufficient for the test duration.
 This adapter advances the environment milestone toward Garden Lab; plant light
 integration, grass policy, lab presentation and ordinary gameplay remain later
 issues.
+
+## Directional light adapter (#210)
+
+`engine_rapier::plant_light::PlantLight::publish` composes measured overhead
+illumination with `RootUptake`, without changing the tissue ledger or physiology.
+This supplies the light input for the environment milestone toward Garden Lab;
+it does not wire Garden/Clock, implement grass policy or add localized lamps.
+`full_sun(direction)` supplies 1000; `dim_room(direction)` supplies 50 on the
+same linear scale. Direction is a unit world-space vector toward the source,
+provided independently of gravity and camera. Both presets use identical
+geometry and accounting. Incident exposure is floored to the runtime's integer
+0..1000 scale without multiplying by tick duration. Shade compares that measured
+intensity with `local_light_threshold`, so full sun remains 1000 at subsecond
+ticks and the shade threshold needs no duration adjustment.
+
+Shoot energy retains the foundation's per-logical-tick units:
+`floor(shoot_energy_per_size * size * light / 1000)` abstract chemical-energy
+units offered each completed plant tick. The coefficient is not a per-second
+rate and the adapter applies no additional duration multiplier. With the default
+coefficient 8 and size 1, full sun offers 8 and dim room floors to 0 units per
+tick. Hosts choosing a different fixed physiology duration must tune per-tick
+energy, maintenance and grace coherently for their intended simulation speed;
+incident intensity and shade classification remain unchanged. Root nutrient and
+water supply retain their independent per-second controls and `tick_ms` scaling
+from #209; this adapter does not change those inputs or ledger accounting.
+
+Pass the complete tissue set for one support, across all its organisms, to one
+publication and one publisher per simulation boundary. Use
+`publish_with_occluders` to also supply `WorldOccluders`: world-space disks from
+all other relevant supports, tagged with this exact tick and geometry revision.
+`publish` is the convenience form for scenes with no external lightweight
+occluders. At most 256 local tissues plus external disks combined (including
+local roots and dead elements) are admitted atomically, before allocation or
+query work. External disks do not add receivers or root supply. Shoot and runner
+elements declare opaque world-space disks:
+center = support pose applied to terrain cell center; radius =
+`cell_size * 0.25 * sqrt(size)`. Roots have no optical footprint. These declared
+disks are the initial blade/leaf/structural approximation, not colliders or a
+second physics world. Dead above-ground tissue stays opaque until removed.
+A future woody role must explicitly supply its geometry before integration.
+All attached elements must name the assembly's current generational support.
+A caller-reserved surface namespace plus never-reused tissue ID identifies each
+disk; reserve that namespace from physical entity IDs and other tissue sets.
+
+Each living Shoot samples once at its disk's source-facing boundary. Only its
+own local boundary contact is exempt under the shared 0.001-world-unit endpoint
+policy. Neighboring tissue, even in the same organism, blocks. Coincident disks
+with distinct identities block one another. A receiver embedded in an ordinary
+solid remains blocked; no organism-wide exclusion exists. Sensors are ignored;
+all other canonical solids (including terrain) block. This initial adapter has
+no transparent physical override. Physical water represented as a collider is
+therefore opaque here; hosts needing transparent water require a scoped policy
+extension rather than silently excluding an entity.
+
+Complete terrain edits, assembly synchronization and the normal canonical step
+before publishing. The adapter copies the canonical query snapshot and derives
+tissue transforms from that same borrowed world. Its borrowed root view prevents
+world/support/terrain mutation until the view is released. Supply a monotonic
+geometry revision changing with every optical movement, source/shape change or
+removal, and the completed simulation tick. Publisher tick monotonicity prevents
+repeated publication through the same publisher. Do not create publishers per
+batch or partition a support into independently capped sets. Each receiving
+support's publication must include every relevant external lightweight disk;
+external supports need no tissue colliders. The external simulation owner must
+transform disk centers using those supports' authoritative canonical poses,
+retain the declared radii and stable surface IDs, and rebuild the disk list
+after motion, tissue removal or support replacement. Supply the matching tick
+and geometry revision in `WorldOccluders`; stale tags reject before queries.
+Tags assert host publication ordering, not an automatic detector of stale
+caller geometry. The adapter copies the supplied disks for the query and
+validates their finite centers, positive finite radii and unique identities
+across local and external geometry. Never resubmit the receiving support's
+own disks in the external list. Root inputs and receiver transforms remain
+local to the receiving support; external tissue from any organism still blocks.
+
+Query batches are at most 64 receivers, with at most 256 rays total, 65536 disk
+tests and 524288 collider-record visits per publication; shared canonical shape
+complexity admission also applies. No render work, stagger or persistent exposure
+cache exists. Publish every physiology boundary after growth, removal or motion;
+new growth first samples on the following tick. `environment(tick)` requires
+exact tick equality (maximum exposure age zero), stricter than shared lighting's
+one-tick age. Pass the returned environment to that matching plant tick only.
+Repeated reads perform no new rays. Diagnostics retain intensity, blocked/ray
+counts, first blocker, total work, tick and geometry revision. Changed Shoot
+records reject through the existing invalid-exposure sentinel, before physiology
+mutation; stale access, overflow, duplicate identity and invalid sources return
+explicit `LightingError`s. Failed admission leaves the publisher unchanged.
+
+Non-ignored `plant_light_contract` fixtures cover canonical solids/terrain,
+sensors, removal, own-surface contact, same-organism and overlapping shade,
+transformed support/source frames, deterministic repeated publication, aggregate
+batch caps, invalid/stale inputs and actual preset energy intake with unchanged
+root supply. Two-support fixtures also prove collider-free external shade,
+blocker diagnostics, support translation/rotation and tissue-removal refresh,
+fixed-sequence replay, aggregate local/external overflow, external identity
+conflicts and publication-tag validation. These are headless adapter claims,
+not visible host acceptance.
