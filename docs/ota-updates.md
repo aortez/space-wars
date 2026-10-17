@@ -449,8 +449,15 @@ preserve other reservations and the live-hold capacity limit, and cover failed
 durable commits. The manager suite passes 158 tests with one existing root-only
 integration test skipped; Clippy reports no warnings. On the second Picade, a
 read-only status sample showed 18 retained SSH holds, 17 expired, while SSH was
-active. Device testing of the fix is still pending; the stalled primary Picade's
-hold count could not be read.
+active. A controlled Pi 5 comparison then reproduced the pre-banner stall on
+login 33. With the fix at `b455bc0`, all 36 separate logins succeeded and expired
+reservations were replaced. Both runs began with an empty reservation set,
+kept one control connection active, and waited 130 seconds between their first
+16 logins and the next batch. The kiosk process and boot remained unchanged.
+The temporary service override was removed afterwards and the installed binary
+hash verified; the fix is not yet permanently installed. The stalled primary
+Picade's hold count could not be read.
+[SSH admission comparison and restoration evidence](data/ota-ssh-admission-20261017.json).
 
 The helper has a 45-second socket/retry budget and reuses one capability. Its unit
 wants and follows the device service without requiring successful startup. If the
@@ -471,8 +478,10 @@ Expected profile changes from the setup worker need coordination with the observ
 For now, even a profile edit made by setup conservatively leaves automatic policy
 suspended until explicit resume; completing setup does not silently accept a new
 profile baseline.
-The controller tests use fake radios and temporary state. The native coordinator
-and SSH hook have not been installed or physically qualified on either Pi.
+The controller tests use fake radios and temporary state. The freshly flashed
+admin images include the native coordinator and SSH hook. The comparison above
+qualifies expired SSH reservation replacement; automatic radio transitions
+still need physical qualification.
 Partial offline remains disabled by default; neither board's installed policy
 or radio settings have changed.
 
@@ -849,8 +858,9 @@ this leaves the watchdog active. The core is intended to feed the shorter
 hardware timer until the requested virtual deadline. However, the physical
 probe below found that the pinned BCM2835 driver programmed the wrong hardware
 timeout. The image now patches that calculation and tests the actual driver
-function during its build. Measured expiry and reopen tests on each board are
-still required; the syscall fixtures cannot establish physical reset.
+function during its build. The corrected kernel has passed the Pi 5 expiry and
+missing-root tests below. Pi 4 execution and post-promotion completion tests
+remain required; the syscall fixtures cannot establish physical reset.
 
 The coordinator enforces the existing 180-second boot-relative trial deadline,
 including across service restarts, without refreshing the allowance from its
@@ -895,8 +905,29 @@ seconds and advertises the same 15,000 ms heartbeat while retaining the virtual
 deadline. A host test compiles the actual patched start function with register
 accesses intercepted, checks 19 timeout boundaries, and verifies that the
 counter agrees with the advertised heartbeat. The original driver fails this
-test; the patch passes. This does not yet prove the corrected kernel on hardware
-or establish the exact reset path of the first attempt.
+test; the patch passes. This does not establish the exact reset path of the
+first attempt.
+
+The corrected image at `82fcfb0` passed its Yocto build and unsigned candidate
+validation. Its kernel was then selected explicitly for two operator-only Pi 5
+tryboots, while retaining the original default kernel and root filesystem:
+
+- A same-root trial ran the corrected kernel, with the early watchdog armed at
+  716 ms and the requested 210-second deadline. Read-only SSH samples observed
+  the unchanged arm record through 208.59 seconds of uptime. The board then
+  returned automatically to the original normal kernel, with both device and
+  kiosk services active and the firmware boot count advancing twice.
+- A trial selecting a verified nonexistent root PARTUUID also returned
+  automatically to the original normal kernel. The firmware boot count again
+  advanced twice. No trial userspace was reachable, so the exact reset time and
+  its early arm record were not directly observed.
+
+Each test restored the original trial files, removed its extra kernel, and
+verified all original boot-asset hashes after returning. The devices still run
+the original flashed image; no production qualification flags or recovery
+baseline were created. Pi 4 tests, post-promotion watchdog completion and
+interrupted-promotion testing remain. The corrected kernel changes the shared
+boot identity and therefore needs boot-asset provisioning, not a rootfs-only OTA.
 [Hardware probe and regression evidence](data/ota-watchdog-hardware-20261017.json).
 
 ### Immutable boot assets and root selection
