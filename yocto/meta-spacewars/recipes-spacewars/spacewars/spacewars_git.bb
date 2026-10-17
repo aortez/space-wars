@@ -101,16 +101,40 @@ python verify_spacewars_source_identity() {
 do_compile[prefuncs] += "verify_spacewars_source_identity"
 do_compile[postfuncs] += "verify_spacewars_source_identity"
 
-python write_spacewars_source_identity() {
+python capture_spacewars_toolchain() {
+    import json
+    import os
     from pathlib import Path
+    from spacewars.build_provenance import capture, write
+
+    provenance = capture(
+        json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")),
+        {**os.environ, "PATH": d.getVar("PATH")}, d.getVar("CC"),
+        d.getVar("RUST_TARGET"), d.getVar("CARGO_BUILD_PROFILE"),
+        d.getVar("SPACEWARS_KIOSK_FEATURE"),
+    )
+    write(Path(d.getVar("WORKDIR")) / "spacewars-build.json", provenance)
+}
+do_compile[prefuncs] += "capture_spacewars_toolchain"
+do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provenance.py:True"
+
+python write_spacewars_source_identity() {
+    import json
+    from pathlib import Path
+    from spacewars.build_provenance import PROVENANCE_PATH, write
 
     bb.build.exec_func("verify_spacewars_source_identity", d)
     path = Path(d.getVar("D")) / "usr/share/spacewars/source.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(d.getVar("SPACEWARS_SOURCE_IDENTITY") + "\n")
     path.chmod(0o644)
+    provenance = json.loads((Path(d.getVar("WORKDIR")) / "spacewars-build.json").read_text())
+    if provenance["source"] != json.loads(d.getVar("SPACEWARS_SOURCE_IDENTITY")):
+        bb.fatal("Space-Wars toolchain record belongs to a different source")
+    write(Path(d.getVar("D")) / PROVENANCE_PATH, provenance)
 }
 do_install[postfuncs] += "write_spacewars_source_identity"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/build_provenance.py:True"
 
 python () {
     srcroot = d.getVar("SPACEWARS_SRCROOT")
@@ -308,6 +332,7 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-kiosk.service.d/renderer.conf \
     ${datadir}/spacewars/fast-update-compat \
     ${datadir}/spacewars/source.json \
+    ${datadir}/spacewars/build.json \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-access.service \
     ${systemd_system_unitdir}/sshd.service.d/spacewars-access.conf \

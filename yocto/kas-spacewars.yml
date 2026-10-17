@@ -10,10 +10,16 @@ header:
 distro: poky
 machine: raspberrypi-spacewars
 
+# The candidate builder supplies its cache explicitly. Keep the existing local
+# default when this variable is absent; never encode host cache paths in images.
+env:
+  SPACEWARS_CACHE_ROOT:
+
 repos:
   poky:
     url: "https://git.yoctoproject.org/poky"
     branch: scarthgap
+    commit: 4fb7016a07507683359ebd620f1951fd5ea44bfa
     layers:
       meta:
       meta-poky:
@@ -21,10 +27,12 @@ repos:
   meta-raspberrypi:
     url: "https://git.yoctoproject.org/meta-raspberrypi"
     branch: scarthgap
+    commit: 018d44467c4f09eb63f8ea5e86e85d755250cf89
 
   meta-openembedded:
     url: "https://git.openembedded.org/meta-openembedded"
     branch: scarthgap
+    commit: 0f00f8b9a21950640da8c5707343e5540133f86e
     layers:
       meta-multimedia:
       meta-networking:
@@ -34,10 +42,12 @@ repos:
   meta-rust-bin:
     url: "https://github.com/rust-embedded/meta-rust-bin.git"
     branch: master
+    commit: eaea247f32f247ab525112d2fbc16e16a553d880
 
   meta-pi-base:
     url: "https://github.com/aortez/sparkle-duck-shared.git"
     branch: main
+    commit: ce48602dfefd4ee7f3d3010086e685ede3fb17b9
     layers:
       yocto/meta-pi-base:
 

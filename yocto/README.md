@@ -10,7 +10,7 @@ when flashing; see [Picade and hardware profiles](../docs/picade.md).
 Install KAS on the build host:
 
 ```sh
-pip3 install kas
+pip3 install kas==5.4
 ```
 
 Yocto builds on Ubuntu 24.04 may also need unprivileged user namespaces enabled:
@@ -57,6 +57,35 @@ Cargo cleans workspace-package debug artifacts only, preserving dependency
 builds and experiment data. Preview with `npm run cache:check`, apply separately
 with `npm run cache:clean`, or set `SPACEWARS_BUILD_CACHE=report` / `off` to
 preview / disable automatic cleanup. No sibling checkout or Yocto cache is pruned.
+
+The five external layers are pinned to full commits in `kas-spacewars.yml`.
+Updating those commits is an explicit source change; a later branch tip does not
+silently change the image. GPU/software aliases inherit the same pins.
+
+For an OTA input record, run the unprivileged builder from the repository root:
+
+```sh
+python3 .github/ci/ota_build_inputs.py \
+  --source <full-source-commit> \
+  --build-directory /absolute/path/outside-the-checkout/yocto-build \
+  --cache /absolute/path/to/yocto-cache \
+  --output target/ota-build-inputs.json
+```
+
+The source and layers must be clean. This command uses kas 5.4, fixes its working
+directory, drops inherited credentials/implicit build overrides, runs the normal
+GPU build, and compares source/layer/configuration identities before and after.
+It rejects extra BitBake configuration such as `auto.conf`, and does not reset
+changed layers at the end. The new output file records the exact deployed gzip
+image hash/name instead of relying on its mutable alias. It also records the
+full layer commits, configuration hashes, source and image sidecar identity.
+
+Inside the recipe, `/usr/share/spacewars/build.json` records the actual Rust,
+Cargo and target C compiler version responses, target, profile, selected kiosk
+feature and source. The file is included in the final rootfs tree identity.
+These records are build evidence, not publication authorization. Independent
+validation of the actual image contents, signed metadata and device rollout
+remain separate steps described in [OTA updates](../docs/ota-updates.md).
 
 `rm_work` is enabled. The build warns below 25 GiB free, stops scheduling tasks
 below 20 GiB, and halts below 10 GiB. Free space and rerun to resume.
