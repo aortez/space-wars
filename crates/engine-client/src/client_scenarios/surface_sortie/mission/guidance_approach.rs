@@ -94,18 +94,24 @@ fn save(path: impl AsRef<Path>, value: &impl Serialize) {
 }
 
 fn fork(source: &MaterialMissionClientScenario) -> MaterialMissionClientScenario {
-    training::performance::timed("match_clone", || MaterialMissionClientScenario {
-        sortie: SurfaceSortieClientScenario::new(source.sortie.state.clone()),
-        pilots: source.pilots.clone(),
+    use training::performance::timed;
+    timed("match_clone", || MaterialMissionClientScenario {
+        sortie: {
+            let state = timed("clone.state", || source.sortie.state.clone());
+            timed("clone.cameras", || SurfaceSortieClientScenario::new(state))
+        },
+        pilots: timed("clone.pilots", || source.pilots.clone()),
         recovery_profiles: source.recovery_profiles,
         bots: source.bots,
         registration: source.registration,
         seed: source.seed,
         profile: profiling::Profile::default(),
-        evaluation: source.evaluation.clone(),
-        surveys: source.surveys.clone(),
-        flag_surveys: source.flag_surveys.clone(),
-        flag_value_shadow: source.flag_value_shadow.clone(),
+        evaluation: timed("clone.evaluation", || source.evaluation.clone()),
+        surveys: timed("clone.surveys", || source.surveys.clone()),
+        flag_surveys: timed("clone.flag_surveys", || source.flag_surveys.clone()),
+        flag_value_shadow: timed("clone.flag_value_shadow", || {
+            source.flag_value_shadow.clone()
+        }),
     })
 }
 
@@ -323,10 +329,13 @@ fn episode(
         if !handoff && !direct_transfer(&checked, case) {
             host_reason =
                 Some(serde_json::to_value(checked.pilots[case.seat].telemetry()).unwrap());
+            training::performance::timed("match_drop", || drop(checked));
             break Outcome::HostPreempted;
         }
         let decision = if handoff || controller.is_none() {
-            run = checked;
+            training::performance::timed("match_drop", || {
+                drop(std::mem::replace(&mut run, checked))
+            });
             None
         } else {
             let result = training::performance::timed("match_network_decision", || {
@@ -341,6 +350,7 @@ fn episode(
                 Ok(decision) => decision,
                 Err(error) => {
                     error_detail = Some(error.to_string());
+                    training::performance::timed("match_drop", || drop(checked));
                     break Outcome::InvalidOutput;
                 }
             };
@@ -349,6 +359,7 @@ fn episode(
             });
             training::performance::record_match_step("component", &run);
             owned_ticks += 1;
+            training::performance::timed("match_drop", || drop(checked));
             Some(decision)
         };
         let after = run.sortie.state.free_flight_observation(case.seat);
@@ -373,7 +384,7 @@ fn episode(
     if let Some(trace) = &mut trace {
         trace.flush().unwrap();
     }
-    Episode {
+    let result = Episode {
         case: case.name.clone(),
         controller: name.into(),
         outcome,
@@ -388,7 +399,9 @@ fn episode(
         error_detail,
         final_mission: serde_json::to_value(run.pilots[case.seat].telemetry()).unwrap(),
         frozen_target_offset: offset,
-    }
+    };
+    training::performance::timed("match_drop", || drop(run));
+    result
 }
 
 #[test]

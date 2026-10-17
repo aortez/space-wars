@@ -11,6 +11,7 @@ use crate::world::{
     BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole,
     ColliderShape, ColliderSpec, CollisionGroups, CompoundChild, PhysicsId, PhysicsWorld,
 };
+use std::sync::Arc;
 
 mod grain;
 pub use grain::{GrainSeed, GrainShape, TerrainGrain};
@@ -60,7 +61,9 @@ pub struct TerrainAssembly {
     body: BodyId,
     spec: TerrainSpec,
     revisions: Vec<Option<u64>>,
-    shapes: Vec<(Vec<SolidRect>, Vec<SolidPolygon>)>,
+    // Unchanged terrain needs no geometry allocation when forking a world.
+    // The first collider rebuild detaches this cache from other branches.
+    shapes: Arc<Vec<(Vec<SolidRect>, Vec<SolidPolygon>)>>,
 }
 
 impl TerrainAssembly {
@@ -91,7 +94,7 @@ impl TerrainAssembly {
             body,
             spec,
             revisions: vec![None; terrain.chunk_count()],
-            shapes: vec![(Vec::new(), Vec::new()); terrain.chunk_count()],
+            shapes: Arc::new(vec![(Vec::new(), Vec::new()); terrain.chunk_count()]),
         };
         if assembly.synchronize(world, terrain, geometry).is_none() {
             world.remove_entity(id);
@@ -233,8 +236,9 @@ impl TerrainAssembly {
                 return None;
             }
             self.revisions[chunk.id.0 as usize] = Some(chunk.generation);
-            self.shapes[index].0.clone_from(&chunk.rectangles);
-            self.shapes[index].1.clone_from(&chunk.polygons);
+            let shapes = &mut Arc::make_mut(&mut self.shapes)[index];
+            shapes.0.clone_from(&chunk.rectangles);
+            shapes.1.clone_from(&chunk.polygons);
             rebuilt += 1;
         }
         if rebuilt > 0 {

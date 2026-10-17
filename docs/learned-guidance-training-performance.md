@@ -3,7 +3,9 @@
 Independent practice and match cases now also share an adaptive episode pool.
 See [adaptive training workers](adaptive-training-workers.md) for Auto/Fixed
 controls, current scaling measurements, and scheduling-parity verification.
-The measurements below retain the earlier cloning investigation.
+The subsequent [shared terrain cache change](#shared-terrain-caches) reduces
+candidate time by another 19–24% at four to eight workers. The measurements
+below retain each earlier optimization stage for comparison.
 
 World copies now use Rapier's in-memory clone operations instead of a snapshot
 round trip. Immutable collision shapes are shared through Rapier's copy-on-write
@@ -23,7 +25,75 @@ an AMD Ryzen 7 9800X3D with eight physical cores and sixteen hardware threads.
 Other builds were active. The executable uses Rust 1.89.0 and the existing
 optimized `ci` profile, including debug assertions and overflow checks.
 
-## In-memory copy results
+## Shared terrain caches
+
+More detailed timers accounted for most of the previously unexplained match
+overhead: discarding temporary worlds took **25.7%** of profiled match time,
+alongside **43.9%** spent copying them. Each host check copied and discarded
+the derived terrain polygon vectors, even when no terrain edit occurred.
+
+`TerrainGeometry` and `TerrainAssembly` now share their immutable geometry
+cache vectors across clones. Refreshing changed geometry or replacing collider
+shapes detaches the corresponding vector before writing. Unchanged refreshes
+retain sharing; durability-only edits also retain the assembly's shape cache.
+Material cells, physical worlds, revision tracking and bot state remain
+independent. Cache contents, chunk identities, collider order and serialized
+state retain their existing semantics.
+
+On the same 172-episode finalist workload, the parallel comparison gave:
+
+| Workers | Candidate before | Candidate after | Wall time saved |
+| --- | ---: | ---: | ---: |
+| Fixed 4 | 698 ms | 565 ms | **19.0%** |
+| Fixed 8 | 438 ms | 335 ms | **23.5%** |
+
+Each row compares medians of three interleaved worker-count samples per
+executable. Baseline and optimized executables ran successively; background
+machine load was not controlled. Precision timings varied between runs and
+are included in these whole-candidate figures. The benchmark's peak process
+RSS fell from 244 to 186 MiB. These are retained-candidate measurements, not a
+new full-training duration or memory measurement.
+
+Separate stage profiles ran in baseline/optimized/baseline/optimized order.
+The baseline includes the same new timers and explicit temporary-world drops.
+Copying averaged **479 → 50 ms** per match batch (89.5% less), and disposal
+**281 → 15 ms** (94.6% less). Uninstrumented serial match medians fell from
+**1.219 → 0.478 s**, a 2.55× speedup. With four precision workers and serial
+match cases, complete candidate medians fell from **1.764 → 1.032 s**. Each
+median uses eight finalist samples across two profiling runs per executable.
+
+The remaining profiled match time is now:
+
+| Disjoint work | Share |
+| --- | ---: |
+| Stepping the handwritten host, including sensing and planning | 48.2% |
+| Stepping the candidate world, including the other bot | 34.1% |
+| World copies | 10.7% |
+| World disposal | 3.3% |
+| Neural-network decisions | 0.2% |
+| Other loop work | 3.4% |
+
+Those are serial stage shares. The optimized eight-worker wall-time split is
+**77.2% precision arrivals / 22.8% match approaches**. Precision cases do not
+perform per-tick host-world copies; physics and simulation steps now deserve
+more attention than further reducing these copy/disposal costs.
+
+All **1,527 targeted tests** passed across terrain, physics, Spacewars, AI,
+training, Scorched Earth, Terrain Lab and guidance fixtures. New regressions
+cover no-op refreshes, durability-only changes, edits across chunk boundaries,
+all three surface reconstructions, preserved geometry identities and independent
+collision queries after editing a cloned world. The eight-worker replay also
+matched all **276 historical episodes and 20,479 trace rows byte-for-byte**.
+Source hashes and saved fitness matched in every benchmark; parallel episodes
+matched their serial controls. The historical checkpoint and finalist hashes
+remained unchanged.
+
+The [compact evidence](data/learned-guidance-shared-geometry.json) records the
+exact binaries, code base, timing samples and validation. Frozen executables,
+source patches, detailed profiles, logs and replay traces are retained under
+`data/training-experiments/training-tail-optimization-20261017/`.
+
+## Initial in-memory copy results
 
 A repeat ran the preserved snapshot-copy executable followed by the optimized
 executable with the same profiler, historical genomes, case order, and worker
@@ -147,6 +217,7 @@ included in this training-source setup measurement.
    preserves the current host probe. Regression checks compare it against
    snapshot restoration, including contacts, sleeping bodies, joints, sensors,
    pending edits, shape copy-on-write, and compound CCD with reused handles.
+   Derived terrain geometry caches now also share immutable data until edited.
 2. **Parallelize match cases — implemented.** Practice and match episodes share
    one reusable pool, with Auto based on machine load and Fixed for benchmarking.
    Case order and deterministic outcomes stay fixed. The prior copy-only result
@@ -175,7 +246,9 @@ each worker count, profiled versus ordinary match episodes, and every control
 and observation across 82,391 precision replay ticks. Checkpoint encoding also
 matches the original bytes. The optimization changes physics-world copying;
 candidate policy, physics integration, training selection, deployed bot, and
-defaults are unchanged. No new training run has started.
+defaults are unchanged. Profiling replays retained candidates; the separate
+[bounded worker trial](adaptive-training-workers.md#varied-population-training-trial)
+checks evolving populations and checkpoint continuation.
 
 At the clone-optimization checkpoint, all 1,332 regression tests passed: 163 physics, 619 Spacewars gameplay, 451 AI,
 91 training framework, and eight guidance fixture tests. The new

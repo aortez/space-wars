@@ -83,6 +83,10 @@ were 1.242 s before and 1.244 s after. Four-worker match time alone fell to
 rates, including world setup and host checks, with no rendering. They measure
 one retained candidate, not the duration of a whole future training run.
 
+A subsequent [shared terrain cache optimization](learned-guidance-training-performance.md#shared-terrain-caches)
+reduced candidate wall time by a further 19–24% at four to eight workers. The
+table above preserves the original worker-pool comparison, before that change.
+
 Auto rose from one to eight workers before the competing load. Eight bounded
 background threads pushed measured machine CPU to 91.5%; Auto reduced its
 allowance to four by second 29. After the load stopped at second 36, it rose
