@@ -29,7 +29,7 @@ Remaining work retains the full OTA scope:
 | #262 | Isolated Release/Nightly publishing and operational signing setup |
 | #263 | Recovery service, health/watchdog handling and supervised bootstrap through baseline handoff implemented; live migration and physical recovery qualification remain |
 | #264 | Shared lock, verified inactive-root writer, operator maintenance guard, deployment holds and persistent SSH login keys implemented; final service/handoff and physical maintenance/data preservation qualification remain |
-| #265 | Dedicated scheduled download worker, bounded connection ownership, time-check handoff and local API implemented; production provisioning and installed-device qualification remain |
+| #265 | Scheduled download worker, bounded connection ownership, time-check handoff, local API and supervised state provisioning implemented; production trust/artifacts and installed-device qualification remain |
 | #266 | Update settings, overnight policy and serialized cancellable handoff |
 | #267 | Full Pi 4/5 qualification, recovery evidence and rollout documentation |
 
@@ -801,7 +801,9 @@ publish the permanent configuration last. A different normal boot must pass its
 own health window. Before finalization starts, failure returns to the staged
 default without an automatic retry. An explicit finalization command archives retired files before removal,
 publishes the initial recovery baseline, then archives the bootstrap reservation.
-The clean `cd66877` image and both schema-3 device kits now contain this path;
+The archived `cd66877` image and both schema-3 device kits contain this finalization path;
+they predate the current network/download worker and provisioning command.
+Rebuild from current source before a new OTA bootstrap. The
 [image and package evidence](data/ota-bootstrap-image-20261015.json) records actual
 filesystem checks, current inventories and packaged command rejection as UID
 1000 on both Pis. Neither Pi has undergone this migration. These tools do not
@@ -1063,7 +1065,7 @@ good root. The controller retains the shared installation lock throughout.
 The only production target comes from the validated inactive partition; there
 is no caller-supplied device, pathname, command or install hook.
 
-Staging is fixed at `/data/spacewars-system/staging/<compressed-sha256>.ext4.zst`.
+Staging is fixed at `/data/spacewars-system/updates/staging/<compressed-sha256>.ext4.zst`.
 Descriptor-relative opens reject symlinks, hardlinks, wrong owners, public
 permissions, a different data filesystem and replacement of the opened file.
 The installer holds the same exclusive staging lock as the download writer;
@@ -1303,7 +1305,7 @@ length. Only the fixed top-level and channel-role paths are admitted. Image
 compressed length must be positive and below 2 GiB; expanded length must fit the
 actual inactive slot. Persistent staging applies its separate space quota. The
 HTTPS session adds redirect/request bounds, progress deadlines and transfer
-throttling, described below; service-owned network-hold integration remains.
+throttling and service-owned network holds, described below.
 
 ## Persistent verification and installation evidence
 
@@ -1312,7 +1314,7 @@ directory. `TrustStore::open` never falls back to a bundled root when persisted
 state is missing or corrupt. On the device, the independent service opens a
 fixed root-owned directory under `/data/spacewars-system`; it must not accept
 that path from a kiosk request. Unix stores require owner-only permissions and
-reject symlinked state. An exclusive file lock serializes verifier instances.
+reject symlinked or hard-linked state. An exclusive file lock serializes verifier instances.
 
 Each refresh starts from the last committed TUF root and version state in a
 private temporary datastore. Accepted metadata progress is retained even when
@@ -1347,10 +1349,79 @@ actual devices and recovery capability at the final handoff, verify expanded
 bytes while writing, and preserve fallback data readability. Blocking image
 hashing belongs on the service's worker, never the client/render loop.
 
+## Supervised OTA state provisioning
+
+After the canonical bootstrap is complete and its recovery baseline is present,
+the root operator can establish the download state with:
+
+```sh
+engine-os-manager maintenance provision-updates \
+  --bundle-sha256 BUNDLE_SHA256 --data-version CONFIRMED_DATA_VERSION
+```
+
+The command reads only `/etc/spacewars/ota-bootstrap.json`. The operator supplies
+the independently selected SHA-256 of that public file and confirms the actual
+current persistent data version. The version must match the confirmed image's
+write schema; it is not inferred automatically from an image after rollback.
+The kiosk socket has no provisioning operation and cannot supply a root, URL,
+path or data version.
+
+The bundle has exactly three fields: `schema: 1`, `root` (the signed TUF root
+object), and `location` (credential-free HTTPS `metadata` and `targets` base URLs
+ending in `/`). Only public TUF fields are accepted. Provisioning verifies the
+root's self-signature threshold before creating state. Metadata expiry remains
+enforced by the normal verifier using accepted device time; provisioning is not
+permission to accept expired metadata or install an image.
+
+The Yocto recipe optionally embeds this file when both BitBake variables
+`SPACEWARS_OTA_BOOTSTRAP_BUNDLE` (absolute source path) and
+`SPACEWARS_OTA_BOOTSTRAP_SHA256` are set. It checks the selection at recipe parsing
+and again at installation, tracks the input in task checksums, and copies its
+exact bytes into the root filesystem. The image tree identity therefore includes
+the bundle. The Python build check verifies structure/public-only fields and the
+selected digest; the native provisioner performs signature verification. Empty
+configuration produces an unprovisioned image, without generating keys or
+substituting test trust.
+
+Setup holds the shared installation lock and rechecks the actual boot, root,
+data partition and recovery journal. An active bootstrap reservation excludes
+setup and downloads. Initial setup also requires generation zero with no signed
+update attempt history. It writes a private checksummed intent at
+`/data/spacewars-system/update-provision.json`, binding the selected bundle/root,
+feed location, board/layout/boot/profile, baseline and initial data version.
+
+Trust, the checksummed `data-schema.json`, and empty staging are prepared beneath
+`.updates-pending`, read back and flushed, then published together as
+`/data/spacewars-system/updates`. Downloads and the production staging accessor
+require the outer receipt's completed phase. An interruption after the directory
+rename can resume the same selected setup; it cannot expose partially initialized
+authority. Completed setup never recreates a missing/corrupt trust store, data
+record or update directory. Repeating it preserves rotated roots, metadata/image
+floors and the last trusted time. Data schema migrations must preserve the initial
+floor and update the current record under the same installation authority.
+
+The earlier development paths directly under `spacewars-system` are rejected if
+present without a receipt; this command does not adopt or overwrite them. This
+pass has not provisioned either Pi. Production public roots/feed publication,
+a newly built bundle-bearing image, supervised
+execution and physical qualification remain outstanding.
+
+All 11 provisioning cases passed on both Pi 5 and Pi 4, alongside 62
+runtime/schedule cases on each. The host passed 287 OTA
+unit tests, 22 signed-feed tests, 181 service tests and 75 Yocto helper tests.
+Checks cover every reported persistence boundary, abrupt process exit after
+directory publication, changed selection/device/data identity, missing/corrupt
+state, unsafe links/permissions, and retention of rotated trust and time/replay
+floors. Clippy, Rust 1.89 and AArch64 compilation also passed. The
+[provisioning evidence](data/ota-provision-20261016.json) records exact source,
+test scope and build-configuration checks. Pi tests use private UID-1000
+directories and injected runtime observations; they do not provision the installed
+service or prove physical power-loss recovery.
+
 ## Persistent image staging (#265)
 
 `engine_ota::staging_linux::StagingStore` manages one candidate in the fixed
-root-owned `/data/spacewars-system/staging` directory on the validated data
+root-owned `/data/spacewars-system/updates/staging` directory on the validated data
 partition. A private, single-link lock also excludes `StagedPayload`, preventing
 cleanup or a new download while the installer has an image open. Opening the
 production store requires that its private directory has already been provisioned;
@@ -1590,12 +1661,12 @@ obtains its own authority. Downloads never begin an installation or request a
 reboot.
 
 Persistent data compatibility also requires the private, checksummed
-`/data/spacewars-system/data-schema.json` record. Its envelope contains
+`/data/spacewars-system/updates/data-schema.json` record. Its envelope contains
 `record: {schema: 1, version: <positive integer>}` and the SHA-256 of the compact
 serialized record. Only supervised provisioning or a serialized schema migration
 may establish it. A rolled-back image's advertised write version is not proof of
 the current data version. Missing/corrupt data identity, an unprovisioned recovery
-journal, absent `/data/spacewars-system/trust` or missing staging reports
+journal, incomplete provisioning, absent `/data/spacewars-system/updates/trust` or missing staging reports
 preparation unavailable. This path does not initialize or reset trust implicitly.
 
 Ready follows complete payload verification, a fresh cached feed/eligibility
@@ -1608,8 +1679,8 @@ evidence only: installation still needs its own full revalidation. After process
 restart, retained bytes are not advertised as Ready without another verification
 session. Partial bytes remain available for a later eligible or explicit retry.
 
-Production provisioning of the data-version record, trust root/feed and staging
-directory remains, as do installed network/provider qualification, startup
+The operator provisioning path is implemented above. Production bundle setup
+and execution remain, as do installed network/provider qualification, startup
 presentation of retained partial-byte status, installer/policy/UI integration and
 physical failure/performance qualification. The service has not been installed or
 enabled on either Pi by these fixture runs.

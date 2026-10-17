@@ -1,5 +1,7 @@
 use super::*;
+use crate::owned_fs::open_directory;
 use std::os::unix::fs::{PermissionsExt, symlink};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::test_support::{EXPIRES, Fault, Fixture, candidate, descriptor, device, location, time};

@@ -38,6 +38,40 @@ struct StoredState {
     checksum: Sha256,
 }
 
+fn initial_state(root: &[u8], location: FeedLocation) -> Result<State> {
+    location.validate()?;
+    if root.len() > crate::MAX_METADATA_BYTES {
+        return Err(Error::Store("bootstrap root exceeds size limit".into()));
+    }
+    let signed: tough::schema::Signed<tough::schema::Root> = serde_json::from_slice(root)?;
+    signed
+        .signed
+        .verify_role(&signed)
+        .map_err(|error| Error::Store(error.to_string()))?;
+    Ok(State {
+        schema: 1,
+        location,
+        trusted: BTreeMap::from([(
+            "root.json".into(),
+            String::from_utf8(root.to_vec())
+                .map_err(|_| Error::Store("root is not UTF-8 JSON".into()))?,
+        )]),
+        feed: None,
+        images: BTreeMap::new(),
+    })
+}
+
+/// Exact initial bytes for the supervised, unpublished provisioning directory.
+/// This does not provide a way to replace an existing verifier's state.
+#[cfg(target_os = "linux")]
+pub(crate) fn initial_bytes(root: &[u8], location: FeedLocation) -> Result<Vec<u8>> {
+    let state = initial_state(root, location)?;
+    Ok(serde_json::to_vec(&StoredState {
+        checksum: Sha256::digest(&serde_json::to_vec(&state)?),
+        state,
+    })?)
+}
+
 /// Exclusively owned verifier state. The device service opens this as root in
 /// its fixed persistent directory; tests and publisher tools use private stores.
 /// It must never be opened at a path supplied through the kiosk socket.
@@ -51,15 +85,7 @@ impl TrustStore {
     /// Explicit bootstrap only. Never silently replace missing/corrupt state
     /// with the root bundled in a newer or rolled-back application image.
     pub fn initialize(path: &Path, root: &[u8], location: FeedLocation) -> Result<Self> {
-        location.validate()?;
-        if root.len() > crate::MAX_METADATA_BYTES {
-            return Err(Error::Store("bootstrap root exceeds size limit".into()));
-        }
-        let signed: tough::schema::Signed<tough::schema::Root> = serde_json::from_slice(root)?;
-        signed
-            .signed
-            .verify_role(&signed)
-            .map_err(|error| Error::Store(error.to_string()))?;
+        let state = initial_state(root, location)?;
         let mut builder = fs::DirBuilder::new();
         #[cfg(unix)]
         {
@@ -71,17 +97,6 @@ impl TrustStore {
         builder.create(path)?;
         check_private(path, true)?;
         let lock = lock(path)?;
-        let state = State {
-            schema: 1,
-            location,
-            trusted: BTreeMap::from([(
-                "root.json".into(),
-                String::from_utf8(root.to_vec())
-                    .map_err(|_| Error::Store("root is not UTF-8 JSON".into()))?,
-            )]),
-            feed: None,
-            images: BTreeMap::new(),
-        };
         let store = Self {
             path: path.into(),
             state,
@@ -292,9 +307,12 @@ pub(crate) fn check_private(path: &Path, directory: bool) -> Result<()> {
     {
         use std::os::unix::fs::MetadataExt;
         // SAFETY: geteuid has no arguments, preconditions, or side effects.
-        if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o077 != 0 {
+        if metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.mode() & 0o077 != 0
+            || (!directory && metadata.nlink() != 1)
+        {
             return Err(Error::Store(
-                "trust store has unsafe ownership or permissions".into(),
+                "trust store has unsafe ownership, permissions or links".into(),
             ));
         }
     }

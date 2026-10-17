@@ -21,7 +21,7 @@ pub const MAX_METADATA_BYTES: usize = 256 * 1024;
 const MAX_METADATA_TOTAL: usize = 8 * 1024 * 1024;
 const MAX_METADATA_REQUESTS: usize = 40;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FeedLocation {
     pub metadata: Url,

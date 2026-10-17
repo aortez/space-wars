@@ -11,6 +11,14 @@ fn runtime_identity_cannot_invoke_root_maintenance() {
         vec!["initialize-access"],
         vec!["ssh-network-admit"],
         vec!["maintenance", "import-root-keys"],
+        vec![
+            "maintenance",
+            "provision-updates",
+            "--bundle-sha256",
+            "invalid",
+            "--data-version",
+            "1",
+        ],
         vec!["maintenance", "fast", "--check"],
         vec!["maintenance", "renderer", "gpu"],
         vec![

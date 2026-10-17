@@ -5,8 +5,8 @@
 //! These blocking filesystem operations belong on the updater's IO worker,
 //! never the render thread. Cancellation/deadline guards run between bounded IO
 //! chunks, including while hashing/decompressing an already downloaded file.
-use crate::owned_fs::{io_result, name, open_at, open_directory, owned, read_file, unchanged};
-use crate::recovery_linux::{DeviceNumber, DiskLayout};
+use crate::owned_fs::{io_result, name, open_at, owned, read_file, unchanged};
+use crate::recovery_linux::DiskLayout;
 use crate::{
     Blob, Channel, DeviceIdentity, Error, ImageDescriptor, ImageHistory, Result, Selection, Sha256,
     TrustStore, UsableTime, VerifiedCandidate,
@@ -18,7 +18,6 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read, Seek, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
 
 pub const STAGING_RESERVE_BYTES: u64 = 256 * 1024 * 1024;
 pub const TRANSFER_CHUNK_BYTES: usize = 64 * 1024;
@@ -628,24 +627,10 @@ pub(crate) fn staging_lock(directory: &File, owner: u32) -> Result<File> {
 }
 
 pub(crate) fn staging_directory(layout: &DiskLayout) -> Result<File> {
-    let root = open_directory(Path::new("/"), 0)?;
-    let data = open_at(&root, "data", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
-    owned(&data.metadata()?, true, 0, false)?;
-    if DeviceNumber::from_dev(data.metadata()?.dev()) != layout.partitions[3].device {
-        return Err(Error::Staging(
-            "staging is not on the validated data partition",
-        ));
-    }
-    let system = open_at(
-        &data,
-        "spacewars-system",
-        libc::O_RDONLY | libc::O_DIRECTORY,
-        0,
-    )?;
-    owned(&system.metadata()?, true, 0, true)?;
-    let staging = open_at(&system, "staging", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+    let updates = crate::provision_linux::updates_directory(layout)?;
+    let staging = open_at(&updates, "staging", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
     owned(&staging.metadata()?, true, 0, true)?;
-    if staging.metadata()?.dev() != data.metadata()?.dev() {
+    if staging.metadata()?.dev() != updates.metadata()?.dev() {
         return Err(Error::Staging(
             "staging filesystem differs from persistent data",
         ));

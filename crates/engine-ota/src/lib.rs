@@ -43,6 +43,8 @@ mod owned_fs;
 #[cfg(target_os = "linux")]
 pub mod persistence_linux;
 #[cfg(target_os = "linux")]
+pub mod provision_linux;
+#[cfg(target_os = "linux")]
 mod watchdog_linux;
 #[cfg(target_os = "linux")]
 pub use watchdog_linux::{EarlyWatchdog, WatchdogCompletion};

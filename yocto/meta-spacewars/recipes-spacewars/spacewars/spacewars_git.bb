@@ -69,6 +69,28 @@ python () {
 do_compile[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
 do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/image_identity.py:True"
 
+# Public bootstrap material is supplied separately from signing keys. Empty
+# configuration builds an unprovisioned image; it never creates a fixture root.
+SPACEWARS_OTA_BOOTSTRAP_BUNDLE ?= ""
+SPACEWARS_OTA_BOOTSTRAP_SHA256 ?= ""
+python () {
+    from spacewars.ota_bundle import read_selected_bundle
+    source = d.getVar("SPACEWARS_OTA_BOOTSTRAP_BUNDLE")
+    expected = d.getVar("SPACEWARS_OTA_BOOTSTRAP_SHA256")
+    if source or expected:
+        read_selected_bundle(source, expected)
+        d.appendVarFlag("do_install", "file-checksums", " " + source + ":True")
+}
+python install_spacewars_ota_bundle() {
+    from spacewars.ota_bundle import install_selected_bundle
+    source = d.getVar("SPACEWARS_OTA_BOOTSTRAP_BUNDLE")
+    expected = d.getVar("SPACEWARS_OTA_BOOTSTRAP_SHA256")
+    if source or expected:
+        install_selected_bundle(d.getVar("D"), source, expected)
+}
+do_install[postfuncs] += "install_spacewars_ota_bundle"
+do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/ota_bundle.py:True"
+
 python verify_spacewars_source_identity() {
     import json
     from spacewars.image_identity import source_identity
@@ -295,6 +317,7 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/spacewars-system.service \
     ${systemd_system_unitdir}/spacewars-recovery.service \
     ${sysconfdir}/spacewars/bootstrap-runtime.json \
+    ${sysconfdir}/spacewars/ota-bootstrap.json \
     ${nonarch_libdir}/tmpfiles.d/spacewars-install.conf \
     ${systemd_system_unitdir}/spacewars-rtc-capture.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \

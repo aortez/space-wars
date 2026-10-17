@@ -4,15 +4,15 @@ use super::*;
 use crate::{linux, network_service};
 use engine_ota::boot_linux::{BootController, BootEvidence};
 use engine_ota::install_lock::InstallLock;
+use engine_ota::provision_linux::{
+    self, DATA_SCHEMA_PATH as DATA_SCHEMA, RECEIPT_PATH, STAGING_PATH as STAGING,
+    TRUST_PATH as TRUST,
+};
 use engine_ota::staging_linux::StagingStore;
-use engine_ota::{DeviceIdentity, ImageHistory, RecoveryStore, Selection, Sha256, TrustStore};
-use std::fs::{self, OpenOptions};
-use std::io::Read;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use engine_ota::{DeviceIdentity, ImageHistory, RecoveryStore, Selection, TrustStore};
+use std::fs;
+use std::os::unix::fs::MetadataExt;
 
-const TRUST: &str = "/data/spacewars-system/trust";
-const STAGING: &str = "/data/spacewars-system/staging";
-const DATA_SCHEMA: &str = "/data/spacewars-system/data-schema.json";
 const IMAGE: &str = "/etc/spacewars/image.json";
 
 #[derive(Clone)]
@@ -100,63 +100,16 @@ struct Context {
     unchanged: Vec<Stamp>,
 }
 
-/// Only supervised bootstrap or a serialized, compatible schema migration may
-/// write this record. Missing/corrupt data identity cannot be inferred from the
-/// currently booted image, especially after a rollback.
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DataVersion {
-    schema: u32,
-    version: u32,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DataEnvelope {
-    record: DataVersion,
-    checksum: Sha256,
-}
-
-fn data_version() -> Result<u32> {
-    data_version_at(DATA_SCHEMA.as_ref(), 0)
-}
-
-fn data_version_at(path: &Path, owner: u32) -> Result<u32> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path)?;
-    let metadata = file.metadata()?;
-    if !metadata.is_file()
-        || metadata.uid() != owner
-        || metadata.mode() & 0o077 != 0
-        || metadata.nlink() != 1
-        || metadata.len() > 4096
-    {
-        return Err(unavailable());
-    }
-    let mut bytes = Vec::new();
-    file.take(4097).read_to_end(&mut bytes)?;
-    if bytes.len() > 4096 {
-        return Err(unavailable());
-    }
-    let saved: DataEnvelope = serde_json::from_slice(&bytes)?;
-    if saved.record.schema != 1
-        || saved.record.version == 0
-        || Sha256::digest(&serde_json::to_vec(&saved.record)?) != saved.checksum
-    {
-        return Err(unavailable());
-    }
-    Ok(saved.record.version)
-}
-
 impl Context {
     fn open() -> Result<Self> {
         let lock = InstallLock::acquire()?;
+        engine_ota::bootstrap::require_no_active_bootstrap(&lock)?;
         let controller = BootController::open(&lock)?;
         let journal = RecoveryStore::open(crate::recovery_service::RECOVERY_DIRECTORY.as_ref())?;
         controller.authorize_maintenance(&journal)?;
         let boot = controller.observe()?;
-        let persistent_schema = data_version()?;
+        let persistent_schema =
+            provision_linux::inspect(&boot.layout, &boot.observation.binding)?.persistent_schema;
         if !boot.image.data.reads.contains(persistent_schema) {
             return Err(unavailable());
         }
@@ -196,6 +149,7 @@ impl Context {
         let unchanged = [
             PathBuf::from(IMAGE),
             PathBuf::from(DATA_SCHEMA),
+            PathBuf::from(RECEIPT_PATH),
             Path::new(crate::recovery_service::RECOVERY_DIRECTORY).join("state.json"),
         ]
         .into_iter()
@@ -212,6 +166,7 @@ impl Context {
     }
 
     fn check(&self) -> Result<()> {
+        engine_ota::bootstrap::require_no_active_bootstrap(&self.lock)?;
         if !self.unchanged.iter().all(Stamp::matches) {
             return Err(unavailable());
         }
@@ -358,6 +313,7 @@ impl Backend for Native {
             let paths = [
                 PathBuf::from(IMAGE),
                 PathBuf::from(DATA_SCHEMA),
+                PathBuf::from(RECEIPT_PATH),
                 Path::new(crate::recovery_service::RECOVERY_DIRECTORY).join("state.json"),
                 Path::new(TRUST).join("state.json"),
                 Path::new(STAGING).join("candidate.json"),
@@ -442,36 +398,7 @@ fn lower_priority() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::{PermissionsExt, symlink};
-
-    #[test]
-    fn data_version_requires_private_durable_identity_instead_of_guessing_from_the_image() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("data-schema.json");
-        let owner = unsafe { libc::geteuid() };
-        assert!(data_version_at(&path, owner).is_err());
-        let record = DataVersion {
-            schema: 1,
-            version: 2,
-        };
-        let bytes = serde_json::to_vec(&serde_json::json!({"record":record,
-            "checksum":Sha256::digest(&serde_json::to_vec(&record).unwrap())}))
-        .unwrap();
-        fs::write(&path, &bytes).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
-        assert_eq!(data_version_at(&path, owner).unwrap(), 2);
-        let mut changed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        changed["record"]["version"] = 1.into();
-        fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
-        assert!(data_version_at(&path, owner).is_err());
-        fs::write(&path, &bytes).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert!(data_version_at(&path, owner).is_err());
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
-        let alias = temp.path().join("alias");
-        symlink(&path, &alias).unwrap();
-        assert!(data_version_at(&alias, owner).is_err());
-    }
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn ready_snapshot_detects_replacement_edits_permissions_and_links() {

@@ -814,6 +814,14 @@ separate requirements. Finalization has not run against either Pi's installed
 state. Do not relabel older runtime images, kits or journals to bypass the new
 protocol checks.
 
+Once finalization has archived the active reservation, the root operator can
+run the separate [OTA state provisioning](ota-updates.md#supervised-ota-state-provisioning)
+command using a reviewed public bundle embedded in the new image and an explicit
+current data version. That command establishes persistent download trust and
+staging; it does not qualify recovery or enable automatic installation. The old
+`cd66877` kits below predate this command and must be rebuilt from current source
+before the complete OTA rollout.
+
 ## Persistent network profiles
 
 The Pi 5's `/etc/NetworkManager/system-connections` and `/var/lib/bluetooth`
@@ -928,10 +936,11 @@ replacements do not remove the need for independent recovery during bootstrap.
 No physical recovery qualification follows from passing the workstation tests.
 
 The earlier `c14c53f` runtime image and schema-2 packages predate the added
-persistence health checks, missing-store guards and bootstrap coordinator. Use
-the clean `cd66877` image and schema-3 kits below for a new preparation. They
-contain the protocol-4 runtime marker and expanded fallback-root inventory;
-existing packages and reservations must never be relabeled to bypass that gate.
+persistence health checks, missing-store guards and bootstrap coordinator. The
+archived `cd66877` image and schema-3 kits contain protocol 4 and the expanded
+fallback-root inventory, but predate the current network/download and provisioning
+code. Rebuild from current source for a new OTA preparation. Existing packages
+and reservations must never be relabeled to bypass protocol checks.
 
 ## Validation
 
