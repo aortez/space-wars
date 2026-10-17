@@ -346,6 +346,27 @@ restores an archive onto a live root/data filesystem. No data/configuration copy
 has been taken from an installed Pi yet; actual root access, independent export
 and supervised restore qualification remain outstanding.
 
+## Direct off-device data recovery
+
+For recovery from a device with storage read errors, `bootstrap_export_data`
+streams the same fixed data/configuration selection directly to the operator's
+stdout. It requires the existing preparation, preserved access/network stores
+and stopped writers. It writes no on-device archive or data-copy receipt and
+does not replace either backup required for migration. A failed inactive-root
+backup still blocks installation.
+
+Run it over authenticated SSH without a terminal, redirecting stdout into a
+new mode-0600 `.tar.partial` file inside a mode-0700 workstation directory.
+Keep stderr separately: it contains progress and, only after the archive is
+flushed and source metadata is rechecked, a final JSON report. Require a zero
+exit status, the final report's selected package and binding hashes, and a full
+workstation length/SHA-256 comparison before treating the export as complete.
+Retain any failed output as incomplete evidence. This is one checked content
+capture, with metadata inspection before and after; it does not perform the
+normal on-device backup's second full content read or issue install authority.
+Rehearse extraction with extended attributes into a fresh private directory
+before relying on the archive for restoration.
+
 ## Preserve original fallback-root files
 
 `bootstrap_prepare_legacy` accepts the separately selected bundle hash, raw-copy

@@ -206,6 +206,59 @@ pub fn backup_installed_data(
     Ok(result)
 }
 
+/// Export the same fixed recovery roots directly to the operator. This is useful
+/// when storage reads have failed and creating another on-device copy is unsafe.
+/// It never publishes a receipt that could authorize an installation.
+pub fn export_installed_data(
+    expected: Sha256,
+    output: impl std::io::Write,
+    mut progress: impl FnMut(u64),
+) -> Result<super::DataExportReport> {
+    let lock = InstallLock::acquire()?;
+    let inspected = Installed::open(expected, &lock, false)?;
+    let binding = inspected
+        .existing
+        .as_ref()
+        .ok_or_else(|| invalid("bootstrap must be prepared before direct data export"))?;
+    crate::access_linux::preserved_for_bootstrap(&lock)?;
+    crate::network_linux::preserved_for_bootstrap(&lock)?;
+    let root = crate::owned_fs::open_directory(std::path::Path::new("/"), 0)?;
+    let check = || -> Result<()> {
+        inspected.check(&lock)?;
+        require_stopped_writers(&inspected.data)
+    };
+    check()?;
+    let before = super::archive::inspect(&root, &inspected.data)?;
+    let (archive, captured) = super::archive::capture(
+        &root,
+        &inspected.data,
+        output,
+        before.archive_upper_bound,
+        &mut progress,
+    )?;
+    check()?;
+    if before != captured || before != super::archive::inspect(&root, &inspected.data)? {
+        return Err(invalid("source changed during direct data export"));
+    }
+    let after = inspect_bootstrap_boot()?;
+    let current =
+        super::BootstrapBinding::observed(expected, inspected.report.plan.target, &after)?;
+    super::state::existing(&inspected.parent, 0, &current)?
+        .ok_or_else(|| invalid("bootstrap reservation disappeared during export"))?;
+    Ok(super::DataExportReport {
+        schema: 1,
+        selection_version: 2,
+        scope: "direct off-device recovery archive; no on-device data receipt or install authority",
+        package_sha256: expected,
+        binding_sha256: Sha256::digest(&serde_json::to_vec(binding)?),
+        source_sha256: before.source_sha256,
+        entries: before.entries,
+        payload_bytes: before.payload_bytes,
+        archive,
+        ready_for_write: false,
+    })
+}
+
 /// Preserve the originals of the fixed fallback-root replacements. This does
 /// not modify that root or authorize installation; the caller separately
 /// selects the package and the two independently exported backup receipts.

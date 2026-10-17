@@ -100,10 +100,9 @@ mod trial_linux;
 pub use access_check::{AdministratorCheck, LegacyAccessCheck, SshCheckConnection};
 pub use data_backup::{
     DataBackupExportCheck, DataBackupProgress, DataBackupReceipt, DataBackupReport,
-    DataBackupStage, verify_data_backup_export,
+    DataBackupStage, DataExportReport, verify_data_backup_export,
 };
 pub use device::activate_bootstrap_boot;
-pub use device::backup_installed_data;
 pub use device::check_installed_legacy_access;
 pub use device::install_bootstrap_root;
 pub use device::prepare_installed_legacy;
@@ -113,6 +112,7 @@ pub use device::{
     CanonicalReboot, CanonicalReport, activate_canonical_boot, complete_canonical_boot,
     prepare_canonical_boot,
 };
+pub use device::{backup_installed_data, export_installed_data};
 pub use legacy_replace::{
     LegacyReplacementProgress, LegacyReplacementReport, LegacyReplacementStage,
 };

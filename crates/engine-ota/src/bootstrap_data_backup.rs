@@ -59,6 +59,20 @@ pub struct DataBackupReport {
 }
 
 #[derive(Debug, Serialize)]
+pub struct DataExportReport {
+    pub schema: u32,
+    pub selection_version: u32,
+    pub scope: &'static str,
+    pub package_sha256: Sha256,
+    pub binding_sha256: Sha256,
+    pub source_sha256: Sha256,
+    pub entries: u64,
+    pub payload_bytes: u64,
+    pub archive: Blob,
+    pub ready_for_write: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct DataBackupExportCheck {
     pub schema: u32,
     pub scope: &'static str,
