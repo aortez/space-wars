@@ -436,7 +436,21 @@ to continue; it does not claim Wi-Fi or Internet readiness. An independently off
 radio in mode Off stays off, preserving Ethernet logins. A policy-owned off state
 must be restored first, and an uncertain prior command cannot produce a successful
 admission. Expired holds remain protective while live sessions or unknown activity
-remain; a quiet, complete observation is required before reaping.
+remain. A new root SSH admission can replace expired SSH holds with its fresh
+120-second hold, maintaining uninterrupted protection without needing to prove
+idle first. Otherwise an active session or an incomplete observer could keep all
+32 slots occupied indefinitely and prevent new logins before the SSH banner.
+Replacement happens only after the policy commit succeeds; unexpired holds and
+all other hold kinds retain their existing limits and recovery grace. Without a
+replacement admission, reaping still requires a quiet, complete observation.
+
+Regression tests reproduce this exhaustion with both busy and unknown activity,
+preserve other reservations and the live-hold capacity limit, and cover failed
+durable commits. The manager suite passes 158 tests with one existing root-only
+integration test skipped; Clippy reports no warnings. On the second Picade, a
+read-only status sample showed 18 retained SSH holds, 17 expired, while SSH was
+active. Device testing of the fix is still pending; the stalled primary Picade's
+hold count could not be read.
 
 The helper has a 45-second socket/retry budget and reuses one capability. Its unit
 wants and follows the device service without requiring successful startup. If the

@@ -541,7 +541,19 @@ impl NetworkPolicy {
             }
             return Ok(());
         }
-        if self.temporary.len() + self.record.deployments.len() >= MAX_HOLDS {
+        // A live session or incomplete observer may prevent idle cleanup for
+        // hours. A new root SSH admission can replace expired SSH reservations
+        // because its fresh hold preserves uninterrupted network protection.
+        // Other reservation kinds retain their existing recovery grace.
+        let replaced: Vec<_> = self
+            .temporary
+            .iter()
+            .filter_map(|(id, hold)| {
+                (kind == HoldKind::Ssh && hold.kind == HoldKind::Ssh && hold.expires_ms <= clock.ms)
+                    .then_some(*id)
+            })
+            .collect();
+        if self.temporary.len() + self.record.deployments.len() - replaced.len() >= MAX_HOLDS {
             return Err(invalid("network hold capacity reached"));
         }
         let mut next = self.record.clone();
@@ -565,6 +577,9 @@ impl NetworkPolicy {
             };
             let expires_ms = clock.after(SETUP_MS)?.min(absolute_ms.unwrap_or(u64::MAX));
             self.commit(next)?;
+            for id in replaced {
+                self.temporary.remove(&id);
+            }
             self.temporary.insert(
                 id,
                 Temporary {
