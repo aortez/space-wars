@@ -23,8 +23,10 @@ SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 cargo test --offline --locked --profile ci
 ```
 
 The scenario suite passes 342 tests (five existing diagnostic/export tests are
-ignored). The common/control suites pass 53 tests. The actual client duck
-workflow covers entry, jumps, exit, live controls, replacement and cleanup.
+ignored). The common/control suites pass 53 tests, and 72 client Clock checks
+pass, including the corrected Rain body count and shaded Falling capture. The
+actual client duck workflow covers entry, jumps, exit, live controls,
+replacement and cleanup.
 Scenario coverage includes ordinary-input jumps onto a closing flap in both
 orientations, standing beyond the original closure deadline, attachment
 validation, stale-claim rejection, swept obstruction, support velocity, pause,
