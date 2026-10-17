@@ -1,0 +1,352 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-17T00:29:56.490318+00:00",
+  "source_commit": "b46fc6c50a5c4e3c6963b87f692892828692eb58",
+  "branch": "feat/ota-updates-254",
+  "issues": [
+    "https://github.com/aortez/space-wars/issues/261",
+    "https://github.com/aortez/space-wars/issues/262",
+    "https://github.com/aortez/space-wars/issues/263",
+    "https://github.com/aortez/space-wars/issues/264",
+    "https://github.com/aortez/space-wars/issues/265"
+  ],
+  "scope": "Explicit root-operator provisioning of public TUF trust, persistent data identity and staging after recovery bootstrap; atomic directory publication, durable outer receipt, worker/install staging integration and optional Yocto public-bundle embedding",
+  "source_files": {
+    "crates/engine-os-manager/src/main.rs": "1ffe16a1257453f5a6647507383ff14ef79d21eb2a67cb6ebfb004743c1a01ab",
+    "crates/engine-os-manager/src/update_native.rs": "bb83c4db081594ae7843273fe984ea223b1445f13670016807f05b1a53a12a0d",
+    "crates/engine-os-manager/tests/maintenance_cli.rs": "db87658f739db0883bd5f63c93b208a437a9e0041c44bc6dbcab0c20950adcfc",
+    "crates/engine-ota/src/lib.rs": "f83892e6739ef5abcd69c226a8f7ba47ff6204b894b95f37e0d6f5f958d15d09",
+    "crates/engine-ota/src/provision_linux.rs": "623ef35668fc581636a7188355c8701dc520c217420f08264e05f2384321def0",
+    "crates/engine-ota/src/provision_tests.rs": "ca33011558e9a83a396f97c91f03c16e65dee4f0983667df1f59dd1250f1a225",
+    "crates/engine-ota/src/repository.rs": "c2ad7d169bd96fbafabd6b2f55a4e480b88c6ee5e813a80bb1c0ecd140824434",
+    "crates/engine-ota/src/staging_linux.rs": "a4b51071d2d4d4fa62fe93fa76eb7d8b23e9afab838a054adfc6c64aea1b0a9b",
+    "crates/engine-ota/src/staging_tests.rs": "8cf852595ca6cc074278d68c1a0e30134f5453fcd0e1a31a40b858421e20f565",
+    "crates/engine-ota/src/store.rs": "61369e8e44164c8d8993ff99b7745d467279189ee5f950c203a0491c8e915dc6",
+    "docs/ota-bootstrap.md": "b17c859cae69f9118acd7cf043b969028fc18b0c2c7c4435413885267a6b4f8d",
+    "docs/ota-updates.md": "521f9eaa7cf14eb795fa98820648f3451c6a52b2ab1ecc1ca968423716a0ffbd",
+    "yocto/meta-spacewars/lib/spacewars/ota_bundle.py": "d0d011daba67ed57a8e05cbd29cc90d7770a4450b2e4ab65015d718de4c35c67",
+    "yocto/meta-spacewars/recipes-spacewars/spacewars/spacewars_git.bb": "debda5a15e1b4590229747a8ee2134ea944756e40e2a7b650004e08eab9e634f",
+    "yocto/tests/ota_bundle_test.py": "b17e8991fb8c440115bae293eab12e8809ce85b819e38052ed371fc5dc5a6286"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -p engine-ota -- --test-threads=1",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Before the final provisioning feed-base length guard and test-only Clippy cleanup; final provisioning tests and device binaries below include both.",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-ota.log",
+      "sha256": "c435a4195e9b7e9f9e9141b5be49f7a3ae36f03dec8032b47676291921cb6abf",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.97s",
+        "test result: ok. 287 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 179.92s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-os-manager -- --test-threads=1",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final service changes; before the final engine-ota provisioning feed-base length guard. Service runtime fixtures rerun on both Pis afterward.",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-service.log",
+      "sha256": "1088309535bd139a6350d08f27852d21451f094aefdc1243b380619e0ac2911f",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.93s",
+        "test result: ok. 156 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 31.57s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.10s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-ota --lib provision_linux::tests:: -- --test-threads=1",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-focused-final3.log",
+      "sha256": "8f68d02915a6934c9a5d7a5a1fd1255d08767d0c8d1db196777f8466a8a32154",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.90s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 284 filtered out; finished in 0.23s"
+      ]
+    },
+    {
+      "command": "cargo clippy --locked -p engine-os-manager -p engine-ota --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-clippy-final2.log",
+      "sha256": "cee5dc5f6a12b872960dedab73e435dfb64e4db45e639dcbf7526746f8b75d5e",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.18s"
+      ]
+    },
+    {
+      "command": "cargo +1.89.0 check --locked -p engine-os-manager -p engine-ota --all-targets",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-msrv-final.log",
+      "sha256": "a659f230e1026670c819aac39fee29eac57bc921ddba009b223dd09456b13c5f",
+      "results": [
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.36s"
+      ]
+    },
+    {
+      "command": "cargo test --locked -p engine-os-manager -p engine-ota --lib --target aarch64-unknown-linux-gnu --no-run --message-format=json",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-arm-final.log",
+      "sha256": "4c696aef0e026fe096048be64935c006fdfa1152f88f852513a588c42c871b0c",
+      "results": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.20s"
+      ]
+    },
+    {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final source",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-fmt-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": []
+    },
+    {
+      "command": "python3 -m unittest discover -s yocto/tests -p '*_test.py'",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Final Python/Yocto sources",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-yocto.log",
+      "sha256": "35447cdc2c69db6d4d2fb794bb0194c3e2cf55d4420edc51782249c42602aa3c",
+      "results": [
+        "Ran 75 tests in 28.776s",
+        "OK"
+      ]
+    },
+    {
+      "command": "bitbake -p",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Existing OTA build directory, optional public bundle unset",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-bitbake-parse.log",
+      "sha256": "f9027b470d27cd35a741a84f99618eba8efc985ee86181f43316a8a765017faa",
+      "results": [
+        "Parsing of 2971 .bb files complete (2970 cached, 1 parsed). 4888 targets, 131 skipped, 0 masked, 0 errors."
+      ]
+    },
+    {
+      "command": "bitbake -R /home/data/workspace/space-wars-ota/target/ota-provision-selected.conf -p",
+      "exit_code": 0,
+      "expected_failure": null,
+      "scope": "Selected structural public-bundle fixture, parse only; not a signed production root or image build",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-bitbake-selected.log",
+      "sha256": "1f6d055871f405ee5b964fd5d419d16bed6d99d2d47a9bd345bd4c293f1df060",
+      "results": [
+        "Parsing of 2971 .bb files complete (0 cached, 2971 parsed). 4888 targets, 131 skipped, 0 masked, 0 errors."
+      ]
+    },
+    {
+      "command": "bitbake -R /home/data/workspace/space-wars-ota/target/ota-provision-wrong-digest.conf -p",
+      "exit_code": 1,
+      "expected_failure": "Exception: ValueError: OTA bootstrap source differs from selected SHA-256",
+      "scope": "Same structural fixture, deliberately wrong independently selected digest",
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-bitbake-negative.log",
+      "sha256": "81c2becf789525de2c5e38ddd7a79f5d11fb5d6e1baf21e088696b805fb0f014",
+      "results": [
+        "Exception: ValueError: OTA bootstrap source differs from selected SHA-256"
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "board": "pi5",
+      "host": "spacewars.local",
+      "uid": 1000,
+      "boot_before": "de606400-dc75-446e-b26b-385592b0f562",
+      "boot_after": "de606400-dc75-446e-b26b-385592b0f562",
+      "fixture_directory": "/data/spacewars/ota-provision-fixtures.wc3P8s",
+      "data_free_bytes_before": 94163288064,
+      "tests": [
+        {
+          "artifact": {
+            "name": "engine_ota",
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-engine_ota-arm-tests",
+            "sha256": "6ce33fec05eb73d2c37b27f34746abdb9e3e64b0ccbd60a1f619e37db2e8a004",
+            "bytes": 28056512,
+            "filters": [
+              "provision_linux::tests::"
+            ],
+            "expected_tests": 11
+          },
+          "exit_code": 0,
+          "result": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 284 filtered out; finished in 3.80s",
+          "output": {
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-pi5-engine_ota.log",
+            "sha256": "9dabef8c6512c13d9acae6024d44ca2496358be4ca3c5f83b26dabcac930760a"
+          }
+        },
+        {
+          "artifact": {
+            "name": "engine_os_manager",
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-engine_os_manager-arm-tests",
+            "sha256": "8b2d9d534b7eaf8dc264310eedee4e90293bbb29034c23cd88c59d81dd004a74",
+            "bytes": 10756056,
+            "filters": [
+              "update_runtime::",
+              "update_schedule::tests::",
+              "time_runtime::tests::",
+              "time_schedule::tests::",
+              "download_reservation_requires",
+              "download_manual_admission",
+              "download_handoff_keeps",
+              "stale_connected_download"
+            ],
+            "expected_tests": 62
+          },
+          "exit_code": 0,
+          "result": "test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 4.22s",
+          "output": {
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-pi5-engine_os_manager.log",
+            "sha256": "e3356c816fcfb587a647e83dd4fa30b865edaa7aef274e53650247fc88fcceac"
+          }
+        }
+      ],
+      "production_provisioning_performed": false,
+      "installed_service_changes": false,
+      "radio_mutations": false,
+      "system_provider_restarted": false,
+      "root_partition_writes": false,
+      "reboots": false
+    },
+    {
+      "board": "pi4",
+      "host": "sw-picade.local",
+      "uid": 1000,
+      "boot_before": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "boot_after": "a3b74618-dc4a-4289-a1d8-0cc6b95fcdd9",
+      "fixture_directory": "/data/spacewars/ota-provision-fixtures.sgWySU",
+      "data_free_bytes_before": 44211638272,
+      "tests": [
+        {
+          "artifact": {
+            "name": "engine_ota",
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-engine_ota-arm-tests",
+            "sha256": "6ce33fec05eb73d2c37b27f34746abdb9e3e64b0ccbd60a1f619e37db2e8a004",
+            "bytes": 28056512,
+            "filters": [
+              "provision_linux::tests::"
+            ],
+            "expected_tests": 11
+          },
+          "exit_code": 0,
+          "result": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 284 filtered out; finished in 6.14s",
+          "output": {
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-pi4-engine_ota.log",
+            "sha256": "cdcc040b8c7ff5ce398adb5883ab487fb2862fdb784dd491fb56832ee3d6ae70"
+          }
+        },
+        {
+          "artifact": {
+            "name": "engine_os_manager",
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-engine_os_manager-arm-tests",
+            "sha256": "8b2d9d534b7eaf8dc264310eedee4e90293bbb29034c23cd88c59d81dd004a74",
+            "bytes": 10756056,
+            "filters": [
+              "update_runtime::",
+              "update_schedule::tests::",
+              "time_runtime::tests::",
+              "time_schedule::tests::",
+              "download_reservation_requires",
+              "download_manual_admission",
+              "download_handoff_keeps",
+              "stale_connected_download"
+            ],
+            "expected_tests": 62
+          },
+          "exit_code": 0,
+          "result": "test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 5.22s",
+          "output": {
+            "path": "/home/data/workspace/space-wars-ota/target/ota-provision-pi4-engine_os_manager.log",
+            "sha256": "b738731d1f2ef19a42274383c896b193cf49fb24dacf0196d9a66a0ee74af181"
+          }
+        }
+      ],
+      "production_provisioning_performed": false,
+      "installed_service_changes": false,
+      "radio_mutations": false,
+      "system_provider_restarted": false,
+      "root_partition_writes": false,
+      "reboots": false
+    }
+  ],
+  "coverage": [
+    "Independently selected public bundle digest, strict supported fields and root self-signature threshold checked before setup",
+    "Bundle/feed-base bounds, credential-bearing URLs, private key fields, invalid signatures, extra fields and unsupported schema rejected",
+    "Shared install lock, no active bootstrap, safe confirmed boot and pristine generation-zero recovery baseline required for first setup",
+    "Explicit current data version, selected bundle/root/feed, physical binding and recovery baseline retained in checksummed intent",
+    "Root-owned trust/data/staging directory published together and usable only after the outer completion receipt",
+    "Every instrumented persistence boundary resumes the original plan; real subprocess exit after directory publication leaves setup unavailable until completion",
+    "Changed request, boot guard, pending content or temporary receipt cannot publish another selected authority",
+    "Existing untracked development files are preserved and rejected rather than adopted",
+    "Completed missing/corrupt/linked/public state is never reinitialized; rotated roots and trusted metadata/image/time floors survive repeated setup",
+    "Data checksum, initial version floor and board binding are checked independently of the booted image",
+    "Native download context and ready-file snapshot include provisioning evidence; production staging requires completed setup",
+    "Runtime UID is denied the new maintenance CLI before parsing privileged input",
+    "Build helper embeds exact selected public bytes, rejects unsafe source/destination links and wrong digests, and changes image tree identity when bundle bytes change",
+    "BitBake accepts absent/selected bundle configuration and rejects a mismatched selected digest during recipe parsing"
+  ],
+  "paths": {
+    "bundled_public_material": "/etc/spacewars/ota-bootstrap.json",
+    "outer_receipt": "/data/spacewars-system/update-provision.json",
+    "trust": "/data/spacewars-system/updates/trust",
+    "staging": "/data/spacewars-system/updates/staging",
+    "data_version": "/data/spacewars-system/updates/data-schema.json"
+  },
+  "fixture_scope": {
+    "device": "Private UID-1000 directories on /data/spacewars; actual filesystem/crypto/subprocess fixtures with injected boot binding and network/time/runtime observations",
+    "privileged_entry": "Production root command not executed; host CLI test verifies ordinary-user denial. Native hardware boot/disk admission remains for supervised device execution.",
+    "keys": "Ephemeral fixture signing keys only; no production keys generated or installed",
+    "bitbake": "Recipe parsing only. Positive parse uses structural placeholder signatures; Rust fixtures separately verify real signed roots. No image or bootstrap kit rebuilt.",
+    "artifacts": "AArch64 library test executables built from the final working tree before its source commit, not bootable or production update images",
+    "service": "No installed service, provider, clock, radio, boot, partition or reboot change"
+  },
+  "fixture_timing_variability": {
+    "note": "An earlier Pi 5 runtime fixture pass took 52.29 seconds; final pass took 4.22 seconds. Both passed. Cause was not isolated; these fixtures do not qualify interactive frame-time impact.",
+    "earlier_result": "test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 52.29s",
+    "earlier_output": {
+      "path": "/home/data/workspace/space-wars-ota/target/ota-provision-pi5-engine_os_manager-pre-limit.log",
+      "sha256": "00bc1c6579b40a7d30d9b132efc1d4f7f1a0240268c53ed2b45f4c9753c25c55"
+    }
+  },
+  "bitbake_warning": "Ubuntu 26.04 is not validated by this Yocto version; parsing completed with no errors in positive cases.",
+  "bitbake_context": {
+    "environment_script": "/home/data/workspace/space-wars-ota/yocto/poky/oe-init-build-env",
+    "build_directory": "/home/data/workspace/.space-wars-ota-yocto-build-raspberrypi-spacewars-gpu",
+    "inputs": {
+      "/home/data/workspace/space-wars-ota/target/ota-provision-parse-bundle.json": "7d04424e03799b7c09bc3bf3c2fb73493df3c68e88c89116a4eaea1d9d647e84",
+      "/home/data/workspace/space-wars-ota/target/ota-provision-selected.conf": "bb2d8463bf68791d543bba4533680bed2c063fb0c8bae156f3d1ed88115ea8b8",
+      "/home/data/workspace/space-wars-ota/target/ota-provision-wrong-digest.conf": "21c99151cc696e26e0560aef27b82754d59f73d9071c31b5449f5cfe740b6ccd"
+    },
+    "configuration_saved_to_local_conf": false
+  },
+  "remaining": [
+    "Operational production signing keys, reviewed public trust bundle and Release/Nightly publishing with exact provenance",
+    "GitHub release-assets transport and publication integration with the bounded downloader",
+    "Build a current bundle-bearing image and bootstrap kits; archived cd66877 kits predate current service/provisioning code",
+    "Root-supervised bootstrap/provisioning and real installed network/provider/HTTP qualification on both Pis",
+    "Time-store repair versus schedule success-generation recovery, expected network profile changes and SSH idle qualification",
+    "Retained partial status, verified installation service, settings and Ask/Automatic overnight handoff",
+    "Physical success/failure/rollback/data/RTC and interactive frame-time qualification"
+  ],
+  "production_provisioning_performed": false,
+  "production_keys_created": false,
+  "image_built": false,
+  "installed_service_changes": false,
+  "live_installation_performed": false,
+  "auto_update_enabled": false,
+  "pushed": false
+}
