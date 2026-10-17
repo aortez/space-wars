@@ -29,6 +29,9 @@ ProtectControlGroups=yes
 # Pinned logind authorizes SetRebootParameter with CAP_SYS_ADMIN. Reboot itself
 # is a fixed PID 1 job; this process does not call the reboot syscall.
 CapabilityBoundingSet=CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_KILL CAP_SYS_ADMIN
+# systemd 255's seccomp setup otherwise drops CAP_SETUID from the effective set.
+# Keep it through root-worker exec; setpriv clears it when entering kiosk UID 1000.
+AmbientCapabilities=CAP_SETUID
 RestrictNamespaces=yes
 SystemCallFilter=~@mount
 DevicePolicy=closed

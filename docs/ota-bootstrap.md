@@ -19,14 +19,14 @@ inactive-root installer, independent-export verifiers, restartable boot staging,
 consumed one-shot activation, a first-boot recovery coordinator, and restartable
 canonical asset preparation/activation with separate staged and canonical
 normal-boot health checks, and an explicit archive/cleanup/recovery handoff.
-**Remaining:** a clean runtime image containing the service-mount correction,
-explicit reconciliation of the consumed Pi 5 attempt, successful corrected
+**Remaining:** a clean image containing the health-worker capability correction,
+explicit reconciliation of the second consumed Pi 5 attempt, successful corrected
 Pi 5/Picade trials, supervised staged/canonical normal-boot verification,
 live finalization and the remaining physical failure qualification. A package
 is not a signed OTA candidate or an enabled updater.
 
 The [2026-10-17 hardware record](data/ota-bootstrap-live-20261017.json) tracks
-the current run. The Picade has completed raw, data/configuration and original-file
+the initial run; follow-up records appear below. The Picade has completed raw, data/configuration and original-file
 backups with independently verified workstation exports, plus the fixed fallback
 file replacements and independent administrator/runtime access checks. SSH was
 lost before the inactive-root installation command began. A subsequent check
@@ -42,9 +42,11 @@ The replacement Pi 5 has since completed preservation, independent exports,
 access checks, inactive-root installation and boot staging. Its first live
 trial reached slot B but stopped at a service mount check. An unfed 210-second
 early watchdog was followed by an automatic reset and return to original slot A.
-The source fix passes a native diagnostic under the service sandbox, but is
-not yet in an installed recovery runtime. The consumed trial and all recovery
-copies remain intact. See the [replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json).
+The corrected runtime passed that check in a second trial, which then failed
+its kiosk state-write check and returned to slot A. Both consumed attempts and
+their recovery copies are retained. See the
+[first replacement trial record](data/ota-pi5-replacement-bootstrap-20261017.json)
+and [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json).
 
 ### Replacement Pi 5 USB drive
 
@@ -175,13 +177,96 @@ initial expected error wording was corrected without repeating the tests.
 All 329 OTA unit tests and 160 manager unit tests passed, with 8 and 2
 environment-specific tests ignored respectively.
 
-The Pi is running its original slot A with kiosk, device service, Wi-Fi and
-administrator access working. Its installed recovery service still has the
-mount-check defect and the journal remains consumed at `trial-requested`.
-There is no health proof, canonical migration or production recovery baseline.
-Do not reset that journal or repeat its activation: retain the attempt and
-reconcile it explicitly before preparing a new binding with a clean corrected
-image. Automatic OTA installation remains disabled.
+After that trial the Pi was running its original slot A with kiosk, device
+service, Wi-Fi and administrator access working. Its journal remained consumed
+at `trial-requested`, without health proof, canonical migration or a production
+recovery baseline. That attempt must never be reset or activated again.
+
+### Explicit failed-attempt reconciliation and corrected image
+
+The [reconciliation record](data/ota-pi5-failed-trial-reconciliation-20261017.json)
+retains the exact consumed journal and all recovery copies. A device-specific
+operator procedure required the unchanged fallback boot, original board and
+mount identities, the shared installation lock, stopped runtime writers, and
+matching control-record and boot-file hashes. Its filesystem rehearsals passed
+27 scenarios across seven test groups, including interruption at ten checkpoints,
+corrupt inputs, foreign links, conflicting archives and a changed journal.
+These are not physical power-loss qualification.
+
+The full 187-file boot tree was independently captured before cleanup. After
+the same checks passed on the Pi, the procedure restored the original factory
+`tryboot.txt` from its verified raw recovery copy and removed only the 78 copied
+and verified staged files. The native inventory probe confirmed the exact
+original 109-file boot tree. It then renamed the whole reservation and package
+to `/data/logs/spacewars-bootstrap-failed-afef8ee0/attempt`, preserving the trial
+journal's bytes and all prior backups. Root slots, normal configuration, later
+user data and fallback replacement scratch files were untouched. Both runtime
+services restarted successfully without a reboot.
+
+The [corrected image record](data/ota-corrected-bootstrap-image-20261017.json)
+binds the clean `a05944b` source to frozen Pi 4/Picade and Pi 5/HyperPixel packages.
+All 6,768 Yocto tasks succeeded, with 6,738 reused. Independent candidate
+inspection verified the image, embedded build inputs and compiler policy. An
+initial stale workstation validator rejected bootstrap protocol 5; rebuilding
+the feature-gated `image_candidate` with `--features publisher` resolved that
+tool mismatch without changing the image or its validation policy.
+
+A new Pi 5 attempt used a distinct preparation binding and fresh preservation;
+it did not reuse the archived attempt's activation allowance.
+
+### Second trial and the health-worker capability correction
+
+The [second trial record](data/ota-pi5-corrected-bootstrap-20261017.json) binds the
+new attempt to the `a05944b` image and its fresh raw, data and original-file
+preservation receipts. The 18,751-entry data archive was independently exported
+and checked for contents, modes, links and timestamps. Numeric owners remain in
+the archive; this unprivileged workstation rehearsal did not recreate them.
+Separate administrator/runtime access checks, inactive-root write and readback,
+filesystem validation and boot staging passed before the single activation.
+
+Trial `f952a6f4` booted slot B and reached `observing-trial`, passing the corrected
+mount check. It repeatedly reported `kiosk required state write failed`. The
+last trial observation was at 173.07 seconds; the next reachable boot was the
+original slot A, with the consumed journal marked `failed / health-timeout`.
+The original normal configuration is unchanged. No manual reboot or watchdog
+operation followed activation. The early watchdog was armed for 210 seconds,
+but the exact reset cause was not captured; this observation alone does not
+establish watchdog expiry.
+
+The state probe worked outside the recovery sandbox. Inside it, `setpriv`
+failed to switch to UID 1000 because the effective capability set lacked
+`CAP_SETUID`, despite its presence in `CapabilityBoundingSet`. The pinned
+[systemd 255 implementation](https://github.com/systemd/systemd-stable/blob/356c54394add8c6a1d52773852c23656590dc33b/src/core/exec-invoke.c#L4917)
+drops this capability during seccomp setup unless it is also requested as an
+ambient capability. The unit now sets `AmbientCapabilities=CAP_SETUID`, keeping
+the existing bounding set and sandbox restrictions. The kiosk probe runs with
+UID/GID 1000, no privileged supplemental groups, zero permitted/effective/ambient
+capabilities and `NoNewPrivileges=1` after the transition.
+
+The [native diagnostic](../yocto/scripts/check-recovery-health.py) uses the
+checkout's recovery sandbox with the installed health worker on a normally
+booted Pi. It holds the installation lock during each transient service and
+checks that the boot, worker binary and bootstrap journal stay unchanged:
+
+```sh
+python3 yocto/scripts/check-recovery-health.py \
+  --host spacewars.local --output target/recovery-health-check \
+  --compare-without-setuid
+```
+
+The output directory must be new. The optional comparison requires reproduction
+of the old systemd 255 capability failure. All five live cases passed: that
+failure, the unprivileged state write, two healthy observations with advancing
+UI/display counters, and rejection of a read-only configuration directory.
+The six artifact-policy tests and nine kiosk-health tests also passed. This
+diagnostic does not run recovery policy or establish boot qualification.
+
+The Pi is operating on its original slot A with kiosk, device service and Wi-Fi
+active, administrator access working and no observed storage errors. The
+production unit has not been patched in place. The capability correction still
+needs a clean image and a fresh trial, after explicitly reconciling the consumed
+`f952a6f4` attempt. Do not reset or reactivate that journal. No normal-default
+promotion, production recovery baseline or automatic OTA installation exists.
 
 ## Read the existing device
 
