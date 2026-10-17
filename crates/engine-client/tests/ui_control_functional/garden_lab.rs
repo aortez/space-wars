@@ -14,12 +14,12 @@ fn press(h: &mut FunctionalHarness, s: &mut UiState, b: InputButton) {
 fn choose(h: &mut FunctionalHarness, s: &mut UiState, current: &mut usize, target: usize) {
     while *current != target {
         press(h, s, InputButton::Down);
-        *current = (*current + 1) % 14;
+        *current = (*current + 1) % scenario_garden_lab::CONTROLS.len();
     }
     press(h, s, InputButton::South);
 }
 fn snapshot(h: &mut FunctionalHarness, predicate: impl Fn(&Value) -> bool) -> Value {
-    let deadline = Instant::now() + TRANSITION_TIMEOUT;
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         let status = h
             .client
@@ -173,6 +173,78 @@ fn garden_lab_controls_lifecycle_and_both_renderers() {
             assert_eq!(tick(&stepped), tick(&paused) + 1);
             capture(h, renderer, "pause-step", &stepped);
 
+            fresh(h, &mut s, &mut c);
+            let capped = until(h, &mut s, &mut c, 40);
+            assert_eq!(tissues(&capped).len(), 32);
+            assert!(
+                capped["growth_summary"]
+                    .as_str()
+                    .unwrap()
+                    .contains("tissue limit")
+            );
+            capture(h, renderer, "capped", &capped);
+            choose(h, &mut s, &mut c, 14);
+            let tuned = snapshot(h, |v| v["tissue_limit"] == 33);
+            for field in [
+                "biological_state",
+                "pending_ns",
+                "tick",
+                "tissues",
+                "connections",
+                "intake",
+                "maintenance",
+                "growth",
+                "loss",
+            ] {
+                assert_eq!(tuned[field], capped[field], "tuning changed {field}");
+            }
+            let expanded = until(h, &mut s, &mut c, 41);
+            assert_eq!(tissues(&expanded).len(), 33);
+            assert!(
+                expanded["growth"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|v| v.as_u64().unwrap() > 0)
+            );
+            capture(h, renderer, "expanded", &expanded);
+            fresh(h, &mut s, &mut c);
+            choose(h, &mut s, &mut c, 17);
+            for _ in 0..3 {
+                press(h, &mut s, InputButton::South);
+            }
+            let narrow = snapshot(h, |v| v["spread_radius"] == 0);
+            let blocked = until(h, &mut s, &mut c, tick(&narrow) + 1);
+            assert_eq!(tissues(&blocked).len(), tissues(&narrow).len());
+            assert!(
+                blocked["growth_summary"]
+                    .as_str()
+                    .unwrap()
+                    .contains("spread radius")
+            );
+            choose(h, &mut s, &mut c, 16);
+            let wider = snapshot(h, |v| v["spread_radius"] == 1);
+            assert_eq!(wider["tissues"], blocked["tissues"]);
+            assert_eq!(wider["pending_ns"], blocked["pending_ns"]);
+            let spread = until(h, &mut s, &mut c, tick(&wider) + 1);
+            assert!(tissues(&spread).len() > tissues(&wider).len());
+            assert!(
+                spread["growth"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|v| v.as_u64().unwrap() > 0)
+            );
+            capture(h, renderer, "spread-expanded", &spread);
+            choose(h, &mut s, &mut c, 2);
+            press(h, &mut s, InputButton::South);
+            choose(h, &mut s, &mut c, 0);
+            let complete = snapshot(h, |v| tick(v) == 300 && v["run_state"] == "complete");
+            choose(h, &mut s, &mut c, 14);
+            let tuned_complete = snapshot(h, |v| v["tissue_limit"] == 33);
+            assert_eq!(tuned_complete["tissues"], complete["tissues"]);
+            assert_eq!(tick(&tuned_complete), 300);
+            capture(h, renderer, "complete-after-tuning", &tuned_complete);
             fresh(h, &mut s, &mut c);
             let sun = until(h, &mut s, &mut c, 10);
             assert!(

@@ -5,7 +5,7 @@ use engine_core::{
     lighting::LightingPublisher,
     plants::{
         self, Environment, Plants, Role,
-        grass::{Grass, Plan, Traits},
+        grass::{Grass, Limit, Plan, Traits},
     },
 };
 use engine_rapier::{
@@ -43,6 +43,10 @@ pub enum Command {
     Previous,
     Next,
     Activate,
+    MoreTissues,
+    FewerTissues,
+    Wider,
+    Narrower,
 }
 impl Command {
     pub fn action(self) -> Action {
@@ -76,12 +80,16 @@ impl Command {
             Self::Previous,
             Self::Next,
             Self::Activate,
+            Self::MoreTissues,
+            Self::FewerTissues,
+            Self::Wider,
+            Self::Narrower,
         ]
         .get(*v as usize)
         .copied()
     }
 }
-pub const CONTROLS: [(&str, Command); 14] = [
+pub const CONTROLS: [(&str, Command); 18] = [
     ("Pause / resume", Command::Pause),
     ("Single step", Command::Step),
     ("Faster (max 16x)", Command::Faster),
@@ -96,6 +104,10 @@ pub const CONTROLS: [(&str, Command); 14] = [
     ("Cut shoots", Command::Cut),
     ("Reset / plant fresh seed", Command::Reset),
     ("Inspect next tissue", Command::Select),
+    ("Tissue limit +1 (max 128)", Command::MoreTissues),
+    ("Tissue limit -1 (min 1)", Command::FewerTissues),
+    ("Spread +1 cell (max 8)", Command::Wider),
+    ("Spread -1 cell (min 0)", Command::Narrower),
 ];
 pub struct GardenLabScenario;
 pub struct GardenLabState {
@@ -196,11 +208,100 @@ impl GardenLabState {
             .tick(before.tick, false, 1, &self.plan.intents, &env)
             .unwrap();
     }
+    pub fn pending_ns(&self) -> u64 {
+        self.pending_ns
+    }
+    pub fn current_plan(&self) -> Plan {
+        let roots = self.roots();
+        let env = GrassEnvironment {
+            roots: &roots,
+            physiology: &roots,
+        };
+        self.grass.plan(&self.plants.observe(), &env)
+    }
+    pub fn growth_summary(&self) -> String {
+        let plan = self.current_plan();
+        if let Some(reason) = plan.waiting {
+            return format!("Waiting: {reason:?}");
+        }
+        if plan.decisions.is_empty() {
+            return "No eligible candidates from living growth-capable tissue".into();
+        }
+        let mut reasons = Vec::new();
+        for d in &plan.decisions {
+            let reason = match d.limit {
+                Limit::Population => "tissue limit reached".into(),
+                Limit::Spread => "outside spread radius".into(),
+                Limit::Occupied => "occupied site".into(),
+                Limit::Space => "unsuitable substrate/space or outside habitat".into(),
+                Limit::Support => "invalid support".into(),
+                Limit::Size => "hard size limit".into(),
+                Limit::Work => "hard work limit".into(),
+                Limit::Cadence => "growth cadence".into(),
+                Limit::Proposed => "growth proposed (runtime admission still required)".into(),
+                Limit::Resource => {
+                    let missing: Vec<_> = ["nutrients", "water", "energy"]
+                        .into_iter()
+                        .enumerate()
+                        .filter(|(i, _)| d.available[*i] < d.cost[*i])
+                        .map(|(_, name)| name)
+                        .collect();
+                    format!("insufficient {}", missing.join("/"))
+                }
+            };
+            if !reasons.contains(&reason) {
+                reasons.push(reason);
+            }
+        }
+        format!("Checked candidates: {}", reasons.join("; "))
+    }
+    pub fn admission_summary(&self) -> String {
+        let o = self.plants.observe();
+        let outcomes: Vec<_> = o
+            .ledger
+            .results
+            .iter()
+            .map(|r| match r {
+                Ok(()) => "growth admitted and paid",
+                Err(plants::Rejection::Unaffordable) => "insufficient reserves after intake/upkeep",
+                Err(plants::Rejection::Space) => "occupied or unsuitable space",
+                Err(plants::Rejection::Support) => "invalid support",
+                Err(plants::Rejection::TissueLimit) => "hard tissue ceiling",
+                Err(plants::Rejection::WorkLimit) => "hard work ceiling",
+                Err(plants::Rejection::Dead) => "parent no longer alive",
+                Err(plants::Rejection::OrganismLimit) => "hard organism ceiling",
+                Err(plants::Rejection::Stale) => "stale proposal",
+                Err(plants::Rejection::Invalid) => "invalid proposal",
+            })
+            .collect();
+        format!(
+            "Last admission tick {}: {}",
+            o.ledger.tick,
+            if outcomes.is_empty() {
+                "no proposal".into()
+            } else {
+                outcomes.join("; ")
+            }
+        )
+    }
     pub fn command(&mut self, c: Command) {
         match c {
-            Command::Previous => self.control = (self.control + 13) % 14,
-            Command::Next => self.control = (self.control + 1) % 14,
+            Command::Previous => {
+                self.control = (self.control + CONTROLS.len() - 1) % CONTROLS.len()
+            }
+            Command::Next => self.control = (self.control + 1) % CONTROLS.len(),
             Command::Activate => self.command(CONTROLS[self.control].1),
+            Command::MoreTissues => {
+                self.grass.traits.max_tissues = (self.grass.traits.max_tissues + 1).min(128)
+            }
+            Command::FewerTissues => {
+                self.grass.traits.max_tissues =
+                    self.grass.traits.max_tissues.saturating_sub(1).max(1)
+            }
+            Command::Wider => self.grass.traits.radius = (self.grass.traits.radius + 1).min(8),
+            Command::Narrower => {
+                self.grass.traits.radius = self.grass.traits.radius.saturating_sub(1)
+            }
             Command::Pause => self.paused = !self.paused,
             Command::Step => {
                 if self.paused {
@@ -459,7 +560,7 @@ impl Scenario for GardenLabScenario {
                 s.seed,
                 o.tick,
                 s.speed,
-                if s.paused { "PAUSED" } else { "running" },
+                if o.tick >= MAX_TICKS { "COMPLETE" } else if s.paused { "PAUSED" } else { "physiology running" },
                 s.intensity,
                 s.availability[0],
                 s.availability[1]
@@ -473,10 +574,11 @@ impl Scenario for GardenLabScenario {
             "Green alive | amber stressed | grey dead | cyan links | white underground | pink selected"
                 .into(),
             format!(
-                "Policy {:x} | tissues {}/32 | plan {:?} | intake {:?} upkeep {:?} growth {:?}",
+                "Policy {:x} | tissues {}/{} | spread {} cells | intake {:?} upkeep {:?} growth {:?}",
                 plants::grass::POLICY,
                 o.tissues.len(),
-                s.plan.waiting,
+                s.grass.traits.max_tissues.min(o.config.max_tissues),
+                s.grass.traits.radius,
                 o.ledger.intake,
                 o.ledger.maintenance,
                 o.ledger.growth
@@ -486,6 +588,12 @@ impl Scenario for GardenLabScenario {
                 s.work.rays, s.work.footprint_tests, s.work.collider_records, s.dropped_ms
             ),
         ];
+        lines.push(s.growth_summary());
+        lines.push(s.admission_summary());
+        lines.push(
+            "Idle tissue still pays maintenance; full supplies do not guarantee affordable growth"
+                .into(),
+        );
         if let Some(t) = o.tissues.get(s.selected % o.tissues.len().max(1)) {
             lines.push(format!(
                 "Tissue {} | organism {} | {:?} | health {} | reserves {:?}",
@@ -558,6 +666,137 @@ fn garden_segment(
 #[cfg(test)]
 mod garden_lab_contract {
     use super::*;
+    #[test]
+    fn live_limits_preserve_complete_state_and_pay_for_independent_expansion() {
+        for spread in [false, true] {
+            let mut s = GardenLabScenario::init((), 42);
+            s.paused = true;
+            s.pending_ns = 500_000_012;
+            if spread {
+                s.grass.traits.radius = 0;
+            } else {
+                s.grass.traits.max_tissues = 1;
+            }
+            s.tick();
+            let before = s.plants.clone();
+            let phase = s.pending_ns;
+            assert!(s.growth_summary().contains(if spread {
+                "spread radius"
+            } else {
+                "tissue limit"
+            }));
+            s.command(if spread {
+                Command::Wider
+            } else {
+                Command::MoreTissues
+            });
+            assert_eq!(s.plants, before);
+            assert_eq!(s.pending_ns, phase);
+            assert!(!s.current_plan().intents.is_empty());
+            s.command(Command::Step);
+            let after = s.plants.observe();
+            assert_eq!(after.tick, before.observe().tick + 1);
+            assert_eq!(after.tissues.len(), 2);
+            assert!(after.ledger.growth.iter().all(|v| *v > 0));
+            assert_eq!(after.tissues[0].id, before.observe().tissues[0].id);
+            assert_eq!(
+                after.tissues[0].organism,
+                before.observe().tissues[0].organism
+            );
+            let preserved = s.plants.clone();
+            for _ in 0..300 {
+                s.command(Command::FewerTissues);
+                s.command(Command::Narrower);
+            }
+            assert_eq!(s.plants, preserved);
+            assert_eq!(s.grass.traits.max_tissues, 1);
+            assert_eq!(s.grass.traits.radius, 0);
+            for _ in 0..300 {
+                s.command(Command::MoreTissues);
+                s.command(Command::Wider);
+            }
+            assert_eq!(s.plants, preserved);
+            assert_eq!(s.grass.traits.max_tissues, 128);
+            assert_eq!(s.grass.traits.radius, 8);
+            while s.plants.observe().tick < MAX_TICKS {
+                s.tick();
+                assert!(s.plants.observe().tissues.len() <= 128);
+                assert!(s.work.rays <= 256);
+                assert!(s.work.footprint_tests <= 65536);
+                assert!(s.work.collider_records <= 524288);
+                assert!(s.current_plan().decisions.len() <= 4 * s.plants.observe().tissues.len());
+            }
+            let completed = s.plants.clone();
+            s.command(Command::MoreTissues);
+            s.command(Command::Step);
+            assert_eq!(s.plants, completed);
+            s.command(Command::Reset);
+            assert_eq!(s.grass.traits, Traits::default());
+            assert_eq!(s.plants, GardenLabScenario::init((), 42).plants);
+            assert_eq!(s.pending_ns, 0);
+        }
+    }
+    #[test]
+    fn admission_is_historical_and_shortages_do_not_bypass_costs() {
+        let mut s = GardenLabScenario::init((), 42);
+        let mut config = plants::Config::default();
+        config.maintenance_per_size = [[30; 3]; 3];
+        let mut plants = Plants::new(config, 42).unwrap();
+        let roots = s.roots();
+        let env = GrassEnvironment {
+            roots: &roots,
+            physiology: &roots,
+        };
+        plants
+            .seed(
+                plants::grass::POLICY,
+                Role::Root,
+                2,
+                [8, 3],
+                Some(s.grass.support),
+                [5; 3],
+                &env,
+            )
+            .unwrap();
+        s.plants = plants;
+        assert_eq!(s.current_plan().decisions[0].limit, Limit::Proposed);
+        s.tick();
+        let o = s.plants.observe();
+        assert_eq!(o.tissues.len(), 1);
+        assert_eq!(o.ledger.results, vec![Err(plants::Rejection::Unaffordable)]);
+        assert!(s.admission_summary().contains("after intake/upkeep"));
+        assert!(s.growth_summary().contains("insufficient"));
+        let admission = s.admission_summary();
+        s.command(Command::MoreTissues);
+        s.command(Command::Wider);
+        assert_eq!(s.admission_summary(), admission);
+        assert!(s.current_plan().intents.is_empty());
+        assert_eq!(s.plants.observe(), o);
+    }
+    #[test]
+    fn current_explanations_follow_actual_ordered_checks() {
+        let mut s = GardenLabScenario::init((), 42);
+        for _ in 0..40 {
+            s.tick();
+        }
+        assert_eq!(s.plants.observe().tissues.len(), 32);
+        assert!(s.growth_summary().contains("tissue limit"));
+        assert!(
+            s.current_plan()
+                .decisions
+                .iter()
+                .all(|d| d.limit == Limit::Population)
+        );
+        s.command(Command::MoreTissues);
+        let plan = s.current_plan();
+        assert!(!s.growth_summary().contains("tissue limit"));
+        assert!(plan.decisions.len() <= 4 * s.plants.observe().tissues.len());
+        for t in s.plants.observe().tissues {
+            s.plants.damage(t.id, 100).unwrap();
+        }
+        assert!(s.current_plan().decisions.is_empty());
+        assert!(s.growth_summary().contains("No eligible candidates"));
+    }
     fn run(s: &mut GardenLabState, n: usize) -> Vec<plants::Observation> {
         (0..n)
             .map(|_| {

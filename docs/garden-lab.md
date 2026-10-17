@@ -100,3 +100,35 @@ The UI workflow retains a Garden Lab launcher capture in each renderer's run.
 It also selects the next tissue while paused, compares the selected diagnostic
 record to that tissue's identity/health/stores, and asserts the pink marker's
 pixels lie at that tissue's projected cell before retaining its PNG/JSON pair.
+
+## Live growth limits
+
+The last four controls raise/lower the tissue ceiling (1–128, one tissue per
+activation) and spread radius (0–8, one cell per activation). Defaults remain
+32 tissues and radius four. Changes edit the existing policy in place, including
+while paused: they preserve biological state, IDs, connections, stores, health,
+ledgers, elapsed time and fractional playback phase. Lowering below the current
+patch retains every tissue and blocks new expansion until eligible. Explicit
+fresh planting and host restart restore defaults.
+
+Spread uses Chebyshev distance from the original seed: both cell-coordinate
+axis differences must be at most the radius. Cells are one world unit. This
+square bound is further restricted by the finite 16×8 habitat, solid dirt for
+roots/runners, empty shoot space, valid support and occupied sites. Routine
+limits are below the policy's 256-tissue/128-cell ceilings and the runtime's
+256-tissue ceiling. Radius eight covers the finite lab width from seed [8,3];
+128 tissues is no larger than its total cell count. Lighting retains its
+256-ray/65,536-footprint/524,288-collider budgets, candidate work remains at most
+four sites per tissue, and only one growth intent is proposed per tick.
+
+Current explanations summarize only the checks actually reached, in their
+original candidate order, with duplicate reasons collapsed. Each candidate
+records its first refusal; masked later checks are not proven blockers. A
+proposal ends enumeration early and still requires runtime admission. Missing
+nutrients, water and energy refer to component reserves at planning time; full
+soil/light settings do not guarantee affordability. Runtime admission is shown
+separately with its ledger tick because intake and upkeep precede final growth
+spending. Idle tissue still pays maintenance. No eligible candidates is not a
+resource or tissue-cap diagnosis. Current explanations are recomputed without
+advancing physiology. Growth limits, lab PAUSED, host pause and the COMPLETE
+300-second run are distinct; raising limits never extends a completed run.
