@@ -52,12 +52,24 @@ operator's private umask. The same error was reproduced in a regression test.
 Boot profile/identity reads now use sudo, and the written selection is read
 back before success.
 
+The subsequent `--finish` execution selected HyperPixel and restored and
+verified all 18,148 data entries. Access provisioning then rejected the
+intentionally empty root-key file: the workstation's `stat %F` reports
+`regular empty file`, while the checker required `regular file`. Its owner and
+0600 permissions match the archive. The checker now uses numeric type/mode
+bits and retains the exact owner/group and single-link requirements. A real
+empty-file test reproduced the failure before the fix. An isolated root
+fixture also passed the remaining provisioning operation against the actual
+archived access store and account files from the frozen image, preserving all
+role files unchanged and leaving root access empty.
+
 Resume this particular drive with
-`python3 target/flash-spacewars-replacement.py --finish`. This checks the
-already-flashed boot/root identities, finishes hostname/profile selection and
-restores data/access without erasing, rewriting or resizing the disk again.
-`--finish --dry-run` passed. Execution still needs the owner's interactive
-workstation sudo authentication; do not boot until it prints `READY`.
+`python3 target/flash-spacewars-replacement.py --finish-access`. This verifies
+the installed image and restored data, finishes access provisioning, and
+performs the final read-only data check. It does not repeat the image write,
+partition resize or data restoration. `--finish-access --dry-run` passed.
+Execution still needs the owner's interactive workstation sudo authentication;
+do not boot until it prints `READY`.
 
 This operator command pins the reviewed image, data archive and helper hashes,
 plus the connected disk's model, capacity, USB path and connection sequence. Its
@@ -80,9 +92,10 @@ Seven focused tests passed in an isolated root container, including foreign
 numeric owners, hard/symbolic links, xattrs, damaged archives, unsafe paths and
 destination conflicts. A further isolated root-container rehearsal restored
 the actual archive's entire selected tree and verified all 18,148 entries,
-including numeric ownership. The actual replacement-device restore and boot
-remain pending. The profile fix passed all 16 hardware tests and the complete
-Yocto suite (69 Node tests and 87 Python tests passed, with one skipped in each).
+including numeric ownership. Replacement-device restoration has now passed;
+completion of access provisioning, final readback and boot remain pending.
+The complete Yocto suite passes 70 Node tests and 87 Python tests, with one
+skipped in each. The focused hardware suite has 16 passing tests.
 A fresh flash still needs its own recovery-baseline qualification; these tests
 do not enable automatic OTA installation.
 

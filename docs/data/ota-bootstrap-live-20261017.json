@@ -80,10 +80,10 @@
       "administrator_key_present": true,
       "old_recovery_journals_present": false,
       "device_written": true,
-      "physical_restore_verified": false,
+      "physical_restore_verified": true,
       "boot_verified": false,
-      "pending": "interactive workstation sudo authentication to finish profile selection and data/access restoration; subsequent Pi 5 boot",
-      "resume_command": "python3 target/flash-spacewars-replacement.py --finish",
+      "pending": "interactive workstation sudo authentication to finish access provisioning and final readback; subsequent Pi 5 boot",
+      "resume_command": "python3 target/flash-spacewars-replacement.py --finish-access",
       "resume_dry_run_passed": true,
       "completed_before_profile_failure": {
         "evidence": "owner-provided terminal output; independently observed resulting partition layout",
@@ -122,6 +122,35 @@
         "nanosecond_timestamps_verified": true,
         "extended_attributes_verified": true,
         "scope": "actual selected data archive restored into isolated root-container tmpfs; replacement-device restoration and boot remain pending"
+      },
+      "physical_final_readback_verified": false,
+      "restoration_completed": {
+        "evidence": "owner-provided --finish execution output",
+        "boot_and_root_identity_verified": true,
+        "hardware_profile_selected": "hyperpixel",
+        "data_entries_restored_and_verified": 18148,
+        "numeric_owners_verified": true,
+        "access_provisioning_completed": false,
+        "final_readback_completed": false
+      },
+      "empty_root_key_failure": {
+        "root_key_bytes": 0,
+        "archive_uid": 0,
+        "archive_gid": 0,
+        "archive_mode": "0600",
+        "actual_stat_description": "regular empty file",
+        "previously_required_description": "regular file",
+        "regression_reproduced": true,
+        "fix": "compare numeric file type and mode bits; retain exact owner, group and regular-file link-count checks",
+        "empty_role_files_preserved": true,
+        "unsafe_metadata_rejection_tests_passed": true
+      },
+      "actual_store_access_provisioning_rehearsal": {
+        "actual_archive_access_store_checked": true,
+        "administrator_preserved": true,
+        "root_access_remained_empty": true,
+        "role_bytes_owners_modes_and_link_counts_unchanged": true,
+        "scope": "isolated root fixture with actual archived access store and frozen-image account files; no physical disk changes"
       }
     }
   },
@@ -133,14 +162,18 @@
     "format_and_diff_check": "passed",
     "offline_archive_restore_root_container_tests_passed": 7,
     "yocto_node_tests": {
-      "passed": 69,
+      "passed": 70,
       "skipped": 1
     },
     "yocto_python_tests": {
       "passed": 87,
       "skipped": 1
     },
-    "hardware_profile_tests_passed": 16
+    "hardware_profile_tests_passed": 16,
+    "flash_storage_host_tests": {
+      "passed": 15,
+      "skipped": 1
+    }
   },
   "remaining": [
     "Flash the selected Pi 5 replacement, verify its restored data and boot, then prepare a new bootstrap binding.",

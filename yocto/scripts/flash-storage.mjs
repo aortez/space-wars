@@ -232,9 +232,14 @@ export function installKey(run, path, bytes, uid, mode, install = requireGnuInst
 }
 
 function checkPath(run, path, mode, type, uid = 0) {
-  const format = `%u:%g:%a:%F${type === 'regular file' ? ':%h' : ''}`;
-  if (sudo(run, 'stat', '-c', format, '--', path) !== `${uid}:${uid}:${mode}:${type}${type === 'regular file' ? ':1' : ''}`) {
-    throw new Error(`Unsafe SSH access path: ${path}`);
+  // %F describes zero-length keys as "regular empty file" on some hosts.
+  // Empty files are deliberate revocations; check type/mode bits, not prose.
+  const regular = type === 'regular file';
+  const bits = ((regular ? 0o100000 : 0o040000) | parseInt(mode, 8)).toString(16);
+  const expected = `${uid}:${uid}:${bits}${regular ? ':1' : ''}`;
+  const observed = sudo(run, 'stat', '-c', `%u:%g:%f${regular ? ':%h' : ''}`, '--', path);
+  if (observed !== expected) {
+    throw new Error(`Unsafe SSH access path: ${path} (expected ${expected}; got ${observed})`);
   }
 }
 

@@ -50,14 +50,14 @@ function model({ store = false, admin = false, sudoFailure = false, mismatch = f
       const path = rest.at(-1);
       if (path.endsWith('/.ssh')) {
         const uid = path.includes('/home/swadmin/') ? 1001 : 1000;
-        return `${uid}:${uid}:700:directory`;
+        return `${uid}:${uid}:41c0`;
       }
       if (path.endsWith('/authorized_keys')) {
         const uid = path.includes('/home/swadmin/') ? 1001 : 1000;
-        return `${uid}:${uid}:600:regular file:1`;
+        return `${uid}:${uid}:8180:1`;
       }
-      if (path.endsWith('/spacewars-access')) return '0:0:755:directory';
-      return `0:0:${path.endsWith('/spacewars-admin') ? '440' : path.endsWith('/root') ? '600' : '644'}:regular file:1`;
+      if (path.endsWith('/spacewars-access')) return '0:0:41ed';
+      return `0:0:${path.endsWith('/spacewars-admin') ? '8120' : path.endsWith('/root') ? '8180' : '81a4'}:1`;
     }
     return '';
   };
@@ -150,9 +150,13 @@ test('existing administrator keys and deliberate revocations survive unless expl
 
 test('unsafe admin key targets and unavailable sudo never become a first-boot fallback', () => {
   const m = model({ store: true, admin: true });
-  const run = (program, args, options) => args[0] === 'stat' && args.at(-1).endsWith('/swadmin')
-    ? '0:0:777:symbolic link:1' : m.run(program, args, options);
-  assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /Unsafe SSH/);
+  // Symlinks, directories, unsafe permissions, wrong owners and hard links
+  // remain invalid even when empty regular key files are accepted.
+  for (const observed of ['0:0:a1ff:1', '0:0:41a4:1', '0:0:81b6:1', '1000:0:81a4:1', '0:1000:81a4:1', '0:0:81a4:2']) {
+    const run = (program, args, options) => args[0] === 'stat' && args.at(-1).endsWith('/swadmin')
+      ? observed : m.run(program, args, options);
+    assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), { run }), /Unsafe SSH/);
+  }
   assert.throws(() => provisionAccess('/dev/sdz', Buffer.from('a'), Buffer.from('b'), model({ sudoFailure: true })), /sudo denied/);
 });
 
@@ -176,6 +180,19 @@ test('real key installation preserves exact bytes and permissions when invoked t
     }
   }
   assert.ok(sources.every(path => !existsSync(path)));
+});
+
+test('real empty key files retain valid permissions and represent disabled or revoked access', t => {
+  const destination = join(temporary(t), 'root');
+  const run = (program, args, options) => program === 'sudo'
+    ? execute(args[0], args.slice(1), options) : execute(program, args, options);
+  for (const mode of ['600', '644']) {
+    installKey(run, destination, Buffer.alloc(0), process.getuid(), mode);
+    const metadata = lstatSync(destination);
+    assert.equal(metadata.size, 0);
+    assert.equal(metadata.mode & 0o777, parseInt(mode, 8));
+    assert.equal(metadata.nlink, 1);
+  }
 });
 
 test('real provisioning creates runtime and admin directories and keys with offline numeric owners', {
@@ -214,7 +231,7 @@ test('real provisioning creates runtime and admin directories and keys with offl
           chownSync(home, uid, uid);
         }
       } else {
-        file(root, 'spacewars-access/root', 'retained root key\n', 0o600);
+        file(root, 'spacewars-access/root', '', 0o600);
         file(root, 'spacewars-access/spacewars', 'retained runtime key\n', 0o644);
       }
       return '';
@@ -241,7 +258,7 @@ test('real provisioning creates runtime and admin directories and keys with offl
     { path: 'home/spacewars/.ssh/authorized_keys', metadata: [1000, 1000, 0o600, 'file'], bytes: runtime },
     { path: 'home/swadmin/.ssh', metadata: [1001, 1001, 0o700, 'directory'], bytes: null },
     { path: 'home/swadmin/.ssh/authorized_keys', metadata: [1001, 1001, 0o600, 'file'], bytes: admin },
-    { path: 'spacewars-access/root', metadata: [0, 0, 0o600, 'file'], bytes: Buffer.from('retained root key\n') },
+    { path: 'spacewars-access/root', metadata: [0, 0, 0o600, 'file'], bytes: Buffer.alloc(0) },
     { path: 'spacewars-access/spacewars', metadata: [0, 0, 0o644, 'file'], bytes: Buffer.from('retained runtime key\n') },
     { path: 'spacewars-access/swadmin', metadata: [0, 0, 0o644, 'file'], bytes: admin },
   ]);
