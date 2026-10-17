@@ -14,7 +14,7 @@ use std::time::Duration;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "scorched-earth",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(2),
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: false,

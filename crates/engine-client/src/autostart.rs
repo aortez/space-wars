@@ -132,6 +132,7 @@ pub(crate) fn install(
     let state = Rc::clone(&runtime);
     let return_launcher = Rc::clone(&launcher);
     let return_settings = Arc::clone(&settings);
+    let return_writer = writer.clone();
     window.on_autostart_return(move || {
         let Some(window) = weak.upgrade() else { return };
         return_launcher.cancel_automatic();
@@ -147,7 +148,7 @@ pub(crate) fn install(
         };
         window.invoke_ingame_return_launcher();
         if let Some(launch) = manual {
-            crate::show_launcher(&window, &launch, &return_settings.read().unwrap(), &catalog);
+            crate::show_launcher(&window, &launch, &return_settings, &return_writer, &catalog);
         }
     });
 

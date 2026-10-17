@@ -140,6 +140,7 @@ fn activation_target(
         },
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
+        "launcher.scenarios.show_all" => launcher(9, UiAction::Confirm),
         "launcher.start" => launcher(1, UiAction::Confirm),
         "launcher.new-match" => launcher(6, UiAction::Confirm),
         "launcher.settings" => launcher(2, UiAction::Confirm),

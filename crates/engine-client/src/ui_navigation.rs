@@ -10,6 +10,9 @@ pub(crate) fn moved_selection(current: i32, item_count: i32, delta: i32) -> i32 
 }
 
 pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
+    if let Some(next) = show_all_selection(current, action) {
+        return next;
+    }
     if let Some(next) = training_footer_selection(current, action) {
         return next;
     }
@@ -27,6 +30,9 @@ pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
 
 /// The same layout adds Play New World beside Play; Quit stays in the footer.
 pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> i32 {
+    if let Some(next) = show_all_selection(current, action) {
+        return next;
+    }
     if let Some(next) = training_footer_selection(current, action) {
         return next;
     }
@@ -37,6 +43,17 @@ pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> 
         UiAction::Left => [0, 6, 5, 2, 4, 3, 1][current],
         UiAction::Right => [0, 6, 3, 5, 4, 2, 1][current],
         _ => current as i32,
+    }
+}
+
+// The new control keeps its own index so existing API focus meanings stay stable.
+fn show_all_selection(current: i32, action: UiAction) -> Option<i32> {
+    match (current, action) {
+        (0, UiAction::Down) | (1 | 6, UiAction::Up) => Some(9),
+        (9, UiAction::Up) => Some(0),
+        (9, UiAction::Down) => Some(1),
+        (9, _) => Some(9),
+        _ => None,
     }
 }
 
@@ -180,7 +197,8 @@ mod tests {
             assert_eq!(navigate(7, UiAction::Up), 5);
             assert_eq!(navigate(7, UiAction::Down), 0);
         }
-        assert_eq!(moved_launcher_selection(0, UiAction::Down), 1);
+        assert_eq!(moved_launcher_selection(0, UiAction::Down), 9);
+        assert_eq!(moved_launcher_selection(9, UiAction::Down), 1);
         assert_eq!(moved_launcher_selection(1, UiAction::Down), 2);
         assert_eq!(moved_launcher_selection(2, UiAction::Right), 3);
         assert_eq!(moved_launcher_selection(3, UiAction::Right), 5);

@@ -28,7 +28,7 @@ mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Main(0),
     capabilities: ScenarioCapabilities {
         benchmark: false,
         headless_benchmark: true,

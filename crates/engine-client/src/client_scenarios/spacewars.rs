@@ -16,7 +16,7 @@ use crate::render::{self, FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-classic",
-    launcher_visible: true,
+    launcher_category: crate::client_scenarios::LauncherCategory::Extra,
     capabilities: ScenarioCapabilities {
         benchmark: true,
         headless_benchmark: true,

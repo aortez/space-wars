@@ -4,6 +4,15 @@ The app reads `settings.toml` from the selected config directory: the desktop
 platform config directory, `--config-dir` / `SPACEWARS_CONFIG_DIR` when supplied,
 or `/data/spacewars/config` (also mounted at `/var/lib/spacewars`) on the kiosks.
 
+## Launcher preference
+
+`[launcher] show_all = false` is the default for new and older settings. Turning
+it on adds the labs and experiments after the six main scenarios. Restoring a
+valid saved or just-played extra enables and persists the preference. It controls
+picker visibility only; explicit scenario launches and scenario settings are
+unchanged. A failed save shows a launcher warning directing users to the shared
+Retry Save action in App Settings; the warning clears once saving succeeds.
+
 ## Recovery contract
 
 - A missing file, section, or field uses its declared default. Existing values
